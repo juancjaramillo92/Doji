@@ -1,0 +1,4471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Doji — XAUUSD Emotion-Based Trading Journal">
+<meta name="theme-color" content="#070611">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
+<title>Doji</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Purple accent */
+  --p:#8b35b8;
+  --p-gl:rgba(139,53,184,.07); --p-gl2:rgba(139,53,184,.16); --p-gl3:rgba(139,53,184,.30);
+
+  /* Gold accent — signature of the glossary's causal-chain blocks */
+  --gold:#e2b14e; --gold-dim:#9d7c38; --gold-gl:rgba(226,177,78,.10);
+
+  /* Layered backgrounds — near-black, faint purple hue (kept, not neutralised) */
+  --bg:#070611; --bg3:#141022;
+  --s2:#141022; --s3:#1c1730;
+
+  /* Borders — dim purple lines */
+  --bd:#251d39; --bd2:#342948;
+
+  /* Text */
+  --tx:#e8e6f0; --mt:#6f6788; --mt2:#9a92b0;
+
+  /* Win / Loss */
+  --win:#3ba585;  --wgl:rgba(59,165,133,.09);
+  --loss:#d63d5a; --lgl:rgba(214,61,90,.09);
+
+  /* Glass surfaces — purple-tinted translucent glass */
+  --glass:#0a0813;             /* solid dark card surface — flat & sharp like the Rules page */
+  --glass-bd:#251d39;
+  --glass-top:linear-gradient(transparent, transparent);
+
+  /* Type */
+  --ui:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+
+  /* Radius scale */
+  --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-full:999px;
+
+  /* Shared bar thickness — single source of truth for every win/loss
+     distribution bar in the Trades tab (session, discipline, R:R, emotions). */
+  --bar-h:10px;
+  /* Shared segment border thickness — every chart segment (donut arcs, R:R,
+     session, discipline, emotion bars) uses this so the "margin" weight is
+     identical across all charts. */
+  --seg-bd:1.5px;
+
+  /* Spacing scale — single source of truth for section rhythm. Every
+     section gap / title gap / internal divider / bar-row gap pulls from one
+     of these so vertical spacing stays even across the whole Trades tab. */
+  --gap-section:16px;  /* space between major sections / cards */
+  --gap-title:12px;    /* space below a section title, before its content */
+  --gap-divider:14px;  /* padding below an internal divider line */
+  --gap-row:12px;      /* rhythm between stacked bar rows */
+
+  /* Elevation */
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 4px 18px -8px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04) inset;
+  --sh-3:0 16px 48px -14px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.06) inset;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════════════════════════════════════════ */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--tx);
+  font-family:var(--ui);
+  font-size:13px; display:flex; flex-direction:column;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  position:relative;
+}
+/* Atmospheric depth — single faint cool-violet glow, top-left corner */
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+}
+nav, .panels { position:relative; z-index:1; }
+button { font-family:inherit; }
+input,textarea { font-family:inherit; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════════════════════════════════════ */
+nav {
+  flex-shrink:0; display:flex; align-items:center; padding:0 24px; height:52px;
+  background:transparent;
+  z-index:50; position:relative;
+}
+.logo {
+  font-weight:800; font-size:16px; letter-spacing:3px; flex-shrink:0;
+  color:var(--p);
+}
+.nav-tabs { display:flex; position:absolute; left:50%; transform:translateX(-50%); gap:4px; }
+.nav-tab {
+  font-family:var(--mono); font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+  padding:7px 16px; height:auto; display:flex; align-items:center; border-radius:var(--r-full);
+  color:var(--mt); cursor:pointer; background:none; border:none;
+}
+.nav-tab:hover { color:var(--p); }
+.nav-tab.active {
+  color:var(--p); background:var(--p-gl2);
+  box-shadow:0 0 18px -4px var(--p-gl3);
+}
+
+.nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.nav-icon-btn {
+  font-family:var(--mono); padding:6px 10px; border:1px solid var(--bd); border-radius:var(--r-sm);
+  background:transparent; color:var(--mt2); cursor:pointer; line-height:1;
+  font-size:14px;
+}
+.nav-icon-btn:hover { border-color:var(--p); color:var(--p); background:var(--p-gl); }
+#nav-fs-btn { display:inline-flex; align-items:center; justify-content:center; }
+#nav-fs-btn .fs-ico-exit { display:none; }
+#nav-fs-btn.is-fs .fs-ico-enter { display:none; }
+#nav-fs-btn.is-fs .fs-ico-exit { display:inline; }
+.nav-add-btn {
+  font-family:var(--mono); padding:4px 11px; border:1px solid var(--p); border-radius:var(--r-sm);
+  background:var(--p-gl2); color:var(--p); cursor:pointer; line-height:1;
+  font-size:18px;
+}
+.nav-add-btn:hover { background:rgba(139,53,184,.3); box-shadow:0 0 18px -2px var(--p-gl3); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANELS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.panels { flex:1; position:relative; overflow:hidden; }
+.panel { display:none; position:absolute; inset:0; overflow-y:auto; padding:26px 30px; background:transparent; }
+.panel.active { display:block; }
+.panel::-webkit-scrollbar { width:6px; }
+.panel::-webkit-scrollbar-thumb { background:var(--p); border-radius:var(--r-full); }
+.panel::-webkit-scrollbar-track { background:transparent; }
+
+#panel-rules.active { display:flex; flex-direction:column; align-items:center; }
+#panel-rules > * { width:100%; max-width:800px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITY
+   ═══════════════════════════════════════════════════════════════════════════ */
+.hidden { display:none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.btn {
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  padding:8px 15px; border:1px solid var(--bd2); background:transparent; color:var(--mt2);
+  cursor:pointer; border-radius:var(--r-sm);
+}
+.btn:hover { border-color:var(--p); color:var(--p); }
+.btn.primary { background:var(--p); color:#fff; border-color:var(--p); font-weight:600; }
+.btn.primary:hover { background:var(--p); color:#fff; box-shadow:0 0 22px -4px var(--p-gl3); }
+.btn.sm { padding:5px 10px; font-size:8px; }
+.btn.r4 { border-radius:var(--r-sm); }
+
+.icon-btn {
+  background:none; border:none; color:var(--mt2); cursor:pointer;
+  font-size:16px; line-height:1;
+}
+.icon-btn:hover { color:var(--tx); }
+
+/* Generic chevron used in collapsible headers */
+.chevron {
+  font-family:var(--mono); font-size:10px; color:var(--mt);
+}
+.chevron.closed { transform:rotate(180deg); }
+
+/* Section header line */
+.sec-hd {
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2); margin-bottom:var(--gap-title); display:flex; align-items:center; gap:8px;
+}
+.sec-hd::after {
+  content:''; flex:0 0 28px; height:1px;
+  background:linear-gradient(90deg,var(--p),transparent);
+}
+/* Collapsible section headers carry a chevron on the right; drop the accent
+   dash so the title sits clean next to it. */
+.collapsible-hdr .sec-hd::after { content:none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRIDS & CARDS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:var(--gap-section); }
+.cbox {
+  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
+  padding:16px 18px;
+  border-radius:var(--r-md); box-shadow:var(--sh-2);
+}
+/* Cards whose body is a divided column grid (setup / emotions). The 4px here
+   plus each column's 14px lands content on the same 18px edge as plain cards,
+   so columned and non-columned sections share one left margin. */
+.cbox.cols { padding:16px 4px; }
+.cbox-l {
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2); margin-bottom:var(--gap-title);
+}
+.chart-area { position:relative; width:100%; height:120px; }
+.chart-area.sm { height:108px; }
+.chart-area canvas { position:absolute !important; top:0; left:0; width:100% !important; height:100% !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERIOD DONUTS (All Time / Week / Month)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.period-card {
+  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
+  margin-bottom:var(--gap-section); border-radius:var(--r-md); overflow:hidden;
+  box-shadow:var(--sh-2);
+}
+.period-row {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;
+  /* Vertical padding insets the column dividers; horizontal padding is small
+     (4px) because each column adds 14px of its own — together that puts the
+     first column's content at 18px, the same left edge as every other card
+     (R:R bar, heatmap, P&L), so all sections line up. */
+  padding:16px 4px;
+}
+.period-col {
+  background:transparent; padding:0 14px;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  border-left:1px solid var(--glass-bd);
+}
+.period-col:first-child { border-left:none; }
+/* ── Unified metric-label typography ─────────────────────────────────────────
+   Single source of truth for every in-section metric label (period / setup /
+   session / emotion). The RULES / STOP LOSS / TAKE PROFIT treatment: mono, 9px,
+   1px tracking, uppercase, --mt, normal weight, left-aligned. Change here and
+   every label across the journal moves together. Section headers (.sec-hd /
+   .cbox-l) are a separate, dimmer tier and intentionally excluded. */
+.period-label, .period-disc-lbl, .setup-donut-label, .sess-wr-label,
+.emo-cat-label, .emo-row-name {
+  font-family:var(--mono); font-size:9px; font-weight:400;
+  letter-spacing:1px; text-transform:uppercase; color:var(--mt);
+}
+.period-label { align-self:flex-start; }
+.period-host {
+  position:relative; display:flex; align-items:center;
+  justify-content:space-between; gap:14px;
+  padding:0 6px;
+}
+.period-donut-wrap { position:relative; width:108px; height:108px; flex-shrink:0; }
+/* Chart.js canvases carry no interaction here (tooltips/clicks disabled), so
+   keep the cursor an arrow — the wheels are read-only, not clickable. */
+.period-donut-wrap canvas { cursor:default; }
+.period-center {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; pointer-events:none;
+}
+.period-pnl { font-family:var(--mono); font-size:9px; font-weight:600; line-height:1; color:var(--mt2); }
+.period-counts-left,
+.period-counts-right {
+  display:flex; flex-direction:column; gap:4px; flex-shrink:0;
+}
+.period-counts-left  { align-items:flex-end; }
+.period-counts-right { align-items:flex-start; }
+.period-counts-left span,
+.period-counts-right span {
+  font-family:var(--mono); font-size:9px; font-weight:600;
+  line-height:1.1; letter-spacing:.5px; white-space:nowrap;
+}
+.period-counts-left  .pc-w { color:var(--win); }
+.period-counts-right .pc-l { color:var(--loss); }
+.period-counts-right .pc-b { color:var(--mt2); }
+
+/* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
+   each win/loss wheel and reuse the session-bar segment styling for a
+   consistent green-followed / red-missed read. */
+.period-disc {
+  width:100%; display:flex; flex-direction:column; gap:var(--gap-row);
+  margin-top:8px; padding-top:var(--gap-divider); border-top:1px solid var(--glass-bd);
+}
+.period-disc-row  { display:flex; flex-direction:column; gap:5px; }
+.period-disc-head { display:flex; justify-content:space-between; align-items:baseline; }
+.period-disc-pct { font-family:var(--mono); font-size:10px; font-weight:500; }
+.period-disc-pct.win  { color:var(--win); }
+.period-disc-pct.loss { color:var(--loss); }
+.period-disc-pct.dim  { color:var(--mt2); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALENDAR WIDGET (shared by the journal-modal date picker and the heatmap)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cal-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
+}
+.cal-nav-btn {
+  background:none; border:none; color:var(--mt2); cursor:pointer;
+  font-size:14px; padding:0 6px; line-height:1;
+}
+.cal-title {
+  font-family:var(--mono); font-size:9px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--tx);
+}
+.cal-dows {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  margin-bottom:4px;
+}
+.cal-dow {
+  font-family:var(--mono); font-size:7px; color:var(--mt);
+  text-align:center;
+}
+.cal-grid {
+  display:grid; grid-template-columns:repeat(7,1fr); gap:2px;
+}
+.cal-day {
+  font-family:var(--mono); font-size:9px; padding:4px 2px;
+  text-align:center; cursor:pointer; border-radius:4px;
+  color:var(--tx); user-select:none; position:relative;
+}
+.cal-day.empty { cursor:default; }
+.cal-day.muted { color:var(--mt2); }
+.cal-day:hover:not(.empty):not(.sel) { background:rgba(139,53,184,.2); }
+.cal-day.today { color:var(--p); }
+.cal-day.sel { background:var(--p); color:#fff; }
+.cal-day.sel-single { border-radius:50%; }
+
+.empty-msg { padding:20px 14px; font-size:12px; color:var(--mt2); }
+
+.collapsible-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; margin-bottom:7px; white-space:nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   P&L / DRAWDOWN CARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pnl-card { padding:22px 26px; position:relative; overflow:hidden; }
+.pnl-card-inner { display:flex; gap:0; height:100%; align-items:stretch; position:relative; z-index:1; }
+.pnl-net   { flex:1; position:relative; display:flex; flex-direction:column; justify-content:space-between; padding-right:24px; border-right:1px solid var(--bd); }
+.pnl-net > * { position:relative; z-index:1; }
+.pnl-dd    { flex:1; display:flex; flex-direction:column; justify-content:space-between; padding-left:24px; }
+
+.pnl-net-number {
+  font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
+}
+.pnl-net-count {
+  font-family:var(--mono); font-size:8px; color:var(--mt);
+  margin-left:8px; letter-spacing:.5px;
+}
+/* Week / month P&L lines under the global net figure — same mono voice as the
+   sub-line, values coloured by sign like every other money figure. */
+.pnl-periods { margin-top:10px; display:flex; flex-direction:column; gap:5px; }
+.pnl-period-row {
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+}
+.pnl-period-lbl {
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--mt);
+}
+.pnl-period-val { font-family:var(--mono); font-size:11px; font-weight:600; }
+
+.dd-hdr { display:flex; align-items:center; justify-content:space-between; }
+.dd-edit-btn {
+  font-family:var(--mono); font-size:6px; letter-spacing:1px; text-transform:uppercase;
+  background:none; border:1px solid var(--bd); color:var(--mt);
+  padding:1px 5px; cursor:pointer;
+}
+.dd-edit-btn:hover { border-color:var(--p); color:var(--p); }
+.dd-today { font-family:var(--mono); font-size:8px; color:var(--mt2); }
+.dd-input {
+  background:transparent; border:none; border-bottom:1px solid var(--p);
+  color:#fff; font-family:var(--mono); font-size:16px; font-weight:400;
+  width:110px; outline:none; padding:2px 0;
+}
+.dd-edit-actions { display:flex; gap:6px; margin-top:8px; }
+.dd-empty {
+  font-family:var(--mono); font-size:10px; color:var(--mt2);
+}
+.dd-bar-wrap {
+  width:100%; height:28px; background:var(--s3); border-radius:5px;
+  overflow:hidden; position:relative;
+}
+.dd-bar-fill {
+  height:100%; width:0%; border-radius:5px;
+  background:rgba(214,61,90,.12); border:var(--seg-bd) solid var(--loss); box-sizing:border-box;
+}
+.dd-bar-pct {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:9px; color:rgba(255,255,255,.4); pointer-events:none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R:R BAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+.rr-bar-wrap {
+  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
+  padding:16px 18px; margin-bottom:var(--gap-section);
+  border-radius:var(--r-md); box-shadow:var(--sh-2);
+}
+.rr-bar-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2); margin-bottom:var(--gap-title);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.rr-bar-segments { display:flex; gap:3px; width:100%; margin:10px 0; }
+.rr-bar-segment-row {
+  width:100%; height:var(--bar-h); border-radius:3px;
+  overflow:hidden; display:flex; gap:1px;
+}
+.rr-bar-seg-win {
+  background:rgba(59,165,133,.12); border:var(--seg-bd) solid var(--win);
+  border-radius:3px 0 0 3px; box-sizing:border-box;
+}
+.rr-bar-seg-loss {
+  background:rgba(214,61,90,.12); border:var(--seg-bd) solid var(--loss);
+  border-radius:0 3px 3px 0; box-sizing:border-box;
+}
+/* Shared empty-bar placeholder — the single faint outlined track that EVERY
+   bar (R:R, session, discipline, per-emotion) shows when no trades are logged,
+   so the empty Trades tab is uniform. Same gray fill + border weight as a
+   break-even segment, dimmed to .4. */
+.bar-empty {
+  width:100%; height:var(--bar-h); border-radius:3px; box-sizing:border-box;
+  background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5);
+  opacity:.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   P&L CALENDAR HEATMAP
+   ═══════════════════════════════════════════════════════════════════════════ */
+.heatmap-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
+}
+.heatmap-nav-btn {
+  background:var(--s2); border:1px solid var(--bd); color:var(--mt2);
+  padding:6px 12px; cursor:pointer; border-radius:var(--r-sm); font-size:14px;
+}
+.heatmap-nav-btn:hover { border-color:var(--p); background:var(--p-gl); }
+.heatmap-title {
+  font-family:var(--mono); font-size:11px; letter-spacing:1px; text-transform:uppercase;
+  color:var(--mt2); font-weight:500;
+}
+.heatmap-grid {
+  display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
+}
+.heatmap-dow {
+  font-family:var(--mono); font-size:8px; color:var(--mt);
+  padding:6px 0; text-align:center; letter-spacing:1px; text-transform:uppercase;
+}
+.heatmap-cell-empty { min-height:80px; }
+.heatmap-cell {
+  background:var(--glass-top), rgba(8,8,10,.55);
+  border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  box-shadow:var(--sh-2);
+  min-height:80px; padding:6px; position:relative;
+  display:flex; flex-direction:column; justify-content:center;
+}
+.heatmap-cell.win  {
+  background:var(--glass-top), linear-gradient(180deg, rgba(59,165,133,.22), rgba(59,165,133,.06));
+  border-color:rgba(59,165,133,.30);
+}
+.heatmap-cell.loss {
+  background:var(--glass-top), linear-gradient(180deg, rgba(214,61,90,.22), rgba(214,61,90,.06));
+  border-color:rgba(214,61,90,.28);
+}
+.heatmap-cell.be {
+  background:var(--glass-top), linear-gradient(180deg, rgba(144,144,160,.20), rgba(144,144,160,.05));
+  border-color:rgba(144,144,160,.32);
+}
+.heatmap-cell.win:hover  { border-color:rgba(59,165,133,.6); }
+.heatmap-cell.loss:hover { border-color:rgba(214,61,90,.6); }
+.heatmap-cell.be:hover   { border-color:rgba(144,144,160,.6); }
+/* Only days that hold a trade are clickable (they open that day's entry). */
+.heatmap-cell.win, .heatmap-cell.loss, .heatmap-cell.be { cursor:pointer; }
+.heatmap-cell-day {
+  position:absolute; top:6px; left:8px;
+  font-family:var(--mono); font-size:10px; color:var(--mt); font-weight:500;
+}
+.heatmap-cell-body {
+  text-align:center; flex:1; width:100%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+/* Default view: colour (win/loss/be) + trade count only — the $ amount is
+   hidden unless the P&L section is open (P&L view) so day-to-day money
+   stays out of the default line of sight. */
+.heatmap-cell-pnl {
+  font-family:var(--mono); font-size:11px; font-weight:600; margin-bottom:3px;
+  color:var(--mt2); text-transform:uppercase;
+  display:none;                 /* revealed by body.pnl-open (P&L view) */
+}
+.heatmap-cell.win  .heatmap-cell-pnl { color:var(--win); }
+.heatmap-cell.loss .heatmap-cell-pnl { color:var(--loss); }
+.heatmap-cell.be   .heatmap-cell-pnl { color:rgba(170,170,185,1); }
+.heatmap-cell-count {
+  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
+  color:var(--mt2); text-transform:uppercase;
+}
+.heatmap-cell.win  .heatmap-cell-count { color:var(--win); }
+.heatmap-cell.loss .heatmap-cell-count { color:var(--loss); }
+.heatmap-cell.be   .heatmap-cell-count { color:rgba(170,170,185,1); }
+/* P&L view (P&L section open → body.pnl-open): every trade-bearing cell shows
+   its day total and the trade count shrinks to a caption. No hover involved —
+   the reveal is a mode, so it works identically on touch. */
+body.pnl-open .heatmap-cell-pnl   { display:block; }
+body.pnl-open .heatmap-cell-count { font-size:7px; font-weight:400; color:var(--mt); }
+/* Month P&L under the heatmap title — only present in P&L view. */
+.heatmap-month-pnl {
+  display:none; text-align:center; margin:-6px 0 12px;
+  font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.5px;
+}
+body.pnl-open .heatmap-month-pnl { display:block; }
+.heatmap-month-pnl.win  { color:var(--win); }
+.heatmap-month-pnl.loss { color:var(--loss); }
+.heatmap-month-pnl.be   { color:var(--mt2); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRADE LOG
+   ═══════════════════════════════════════════════════════════════════════════ */
+.tlog-wrap {
+  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd); margin-bottom:var(--gap-section);
+  border-radius:var(--r-md); box-shadow:var(--sh-2); overflow:hidden;
+}
+.tlog-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 18px; white-space:nowrap;
+}
+/* Pagination only renders when there's more than one page. On a single page
+   the bar is empty, so collapse it — otherwise it leaves a hollow gap above
+   the column titles that doesn't match the other sections' top spacing. */
+.tlog-hdr:has(.tlog-pagination:empty) { display:none; }
+.tlog-pagination {
+  display:flex; align-items:center; gap:6px;
+}
+.tlog-pag-info {
+  font-family:var(--mono); font-size:8px; color:var(--mt);
+}
+.tlog-pag-btn {
+  font-family:var(--mono); font-size:8px;
+  padding:3px 10px; border:1px solid var(--bd);
+  background:transparent; color:var(--mt2); cursor:pointer;
+}
+.tlog-pag-btn:disabled { opacity:.4; cursor:default; }
+/* Pad the table area so the header underline and row separators stop 18px from
+   the card edge — matching the inset lines in every other section instead of
+   running to the margin. First/last cell padding is zeroed below so the text
+   still lands on the shared 18px content edge. */
+.tw { overflow-x:auto; padding:0 18px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+table { width:100%; border-collapse:collapse; }
+thead th {
+  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
+  color:var(--mt); padding:16px 12px 10px; text-align:left;
+  border-bottom:1px solid var(--glass-bd); background:transparent; white-space:nowrap;
+}
+th:first-child, td:first-child { padding-left:0; }
+th:last-child,  td:last-child  { padding-right:0; }
+thead th.r { text-align:right; }
+thead th.c { text-align:center; }
+tbody tr {
+  border-bottom:1px solid rgba(139,53,184,.04);
+ cursor:pointer;
+}
+tbody tr:hover { background:rgba(255,255,255,.03); }
+td {
+  padding:9px 12px; font-family:var(--mono); font-size:10px;
+  color:var(--mt2); white-space:nowrap; text-transform:uppercase;
+}
+td.win { color:var(--win); }
+td.loss{ color:var(--loss); }
+td.r   { text-align:right; }
+td.c   { text-align:center; }
+
+.dir-pill {
+  display:inline-block; font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  padding:3px 9px; text-transform:uppercase; font-weight:600; border-radius:var(--r-full);
+  color:var(--mt2); background:rgba(255,255,255,.04); border:1px solid var(--glass-bd);
+}
+.del-btn {
+  background:none; border:none; color:var(--loss); cursor:pointer;
+  font-size:12px; padding:2px 5px; opacity:.4;
+}
+.del-btn:hover { opacity:1; }
+.lesson-cell {
+  font-size:9px; color:var(--mt2);
+}
+.lesson-cell.empty {
+  color:var(--mt); font-style:italic;
+}
+/* Final Lesson column: take all remaining width, truncate only at the edge */
+.lesson-col {
+  width:100%; max-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.rules-tick { color:var(--win); }
+.rules-cross { color:var(--loss); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SETUP DONUTS (per-setup win rate)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.setup-donut-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:0;
+}
+.setup-donut-col {
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:0 14px;
+}
+.setup-donut-col + .setup-donut-col { border-left:1px solid var(--glass-bd); }
+/* Per-setup session bars sit beneath the wheel, divided like the period
+   columns; reuse the session win-rate bar styling for consistency. */
+.setup-sess {
+  width:100%; margin-top:8px; padding-top:var(--gap-divider);
+  border-top:1px solid var(--glass-bd);
+}
+.setup-donut-label { align-self:flex-start; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SESSION WIN-RATE BARS (win/loss split, green/red)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sess-wr-list { display:flex; flex-direction:column; gap:14px; padding:6px 2px 2px; }
+.sess-wr-row  { display:grid; grid-template-columns:46px 1fr 38px; align-items:center; gap:10px; }
+.sess-wr-label { text-align:left; }
+.sess-wr-track {
+  height:var(--bar-h); border-radius:3px; overflow:hidden;
+  display:flex; gap:1px;
+}
+.sess-wr-seg-win {
+  background:rgba(59,165,133,.12); border:var(--seg-bd) solid var(--win);
+  box-sizing:border-box;
+}
+.sess-wr-seg-loss {
+  background:rgba(214,61,90,.12); border:var(--seg-bd) solid var(--loss);
+  box-sizing:border-box;
+}
+.sess-wr-seg-be {
+  background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5);
+  box-sizing:border-box;
+}
+.sess-wr-track.first .sess-wr-seg-win  { border-radius:3px 0 0 3px; }
+.sess-wr-track .sess-wr-seg-last       { border-radius:0 3px 3px 0; }
+.sess-wr-track.solo > *                { border-radius:3px; }
+.sess-wr-pct {
+  font-family:var(--mono); font-size:10px; font-weight:500; text-align:left;
+}
+.sess-wr-pct.win  { color:var(--win); }
+.sess-wr-pct.loss { color:var(--loss); }
+.sess-wr-pct.dim  { color:var(--mt2); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RULES TAB
+   ═══════════════════════════════════════════════════════════════════════════ */
+.rule-banner { text-align:center; padding:14px 32px; margin-bottom:40px; }
+.rule-banner-text {
+  font-size:12px; color:var(--mt2); letter-spacing:2px; text-transform:uppercase;
+}
+.steps-card {
+  margin-bottom:10px; max-width:720px; margin-left:auto; margin-right:auto;
+  position:relative; padding:8px 0;
+}
+.steps-card::before {
+  content:''; position:absolute; left:50%; top:0; bottom:0; width:1px;
+  background:linear-gradient(to bottom, transparent, var(--mt2) 10%, var(--mt2) 90%, transparent);
+  transform:translateX(-50%);
+}
+.step-row {
+  display:grid; grid-template-columns:1fr 40px 1fr;
+  align-items:center; margin-bottom:32px;
+}
+.step-row:last-child { margin-bottom:0; }
+.step-dot {
+  width:10px; height:10px; border-radius:50%; background:var(--mt2);
+  box-shadow:0 0 0 3px rgba(154,146,176,.15);
+  margin:0 auto; position:relative; z-index:1;
+}
+.step-row.left .step-content { text-align:right; padding-right:28px; grid-column:1; }
+.step-row.left .step-dot     { grid-column:2; }
+.step-row.left .step-empty   { grid-column:3; }
+.step-row.right .step-empty   { grid-column:1; }
+.step-row.right .step-dot     { grid-column:2; }
+.step-row.right .step-content { text-align:left; padding-left:28px; grid-column:3; }
+.step-title { font-size:13px; font-weight:600; color:var(--mt2); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.step-desc  { font-size:10px; color:var(--mt2); line-height:1.7; text-transform:uppercase; letter-spacing:.5px; }
+
+.quote-bare { text-align:center; padding:24px 32px 16px; margin-top:40px; }
+.quote-body {
+  font-size:13px; font-weight:300; color:var(--mt2); line-height:1.9;
+  font-style:italic; display:inline-block; max-width:680px; text-transform:uppercase;
+}
+.quote-body b { font-weight:600; font-style:normal; color:var(--p); }
+.quote-attr {
+  font-family:var(--mono); font-size:9px; color:var(--mt); text-transform:uppercase;
+  margin-top:10px; letter-spacing:1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EMOTION BARS (per-emotion win/loss by outcome)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.emo-row { display:flex; flex-direction:column; gap:5px; margin-bottom:var(--gap-row); }
+.emo-row:last-child { margin-bottom:0; }
+.emo-row-head { display:flex; justify-content:space-between; align-items:baseline; }
+/* .emo-row-name typography comes from the shared metric-label rule */
+.emo-row-pcts { font-family:var(--mono); font-size:10px; font-weight:500; }
+.emo-row-pcts .win  { color:var(--win); }
+.emo-row-pcts .loss { color:var(--loss); }
+.emo-row-pcts .sep  { color:var(--mt); }
+/* Phase qualifier (before/during) in phase-split row labels. */
+.emo-row-track {
+  height:var(--bar-h); border-radius:3px;
+  overflow:hidden;
+}
+.emo-row-bar { display:flex; gap:1px; height:100%; }
+.emo-row-bar > div { box-sizing:border-box; }
+.emo-row-bar .seg-win  { background:rgba(59,165,133,.12); border:var(--seg-bd) solid var(--win); }
+.emo-row-bar .seg-be   { background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5); }
+.emo-row-bar .seg-loss { background:rgba(214,61,90,.12);  border:var(--seg-bd) solid var(--loss); }
+/* Untraded emotion: muted label + the shared .bar-empty placeholder, so an
+   empty per-emotion row matches every other empty bar in the tab. */
+.emo-row.is-empty .emo-row-name,
+.emo-row.is-empty .emo-row-pcts.no-data { color:var(--mt); font-family:var(--mono); }
+
+/* Emotion category wheels (Positive / Fear / Reactive) — a row of result
+   wheels above the per-emotion bars, divided like the period/setup columns.
+   Wheels themselves are built by mountResultDonut for cross-journal cohesion. */
+.emo-cat-row {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;
+}
+.emo-cat-col {
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:0 14px;
+}
+.emo-cat-col + .emo-cat-col { border-left:1px solid var(--glass-bd); }
+.emo-cat-label {
+  display:flex; align-items:center; gap:6px; align-self:flex-start;
+}
+/* Per-emotion bars stacked under each category wheel, in the same column.
+   Reuses the .emo-row primitive (same --bar-h thickness + seg colors). */
+.emo-cat-bars {
+  width:100%; margin-top:8px; padding-top:var(--gap-divider);
+  border-top:1px solid rgba(255,255,255,.07);
+}
+.emo-cat-bars:empty { display:none; }
+/* disciplineBar rows (Positive column's SL/TP) space themselves via parent
+   flex-gap in their native homes; here spacing comes from row margins, so
+   give them the same --gap-row rhythm the .emo-row rows use. */
+.emo-cat-bars .period-disc-row { margin-bottom:var(--gap-row); }
+.emo-cat-bars .period-disc-row:last-child { margin-bottom:0; }
+/* "During the Trade" discipline card — one column per management emotion
+   (Panic / Anxious / Greed / Impatient), each holding two compliance bars
+   (Stop Loss, Take Profit) built by the shared disciplineBar primitive.
+   Lives in its own cbox directly under the emotions-by-outcome card. */
+.emo-during:empty { display:none; }
+.emo-during-grid {
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:0;
+}
+.emo-during-col {
+  display:flex; flex-direction:column; gap:var(--gap-row);
+  padding:0 14px;
+}
+.emo-during-col > .emo-cat-label { margin-bottom:2px; }
+.emo-during-col + .emo-during-col { border-left:1px solid var(--glass-bd); }
+/* Quiet trade-count next to each during-emotion label — one tier dimmer than
+   the label itself, same mono type inherited from the parent. */
+.emo-during-n { color:var(--mt2); font-weight:400; margin-left:6px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JOURNAL MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+.journal-modal {
+  display:none; position:fixed; inset:0;
+  background:rgba(4,3,9,.82);
+  z-index:400; overflow-y:auto; padding:24px 20px;
+}
+.journal-modal.open { display:flex; }
+.journal-modal-card {
+  width:fit-content; max-width:100%; margin:auto;
+  position:relative;
+  display:flex; flex-direction:column; gap:12px;
+}
+.jm-hdr {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  border:1px solid var(--bd); border-radius:var(--r-md);
+  background-color:var(--bg);
+  background-image:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+  background-attachment:fixed; background-repeat:no-repeat;
+  padding:15px 18px;
+}
+.jm-hdr-left   { flex:1; display:flex; align-items:center; }
+.jm-hdr-center { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.jm-hdr-right  {
+  flex:1; display:flex; align-items:center; justify-content:flex-end;
+  position:relative;
+}
+.jm-pnl-input {
+  font-family:var(--mono); font-size:9px; letter-spacing:.5px;
+  padding:6px 12px; border:1px solid var(--glass-bd);
+  color:var(--tx); border-radius:var(--r-full); background:rgba(255,255,255,.04);
+  width:76px; text-align:center; outline:none;
+  -moz-appearance:textfield;
+}
+.jm-pnl-input::-webkit-outer-spin-button,
+.jm-pnl-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.jm-pnl-input:focus { border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3); }
+
+.jm-session-wrap { position:relative; }
+.jm-session-opts {
+  position:absolute; top:calc(100% + 8px); left:0; z-index:60;
+  min-width:166px;
+  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  box-shadow:var(--sh-3);
+  padding:5px; display:none; flex-direction:column; gap:2px;
+}
+.jm-session-opts.open { display:flex; }
+.jm-session-opt {
+  font-family:var(--mono); font-size:10px; letter-spacing:.6px; text-transform:uppercase;
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  width:100%; text-align:left; cursor:pointer;
+  padding:8px 11px; border:none; border-radius:var(--r-sm);
+  background:transparent; color:var(--mt2);
+}
+.jm-session-opt:hover { background:var(--p-gl2); color:#f0eeff; }
+.jm-session-opt .opt-check { font-size:9px; color:var(--p); }
+.jm-session-opt.sel { color:var(--p); background:var(--p-gl); }
+.jm-session-opt.sel:hover { background:var(--p-gl2); }
+
+.jm-cal-wrap {
+  display:none; position:absolute; top:calc(100% + 8px); right:0;
+  background:var(--glass-top), var(--glass);
+  border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  z-index:200; padding:12px; min-width:220px; box-shadow:var(--sh-3);
+}
+.jm-cal-wrap.open { display:block; }
+
+.jm-body { padding:0; }
+
+/* Sectioned form cards — bordered, floating boxes (no outer card, no titles
+   except the lesson) so each thing recorded reads as its own panel. */
+.jm-card {
+  width:100%; border:1px solid var(--bd); border-radius:var(--r-md);
+  background-color:var(--bg);
+  background-image:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+  background-attachment:fixed; background-repeat:no-repeat;
+  padding:15px 18px;
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+}
+.jm-card + .jm-card { margin-top:12px; }
+.jm-card-label {
+  align-self:center; text-align:center;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JOURNAL FORM
+   ═══════════════════════════════════════════════════════════════════════════ */
+.journal-form { display:flex; flex-direction:column; align-items:center; width:100%; }
+
+.jf-yn-row {
+  display:flex; gap:40px; justify-content:center; flex-wrap:wrap;
+}
+.jf-yn-item {
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.jf-yn-buttons { display:flex; gap:6px; }
+
+.jf-setup-row {
+  display:flex; justify-content:center; gap:14px;
+}
+
+.journal-q-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2); margin-bottom:12px; display:block;
+}
+.journal-q-textarea {
+  width:100%; background:transparent; border:none;
+  border-radius:0;
+  color:#fff; font-size:13px; font-weight:300;
+  padding:8px 0; outline:none; line-height:1.9; resize:none; min-height:64px;
+  text-align:center;
+}
+.journal-q-textarea::placeholder { color:rgba(255,255,255,.2); text-transform:uppercase; font-size:8px; letter-spacing:1px; }
+
+.jf-pill-radio { display:none; }
+.jf-pill-lbl {
+  font-family:var(--mono); font-size:9px; letter-spacing:.3px; text-transform:uppercase;
+  padding:6px 12px; border:1px solid var(--glass-bd);
+  color:rgba(255,255,255,.75); cursor:pointer;
+  border-radius:var(--r-full); background:rgba(255,255,255,.04); white-space:nowrap;
+}
+.jf-emo-pill { width:90px; text-align:center; display:inline-block; }
+.jf-yn-pill  { width:56px; text-align:center; display:inline-block; }
+.jf-pill-lbl:hover { border-color:rgba(255,255,255,.3); color:#fff; background:rgba(255,255,255,.07); }
+.jf-pill-radio:checked + .jf-pill-lbl {
+  border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3);
+}
+
+/* Emotion chip layout — 3 columns separated by vertical dividers */
+.jf-emo-cols {
+  display:flex; align-items:center; justify-content:center; width:100%;
+}
+.jf-emo-col {
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.jf-emo-row { display:flex; gap:6px; }
+.jf-emo-divider {
+  width:1px; background:rgba(255,255,255,.1); align-self:stretch;
+  margin:0 14px; flex-shrink:0;
+}
+
+.journal-form-actions {
+  display:flex; gap:10px; margin-top:22px; padding-bottom:8px;
+  justify-content:center;
+}
+.jm-btn-save {
+  background:var(--p); border:1px solid var(--p); color:#fff;
+  cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
+  text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
+  width:110px;
+}
+.jm-btn-save:hover { background:var(--p); border-color:var(--p); box-shadow:0 0 22px -4px var(--p-gl3); }
+.jm-btn-cancel {
+  background:rgba(255,255,255,.04); border:1px solid var(--bd2); color:var(--mt2);
+  cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
+  text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
+ width:110px;
+}
+.jm-btn-cancel:hover { background:rgba(255,255,255,.08); border-color:var(--bd2); color:var(--tx); }
+.jm-btn-delete {
+  background:none; border:1px solid rgba(255,255,255,.15); color:var(--mt);
+  cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
+  text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
+ width:110px;
+}
+.jm-btn-delete:hover { border-color:var(--loss); color:var(--loss); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   I/O MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+.io-modal {
+  display:none; position:fixed; inset:0;
+  background:rgba(4,3,9,.82);
+  z-index:500; align-items:center; justify-content:center; padding:20px;
+}
+.io-modal.open { display:flex; }
+.io-modal-card {
+  background:var(--bg);
+  border:1px solid var(--glass-bd);
+  width:100%; max-width:500px;
+  border-radius:var(--r-lg); box-shadow:var(--sh-3); overflow:hidden;
+}
+.io-modal-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; border-bottom:1px solid var(--bd);
+}
+.io-modal-title {
+  font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--mt2);
+}
+.io-modal-body {
+  padding:20px; display:flex; flex-direction:column; gap:14px;
+  max-height:80vh; overflow-y:auto;
+}
+.io-section {
+  border:1px solid var(--bd); padding:16px; border-radius:var(--r-md);
+  background:rgba(255,255,255,.02);
+}
+.io-section-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2); margin-bottom:6px;
+}
+.io-section-desc {
+  font-size:11px; color:var(--mt2); line-height:1.7; margin-bottom:12px;
+}
+.io-section-desc b { color:var(--tx); }
+.io-section-required {
+  font-size:10px; color:var(--mt); margin-bottom:12px; line-height:1.6;
+}
+.io-section-required .req { color:var(--p); }
+.io-section-actions {
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+}
+.io-import-status {
+  font-family:var(--mono); font-size:8px; color:var(--mt2);
+  margin-top:10px; min-height:14px;
+}
+.io-import-status.win  { color:var(--win); }
+.io-import-status.loss { color:var(--loss); }
+
+.export-ready-link {
+  margin-top:10px; padding:10px 12px;
+  background:rgba(59,165,133,.08); border:1px solid rgba(59,165,133,.25);
+  display:flex; align-items:center; justify-content:space-between;
+  border-radius:var(--r-sm);
+}
+.export-ready-link span {
+  font-family:var(--mono); font-size:8px; color:var(--win);
+}
+.export-ready-link a {
+  font-family:var(--mono); font-size:8px; letter-spacing:1px; text-transform:uppercase;
+  background:var(--win); color:var(--bg);
+  padding:6px 15px; text-decoration:none; font-weight:700; border-radius:var(--r-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAY PICKER POPUP  (calendar day with 2+ trades — reuses .io-modal shell)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.day-modal-card { max-width:420px; }
+.day-modal-title .win  { color:var(--win); }
+.day-modal-title .loss { color:var(--loss); }
+.day-trade-list { display:flex; flex-direction:column; gap:8px; }
+.day-trade-row {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:11px 13px; border:1px solid var(--bd); border-radius:var(--r-md);
+  background:rgba(255,255,255,.02); cursor:pointer;
+}
+.day-trade-row:hover { border-color:var(--p); background:var(--p-gl); }
+.day-trade-left { display:flex; align-items:center; gap:10px; min-width:0; }
+.day-trade-meta { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.day-trade-setup {
+  font-size:12px; color:var(--tx);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.day-trade-sub {
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--mt2);
+}
+.day-trade-pnl { font-family:var(--mono); font-size:13px; font-weight:600; flex-shrink:0; }
+.day-trade-pnl.win  { color:var(--win); }
+.day-trade-pnl.loss { color:var(--loss); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOAST
+   ═══════════════════════════════════════════════════════════════════════════ */
+.notif {
+  position:fixed; bottom:22px; right:22px;
+  background:var(--bg);
+  border:1px solid var(--p); color:var(--p);
+  font-family:var(--mono); font-size:10px; padding:11px 18px;
+  border-radius:var(--r-full); box-shadow:var(--sh-3);
+  z-index:600; opacity:0;
+  pointer-events:none;
+}
+.notif.show { opacity:1; pointer-events:auto; }
+.notif.err { border-color:var(--loss); color:var(--loss); }
+/* Inline Undo button carried by the delete toast (see notifyUndo). */
+.notif-undo {
+  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
+  margin-left:12px; padding:3px 11px; cursor:pointer;
+  background:transparent; color:var(--p); border:1px solid var(--p);
+  border-radius:var(--r-full);
+}
+.notif-undo:hover { background:var(--p-gl2); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOGIN OVERLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+.login-overlay {
+  display:none; position:fixed; inset:0; z-index:500;
+  background:var(--bg);
+  align-items:center; justify-content:center; padding:24px;
+}
+.login-overlay::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+}
+.login-overlay.open { display:flex; }
+.login-card {
+  position:relative; width:100%; max-width:320px;
+  display:flex; flex-direction:column; gap:12px;
+  background:var(--glass-top), var(--glass);
+  border:1px solid var(--glass-bd); border-radius:var(--r-lg);
+  box-shadow:var(--sh-3);
+  padding:32px 28px 28px;
+}
+.login-brand { display:flex; align-items:center; justify-content:center; gap:10px; }
+.login-mark {
+  width:34px; height:34px; border-radius:var(--r-sm);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--p-gl2); border:1px solid var(--p);
+  color:var(--p); font-weight:800; font-size:18px;
+}
+.login-word { font-weight:800; font-size:18px; letter-spacing:3px; color:var(--p); }
+.login-sub {
+  text-align:center; margin-bottom:10px;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--mt);
+}
+.login-input {
+  font-family:var(--mono); font-size:11px; letter-spacing:.5px;
+  padding:11px 14px; border:1px solid var(--glass-bd);
+  color:var(--tx); border-radius:var(--r-sm); background:rgba(255,255,255,.04);
+  width:100%; outline:none;
+}
+.login-input:focus { border-color:var(--p); background:var(--p-gl); box-shadow:0 0 16px -4px var(--p-gl3); }
+.login-btn { width:100%; padding:11px 0; margin-top:4px; border-radius:var(--r-sm); }
+.login-btn[disabled] { opacity:.5; cursor:default; }
+.login-err {
+  min-height:14px; text-align:center;
+  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--loss);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BROKER SYNC — pending-entry states
+   A synced trade that still lacks its rules/emotions data is flagged in
+   purple wherever it appears (banner, heatmap cell, trade-log row). Once the
+   entry is completed the flag clears and everything reverts to the journal's
+   normal colours.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.broker-banner {
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:var(--gap-section); padding:12px 16px; cursor:pointer;
+  background:var(--p-gl2); border:1px solid var(--p); border-radius:var(--r-md);
+  color:#f0eeff; font-size:12px;
+  animation:brokerPulse 2.4s ease-in-out infinite;
+}
+.broker-banner b { color:var(--p); font-family:var(--mono); font-size:11px; letter-spacing:.5px; }
+.broker-banner .broker-banner-cta {
+  margin-left:auto; font-family:var(--mono); font-size:9px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--p); white-space:nowrap;
+}
+@keyframes brokerPulse {
+  0%, 100% { box-shadow:0 0 0 0 rgba(139,53,184,0); }
+  50%      { box-shadow:0 0 18px -2px var(--p-gl3); }
+}
+.heatmap-cell.pending {
+  border-color:var(--p);
+  animation:brokerPulse 2.4s ease-in-out infinite;
+}
+tr.broker-pending td { background:var(--p-gl); }
+tr.broker-pending td:first-child { border-left:2px solid var(--p); }
+@media (prefers-reduced-motion:reduce) {
+  .broker-banner, .heatmap-cell.pending { animation:none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE LAYER (≤640px)
+   One breakpoint. Multi-column analytic rows (period wheels, setup wheels,
+   emotion category wheels, during-trade discipline) become horizontal
+   swipe carousels: native CSS scroll-snap, one column per swipe, whichever
+   slide you leave in view stays in view (position persisted across
+   re-renders by the Carousel module). Companion pairs (.grid-2) stack
+   vertically — they're two halves of one card, not siblings to flick through.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* Swipe-position dots — hidden on desktop where all columns are visible. */
+.snap-dots { display:none; }
+@media (max-width:640px) {
+  .panel { padding:18px 14px; }
+  nav { padding:0 16px; }
+
+  /* Companion boxes stack */
+  .grid-2 { grid-template-columns:1fr; }
+
+  /* ── Carousels ── */
+  .period-row, .setup-donut-row, .emo-cat-row, .emo-during-grid {
+    display:grid; grid-auto-flow:column; grid-auto-columns:100%;
+    grid-template-columns:none;
+    overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .period-row::-webkit-scrollbar, .setup-donut-row::-webkit-scrollbar,
+  .emo-cat-row::-webkit-scrollbar, .emo-during-grid::-webkit-scrollbar { display:none; }
+  .period-col, .setup-donut-col, .emo-cat-col, .emo-during-col {
+    scroll-snap-align:center; scroll-snap-stop:always;
+    min-width:0;
+  }
+  /* Column dividers read as card edges mid-swipe — drop them on mobile. */
+  .period-col, .setup-donut-col + .setup-donut-col,
+  .emo-cat-col + .emo-cat-col, .emo-during-col + .emo-during-col { border-left:none; }
+
+  /* One spacing rule for every carousel: 16px clearance above the dots and
+     16px to the card's bottom edge. In .cbox cards that's the dots' own
+     16px top padding + the card's 16px bottom padding; .period-card has no
+     padding of its own, but its row already ends with 16px bottom padding,
+     so the dots there contribute 0 on top and 16px below. Identical visual
+     rhythm in both. */
+  .snap-dots {
+    display:flex; justify-content:center; gap:6px;
+    padding:16px 0 0;
+  }
+  .period-card .snap-dots { padding:0 0 16px; }
+  .snap-dot {
+    width:6px; height:6px; border-radius:50%;
+    background:var(--bd2); border:none; padding:0; cursor:pointer;
+    transition:background .2s;
+  }
+  .snap-dot.on { background:var(--p); }
+
+  /* Heatmap: tighter cells so a full month fits a phone width. */
+  .heatmap-cell, .heatmap-cell-empty { min-height:58px; }
+  .heatmap-cell { padding:4px; border-radius:var(--r-sm); }
+
+  /* Trade log: phone shows the identity columns only — Date, Dir, Session,
+     Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
+     itself (tap the row); no sideways scrolling. */
+  .tlog-wrap th:nth-child(n+6), .tlog-wrap td:nth-child(n+6) { display:none; }
+
+  /* Journal modal: full-bleed card. */
+  .journal-modal { padding:12px 10px; }
+  .journal-modal-card { width:100%; }
+  .jm-hdr { flex-wrap:wrap; row-gap:10px; padding:12px 14px; }
+  .jm-hdr-left, .jm-hdr-right { flex:0 0 auto; }
+  .jm-hdr-center { flex:1 1 100%; justify-content:center; order:3; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">DOJI</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="rules">Rules</button>
+    <button class="nav-tab"        data-tab="trades">Trades</button>
+  </div>
+  <div class="nav-actions">
+    <button id="nav-fs-btn" class="nav-icon-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+      <svg class="fs-ico fs-ico-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+      <svg class="fs-ico fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8H5a2 2 0 0 1-2-2V3m18 5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m13-5h-3a2 2 0 0 0-2 2v3"/></svg>
+    </button>
+    <button id="nav-io-btn" class="nav-icon-btn" title="Import / Export" aria-label="Import / Export data">&#x21C5;</button>
+    <button id="nav-add-btn" class="nav-add-btn" title="New entry" aria-label="New journal entry">+</button>
+  </div>
+</nav>
+
+<div class="panels">
+
+  <!-- ═══ RULES ═══ -->
+  <div class="panel active" id="panel-rules">
+    <div class="rule-banner">
+      <div class="rule-banner-text" id="rule-banner-text">Only operate in obvious trends and cycles</div>
+    </div>
+    <div class="steps-card" id="steps-card"></div>
+    <div class="quote-bare">
+      <div class="quote-body">The elements of good trading are: <b>(1) cutting losses,</b> <b>(2) cutting losses,</b> and <b>(3) cutting losses.</b> If you can follow these three rules, you may have a chance.</div>
+      <div class="quote-attr">— Ed Seykota</div>
+    </div>
+  </div>
+
+  <!-- ═══ TRADES ═══ -->
+  <div class="panel" id="panel-trades">
+
+    <!-- Broker-sync banner: appears while any auto-synced trade is still
+         missing its rules/emotions data. Tapping it opens the oldest one. -->
+    <div id="broker-banner" class="broker-banner" style="display:none;" role="button" tabindex="0"></div>
+
+    <!-- P&L (collapsible — starts collapsed to keep money outcomes out of the
+         default view; opening it switches the whole journal into P&L view) -->
+    <div style="margin-bottom:16px;">
+      <div class="collapsible-hdr" data-collapse-target="ap-body" data-collapse-chev="ap-chev">
+        <div class="sec-hd" style="margin:0;">P&amp;L</div>
+        <span id="ap-chev" class="chevron closed">&#x25B2;</span>
+      </div>
+      <div id="ap-body" style="display:none;">
+        <div class="grid-2">
+          <div class="cbox pnl-card">
+            <div class="pnl-card-inner">
+              <div class="pnl-net">
+                <div class="cbox-l">Net P&amp;L<span id="pnl-net-count" class="pnl-net-count"></span></div>
+                <div id="pnl-net-number" class="pnl-net-number">—</div>
+                <div class="pnl-periods">
+                  <div class="pnl-period-row"><span class="pnl-period-lbl">This Week</span><span id="pnl-net-week" class="pnl-period-val">—</span></div>
+                  <div class="pnl-period-row"><span class="pnl-period-lbl">This Month</span><span id="pnl-net-month" class="pnl-period-val">—</span></div>
+                </div>
+              </div>
+              <div class="pnl-dd">
+                <div class="dd-hdr">
+                  <div class="cbox-l" style="margin-bottom:0;">Max Daily DD</div>
+                  <button id="dd-edit-btn" class="dd-edit-btn">Edit</button>
+                </div>
+                <div id="dd-today" class="dd-today"></div>
+                <div>
+                  <div id="dd-display"></div>
+                  <div id="dd-edit" class="hidden" style="margin-bottom:8px;">
+                    <input id="dd-input" class="dd-input" type="number" step="0.01" placeholder="e.g. 200">
+                    <div class="dd-edit-actions">
+                      <button id="dd-save-btn"   class="btn primary sm r4">Save</button>
+                      <button id="dd-cancel-btn" class="btn sm r4">Cancel</button>
+                    </div>
+                  </div>
+                  <div class="dd-bar-wrap">
+                    <div id="dd-bar-fill" class="dd-bar-fill"></div>
+                    <div id="dd-bar-pct"  class="dd-bar-pct"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cbox">
+            <div class="cbox-l">Cumulative P&amp;L</div>
+            <div class="chart-area" style="height:90px;"><canvas id="chart-pnl"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Period wheels + per-period discipline bars (Rules / Stop Loss / Take Profit) -->
+    <div class="period-card"><div class="period-row" id="period-row">
+      <div class="period-col" data-period="total">
+        <div class="period-label">All Time</div>
+        <div class="period-host">
+          <div class="period-counts-left">
+            <span class="pc-w" id="cnt-w-total">— W</span>
+          </div>
+          <div class="period-donut-wrap">
+            <canvas id="chart-period-total" width="108" height="108"></canvas>
+            <div class="period-center"><div class="period-pnl" id="pnl-total">—</div></div>
+          </div>
+          <div class="period-counts-right">
+            <span class="pc-l" id="cnt-l-total">— L</span>
+            <span class="pc-b" id="cnt-b-total">— B</span>
+          </div>
+        </div>
+        <div class="period-disc" id="disc-bars-total"></div>
+      </div>
+      <div class="period-col" data-period="week">
+        <div class="period-label">This Week</div>
+        <div class="period-host">
+          <div class="period-counts-left">
+            <span class="pc-w" id="cnt-w-week">— W</span>
+          </div>
+          <div class="period-donut-wrap">
+            <canvas id="chart-period-week" width="108" height="108"></canvas>
+            <div class="period-center"><div class="period-pnl" id="pnl-week">—</div></div>
+          </div>
+          <div class="period-counts-right">
+            <span class="pc-l" id="cnt-l-week">— L</span>
+            <span class="pc-b" id="cnt-b-week">— B</span>
+          </div>
+        </div>
+        <div class="period-disc" id="disc-bars-week"></div>
+      </div>
+      <div class="period-col" data-period="month">
+        <div class="period-label">This Month</div>
+        <div class="period-host">
+          <div class="period-counts-left">
+            <span class="pc-w" id="cnt-w-month">— W</span>
+          </div>
+          <div class="period-donut-wrap">
+            <canvas id="chart-period-month" width="108" height="108"></canvas>
+            <div class="period-center"><div class="period-pnl" id="pnl-month">—</div></div>
+          </div>
+          <div class="period-counts-right">
+            <span class="pc-l" id="cnt-l-month">— L</span>
+            <span class="pc-b" id="cnt-b-month">— B</span>
+          </div>
+        </div>
+        <div class="period-disc" id="disc-bars-month"></div>
+      </div>
+    </div></div>
+
+    <!-- R:R bar -->
+    <div class="rr-bar-wrap">
+      <div class="rr-bar-label">
+        <span id="rr-bar-label-txt">RR Ratio</span>
+        <span id="rr-bar-value"></span>
+      </div>
+      <div id="rr-bar-segments" class="rr-bar-segments"></div>
+    </div>
+
+    <!-- P&L Heatmap Calendar -->
+    <div class="cbox" style="margin-bottom:var(--gap-section);">
+      <div id="calendar-heatmap"></div>
+    </div>
+
+    <!-- Setup & Session Win Rate (each setup's wheel + its per-session bars) -->
+    <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+      <div id="setup-table"></div>
+    </div>
+
+    <!-- Emotions by outcome (before-phase) -->
+    <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+      <div id="emo-cat-wheels"></div>
+    </div>
+
+    <!-- During-the-trade discipline (per management emotion) -->
+    <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+      <div id="emo-during-mgmt" class="emo-during"></div>
+    </div>
+
+    <!-- Trade log -->
+    <div class="tlog-wrap">
+      <div class="tlog-hdr">
+        <div id="tlog-pagination" class="tlog-pagination"></div>
+      </div>
+      <div id="tlog-body">
+        <div class="tw" id="trade-table"></div>
+      </div>
+    </div>
+
+  </div>
+
+
+</div>
+<!-- /panels -->
+
+<!-- ═══ I/O MODAL ═══ -->
+<div id="io-modal" class="io-modal" role="dialog" aria-modal="true" aria-labelledby="io-modal-title" aria-hidden="true">
+  <div class="io-modal-card">
+    <div class="io-modal-hdr">
+      <span id="io-modal-title" class="io-modal-title">Data Import / Export</span>
+      <button id="io-close-btn" class="icon-btn" aria-label="Close">✕</button>
+    </div>
+    <div class="io-modal-body">
+
+      <div id="io-section-import" class="io-section">
+        <div class="io-section-label">Import Trades</div>
+        <div class="io-section-desc">
+          Accepts <b>.xlsx</b> or <b>.csv</b> files.
+          Download the template to see the exact format expected.
+        </div>
+        <div class="io-section-required">
+          Required: <span class="req">Date, Direction</span> &nbsp;·&nbsp;
+          Optional: Session, Setup, P&amp;L, Followed Rules, Followed SLS, Followed TPS, Before Tags, During Tags, Final Lesson
+        </div>
+        <div class="io-section-actions">
+          <input type="file" id="io-import-file" accept=".xlsx,.xls,.csv" class="hidden">
+          <button id="io-import-btn"   class="btn primary r4">↑ Choose File</button>
+          <button id="io-template-btn" class="btn r4">↓ Download Template</button>
+        </div>
+        <div id="io-import-status" class="io-import-status"></div>
+      </div>
+
+      <div id="io-section-journal" class="io-section">
+        <div class="io-section-label">Export Journal to Excel</div>
+        <div class="io-section-desc">
+          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, discipline (rules / SLS / TPS), emotion tags (before &amp; during), and final lesson.
+        </div>
+        <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
+      </div>
+
+      <div id="io-section-json" class="io-section">
+        <div class="io-section-label">Full Backup / Restore (JSON)</div>
+        <div class="io-section-desc">
+          Exports <b>everything</b> — trades, journal entries, and rules — as a single <b>.json</b> file.
+          Restoring from this file replaces all current data.
+        </div>
+        <div class="io-section-actions">
+          <button id="io-export-json-btn"  class="btn r4">↓ Export Backup</button>
+          <input type="file" id="io-restore-file" accept=".json" class="hidden">
+          <button id="io-restore-btn"      class="btn r4">↑ Restore Backup</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ JOURNAL MODAL ═══ -->
+<div id="journal-modal" class="journal-modal" role="dialog" aria-modal="true" aria-label="Trade journal entry" aria-hidden="true">
+  <div class="journal-modal-card" id="journal-modal-card">
+    <div class="jm-hdr">
+      <div class="jm-hdr-left">
+        <div class="jm-session-wrap">
+          <button id="jm-session-btn" class="jf-pill-lbl"></button>
+          <div id="jm-session-opts" class="jm-session-opts"></div>
+        </div>
+      </div>
+      <div class="jm-hdr-center">
+        <input type="radio" class="jf-pill-radio" name="jm-direction" id="jmd-sell" value="SELL">
+        <label for="jmd-sell" class="jf-pill-lbl">Short</label>
+        <input id="jm-pnl" class="jm-pnl-input" type="number" step="0.01" placeholder="P&amp;L">
+        <input type="radio" class="jf-pill-radio" name="jm-direction" id="jmd-buy"  value="BUY">
+        <label for="jmd-buy"  class="jf-pill-lbl">Long</label>
+      </div>
+      <div class="jm-hdr-right">
+        <span id="jm-date-label" class="jf-pill-lbl" style="cursor:pointer;white-space:nowrap;">—</span>
+        <div id="jm-cal" class="jm-cal-wrap">
+          <div class="cal-hdr">
+            <button class="cal-nav-btn" data-cal-nav="-1" data-cal-target="journal">&lsaquo;</button>
+            <span class="cal-title" id="journal-cal-title"></span>
+            <button class="cal-nav-btn" data-cal-nav="1"  data-cal-target="journal">&rsaquo;</button>
+          </div>
+          <div class="cal-dows">
+            <span class="cal-dow">Su</span><span class="cal-dow">Mo</span><span class="cal-dow">Tu</span><span class="cal-dow">We</span><span class="cal-dow">Th</span><span class="cal-dow">Fr</span><span class="cal-dow">Sa</span>
+          </div>
+          <div class="cal-grid" id="journal-cal-grid"></div>
+        </div>
+      </div>
+    </div>
+    <div id="jm-body" class="jm-body"></div>
+  </div>
+</div>
+
+<!-- ═══ DAY PICKER POPUP (calendar day with 2+ trades) ═══ -->
+<div id="day-modal" class="io-modal" role="dialog" aria-modal="true" aria-labelledby="day-modal-title" aria-hidden="true">
+  <div class="io-modal-card day-modal-card">
+    <div class="io-modal-hdr">
+      <span id="day-modal-title" class="io-modal-title"></span>
+      <button id="day-close-btn" class="icon-btn" aria-label="Close">✕</button>
+    </div>
+    <div class="io-modal-body">
+      <div id="day-trade-list" class="day-trade-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LOGIN OVERLAY ═══
+     Shown only when the cloud is configured and there is no active session.
+     Same visual language as the journal modal header: glass card, pill
+     inputs, purple accent. No reset flow by design — single-user app;
+     password resets happen in the Supabase dashboard. -->
+<div id="login-overlay" class="login-overlay" aria-hidden="true">
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="login-mark">D</span>
+      <span class="login-word">Doji</span>
+    </div>
+    <div class="login-sub">XAUUSD Trading Journal</div>
+    <input id="login-email" class="login-input" type="email" autocomplete="email" placeholder="Email" spellcheck="false">
+    <input id="login-pass"  class="login-input" type="password" autocomplete="current-password" placeholder="Password">
+    <button id="login-btn" class="btn primary login-btn">Sign in</button>
+    <div id="login-err" class="login-err"></div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<!-- Served from jsDelivr because it mirrors the npm artifacts byte-for-byte,
+     which lets the SRI hashes below be computed (and re-verified) straight from
+     the official npm tarballs. chart.umd.js in the 4.4.0 package IS the
+     minified build — npm ships no separate .min for 4.4.0. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"
+  integrity="sha512-6HrPqAvK+lZElIZ4mZ64fyxIBTsaX5zAFZg2V/2WT+iKPrFzTzvx6QAsLW2OaLwobhMYBog/+bvmIEEGXi0p1w=="
+  crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+  integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA=="
+  crossorigin="anonymous"></script>
+<!-- Supabase client (floating v2 — no SRI possible on a floating tag; pin a
+     version + hash before shipping publicly if you want byte-level integrity). -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
+  crossorigin="anonymous"></script>
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOJI — XAUUSD Emotion-Based Trading Journal
+
+   Architecture:
+     CONFIG       static, read-only domain values
+     STATE        single mutable application state object
+     STORAGE      pure load/save against localStorage
+     DOM          tiny query/escape helpers
+     DATES        date formatting and bucketing utilities
+     STATS        pure trade math (win rate, R:R, P&L, streaks)
+     CALENDAR     reusable month-grid widget shared by 3 surfaces
+     CHARTS       Chart.js wrappers with shared option presets
+     RULES        Rules tab renderer
+     TRADES       Trades tab renderers (one render fn per component)
+     JOURNAL      Modal: open / form / save / delete
+     IO           Excel import + journal export + JSON backup/restore
+     INIT         Boot sequence and global event wiring
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── CONFIG ─────────────────────────────────────────────────────────────── */
+const CONFIG = Object.freeze({
+  STORE: {
+    trades:   'doji_trades_v6',
+    journal:  'doji_journal_v6',
+    rules:    'doji_rules_v8',
+    ddMax:    'doji_ddmax_v5'
+  },
+  // Phase-specific tag vocabularies. BEFORE captures the state a trade was
+  // ENTERED in (the causal phase); DURING captures the state while managing
+  // the position — a short list of exactly the emotions that attack SL/TP
+  // discipline, plus the two positives. The two lists deliberately diverge:
+  // Gun-shy or Hesitant describe a decision you haven't made yet, Panic or
+  // Impatient only exist once real money is moving.
+  EMOTIONS_BEFORE: ['Calm','Confident','Anxious','Hesitant','Gun-shy','Overwhelmed','Revenge','Greed','Bored','FOMO'],
+  EMOTIONS_DURING: ['Calm','Confident','Panic','Anxious','Greed','Impatient'],
+  // Fear group semantics — four distinct fear-objects, not four synonyms:
+  //   Anxious = fear in the body (no clear object) · Hesitant = fear about THIS
+  //   setup · Gun-shy = fear carried from the last loss · Overwhelmed = fear
+  //   from conflicting information. (Fear/Doubtful were retired: Doubtful
+  //   duplicated Hesitant, generic Fear duplicated the category itself.)
+  EMOTION_GROUPS: [
+    // duringDiscipline: the Positive column shows before-only outcome bars for
+    // its members (same lens as Fear/Reactive) plus two disciplineBar rows —
+    // SL/TP compliance on trades where a member was felt DURING the trade.
+    // The positives' management record lives here; the negatives' lives in the
+    // separate "During the Trade" card.
+    { name:'Positive', members:['Calm','Confident'], duringDiscipline:true,         border:'#3ba585', bg:'rgba(59,165,133,.20)' },
+    { name:'Fear',     members:['Hesitant','Anxious','Gun-shy','Overwhelmed'],      border:'#8b35b8', bg:'rgba(139,53,184,.25)' },
+    { name:'Reactive', members:['Revenge','Greed','Bored','FOMO'],                  border:'#d63d5a', bg:'rgba(214,61,90,.20)'  }
+  ],
+  // Negative DURING tags — the management-error drivers shown in the
+  // "During the Trade" discipline subsection.
+  EMOTIONS_DURING_NEGATIVE: ['Panic','Anxious','Greed','Impatient'],
+  SESSIONS: ['Asian','Asia+London','London','London+NY','New York'],
+  SESSION_ABBR: { 'Asian':'AS', 'Asia+London':'AS+LN', 'London':'LN', 'London+NY':'LN+NY', 'New York':'NY' },
+  SETUPS: ['Break & Retest','Support & Resistance'],
+  PER_PAGE: 10,
+  // Backup schema stamp, written into every JSON backup. Bump when the trade /
+  // journal record shape changes so a future version of the app can migrate
+  // (or warn) deterministically instead of sniffing field names.
+  BACKUP_SCHEMA: 6,
+  // How long a deleted trade stays recoverable via the toast's Undo button.
+  UNDO_MS: 7000,
+  // Any trade whose P&L lands within ±this of zero is classed as break-even for
+  // win/loss purposes (wheels, win-rate, R:R) — a near-flat scratch (e.g. a 0.10
+  // close that was meant to be flat) shouldn't count as a win or a loss. The
+  // actual dollar amount still flows into total P&L; only the win/loss LABEL is
+  // suppressed. Change this one number to widen or tighten the scratch band.
+  BE_THRESHOLD: 3,
+  DEFAULT_RULES: {
+    banner: 'Only operate in obvious trends and cycles',
+    steps: [
+      { title:'Top Down Analysis / Bias',      desc:'Identify Fair Value Gaps, Check DXY and US10Y.' },
+      { title:'Identify Liquidity Pools, S&R', desc:'Mark where price has recently reacted.' },
+      { title:'Identify Psychological Levels', desc:'Identify quarters and round numbers.' },
+      { title:'Read Candle & Chart Patterns',  desc:"Don't anticipate. React to confirmation." },
+      { title:'Setup SL & TP · Min R:R 1:1.5', desc:"If the numbers don't work, skip the trade." }
+    ]
+  }
+});
+
+/* ─── STATE ──────────────────────────────────────────────────────────────── */
+const State = {
+  trades:   [],
+  journals: [],
+  // Derived index: tradeId → journal. Rebuilt by rebuildJournalIndex() after
+  // any mutation. journalForTrade(t) reads from here so render
+  // pipelines run in O(trades) instead of O(trades × journals).
+  journalByTradeId: new Map(),
+  // Derived index: tradeId → trade. Same rebuild lifecycle as the one above.
+  // tradeForJournal(j) reads from here so journal→trade lookups are O(1)
+  // instead of a State.trades.find() scan on every call.
+  tradeById: new Map(),
+  tradeLogPage: 0,
+  // Chart instances keyed by canvas id (or logical name)
+  charts: Object.create(null),
+  // Collapsed-section open/closed flags (default open = true)
+  sections: Object.create(null),
+  // Calendar view-state — separate cursor per surface
+  cal: {
+    journal:  { y: 0, m: 0, sel: '' },
+    heatmap:  { y: 0, m: 0 }
+  }
+};
+
+/* ─── STORAGE ────────────────────────────────────────────────────────────── */
+const Storage = {
+  loadTrades()    { return safeJSON(CONFIG.STORE.trades,  []); },
+  loadJournals()  { return safeJSON(CONFIG.STORE.journal, []); },
+  loadRules()     { return safeJSON(CONFIG.STORE.rules,   CONFIG.DEFAULT_RULES); },
+  loadDDMax()     { const v = parseFloat(localStorage.getItem(CONFIG.STORE.ddMax)); return isNaN(v) ? null : v; },
+
+  saveTradesAndJournals() {
+    rebuildJournalIndex();
+    try {
+      localStorage.setItem(CONFIG.STORE.trades,  JSON.stringify(State.trades));
+      localStorage.setItem(CONFIG.STORE.journal, JSON.stringify(State.journals));
+    } catch (e) {
+      notify('⚠ Storage full — export a JSON backup now.', true);
+    }
+    Cloud.push(CONFIG.STORE.trades);
+    Cloud.push(CONFIG.STORE.journal);
+  },
+  saveRules(r)   { try { localStorage.setItem(CONFIG.STORE.rules, JSON.stringify(r)); } catch (e) { notify('⚠ Could not save — storage unavailable.', true); } Cloud.push(CONFIG.STORE.rules); },
+  saveDDMax(v)   { try { localStorage.setItem(CONFIG.STORE.ddMax, String(v)); } catch (e) { notify('⚠ Could not save — storage unavailable.', true); } Cloud.push(CONFIG.STORE.ddMax); }
+};
+function safeJSON(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+
+/* ─── DOM HELPERS ────────────────────────────────────────────────────────── */
+const $  = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
+function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Monotonic counter folded into the id so ids minted within the same
+// millisecond (bulk Excel import mints two per row in a tight loop) can never
+// collide even if Math.random repeats. Stays within the /^[A-Za-z0-9_\-]{1,64}$/
+// shape the restore validators enforce.
+let _uidSeq = 0;
+function uid() {
+  _uidSeq = (_uidSeq + 1) % 1296; // wraps at 2 base-36 chars
+  return Date.now().toString(36)
+       + _uidSeq.toString(36).padStart(2, '0')
+       + Math.random().toString(36).slice(2, 6);
+}
+
+/* ─── NOTIFICATION ───────────────────────────────────────────────────────── */
+let _notifTimer = 0;
+function notify(msg, isError) {
+  const el = $('notif');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'notif show' + (isError ? ' err' : '');
+  clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+// Toast variant carrying an inline Undo button (used by PendingDelete). The
+// button is re-created on every call, so its click handler is delegated on
+// #notif in wireEvents rather than bound here. Shares notify()'s timer, so any
+// later toast simply replaces this one — at which point Undo is gone from the
+// screen but the recovery window itself is governed by PendingDelete's timer.
+function notifyUndo(msg) {
+  const el = $('notif');
+  if (!el) return;
+  el.innerHTML = escHtml(msg) + '<button class="notif-undo" type="button">Undo</button>';
+  el.className = 'notif show';
+  clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(() => el.classList.remove('show'), CONFIG.UNDO_MS);
+}
+
+/* ─── DATE UTILITIES ─────────────────────────────────────────────────────── */
+const Dates = {
+  fmt(iso, opts) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-GB', opts || { day:'2-digit', month:'short', year:'2-digit' });
+  },
+  isoDay(d) {
+    // YYYY-MM-DD in local time
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  },
+  parseISODay(iso) {
+    // Local-noon parse so a date-only string doesn't shift across timezones
+    return new Date(iso + 'T12:00:00');
+  },
+  // Trade date for grouping. Prefer openTime; fall back to journal createdAt if linked.
+  tradeDayISO(t, j) {
+    const src = t?.openTime || j?.createdAt;
+    return src ? src.slice(0, 10) : null;
+  },
+  // Session boundaries are pinned to New York wall-clock time (DST-correct via
+  // nyParts below) instead of the machine's local clock. A local-hour mapping
+  // only lines up with market sessions while local time and NY time share an
+  // offset — Colombia never shifts but New York does, so for half the year the
+  // old local mapping ran one hour off. This is only the modal's DEFAULT; the
+  // session pill can always be overridden by hand.
+  detectSession() {
+    const h = Dates.nyParts(new Date()).hour;
+    if (h >= 17 || h < 3) return 'Asian';
+    if (h < 5)  return 'Asia+London';
+    if (h < 8)  return 'London';
+    if (h < 12) return 'London+NY';
+    return 'New York';
+  },
+
+  // ─── Weekly forex-close anchor (Friday 17:00 America/New_York) ──────────────
+  // Wall-clock NY parts for `date`, DST-correct via Intl. hour is normalised 0–23.
+  nyParts(date) {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', weekday: 'short',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+    const p = {};
+    for (const part of fmt.formatToParts(date)) p[part.type] = part.value;
+    let hour = +p.hour; if (hour === 24) hour = 0; // some engines emit '24' at midnight
+    const wd = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 }[p.weekday];
+    return { y:+p.year, m:+p.month, d:+p.day, weekday:wd, hour, minute:+p.minute };
+  },
+  // Date (YYYY-MM-DD) of the most recently *completed* weekly close — the Friday
+  // whose 17:00 New York close is at or before `date`. Stable per-week key, so a
+  // backup fires once per trading week and never twice. DST handled by nyParts.
+  lastForexCloseKey(date = new Date()) {
+    const p = Dates.nyParts(date);
+    let sinceFriday = (p.weekday - 5 + 7) % 7;            // Fri=0, Sat=1 … Thu=6
+    if (p.weekday === 5 && p.hour < 17) sinceFriday = 7;  // Fri pre-close → last week
+    const base = new Date(Date.UTC(p.y, p.m - 1, p.d));
+    base.setUTCDate(base.getUTCDate() - sinceFriday);
+    const yy = base.getUTCFullYear();
+    const mm = String(base.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(base.getUTCDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  }
+};
+
+/* ─── LOOKUPS ────────────────────────────────────────────────────────────── */
+// Rebuilds the tradeId→journal index. Called after any mutation that adds,
+// removes, or replaces trades/journals. Cheap (single pass) and makes every
+// downstream lookup O(1).
+function rebuildJournalIndex() {
+  State.journalByTradeId = new Map();
+  for (const j of State.journals) {
+    if (j && j.tradeId) State.journalByTradeId.set(j.tradeId, j);
+  }
+  State.tradeById = new Map();
+  for (const t of State.trades) {
+    if (t && t.id) State.tradeById.set(t.id, t);
+  }
+}
+function journalForTrade(t)   { return t ? State.journalByTradeId.get(t.id) : undefined; }
+function tradeForJournal(j)   { return j ? State.tradeById.get(j.tradeId) : undefined; }
+// Maps a numeric P&L to its outcome class. Single source of truth so the
+// win / loss / break-even rule can't drift between the calendar, log and journal.
+// A scratch within ±CONFIG.BE_THRESHOLD of zero counts as break-even, not a
+// win or loss — but its dollar value is still summed into total P&L elsewhere
+// (pickPnls reads pnl directly and ignores this label).
+function resultFromPnl(pnl)   { return Math.abs(pnl) <= CONFIG.BE_THRESHOLD ? 'be' : (pnl > 0 ? 'win' : 'loss'); }
+
+/* ─── MIGRATION ──────────────────────────────────────────────────────────── */
+// Fills missing fields on legacy entries. Idempotent.
+function migrateData() {
+  let changed = false;
+  // Tag-vocabulary Sets hoisted out of the loop — one allocation, O(1) lookups.
+  const beforeVocab = new Set(CONFIG.EMOTIONS_BEFORE);
+  const duringVocab = new Set(CONFIG.EMOTIONS_DURING);
+  for (const j of State.journals) {
+    if (!j.beforeTags)  { j.beforeTags  = []; changed = true; }
+    if (!j.duringTags)  { j.duringTags  = []; changed = true; }
+    if (!j.afterTags)   { j.afterTags   = []; changed = true; }
+    if (!j.emotionTags) { j.emotionTags = []; changed = true; }
+    if (j.followedSLS == null) { j.followedSLS = ''; changed = true; }
+    if (j.followedTPS == null) { j.followedTPS = ''; changed = true; }
+    // Scrub any P&L that isn't a finite number. JSON.stringify turns NaN into
+    // null on save, but defensive: clear it to null so downstream math stays
+    // clean even on legacy data written by older versions of this app.
+    if (j.pnl != null && j.pnl !== '' && safeNum(j.pnl) === null) {
+      j.pnl = null;
+      changed = true;
+    }
+    // Legacy field names: movedStop → followedSLS (inverted), tpEarly → followedTPS (inverted)
+    if (j.movedStop !== undefined && !j.followedSLS) {
+      j.followedSLS = j.movedStop === 'yes' ? 'no' : j.movedStop === 'no' ? 'yes' : '';
+      changed = true;
+    }
+    if (j.tpEarly !== undefined && !j.followedTPS) {
+      j.followedTPS = j.tpEarly === 'yes' ? 'no' : j.tpEarly === 'no' ? 'yes' : '';
+      changed = true;
+    }
+    if (j.notes && !j.finalLesson) { j.finalLesson = j.notes; changed = true; }
+    // Tag-vocabulary migration (2026-07): the emotion lists became
+    // phase-specific. BEFORE retired Fear and Doubtful (replaced by Gun-shy
+    // and Overwhelmed); DURING shrank to the management-error set. Per the
+    // trader's decision, retired tags are DROPPED, not remapped — old trades
+    // keep everything else. Idempotent: filtering an already-clean list is a
+    // no-op. Runs on boot and on JSON-backup restore, so legacy backups are
+    // scrubbed the same way.
+    if (j.beforeTags.some(t => !beforeVocab.has(t))) {
+      j.beforeTags = j.beforeTags.filter(t => beforeVocab.has(t));
+      changed = true;
+    }
+    if (j.duringTags.some(t => !duringVocab.has(t))) {
+      j.duringTags = j.duringTags.filter(t => duringVocab.has(t));
+      changed = true;
+    }
+    const union = [...new Set([...j.beforeTags, ...j.duringTags])];
+    // Also serves as the legacy emotionTags backfill: the union is now
+    // recomputed unconditionally, so a missing/stale union self-heals.
+    if (j.emotionTags.length !== union.length || j.emotionTags.some(t => !union.includes(t))) {
+      j.emotionTags = union;
+      changed = true;
+    }
+  }
+  for (const t of State.trades) {
+    if (!t.source) { t.source = 'journal'; changed = true; }
+  }
+  // Re-derive result from pnl so the two can't drift. pnl is the source of
+  // truth; result is a denormalized cache held on BOTH the journal and its
+  // linked trade. Normal save/import keep them in sync, but a hand-edited or
+  // legacy backup can carry a stale result (e.g. 'win' with a null pnl), which
+  // would be counted in win totals yet excluded from averages. Recompute both
+  // sides here. Local id→trade map keeps this O(n) rather than a find() per row.
+  const tradeById = new Map(State.trades.map(t => [t.id, t]));
+  for (const j of State.journals) {
+    const v = safeNum(j.pnl);
+    const derived = v !== null ? resultFromPnl(v) : null;
+    if (j.result !== derived) { j.result = derived; changed = true; }
+    const t = tradeById.get(j.tradeId);
+    if (t && t.result !== derived) { t.result = derived; changed = true; }
+  }
+  if (changed) Storage.saveTradesAndJournals();
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// Returns { n, wins, losses, be, wr, rr, avgWin, avgLoss, avgPnl, totalPnl }
+// avgWin / avgLoss are absolute-value averages (rejecting null P&L).
+// avgPnl is the signed average across trades that have P&L.
+// rr = avgWin / avgLoss (clamped to 9.99 when there are no losses).
+function calcStats(list) {
+  const out = { n:0, wins:0, losses:0, be:0, wr:0, rr:0, avgWin:0, avgLoss:0, avgPnl:0, totalPnl:0 };
+  if (!list.length) return out;
+
+  const winners = list.filter(t => t.result === 'win');
+  const losers  = list.filter(t => t.result === 'loss');
+  const breaks  = list.filter(t => t.result === 'be');
+
+  out.n      = list.length;
+  out.wins   = winners.length;
+  out.losses = losers.length;
+  out.be     = breaks.length;
+  // Win rate is taken over DECIDED trades (win + loss + B/E). Trades with no
+  // P&L logged (result === null) are excluded, so this % always matches the
+  // win/loss wheels, which only ever plot win/loss/B/E segments.
+  const decided = out.wins + out.losses + out.be;
+  out.wr     = decided ? (out.wins / decided) * 100 : 0;
+
+  const winAbs  = pickPnls(winners).map(Math.abs);
+  const lossAbs = pickPnls(losers).map(Math.abs);
+  const allPnl  = pickPnls(list);
+
+  out.avgWin   = mean(winAbs);
+  out.avgLoss  = mean(lossAbs);
+  out.avgPnl   = mean(allPnl);
+  out.totalPnl = sum(allPnl);
+  out.rr       = out.avgLoss > 0 ? round2(out.avgWin / out.avgLoss) : (out.avgWin > 0 ? 9.99 : 0);
+  return out;
+}
+function pickPnls(trades) {
+  const r = [];
+  for (const t of trades) {
+    const j = journalForTrade(t);
+    if (!j) continue;
+    const v = safeNum(j.pnl);
+    if (v !== null) r.push(v);
+  }
+  return r;
+}
+function mean(arr)  { return arr.length ? sum(arr) / arr.length : 0; }
+function sum(arr)   { let s = 0; for (const v of arr) s += v; return s; }
+function round2(v)  { return Math.round(v * 100) / 100; }
+
+// Best-available chronological key for a trade. openTime is a FIXED 09:30Z stamp
+// for journal-entered trades, so every same-day trade collides on it — which
+// breaks any ordering or gap math. The linked journal's createdAt carries the
+// real logging time down to the millisecond, giving a stable sequence. Falls
+// back to openTime for imported trades that have no journal. Single source of
+// truth so every consumer agrees on "recent" and "in order".
+function tradeLogTime(t) {
+  const j = journalForTrade(t);
+  return new Date(j?.createdAt || t?.openTime || 0).getTime();
+}
+
+// Coerce j.pnl to a number, returning null if it isn't a finite number.
+// Use this everywhere a P&L value flows into arithmetic — `parseFloat` alone
+// will silently produce NaN for strings like "—" or "abc", and one NaN can
+// poison an entire cumulative sum, average, or standard-deviation calculation.
+function safeNum(v) {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Most-recent streak among the supplied trades, plus the all-time max win streak.
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALENDAR — single month-grid renderer used by:
+     • Trade-filter date picker (range select)
+     • Journal modal (single date)
+     • P&L heatmap (full-size cells with P&L info)
+
+   The differences are all in the cell renderer, so we expose a renderCell hook.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Calendar = {
+  // opts: { gridId, titleId, year, month, renderCell(date, iso) -> string }
+  render(opts) {
+    const grid  = $(opts.gridId);
+    const title = $(opts.titleId);
+    if (!grid) return;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    if (title) title.textContent = `${months[opts.month]} ${opts.year}`;
+
+    const firstDay   = new Date(opts.year, opts.month, 1).getDay();
+    const daysInMonth = new Date(opts.year, opts.month + 1, 0).getDate();
+
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<span class="cal-day empty"></span>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(opts.year, opts.month, d);
+      const iso  = Dates.isoDay(date);
+      html += opts.renderCell(date, iso, d);
+    }
+    grid.innerHTML = html;
+  },
+
+  // Step the cursor for a target ('trade' | 'journal' | 'heatmap')
+  navigate(target, dir) {
+    const cur = State.cal[target];
+    cur.m += dir;
+    if (cur.m > 11)  { cur.m = 0;  cur.y++; }
+    if (cur.m < 0)   { cur.m = 11; cur.y--; }
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHARTS — shared Chart.js helpers
+
+   DESIGN SYSTEM — read before adding any wheel or bar.
+   To keep the journal cohesive, every wheel and bar is built from one shared
+   primitive. Do NOT hand-roll a new Chart config or bar markup — reuse these:
+     • Result wheel (W/L/B doughnut) → mountResultDonut(canvasId, [w, l, bes])
+     • Win/loss distribution bars     → sessionBarsHtml(list)  (.sess-wr-* classes)
+     • Compliance bars (followed %)   → disciplineBar(label, followed, n)
+     • Bar thickness                  → --bar-h token   (CSS)
+     • Wheel cutout / palette         → DONUT_CUTOUT, RESULT_FILL, RESULT_BORDER
+   A new metric should call the matching primitive so it inherits the exact
+   dimensions, colors, borders, and animation already in use everywhere else.
+   ═══════════════════════════════════════════════════════════════════════════ */
+// Win / Loss / Break-Even palette (in that order) shared by every donut.
+// Keep in sync with the --win / --loss CSS vars and the heatmap/emotion-bar styles.
+const RESULT_FILL   = Object.freeze(['rgba(59,165,133,.12)','rgba(214,61,90,.12)','rgba(144,144,160,.10)']);
+const RESULT_BORDER = Object.freeze(['#3ba585','#d63d5a','rgba(144,144,160,.5)']);
+// Pull the segment border weight from the same --seg-bd token the CSS bars use,
+// so donut arcs and bar segments always share one border thickness.
+const SEG_BD = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--seg-bd')) || 1.5;
+
+// Canonical result wheel (win / loss / break-even doughnut). Single source of
+// truth for EVERY wheel in the journal — period wheels and setup wheels — so
+// they're built identically and can't drift, the wheel analogue of the shared
+// bar styling. counts = [wins, losses, bes]; an all-zero set renders a hollow
+// placeholder ring. Destroys any prior instance on the same canvas first.
+const DONUT_CUTOUT = '68%';
+function mountResultDonut(canvasId, counts) {
+  Charts.destroy(canvasId);
+  const canvas = $(canvasId);
+  if (!canvas) return;
+  const hasData = counts.reduce((a, b) => a + b, 0) > 0;
+  State.charts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['W', 'L', 'B/E'],
+      datasets: [{
+        data:            hasData ? counts : [1],
+        backgroundColor: hasData ? RESULT_FILL   : ['rgba(255,255,255,.04)'],
+        borderColor:     hasData ? RESULT_BORDER : ['rgba(255,255,255,.06)'],
+        borderWidth:     hasData ? SEG_BD : 1
+      }]
+    },
+    options: {
+      responsive: false,
+      cutout: DONUT_CUTOUT,
+      animation: false,
+      // No hover interaction: segments must never light up / recolour on hover.
+      events: [],
+      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+}
+
+const Charts = {
+  // Robust destroy: removes our cached instance AND any Chart.js instance that
+  // may already be attached to the same canvas (defensive against stale refs
+  // surviving across renderTrades calls). `key` MUST be the canvas DOM id so
+  // that Chart.getChart(canvas) can locate any orphan chart bound by Chart.js.
+  destroy(key) {
+    const c = State.charts[key];
+    if (c) {
+      try { c.destroy(); } catch {}
+      delete State.charts[key];
+    }
+    // Belt-and-braces: if Chart.js has a chart bound to a DOM canvas with this
+    // id, kill it too. `Chart.getChart()` is documented and safe.
+    if (typeof Chart !== 'undefined' && typeof Chart.getChart === 'function') {
+      const canvas = document.getElementById(key);
+      if (canvas) {
+        const existing = Chart.getChart(canvas);
+        if (existing) { try { existing.destroy(); } catch {} }
+      }
+    }
+  },
+
+  // Common scale theming shared by line + bar charts. Tooltips disabled —
+  // chart values are always shown directly in the surrounding UI.
+  baseOptions() {
+    return {
+      responsive: true, maintainAspectRatio: false,
+      animation: false,
+      // No hover interaction anywhere — points/bars must not enlarge or recolour.
+      events: [],
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,.06)' },
+          ticks: { color: '#707080', font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 }, maxTicksLimit: 8 }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,.06)' },
+          ticks: { color: '#707080', font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 } }
+        }
+      }
+    };
+  },
+
+  percentYOptions() {
+    const o = Charts.baseOptions();
+    o.scales.y.min = 0;
+    o.scales.y.max = 100;
+    o.scales.y.ticks = {
+      callback: v => v + '%',
+      color: '#707080',
+      font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 }
+    };
+    return o;
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RULES TAB
+   ═══════════════════════════════════════════════════════════════════════════ */
+function renderRules() {
+  const r = Storage.loadRules();
+  $('rule-banner-text').textContent = r.banner;
+
+  const rows = r.steps.map((step, i) => {
+    const side = i % 2 === 0 ? 'left' : 'right';
+    const content = `
+      <div class="step-content">
+        <div class="step-title">${escHtml(step.title)}</div>
+        <div class="step-desc">${escHtml(step.desc)}</div>
+      </div>`;
+    const dot   = '<div class="step-dot"></div>';
+    const empty = '<div class="step-empty"></div>';
+    return `<div class="step-row ${side}">${ side === 'left' ? content + dot + empty : empty + dot + content }</div>`;
+  });
+  $('steps-card').innerHTML = rows.join('');
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRADES TAB — orchestrator
+   ═══════════════════════════════════════════════════════════════════════════ */
+function renderTrades() {
+  // The on-screen filter bar was removed, so every view works from the full
+  // trade set (copied so downstream sorts can't mutate State order).
+  const ft = State.trades.slice();
+  // Render each component in isolation. In the normal path every step runs
+  // exactly as before; if one ever throws (e.g. a CDN chart lib that failed
+  // to load), that single widget degrades instead of blanking the whole tab —
+  // the core data views (heatmap, trade table) still render.
+  const steps = [
+    () => renderBrokerBanner(),
+    () => renderPnLCard(ft),
+    () => renderDD(),
+    () => renderPeriodDonuts(ft),
+    () => renderRRBar(ft),
+    () => renderHeatmap(),
+    () => renderSetupTable(ft),
+    () => renderEmotionBars(ft),
+    () => renderDuringMgmt(ft),
+    () => renderTradeTable(ft)
+  ];
+  for (const step of steps) {
+    try { step(); }
+    catch (err) { console.error('Doji: render step failed', err); }
+  }
+  // Wire/restore the mobile swipe carousels now that every host is rebuilt.
+  try { Carousel.refresh(); }
+  catch (err) { console.error('Doji: carousel wiring failed', err); }
+}
+
+/* ─── DAILY DRAWDOWN ─────────────────────────────────────────────────────── */
+function todayLossTotal() {
+  const todayKey = Dates.isoDay(new Date());
+  let loss = 0;
+  for (const j of State.journals) {
+    if (j.pnl == null || j.pnl >= 0) continue;
+    const t = tradeForJournal(j);
+    if (!t) continue;
+    const day = (t.openTime || j.createdAt || '').slice(0, 10);
+    if (day === todayKey) loss += Math.abs(j.pnl);
+  }
+  return loss;
+}
+
+function renderDD() {
+  const limit   = Storage.loadDDMax();
+  const loss    = todayLossTotal();
+  const todayEl = $('dd-today');
+  const display = $('dd-display');
+  const fill    = $('dd-bar-fill');
+  const pctEl   = $('dd-bar-pct');
+
+  todayEl.textContent = loss > 0 ? `Today: -${loss.toFixed(2)}` : 'No losses today';
+
+  if (limit == null) {
+    fill.style.width = '0%';
+    pctEl.textContent = '';
+    display.innerHTML = '<div class="dd-empty">Set a limit to track drawdown</div>';
+    return;
+  }
+
+  display.innerHTML = '';
+  const pct = Math.min((loss / limit) * 100, 100);
+  fill.style.width = pct + '%';
+  pctEl.textContent = Math.round(pct) + '%';
+}
+function toggleDDEdit() {
+  const display = $('dd-display');
+  const edit    = $('dd-edit');
+  const input   = $('dd-input');
+  const opening = edit.classList.contains('hidden');
+  display.classList.toggle('hidden', opening);
+  edit.classList.toggle('hidden', !opening);
+  if (opening) {
+    input.value = Storage.loadDDMax() ?? '';
+    input.focus();
+  }
+}
+function saveDDMax() {
+  const v = safeNum($('dd-input').value);
+  if (v === null || v <= 0) {
+    notify('Enter a positive number (e.g. 200).', true);
+    return;
+  }
+  Storage.saveDDMax(v);
+  toggleDDEdit();
+  renderDD();
+  notify('Drawdown limit saved');
+}
+
+/* ─── P&L CARD + CUMULATIVE LINE CHART ───────────────────────────────────── */
+function renderPnLCard(ft) {
+  const netEl   = $('pnl-net-number');
+  const countEl = $('pnl-net-count');
+
+  const pnls = pickPnls(ft);
+  if (!pnls.length) {
+    netEl.textContent = '—';
+    netEl.style.color = 'var(--mt2)';
+    if (countEl) countEl.textContent = '';
+  } else {
+    const net = sum(pnls);
+    netEl.textContent = (net >= 0 ? '+' : '') + net.toFixed(2);
+    netEl.style.color = net > 0 ? 'var(--win)' : net < 0 ? 'var(--loss)' : 'var(--mt2)';
+    if (countEl) countEl.textContent = pnls.length;
+  }
+  renderPeriodPnls(ft);
+  renderCumulativeChart(ft);
+}
+
+// Calendar-week and calendar-month P&L lines in the Net P&L box. Windows come
+// from the same periodCutoff() the period wheels use, so the two "This Week" /
+// "This Month" figures in the journal always describe the identical window.
+function renderPeriodPnls(ft) {
+  const weekCut  = periodCutoff('week');
+  const monthCut = periodCutoff('month');
+  let week = 0, month = 0, weekAny = false, monthAny = false;
+  for (const t of ft) {
+    if (!t.openTime) continue;
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v === null) continue;
+    const d = new Date(t.openTime);
+    if (d >= weekCut)  { week  += v; weekAny  = true; }
+    if (d >= monthCut) { month += v; monthAny = true; }
+  }
+  setPeriodVal('pnl-net-week',  weekAny,  round2(week));
+  setPeriodVal('pnl-net-month', monthAny, round2(month));
+}
+function setPeriodVal(id, any, v) {
+  const el = $(id);
+  if (!el) return;
+  if (!any) { el.textContent = '—'; el.style.color = 'var(--mt2)'; return; }
+  el.textContent = (v >= 0 ? '+' : '') + v.toFixed(2);
+  el.style.color = v > 0 ? 'var(--win)' : v < 0 ? 'var(--loss)' : 'var(--mt2)';
+}
+
+function renderCumulativeChart(ft) {
+  Charts.destroy('chart-pnl');
+  const canvas = $('chart-pnl');
+  if (!canvas) return;
+
+  const points = [];
+  for (const t of ft) {
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v === null) continue;
+    points.push({ t, pnl: v });
+  }
+  if (!points.length) {
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  // Sort by tradeLogTime, not openTime: journal-entered trades on the same day
+  // all share the fixed 09:30Z openTime stamp, so sorting on it plots same-day
+  // trades in arbitrary order and bends the equity curve's intraday path. The
+  // trade log already sequences with tradeLogTime — match it.
+  points.sort((a, b) => tradeLogTime(a.t) - tradeLogTime(b.t));
+
+  const labels = [];
+  const data   = [];
+  let cum = 0;
+  for (const p of points) {
+    cum += p.pnl;
+    labels.push(Dates.fmt(p.t.openTime, { day:'2-digit', month:'short' }));
+    data.push(round2(cum));
+  }
+
+  const PNL_GREEN = '#3ba585', PNL_RED = '#d63d5a';
+  const PNL_LINE = (data[data.length - 1] ?? 0) >= 0 ? PNL_GREEN : PNL_RED;
+
+  State.charts['chart-pnl'] = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: PNL_LINE,
+        borderWidth: 1.5,
+        pointRadius: data.length > 20 ? 0 : 2,
+        pointBackgroundColor: PNL_LINE,
+        pointBorderColor: PNL_LINE,
+        fill: false,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: 'rgba(255,255,255,.06)' },
+          ticks: {
+            color: '#707080', font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 },
+            callback: v => (v >= 0 ? '+' : '') + v
+          }
+        }
+      }
+    }
+  });
+}
+
+
+/* ─── PERIOD DONUTS ──────────────────────────────────────────────────────── */
+function periodCutoff(period) {
+  const now = new Date();
+  if (period === 'week') {
+    // Trading week runs Sunday → Friday close.
+    // Roll back to the most recent Sunday at midnight.
+    const d = new Date(now);
+    d.setDate(now.getDate() - now.getDay()); // 0=Sun … 6=Sat
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  if (period === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
+  return null;
+}
+
+// Builds one compliance bar (Rules / Stop Loss / Take Profit) using the exact
+// session-bar segment language: green = followed, red = missed, last-segment
+// rounding, solo handling. Straight percentage regardless of sample size; an
+// empty period shows a dim dash + flat track.
+function disciplineBar(label, followed, n) {
+  if (n === 0) {
+    return `
+      <div class="period-disc-row">
+        <div class="period-disc-head">
+          <span class="period-disc-lbl">${label}</span>
+          <span class="period-disc-pct dim">—</span>
+        </div>
+        <div class="bar-empty"></div>
+      </div>`;
+  }
+  const pct    = Math.round(followed / n * 100);
+  const missed = n - followed;
+  const fPct   = followed / n * 100;
+  const mPct   = missed   / n * 100;
+
+  const segs = [];
+  if (followed) segs.push(`<div class="sess-wr-seg-win"  style="width:${fPct}%"></div>`);
+  if (missed)   segs.push(`<div class="sess-wr-seg-loss" style="width:${mPct}%"></div>`);
+  const lastIdx = segs.length - 1;
+  const segHtml = segs.map((s, i) =>
+    i === lastIdx ? s.replace('class="sess-wr-seg', 'class="sess-wr-seg-last sess-wr-seg') : s
+  ).join('');
+
+  const trackCls = segs.length === 1 ? 'solo' : 'first';
+  const pctCls   = pct >= 50 ? 'win' : 'loss';
+  return `
+    <div class="period-disc-row">
+      <div class="period-disc-head">
+        <span class="period-disc-lbl">${label}</span>
+        <span class="period-disc-pct ${pctCls}">${pct}%</span>
+      </div>
+      <div class="sess-wr-track ${trackCls}" title="${followed}/${n} followed">${segHtml}</div>
+    </div>`;
+}
+
+function renderPeriodDonuts(ft) {
+  for (const period of ['total','week','month']) renderPeriodDonut(period, ft);
+}
+
+function renderPeriodDonut(period, ft) {
+  const canvasId = 'chart-period-' + period;
+
+  const cutoff = periodCutoff(period);
+  const list   = period === 'total' ? ft.slice()
+               : ft.filter(t => t.openTime && new Date(t.openTime) >= cutoff);
+
+  const wins   = list.filter(t => t.result === 'win').length;
+  const losses = list.filter(t => t.result === 'loss').length;
+  const bes    = list.filter(t => t.result === 'be').length;
+  const total  = wins + losses + bes;
+  const wr     = total ? Math.round(wins / total * 100) : null;
+
+  const wrEl = $('pnl-' + period);
+  if (wrEl) wrEl.textContent = wr !== null ? wr + '%' : '—';
+  $('cnt-w-' + period).textContent = wins   + ' W';
+  $('cnt-l-' + period).textContent = losses + ' L';
+  $('cnt-b-' + period).textContent = bes    + ' B';
+
+  // Discipline compliance for this same timeframe — denominator is journaled
+  // trades in the period, so the bars track Rules / SLS / TPS adherence over
+  // All Time / Week / Month alongside the win/loss wheel above.
+  const discHost = $('disc-bars-' + period);
+  if (discHost) {
+    const js = list.map(journalForTrade).filter(Boolean);
+    const dn = js.length;
+    discHost.innerHTML =
+      disciplineBar('Rules',       js.filter(j => j.followedRules === 'yes').length, dn) +
+      disciplineBar('Stop Loss',   js.filter(j => j.followedSLS   === 'yes').length, dn) +
+      disciplineBar('Take Profit', js.filter(j => j.followedTPS   === 'yes').length, dn);
+  }
+
+  mountResultDonut(canvasId, [wins, losses, bes]);
+}
+
+/* ─── R:R BAR ────────────────────────────────────────────────────────────── */
+function renderRRBar(ft) {
+  const labelEl = $('rr-bar-label-txt');
+  const valueEl = $('rr-bar-value');
+  const segEl   = $('rr-bar-segments');
+
+  const winPnls  = [];
+  const lossPnls = [];
+  for (const t of ft) {
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v === null) continue;
+    if (t.result === 'win')  winPnls.push(v);
+    if (t.result === 'loss') lossPnls.push(Math.abs(v));
+  }
+
+  const avgWin  = mean(winPnls);
+  const avgLoss = mean(lossPnls);
+
+  if (!winPnls.length && !lossPnls.length) {
+    labelEl.textContent = 'RR Ratio — log trades with P&L to see this';
+    valueEl.textContent = '';
+    segEl.innerHTML = '<div class="bar-empty"></div>';
+    return;
+  }
+
+  const ratio = avgLoss > 0 ? avgWin / avgLoss : (avgWin > 0 ? 9.99 : 1);
+  labelEl.textContent = 'RR Ratio';
+  valueEl.textContent = ratio.toFixed(2) + ':1';
+
+  const total    = ratio + 1;
+  const greenPct = (ratio / total * 100).toFixed(1);
+  const redPct   = (1     / total * 100).toFixed(1);
+
+  segEl.innerHTML = `
+    <div class="rr-bar-segment-row">
+      <div class="rr-bar-seg-win"  style="width:${greenPct}%;"></div>
+      <div class="rr-bar-seg-loss" style="width:${redPct}%;"></div>
+    </div>`;
+}
+
+
+/* ─── HEATMAP CALENDAR ───────────────────────────────────────────────────── */
+function ensureHeatmapStructure() {
+  const host = $('calendar-heatmap');
+  if (!host || host.dataset.ready) return;
+  host.innerHTML = `
+    <div class="heatmap-hdr">
+      <button id="heatmap-prev" class="heatmap-nav-btn">&larr;</button>
+      <span id="heatmap-title" class="heatmap-title"></span>
+      <button id="heatmap-next" class="heatmap-nav-btn">&rarr;</button>
+    </div>
+    <div id="heatmap-month-pnl" class="heatmap-month-pnl"></div>
+    <div id="heatmap-grid" class="heatmap-grid"></div>`;
+  host.dataset.ready = '1';
+  $('heatmap-prev').addEventListener('click', () => { Calendar.navigate('heatmap', -1); renderHeatmap(); });
+  $('heatmap-next').addEventListener('click', () => { Calendar.navigate('heatmap',  1); renderHeatmap(); });
+  // Clicking a day that holds a trade opens that entry's journal modal — the
+  // same path as clicking its row in the trade log. Delegated on the grid,
+  // which persists across re-renders (only its innerHTML is replaced).
+  $('heatmap-grid').addEventListener('click', e => {
+    const cell = e.target.closest('.heatmap-cell[data-day]');
+    if (cell) openTradeForDay(cell.dataset.day);
+  });
+}
+// Opens the journal for a calendar day. A single trade opens its entry
+// directly; a day holding two or more opens a small picker listing every
+// trade on that day so you choose which one to open.
+function openTradeForDay(isoDay) {
+  const onDay = State.trades.filter(t => t.openTime && t.openTime.slice(0, 10) === isoDay);
+  if (!onDay.length) return;
+  if (onDay.length === 1) { Journal.openForTrade(onDay[0].id); return; }
+  openDayPopup(isoDay, onDay);
+}
+
+// Day picker: lists every trade on a day (newest logged first, matching the
+// trade log) with direction, setup, session and P&L. Clicking a row opens that
+// trade's journal. Built from the shared modal shell + dir-pill so it matches
+// the rest of the app.
+function openDayPopup(isoDay, trades) {
+  const modal = $('day-modal');
+  const list  = $('day-trade-list');
+  if (!modal || !list) return;
+
+  // Local-noon parse so the date label doesn't slip a day in negative timezones.
+  const dateStr = Dates.fmt(Dates.parseISODay(isoDay),
+    { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+
+  let total = 0, counted = 0;
+  for (const t of trades) {
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v !== null) { total += v; counted++; }
+  }
+  total = round2(total);
+  // Classify the day total through resultFromPnl — same rule the heatmap uses
+  // for this exact number — so the popup header and the cell can't disagree.
+  const totalRes = counted ? resultFromPnl(total) : '';
+  const totalCls = totalRes === 'win' ? 'win' : totalRes === 'loss' ? 'loss' : '';
+  const totalTxt = counted ? (total > 0 ? '+' : '') + total.toFixed(2) : '';
+  $('day-modal-title').innerHTML =
+    `${dateStr} &nbsp;·&nbsp; ${trades.length} trades` +
+    (counted ? ` &nbsp;·&nbsp; <span class="${totalCls}">${totalTxt}</span>` : '');
+
+  list.innerHTML = [...trades]
+    .sort((a, b) => tradeLogTime(b) - tradeLogTime(a))
+    .map(t => {
+      const j      = journalForTrade(t);
+      const pnlNum = j ? safeNum(j.pnl) : null;
+      const pnlTxt = pnlNum !== null ? (pnlNum > 0 ? '+' : '') + pnlNum.toFixed(2) : '—';
+      const rCls   = pnlNum !== null ? resultFromPnl(pnlNum) : '';
+      const pnlCls = rCls === 'win' ? 'win' : rCls === 'loss' ? 'loss' : '';
+      const sess   = t.session ? (CONFIG.SESSION_ABBR[t.session] || t.session) : '—';
+      const dir    = t.direction === 'BUY' ? 'Long' : t.direction === 'SELL' ? 'Short' : '—';
+      return `<div class="day-trade-row" data-trade="${escHtml(t.id)}">
+        <div class="day-trade-left">
+          <span class="dir-pill">${dir}</span>
+          <div class="day-trade-meta">
+            <span class="day-trade-setup">${escHtml(t.setup || '—')}</span>
+            <span class="day-trade-sub">${escHtml(sess)}</span>
+          </div>
+        </div>
+        <span class="day-trade-pnl ${pnlCls}">${pnlTxt}</span>
+      </div>`;
+    }).join('');
+
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeDayPopup() {
+  const modal = $('day-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+function renderHeatmap() {
+  ensureHeatmapStructure();
+  const cur = State.cal.heatmap;
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  $('heatmap-title').textContent = `${months[cur.m]} ${cur.y}`;
+
+  // Month total for P&L view — same dayData source as the cells, so the
+  // header figure is always exactly the sum of the cells below it.
+  const mp = $('heatmap-month-pnl');
+  if (mp) {
+    let mTotal = 0, mAny = false;
+    const dim = new Date(cur.y, cur.m + 1, 0).getDate();
+    for (let d = 1; d <= dim; d++) {
+      const key = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dd = dayData(key);
+      if (dd.tradeCount > 0) { mTotal += dd.pnl; mAny = true; }
+    }
+    mTotal = round2(mTotal);
+    if (!mAny) { mp.textContent = ''; mp.className = 'heatmap-month-pnl'; }
+    else {
+      const res = resultFromPnl(mTotal);
+      mp.textContent = (mTotal >= 0 ? '+' : '') + mTotal.toFixed(2);
+      mp.className = 'heatmap-month-pnl ' + (res === 'win' ? 'win' : res === 'loss' ? 'loss' : 'be');
+    }
+  }
+
+  const grid = $('heatmap-grid');
+  const dows = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('');
+
+  const firstDay   = new Date(cur.y, cur.m, 1).getDay();
+  const daysInMonth = new Date(cur.y, cur.m + 1, 0).getDate();
+  for (let i = 0; i < firstDay; i++) html += '<div class="heatmap-cell-empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const data = dayData(iso);
+    let cls  = data.tradeCount === 0 ? '' : resultFromPnl(data.pnl);
+    // A day holding any incomplete broker-synced trade pulses purple until
+    // its rules/emotions data is filled in.
+    if (State.trades.some(t => t.brokerPending && t.openTime && t.openTime.slice(0, 10) === iso)) cls += ' pending';
+    const pnlText   = data.tradeCount > 0 ? '$' + Math.abs(data.pnl).toFixed(2) : '';
+    const countText = data.tradeCount > 0 ? `${data.tradeCount} trade${data.tradeCount > 1 ? 's' : ''}` : '';
+    html += `
+      <div class="heatmap-cell ${cls}" data-day="${iso}">
+        <div class="heatmap-cell-day">${d}</div>
+        <div class="heatmap-cell-body">
+          <div class="heatmap-cell-pnl">${pnlText}</div>
+          <div class="heatmap-cell-count">${countText}</div>
+        </div>
+      </div>`;
+  }
+  grid.innerHTML = html;
+}
+function dayData(isoDay) {
+  let tradeCount = 0, pnl = 0;
+  for (const t of State.trades) {
+    if (!t.openTime || t.openTime.slice(0, 10) !== isoDay) continue;
+    tradeCount++;
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v !== null) pnl += v;
+  }
+  return { tradeCount, pnl: round2(pnl) };
+}
+
+/* ─── SESSION & SETUP CHARTS ─────────────────────────────────────────────── */
+// Builds the per-session win/loss bars (segmented win → B/E → loss) for a
+// given trade list, reusing the session win-rate bar styling. Every session is
+// always rendered — sessions with no trades show a dim placeholder row — so two
+// setup columns stay identical in height. The trade count rides on each bar's
+// title so a thin-sample 100% is obviously thin.
+function sessionBarsHtml(list) {
+  const rows = CONFIG.SESSIONS.map(s => {
+    const sub = list.filter(t => t.session === s);
+    const abbr = CONFIG.SESSION_ABBR[s];
+    if (!sub.length) return { abbr, empty: true };
+    const st = calcStats(sub);
+    // Denominator is decided trades (win+loss+B/E). A session that has trades
+    // but none with a logged result yet renders as the dim placeholder.
+    const decided = st.wins + st.losses + st.be;
+    if (!decided) return { abbr, empty: true };
+    return {
+      abbr, empty: false,
+      wins: st.wins, losses: st.losses, be: st.be, n: decided,
+      wr: Math.round(st.wr)
+    };
+  });
+
+  return `
+    <div class="sess-wr-list">
+      ${rows.map(r => {
+        if (r.empty) {
+          return `
+            <div class="sess-wr-row">
+              <div class="sess-wr-label">${r.abbr}</div>
+              <div class="bar-empty"></div>
+              <div class="sess-wr-pct dim">—</div>
+            </div>`;
+        }
+        const wPct = (r.wins   / r.n) * 100;
+        const lPct = (r.losses / r.n) * 100;
+        const bPct = (r.be     / r.n) * 100;
+        // Order segments win → be → loss; tag the last visible one for rounding.
+        const segs = [];
+        if (r.wins)   segs.push(`<div class="sess-wr-seg-win"  style="width:${wPct}%"></div>`);
+        if (r.be)     segs.push(`<div class="sess-wr-seg-be"   style="width:${bPct}%"></div>`);
+        if (r.losses) segs.push(`<div class="sess-wr-seg-loss" style="width:${lPct}%"></div>`);
+        const lastIdx = segs.length - 1;
+        const segHtml = segs.map((s, i) =>
+          i === lastIdx ? s.replace('class="sess-wr-seg', 'class="sess-wr-seg-last sess-wr-seg') : s
+        ).join('');
+        const trackCls = segs.length === 1 ? 'solo' : 'first';
+        const pctClass = r.wr >= 50 ? 'win' : 'loss';
+        return `
+          <div class="sess-wr-row">
+            <div class="sess-wr-label">${r.abbr}</div>
+            <div class="sess-wr-track ${trackCls}" title="${r.wins}W · ${r.losses}L · ${r.be}B (${r.n} trades)">${segHtml}</div>
+            <div class="sess-wr-pct ${pctClass}">${r.wr}%</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderSetupTable(ft) {
+  const host = $('setup-table');
+  if (!host) return;
+
+  const stats = CONFIG.SETUPS.map(setup => {
+    const list = ft.filter(t => t.setup === setup);
+    const w = list.filter(t => t.result === 'win').length;
+    const l = list.filter(t => t.result === 'loss').length;
+    const b = list.filter(t => t.result === 'be').length;
+    const total = w + l + b;
+    const wr = total ? Math.round(w / total * 100) : null;
+    const cid = 'chart-setup-' + setup.replace(/[^a-z0-9]/gi, '');
+    return { setup, list, w, l, b, total, wr, cid };
+  });
+
+  host.innerHTML = `
+    <div class="setup-donut-row">
+      ${stats.map(s => {
+        const wrText  = s.wr === null ? '—' : s.wr + '%';
+        return `
+          <div class="setup-donut-col">
+            <div class="setup-donut-label">${escHtml(s.setup)}</div>
+            <div class="period-host">
+              <div class="period-counts-left">
+                <span class="pc-w">${s.w} W</span>
+              </div>
+              <div class="period-donut-wrap">
+                <canvas id="${s.cid}" width="108" height="108"></canvas>
+                <div class="period-center"><div class="period-pnl">${wrText}</div></div>
+              </div>
+              <div class="period-counts-right">
+                <span class="pc-l">${s.l} L</span>
+                <span class="pc-b">${s.b} B</span>
+              </div>
+            </div>
+            <div class="setup-sess">${sessionBarsHtml(s.list)}</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+
+  // Mount each setup wheel through the shared builder so they're identical to
+  // the period wheels.
+  for (const s of stats) mountResultDonut(s.cid, [s.w, s.l, s.b]);
+}
+
+
+/* ─── EMOTION BARS (per-emotion win/loss by outcome) ─────────────────────── */
+// Phase policy: ALL columns (bars AND wheels) read BEFORE tags only — the
+// entry state is the causal phase, so these charts answer "what state did I
+// enter in?". The Positive column additionally carries two disciplineBar rows
+// (Stop Loss / Take Profit) computed from trades where Calm or Confident was
+// felt DURING the trade — the positives' management record, mirroring the
+// negatives' record in the separate "During the Trade" card below.
+function renderEmotionBars(ft) {
+  // Everything renders under the category wheels; guard on that host.
+  const wheelHost = $('emo-cat-wheels');
+  if (!wheelHost) return;
+
+  // Before-phase outcome counts, deduped per trade.
+  const counts = {};
+  for (const e of CONFIG.EMOTIONS_BEFORE) counts[e] = { win:0, loss:0, be:0 };
+  // Category-level counts: each trade counted ONCE per category it touches
+  // (trade-level dedup, not a sum of member bars), on before-phase presence —
+  // so every wheel reconciles with the before-only bars beneath it.
+  const catCounts = CONFIG.EMOTION_GROUPS.map(grp => ({ grp, win:0, loss:0, be:0, total:0 }));
+  // SL/TP compliance on trades where a POSITIVE emotion was felt during the
+  // trade (answered questions only — blanks don't dilute the rate).
+  const posDisc = { slsYes:0, slsN:0, tpsYes:0, tpsN:0 };
+  const positiveMembers = new Set(CONFIG.EMOTION_GROUPS.find(g => g.duringDiscipline).members);
+
+  const tally = (bucket, result) => {
+    if (result === 'win')       bucket.win++;
+    else if (result === 'loss') bucket.loss++;
+    else                        bucket.be++;
+  };
+
+  for (const t of ft) {
+    const j = journalForTrade(t);
+    if (!j) continue;
+
+    const beforeSet = new Set((j.beforeTags || []).filter(tag => counts[tag]));
+    for (const tag of beforeSet) tally(counts[tag], t.result);
+
+    for (const cc of catCounts) {
+      if (!cc.grp.members.some(m => beforeSet.has(m))) continue;
+      cc.total++;
+      tally(cc, t.result);
+    }
+
+    if ((j.duringTags || []).some(tag => positiveMembers.has(tag))) {
+      if (j.followedSLS === 'yes' || j.followedSLS === 'no') { posDisc.slsN++; if (j.followedSLS === 'yes') posDisc.slsYes++; }
+      if (j.followedTPS === 'yes' || j.followedTPS === 'no') { posDisc.tpsN++; if (j.followedTPS === 'yes') posDisc.tpsYes++; }
+    }
+  }
+
+  // Whole-period emotion presence is no longer a special case: when there's no
+  // data we still render the three category wheels (hollow rings showing "—")
+  // with their muted, untraded bar rows underneath — so the section keeps the
+  // same shape as every other card when empty, instead of collapsing to a line
+  // of text. The wheel builder and barRow both already handle all-zero counts.
+
+  const seg = (cls, v) => v > 0 ? `<div class="${cls}" style="flex:${v};"></div>` : '';
+
+  // One win/be/loss bar. Untraded buckets render muted with an empty track so
+  // every column keeps the same row count and rhythm.
+  const barRow = (labelHtml, c) => {
+    const decided = c.win + c.be + c.loss;
+    if (!decided) {
+      return `<div class="emo-row is-empty">
+        <div class="emo-row-head">
+          <span class="emo-row-name">${labelHtml}</span>
+          <span class="emo-row-pcts no-data">—</span>
+        </div>
+        <div class="bar-empty"></div>
+      </div>`;
+    }
+    const rate     = Math.round(c.win  / decided * 100);
+    const lossRate = Math.round(c.loss / decided * 100);
+    return `<div class="emo-row">
+      <div class="emo-row-head">
+        <span class="emo-row-name">${labelHtml}</span>
+        <span class="emo-row-pcts"><span class="win">${rate}%</span> <span class="sep">/</span> <span class="loss">${lossRate}%</span></span>
+      </div>
+      <div class="emo-row-track">
+        <div class="emo-row-bar" style="width:100%;">
+          ${seg('seg-win', c.win)}${seg('seg-be', c.be)}${seg('seg-loss', c.loss)}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const decidedOf = e => { const c = counts[e]; return c.win + c.loss + c.be; };
+
+  // Members sorted traded-first (best win rate), untraded sunk to the bottom.
+  const memberRows = (grp) => grp.members
+    .slice()
+    .sort((a, b) => {
+      const da = decidedOf(a), db = decidedOf(b);
+      if (!da && !db) return 0;          // both untraded → keep config order
+      if (!da) return 1;                 // untraded sinks below traded
+      if (!db) return -1;
+      return (counts[b].win / db) - (counts[a].win / da);  // win rate desc
+    })
+    .map(e => barRow(e, counts[e]))
+    .join('');
+
+  // Bars for one category: before-only outcome rows for every member. The
+  // duringDiscipline group (Positive) appends its SL/TP compliance rows,
+  // built by the shared disciplineBar primitive — same computation as the
+  // Panic/Anxious/Greed/Impatient bars in the during card.
+  const barsFor = (grp) => {
+    let html = memberRows(grp);
+    if (grp.duringDiscipline) {
+      html += disciplineBar('Stop Loss',   posDisc.slsYes, posDisc.slsN)
+           +  disciplineBar('Take Profit', posDisc.tpsYes, posDisc.tpsN);
+    }
+    return html;
+  };
+
+  // Category wheels (trade-level WR per overall emotion), each with its member
+  // bars stacked directly underneath in the same column. Wheels built through
+  // the shared wheel builder so they match every other wheel in the journal.
+  // All three always render — an empty category shows a hollow ring with "—".
+  wheelHost.innerHTML = `
+    <div class="emo-cat-row">
+      ${catCounts.map((cc, i) => {
+        const decided = cc.win + cc.loss + cc.be;
+        const wr = decided ? Math.round(cc.win / decided * 100) : null;
+        const wrText  = wr === null ? '—' : wr + '%';
+        return `
+          <div class="emo-cat-col">
+            <div class="emo-cat-label">${cc.grp.name}</div>
+            <div class="period-host">
+              <div class="period-counts-left">
+                <span class="pc-w">${cc.win} W</span>
+              </div>
+              <div class="period-donut-wrap">
+                <canvas id="chart-emo-cat-${i}" width="108" height="108"></canvas>
+                <div class="period-center"><div class="period-pnl">${wrText}</div></div>
+              </div>
+              <div class="period-counts-right">
+                <span class="pc-l">${cc.loss} L</span>
+                <span class="pc-b">${cc.be} B</span>
+              </div>
+            </div>
+            <div class="emo-cat-bars">${barsFor(cc.grp)}</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+  catCounts.forEach((cc, i) => mountResultDonut('chart-emo-cat-' + i, [cc.win, cc.loss, cc.be]));
+}
+
+/* ─── DURING THE TRADE — discipline held under each management emotion ───── */
+// The during-phase negatives aren't win/loss predictors (that would mostly
+// echo entry quality) — they're DISCIPLINE predictors: the proximate causes of
+// moved stops and early TPs. So each tag gets compliance bars, not outcome
+// bars: of the trades where this emotion showed up mid-trade, what share kept
+// the SL strategy and what share kept the TP strategy. Built entirely from the
+// shared disciplineBar primitive so it inherits the exact segment language,
+// --bar-h thickness, and empty-state treatment used everywhere else.
+function renderDuringMgmt(ft) {
+  const host = $('emo-during-mgmt');
+  if (!host) return;
+
+  const data = {};
+  for (const e of CONFIG.EMOTIONS_DURING_NEGATIVE)
+    data[e] = { slsYes:0, slsN:0, tpsYes:0, tpsN:0, total:0 };
+
+  for (const t of ft) {
+    const j = journalForTrade(t);
+    if (!j) continue;
+    const seen = new Set((j.duringTags || []).filter(tag => data[tag]));
+    for (const tag of seen) {
+      const d = data[tag];
+      d.total++;
+      // Denominators are ANSWERED trades only — an unanswered SLS/TPS field
+      // shouldn't dilute the compliance rate.
+      if (j.followedSLS === 'yes' || j.followedSLS === 'no') { d.slsN++; if (j.followedSLS === 'yes') d.slsYes++; }
+      if (j.followedTPS === 'yes' || j.followedTPS === 'no') { d.tpsN++; if (j.followedTPS === 'yes') d.tpsYes++; }
+    }
+  }
+
+  // All four columns always render — an untraded emotion shows dim dashes and
+  // empty tracks (disciplineBar's n=0 path), keeping the section's shape stable.
+  host.innerHTML = `
+    <div class="emo-during-grid">
+      ${CONFIG.EMOTIONS_DURING_NEGATIVE.map(e => {
+        const d = data[e];
+        const count = d.total ? `<span class="emo-during-n">${d.total}</span>` : '';
+        return `
+          <div class="emo-during-col">
+            <div class="emo-cat-label">${e}${count}</div>
+            ${disciplineBar('Stop Loss',   d.slsYes, d.slsN)}
+            ${disciplineBar('Take Profit', d.tpsYes, d.tpsN)}
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+
+/* ─── TRADE TABLE ────────────────────────────────────────────────────────── */
+function renderTradeTable(ft) {
+  const host = $('trade-table');
+  const pag  = $('tlog-pagination');
+  if (!ft.length) {
+    host.innerHTML = '<div class="empty-msg">No trades yet. Tap <b style="color:var(--p)">+</b> to log your first trade.</div>';
+    pag.innerHTML = '';
+    return;
+  }
+
+  // Sort newest-logged first. openTime is a fixed time-of-day per entry date
+  // (e.g. 09:30Z), so same-day trades all collide on it — which is why order
+  // looked random. tradeLogTime() reads the linked journal's createdAt (real
+  // logging timestamp, down to the ms), giving a stable newest-on-top order.
+  const sorted     = [...ft].sort((a, b) => tradeLogTime(b) - tradeLogTime(a));
+  const totalPages = Math.ceil(sorted.length / CONFIG.PER_PAGE);
+  if (State.tradeLogPage >= totalPages) State.tradeLogPage = totalPages - 1;
+  const page = sorted.slice(State.tradeLogPage * CONFIG.PER_PAGE, (State.tradeLogPage + 1) * CONFIG.PER_PAGE);
+
+  const head = `
+    <thead><tr>
+      <th>Date</th><th>Dir</th><th>Session</th><th>Setup</th>
+      <th>P&amp;L</th><th class="c">Rules</th><th class="c">SLS</th><th class="c">TPS</th><th class="lesson-col">Final Lesson</th><th></th>
+    </tr></thead>`;
+
+  const body = page.map(t => {
+    const j = journalForTrade(t);
+    const date    = Dates.fmt(t.openTime, { day:'2-digit', month:'short', year:'2-digit' });
+    const yn = v => v === 'yes' ? '<span class="rules-tick">✓</span>'
+                  : v === 'no'  ? '<span class="rules-cross">✕</span>' : '—';
+    const rules = j ? yn(j.followedRules) : '—';
+    const sls   = j ? yn(j.followedSLS)   : '—';
+    const tps   = j ? yn(j.followedTPS)   : '—';
+    const lesson = j && j.finalLesson
+      ? `<span class="lesson-cell">${escHtml(j.finalLesson)}</span>`
+      : '<span class="lesson-cell empty">—</span>';
+    const pnlNum  = j ? safeNum(j.pnl) : null;
+    const pnlText = pnlNum !== null ? (pnlNum > 0 ? '+' : '') + pnlNum.toFixed(2) : '—';
+    // Colour via resultFromPnl so a ±BE_THRESHOLD scratch renders neutral here,
+    // matching the wheels / heatmap / win-rate instead of colouring by raw sign.
+    const rCls    = pnlNum !== null ? resultFromPnl(pnlNum) : '';
+    const pnlCls  = rCls === 'win' ? 'win' : rCls === 'loss' ? 'loss' : '';
+
+    const sessionAbbr = t.session ? (CONFIG.SESSION_ABBR[t.session] || t.session) : '—';
+
+    return `<tr data-trade="${escHtml(t.id)}"${t.brokerPending ? ' class="broker-pending"' : ''}>
+      <td>${date}</td>
+      <td><span class="dir-pill">${escHtml(t.direction || '—')}</span></td>
+      <td>${escHtml(sessionAbbr)}</td>
+      <td>${escHtml(t.setup || '—')}</td>
+      <td class="${pnlCls}">${pnlText}</td>
+      <td class="c">${rules}</td>
+      <td class="c">${sls}</td>
+      <td class="c">${tps}</td>
+      <td class="lesson-col">${lesson}</td>
+      <td><button class="del-btn" data-del="${escHtml(t.id)}" title="Delete trade" aria-label="Delete trade">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  host.innerHTML = `<table>${head}<tbody>${body}</tbody></table>`;
+
+  if (totalPages > 1) {
+    const start = State.tradeLogPage * CONFIG.PER_PAGE + 1;
+    const end   = Math.min((State.tradeLogPage + 1) * CONFIG.PER_PAGE, sorted.length);
+    pag.innerHTML = `
+      <span class="tlog-pag-info">${start}–${end} of ${sorted.length}</span>
+      <button class="tlog-pag-btn" data-page="prev" ${State.tradeLogPage === 0 ? 'disabled' : ''}>← Prev</button>
+      <button class="tlog-pag-btn" data-page="next" ${State.tradeLogPage === totalPages - 1 ? 'disabled' : ''}>Next →</button>`;
+  } else {
+    pag.innerHTML = '';
+  }
+}
+
+/* ─── UNDOABLE DELETE ────────────────────────────────────────────────────────
+   Deletes apply (and persist) immediately, but the removed trade + journal are
+   held in memory for CONFIG.UNDO_MS so the toast's Undo button can put them
+   straight back. Only the most recent delete is recoverable — staging a new
+   one finalises the previous. Closing the tab inside the window simply makes
+   the delete permanent (it was already saved), so nothing can end up in limbo.
+   This replaces the old native confirm() dialogs: a confirm gets clicked
+   through on reflex; an undo window forgives the reflex.
+   ─────────────────────────────────────────────────────────────────────────── */
+const PendingDelete = {
+  timer: 0,
+  trade: null,
+  journal: null,
+
+  stage(tradeId) {
+    PendingDelete.commit();  // finalise any previous pending delete first
+    const t = State.tradeById.get(tradeId) || null;
+    const j = State.journals.find(x => x.tradeId === tradeId) || null;
+    if (!t && !j) return;
+    State.trades   = State.trades.filter(x => x.id !== tradeId);
+    State.journals = State.journals.filter(x => x.tradeId !== tradeId);
+    PendingDelete.trade   = t;
+    PendingDelete.journal = j;
+    Storage.saveTradesAndJournals();
+    renderTrades();
+    notifyUndo('Trade deleted');
+    PendingDelete.timer = setTimeout(() => PendingDelete.commit(), CONFIG.UNDO_MS);
+  },
+
+  undo() {
+    clearTimeout(PendingDelete.timer);
+    if (!PendingDelete.trade && !PendingDelete.journal) return;
+    if (PendingDelete.trade)   State.trades.push(PendingDelete.trade);
+    if (PendingDelete.journal) State.journals.push(PendingDelete.journal);
+    PendingDelete.trade = PendingDelete.journal = null;
+    Storage.saveTradesAndJournals();
+    renderTrades();
+    notify('Trade restored');
+  },
+
+  commit() {
+    clearTimeout(PendingDelete.timer);
+    PendingDelete.trade = PendingDelete.journal = null;
+  }
+};
+
+function deleteTrade(id) { PendingDelete.stage(id); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JOURNAL MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Journal = {
+  // Currently-edited entry id (null = new).
+  editingId: null,
+  // tradeId we should attach a new entry to (set by openForTrade).
+  linkedTradeId: null,
+
+  open(existing) {
+    Journal.editingId     = existing ? existing.id : null;
+    Journal.linkedTradeId = null;
+
+    $('jm-body').innerHTML = renderJournalForm(existing);
+
+    // Header fields
+    $('jm-pnl').value = (existing && existing.pnl != null) ? existing.pnl : '';
+    const dir = existing ? existing.direction : '';
+    $('jmd-buy').checked  = dir === 'BUY';
+    $('jmd-sell').checked = dir === 'SELL';
+    setSessionPill((existing && existing.session) || Dates.detectSession());
+    // Seed the date picker from the day the trade is actually filed under (its
+    // openTime), NOT from createdAt. createdAt is a UTC ISO stamp, so for an
+    // evening trade in the Americas its date is already the next calendar day —
+    // re-saving an edit would silently shove the trade forward a day. openTime
+    // carries the civil day the entry belongs to, so editing preserves it.
+    let seedDay;
+    if (existing) {
+      const linked = State.tradeById.get(existing.tradeId);
+      seedDay = (linked && linked.openTime)
+        ? linked.openTime.slice(0, 10)
+        : Dates.isoDay(new Date(existing.createdAt)); // fallback: local day, not UTC slice
+    } else {
+      seedDay = Dates.isoDay(new Date());
+    }
+    setDateLabel(seedDay);
+
+    $('journal-modal').classList.add('open');
+    $('journal-modal').setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  },
+
+  openForTrade(tradeId) {
+    const t = State.tradeById.get(tradeId);
+    if (!t) return;
+    const j = journalForTrade(t);
+    if (j) Journal.open(j);
+    else {
+      Journal.open(null);
+      Journal.linkedTradeId = tradeId;
+    }
+  },
+
+  close() {
+    $('journal-modal').classList.remove('open');
+    $('journal-modal').setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    renderTrades();
+  },
+
+  save() {
+    const session   = $('jm-session-btn').dataset.value || '';
+    const direction = (document.querySelector('input[name="jm-direction"]:checked') || {}).value || '';
+    const pnlRaw    = $('jm-pnl').value.trim();
+
+    // Direction is required — without it, the rest of the analytics break.
+    if (!direction) {
+      notify('Pick Long or Short before saving.', true);
+      return;
+    }
+    // Accept blank P&L (entry counts but is not yet resolved). If anything is
+    // typed, it must be a finite number; reject "abc", "12,50", whitespace, etc.
+    // rather than letting NaN propagate into storage and corrupt every chart.
+    let pnl = null;
+    if (pnlRaw !== '') {
+      const v = safeNum(pnlRaw.replace(',', '.')); // be lenient with EU decimals
+      if (v === null) {
+        notify('P&L must be a number (e.g. 125 or -75.50). Leave blank if unknown.', true);
+        return;
+      }
+      pnl = v;
+    }
+
+    const entryDate = State.cal.journal.sel || Dates.isoDay(new Date());
+
+    const followedRules = pickRadio('followedRules');
+    const followedSLS   = pickRadio('followedSLS');
+    const followedTPS   = pickRadio('followedTPS');
+    const setup         = pickRadio('jf-setup');
+
+    const beforeTags = pickChecks('jf-before-tag');
+    const duringTags = pickChecks('jf-during-tag');
+    const finalLesson = ($('jf-lesson')?.value || '').trim();
+
+    const result = pnl !== null ? resultFromPnl(pnl) : null;
+    const emotionTags = [...new Set([...beforeTags, ...duringTags])];
+
+    const now = new Date().toISOString();
+    const openTime = entryDate ? entryDate + 'T09:30:00.000Z' : now;
+
+    if (Journal.editingId) {
+      const j = State.journals.find(x => x.id === Journal.editingId);
+      if (!j) { notify('Entry not found.', true); return; }
+      Object.assign(j, {
+        updatedAt: now, session, direction, setup, pnl, result,
+        followedRules, followedSLS, followedTPS,
+        beforeTags, duringTags, afterTags: [], emotionTags, finalLesson
+      });
+      const t = State.tradeById.get(j.tradeId);
+      if (t) Object.assign(t, { direction, session, setup, result, openTime });
+      BrokerSync.clearIfComplete(t, j);
+    } else {
+      const tid = Journal.linkedTradeId || uid();
+      const jid = uid();
+      if (!Journal.linkedTradeId) {
+        State.trades.push({
+          id: tid, direction, result, session, setup,
+          openTime, openPrice: null, exitPrice: null, rr: null, source: 'journal'
+        });
+      } else {
+        const t = State.tradeById.get(tid);
+        if (t) Object.assign(t, { direction, session, setup, result, openTime });
+      }
+      const newJ = {
+        id: jid, tradeId: tid, createdAt: now, updatedAt: now,
+        session, direction, setup, result, pnl,
+        followedRules, followedSLS, followedTPS,
+        beforeTags, duringTags, afterTags: [], emotionTags, finalLesson
+      };
+      State.journals.push(newJ);
+      BrokerSync.clearIfComplete(State.tradeById.get(tid), newJ);
+    }
+
+    Storage.saveTradesAndJournals();
+    Journal.close();
+    notify('Entry saved');
+  },
+
+  delete(id) {
+    const j = State.journals.find(x => x.id === id);
+    if (!j) return;
+    // No confirm dialog — close the modal and stage an undoable delete; the
+    // toast offers a CONFIG.UNDO_MS window to reverse it (see PendingDelete).
+    Journal.close();
+    PendingDelete.stage(j.tradeId);
+  }
+};
+
+function pickRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+function pickChecks(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(el => el.value);
+}
+
+/* ─── FORM RENDERER ──────────────────────────────────────────────────────── */
+function renderJournalForm(existing) {
+  const j = existing || {
+    setup: '', followedRules: '', followedSLS: '', followedTPS: '',
+    beforeTags: [], duringTags: [], finalLesson: ''
+  };
+
+  // Section 1 — Discipline + Setup
+  const ynRow = ['followedRules','followedSLS','followedTPS'].map((name, i) => {
+    const labels = ['Followed rules?','Followed SLS?','Followed TPS?'];
+    const val    = j[name];
+    const opts = ['yes','no'].map(v => {
+      const id  = `${name}-${v}`;
+      const chk = val === v ? ' checked' : '';
+      const lv  = v === 'yes' ? 'Yes' : 'No';
+      return `
+        <input type="radio" class="jf-pill-radio" name="${name}" id="${id}" value="${v}"${chk}>
+        <label class="jf-pill-lbl jf-yn-pill" for="${id}">${lv}</label>`;
+    }).join('');
+    return `<div class="jf-yn-item">
+      <label class="journal-q-label" style="margin-bottom:0;">${labels[i]}</label>
+      <div class="jf-yn-buttons">${opts}</div>
+    </div>`;
+  }).join('');
+
+  const setupPills = CONFIG.SETUPS.map(s => {
+    const id  = 'jf-setup-' + s.replace(/[^a-z0-9]/gi, '');
+    const chk = j.setup === s ? ' checked' : '';
+    return `
+      <input type="radio" class="jf-pill-radio" name="jf-setup" id="${id}" value="${escHtml(s)}"${chk}>
+      <label class="jf-pill-lbl" for="${id}">${escHtml(s)}</label>`;
+  }).join('');
+
+  const buttons = Journal.editingId
+    ? `<button class="jm-btn-save"   data-jm-action="save">Save</button>
+       <button class="jm-btn-cancel" data-jm-action="cancel">Cancel</button>
+       <button class="jm-btn-delete" data-jm-action="delete">Delete</button>`
+    : `<button class="jm-btn-save"   data-jm-action="save">Save</button>
+       <button class="jm-btn-cancel" data-jm-action="cancel">Cancel</button>`;
+
+  return `
+    <div class="journal-form">
+      <div class="jm-card">
+        <div class="jf-yn-row">${ynRow}</div>
+        <div class="jf-setup-row">${setupPills}</div>
+      </div>
+      <div class="jm-card">
+        <div style="width:100%;text-align:center;">
+          <label class="journal-q-label">Before the trade</label>
+          ${emotionChips('before', j.beforeTags || [])}
+        </div>
+        <div style="width:100%;text-align:center;">
+          <label class="journal-q-label">During the trade</label>
+          ${emotionChips('during', j.duringTags || [])}
+        </div>
+      </div>
+      <div class="jm-card">
+        <span class="jm-card-label">Final Lesson</span>
+        <textarea class="journal-q-textarea" id="jf-lesson"
+          placeholder="What is the one thing you are taking away from this trade?">${escHtml(j.finalLesson || '')}</textarea>
+      </div>
+      <div class="journal-form-actions">${buttons}</div>
+    </div>`;
+}
+
+// Phase-specific chip layouts (columns divided Positive | negatives):
+//   before → [Calm/Confident] | [Hesitant/Anxious, Gun-shy/Overwhelmed] | [Revenge/Greed, Bored/FOMO]
+//   during → [Calm/Confident] | [Panic/Anxious, Greed/Impatient]
+// The during picker is deliberately short — only the states that exist while
+// holding a position and that drive management errors.
+function emotionChips(phase, selected) {
+  const sel = new Set(selected);
+  const pill = e => {
+    const id  = `jf-${phase}-${e.toLowerCase().replace(/\s/g,'-')}`;
+    const chk = sel.has(e) ? ' checked' : '';
+    return `
+      <input type="checkbox" class="jf-pill-radio" name="jf-${phase}-tag" id="${id}" value="${e}"${chk}>
+      <label class="jf-pill-lbl jf-emo-pill" for="${id}">${e}</label>`;
+  };
+  if (phase === 'during') {
+    return `
+      <div class="jf-emo-cols">
+        <div class="jf-emo-col">${pill('Calm')}${pill('Confident')}</div>
+        <div class="jf-emo-divider"></div>
+        <div class="jf-emo-col">
+          <div class="jf-emo-row">${pill('Panic')}${pill('Anxious')}</div>
+          <div class="jf-emo-row">${pill('Greed')}${pill('Impatient')}</div>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="jf-emo-cols">
+      <div class="jf-emo-col">${pill('Calm')}${pill('Confident')}</div>
+      <div class="jf-emo-divider"></div>
+      <div class="jf-emo-col">
+        <div class="jf-emo-row">${pill('Hesitant')}${pill('Anxious')}</div>
+        <div class="jf-emo-row">${pill('Gun-shy')}${pill('Overwhelmed')}</div>
+      </div>
+      <div class="jf-emo-divider"></div>
+      <div class="jf-emo-col">
+        <div class="jf-emo-row">${pill('Revenge')}${pill('Greed')}</div>
+        <div class="jf-emo-row">${pill('Bored')}${pill('FOMO')}</div>
+      </div>
+    </div>`;
+}
+
+/* ─── BINDINGS for journal form (delegate-style; called after innerHTML reset) */
+/* ─── HEADER WIDGETS (Session pill + Date pill) ──────────────────────────── */
+function setSessionPill(s) {
+  const btn  = $('jm-session-btn');
+  const opts = $('jm-session-opts');
+  if (!btn || !opts) return;
+  btn.textContent   = CONFIG.SESSION_ABBR[s] || s;
+  btn.dataset.value = s;
+  // List every session (including the current one, flagged) so the menu never
+  // reorders and the active choice stays visible. Full name on the left, with
+  // the abbreviation as a quiet tag — or a check when it's the selected row.
+  opts.innerHTML = '';
+  for (const x of CONFIG.SESSIONS) {
+    const isSel = x === s;
+    const name  = x.replace('+', ' + ');
+    const right = isSel ? '<span class="opt-check">✓</span>' : '';
+    const b = document.createElement('button');
+    b.type      = 'button';
+    b.className = 'jm-session-opt' + (isSel ? ' sel' : '');
+    b.innerHTML = `<span class="opt-name">${escHtml(name)}</span>${right}`;
+    b.addEventListener('click', () => { setSessionPill(x); toggleSessionMenu(false); });
+    opts.appendChild(b);
+  }
+}
+function toggleSessionMenu(force) {
+  const opts = $('jm-session-opts');
+  const open = force === undefined ? !opts.classList.contains('open') : !!force;
+  opts.classList.toggle('open', open);
+}
+function setDateLabel(iso) {
+  State.cal.journal.sel = iso;
+  const span = $('jm-date-label');
+  if (span) span.textContent = Dates.parseISODay(iso)
+    .toLocaleDateString('en-GB', { day:'2-digit', month:'short' }).toUpperCase();
+}
+
+/* ─── JOURNAL CALENDAR (single-date select) ──────────────────────────────── */
+function toggleJournalCal(force) {
+  const wrap = $('jm-cal');
+  const open = force === undefined ? !wrap.classList.contains('open') : !!force;
+  if (open) {
+    const sel = State.cal.journal.sel;
+    if (sel) {
+      const d = Dates.parseISODay(sel);
+      State.cal.journal.y = d.getFullYear();
+      State.cal.journal.m = d.getMonth();
+    } else {
+      const now = new Date();
+      State.cal.journal.y = now.getFullYear();
+      State.cal.journal.m = now.getMonth();
+    }
+    renderJournalCal();
+    wrap.classList.add('open');
+  } else {
+    wrap.classList.remove('open');
+  }
+}
+function renderJournalCal() {
+  const cur = State.cal.journal;
+  const todayISO = Dates.isoDay(new Date());
+  Calendar.render({
+    gridId: 'journal-cal-grid',
+    titleId: 'journal-cal-title',
+    year: cur.y, month: cur.m,
+    renderCell(date, iso, d) {
+      const isSel    = iso === cur.sel;
+      const isToday  = iso === todayISO;
+      const cls = ['cal-day'];
+      if (isSel)   cls.push('sel', 'sel-single');
+      else if (isToday) cls.push('today');
+      else         cls.push('muted');
+      const label = date.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+      return `<span class="${cls.join(' ')}" role="button" tabindex="0" aria-label="${escHtml(label)}" data-jcal-day="${iso}">${d}</span>`;
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   I/O — Import / Export
+   ═══════════════════════════════════════════════════════════════════════════ */
+const IO = {
+  openModal()  {
+    const m = $('io-modal');
+    m.classList.add('open');
+    m.setAttribute('aria-hidden', 'false');
+  },
+  closeModal() {
+    const m = $('io-modal');
+    m.classList.remove('open');
+    m.setAttribute('aria-hidden', 'true');
+    const status = $('io-import-status');
+    if (status) { status.textContent = ''; status.className = 'io-import-status'; }
+  },
+
+  // Inject a clickable <a download> into the section so the user can save it.
+  showLink(dataUri, filename, sectionId) {
+    const container = $(sectionId);
+    if (!container) return;
+    container.querySelector('.export-ready-link')?.remove();
+    const div = document.createElement('div');
+    div.className = 'export-ready-link';
+    div.innerHTML = `
+      <span>Ready</span>
+      <a href="${dataUri}" download="${filename}">↓ Download</a>`;
+    container.appendChild(div);
+  },
+
+  /* ─── Template & Excel import ─────────────────────────────────────────── */
+  downloadTemplate() {
+    const template = [
+      { 'Date':'2024-03-15','Direction':'BUY', 'Session':'London','Setup':'Support & Resistance',
+        'P&L ($)':153, 'Followed Rules':'Yes','Followed SLS':'Yes','Followed TPS':'Yes',
+        'Before Tags':'Calm, Confident','During Tags':'Calm','Final Lesson':'Patience before entry pays off.' },
+      { 'Date':'2024-03-16','Direction':'SELL','Session':'New York','Setup':'Break & Retest',
+        'P&L ($)':-138,'Followed Rules':'No','Followed SLS':'No','Followed TPS':'No',
+        'Before Tags':'FOMO, Greed','During Tags':'Anxious','Final Lesson':'Never chase. If you miss it, the next one is coming.' }
+    ];
+    const ws = XLSX.utils.json_to_sheet(template);
+    ws['!cols'] = [{wch:12},{wch:10},{wch:12},{wch:22},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25},{wch:50}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Trades');
+    const wbout = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
+    IO.showLink(
+      'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout,
+      'doji-import-template.xlsx',
+      'io-section-import'
+    );
+  },
+
+  importExcel(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const status = $('io-import-status');
+    status.textContent = 'Reading…'; status.className = 'io-import-status';
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      status.textContent = '✗ Could not read file';
+      status.className   = 'io-import-status loss';
+      input.value = '';
+    };
+    reader.onload = e => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), { type:'array', cellDates:true });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'' });
+        if (!rows.length) {
+          status.textContent = '✗ No rows found.';
+          return;
+        }
+
+        const result = importRowsIntoState(rows);
+        Storage.saveTradesAndJournals();
+        renderTrades();
+
+        let msg = `✓ Imported ${result.added} trade${result.added !== 1 ? 's' : ''}`;
+        const skips = [];
+        if (result.skippedDir)  skips.push(`${result.skippedDir} missing/invalid Direction`);
+        if (result.skippedDate) skips.push(`${result.skippedDate} unrecognised Date`);
+        if (skips.length) msg += ` (skipped: ${skips.join(', ')})`;
+        status.textContent = msg;
+        status.className   = 'io-import-status ' + (result.added > 0 ? 'win' : '');
+        input.value = '';
+      } catch (err) {
+        status.textContent = '✗ ' + err.message;
+        status.className   = 'io-import-status loss';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  },
+
+  /* ─── Journal export ──────────────────────────────────────────────────── */
+  exportJournal() {
+    if (!State.journals.length) { notify('No journal entries to export', true); return; }
+    const yn  = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '';
+    const res = v => v === 'win' ? 'Win' : v === 'loss' ? 'Loss' : v === 'be' ? 'Break Even' : '';
+
+    const sorted = [...State.journals].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    const rows = sorted.map(j => {
+      const t = State.tradeById.get(j.tradeId) || {};
+      return {
+        // Export the date the trade is FILED under (openTime — the day picked
+        // in the modal's calendar), matching the trade log and heatmap. Using
+        // createdAt here exported backdated entries under the day they were
+        // LOGGED instead of the day they were traded. createdAt remains only
+        // the fallback for a journal with no linked trade.
+        'Date':           Dates.fmt(t.openTime || j.createdAt, { day:'2-digit', month:'short', year:'numeric' }),
+        'Direction':      t.direction || '',
+        'Session':        t.session   || '',
+        'Setup':          t.setup     || '',
+        'P&L ($)':        j.pnl != null ? j.pnl : '',
+        'Result':         res(t.result),
+        'Followed Rules': yn(j.followedRules),
+        'Followed SLS':   yn(j.followedSLS),
+        'Followed TPS':   yn(j.followedTPS),
+        'Before Tags':    (j.beforeTags || []).join(', '),
+        'During Tags':    (j.duringTags || []).join(', '),
+        'Final Lesson':   j.finalLesson || ''
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25},{wch:50}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Journal');
+    const wbout = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
+    IO.showLink(
+      'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout,
+      'doji-journal-' + Dates.isoDay(new Date()) + '.xlsx',
+      'io-section-journal'
+    );
+    notify(`Journal ready — ${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`);
+  },
+
+  /* ─── JSON backup / restore ───────────────────────────────────────────── */
+  // Single source of truth for backup contents. Both the manual export below and
+  // the automatic weekly backup (BackupWatcher) build from this, so the two paths
+  // can never drift apart.
+  buildBackupPayload() {
+    return {
+      schema:     CONFIG.BACKUP_SCHEMA,
+      exportedAt: new Date().toISOString(),
+      trades:     State.trades,
+      journals:   State.journals,
+      rules:      Storage.loadRules(),
+      ddMax:      Storage.loadDDMax()
+    };
+  },
+  exportJSON() {
+    const payload = IO.buildBackupPayload();
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+    IO.showLink(dataUri, 'doji-backup-' + Dates.isoDay(new Date()) + '.json', 'io-section-json');
+    notify('Backup ready');
+  },
+  // Programmatic download (no click) for the automatic weekly backup. Distinct
+  // from showLink(), which renders a link the user taps inside the I/O modal.
+  // Lands in Firefox's configured download folder; silent only if Firefox is set
+  // to save without asking (Settings → Files and Applications → "Save files to").
+  downloadBackup(filename) {
+    const json = JSON.stringify(IO.buildBackupPayload(), null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+
+  importJSON(input) {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => {
+      notify('Restore failed: could not read file', true);
+      input.value = '';
+    };
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data || typeof data !== 'object') {
+          throw new Error('File is not a Doji backup.');
+        }
+
+        // A real Doji backup always carries BOTH arrays (see buildBackupPayload).
+        // Require both before touching State — a partial file must not
+        // half-replace the data set (e.g. new trades + stale journals), which
+        // would leave orphaned entries pointing at deleted trade ids. The modal
+        // promises "replaces all current data"; make that literally true.
+        if (!Array.isArray(data.trades) || !Array.isArray(data.journals)) {
+          throw new Error('File is not a Doji backup.');
+        }
+
+        // Schema stamp (written since v6). Older backups lack it — restore
+        // proceeds and migrateData() upgrades the records. A NEWER stamp means
+        // the file came from a future app version: restore best-effort, but
+        // tell the user the data may carry fields this version doesn't know.
+        const newerSchema = safeNum(data.schema) !== null
+                         && data.schema > CONFIG.BACKUP_SCHEMA;
+
+        // Validate each restored record before letting it into State. Anything
+        // missing required fields is dropped rather than imported, so the rest
+        // of the app doesn't need to defend against malformed objects coming
+        // out of the persistence layer.
+        const validTrades   = data.trades.filter(IO._isValidTrade);
+        const validJournals = data.journals.filter(IO._isValidJournal);
+
+        State.trades   = validTrades;
+        State.journals = validJournals;
+        if (data.rules && typeof data.rules === 'object') Storage.saveRules(data.rules);
+        if (data.ddMax != null) {
+          const dd = safeNum(data.ddMax);
+          if (dd !== null && dd > 0) Storage.saveDDMax(dd);
+        }
+        migrateData();
+        Storage.saveTradesAndJournals();
+        renderTrades(); renderRules();
+
+        // Surface any rows we dropped so the user knows the restore wasn't 100%.
+        const dropped = [];
+        if (validTrades.length   < data.trades.length)
+          dropped.push(`${data.trades.length   - validTrades.length} trades`);
+        if (validJournals.length < data.journals.length)
+          dropped.push(`${data.journals.length - validJournals.length} entries`);
+
+        const msg = `Restored ${State.trades.length} trades, ${State.journals.length} entries`
+                  + (dropped.length ? ` (skipped invalid: ${dropped.join(', ')})` : '')
+                  + (newerSchema ? ' — file is from a newer Doji version' : '');
+        notify(msg, dropped.length > 0 || newerSchema);
+        IO.closeModal();
+      } catch (err) {
+        notify('Restore failed: ' + err.message, true);
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  },
+
+  // Lightweight schema guards. Keep these in sync with Journal.save() and
+  // importRowsIntoState() — the shape they produce is the contract.
+  _isValidTrade(t) {
+    return t && typeof t === 'object'
+      && typeof t.id === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(t.id);
+  },
+  _isValidJournal(j) {
+    if (!j || typeof j !== 'object') return false;
+    if (typeof j.id      !== 'string' || !/^[A-Za-z0-9_\-]{1,64}$/.test(j.id))      return false;
+    if (typeof j.tradeId !== 'string' || !/^[A-Za-z0-9_\-]{1,64}$/.test(j.tradeId)) return false;
+    // If a P&L exists, it must be a finite number. NaN/Infinity/garbage rejected
+    // here so a corrupt backup can't poison every chart after restore.
+    if (j.pnl != null && j.pnl !== '' && safeNum(j.pnl) === null) return false;
+    return true;
+  }
+};
+
+// Append rows from an imported sheet straight into State.
+function importRowsIntoState(rows) {
+  const colByName = (row, candidates) => {
+    const keys = Object.keys(row);
+    for (const cand of candidates) {
+      const needle = cand.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const match  = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === needle);
+      if (match !== undefined && row[match] !== '') return String(row[match]).trim();
+    }
+    return '';
+  };
+  const parseYN = v => {
+    const s = v.toLowerCase();
+    if (s === 'yes' || s === 'y' || s === '1') return 'yes';
+    if (s === 'no'  || s === 'n' || s === '0') return 'no';
+    return '';
+  };
+  // Parses dates from a wide variety of inputs Excel/CSV will hand us:
+  //   - Date objects (when {cellDates:true} is on)
+  //   - Excel serial numbers (number of days since 1900-01-01)
+  //   - ISO strings ("2024-03-15", "2024-03-15T...")
+  //   - DD/MM/YYYY and DD-MM-YYYY (European, common in templates)
+  //   - DD MMM YY ("15 Mar 24") and DD MMM YYYY ("15 Mar 2024")
+  //   - Anything else valid for native Date
+  const parseDate = raw => {
+    if (!raw) return null;
+    if (raw instanceof Date) return isNaN(raw) ? null : raw;
+
+    if (typeof raw === 'number') {
+      // Excel serial date: days since 1899-12-30 (Excel's 1900 leap-year bug accounted for)
+      const ms = (raw - 25569) * 86400000;
+      const d = new Date(ms);
+      return isNaN(d) ? null : d;
+    }
+
+    const s = String(raw).trim();
+
+    // Pure-numeric strings are Excel serial dates (colByName stringifies them)
+    if (/^\d+(\.\d+)?$/.test(s)) {
+      const n = parseFloat(s);
+      // Excel serials for trading dates are roughly 25,000 (1968) to 73,000 (2099).
+      // Reject obviously-not-a-date values like 0, 1, 12345, etc by lower-bounding.
+      if (n > 25000 && n < 73000) {
+        const d = new Date((n - 25569) * 86400000);
+        return isNaN(d) ? null : d;
+      }
+      return null;
+    }
+
+    // ISO first — "2024-03-15" or full ISO
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const d = new Date(s.length === 10 ? s + 'T12:00:00' : s);
+      return isNaN(d) ? null : d;
+    }
+    // DD/MM/YYYY or DD-MM-YYYY — must read as European
+    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+      const day = +m[1], mon = +m[2] - 1;
+      let year = +m[3];
+      if (year < 100) year += 2000;
+      const d = new Date(year, mon, day, 12);
+      return isNaN(d) ? null : d;
+    }
+    // "15 Mar 24" / "15 Mar 2024"
+    m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})$/);
+    if (m) {
+      const day = +m[1];
+      const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+      const mon = months.indexOf(m[2].toLowerCase().slice(0, 3));
+      let year = +m[3];
+      if (year < 100) year += 2000;
+      if (mon < 0) return null;
+      const d = new Date(year, mon, day, 12);
+      return isNaN(d) ? null : d;
+    }
+    // Last resort
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  };
+
+  let added = 0, skippedDir = 0, skippedDate = 0;
+  for (const row of rows) {
+    const dir = colByName(row, ['direction','dir']).toUpperCase();
+    if (dir !== 'BUY' && dir !== 'SELL') { skippedDir++; continue; }
+
+    const dateVal = parseDate(colByName(row, ['date']));
+    if (!dateVal) { skippedDate++; continue; }
+    const pnlRaw  = colByName(row, ['pnl','p&l','p&l($)','pl']);
+    let session   = colByName(row, ['session']) || null;
+    let setup     = colByName(row, ['setup'])   || null;
+    // Lenient on EU decimals; safeNum rejects NaN so corrupt rows don't poison
+    // downstream sums/averages.
+    const pnl     = pnlRaw !== '' ? safeNum(String(pnlRaw).replace(',', '.')) : null;
+
+    if (session && !CONFIG.SESSIONS.includes(session)) session = null;
+    if (setup   && !CONFIG.SETUPS.includes(setup))     setup   = null;
+
+    const result  = pnl !== null ? resultFromPnl(pnl) : null;
+    const isoDate = dateVal.toISOString();
+    const tid = uid(), jid = uid();
+
+    State.trades.push({
+      id: tid, direction: dir, result, session, setup,
+      openTime: isoDate, openPrice: null, exitPrice: null, rr: null, source: 'import'
+    });
+
+    const beforeRaw = colByName(row, ['beforetags','before tags']).split(',').map(s => s.trim()).filter(Boolean);
+    const duringRaw = colByName(row, ['duringtags','during tags']).split(',').map(s => s.trim()).filter(Boolean);
+    // Only keep tags that match the PHASE-SPECIFIC vocabulary. Anything else
+    // (typos, retired tags like Fear/Doubtful, tags valid in the other phase,
+    // injection attempts) is silently dropped — keeps the data model clean and
+    // prevents downstream checks from comparing against a tag that will
+    // never appear elsewhere in the app.
+    const knownBefore = new Set(CONFIG.EMOTIONS_BEFORE);
+    const knownDuring = new Set(CONFIG.EMOTIONS_DURING);
+    const beforeTags = beforeRaw.filter(t => knownBefore.has(t));
+    const duringTags = duringRaw.filter(t => knownDuring.has(t));
+
+    State.journals.push({
+      id: jid, tradeId: tid, createdAt: isoDate, updatedAt: isoDate,
+      session, direction: dir, result, setup, pnl,
+      followedRules: parseYN(colByName(row, ['followedrules','followed rules'])),
+      followedSLS:   parseYN(colByName(row, ['followedsls','followed sls'])),
+      followedTPS:   parseYN(colByName(row, ['followedtps','followed tps'])),
+      beforeTags, duringTags, afterTags: [],
+      emotionTags: [...new Set([...beforeTags, ...duringTags])],
+      finalLesson: colByName(row, ['finallesson','final lesson'])
+    });
+    added++;
+  }
+  return { added, skippedDir, skippedDate };
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLOUD — Supabase mirror
+   ───────────────────────────────────────────────────────────────────────────
+   localStorage stays the instant-boot cache and offline fallback; Supabase is
+   the source of truth. Boot pulls cloud → overwrites local → re-renders;
+   every save pushes back (debounced). broker_fills rows stream in over
+   realtime and become pending trade+journal skeletons (see BrokerSync).
+   Schema + Gmail parser live in supabase_schema.sql / doji_gmail_sync.gs.
+   If the placeholders below are untouched the app runs local-only, exactly
+   as before — nothing else depends on the cloud being present.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const CLOUD_CONFIG = {
+  // Bare project URL — the client appends /rest/v1, /auth/v1 etc. itself.
+  URL:      'https://gujhyogvkzjgnrodyuse.supabase.co',
+  // Publishable key (new-format anon key) — safe to ship in the page.
+  ANON_KEY: 'sb_publishable_qDYX9YI-F8zrTYs0Vw5nhA_gNuYWsyL'
+};
+
+const Cloud = {
+  sb: null,
+  ready: false,
+  _pushTimers: Object.create(null),
+
+  configured() {
+    return typeof window.supabase !== 'undefined'
+        && CLOUD_CONFIG.URL && !CLOUD_CONFIG.URL.includes('YOUR-')
+        && CLOUD_CONFIG.ANON_KEY && !CLOUD_CONFIG.ANON_KEY.includes('PASTE');
+  },
+
+  async init() {
+    if (!this.configured()) {
+      // Expected until the Supabase URL + anon key are pasted into
+      // CLOUD_CONFIG above. Local-only mode is fully functional.
+      console.info('Doji: running local-only (cloud credentials not set).');
+      return;
+    }
+    this.sb = window.supabase.createClient(CLOUD_CONFIG.URL, CLOUD_CONFIG.ANON_KEY);
+    try {
+      const { data } = await this.sb.auth.getSession();
+      if (!data || !data.session) { Login.show(); return; } // Login.submit → Cloud.start
+      await this.start();
+    } catch (e) {
+      console.error('Doji Cloud: init failed', e);
+      notify('⚠ Cloud unreachable — running on local copy.', true);
+    }
+  },
+
+  // Runs once authenticated: pull → re-render → ingest pending fills → listen.
+  async start() {
+    Login.hide();
+    try {
+      await this.pull();
+      await BrokerSync.fetchPending();
+      this.subscribe();
+      this.ready = true;
+    } catch (e) {
+      console.error('Doji Cloud: start failed', e);
+      notify('⚠ Cloud sync failed — running on local copy.', true);
+    }
+  },
+
+  // Cloud → local. Overwrites the localStorage cache with the cloud rows and
+  // reboots app state through the normal load/migrate path so cloud data gets
+  // the exact same treatment as locally-saved data.
+  async pull() {
+    const { data, error } = await this.sb.from('app_state').select('key, value');
+    if (error) throw error;
+    let touched = false;
+    for (const row of (data || [])) {
+      if (!Object.values(CONFIG.STORE).includes(row.key)) continue;
+      try {
+        localStorage.setItem(row.key,
+          row.key === CONFIG.STORE.ddMax ? String(row.value) : JSON.stringify(row.value));
+        touched = true;
+      } catch (e) { console.error('Doji Cloud: cache write failed', e); }
+    }
+    if (touched) {
+      State.trades   = Storage.loadTrades();
+      State.journals = Storage.loadJournals();
+      migrateData();
+      rebuildJournalIndex();
+      renderRules();
+      renderTrades();
+    }
+  },
+
+  // Local → cloud, debounced per key so a burst of edits lands as one upsert.
+  push(key) {
+    if (!this.ready) return;
+    clearTimeout(this._pushTimers[key]);
+    this._pushTimers[key] = setTimeout(async () => {
+      try {
+        const raw = localStorage.getItem(key);
+        const value = key === CONFIG.STORE.ddMax
+          ? (raw === null ? null : parseFloat(raw))
+          : JSON.parse(raw ?? 'null');
+        const { error } = await this.sb.from('app_state')
+          .upsert({ key, value, updated_at: new Date().toISOString() });
+        if (error) throw error;
+      } catch (e) {
+        console.error('Doji Cloud: push failed for ' + key, e);
+        notify('⚠ Cloud save failed — data kept locally.', true);
+      }
+    }, 800);
+  },
+
+  // Realtime: a new broker fill lands → skeleton it immediately.
+  // (Requires realtime enabled on broker_fills in Supabase.)
+  subscribe() {
+    this.sb.channel('broker-fills')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'broker_fills' },
+        payload => { try { BrokerSync.ingest(payload.new); } catch (e) { console.error(e); } })
+      .subscribe();
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOGIN — session gate over the app (only when the cloud is configured)
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Login = {
+  show() {
+    const o = $('login-overlay');
+    if (!o) return;
+    o.classList.add('open');
+    o.setAttribute('aria-hidden', 'false');
+    const em = $('login-email');
+    if (em) em.focus();
+  },
+  hide() {
+    const o = $('login-overlay');
+    if (!o) return;
+    o.classList.remove('open');
+    o.setAttribute('aria-hidden', 'true');
+    const err = $('login-err');
+    if (err) err.textContent = '';
+  },
+  wire() {
+    const btn = $('login-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => Login.submit());
+    for (const id of ['login-email', 'login-pass']) {
+      const el = $(id);
+      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') Login.submit(); });
+    }
+  },
+  async submit() {
+    const btn  = $('login-btn');
+    const err  = $('login-err');
+    const email = ($('login-email').value || '').trim();
+    const pass  = $('login-pass').value || '';
+    if (!email || !pass) { err.textContent = 'Enter your email and password.'; return; }
+    btn.disabled = true; btn.textContent = 'Signing in…'; err.textContent = '';
+    try {
+      const { error } = await Cloud.sb.auth.signInWithPassword({ email, password: pass });
+      if (error) { err.textContent = 'Wrong email or password.'; return; }
+      await Cloud.start();
+    } catch (e) {
+      console.error('Doji Login:', e);
+      err.textContent = 'Could not reach the server. Try again.';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign in';
+    }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BROKER SYNC — auto-entered trades, passive completion flow
+   ───────────────────────────────────────────────────────────────────────────
+   A parsed broker fill becomes a trade + journal skeleton carrying the data
+   the email knows (direction, net P&L, fill time → date & session estimate)
+   and flagged brokerPending. No popups, no gate: the pending trade shows
+   purple in the heatmap and trade log, and a banner at the top of the tab
+   invites completion. The flag clears the moment its journal entry is
+   complete — setup, all three discipline answers, and at least one emotion
+   in each phase — and every purple mark reverts to normal colours.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const BrokerSync = {
+  async fetchPending() {
+    const { data, error } = await Cloud.sb.from('broker_fills')
+      .select('*').eq('processed', false).order('fill_time', { ascending: true });
+    if (error) { console.error('Doji BrokerSync: fetch failed', error); return; }
+    for (const fill of (data || [])) this.ingest(fill);
+  },
+
+  ingest(fill) {
+    if (!fill || !fill.position_id) return;
+    // Dedup on Position ID — a re-delivered email or a realtime+fetch overlap
+    // must never mint a second trade.
+    if (State.trades.some(t => t.brokerPositionId === fill.position_id)) {
+      this.markProcessed(fill.position_id);
+      return;
+    }
+    const pnl    = safeNum(fill.net_pnl);
+    const result = pnl !== null ? resultFromPnl(pnl) : null;
+    const openTime = fill.fill_time || new Date().toISOString();
+    const now = new Date().toISOString();
+    const tid = uid(), jid = uid();
+
+    State.trades.push({
+      id: tid,
+      direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
+      result,
+      session: this.detectSession(new Date(openTime)),
+      setup: '',
+      openTime,
+      openPrice: safeNum(fill.fill_price),
+      exitPrice: null, rr: null,
+      source: 'broker',
+      brokerPositionId: fill.position_id,
+      brokerPending: true
+    });
+    State.journals.push({
+      id: jid, tradeId: tid, createdAt: now, updatedAt: now,
+      session: '', direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
+      setup: '', result, pnl,
+      followedRules: '', followedSLS: '', followedTPS: '',
+      beforeTags: [], duringTags: [], afterTags: [], emotionTags: [],
+      finalLesson: ''
+    });
+    Storage.saveTradesAndJournals();
+    this.markProcessed(fill.position_id);
+    renderTrades();
+  },
+
+  async markProcessed(positionId) {
+    try {
+      const { error } = await Cloud.sb.from('broker_fills')
+        .update({ processed: true }).eq('position_id', positionId);
+      if (error) throw error;
+    } catch (e) { console.error('Doji BrokerSync: markProcessed failed', e); }
+  },
+
+  // Session estimate from the fill's New-York wall-clock hour. The email only
+  // knows the close, so this is a best guess the trader can correct in the
+  // entry. Boundaries (NY time): Asian 18:00–03:00 · Asia+London 03:00–04:00
+  // · London 04:00–08:00 · London+NY 08:00–12:00 · New York 12:00–18:00.
+  detectSession(date) {
+    const h = Dates.nyParts(date).hour;
+    if (h >= 18 || h < 3) return 'Asian';
+    if (h < 4)  return 'Asia+London';
+    if (h < 8)  return 'London';
+    if (h < 12) return 'London+NY';
+    return 'New York';
+  },
+
+  // Completion contract for a broker-synced entry.
+  isComplete(j) {
+    return !!(j && j.setup && j.followedRules && j.followedSLS && j.followedTPS
+      && j.beforeTags && j.beforeTags.length
+      && j.duringTags && j.duringTags.length);
+  },
+
+  // Called from Journal.save() with the just-saved pair.
+  clearIfComplete(trade, journal) {
+    if (trade && trade.brokerPending && this.isComplete(journal)) {
+      delete trade.brokerPending;
+    }
+  },
+
+  pending() {
+    return State.trades
+      .filter(t => t.brokerPending)
+      .sort((a, b) => new Date(a.openTime) - new Date(b.openTime));
+  }
+};
+
+// Banner at the top of the Trades tab while any synced trade is incomplete.
+function renderBrokerBanner() {
+  const el = $('broker-banner');
+  if (!el) return;
+  const pend = BrokerSync.pending();
+  if (!pend.length) { el.style.display = 'none'; return; }
+  const n = pend.length;
+  el.innerHTML =
+    `<b>${n}</b> new trade${n > 1 ? 's' : ''} synced from your broker — ` +
+    `fill in the rules &amp; emotions data.` +
+    `<span class="broker-banner-cta">Open entry →</span>`;
+  el.style.display = 'flex';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAROUSEL — mobile swipe position + dots for the multi-column rows
+   ───────────────────────────────────────────────────────────────────────────
+   The scroll/snap behaviour itself is pure CSS (mobile layer). This module
+   only adds what CSS can't: position dots, and remembering which slide was
+   left on top so a re-render (renderTrades rebuilds several hosts) restores
+   the same slide instead of snapping back to the first. Desktop is untouched
+   — dots are display:none and the containers don't scroll.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Carousel = {
+  // slide index per carousel key — survives re-renders, resets on reload
+  pos: Object.create(null),
+
+  // (Re)wire every carousel after a Trades render. Static containers
+  // (#period-row) are wired once via a dataset flag; rebuilt ones get fresh
+  // listeners naturally because their DOM is new.
+  refresh() {
+    const rows = [
+      ['period', document.getElementById('period-row')],
+      ['setup',  document.querySelector('#setup-table .setup-donut-row')],
+      ['emo',    document.querySelector('#emo-cat-wheels .emo-cat-row')],
+      ['during', document.querySelector('#emo-during-mgmt .emo-during-grid')]
+    ];
+    for (const [key, el] of rows) {
+      if (!el || el.dataset.carousel) continue;
+      el.dataset.carousel = key;
+      this.buildDots(key, el);
+      el.addEventListener('scroll', () => {
+        const w = el.clientWidth || 1;
+        const idx = Math.round(el.scrollLeft / w);
+        if (idx !== this.pos[key]) { this.pos[key] = idx; this.paintDots(key, el); }
+      }, { passive: true });
+      // Restore the slide the trader left on top. Two rAFs: layout must be
+      // final (fonts/canvas sizing) before scrollLeft lands on a real width.
+      const saved = this.pos[key];
+      if (saved) requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.scrollLeft = saved * el.clientWidth;
+      }));
+    }
+  },
+
+  buildDots(key, el) {
+    let dots = el.nextElementSibling;
+    if (!dots || !dots.classList || !dots.classList.contains('snap-dots')) {
+      dots = document.createElement('div');
+      dots.className = 'snap-dots';
+      el.insertAdjacentElement('afterend', dots);
+    }
+    const n = el.children.length;
+    dots.innerHTML = Array.from({ length: n }, (_, i) =>
+      `<button class="snap-dot" data-slide="${i}" aria-label="Slide ${i + 1}"></button>`).join('');
+    dots.addEventListener('click', e => {
+      const b = e.target.closest('[data-slide]');
+      if (b) el.scrollTo({ left: (+b.dataset.slide) * el.clientWidth, behavior: 'smooth' });
+    });
+    this.paintDots(key, el);
+  },
+
+  paintDots(key, el) {
+    const dots = el.nextElementSibling;
+    if (!dots || !dots.classList.contains('snap-dots')) return;
+    const cur = this.pos[key] || 0;
+    [...dots.children].forEach((d, i) => d.classList.toggle('on', i === cur));
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COLLAPSIBLE SECTIONS & TABS
+   ═══════════════════════════════════════════════════════════════════════════ */
+function toggleSection(bodyId, chevId) {
+  const body = $(bodyId); if (!body) return;
+  const chev = $(chevId);
+  const open = State.sections[bodyId] !== false;
+  State.sections[bodyId] = !open;
+  body.style.display = open ? 'none' : '';
+  if (chev) chev.classList.toggle('closed', open);
+  // The P&L section doubles as a view-mode switch: while it's open the whole
+  // journal runs in P&L view (heatmap cells show day totals, the heatmap
+  // header shows the month total). CSS keys off this one body class.
+  if (bodyId === 'ap-body') document.body.classList.toggle('pnl-open', !open);
+  // Revealing a section: charts rendered while display:none computed a 0×0
+  // size, so nudge any Chart.js instances inside to redraw at full size.
+  if (open === false) {
+    body.querySelectorAll('canvas').forEach(c => {
+      if (c.id && State.charts[c.id]) State.charts[c.id].resize();
+    });
+  }
+}
+
+function showTab(id) {
+  $$('.panel').forEach(p => p.classList.remove('active'));
+  $$('.nav-tab').forEach(b => b.classList.remove('active'));
+  const panel = $('panel-' + id);
+  const tab   = document.querySelector(`[data-tab="${id}"]`);
+  if (panel) panel.classList.add('active');
+  if (tab)   tab.classList.add('active');
+  if (id === 'trades')  renderTrades();
+  if (id === 'rules')   renderRules();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLOBAL EVENT WIRING
+   ═══════════════════════════════════════════════════════════════════════════ */
+function wireEvents() {
+
+  // Null-safe binding helper. wireEvents fires once at boot; if any element
+  // listed below has been renamed or removed in the markup we'd rather log a
+  // warning and keep the rest of the app functional than crash the whole boot.
+  const on = (id, event, handler) => {
+    const el = typeof id === 'string' ? $(id) : id;
+    if (el) el.addEventListener(event, handler);
+    else console.warn(`Doji: missing element for handler "${id}" (${event})`);
+  };
+
+  /* Nav tabs */
+  $$('.nav-tab').forEach(btn => btn.addEventListener('click', () => showTab(btn.dataset.tab)));
+  on('nav-io-btn',  'click', IO.openModal);
+  on('nav-add-btn', 'click', () => Journal.open(null));
+
+  /* Fullscreen toggle */
+  const fsBtn  = $('nav-fs-btn');
+  const fsOn   = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const fsSync = () => { if (fsBtn) fsBtn.classList.toggle('is-fs', fsOn()); };
+  on('nav-fs-btn', 'click', () => {
+    if (fsOn()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+    else { const r = document.documentElement; (r.requestFullscreen || r.webkitRequestFullscreen).call(r); }
+  });
+  document.addEventListener('fullscreenchange', fsSync);
+  document.addEventListener('webkitfullscreenchange', fsSync);
+
+  /* Calendar nav (journal calendar via data-cal-target) */
+  $$('[data-cal-nav]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const target = btn.dataset.calTarget;
+      const dir    = parseInt(btn.dataset.calNav, 10);
+      Calendar.navigate(target, dir);
+      if (target === 'journal') renderJournalCal();
+    });
+  });
+
+  /* Collapsible section headers */
+  // P&L starts collapsed (hidden by default) — process-first; record
+  // that initial state so the first toggle opens rather than re-hides it.
+  State.sections['ap-body'] = false;
+  $$('[data-collapse-target]').forEach(hdr => {
+    hdr.addEventListener('click', () => toggleSection(hdr.dataset.collapseTarget, hdr.dataset.collapseChev));
+  });
+
+  /* Broker banner → open the oldest incomplete synced entry */
+  on('broker-banner', 'click', () => {
+    const pend = BrokerSync.pending();
+    if (pend.length) Journal.openForTrade(pend[0].id);
+  });
+
+  /* Drawdown card */
+  on('dd-edit-btn',   'click', toggleDDEdit);
+  on('dd-save-btn',   'click', saveDDMax);
+  on('dd-cancel-btn', 'click', toggleDDEdit);
+
+  /* Trade table delegation: row click opens journal, ✕ deletes, page nav */
+  on('trade-table', 'click', e => {
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) {
+      e.stopPropagation();
+      // No confirm dialog — the delete applies instantly and the toast offers
+      // a CONFIG.UNDO_MS Undo window instead (see PendingDelete).
+      deleteTrade(delBtn.dataset.del);
+      return;
+    }
+    const tr = e.target.closest('tr[data-trade]');
+    if (tr) Journal.openForTrade(tr.dataset.trade);
+  });
+  on('tlog-pagination', 'click', e => {
+    const btn = e.target.closest('[data-page]');
+    if (!btn) return;
+    if (btn.dataset.page === 'prev' && State.tradeLogPage > 0) State.tradeLogPage--;
+    if (btn.dataset.page === 'next') State.tradeLogPage++;
+    // Only the table slice changes — leave charts/donuts alone.
+    renderTradeTable(State.trades.slice());
+  });
+
+
+  /* Journal modal: outside-click closes; form actions delegated */
+  on('journal-modal', 'click', e => {
+    if (e.target === $('journal-modal')) Journal.close();
+  });
+  on('jm-body', 'click', e => {
+    const action = e.target.closest('[data-jm-action]')?.dataset.jmAction;
+    if (!action) return;
+    if (action === 'save')   Journal.save();
+    if (action === 'cancel') Journal.close();
+    if (action === 'delete') Journal.delete(Journal.editingId);
+  });
+
+  /* Journal header: session pill, date pill, calendar grid */
+  on('jm-session-btn',   'click', () => toggleSessionMenu());
+  on('jm-date-label',    'click', () => toggleJournalCal());
+  on('journal-cal-grid', 'click', e => {
+    const cell = e.target.closest('[data-jcal-day]');
+    if (cell) {
+      setDateLabel(cell.dataset.jcalDay);
+      toggleJournalCal(false);
+    }
+  });
+  on('journal-cal-grid', 'keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const cell = e.target.closest('[data-jcal-day]');
+    if (!cell) return;
+    e.preventDefault();
+    setDateLabel(cell.dataset.jcalDay);
+    toggleJournalCal(false);
+  });
+
+  /* Close journal calendar / session menu when clicking outside */
+  document.addEventListener('click', e => {
+    const cal = $('jm-cal');
+    const lbl = $('jm-date-label');
+    if (cal && cal.classList.contains('open') && !cal.contains(e.target) && e.target !== lbl) {
+      cal.classList.remove('open');
+    }
+    const opts = $('jm-session-opts');
+    const sBtn = $('jm-session-btn');
+    if (opts && opts.classList.contains('open') && !opts.contains(e.target) && e.target !== sBtn) {
+      opts.classList.remove('open');
+    }
+  });
+
+  /* I/O modal */
+  on('io-close-btn',          'click',  IO.closeModal);
+  on('io-import-btn',         'click',  () => $('io-import-file')?.click());
+  on('io-import-file',        'change', e => IO.importExcel(e.target));
+  on('io-template-btn',       'click',  IO.downloadTemplate);
+  on('io-export-journal-btn', 'click',  IO.exportJournal);
+  on('io-export-json-btn',    'click',  IO.exportJSON);
+  on('io-restore-btn',        'click',  () => $('io-restore-file')?.click());
+  on('io-restore-file',       'change', e => IO.importJSON(e.target));
+
+  /* Day picker popup */
+  on('day-close-btn', 'click', closeDayPopup);
+  on('day-modal', 'click', e => { if (e.target === $('day-modal')) closeDayPopup(); });
+  on('day-trade-list', 'click', e => {
+    const row = e.target.closest('.day-trade-row[data-trade]');
+    if (!row) return;
+    closeDayPopup();
+    Journal.openForTrade(row.dataset.trade);
+  });
+
+
+  /* Undo button inside the delete toast (re-created per notifyUndo → delegate) */
+  on('notif', 'click', e => {
+    if (e.target.closest('.notif-undo')) PendingDelete.undo();
+  });
+
+  /* Keyboard shortcuts */
+  document.addEventListener('keydown', e => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Escape') {
+      // Only close what's actually open — Journal.close() triggers a full
+      // renderTrades(), so firing it on every stray Escape press would tear
+      // down and rebuild every chart for nothing.
+      if ($('journal-modal').classList.contains('open')) Journal.close();
+      if ($('io-modal').classList.contains('open'))      IO.closeModal();
+      if ($('day-modal').classList.contains('open'))     closeDayPopup();
+      return;
+    }
+    if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault();
+      Journal.open(null);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAY ROLLOVER WATCHER
+   ───────────────────────────────────────────────────────────────────────────
+   The dashboard derives "today" live every time it draws (daily drawdown,
+   heatmap today-marker, rolling week/month buckets) — but it only re-draws on
+   user actions. If the tab sits open across midnight, nothing fires, so the UI
+   freezes on the day it was last rendered. This watcher tracks the local
+   calendar day and re-renders the moment it flips: a slow interval covers a
+   tab left open, and an immediate check on focus/visibility covers throttled
+   background timers and a machine waking from sleep. Re-render only — no data
+   is mutated; the views recompute "today" on their own.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const DayWatcher = {
+  current: null,
+  start() {
+    this.current = Dates.isoDay(new Date());
+    setInterval(() => this.check(), 30000); // 30s — cheap; only re-renders on a real flip
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.check(); });
+    window.addEventListener('focus', () => this.check());
+  },
+  check() {
+    const now = new Date();
+    const today = Dates.isoDay(now);
+    if (today !== this.current) {
+      const prevMonth = this.current ? this.current.slice(0, 7) : null; // YYYY-MM
+      this.current = today;
+      // When a new month rolls in while the tab is left open, snap the P&L
+      // calendar to the new current month so it never sits on a stale month.
+      // Fires only at a real month boundary (the 1st), so a user paging back
+      // through history mid-month is never yanked forward.
+      if (prevMonth && today.slice(0, 7) !== prevMonth) {
+        State.cal.heatmap.y = now.getFullYear();
+        State.cal.heatmap.m = now.getMonth();
+      }
+      try { renderTrades(); }
+      catch (err) { console.error('Doji: day-rollover re-render failed', err); }
+    }
+  }
+};
+
+// Weekly auto-backup. Mirrors DayWatcher: a cheap timer plus focus/visibility
+// triggers, all funnelling into one idempotent check keyed on the trading week,
+// so throttling or a sleeping PC only delays a backup — it never misses or
+// double-writes. Fires once per Friday 17:00 NY close while the tab is open; on
+// first run it writes one backup immediately (named for the last completed week)
+// so you can confirm it works. Skips writing while there's no data to save.
+const BackupWatcher = {
+  STORE_KEY: 'doji_backupLastClose',
+  lastClose: null,
+  start() {
+    try { this.lastClose = localStorage.getItem(this.STORE_KEY); }
+    catch (e) { this.lastClose = null; }
+    setInterval(() => this.check(), 30000); // 30s — matches DayWatcher; check is cheap
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.check(); });
+    window.addEventListener('focus', () => this.check());
+    this.check();
+  },
+  check() {
+    try {
+      const closeKey = Dates.lastForexCloseKey();
+      if (closeKey === this.lastClose) return;                     // already done this week
+      if (!State.trades.length && !State.journals.length) return;  // nothing to back up yet
+      IO.downloadBackup('doji-backup-' + closeKey + '.json');
+      this.lastClose = closeKey;
+      try { localStorage.setItem(this.STORE_KEY, closeKey); } catch (e) {}
+      // A gesture-less programmatic download can be silently blocked by the
+      // browser (background tabs especially) and there is no API to detect it,
+      // so the toast asks the user to verify rather than asserting the file
+      // was written.
+      notify('Weekly backup triggered → doji-backup-' + closeKey + '.json — verify it landed in downloads');
+    } catch (err) {
+      console.error('Doji: weekly auto-backup failed', err);
+    }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function init() {
+  // Initial state
+  State.trades   = Storage.loadTrades();
+  State.journals = Storage.loadJournals();
+  migrateData();
+  rebuildJournalIndex();
+
+  // Calendar default cursors
+  const now = new Date();
+  State.cal.heatmap.y = now.getFullYear();
+  State.cal.heatmap.m = now.getMonth();
+  State.cal.journal.y = now.getFullYear();
+  State.cal.journal.m = now.getMonth();
+
+  wireEvents();
+  renderRules();
+  renderTrades();
+  DayWatcher.start();
+  BackupWatcher.start();
+
+  // Cloud last: everything above is fully functional local-only. If cloud is
+  // unconfigured or unreachable, the app runs exactly as before.
+  Login.wire();
+  Cloud.init();
+
+  // Ask the browser to mark this origin's storage as persistent, so the
+  // localStorage holding the entire journal is exempt from best-effort
+  // eviction under disk pressure. Browsers grant this quietly for sites used
+  // regularly; if declined, the weekly auto-backup remains the safety net.
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persisted()
+      .then(ok => ok || navigator.storage.persist())
+      .then(ok => {
+        if (ok) return;
+        // Warn once, not on every boot — after the user has seen and
+        // understood the decline, repeating it just clutters the console.
+        try {
+          if (localStorage.getItem('doji_persistWarned')) return;
+          localStorage.setItem('doji_persistWarned', '1');
+        } catch (e) {}
+        console.warn('Doji: persistent storage declined — the browser may evict site data under disk pressure. Keep weekly backups safe.');
+      })
+      .catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
