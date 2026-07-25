@@ -37,7 +37,7 @@
   --loss:#d63d5a; --lgl:rgba(214,61,90,.09);
 
   /* Glass surfaces — purple-tinted translucent glass */
-  --glass:#0a0813;             /* solid dark card surface — flat & sharp like the Rules page */
+  --glass:#0a0813;             /* solid dark card surface — flat, no translucency */
   --glass-bd:#251d39;
   --glass-top:linear-gradient(transparent, transparent);
 
@@ -49,7 +49,7 @@
   --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-full:999px;
 
   /* Shared bar thickness — single source of truth for every win/loss
-     distribution bar in the Trades tab (session, discipline, R:R, emotions). */
+     distribution bar in the trades panel (session, discipline, R:R, emotions). */
   --bar-h:10px;
   /* Shared segment border thickness — every chart segment (donut arcs, R:R,
      session, discipline, emotion bars) uses this so the "margin" weight is
@@ -58,7 +58,7 @@
 
   /* Spacing scale — single source of truth for section rhythm. Every
      section gap / title gap / internal divider / bar-row gap pulls from one
-     of these so vertical spacing stays even across the whole Trades tab. */
+     of these so vertical spacing stays even across the whole panel. */
   --gap-section:16px;  /* space between major sections / cards */
   --gap-title:12px;    /* space below a section title, before its content */
   --gap-divider:14px;  /* padding below an internal divider line */
@@ -406,7 +406,7 @@ nav {
 }
 /* Shared empty-bar placeholder — the single faint outlined track that EVERY
    bar (R:R, session, discipline, per-emotion) shows when no trades are logged,
-   so the empty Trades tab is uniform. Same gray fill + border weight as a
+   so the empty panel is uniform. Same gray fill + border weight as a
    break-even segment, dimmed to .4. */
 .bar-empty {
   width:100%; height:var(--bar-h); border-radius:3px; box-sizing:border-box;
@@ -470,9 +470,17 @@ nav {
   text-align:center; flex:1; width:100%;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
-/* Default view: colour (win/loss/be) + trade count only — the $ amount is
-   hidden unless the P&L section is open (P&L view) so day-to-day money
-   stays out of the default line of sight. */
+/* Cell body reads top-down: trade count, then the day's P&L beneath it. The
+   count leads because it is the only thing shown in the default view — the $
+   amount stays hidden until the P&L section is open, keeping day-to-day money
+   out of the default line of sight. */
+.heatmap-cell-count {
+  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
+  color:var(--mt2); text-transform:uppercase;
+}
+.heatmap-cell.win  .heatmap-cell-count { color:var(--win); }
+.heatmap-cell.loss .heatmap-cell-count { color:var(--loss); }
+.heatmap-cell.be   .heatmap-cell-count { color:rgba(170,170,185,1); }
 .heatmap-cell-pnl {
   font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2); text-transform:uppercase;
@@ -481,15 +489,8 @@ nav {
 .heatmap-cell.win  .heatmap-cell-pnl { color:var(--win); }
 .heatmap-cell.loss .heatmap-cell-pnl { color:var(--loss); }
 .heatmap-cell.be   .heatmap-cell-pnl { color:rgba(170,170,185,1); }
-.heatmap-cell-count {
-  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
-  color:var(--mt2); text-transform:uppercase;
-}
-.heatmap-cell.win  .heatmap-cell-count { color:var(--win); }
-.heatmap-cell.loss .heatmap-cell-count { color:var(--loss); }
-.heatmap-cell.be   .heatmap-cell-count { color:rgba(170,170,185,1); }
 /* P&L view (P&L section open → body.pnl-open): every trade-bearing cell shows
-   its day total and the trade count shrinks to a caption. No hover involved —
+   its day total and the count above it shrinks to a caption. No hover involved —
    the reveal is a mode, so it works identically on touch. */
 body.pnl-open .heatmap-cell-pnl   { display:block; }
 body.pnl-open .heatmap-cell-count { font-size:7px; font-weight:400; color:var(--mt); }
@@ -547,7 +548,6 @@ thead th {
 }
 th:first-child, td:first-child { padding-left:0; }
 th:last-child,  td:last-child  { padding-right:0; }
-thead th.r { text-align:right; }
 thead th.c { text-align:center; }
 tbody tr {
   border-bottom:1px solid rgba(139,53,184,.04);
@@ -560,7 +560,6 @@ td {
 }
 td.win { color:var(--win); }
 td.loss{ color:var(--loss); }
-td.r   { text-align:right; }
 td.c   { text-align:center; }
 
 .dir-pill {
@@ -664,7 +663,7 @@ td.c   { text-align:center; }
 .emo-row-bar .seg-be   { background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5); }
 .emo-row-bar .seg-loss { background:rgba(214,61,90,.12);  border:var(--seg-bd) solid var(--loss); }
 /* Untraded emotion: muted label + the shared .bar-empty placeholder, so an
-   empty per-emotion row matches every other empty bar in the tab. */
+   empty per-emotion row matches every other empty bar in the panel. */
 .emo-row.is-empty .emo-row-name,
 .emo-row.is-empty .emo-row-pcts.no-data { color:var(--mt); font-family:var(--mono); }
 
@@ -1137,13 +1136,14 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
   .snap-dot.on { background:var(--p); }
 
   /* Heatmap: tighter cells so a full month fits a phone width. Numbers step
-     down a size and the "trade(s)" word is dropped — the bare count reads
-     fine inside a month grid and the cells stop feeling crammed. */
+     down a size and the "trade(s)" word is dropped — inside a month grid the
+     bare count is unambiguous, and dropping it gives the day's P&L (which sits
+     underneath) room to breathe. */
   .heatmap-cell, .heatmap-cell-empty { min-height:52px; }
   .heatmap-cell { padding:4px; border-radius:var(--r-sm); }
   .heatmap-cell-day   { font-size:8px; top:4px; left:5px; }
   .heatmap-cell-count { font-size:8px; letter-spacing:0; }
-  .heatmap-cell-count .hm-w { display:none; }
+  .heatmap-cell-count-word { display:none; }
   .heatmap-cell-pnl   { font-size:9px; margin-top:2px; }
   body.pnl-open .heatmap-cell-count { font-size:7px; }
 
@@ -1190,9 +1190,11 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
   .jf-setup-row::-webkit-scrollbar, .journal-form-actions::-webkit-scrollbar { display:none; }
   .jf-emo-cols > *, .jf-yn-row > *, .jf-setup-row > *, .journal-form-actions > * { flex-shrink:0; }
   /* Auto margins on the end children centre each strip while it fits and
-     collapse to 0 once it overflows — so "During the trade" stays centred and
-     only "Before the trade" (3 columns, 454px) becomes a side-scroller, with
-     its leading chips still reachable at scrollLeft 0. */
+     collapse to 0 once it overflows. "During the trade" (305px of chips) has
+     slack and stays centred; only "Before the trade" (520px across 3 columns)
+     becomes a side-scroller, with its leading chips still reachable at
+     scrollLeft 0. Divider spacing is left at its desktop value — trimming it
+     saves 16px of swipe on one row and costs spacing consistency everywhere. */
   .jf-emo-cols > :first-child, .jf-yn-row > :first-child,
   .jf-setup-row > :first-child, .journal-form-actions > :first-child { margin-left:auto; }
   .jf-emo-cols > :last-child, .jf-yn-row > :last-child,
@@ -1202,7 +1204,6 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
   .jf-yn-row { gap:10px; }
   .jf-yn-pill { width:44px; }
   .jf-setup-row { gap:10px; }
-  .jf-emo-divider { margin:0 10px; }
 
   .journal-form-actions { gap:8px; width:100%; }
   .jm-btn-save, .jm-btn-cancel, .jm-btn-delete { width:auto; min-width:92px; padding:9px 14px; }
@@ -1420,7 +1421,7 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
       <div id="io-section-json" class="io-section">
         <div class="io-section-label">Full Backup / Restore (JSON)</div>
         <div class="io-section-desc">
-          Exports <b>everything</b> — trades, journal entries, and rules — as a single <b>.json</b> file.
+          Exports <b>everything</b> — every trade, journal entry, and the drawdown limit — as a single <b>.json</b> file.
           Restoring from this file replaces all current data.
         </div>
         <div class="io-section-actions">
@@ -1528,12 +1529,13 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
      CONFIG       static, read-only domain values
      STATE        single mutable application state object
      STORAGE      pure load/save against localStorage
+     DEVICE       desktop-vs-handheld classification (weekly-backup gate)
      DOM          tiny query/escape helpers
      DATES        date formatting and bucketing utilities
      STATS        pure trade math (win rate, R:R, P&L, streaks)
      CALENDAR     reusable month-grid widget shared by 3 surfaces
      CHARTS       Chart.js wrappers with shared option presets
-     TRADES       Trades tab renderers (one render fn per component)
+     TRADES       Trades panel renderers (one render fn per component)
      JOURNAL      Modal: open / form / save / delete
      IO           Excel import + journal export + JSON backup/restore
      INIT         Boot sequence and global event wiring
@@ -1544,7 +1546,6 @@ const CONFIG = Object.freeze({
   STORE: {
     trades:   'doji_trades_v6',
     journal:  'doji_journal_v6',
-    rules:    'doji_rules_v8',
     ddMax:    'doji_ddmax_v5'
   },
   // Phase-specific tag vocabularies. BEFORE captures the state a trade was
@@ -1589,16 +1590,6 @@ const CONFIG = Object.freeze({
   // actual dollar amount still flows into total P&L; only the win/loss LABEL is
   // suppressed. Change this one number to widen or tighten the scratch band.
   BE_THRESHOLD: 3,
-  DEFAULT_RULES: {
-    banner: 'Only operate in obvious trends and cycles',
-    steps: [
-      { title:'Top Down Analysis / Bias',      desc:'Identify Fair Value Gaps, Check DXY and US10Y.' },
-      { title:'Identify Liquidity Pools, S&R', desc:'Mark where price has recently reacted.' },
-      { title:'Identify Psychological Levels', desc:'Identify quarters and round numbers.' },
-      { title:'Read Candle & Chart Patterns',  desc:"Don't anticipate. React to confirmation." },
-      { title:'Setup SL & TP · Min R:R 1:1.5', desc:"If the numbers don't work, skip the trade." }
-    ]
-  }
 });
 
 /* ─── STATE ──────────────────────────────────────────────────────────────── */
@@ -1629,7 +1620,6 @@ const State = {
 const Storage = {
   loadTrades()    { return safeJSON(CONFIG.STORE.trades,  []); },
   loadJournals()  { return safeJSON(CONFIG.STORE.journal, []); },
-  loadRules()     { return safeJSON(CONFIG.STORE.rules,   CONFIG.DEFAULT_RULES); },
   loadDDMax()     { const v = parseFloat(localStorage.getItem(CONFIG.STORE.ddMax)); return isNaN(v) ? null : v; },
 
   saveTradesAndJournals() {
@@ -1643,13 +1633,48 @@ const Storage = {
     Cloud.push(CONFIG.STORE.trades);
     Cloud.push(CONFIG.STORE.journal);
   },
-  saveRules(r)   { try { localStorage.setItem(CONFIG.STORE.rules, JSON.stringify(r)); } catch (e) { notify('⚠ Could not save — storage unavailable.', true); } Cloud.push(CONFIG.STORE.rules); },
   saveDDMax(v)   { try { localStorage.setItem(CONFIG.STORE.ddMax, String(v)); } catch (e) { notify('⚠ Could not save — storage unavailable.', true); } Cloud.push(CONFIG.STORE.ddMax); }
 };
 function safeJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
   catch { return fallback; }
 }
+
+/* ─── DEVICE ─────────────────────────────────────────────────────────────── */
+// Single source of truth for "is this a desktop-class device". Only the weekly
+// auto-backup consults it: a phone's Downloads folder is not where a backup
+// belongs, and a gesture-less download there is as likely to be blocked as
+// saved.
+//
+// Any one handheld signal is decisive; desktop is the verdict only when none
+// fire. Trusting a single negative answer is what makes naive sniffing brittle
+// — Chrome's device emulation, for instance, reports userAgentData.mobile as
+// false while every other signal says phone.
+//   1. navigator.userAgentData.mobile — the browser's own explicit claim.
+//   2. A coarse primary pointer with no hover — phones and tablets. A
+//      touchscreen laptop still reports pointer:fine for its mouse, so it
+//      correctly stays desktop-class.
+//   3. UA string, for engines exposing neither of the above (Safari).
+// Known gap: iPadOS 13+ presents itself as a Mac with a trackpad and reads as
+// desktop. The manual export in the I/O panel covers anything this gets wrong,
+// and the check fails open for the same reason — a spare backup costs nothing,
+// a missing one costs the journal.
+const Device = {
+  isDesktop() {
+    try {
+      const uad = navigator.userAgentData;
+      if (uad && uad.mobile === true) return false;
+      if (window.matchMedia) {
+        const mq = window.matchMedia('(pointer:coarse) and (hover:none)');
+        if (mq.media !== 'not all' && mq.matches) return false;
+      }
+      if (/Android|iPhone|iPod|iPad|Windows Phone|Mobile/i.test(navigator.userAgent)) return false;
+      return true;
+    } catch (e) {
+      return true;
+    }
+  }
+};
 
 /* ─── DOM HELPERS ────────────────────────────────────────────────────────── */
 const $  = id => document.getElementById(id);
@@ -1662,9 +1687,16 @@ function escHtml(s) {
 // Setup names render twice — full text and an initials form ("Break & Retest"
 // → "B&R", "Support & Resistance" → "S&R"). The phone stylesheet swaps which
 // span is visible so the trade log fits a phone width with no sideways scroll.
+// Initials come from word boundaries rather than splitting on "&", so a future
+// setup added to CONFIG.SETUPS abbreviates sensibly whether or not it has one
+// ("Order Block" → "OB").
 function abbrevSetup(s) {
-  return s.split('&').map(part => part.trim().charAt(0).toUpperCase()).join('&');
+  return String(s).trim().split(/\s+/)
+    .map(word => word === '&' ? '&' : word.charAt(0).toUpperCase())
+    .join('');
 }
+// The pair is emitted together everywhere a setup appears in a list (trade log,
+// day-picker) so the two surfaces can never drift apart.
 function setupCellHtml(setup) {
   if (!setup) return '—';
   return `<span class="setup-full">${escHtml(setup)}</span><span class="setup-abbr">${escHtml(abbrevSetup(setup))}</span>`;
@@ -2102,8 +2134,9 @@ const Charts = {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TRADES — orchestrator (the Rules tab UI was retired; rules data is kept in
-   storage untouched so old JSON backups still import/export cleanly)
+   TRADES — orchestrator. The sole panel; the Rules tab and its stored data were
+   retired together. A pre-retirement backup that still carries a `rules` key
+   restores fine — the key is simply ignored.
    ═══════════════════════════════════════════════════════════════════════════ */
 function renderTrades() {
   // The on-screen filter bar was removed, so every view works from the full
@@ -2586,7 +2619,7 @@ function renderHeatmap() {
     const pnlText   = data.tradeCount > 0 ? '$' + Math.abs(data.pnl).toFixed(2) : '';
     // The word "trade(s)" lives in its own span so the phone stylesheet can
     // drop it — on a 7-column month grid the bare count is unambiguous.
-    const countText = data.tradeCount > 0 ? `${data.tradeCount}<span class="hm-w"> trade${data.tradeCount > 1 ? 's' : ''}</span>` : '';
+    const countText = data.tradeCount > 0 ? `${data.tradeCount}<span class="heatmap-cell-count-word"> trade${data.tradeCount > 1 ? 's' : ''}</span>` : '';
     html += `
       <div class="heatmap-cell ${cls}" data-day="${iso}">
         <div class="heatmap-cell-day">${d}</div>
@@ -3515,7 +3548,6 @@ const IO = {
       exportedAt: new Date().toISOString(),
       trades:     State.trades,
       journals:   State.journals,
-      rules:      Storage.loadRules(),
       ddMax:      Storage.loadDDMax()
     };
   },
@@ -3578,7 +3610,6 @@ const IO = {
 
         State.trades   = validTrades;
         State.journals = validJournals;
-        if (data.rules && typeof data.rules === 'object') Storage.saveRules(data.rules);
         if (data.ddMax != null) {
           const dd = safeNum(data.ddMax);
           if (dd !== null && dd > 0) Storage.saveDDMax(dd);
@@ -3929,7 +3960,7 @@ const Login = {
    A parsed broker fill becomes a trade + journal skeleton carrying the data
    the email knows (direction, net P&L, fill time → date & session estimate)
    and flagged brokerPending. No popups, no gate: the pending trade shows
-   purple in the heatmap and trade log, and a banner at the top of the tab
+   purple in the heatmap and trade log, and a banner at the top of the panel
    invites completion. The flag clears the moment its journal entry is
    complete — setup, all three discipline answers, and at least one emotion
    in each phase — and every purple mark reverts to normal colours.
@@ -4024,7 +4055,7 @@ const BrokerSync = {
   }
 };
 
-// Banner at the top of the Trades tab while any synced trade is incomplete.
+// Banner at the top of the trades panel while any synced trade is incomplete.
 function renderBrokerBanner() {
   const el = $('broker-banner');
   if (!el) return;
@@ -4350,6 +4381,14 @@ const BackupWatcher = {
   STORE_KEY: 'doji_backupLastClose',
   lastClose: null,
   start() {
+    // Phones and tablets never auto-download. The week marker below is stored
+    // per-device, so skipping here doesn't consume the laptop's turn — the
+    // laptop still fires its own backup the next time it's opened after the
+    // Friday close.
+    if (!Device.isDesktop()) {
+      console.info('Doji: weekly auto-backup is desktop-only — skipped on this device. Use Export Backup in the I/O panel to save one by hand.');
+      return;
+    }
     try { this.lastClose = localStorage.getItem(this.STORE_KEY); }
     catch (e) { this.lastClose = null; }
     setInterval(() => this.check(), 30000); // 30s — matches DayWatcher; check is cheap
@@ -4359,6 +4398,7 @@ const BackupWatcher = {
   },
   check() {
     try {
+      if (!Device.isDesktop()) return;                             // guard for manual calls
       const closeKey = Dates.lastForexCloseKey();
       if (closeKey === this.lastClose) return;                     // already done this week
       if (!State.trades.length && !State.journals.length) return;  // nothing to back up yet
