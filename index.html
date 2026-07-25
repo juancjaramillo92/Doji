@@ -104,18 +104,6 @@ nav {
   font-weight:800; font-size:16px; letter-spacing:3px; flex-shrink:0;
   color:var(--p);
 }
-.nav-tabs { display:flex; position:absolute; left:50%; transform:translateX(-50%); gap:4px; }
-.nav-tab {
-  font-family:var(--mono); font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
-  padding:7px 16px; height:auto; display:flex; align-items:center; border-radius:var(--r-full);
-  color:var(--mt); cursor:pointer; background:none; border:none;
-}
-.nav-tab:hover { color:var(--p); }
-.nav-tab.active {
-  color:var(--p); background:var(--p-gl2);
-  box-shadow:0 0 18px -4px var(--p-gl3);
-}
-
 .nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
 .nav-icon-btn {
   font-family:var(--mono); padding:6px 10px; border:1px solid var(--bd); border-radius:var(--r-sm);
@@ -144,8 +132,6 @@ nav {
 .panel::-webkit-scrollbar-thumb { background:var(--p); border-radius:var(--r-full); }
 .panel::-webkit-scrollbar-track { background:transparent; }
 
-#panel-rules.active { display:flex; flex-direction:column; align-items:center; }
-#panel-rules > * { width:100%; max-width:800px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    UTILITY
@@ -600,6 +586,9 @@ td.c   { text-align:center; }
 }
 .rules-tick { color:var(--win); }
 .rules-cross { color:var(--loss); }
+/* Setup names ship as a full + initials pair; desktop shows the full text and
+   the phone stylesheet flips the pair (see the max-width:640px block). */
+.setup-abbr { display:none; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SETUP DONUTS (per-setup win rate)
@@ -651,52 +640,6 @@ td.c   { text-align:center; }
 .sess-wr-pct.win  { color:var(--win); }
 .sess-wr-pct.loss { color:var(--loss); }
 .sess-wr-pct.dim  { color:var(--mt2); }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   RULES TAB
-   ═══════════════════════════════════════════════════════════════════════════ */
-.rule-banner { text-align:center; padding:14px 32px; margin-bottom:40px; }
-.rule-banner-text {
-  font-size:12px; color:var(--mt2); letter-spacing:2px; text-transform:uppercase;
-}
-.steps-card {
-  margin-bottom:10px; max-width:720px; margin-left:auto; margin-right:auto;
-  position:relative; padding:8px 0;
-}
-.steps-card::before {
-  content:''; position:absolute; left:50%; top:0; bottom:0; width:1px;
-  background:linear-gradient(to bottom, transparent, var(--mt2) 10%, var(--mt2) 90%, transparent);
-  transform:translateX(-50%);
-}
-.step-row {
-  display:grid; grid-template-columns:1fr 40px 1fr;
-  align-items:center; margin-bottom:32px;
-}
-.step-row:last-child { margin-bottom:0; }
-.step-dot {
-  width:10px; height:10px; border-radius:50%; background:var(--mt2);
-  box-shadow:0 0 0 3px rgba(154,146,176,.15);
-  margin:0 auto; position:relative; z-index:1;
-}
-.step-row.left .step-content { text-align:right; padding-right:28px; grid-column:1; }
-.step-row.left .step-dot     { grid-column:2; }
-.step-row.left .step-empty   { grid-column:3; }
-.step-row.right .step-empty   { grid-column:1; }
-.step-row.right .step-dot     { grid-column:2; }
-.step-row.right .step-content { text-align:left; padding-left:28px; grid-column:3; }
-.step-title { font-size:13px; font-weight:600; color:var(--mt2); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
-.step-desc  { font-size:10px; color:var(--mt2); line-height:1.7; text-transform:uppercase; letter-spacing:.5px; }
-
-.quote-bare { text-align:center; padding:24px 32px 16px; margin-top:40px; }
-.quote-body {
-  font-size:13px; font-weight:300; color:var(--mt2); line-height:1.9;
-  font-style:italic; display:inline-block; max-width:680px; text-transform:uppercase;
-}
-.quote-body b { font-weight:600; font-style:normal; color:var(--p); }
-.quote-attr {
-  font-family:var(--mono); font-size:9px; color:var(--mt); text-transform:uppercase;
-  margin-top:10px; letter-spacing:1px;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    EMOTION BARS (per-emotion win/loss by outcome)
@@ -1193,21 +1136,79 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
   }
   .snap-dot.on { background:var(--p); }
 
-  /* Heatmap: tighter cells so a full month fits a phone width. */
-  .heatmap-cell, .heatmap-cell-empty { min-height:58px; }
+  /* Heatmap: tighter cells so a full month fits a phone width. Numbers step
+     down a size and the "trade(s)" word is dropped — the bare count reads
+     fine inside a month grid and the cells stop feeling crammed. */
+  .heatmap-cell, .heatmap-cell-empty { min-height:52px; }
   .heatmap-cell { padding:4px; border-radius:var(--r-sm); }
+  .heatmap-cell-day   { font-size:8px; top:4px; left:5px; }
+  .heatmap-cell-count { font-size:8px; letter-spacing:0; }
+  .heatmap-cell-count .hm-w { display:none; }
+  .heatmap-cell-pnl   { font-size:9px; margin-bottom:2px; }
+  body.pnl-open .heatmap-cell-count { font-size:6px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
      Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
-     itself (tap the row); no sideways scrolling. */
+     itself (tap the row); no sideways scrolling. Setup flips to its initials
+     form (B&R / S&R) and cell padding tightens so all 5 columns land inside
+     the screen. */
   .tlog-wrap th:nth-child(n+6), .tlog-wrap td:nth-child(n+6) { display:none; }
+  .setup-full { display:none; }
+  .setup-abbr { display:inline; }
+  .tw { padding:0 14px; }
+  td, thead th { padding-left:6px; padding-right:6px; }
+
+  /* Pop-ups: tighter shells so every card sits fully inside the viewport. */
+  .io-modal { padding:14px 10px; }
+  .io-modal-body { padding:16px 14px; }
 
   /* Journal modal: full-bleed card. */
-  .journal-modal { padding:12px 10px; }
-  .journal-modal-card { width:100%; }
-  .jm-hdr { flex-wrap:wrap; row-gap:10px; padding:12px 14px; }
+  .journal-modal { padding:12px 8px; overflow-x:hidden; }
+  .journal-modal-card { width:100%; max-width:100%; }
+
+  /* Header stays a single row: Session · Short / P&L / Long · Date. Pills
+     shed horizontal padding and the P&L input narrows so all five fit. */
+  .jm-hdr { flex-wrap:nowrap; gap:8px; padding:10px 10px; }
   .jm-hdr-left, .jm-hdr-right { flex:0 0 auto; }
-  .jm-hdr-center { flex:1 1 100%; justify-content:center; order:3; }
+  .jm-hdr-center { flex:1 1 auto; justify-content:center; gap:4px; min-width:0; }
+  .jm-hdr .jf-pill-lbl { padding:6px 8px; letter-spacing:.2px; }
+  .jm-pnl-input { width:54px; padding:6px 6px; }
+
+  /* Form cards: wide control rows (Y/N trio, setup pills, emotion columns,
+     action buttons) must never spill past the card edge. Each becomes a
+     horizontal swipe strip: centred while it fits (the auto margins on the
+     first/last child do that), left-anchored and scrollable once it doesn't —
+     flex-start is what keeps the leading buttons reachable, since centring an
+     overflowing flex row clips its start unscrollably. */
+  .jm-card { padding:14px 10px; overflow:hidden; }
+  .jf-yn-row, .jf-setup-row, .journal-form-actions {
+    max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    justify-content:flex-start; flex-wrap:nowrap;
+    scrollbar-width:none; padding-bottom:2px;
+  }
+  .jf-yn-row::-webkit-scrollbar,
+  .jf-setup-row::-webkit-scrollbar, .journal-form-actions::-webkit-scrollbar { display:none; }
+  .jf-yn-row > *, .jf-setup-row > *, .journal-form-actions > * { flex-shrink:0; }
+  .jf-yn-row > :first-child,
+  .jf-setup-row > :first-child, .journal-form-actions > :first-child { margin-left:auto; }
+  .jf-yn-row > :last-child,
+  .jf-setup-row > :last-child, .journal-form-actions > :last-child { margin-right:auto; }
+  /* All three discipline questions fit one row once the Yes/No pills give back
+     their desktop width — no swiping needed for the most-used control. */
+  .jf-yn-row { gap:10px; }
+  .jf-yn-pill { width:44px; }
+  .jf-setup-row { gap:10px; }
+
+  /* Emotions: the 3-column desktop layout is 454px wide, so on a phone the
+     columns stack instead of scrolling — every chip stays visible and no word
+     gets truncated. The first column (Calm / Confident) turns sideways so the
+     card doesn't grow a row taller than it needs. */
+  .jf-emo-cols { flex-direction:column; gap:10px; }
+  .jf-emo-col:first-child { flex-direction:row; }
+  .jf-emo-divider { width:100%; height:1px; align-self:stretch; margin:2px 0; }
+
+  .journal-form-actions { gap:8px; width:100%; }
+  .jm-btn-save, .jm-btn-cancel, .jm-btn-delete { width:auto; min-width:92px; padding:9px 14px; }
 }
 </style>
 </head>
@@ -1215,10 +1216,6 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
 
 <nav>
   <div class="logo">DOJI</div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" data-tab="rules">Rules</button>
-    <button class="nav-tab"        data-tab="trades">Trades</button>
-  </div>
   <div class="nav-actions">
     <button id="nav-fs-btn" class="nav-icon-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
       <svg class="fs-ico fs-ico-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -1231,20 +1228,8 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
 
 <div class="panels">
 
-  <!-- ═══ RULES ═══ -->
-  <div class="panel active" id="panel-rules">
-    <div class="rule-banner">
-      <div class="rule-banner-text" id="rule-banner-text">Only operate in obvious trends and cycles</div>
-    </div>
-    <div class="steps-card" id="steps-card"></div>
-    <div class="quote-bare">
-      <div class="quote-body">The elements of good trading are: <b>(1) cutting losses,</b> <b>(2) cutting losses,</b> and <b>(3) cutting losses.</b> If you can follow these three rules, you may have a chance.</div>
-      <div class="quote-attr">— Ed Seykota</div>
-    </div>
-  </div>
-
-  <!-- ═══ TRADES ═══ -->
-  <div class="panel" id="panel-trades">
+  <!-- ═══ TRADES (sole panel — the Rules tab was retired) ═══ -->
+  <div class="panel active" id="panel-trades">
 
     <!-- Broker-sync banner: appears while any auto-synced trade is still
          missing its rules/emotions data. Tapping it opens the oldest one. -->
@@ -1551,7 +1536,6 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
      STATS        pure trade math (win rate, R:R, P&L, streaks)
      CALENDAR     reusable month-grid widget shared by 3 surfaces
      CHARTS       Chart.js wrappers with shared option presets
-     RULES        Rules tab renderer
      TRADES       Trades tab renderers (one render fn per component)
      JOURNAL      Modal: open / form / save / delete
      IO           Excel import + journal export + JSON backup/restore
@@ -1677,6 +1661,16 @@ function escHtml(s) {
   return String(s ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Setup names render twice — full text and an initials form ("Break & Retest"
+// → "B&R", "Support & Resistance" → "S&R"). The phone stylesheet swaps which
+// span is visible so the trade log fits a phone width with no sideways scroll.
+function abbrevSetup(s) {
+  return s.split('&').map(part => part.trim().charAt(0).toUpperCase()).join('&');
+}
+function setupCellHtml(setup) {
+  if (!setup) return '—';
+  return `<span class="setup-full">${escHtml(setup)}</span><span class="setup-abbr">${escHtml(abbrevSetup(setup))}</span>`;
 }
 // Monotonic counter folded into the id so ids minted within the same
 // millisecond (bulk Excel import mints two per row in a tight loop) can never
@@ -2111,29 +2105,8 @@ const Charts = {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   RULES TAB
-   ═══════════════════════════════════════════════════════════════════════════ */
-function renderRules() {
-  const r = Storage.loadRules();
-  $('rule-banner-text').textContent = r.banner;
-
-  const rows = r.steps.map((step, i) => {
-    const side = i % 2 === 0 ? 'left' : 'right';
-    const content = `
-      <div class="step-content">
-        <div class="step-title">${escHtml(step.title)}</div>
-        <div class="step-desc">${escHtml(step.desc)}</div>
-      </div>`;
-    const dot   = '<div class="step-dot"></div>';
-    const empty = '<div class="step-empty"></div>';
-    return `<div class="step-row ${side}">${ side === 'left' ? content + dot + empty : empty + dot + content }</div>`;
-  });
-  $('steps-card').innerHTML = rows.join('');
-}
-
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   TRADES TAB — orchestrator
+   TRADES — orchestrator (the Rules tab UI was retired; rules data is kept in
+   storage untouched so old JSON backups still import/export cleanly)
    ═══════════════════════════════════════════════════════════════════════════ */
 function renderTrades() {
   // The on-screen filter bar was removed, so every view works from the full
@@ -2555,7 +2528,7 @@ function openDayPopup(isoDay, trades) {
         <div class="day-trade-left">
           <span class="dir-pill">${dir}</span>
           <div class="day-trade-meta">
-            <span class="day-trade-setup">${escHtml(t.setup || '—')}</span>
+            <span class="day-trade-setup">${setupCellHtml(t.setup)}</span>
             <span class="day-trade-sub">${escHtml(sess)}</span>
           </div>
         </div>
@@ -2614,7 +2587,9 @@ function renderHeatmap() {
     // its rules/emotions data is filled in.
     if (State.trades.some(t => t.brokerPending && t.openTime && t.openTime.slice(0, 10) === iso)) cls += ' pending';
     const pnlText   = data.tradeCount > 0 ? '$' + Math.abs(data.pnl).toFixed(2) : '';
-    const countText = data.tradeCount > 0 ? `${data.tradeCount} trade${data.tradeCount > 1 ? 's' : ''}` : '';
+    // The word "trade(s)" lives in its own span so the phone stylesheet can
+    // drop it — on a 7-column month grid the bare count is unambiguous.
+    const countText = data.tradeCount > 0 ? `${data.tradeCount}<span class="hm-w"> trade${data.tradeCount > 1 ? 's' : ''}</span>` : '';
     html += `
       <div class="heatmap-cell ${cls}" data-day="${iso}">
         <div class="heatmap-cell-day">${d}</div>
@@ -2985,7 +2960,7 @@ function renderTradeTable(ft) {
       <td>${date}</td>
       <td><span class="dir-pill">${escHtml(t.direction || '—')}</span></td>
       <td>${escHtml(sessionAbbr)}</td>
-      <td>${escHtml(t.setup || '—')}</td>
+      <td>${setupCellHtml(t.setup)}</td>
       <td class="${pnlCls}">${pnlText}</td>
       <td class="c">${rules}</td>
       <td class="c">${sls}</td>
@@ -3613,7 +3588,7 @@ const IO = {
         }
         migrateData();
         Storage.saveTradesAndJournals();
-        renderTrades(); renderRules();
+        renderTrades();
 
         // Surface any rows we dropped so the user knows the restore wasn't 100%.
         const dropped = [];
@@ -3867,7 +3842,6 @@ const Cloud = {
       State.journals = Storage.loadJournals();
       migrateData();
       rebuildJournalIndex();
-      renderRules();
       renderTrades();
     }
   },
@@ -4156,17 +4130,6 @@ function toggleSection(bodyId, chevId) {
   }
 }
 
-function showTab(id) {
-  $$('.panel').forEach(p => p.classList.remove('active'));
-  $$('.nav-tab').forEach(b => b.classList.remove('active'));
-  const panel = $('panel-' + id);
-  const tab   = document.querySelector(`[data-tab="${id}"]`);
-  if (panel) panel.classList.add('active');
-  if (tab)   tab.classList.add('active');
-  if (id === 'trades')  renderTrades();
-  if (id === 'rules')   renderRules();
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    GLOBAL EVENT WIRING
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -4181,8 +4144,6 @@ function wireEvents() {
     else console.warn(`Doji: missing element for handler "${id}" (${event})`);
   };
 
-  /* Nav tabs */
-  $$('.nav-tab').forEach(btn => btn.addEventListener('click', () => showTab(btn.dataset.tab)));
   on('nav-io-btn',  'click', IO.openModal);
   on('nav-add-btn', 'click', () => Journal.open(null));
 
@@ -4436,7 +4397,6 @@ const BackupWatcher = {
   State.cal.journal.m = now.getMonth();
 
   wireEvents();
-  renderRules();
   renderTrades();
   DayWatcher.start();
   BackupWatcher.start();
