@@ -52,9 +52,21 @@
      distribution bar in the trades panel (session, discipline, R:R, emotions). */
   --bar-h:10px;
   /* Shared segment border thickness — every chart segment (donut arcs, R:R,
-     session, discipline, emotion bars) uses this so the "margin" weight is
-     identical across all charts. */
+     session, discipline, emotion bars, calendar day cells) uses this so the
+     "margin" weight is identical across all charts. */
   --seg-bd:1.5px;
+  /* Shared segment palette — the single source of truth for the fill + border
+     of EVERY win / loss / break-even surface in the panel: bar segments, donut
+     arcs, and calendar day + week cells. Flat 12% fill against a full-strength
+     border is the house treatment; change it here and bars, wheels and the
+     heatmap all move together. mountResultDonut() reads these same vars, so
+     the Chart.js arcs can't drift from the CSS. */
+  --seg-win-bg:rgba(59,165,133,.12);
+  --seg-loss-bg:rgba(214,61,90,.12);
+  --seg-be-bg:rgba(144,144,160,.10);
+  --seg-be-bd:rgba(144,144,160,.5);
+  /* Gap between adjacent chart segments, and between calendar cells. */
+  --seg-gap:3px;
 
   /* Spacing scale — single source of truth for section rhythm. Every
      section gap / title gap / internal divider / bar-row gap pulls from one
@@ -149,7 +161,6 @@ nav {
 .btn:hover { border-color:var(--p); color:var(--p); }
 .btn.primary { background:var(--p); color:#fff; border-color:var(--p); font-weight:600; }
 .btn.primary:hover { background:var(--p); color:#fff; box-shadow:0 0 22px -4px var(--p-gl3); }
-.btn.sm { padding:5px 10px; font-size:8px; }
 .btn.r4 { border-radius:var(--r-sm); }
 
 .icon-btn {
@@ -261,6 +272,43 @@ nav {
 .period-counts-right .pc-l { color:var(--loss); }
 .period-counts-right .pc-b { color:var(--mt2); }
 
+/* ── Per-wheel money column (P&L view only) ────────────────────────────────
+   A fourth flex item on the right of each wheel row carrying the same period's
+   gross profit, gross loss, net and trade count. It only exists while the P&L
+   section is open (body.pnl-open), which is also what reveals dollar figures
+   in the calendar — one mode, one reveal, consistent on touch and desktop.
+   Because .period-host is space-between, adding this item is what shifts the
+   donut left; no separate offset rule is needed. */
+.period-money { display:none; flex-direction:column; gap:5px; flex-shrink:0; }
+body.pnl-open .period-money { display:flex; }
+/* With four items in the row the fixed 14px gaps get expensive — tighten the
+   row's own padding and gap while the money column is present. */
+body.pnl-open .period-host { gap:10px; padding:0; }
+.pm-row { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.pm-lbl {
+  font-family:var(--mono); font-size:7px; letter-spacing:.5px;
+  text-transform:uppercase; color:var(--mt);
+}
+.pm-val {
+  font-family:var(--mono); font-size:9px; font-weight:600;
+  line-height:1.1; letter-spacing:.5px; white-space:nowrap; color:var(--mt2);
+}
+.pm-val.win  { color:var(--win); }
+.pm-val.loss { color:var(--loss); }
+.pm-val.dim  { color:var(--mt2); }
+
+/* Between the phone carousel breakpoint and ~1080px a three-up row can't hold
+   a 108px wheel, both count rails AND the money column side by side. Rather
+   than shrink the donut, drop the money block to a full-width strip under the
+   wheel and lay its four figures out horizontally. */
+@media (max-width:1080px) and (min-width:641px) {
+  body.pnl-open .period-host { flex-wrap:wrap; justify-content:center; }
+  body.pnl-open .period-money {
+    flex:1 0 100%; flex-direction:row; justify-content:space-around; gap:8px;
+  }
+  body.pnl-open .pm-row { flex-direction:column; align-items:center; gap:3px; }
+}
+
 /* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
    each win/loss wheel and reuse the session-bar segment styling for a
    consistent green-followed / red-missed read. */
@@ -321,13 +369,21 @@ nav {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   P&L / DRAWDOWN CARD
+   P&L CARD — net figure + performance stats
+   ───────────────────────────────────────────────────────────────────────────
+   The right half used to hold the daily max-drawdown meter. That widget was
+   retired: it answered one narrow question ("how close am I to today's stop?")
+   with half a card, while the numbers that actually describe a P&L record —
+   gross profit, gross loss, profit factor, expectancy, best/worst day — had
+   nowhere to live. The week / month lines that sat under the net figure went
+   with it; the period wheels now carry those same windows with their own money
+   column, so keeping them here would have printed the identical figure twice.
    ═══════════════════════════════════════════════════════════════════════════ */
 .pnl-card { padding:22px 26px; position:relative; overflow:hidden; }
 .pnl-card-inner { display:flex; gap:0; height:100%; align-items:stretch; position:relative; z-index:1; }
-.pnl-net   { flex:1; position:relative; display:flex; flex-direction:column; justify-content:space-between; padding-right:24px; border-right:1px solid var(--bd); }
+.pnl-net   { flex:0 0 auto; position:relative; display:flex; flex-direction:column; justify-content:center; padding-right:24px; border-right:1px solid var(--bd); }
 .pnl-net > * { position:relative; z-index:1; }
-.pnl-dd    { flex:1; display:flex; flex-direction:column; justify-content:space-between; padding-left:24px; }
+.pnl-stats { flex:1; min-width:0; padding-left:24px; }
 
 .pnl-net-number {
   font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
@@ -336,46 +392,51 @@ nav {
   font-family:var(--mono); font-size:8px; color:var(--mt);
   margin-left:8px; letter-spacing:.5px;
 }
-/* Week / month P&L lines under the global net figure — same mono voice as the
-   sub-line, values coloured by sign like every other money figure. */
-.pnl-periods { margin-top:10px; display:flex; flex-direction:column; gap:5px; }
-.pnl-period-row {
-  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
-}
-.pnl-period-lbl {
-  font-family:var(--mono); font-size:8px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--mt);
-}
-.pnl-period-val { font-family:var(--mono); font-size:11px; font-weight:600; }
 
-.dd-hdr { display:flex; align-items:center; justify-content:space-between; }
-.dd-edit-btn {
-  font-family:var(--mono); font-size:6px; letter-spacing:1px; text-transform:uppercase;
-  background:none; border:1px solid var(--bd); color:var(--mt);
-  padding:1px 5px; cursor:pointer;
+/* Stat grid — two columns of label / value pairs in the shared mono voice.
+   Values are coloured by sign like every other money figure in the panel. */
+.pnl-stats-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  column-gap:18px; row-gap:9px;
 }
-.dd-edit-btn:hover { border-color:var(--p); color:var(--p); }
-.dd-today { font-family:var(--mono); font-size:8px; color:var(--mt2); }
-.dd-input {
-  background:transparent; border:none; border-bottom:1px solid var(--p);
-  color:#fff; font-family:var(--mono); font-size:16px; font-weight:400;
-  width:110px; outline:none; padding:2px 0;
+.pnl-stat { display:flex; align-items:baseline; justify-content:space-between; gap:10px; min-width:0; }
+.pnl-stat-lbl {
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--mt); white-space:nowrap;
 }
-.dd-edit-actions { display:flex; gap:6px; margin-top:8px; }
-.dd-empty {
-  font-family:var(--mono); font-size:10px; color:var(--mt2);
+.pnl-stat-val {
+  font-family:var(--mono); font-size:11px; font-weight:600;
+  white-space:nowrap; color:var(--mt2);
 }
-.dd-bar-wrap {
-  width:100%; height:28px; background:var(--s3); border-radius:5px;
-  overflow:hidden; position:relative;
+.pnl-stat-val.win  { color:var(--win); }
+.pnl-stat-val.loss { color:var(--loss); }
+.pnl-stat-val.dim  { color:var(--mt2); }
+
+/* ── Month over month ──────────────────────────────────────────────────────
+   Three divided columns (previous month / current month / change), built with
+   the same divider + 14px column padding as .period-col so it lines up on the
+   shared 18px content edge. */
+.mom-row {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;
 }
-.dd-bar-fill {
-  height:100%; width:0%; border-radius:5px;
-  background:rgba(214,61,90,.12); border:var(--seg-bd) solid var(--loss); box-sizing:border-box;
+.mom-col {
+  padding:0 14px; display:flex; flex-direction:column; gap:5px;
+  border-left:1px solid var(--glass-bd); min-width:0;
 }
-.dd-bar-pct {
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-family:var(--mono); font-size:9px; color:rgba(255,255,255,.4); pointer-events:none;
+.mom-col:first-child { border-left:none; }
+.mom-lbl {
+  font-family:var(--mono); font-size:9px; font-weight:400;
+  letter-spacing:1px; text-transform:uppercase; color:var(--mt);
+}
+.mom-val {
+  font-family:var(--mono); font-size:15px; font-weight:600;
+  line-height:1; color:var(--mt2); white-space:nowrap;
+}
+.mom-val.win  { color:var(--win); }
+.mom-val.loss { color:var(--loss); }
+.mom-sub {
+  font-family:var(--mono); font-size:8px; letter-spacing:.5px;
+  color:var(--mt); white-space:nowrap;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -397,11 +458,11 @@ nav {
   overflow:hidden; display:flex; gap:1px;
 }
 .rr-bar-seg-win {
-  background:rgba(59,165,133,.12); border:var(--seg-bd) solid var(--win);
+  background:var(--seg-win-bg); border:var(--seg-bd) solid var(--win);
   border-radius:3px 0 0 3px; box-sizing:border-box;
 }
 .rr-bar-seg-loss {
-  background:rgba(214,61,90,.12); border:var(--seg-bd) solid var(--loss);
+  background:var(--seg-loss-bg); border:var(--seg-bd) solid var(--loss);
   border-radius:0 3px 3px 0; box-sizing:border-box;
 }
 /* Shared empty-bar placeholder — the single faint outlined track that EVERY
@@ -410,7 +471,7 @@ nav {
    break-even segment, dimmed to .4. */
 .bar-empty {
   width:100%; height:var(--bar-h); border-radius:3px; box-sizing:border-box;
-  background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5);
+  background:var(--seg-be-bg); border:var(--seg-bd) solid var(--seg-be-bd);
   opacity:.4;
 }
 
@@ -430,38 +491,78 @@ nav {
   font-family:var(--mono); font-size:11px; letter-spacing:1px; text-transform:uppercase;
   color:var(--mt2); font-weight:500;
 }
+/* Seven day columns plus a week-summary column on the right. The summary is
+   narrower than a day — it carries a count and a figure, not a date. */
 .heatmap-grid {
-  display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
+  display:grid; grid-template-columns:repeat(7,1fr) minmax(58px,.8fr);
+  gap:var(--seg-gap);
 }
 .heatmap-dow {
   font-family:var(--mono); font-size:8px; color:var(--mt);
   padding:6px 0; text-align:center; letter-spacing:1px; text-transform:uppercase;
 }
+/* The week column's header sits apart from the weekday names — it labels a
+   different axis, so it takes the dimmer accent rather than the same weight. */
+.heatmap-dow-week { color:var(--p); }
 .heatmap-cell-empty { min-height:80px; }
+/* Day cells now wear the exact chart-segment treatment: flat --seg-*-bg fill,
+   full-strength --seg-bd border in the result colour, no gradient. Previously
+   they used a two-stop gradient and a dimmed border, which made the same win
+   read one shade in the calendar and another in every bar and wheel. One
+   palette, one border weight, one gap token across all three now. */
 .heatmap-cell {
   background:var(--glass-top), rgba(8,8,10,.55);
-  border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  border:var(--seg-bd) solid var(--glass-bd); border-radius:var(--r-md);
   box-shadow:var(--sh-2);
   min-height:80px; padding:6px; position:relative;
   display:flex; flex-direction:column; justify-content:center;
+  box-sizing:border-box;
 }
-.heatmap-cell.win  {
-  background:var(--glass-top), linear-gradient(180deg, rgba(59,165,133,.22), rgba(59,165,133,.06));
-  border-color:rgba(59,165,133,.30);
-}
-.heatmap-cell.loss {
-  background:var(--glass-top), linear-gradient(180deg, rgba(214,61,90,.22), rgba(214,61,90,.06));
-  border-color:rgba(214,61,90,.28);
-}
-.heatmap-cell.be {
-  background:var(--glass-top), linear-gradient(180deg, rgba(144,144,160,.20), rgba(144,144,160,.05));
-  border-color:rgba(144,144,160,.32);
-}
-.heatmap-cell.win:hover  { border-color:rgba(59,165,133,.6); }
-.heatmap-cell.loss:hover { border-color:rgba(214,61,90,.6); }
-.heatmap-cell.be:hover   { border-color:rgba(144,144,160,.6); }
+.heatmap-cell.win  { background:var(--seg-win-bg);  border-color:var(--win); }
+.heatmap-cell.loss { background:var(--seg-loss-bg); border-color:var(--loss); }
+.heatmap-cell.be   { background:var(--seg-be-bg);   border-color:var(--seg-be-bd); }
+/* Hover only lifts the fill — the border is already at full strength, so
+   brightening it further would break the match with the bars. */
+.heatmap-cell.win:hover  { background:rgba(59,165,133,.22); }
+.heatmap-cell.loss:hover { background:rgba(214,61,90,.22); }
+.heatmap-cell.be:hover   { background:rgba(144,144,160,.20); }
 /* Only days that hold a trade are clickable (they open that day's entry). */
 .heatmap-cell.win, .heatmap-cell.loss, .heatmap-cell.be { cursor:pointer; }
+
+/* ── Week summary cell ─────────────────────────────────────────────────────
+   Same segment treatment as a day cell so the row reads as one material, but
+   read-only (no click target) and labelled with its week ordinal. */
+.heatmap-week {
+  border:var(--seg-bd) solid var(--glass-bd); border-radius:var(--r-md);
+  background:var(--glass-top), rgba(8,8,10,.55);
+  min-height:80px; padding:6px 4px; position:relative; box-sizing:border-box;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.heatmap-week.win  { background:var(--seg-win-bg);  border-color:var(--win); }
+.heatmap-week.loss { background:var(--seg-loss-bg); border-color:var(--loss); }
+.heatmap-week.be   { background:var(--seg-be-bg);   border-color:var(--seg-be-bd); }
+.heatmap-week-lbl {
+  position:absolute; top:6px; left:0; right:0; text-align:center;
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--mt);
+}
+.heatmap-week-count {
+  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
+  color:var(--mt2); text-transform:uppercase;
+}
+.heatmap-week.win  .heatmap-week-count { color:var(--win); }
+.heatmap-week.loss .heatmap-week-count { color:var(--loss); }
+.heatmap-week.be   .heatmap-week-count { color:rgba(170,170,185,1); }
+.heatmap-week-pnl {
+  font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
+  color:var(--mt2);
+  display:none;                 /* revealed by body.pnl-open, same as day cells */
+}
+.heatmap-week.win  .heatmap-week-pnl { color:var(--win); }
+.heatmap-week.loss .heatmap-week-pnl { color:var(--loss); }
+.heatmap-week.be   .heatmap-week-pnl { color:rgba(170,170,185,1); }
+body.pnl-open .heatmap-week-pnl   { display:block; }
+body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--mt); }
 .heatmap-cell-day {
   position:absolute; top:6px; left:8px;
   font-family:var(--mono); font-size:10px; color:var(--mt); font-weight:500;
@@ -619,15 +720,15 @@ td.c   { text-align:center; }
   display:flex; gap:1px;
 }
 .sess-wr-seg-win {
-  background:rgba(59,165,133,.12); border:var(--seg-bd) solid var(--win);
+  background:var(--seg-win-bg); border:var(--seg-bd) solid var(--win);
   box-sizing:border-box;
 }
 .sess-wr-seg-loss {
-  background:rgba(214,61,90,.12); border:var(--seg-bd) solid var(--loss);
+  background:var(--seg-loss-bg); border:var(--seg-bd) solid var(--loss);
   box-sizing:border-box;
 }
 .sess-wr-seg-be {
-  background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5);
+  background:var(--seg-be-bg); border:var(--seg-bd) solid var(--seg-be-bd);
   box-sizing:border-box;
 }
 .sess-wr-track.first .sess-wr-seg-win  { border-radius:3px 0 0 3px; }
@@ -659,9 +760,9 @@ td.c   { text-align:center; }
 }
 .emo-row-bar { display:flex; gap:1px; height:100%; }
 .emo-row-bar > div { box-sizing:border-box; }
-.emo-row-bar .seg-win  { background:rgba(59,165,133,.12); border:var(--seg-bd) solid var(--win); }
-.emo-row-bar .seg-be   { background:rgba(144,144,160,.10); border:var(--seg-bd) solid rgba(144,144,160,.5); }
-.emo-row-bar .seg-loss { background:rgba(214,61,90,.12);  border:var(--seg-bd) solid var(--loss); }
+.emo-row-bar .seg-win  { background:var(--seg-win-bg);  border:var(--seg-bd) solid var(--win); }
+.emo-row-bar .seg-be   { background:var(--seg-be-bg);   border:var(--seg-bd) solid var(--seg-be-bd); }
+.emo-row-bar .seg-loss { background:var(--seg-loss-bg); border:var(--seg-bd) solid var(--loss); }
 /* Untraded emotion: muted label + the shared .bar-empty placeholder, so an
    empty per-emotion row matches every other empty bar in the panel. */
 .emo-row.is-empty .emo-row-name,
@@ -1139,13 +1240,21 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
      down a size and the "trade(s)" word is dropped — inside a month grid the
      bare count is unambiguous, and dropping it gives the day's P&L (which sits
      underneath) room to breathe. */
-  .heatmap-cell, .heatmap-cell-empty { min-height:52px; }
-  .heatmap-cell { padding:4px; border-radius:var(--r-sm); }
+  .heatmap-cell, .heatmap-cell-empty, .heatmap-week { min-height:52px; }
+  .heatmap-cell, .heatmap-week { padding:4px; border-radius:var(--r-sm); }
   .heatmap-cell-day   { font-size:8px; top:4px; left:5px; }
   .heatmap-cell-count { font-size:8px; letter-spacing:0; }
   .heatmap-cell-count-word { display:none; }
   .heatmap-cell-pnl   { font-size:9px; margin-top:2px; }
   body.pnl-open .heatmap-cell-count { font-size:7px; }
+  /* Eight columns on a phone: the week summary shrinks to the minimum that
+     still fits "$1,234.56"-scale text, leaving the seven day cells even. */
+  .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
+  .heatmap-dow-week   { font-size:7px; letter-spacing:0; }
+  .heatmap-week-lbl   { font-size:7px; top:4px; letter-spacing:0; }
+  .heatmap-week-count { font-size:8px; letter-spacing:0; }
+  .heatmap-week-pnl   { font-size:8px; margin-top:2px; }
+  body.pnl-open .heatmap-week-count { font-size:7px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
      Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
@@ -1247,30 +1356,16 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
               <div class="pnl-net">
                 <div class="cbox-l">Net P&amp;L<span id="pnl-net-count" class="pnl-net-count"></span></div>
                 <div id="pnl-net-number" class="pnl-net-number">—</div>
-                <div class="pnl-periods">
-                  <div class="pnl-period-row"><span class="pnl-period-lbl">This Week</span><span id="pnl-net-week" class="pnl-period-val">—</span></div>
-                  <div class="pnl-period-row"><span class="pnl-period-lbl">This Month</span><span id="pnl-net-month" class="pnl-period-val">—</span></div>
-                </div>
               </div>
-              <div class="pnl-dd">
-                <div class="dd-hdr">
-                  <div class="cbox-l" style="margin-bottom:0;">Max Daily DD</div>
-                  <button id="dd-edit-btn" class="dd-edit-btn">Edit</button>
-                </div>
-                <div id="dd-today" class="dd-today"></div>
-                <div>
-                  <div id="dd-display"></div>
-                  <div id="dd-edit" class="hidden" style="margin-bottom:8px;">
-                    <input id="dd-input" class="dd-input" type="number" step="0.01" placeholder="e.g. 200">
-                    <div class="dd-edit-actions">
-                      <button id="dd-save-btn"   class="btn primary sm r4">Save</button>
-                      <button id="dd-cancel-btn" class="btn sm r4">Cancel</button>
-                    </div>
-                  </div>
-                  <div class="dd-bar-wrap">
-                    <div id="dd-bar-fill" class="dd-bar-fill"></div>
-                    <div id="dd-bar-pct"  class="dd-bar-pct"></div>
-                  </div>
+              <div class="pnl-stats">
+                <div class="cbox-l">Performance</div>
+                <div class="pnl-stats-grid">
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Profit</span><span id="pnl-gross-profit" class="pnl-stat-val">—</span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Loss</span><span id="pnl-gross-loss" class="pnl-stat-val">—</span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Profit Factor</span><span id="pnl-profit-factor" class="pnl-stat-val">—</span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Expectancy</span><span id="pnl-expectancy" class="pnl-stat-val">—</span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Best Day</span><span id="pnl-best-day" class="pnl-stat-val">—</span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Worst Day</span><span id="pnl-worst-day" class="pnl-stat-val">—</span></div>
                 </div>
               </div>
             </div>
@@ -1278,6 +1373,29 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
           <div class="cbox">
             <div class="cbox-l">Cumulative P&amp;L</div>
             <div class="chart-area" style="height:90px;"><canvas id="chart-pnl"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Month over month: last month vs this month, and the swing between
+             them. Three divided columns on the shared 14px column padding. -->
+        <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+          <div class="cbox-l" style="padding:0 14px;">Month over Month</div>
+          <div class="mom-row">
+            <div class="mom-col">
+              <div class="mom-lbl" id="mom-prev-lbl">Last Month</div>
+              <div class="mom-val" id="mom-prev-val">—</div>
+              <div class="mom-sub" id="mom-prev-sub">—</div>
+            </div>
+            <div class="mom-col">
+              <div class="mom-lbl" id="mom-cur-lbl">This Month</div>
+              <div class="mom-val" id="mom-cur-val">—</div>
+              <div class="mom-sub" id="mom-cur-sub">—</div>
+            </div>
+            <div class="mom-col">
+              <div class="mom-lbl">Change</div>
+              <div class="mom-val" id="mom-delta-val">—</div>
+              <div class="mom-sub" id="mom-delta-sub">—</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1299,6 +1417,12 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
             <span class="pc-l" id="cnt-l-total">— L</span>
             <span class="pc-b" id="cnt-b-total">— B</span>
           </div>
+          <div class="period-money">
+            <div class="pm-row"><span class="pm-lbl">Profit</span><span class="pm-val win"  id="pm-p-total">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Loss</span><span class="pm-val loss" id="pm-l-total">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Net</span><span class="pm-val"      id="pm-n-total">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Trades</span><span class="pm-val dim"  id="pm-t-total">—</span></div>
+          </div>
         </div>
         <div class="period-disc" id="disc-bars-total"></div>
       </div>
@@ -1316,6 +1440,12 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
             <span class="pc-l" id="cnt-l-week">— L</span>
             <span class="pc-b" id="cnt-b-week">— B</span>
           </div>
+          <div class="period-money">
+            <div class="pm-row"><span class="pm-lbl">Profit</span><span class="pm-val win"  id="pm-p-week">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Loss</span><span class="pm-val loss" id="pm-l-week">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Net</span><span class="pm-val"      id="pm-n-week">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Trades</span><span class="pm-val dim"  id="pm-t-week">—</span></div>
+          </div>
         </div>
         <div class="period-disc" id="disc-bars-week"></div>
       </div>
@@ -1332,6 +1462,12 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
           <div class="period-counts-right">
             <span class="pc-l" id="cnt-l-month">— L</span>
             <span class="pc-b" id="cnt-b-month">— B</span>
+          </div>
+          <div class="period-money">
+            <div class="pm-row"><span class="pm-lbl">Profit</span><span class="pm-val win"  id="pm-p-month">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Loss</span><span class="pm-val loss" id="pm-l-month">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Net</span><span class="pm-val"      id="pm-n-month">—</span></div>
+            <div class="pm-row"><span class="pm-lbl">Trades</span><span class="pm-val dim"  id="pm-t-month">—</span></div>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-month"></div>
@@ -1421,7 +1557,7 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
       <div id="io-section-json" class="io-section">
         <div class="io-section-label">Full Backup / Restore (JSON)</div>
         <div class="io-section-desc">
-          Exports <b>everything</b> — every trade, journal entry, and the drawdown limit — as a single <b>.json</b> file.
+          Exports <b>everything</b> — every trade and journal entry — as a single <b>.json</b> file.
           Restoring from this file replaces all current data.
         </div>
         <div class="io-section-actions">
@@ -1545,8 +1681,7 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
 const CONFIG = Object.freeze({
   STORE: {
     trades:   'doji_trades_v6',
-    journal:  'doji_journal_v6',
-    ddMax:    'doji_ddmax_v5'
+    journal:  'doji_journal_v6'
   },
   // Phase-specific tag vocabularies. BEFORE captures the state a trade was
   // ENTERED in (the causal phase); DURING captures the state while managing
@@ -1620,7 +1755,6 @@ const State = {
 const Storage = {
   loadTrades()    { return safeJSON(CONFIG.STORE.trades,  []); },
   loadJournals()  { return safeJSON(CONFIG.STORE.journal, []); },
-  loadDDMax()     { const v = parseFloat(localStorage.getItem(CONFIG.STORE.ddMax)); return isNaN(v) ? null : v; },
 
   saveTradesAndJournals() {
     rebuildJournalIndex();
@@ -1632,8 +1766,7 @@ const Storage = {
     }
     Cloud.push(CONFIG.STORE.trades);
     Cloud.push(CONFIG.STORE.journal);
-  },
-  saveDDMax(v)   { try { localStorage.setItem(CONFIG.STORE.ddMax, String(v)); } catch (e) { notify('⚠ Could not save — storage unavailable.', true); } Cloud.push(CONFIG.STORE.ddMax); }
+  }
 };
 function safeJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
@@ -2032,12 +2165,15 @@ const Calendar = {
    dimensions, colors, borders, and animation already in use everywhere else.
    ═══════════════════════════════════════════════════════════════════════════ */
 // Win / Loss / Break-Even palette (in that order) shared by every donut.
-// Keep in sync with the --win / --loss CSS vars and the heatmap/emotion-bar styles.
-const RESULT_FILL   = Object.freeze(['rgba(59,165,133,.12)','rgba(214,61,90,.12)','rgba(144,144,160,.10)']);
-const RESULT_BORDER = Object.freeze(['#3ba585','#d63d5a','rgba(144,144,160,.5)']);
-// Pull the segment border weight from the same --seg-bd token the CSS bars use,
-// so donut arcs and bar segments always share one border thickness.
-const SEG_BD = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--seg-bd')) || 1.5;
+// Read straight off the --seg-* design tokens rather than restated as literals,
+// so the arcs, the CSS bar segments and the calendar cells cannot drift apart —
+// there is now exactly one place any of those colours is written down.
+const cssToken = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const RESULT_FILL   = Object.freeze([cssToken('--seg-win-bg'), cssToken('--seg-loss-bg'), cssToken('--seg-be-bg')]);
+const RESULT_BORDER = Object.freeze([cssToken('--win'),        cssToken('--loss'),        cssToken('--seg-be-bd')]);
+// Same story for the segment border weight, from the --seg-bd token the CSS
+// bars use, so donut arcs and bar segments always share one border thickness.
+const SEG_BD = parseFloat(cssToken('--seg-bd')) || 1.5;
 
 // Canonical result wheel (win / loss / break-even doughnut). Single source of
 // truth for EVERY wheel in the journal — period wheels and setup wheels — so
@@ -2149,7 +2285,6 @@ function renderTrades() {
   const steps = [
     () => renderBrokerBanner(),
     () => renderPnLCard(ft),
-    () => renderDD(),
     () => renderPeriodDonuts(ft),
     () => renderRRBar(ft),
     () => renderHeatmap(),
@@ -2167,67 +2302,24 @@ function renderTrades() {
   catch (err) { console.error('Doji: carousel wiring failed', err); }
 }
 
-/* ─── DAILY DRAWDOWN ─────────────────────────────────────────────────────── */
-function todayLossTotal() {
-  const todayKey = Dates.isoDay(new Date());
-  let loss = 0;
-  for (const j of State.journals) {
-    if (j.pnl == null || j.pnl >= 0) continue;
-    const t = tradeForJournal(j);
-    if (!t) continue;
-    const day = (t.openTime || j.createdAt || '').slice(0, 10);
-    if (day === todayKey) loss += Math.abs(j.pnl);
-  }
-  return loss;
-}
-
-function renderDD() {
-  const limit   = Storage.loadDDMax();
-  const loss    = todayLossTotal();
-  const todayEl = $('dd-today');
-  const display = $('dd-display');
-  const fill    = $('dd-bar-fill');
-  const pctEl   = $('dd-bar-pct');
-
-  todayEl.textContent = loss > 0 ? `Today: -${loss.toFixed(2)}` : 'No losses today';
-
-  if (limit == null) {
-    fill.style.width = '0%';
-    pctEl.textContent = '';
-    display.innerHTML = '<div class="dd-empty">Set a limit to track drawdown</div>';
-    return;
-  }
-
-  display.innerHTML = '';
-  const pct = Math.min((loss / limit) * 100, 100);
-  fill.style.width = pct + '%';
-  pctEl.textContent = Math.round(pct) + '%';
-}
-function toggleDDEdit() {
-  const display = $('dd-display');
-  const edit    = $('dd-edit');
-  const input   = $('dd-input');
-  const opening = edit.classList.contains('hidden');
-  display.classList.toggle('hidden', opening);
-  edit.classList.toggle('hidden', !opening);
-  if (opening) {
-    input.value = Storage.loadDDMax() ?? '';
-    input.focus();
-  }
-}
-function saveDDMax() {
-  const v = safeNum($('dd-input').value);
-  if (v === null || v <= 0) {
-    notify('Enter a positive number (e.g. 200).', true);
-    return;
-  }
-  Storage.saveDDMax(v);
-  toggleDDEdit();
-  renderDD();
-  notify('Drawdown limit saved');
-}
-
 /* ─── P&L CARD + CUMULATIVE LINE CHART ───────────────────────────────────── */
+// Shared money formatter for every figure in this section: explicit sign, two
+// decimals. One function so the stat grid, the wheel money columns and the
+// month-over-month row can never format the same number two different ways.
+function money(v) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); }
+
+// Paints a money value into an element and colours it by sign, using the same
+// win / loss / neutral rule as every other figure in the panel.
+function setMoney(id, v, { blank = false, text = null } = {}) {
+  const el = $(id);
+  if (!el) return;
+  if (blank) { el.textContent = '—'; el.className = el.className.replace(/\s*\b(win|loss|dim)\b/g, '') + ' dim'; el.style.color = ''; return; }
+  el.textContent = text !== null ? text : money(v);
+  const cls = v > 0 ? 'win' : v < 0 ? 'loss' : 'dim';
+  el.className = el.className.replace(/\s*\b(win|loss|dim)\b/g, '') + ' ' + cls;
+  el.style.color = '';
+}
+
 function renderPnLCard(ft) {
   const netEl   = $('pnl-net-number');
   const countEl = $('pnl-net-count');
@@ -2239,39 +2331,116 @@ function renderPnLCard(ft) {
     if (countEl) countEl.textContent = '';
   } else {
     const net = sum(pnls);
-    netEl.textContent = (net >= 0 ? '+' : '') + net.toFixed(2);
+    netEl.textContent = money(net);
     netEl.style.color = net > 0 ? 'var(--win)' : net < 0 ? 'var(--loss)' : 'var(--mt2)';
     if (countEl) countEl.textContent = pnls.length;
   }
-  renderPeriodPnls(ft);
+  renderPnLStats(ft);
+  renderMoM(ft);
   renderCumulativeChart(ft);
 }
 
-// Calendar-week and calendar-month P&L lines in the Net P&L box. Windows come
-// from the same periodCutoff() the period wheels use, so the two "This Week" /
-// "This Month" figures in the journal always describe the identical window.
-function renderPeriodPnls(ft) {
-  const weekCut  = periodCutoff('week');
-  const monthCut = periodCutoff('month');
-  let week = 0, month = 0, weekAny = false, monthAny = false;
+// ─── Performance stats ──────────────────────────────────────────────────────
+// Gross profit / gross loss split on the raw SIGN of each P&L, not on the
+// win/loss LABEL. The two differ inside the ±BE_THRESHOLD scratch band: a
+// +$1.20 close is labelled break-even for win-rate purposes but is still $1.20
+// of money earned. Splitting on sign is what makes gross profit − gross loss
+// come out exactly equal to net P&L, which is the property that lets a trader
+// check this box against itself. The wheels keep using the labels; this box
+// keeps using the dollars, and the comment above each explains which is which.
+function renderPnLStats(ft) {
+  let gp = 0, gl = 0, n = 0;
+  const byDay = new Map();
   for (const t of ft) {
-    if (!t.openTime) continue;
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
     if (v === null) continue;
-    const d = new Date(t.openTime);
-    if (d >= weekCut)  { week  += v; weekAny  = true; }
-    if (d >= monthCut) { month += v; monthAny = true; }
+    n++;
+    if (v >= 0) gp += v; else gl += -v;
+    const day = Dates.tradeDayISO(t, j);
+    if (day) byDay.set(day, (byDay.get(day) || 0) + v);
   }
-  setPeriodVal('pnl-net-week',  weekAny,  round2(week));
-  setPeriodVal('pnl-net-month', monthAny, round2(month));
+
+  if (!n) {
+    for (const id of ['pnl-gross-profit','pnl-gross-loss','pnl-profit-factor',
+                      'pnl-expectancy','pnl-best-day','pnl-worst-day'])
+      setMoney(id, 0, { blank: true });
+    return;
+  }
+
+  gp = round2(gp); gl = round2(gl);
+  // A zero column prints a bare 0.00 — "+0.00" and especially "−0.00" read as
+  // typos. setMoney still resolves both to the neutral colour on a zero value.
+  setMoney('pnl-gross-profit', gp,  { text: gp ? '+' + gp.toFixed(2) : '0.00' });
+  setMoney('pnl-gross-loss',   -gl, { text: gl ? '−' + gl.toFixed(2) : '0.00' });
+
+  // Profit factor = gross profit / gross loss. With no losing dollars at all
+  // the ratio is undefined rather than zero — show ∞, not a misleading number.
+  // Anything at or above 1.0 is money-positive, so that's where the colour flips.
+  if (gl === 0) setMoney('pnl-profit-factor', gp > 0 ? 1 : 0, { text: gp > 0 ? '∞' : '—' });
+  else {
+    const pf = gp / gl;
+    setMoney('pnl-profit-factor', pf - 1, { text: pf.toFixed(2) });
+  }
+
+  // Expectancy = average dollars per journaled trade. Answers "what is one
+  // more trade worth to me, on this record?" — the figure position sizing keys off.
+  const exp = round2(sum(pickPnls(ft)) / n);
+  setMoney('pnl-expectancy', exp);
+
+  // Best / worst DAY, not best / worst trade — a day is the unit a day-trader
+  // actually lives in, and it nets a revenge-trade spiral into one honest number.
+  const totals = [...byDay.values()].map(round2);
+  setMoney('pnl-best-day',  Math.max(...totals));
+  setMoney('pnl-worst-day', Math.min(...totals));
 }
-function setPeriodVal(id, any, v) {
-  const el = $(id);
-  if (!el) return;
-  if (!any) { el.textContent = '—'; el.style.color = 'var(--mt2)'; return; }
-  el.textContent = (v >= 0 ? '+' : '') + v.toFixed(2);
-  el.style.color = v > 0 ? 'var(--win)' : v < 0 ? 'var(--loss)' : 'var(--mt2)';
+
+// ─── Month over month ───────────────────────────────────────────────────────
+// Calendar months, current vs the one before it, with the swing between them.
+// The current month is partial by definition, so the trade counts sit under
+// each figure — a smaller month with fewer trades in it is not the same story
+// as a smaller month with the same number of trades.
+function renderMoM(ft) {
+  const now  = new Date();
+  const curY = now.getFullYear(), curM = now.getMonth();
+  const prev = new Date(curY, curM - 1, 1);
+  const key  = (y, m) => `${y}-${String(m + 1).padStart(2, '0')}`;
+  const curKey = key(curY, curM), prevKey = key(prev.getFullYear(), prev.getMonth());
+
+  let curSum = 0, curN = 0, prevSum = 0, prevN = 0;
+  for (const t of ft) {
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v === null) continue;
+    const day = Dates.tradeDayISO(t, j);
+    if (!day) continue;
+    const mk = day.slice(0, 7);
+    if (mk === curKey)  { curSum  += v; curN++;  }
+    if (mk === prevKey) { prevSum += v; prevN++; }
+  }
+  curSum = round2(curSum); prevSum = round2(prevSum);
+
+  const mLabel = d => d.toLocaleDateString('en-GB', { month:'short', year:'numeric' });
+  const setTxt = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
+  const trades = k => k === 1 ? '1 trade' : `${k} trades`;
+
+  setTxt('mom-prev-lbl', mLabel(prev));
+  setTxt('mom-cur-lbl',  mLabel(now) + ' · MTD');
+  setTxt('mom-prev-sub', prevN ? trades(prevN) : 'no trades');
+  setTxt('mom-cur-sub',  curN  ? trades(curN)  : 'no trades');
+  setMoney('mom-prev-val', prevSum, { blank: !prevN });
+  setMoney('mom-cur-val',  curSum,  { blank: !curN  });
+
+  // Change in dollars is always meaningful; the percentage only is when the
+  // prior month actually moved. Percent is taken against |prevSum| so a swing
+  // out of a losing month reads as a positive improvement rather than an
+  // inverted sign. With no prior month at all there is nothing to compare to.
+  if (!prevN && !curN) { setMoney('mom-delta-val', 0, { blank:true }); setTxt('mom-delta-sub', '—'); return; }
+  const delta = round2(curSum - prevSum);
+  setMoney('mom-delta-val', delta);
+  setTxt('mom-delta-sub',
+    prevSum === 0 ? 'no prior baseline'
+                  : (delta >= 0 ? '+' : '−') + Math.abs(delta / Math.abs(prevSum) * 100).toFixed(0) + '% vs last month');
 }
 
 function renderCumulativeChart(ft) {
@@ -2423,6 +2592,28 @@ function renderPeriodDonut(period, ft) {
   $('cnt-w-' + period).textContent = wins   + ' W';
   $('cnt-l-' + period).textContent = losses + ' L';
   $('cnt-b-' + period).textContent = bes    + ' B';
+
+  // Money column beside the wheel — only visible while the P&L section is open
+  // (CSS handles the reveal). Gross profit / gross loss split on the SIGN of
+  // each P&L, matching the Performance box exactly, so Profit − Loss = Net here
+  // too. Note this deliberately does NOT match the W / L counts on the wheel:
+  // those use the ±BE_THRESHOLD result label, so a scratch trade sits in B on
+  // the wheel while its dollars still land in Profit or Loss below. Trades
+  // counts journaled P&L entries — a trade logged without a figure isn't money.
+  let gp = 0, gl = 0, mn = 0;
+  for (const t of list) {
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v === null) continue;
+    mn++;
+    if (v >= 0) gp += v; else gl += -v;
+  }
+  gp = round2(gp); gl = round2(gl);
+  const pEl = $('pm-p-' + period), lEl = $('pm-l-' + period), tEl = $('pm-t-' + period);
+  if (pEl) pEl.textContent = mn ? (gp ? '+' + gp.toFixed(2) : '0.00') : '—';
+  if (lEl) lEl.textContent = mn ? (gl ? '−' + gl.toFixed(2) : '0.00') : '—';
+  if (tEl) tEl.textContent = mn ? String(mn) : '—';
+  setMoney('pm-n-' + period, round2(gp - gl), { blank: !mn });
 
   // Discipline compliance for this same timeframe — denominator is journaled
   // trades in the period, so the bars track Rules / SLS / TPS adherence over
@@ -2582,33 +2773,39 @@ function renderHeatmap() {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   $('heatmap-title').textContent = `${months[cur.m]} ${cur.y}`;
 
-  // Month total for P&L view — same dayData source as the cells, so the
-  // header figure is always exactly the sum of the cells below it.
-  const mp = $('heatmap-month-pnl');
-  if (mp) {
-    let mTotal = 0, mAny = false;
-    const dim = new Date(cur.y, cur.m + 1, 0).getDate();
-    for (let d = 1; d <= dim; d++) {
-      const key = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const dd = dayData(key);
-      if (dd.tradeCount > 0) { mTotal += dd.pnl; mAny = true; }
-    }
-    mTotal = round2(mTotal);
-    if (!mAny) { mp.textContent = ''; mp.className = 'heatmap-month-pnl'; }
-    else {
-      const res = resultFromPnl(mTotal);
-      mp.textContent = (mTotal >= 0 ? '+' : '') + mTotal.toFixed(2);
-      mp.className = 'heatmap-month-pnl ' + (res === 'win' ? 'win' : res === 'loss' ? 'loss' : 'be');
-    }
-  }
-
   const grid = $('heatmap-grid');
   const dows = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('');
+  // Eighth header cell labels the week-summary column on the right.
+  let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('')
+           + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
 
-  const firstDay   = new Date(cur.y, cur.m, 1).getDay();
+  const firstDay    = new Date(cur.y, cur.m, 1).getDay();
   const daysInMonth = new Date(cur.y, cur.m + 1, 0).getDate();
-  for (let i = 0; i < firstDay; i++) html += '<div class="heatmap-cell-empty"></div>';
+
+  // The grid is emitted week by week: seven day slots (leading and trailing
+  // blanks included) followed by that week's summary cell. `slot` counts
+  // positions, not dates, so the summary always lands in column 8 no matter
+  // which weekday the month starts on. Week totals accumulate from the same
+  // dayData() reads that fill the cells, and the month total accumulates from
+  // the week totals — so header, week column and day cells can never disagree.
+  let slot = 0, wkN = 0, wkPnl = 0, wkTrades = 0;
+  let mTotal = 0, mAny = false;
+
+  const flushWeek = () => {
+    wkN++;
+    const cls   = wkTrades === 0 ? '' : resultFromPnl(wkPnl);
+    const count = wkTrades > 0 ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
+    const pnl   = wkTrades > 0 ? '$' + Math.abs(round2(wkPnl)).toFixed(2) : '';
+    html += `
+      <div class="heatmap-week ${cls}">
+        <div class="heatmap-week-lbl">W${wkN}</div>
+        <div class="heatmap-week-count">${count}</div>
+        <div class="heatmap-week-pnl">${pnl}</div>
+      </div>`;
+    wkPnl = 0; wkTrades = 0;
+  };
+
+  for (let i = 0; i < firstDay; i++) { html += '<div class="heatmap-cell-empty"></div>'; slot++; }
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const data = dayData(iso);
@@ -2618,7 +2815,7 @@ function renderHeatmap() {
     if (State.trades.some(t => t.brokerPending && t.openTime && t.openTime.slice(0, 10) === iso)) cls += ' pending';
     const pnlText   = data.tradeCount > 0 ? '$' + Math.abs(data.pnl).toFixed(2) : '';
     // The word "trade(s)" lives in its own span so the phone stylesheet can
-    // drop it — on a 7-column month grid the bare count is unambiguous.
+    // drop it — on a month grid the bare count is unambiguous.
     const countText = data.tradeCount > 0 ? `${data.tradeCount}<span class="heatmap-cell-count-word"> trade${data.tradeCount > 1 ? 's' : ''}</span>` : '';
     html += `
       <div class="heatmap-cell ${cls}" data-day="${iso}">
@@ -2628,8 +2825,33 @@ function renderHeatmap() {
           <div class="heatmap-cell-pnl">${pnlText}</div>
         </div>
       </div>`;
+
+    if (data.tradeCount > 0) {
+      wkTrades += data.tradeCount; wkPnl += data.pnl;
+      mTotal   += data.pnl;        mAny   = true;
+    }
+    slot++;
+    if (slot % 7 === 0) flushWeek();
+  }
+  // Trailing partial week: pad the row out to seven slots, then summarise it.
+  if (slot % 7 !== 0) {
+    while (slot % 7 !== 0) { html += '<div class="heatmap-cell-empty"></div>'; slot++; }
+    flushWeek();
   }
   grid.innerHTML = html;
+
+  // Month total for P&L view — the sum of the week totals above, which are in
+  // turn the sums of the day cells, so the three tiers always reconcile.
+  const mp = $('heatmap-month-pnl');
+  if (mp) {
+    mTotal = round2(mTotal);
+    if (!mAny) { mp.textContent = ''; mp.className = 'heatmap-month-pnl'; }
+    else {
+      const res = resultFromPnl(mTotal);
+      mp.textContent = (mTotal >= 0 ? '+' : '') + mTotal.toFixed(2);
+      mp.className = 'heatmap-month-pnl ' + (res === 'win' ? 'win' : res === 'loss' ? 'loss' : 'be');
+    }
+  }
 }
 function dayData(isoDay) {
   let tradeCount = 0, pnl = 0;
@@ -3547,8 +3769,7 @@ const IO = {
       schema:     CONFIG.BACKUP_SCHEMA,
       exportedAt: new Date().toISOString(),
       trades:     State.trades,
-      journals:   State.journals,
-      ddMax:      Storage.loadDDMax()
+      journals:   State.journals
     };
   },
   exportJSON() {
@@ -3610,10 +3831,9 @@ const IO = {
 
         State.trades   = validTrades;
         State.journals = validJournals;
-        if (data.ddMax != null) {
-          const dd = safeNum(data.ddMax);
-          if (dd !== null && dd > 0) Storage.saveDDMax(dd);
-        }
+        // A pre-retirement backup may still carry a `ddMax` key from the daily
+        // max-drawdown widget. It is ignored, not an error — the file restores
+        // normally and the key simply has nowhere to go.
         migrateData();
         Storage.saveTradesAndJournals();
         renderTrades();
@@ -3860,8 +4080,7 @@ const Cloud = {
     for (const row of (data || [])) {
       if (!Object.values(CONFIG.STORE).includes(row.key)) continue;
       try {
-        localStorage.setItem(row.key,
-          row.key === CONFIG.STORE.ddMax ? String(row.value) : JSON.stringify(row.value));
+        localStorage.setItem(row.key, JSON.stringify(row.value));
         touched = true;
       } catch (e) { console.error('Doji Cloud: cache write failed', e); }
     }
@@ -3880,10 +4099,7 @@ const Cloud = {
     clearTimeout(this._pushTimers[key]);
     this._pushTimers[key] = setTimeout(async () => {
       try {
-        const raw = localStorage.getItem(key);
-        const value = key === CONFIG.STORE.ddMax
-          ? (raw === null ? null : parseFloat(raw))
-          : JSON.parse(raw ?? 'null');
+        const value = JSON.parse(localStorage.getItem(key) ?? 'null');
         const { error } = await this.sb.from('app_state')
           .upsert({ key, value, updated_at: new Date().toISOString() });
         if (error) throw error;
@@ -4211,11 +4427,6 @@ function wireEvents() {
     if (pend.length) Journal.openForTrade(pend[0].id);
   });
 
-  /* Drawdown card */
-  on('dd-edit-btn',   'click', toggleDDEdit);
-  on('dd-save-btn',   'click', saveDDMax);
-  on('dd-cancel-btn', 'click', toggleDDEdit);
-
   /* Trade table delegation: row click opens journal, ✕ deletes, page nav */
   on('trade-table', 'click', e => {
     const delBtn = e.target.closest('[data-del]');
@@ -4334,8 +4545,8 @@ function wireEvents() {
 /* ═══════════════════════════════════════════════════════════════════════════
    DAY ROLLOVER WATCHER
    ───────────────────────────────────────────────────────────────────────────
-   The dashboard derives "today" live every time it draws (daily drawdown,
-   heatmap today-marker, rolling week/month buckets) — but it only re-draws on
+   The dashboard derives "today" live every time it draws (heatmap
+   today-marker, rolling week/month buckets, month-over-month) — but it only re-draws on
    user actions. If the tab sits open across midnight, nothing fires, so the UI
    freezes on the day it was last rendered. This watcher tracks the local
    calendar day and re-renders the moment it flips: a slow interval covers a
