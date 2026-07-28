@@ -292,55 +292,38 @@ nav {
 
    Each row reads value-then-label (+631.70 PROFIT), right-aligned, so the
    labels form the terminating edge. */
+/* ── Per-wheel money column (P&L view only) ────────────────────────────────
+   Only present while the P&L section is open (body.pnl-open), the same mode
+   that reveals dollar figures in the calendar — one reveal, consistent on
+   touch and desktop.
+
+   A strip beneath the wheel at every width: the row wraps, the strip claims a
+   full line, and its four figures sit in equal columns, each label over its
+   value. That leaves the wheel centred on the line above with nothing competing
+   for its space, and the figures evenly distributed rather than crowded against
+   one edge — so a narrow column and a wide one differ only in how much air the
+   four columns get, never in arrangement. One layout, no breakpoint. */
 .period-money {
-  display:none; position:absolute; right:0; top:50%; transform:translateY(-50%);
-  grid-template-columns:auto auto; column-gap:10px; row-gap:8px; align-items:baseline;
+  display:none; flex:1 0 100%;
+  grid-template-columns:repeat(4,1fr); grid-template-rows:auto auto;
+  grid-auto-flow:column; justify-items:center; align-items:baseline;
+  row-gap:3px; column-gap:8px;
 }
 body.pnl-open .period-money { display:grid; }
-body.pnl-open .period-host  { width:100%; justify-content:center; padding:0; }
-/* Two auto tracks: the first sizes to the longest label, the second to the
-   longest value, so labels share a left edge and values share a right one
-   without either being hand-measured. */
+/* Full width so the strip has a line to claim; wrap so it gets one; centred so
+   the wheel sits mid-column above it. .period-col centres its children, so
+   without width:100% the row would shrink-wrap and the strip with it. */
+body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center; padding:0; }
 .pm-lbl {
   font-family:var(--mono); font-size:7px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt);
 }
 .pm-val {
   font-family:var(--mono); font-size:10px; font-weight:600;
-  line-height:1.1; letter-spacing:.5px; white-space:nowrap;
-  text-align:right; color:var(--mt2);
+  line-height:1.1; letter-spacing:.5px; white-space:nowrap; color:var(--mt2);
 }
 .pm-val.win  { color:var(--win); }
 .pm-val.loss { color:var(--loss); }
-
-/* A right-pinned column and a centred wheel can only coexist while the slack
-   either side of the wheel exceeds the figures' width. Measured: the wheel
-   group runs 188px and the widest realistic row (+12532.10 PROFIT) ~86px, so
-   a third of the panel has to reach ~379px — which happens at a 1280px
-   viewport. Below that the column returns to flow as a strip under the wheel,
-   figures stacked over their labels, rather than overlapping the counts. */
-@media (max-width:1280px) {
-  body.pnl-open .period-host { flex-wrap:wrap; }
-  body.pnl-open .period-money {
-    position:static; transform:none; flex:1 0 100%;
-    grid-template-columns:repeat(4,1fr); grid-template-rows:auto auto;
-    grid-auto-flow:column; justify-items:center; row-gap:3px; column-gap:8px;
-  }
-}
-
-/* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
-   each win/loss wheel and reuse the session-bar segment styling for a
-   consistent green-followed / red-missed read. */
-.period-disc {
-  width:100%; display:flex; flex-direction:column; gap:var(--gap-row);
-  margin-top:8px; padding-top:var(--gap-divider); border-top:1px solid var(--glass-bd);
-}
-.period-disc-row  { display:flex; flex-direction:column; gap:5px; }
-.period-disc-head { display:flex; justify-content:space-between; align-items:baseline; }
-.period-disc-pct { font-family:var(--mono); font-size:10px; font-weight:500; }
-.period-disc-pct.win  { color:var(--win); }
-.period-disc-pct.loss { color:var(--loss); }
-.period-disc-pct.dim  { color:var(--mt2); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CALENDAR WIDGET (shared by the journal-modal date picker and the heatmap)
@@ -1251,6 +1234,8 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
   /* Eight columns on a phone: the week rail shrinks to the minimum that still
      fits its figures, and its separating margin comes in with it. */
   .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
+  /* Saturday dropped: six days share the freed width and the week rail widens. */
+  .heatmap-grid.no-sat { grid-template-columns:repeat(6,1fr) minmax(44px,.8fr); }
   .heatmap-dow-week, .heatmap-week { margin-left:8px; }
   /* Four label/value pairs exceed a phone's width on one line — tighten the
      gap and let them wrap to a second row rather than overflow. */
@@ -1917,6 +1902,14 @@ const Dates = {
     return `${yy}-${mm}-${dd}`;
   }
 };
+
+/* ─── LAYOUT BREAKPOINT ──────────────────────────────────────────────────────
+   One matchMedia mirroring the stylesheet's 640px phone breakpoint. The heatmap
+   is the only view whose STRUCTURE, not just its styling, changes there — it
+   drops the Saturday column — so the renderer has to know, and has to redraw
+   when the breakpoint is crossed. Distinct from Device, which classifies the
+   hardware for the backup gate; this is purely about how wide the panel is. */
+const Phone = window.matchMedia('(max-width:640px)');
 
 /* ─── LOOKUPS ────────────────────────────────────────────────────────────── */
 // Rebuilds the tradeId→journal index. Called after any mutation that adds,
@@ -2715,21 +2708,43 @@ function renderHeatmap() {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   $('heatmap-title').textContent = `${months[cur.m]} ${cur.y}`;
 
-  const grid = $('heatmap-grid');
-  const dows = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  // Eighth header cell labels the week-summary column on the right.
-  let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('')
-           + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
-
+  // Saturday never trades — the journal's week runs Sunday → Friday close — so
+  // on a phone it is dropped, handing its width to the six days that matter and
+  // to the week rail. Dropped ONLY when genuinely empty: a trade mis-stamped to
+  // a Saturday must never become invisible and unclickable, so a Saturday
+  // holding one keeps its column however narrow the screen.
   const firstDay    = new Date(cur.y, cur.m, 1).getDay();
   const daysInMonth = new Date(cur.y, cur.m + 1, 0).getDate();
 
-  // The grid is emitted week by week: seven day slots (leading and trailing
+  // Read each day once, up front: the Saturday decision needs the counts before
+  // the grid can be laid out, and the cells need them again while emitting.
+  const days = [];
+  let satTrades = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso  = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const wd   = new Date(cur.y, cur.m, d).getDay();
+    const data = dayData(iso);
+    days.push({ d, iso, wd, data });
+    if (wd === 6) satTrades += data.tradeCount;
+  }
+
+  const showSat = !Phone.matches || satTrades > 0;
+  const visible = showSat ? days : days.filter(x => x.wd !== 6);
+  const cols    = showSat ? 7 : 6;
+
+  const grid = $('heatmap-grid');
+  grid.classList.toggle('no-sat', !showSat);
+  const dows = showSat ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                       : ['Sun','Mon','Tue','Wed','Thu','Fri'];
+  // A final header cell labels the week-summary column on the right.
+  let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('')
+           + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
+
+  // The grid is emitted week by week: `cols` day slots (leading and trailing
   // blanks included) followed by that week's summary cell. `slot` counts
-  // positions, not dates, so the summary always lands in column 8 no matter
-  // which weekday the month starts on. Week totals accumulate from the same
-  // dayData() reads that fill the cells, and the month total accumulates from
-  // the week totals — so header, week column and day cells can never disagree.
+  // positions, not dates, so the summary always lands in the last column no
+  // matter which weekday the month starts on. Week totals accumulate from the
+  // same dayData() reads that fill the cells, so the two can never disagree.
   let slot = 0, wkN = 0, wkPnl = 0, wkTrades = 0;
 
   const flushWeek = () => {
@@ -2745,12 +2760,16 @@ function renderHeatmap() {
       </div>`;
     wkPnl = 0; wkTrades = 0;
   };
+  const blank = () => { html += '<div class="heatmap-cell-empty"></div>'; slot++; };
 
-  for (let i = 0; i < firstDay; i++) { html += '<div class="heatmap-cell-empty"></div>'; slot++; }
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const data = dayData(iso);
-    let cls  = data.tradeCount === 0 ? '' : resultFromPnl(data.pnl);
+  // Leading blanks run to the first visible day's own column. Reading it off
+  // that day rather than off the 1st handles a month opening on a dropped
+  // Saturday: the first cell is then Sunday the 2nd, in column 0, with no
+  // blank row to step over.
+  for (let i = 0; i < (visible.length ? visible[0].wd : firstDay); i++) blank();
+
+  for (const { d, iso, data } of visible) {
+    let cls = data.tradeCount === 0 ? '' : resultFromPnl(data.pnl);
     // A day holding any incomplete broker-synced trade pulses purple until
     // its rules/emotions data is filled in.
     if (State.trades.some(t => t.brokerPending && t.openTime && t.openTime.slice(0, 10) === iso)) cls += ' pending';
@@ -2769,11 +2788,11 @@ function renderHeatmap() {
 
     if (data.tradeCount > 0) { wkTrades += data.tradeCount; wkPnl += data.pnl; }
     slot++;
-    if (slot % 7 === 0) flushWeek();
+    if (slot % cols === 0) flushWeek();
   }
-  // Trailing partial week: pad the row out to seven slots, then summarise it.
-  if (slot % 7 !== 0) {
-    while (slot % 7 !== 0) { html += '<div class="heatmap-cell-empty"></div>'; slot++; }
+  // Trailing partial week: pad the row out, then summarise it.
+  if (slot % cols !== 0) {
+    while (slot % cols !== 0) blank();
     flushWeek();
   }
   grid.innerHTML = html;
@@ -4372,6 +4391,10 @@ function wireEvents() {
       if (target === 'journal') renderJournalCal();
     });
   });
+
+  /* Redraw the month when the layout crosses the phone breakpoint — the grid
+     gains or loses its Saturday column there, which only the renderer builds. */
+  Phone.addEventListener('change', renderHeatmap);
 
   /* Collapsible section headers */
   // P&L starts collapsed (hidden by default) — process-first; record
