@@ -325,6 +325,20 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .pm-val.win  { color:var(--win); }
 .pm-val.loss { color:var(--loss); }
 
+/* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
+   each win/loss wheel and reuse the session-bar segment styling for a
+   consistent green-followed / red-missed read. */
+.period-disc {
+  width:100%; display:flex; flex-direction:column; gap:var(--gap-row);
+  margin-top:8px; padding-top:var(--gap-divider); border-top:1px solid var(--glass-bd);
+}
+.period-disc-row  { display:flex; flex-direction:column; gap:5px; }
+.period-disc-head { display:flex; justify-content:space-between; align-items:baseline; }
+.period-disc-pct { font-family:var(--mono); font-size:10px; font-weight:500; }
+.period-disc-pct.win  { color:var(--win); }
+.period-disc-pct.loss { color:var(--loss); }
+.period-disc-pct.dim  { color:var(--mt2); }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    CALENDAR WIDGET (shared by the journal-modal date picker and the heatmap)
    ═══════════════════════════════════════════════════════════════════════════ */
