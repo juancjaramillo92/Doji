@@ -595,15 +595,16 @@ body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--
    the reveal is a mode, so it works identically on touch. */
 body.pnl-open .heatmap-cell-pnl   { display:block; }
 body.pnl-open .heatmap-cell-count { font-size:7px; font-weight:400; color:var(--mt); }
-/* Month P&L under the heatmap title — only present in P&L view. */
+/* Month totals under the heatmap title — profit, loss, net and trade count on
+   one centred line, only present in P&L view. Reuses .pm-lbl / .pm-val from the
+   wheel money columns: same kind of figure, so the same typography. Each pair
+   is grouped so the label sits tight to its value while the pairs stay apart. */
 .heatmap-month-pnl {
-  display:none; text-align:center; margin:-6px 0 12px;
-  font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.5px;
+  display:none; justify-content:center; align-items:baseline;
+  gap:22px; margin:-6px 0 12px;
 }
-body.pnl-open .heatmap-month-pnl { display:block; }
-.heatmap-month-pnl.win  { color:var(--win); }
-.heatmap-month-pnl.loss { color:var(--loss); }
-.heatmap-month-pnl.be   { color:var(--mt2); }
+body.pnl-open .heatmap-month-pnl { display:flex; }
+.heatmap-month-stat { display:inline-flex; align-items:baseline; gap:6px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TRADE LOG
@@ -1251,6 +1252,9 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
      fits its figures, and its separating margin comes in with it. */
   .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
   .heatmap-dow-week, .heatmap-week { margin-left:8px; }
+  /* Four label/value pairs exceed a phone's width on one line — tighten the
+     gap and let them wrap to a second row rather than overflow. */
+  .heatmap-month-pnl { gap:12px; flex-wrap:wrap; row-gap:6px; }
   .heatmap-dow-week   { font-size:7px; letter-spacing:0; }
   .heatmap-week-count { font-size:8px; letter-spacing:0; }
   .heatmap-week-pnl   { font-size:8px; margin-top:2px; }
@@ -2392,9 +2396,7 @@ function renderCumulativeChart(ft) {
     data.push(round2(cum));
   }
 
-  // Line takes the colour of where the curve ended up; the area under it is
-  // split at zero, green above and red below, from the same --seg-*-bg tokens
-  // the bars, wheels and calendar cells use.
+  // Line takes the colour of where the curve ended up.
   const line = (data[data.length - 1] ?? 0) >= 0 ? cssToken('--win') : cssToken('--loss');
 
   State.charts['chart-pnl'] = new Chart(canvas.getContext('2d'), {
@@ -2408,16 +2410,20 @@ function renderCumulativeChart(ft) {
         pointRadius: data.length > 20 ? 0 : 2,
         pointBackgroundColor: line,
         pointBorderColor: line,
-        fill: { target:'origin', above: cssToken('--seg-win-bg'), below: cssToken('--seg-loss-bg') },
+        fill: false,
         tension: 0.3
       }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      // responsive + maintainAspectRatio:false means the curve is re-laid out
+      // to whatever the card currently measures: Chart.js observes the container,
+      // and the chart is rebuilt from scratch on every renderTrades(), so it
+      // re-fits both as the window changes and as trades accumulate.
+      responsive: true, maintainAspectRatio: false, resizeDelay: 0,
       animation: false,
-      // Only enough padding to stop a peak or the final point being clipped by
-      // the canvas edge — the plot otherwise runs to the full area.
-      layout: { padding: { top: 6, right: 3, bottom: 0, left: 0 } },
+      // Only enough padding to keep a peak or the final point's marker off the
+      // canvas edge — the plot otherwise runs to the full area.
+      layout: { padding: { top: 4, right: 4, bottom: 0, left: 0 } },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false }
@@ -2425,6 +2431,11 @@ function renderCumulativeChart(ft) {
       scales: {
         x: { display: false },
         y: {
+          // Bounded to the data's own range plus a little grace, rather than
+          // forced through zero: a curve sitting between 500 and 600 should use
+          // the full height, not flatten itself against the top of a 0-600 axis.
+          // Recomputed on every build, so the scale tracks the curve as it grows.
+          grace: '8%',
           // No axis rule: the horizontal gridlines already carry the scale, and
           // a vertical border boxes the plot in against the card's own edge.
           border: { display: false },
@@ -2609,7 +2620,12 @@ function ensureHeatmapStructure() {
       <span id="heatmap-title" class="heatmap-title"></span>
       <button id="heatmap-next" class="heatmap-nav-btn">&rarr;</button>
     </div>
-    <div id="heatmap-month-pnl" class="heatmap-month-pnl"></div>
+    <div id="heatmap-month-pnl" class="heatmap-month-pnl">
+      <span class="heatmap-month-stat"><span class="pm-lbl">Profit</span><span class="pm-val" id="hm-profit">—</span></span>
+      <span class="heatmap-month-stat"><span class="pm-lbl">Loss</span><span class="pm-val" id="hm-loss">—</span></span>
+      <span class="heatmap-month-stat"><span class="pm-lbl">Net</span><span class="pm-val" id="hm-net">—</span></span>
+      <span class="heatmap-month-stat"><span class="pm-lbl">Trades</span><span class="pm-val" id="hm-trades">—</span></span>
+    </div>
     <div id="heatmap-grid" class="heatmap-grid"></div>`;
   host.dataset.ready = '1';
   $('heatmap-prev').addEventListener('click', () => { Calendar.navigate('heatmap', -1); renderHeatmap(); });
@@ -2715,7 +2731,6 @@ function renderHeatmap() {
   // dayData() reads that fill the cells, and the month total accumulates from
   // the week totals — so header, week column and day cells can never disagree.
   let slot = 0, wkN = 0, wkPnl = 0, wkTrades = 0;
-  let mTotal = 0, mAny = false;
 
   const flushWeek = () => {
     wkN++;
@@ -2752,10 +2767,7 @@ function renderHeatmap() {
         </div>
       </div>`;
 
-    if (data.tradeCount > 0) {
-      wkTrades += data.tradeCount; wkPnl += data.pnl;
-      mTotal   += data.pnl;        mAny   = true;
-    }
+    if (data.tradeCount > 0) { wkTrades += data.tradeCount; wkPnl += data.pnl; }
     slot++;
     if (slot % 7 === 0) flushWeek();
   }
@@ -2766,18 +2778,32 @@ function renderHeatmap() {
   }
   grid.innerHTML = html;
 
-  // Month total for P&L view — the sum of the week totals above, which are in
-  // turn the sums of the day cells, so the three tiers always reconcile.
-  const mp = $('heatmap-month-pnl');
-  if (mp) {
-    mTotal = round2(mTotal);
-    if (!mAny) { mp.textContent = ''; mp.className = 'heatmap-month-pnl'; }
-    else {
-      const res = resultFromPnl(mTotal);
-      mp.textContent = money(mTotal);
-      mp.className = 'heatmap-month-pnl ' + (res === 'win' ? 'win' : res === 'loss' ? 'loss' : 'be');
-    }
+  // Month strip for P&L view. Trades counts every trade stamped to the month —
+  // the same set the day cells count, so the cells' counts sum to it. Profit and
+  // loss split on the sign of each trade's P&L, so Profit − Loss = Net, and Net
+  // equals the sum of the week cells, which equals the sum of the day cells.
+  const m = monthTotals(cur.y, cur.m);
+  setFigure('hm-profit', m.trades ? money(m.gross) : '—', m.gross);
+  setFigure('hm-loss',   m.trades ? money(m.loss)  : '—', -m.loss);
+  setFigure('hm-net',    m.trades ? money(m.net)   : '—', m.net);
+  setFigure('hm-trades', m.trades ? String(m.trades) : '—', 0);
+}
+
+// Month aggregates keyed on the stamped date, matching how the day cells bucket
+// (openTime string prefix) rather than the Date comparison the period wheels use —
+// a calendar view has to agree with its own cells above all else.
+function monthTotals(y, month) {
+  const prefix = `${y}-${String(month + 1).padStart(2, '0')}`;
+  let trades = 0, gross = 0, loss = 0;
+  for (const t of State.trades) {
+    if (!t.openTime || t.openTime.slice(0, 7) !== prefix) continue;
+    trades++;
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v === null) continue;
+    if (v >= 0) gross += v; else loss -= v;
   }
+  return { trades, gross: round2(gross), loss: round2(loss), net: round2(gross - loss) };
 }
 function dayData(isoDay) {
   let tradeCount = 0, pnl = 0;
