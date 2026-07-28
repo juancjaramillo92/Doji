@@ -289,21 +289,24 @@ nav {
    labels form the terminating edge. */
 .period-money {
   display:none; position:absolute; right:0; top:50%; transform:translateY(-50%);
-  flex-direction:column; align-items:flex-end; gap:8px;
+  grid-template-columns:auto auto; column-gap:10px; row-gap:8px; align-items:baseline;
 }
-body.pnl-open .period-money { display:flex; }
+body.pnl-open .period-money { display:grid; }
 body.pnl-open .period-host  { width:100%; justify-content:center; padding:0; }
-.pm-row { display:flex; align-items:baseline; gap:6px; }
-.pm-val {
-  font-family:var(--mono); font-size:10px; font-weight:600;
-  line-height:1.1; letter-spacing:.5px; white-space:nowrap; color:var(--mt2);
-}
-.pm-val.win  { color:var(--win); }
-.pm-val.loss { color:var(--loss); }
+/* Two auto tracks: the first sizes to the longest label, the second to the
+   longest value, so labels share a left edge and values share a right one
+   without either being hand-measured. */
 .pm-lbl {
   font-family:var(--mono); font-size:7px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt);
 }
+.pm-val {
+  font-family:var(--mono); font-size:10px; font-weight:600;
+  line-height:1.1; letter-spacing:.5px; white-space:nowrap;
+  text-align:right; color:var(--mt2);
+}
+.pm-val.win  { color:var(--win); }
+.pm-val.loss { color:var(--loss); }
 
 /* A right-pinned column and a centred wheel can only coexist while the slack
    either side of the wheel exceeds the figures' width. Measured: the wheel
@@ -315,9 +318,9 @@ body.pnl-open .period-host  { width:100%; justify-content:center; padding:0; }
   body.pnl-open .period-host { flex-wrap:wrap; }
   body.pnl-open .period-money {
     position:static; transform:none; flex:1 0 100%;
-    flex-direction:row; justify-content:space-around; align-items:baseline; gap:8px;
+    grid-template-columns:repeat(4,1fr); grid-template-rows:auto auto;
+    grid-auto-flow:column; justify-items:center; row-gap:3px; column-gap:8px;
   }
-  body.pnl-open .pm-row { flex-direction:column; align-items:center; gap:3px; }
 }
 
 /* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
@@ -396,12 +399,24 @@ body.pnl-open .period-host  { width:100%; justify-content:center; padding:0; }
    ═══════════════════════════════════════════════════════════════════════════ */
 .pnl-card { padding:22px 26px; }
 .pnl-card-inner { display:flex; align-items:stretch; gap:28px; }
+/* Two stacked figures share the left half: the account balance the last synced
+   fill reported, then the journal's own net. */
 .pnl-net {
   flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;
-  padding-right:28px; border-right:1px solid var(--bd);
+  gap:18px; padding-right:28px; border-right:1px solid var(--bd);
 }
 .pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; }
 
+/* Balance is a fact, not a verdict — it stays neutral while the net figure
+   below it takes the win/loss colouring. */
+.pnl-balance-number {
+  font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
+  color:var(--tx);
+}
+.pnl-balance-at {
+  font-family:var(--mono); font-size:8px; letter-spacing:.5px;
+  color:var(--mt); margin-top:6px;
+}
 .pnl-net-number {
   font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
   color:var(--mt2);
@@ -1334,8 +1349,15 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
           <div class="cbox pnl-card">
             <div class="pnl-card-inner">
               <div class="pnl-net">
-                <div class="cbox-l">Net P&amp;L<span id="pnl-net-count" class="pnl-net-count"></span></div>
-                <div id="pnl-net-number" class="pnl-net-number">—</div>
+                <div>
+                  <div class="cbox-l">Current Balance</div>
+                  <div id="pnl-balance-number" class="pnl-balance-number">—</div>
+                  <div id="pnl-balance-at" class="pnl-balance-at"></div>
+                </div>
+                <div>
+                  <div class="cbox-l">Net P&amp;L<span id="pnl-net-count" class="pnl-net-count"></span></div>
+                  <div id="pnl-net-number" class="pnl-net-number">—</div>
+                </div>
               </div>
               <div class="pnl-stats">
                 <div class="cbox-l">Performance</div>
@@ -1373,10 +1395,10 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
             <span class="pc-b" id="cnt-b-total">— B</span>
           </div>
           <div class="period-money">
-            <div class="pm-row"><span class="pm-val" id="pm-p-total">—</span><span class="pm-lbl">Profit</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-l-total">—</span><span class="pm-lbl">Loss</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-n-total">—</span><span class="pm-lbl">Net</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-t-total">—</span><span class="pm-lbl">Trades</span></div>
+            <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-total">—</span>
+            <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-total">—</span>
+            <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-total">—</span>
+            <span class="pm-lbl">Trades</span><span class="pm-val" id="pm-t-total">—</span>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-total"></div>
@@ -1396,10 +1418,10 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
             <span class="pc-b" id="cnt-b-week">— B</span>
           </div>
           <div class="period-money">
-            <div class="pm-row"><span class="pm-val" id="pm-p-week">—</span><span class="pm-lbl">Profit</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-l-week">—</span><span class="pm-lbl">Loss</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-n-week">—</span><span class="pm-lbl">Net</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-t-week">—</span><span class="pm-lbl">Trades</span></div>
+            <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-week">—</span>
+            <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-week">—</span>
+            <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-week">—</span>
+            <span class="pm-lbl">Trades</span><span class="pm-val" id="pm-t-week">—</span>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-week"></div>
@@ -1419,10 +1441,10 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
             <span class="pc-b" id="cnt-b-month">— B</span>
           </div>
           <div class="period-money">
-            <div class="pm-row"><span class="pm-val" id="pm-p-month">—</span><span class="pm-lbl">Profit</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-l-month">—</span><span class="pm-lbl">Loss</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-n-month">—</span><span class="pm-lbl">Net</span></div>
-            <div class="pm-row"><span class="pm-val" id="pm-t-month">—</span><span class="pm-lbl">Trades</span></div>
+            <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-month">—</span>
+            <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-month">—</span>
+            <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-month">—</span>
+            <span class="pm-lbl">Trades</span><span class="pm-val" id="pm-t-month">—</span>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-month"></div>
@@ -2290,7 +2312,15 @@ function renderPnLCard(ft) {
 
   let n = 0, net = 0, gross = 0, loss = 0;
   let week = 0, weekWas = 0, month = 0, monthWas = 0;
+  let balance = null, balanceAt = '';
   for (const t of ft) {
+    // The account balance rides on the fill that reported it, so the newest
+    // one wins — independently of the P&L buckets below, since a fill counts
+    // for the balance whether or not its entry has been journaled yet.
+    // openTime is always a UTC ISO string here, so it sorts lexicographically.
+    if (typeof t.brokerBalance === 'number' && t.openTime > balanceAt) {
+      balance = t.brokerBalance; balanceAt = t.openTime;
+    }
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
     if (v === null) continue;
@@ -2304,6 +2334,10 @@ function renderPnLCard(ft) {
     else if (d >= monthPrior) monthWas += v;
   }
 
+  $('pnl-balance-number').textContent = balance === null ? '—' : balance.toFixed(2);
+  $('pnl-balance-at').textContent = balance === null
+    ? 'awaiting a synced fill'
+    : 'as of ' + Dates.fmt(balanceAt);
   $('pnl-net-count').textContent = n || '';
   setFigure('pnl-net-number',   n ? money(round2(net))   : '—', net);
   setFigure('pnl-gross-profit', n ? money(round2(gross)) : '—', gross);
@@ -4076,7 +4110,7 @@ const BrokerSync = {
     const now = new Date().toISOString();
     const tid = uid(), jid = uid();
 
-    State.trades.push({
+    const trade = {
       id: tid,
       direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
       result,
@@ -4088,7 +4122,15 @@ const BrokerSync = {
       source: 'broker',
       brokerPositionId: fill.position_id,
       brokerPending: true
-    });
+    };
+    // Account balance after the fill, when the broker's email carries one.
+    // Held on the trade rather than in a key of its own: it then backs up,
+    // restores and cloud-syncs with the trades for free, and deleting a fill
+    // correctly reverts the display to the balance before it. Absent when the
+    // email has no balance line — the card shows a dash and nothing else cares.
+    const balance = safeNum(fill.balance);
+    if (balance !== null) trade.brokerBalance = balance;
+    State.trades.push(trade);
     State.journals.push({
       id: jid, tradeId: tid, createdAt: now, updatedAt: now,
       session: '', direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
