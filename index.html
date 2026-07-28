@@ -410,10 +410,12 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; }
 
 /* Balance is a fact, not a verdict — it stays neutral while the net figure
-   below it takes the win/loss colouring. */
+   below it takes the win/loss colouring. It carries the same grey as every
+   section title (--mt2), which is also .pnl-net-number's uncoloured state:
+   nothing in the panel is pure white, so the balance isn't either. */
 .pnl-balance-number {
   font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
-  color:var(--tx);
+  color:var(--mt2);
 }
 .pnl-balance-at {
   font-family:var(--mono); font-size:8px; letter-spacing:.5px;
@@ -1169,12 +1171,28 @@ td.c   { text-align:center; }
   0%, 100% { box-shadow:0 0 0 0 rgba(139,53,184,0); }
   50%      { box-shadow:0 0 18px -2px var(--p-gl3); }
 }
+/* A day holding an unfilled trade takes the purple outright rather than
+   wearing its P&L colour with a purple edge. The point of the flag is that it
+   is unfinished, not that it won or lost — the result colour returns the
+   moment the entry is complete. Declared after the .win/.loss/.be fills above
+   so it overrides them on equal specificity. */
 .heatmap-cell.pending {
+  background:rgba(139,53,184,.30);
   border-color:var(--p);
+  cursor:pointer;   /* a pending day may carry no result class of its own yet */
   animation:brokerPulse 2.4s ease-in-out infinite;
 }
+.heatmap-cell.pending:hover { background:rgba(139,53,184,.42); }
+
 tr.broker-pending td { background:var(--p-gl); }
-tr.broker-pending td:first-child { border-left:2px solid var(--p); }
+/* The accent is drawn as an inset shadow rather than a border so it consumes
+   no layout width, leaving the padding free to do the spacing on its own: the
+   bar sits flush to the row's left edge and the date starts a clear 14px
+   clear of it, instead of being pinned against a 2px rule. */
+tr.broker-pending td:first-child {
+  box-shadow:inset 3px 0 0 var(--p);
+  padding-left:14px;
+}
 @media (prefers-reduced-motion:reduce) {
   .broker-banner, .heatmap-cell.pending { animation:none; }
 }
@@ -2353,9 +2371,10 @@ function renderPnLCard(ft) {
   }
 
   $('pnl-balance-number').textContent = balance === null ? '—' : balance.toFixed(2);
-  $('pnl-balance-at').textContent = balance === null
-    ? 'awaiting a synced fill'
-    : 'as of ' + Dates.fmt(balanceAt);
+  // Only the empty state says anything here. Once a balance exists the figure
+  // speaks for itself — it is by definition the latest one synced, so dating
+  // it added a line of chrome that restated the obvious.
+  $('pnl-balance-at').textContent = balance === null ? 'awaiting a synced fill' : '';
   $('pnl-net-count').textContent = n || '';
   setFigure('pnl-net-number',   n ? money(round2(net))   : '—', net);
   setFigure('pnl-gross-profit', n ? money(round2(gross)) : '—', gross);
@@ -2715,6 +2734,7 @@ function closeDayPopup() {
   if (!modal) return;
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden', 'true');
+  Cloud.flushDeferred();   // run any sync held back while this was open
 }
 function renderHeatmap() {
   ensureHeatmapStructure();
@@ -3328,6 +3348,7 @@ const Journal = {
     $('journal-modal').setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     renderTrades();
+    Cloud.flushDeferred();   // run any sync held back while this was open
   },
 
   save() {
@@ -3624,6 +3645,7 @@ const IO = {
     m.setAttribute('aria-hidden', 'true');
     const status = $('io-import-status');
     if (status) { status.textContent = ''; status.className = 'io-import-status'; }
+    Cloud.flushDeferred();   // run any sync held back while this was open
   },
 
   // Inject a clickable <a download> into the section so the user can save it.
@@ -4041,14 +4063,18 @@ const Cloud = {
     }
   },
 
-  // Runs once authenticated: pull → re-render → ingest pending fills → listen.
+  // Runs once authenticated: pull → re-render → ingest pending fills →
+  // listen live → watch for every signal that the page has come back.
+  // ready flips before subscribe/watch so the listeners they attach are
+  // live from their first event rather than no-op'ing on a cold flag.
   async start() {
     Login.hide();
     try {
       await this.pull();
       await BrokerSync.fetchPending();
-      this.subscribe();
       this.ready = true;
+      this.subscribe();
+      this.watch();
     } catch (e) {
       console.error('Doji Cloud: start failed', e);
       notify('⚠ Cloud sync failed — running on local copy.', true);
@@ -4083,11 +4109,15 @@ const Cloud = {
     if (!this.ready) return;
     clearTimeout(this._pushTimers[key]);
     this._pushTimers[key] = setTimeout(async () => {
+      const stamp = new Date().toISOString();
       try {
         const value = JSON.parse(localStorage.getItem(key) ?? 'null');
         const { error } = await this.sb.from('app_state')
-          .upsert({ key, value, updated_at: new Date().toISOString() });
+          .upsert({ key, value, updated_at: stamp });
         if (error) throw error;
+        // Remembered so the realtime echo of this very write is recognised as
+        // our own and doesn't trigger a pointless pull. See _onRemoteState.
+        this._lastPushAt[key] = Date.parse(stamp);
       } catch (e) {
         console.error('Doji Cloud: push failed for ' + key, e);
         notify('⚠ Cloud save failed — data kept locally.', true);
@@ -4095,14 +4125,139 @@ const Cloud = {
     }, 800);
   },
 
-  // Realtime: a new broker fill lands → skeleton it immediately.
-  // (Requires realtime enabled on broker_fills in Supabase.)
+  /* ─── Live sync ─────────────────────────────────────────────────────────
+     Two mechanisms, deliberately overlapping.
+
+     REALTIME keeps an open tab current the instant anything changes — a new
+     broker fill, or a state write from another device. It is the fast path.
+
+     REFRESH is the floor underneath it. Every websocket dies eventually: a
+     phone backgrounds its tab and the socket is killed outright, a laptop
+     sleeps, a network drops. Changes that happened during the gap are never
+     replayed — there is no catch-up. So the app also re-pulls whenever it
+     returns to the foreground, whenever the network comes back, whenever the
+     channel re-subscribes after a drop, and on a slow timer as a last resort.
+
+     Correctness lives in REFRESH. REALTIME only makes it feel instant. If
+     realtime were switched off entirely the app would still converge.
+     ───────────────────────────────────────────────────────────────────── */
+
+  REFRESH_MIN_MS:  10000,   // floor between foreground-triggered refreshes
+  REFRESH_POLL_MS: 300000,  // 5 min backstop for a tab left open for days
+
+  _watching:       false,
+  _refreshing:     false,
+  _deferred:       false,
+  _lastRefresh:    0,
+  _lastPushAt:     Object.create(null),
+  _channel:        null,
+  _channelDropped: false,
+
+  // A refresh rebuilds State and re-renders. Doing that under an open modal
+  // would pull the ground out from under half-typed input, so a refresh that
+  // arrives then is held rather than dropped — flushDeferred runs it the
+  // moment the modal closes.
+  _inputOpen() {
+    return ['journal-modal', 'io-modal', 'day-modal']
+      .some(id => $(id) && $(id).classList.contains('open'));
+  },
+
+  // Cloud → local, on demand. pull() strictly before fetchPending(): minting
+  // a fill against stale local state is precisely what would let a second
+  // copy of a trade slip past the dedup check.
+  async refresh({ force = false } = {}) {
+    if (!this.ready || !this.sb) return;
+    if (this._refreshing) return;                 // one in flight is enough
+    if (this._inputOpen()) { this._deferred = true; return; }
+    const now = Date.now();
+    if (!force && now - this._lastRefresh < this.REFRESH_MIN_MS) return;
+    this._refreshing  = true;
+    this._lastRefresh = now;
+    try {
+      await this.pull();
+      await BrokerSync.fetchPending();
+    } catch (e) {
+      // Silent by design: a failed background refresh leaves the last good
+      // local copy on screen, and the next signal will try again. A toast on
+      // every flaky reconnect would be noise, not information.
+      console.error('Doji Cloud: refresh failed', e);
+    } finally {
+      this._refreshing = false;
+    }
+  },
+
+  // Called by every modal on close.
+  flushDeferred() {
+    if (!this._deferred) return;
+    this._deferred = false;
+    this.refresh({ force: true });
+  },
+
+  watch() {
+    if (this._watching) return;
+    this._watching = true;
+
+    // Foregrounded again — phone unlocked, tab switched back to, app resumed.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this.refresh();
+    });
+    window.addEventListener('focus', () => this.refresh());
+
+    // Restored from the back/forward cache. init() never re-ran, so on a
+    // phone this is often the only signal that the page is live again.
+    window.addEventListener('pageshow', e => {
+      if (e.persisted) this.refresh({ force: true });
+    });
+
+    window.addEventListener('online', () => this.refresh({ force: true }));
+
+    // Backstop for a desktop tab that is never closed, never loses focus, and
+    // whose socket died quietly. Visible-only, so a backgrounded phone is
+    // never woken for it.
+    setInterval(() => { if (!document.hidden) this.refresh(); }, this.REFRESH_POLL_MS);
+  },
+
+  /* ─── Realtime ──────────────────────────────────────────────────────────
+     One channel, two tables. A broker_fills INSERT mints a trade; an
+     app_state change means another device edited something, so re-pull.
+     Both tables must sit in the Supabase realtime publication, and RLS must
+     permit select on them — realtime enforces RLS at delivery time, so a
+     missing policy shows up as silence rather than as an error.
+     ───────────────────────────────────────────────────────────────────── */
   subscribe() {
-    this.sb.channel('broker-fills')
+    if (this._channel) { try { this.sb.removeChannel(this._channel); } catch (e) {} }
+    this._channel = this.sb.channel('doji-sync')
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'broker_fills' },
         payload => { try { BrokerSync.ingest(payload.new); } catch (e) { console.error(e); } })
-      .subscribe();
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'app_state' },
+        payload => { try { this._onRemoteState(payload.new); } catch (e) { console.error(e); } })
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          // Re-joined after a drop. Everything that changed while the socket
+          // was down was never delivered and never will be — pull instead.
+          if (this._channelDropped) {
+            this._channelDropped = false;
+            this.refresh({ force: true });
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          this._channelDropped = true;
+        }
+      });
+  },
+
+  // Every push echoes back to its own author. Comparing payloads can't tell
+  // the echo apart: Postgres normalises jsonb key order, so the round-trip is
+  // equal in meaning but not as a string, and a byte compare would fire a
+  // wasted pull after every single save. The write's own timestamp is exact
+  // and survives the trip intact, so that is what identifies it.
+  _onRemoteState(row) {
+    if (!row || !row.key) return;
+    if (!Object.values(CONFIG.STORE).includes(row.key)) return;
+    const mine = this._lastPushAt[row.key];
+    if (mine && row.updated_at && Date.parse(row.updated_at) === mine) return; // own echo
+    this.refresh({ force: true });
   }
 };
 
@@ -4186,7 +4341,15 @@ const BrokerSync = {
     const result = pnl !== null ? resultFromPnl(pnl) : null;
     const openTime = fill.fill_time || new Date().toISOString();
     const now = new Date().toISOString();
-    const tid = uid(), jid = uid();
+    // IDs derived from the Position ID rather than drawn at random, so two
+    // devices ingesting the same fill in the same moment produce identical
+    // records instead of two differently-keyed copies of one trade. Whichever
+    // push lands last, the merge is then idempotent and a duplicate is
+    // impossible rather than merely unlikely. Falls back to a random id if the
+    // Position ID carries nothing usable, which would otherwise collide.
+    const slug = String(fill.position_id).replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 48);
+    const tid = slug ? 'bkrt_' + slug : uid();
+    const jid = slug ? 'bkrj_' + slug : uid();
 
     const trade = {
       id: tid,
@@ -4272,8 +4435,8 @@ function renderBrokerBanner() {
   if (!pend.length) { el.style.display = 'none'; return; }
   const n = pend.length;
   el.innerHTML =
-    `<b>${n}</b> new trade${n > 1 ? 's' : ''} synced from your broker — ` +
-    `fill in the rules &amp; emotions data.` +
+    `<b>${n}</b> New trade${n > 1 ? 's' : ''} synced from your broker. ` +
+    `Fill in the rules &amp; emotions data.` +
     `<span class="broker-banner-cta">Open entry →</span>`;
   el.style.display = 'flex';
 }
