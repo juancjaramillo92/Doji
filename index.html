@@ -277,18 +277,22 @@ nav {
    touch and desktop.
 
    It is taken out of flow rather than added as a fourth flex item so the wheel
-   stays optically centred in its column instead of being shoved off-centre by
-   whatever the figures happen to measure. .period-host already establishes the
-   containing block, and its padding drops to 0 in this mode, so right:0 lands
-   on the column's 14px content edge — the same inset the "ALL TIME" label sits
-   at on the left. Each row reads value-then-label (+631.70 PROFIT) and the
-   rows right-align, so the labels form the terminating edge. */
+   stays optically centred instead of being shoved off-centre by whatever the
+   figures happen to measure. That requires .period-host to be full width:
+   .period-col centres its children, so the row otherwise shrink-wraps its own
+   content and right:0 would land beside the counts rather than at the column
+   edge. width:100% + padding:0 puts right:0 on the column's 14px content edge —
+   the same inset .period-label sits at on the left, which it reaches via
+   align-self:flex-start for the same underlying reason.
+
+   Each row reads value-then-label (+631.70 PROFIT), right-aligned, so the
+   labels form the terminating edge. */
 .period-money {
   display:none; position:absolute; right:0; top:50%; transform:translateY(-50%);
-  flex-direction:column; align-items:flex-end; gap:7px;
+  flex-direction:column; align-items:flex-end; gap:8px;
 }
 body.pnl-open .period-money { display:flex; }
-body.pnl-open .period-host  { justify-content:center; padding:0; }
+body.pnl-open .period-host  { width:100%; justify-content:center; padding:0; }
 .pm-row { display:flex; align-items:baseline; gap:6px; }
 .pm-val {
   font-family:var(--mono); font-size:10px; font-weight:600;
@@ -301,10 +305,13 @@ body.pnl-open .period-host  { justify-content:center; padding:0; }
   text-transform:uppercase; color:var(--mt);
 }
 
-/* Below ~1080px a 108px wheel and the figures can't share a third of the row
-   without the two colliding. The column returns to flow as a full-width strip
-   under the wheel, figures stacked over their labels. */
-@media (max-width:1080px) {
+/* A right-pinned column and a centred wheel can only coexist while the slack
+   either side of the wheel exceeds the figures' width. Measured: the wheel
+   group runs 188px and the widest realistic row (+12532.10 PROFIT) ~86px, so
+   a third of the panel has to reach ~379px — which happens at a 1280px
+   viewport. Below that the column returns to flow as a strip under the wheel,
+   figures stacked over their labels, rather than overlapping the counts. */
+@media (max-width:1280px) {
   body.pnl-open .period-host { flex-wrap:wrap; }
   body.pnl-open .period-money {
     position:static; transform:none; flex:1 0 100%;
@@ -382,14 +389,15 @@ body.pnl-open .period-host  { justify-content:center; padding:0; }
    went with it — the period wheels now carry those windows with their own
    money column, so keeping them here printed the identical figure twice.
 
-   Both halves centre against a full-height divider, and the 28px of padding
-   inside .pnl-net is mirrored by the 28px flex gap outside it, so content sits
-   the same distance from the rule on either side.
+   Both halves take an equal share of the card so the divider lands on the
+   midpoint, and the 28px of padding inside .pnl-net is mirrored by the 28px
+   flex gap outside it — content sits the same distance from the rule on either
+   side.
    ═══════════════════════════════════════════════════════════════════════════ */
 .pnl-card { padding:22px 26px; }
 .pnl-card-inner { display:flex; align-items:stretch; gap:28px; }
 .pnl-net {
-  flex:0 0 auto; display:flex; flex-direction:column; justify-content:center;
+  flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;
   padding-right:28px; border-right:1px solid var(--bd);
 }
 .pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; }
@@ -405,14 +413,10 @@ body.pnl-open .period-host  { justify-content:center; padding:0; }
   margin-left:8px; letter-spacing:.5px;
 }
 
-/* Four figures in a 2×2 grid: the gross split on top, the two change rates
-   beneath. Row gap is wider than the label/value baseline gap so the pairs
-   read as pairs rather than as one eight-item list. */
-.pnl-stats-grid {
-  display:grid; grid-template-columns:1fr 1fr;
-  column-gap:24px; row-gap:14px;
-}
-.pnl-stat { display:flex; align-items:baseline; justify-content:space-between; gap:10px; min-width:0; }
+/* Four figures in one column: label left, value right, so the values form a
+   clean right edge against the card's own padding. */
+.pnl-stats-grid { display:flex; flex-direction:column; gap:11px; }
+.pnl-stat { display:flex; align-items:baseline; justify-content:space-between; gap:16px; }
 .pnl-stat-lbl {
   font-family:var(--mono); font-size:8px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt); white-space:nowrap;
@@ -514,16 +518,12 @@ body.pnl-open .period-host  { justify-content:center; padding:0; }
 .heatmap-cell.win, .heatmap-cell.loss, .heatmap-cell.be { cursor:pointer; }
 
 /* ── Week summary cell ─────────────────────────────────────────────────────
-   Same material as a day cell, read-only, labelled with its week ordinal. */
+   Same material as a day cell, read-only. Its ordinal sits exactly where the
+   day number sits in a day cell — see the shared .heatmap-cell-day rule. */
 .heatmap-week { padding:6px 4px; align-items:center; justify-content:center; }
 .heatmap-week.win  { background:var(--seg-win-bg); }
 .heatmap-week.loss { background:var(--seg-loss-bg); }
 .heatmap-week.be   { background:var(--seg-be-bg); }
-.heatmap-week-lbl {
-  position:absolute; top:6px; left:0; right:0; text-align:center;
-  font-family:var(--mono); font-size:8px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--mt);
-}
 .heatmap-week-count {
   font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
   color:var(--mt2); text-transform:uppercase;
@@ -541,7 +541,9 @@ body.pnl-open .period-host  { justify-content:center; padding:0; }
 .heatmap-week.be   .heatmap-week-pnl { color:rgba(170,170,185,1); }
 body.pnl-open .heatmap-week-pnl   { display:block; }
 body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--mt); }
-.heatmap-cell-day {
+/* The day number and the week ordinal are the same thing in two columns — the
+   cell's identity, pinned to its top-left corner. One rule keeps them aligned. */
+.heatmap-cell-day, .heatmap-week-lbl {
   position:absolute; top:6px; left:8px;
   font-family:var(--mono); font-size:10px; color:var(--mt); font-weight:500;
 }
@@ -1220,7 +1222,7 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
      underneath) room to breathe. */
   .heatmap-cell, .heatmap-cell-empty, .heatmap-week { min-height:52px; }
   .heatmap-cell, .heatmap-week { padding:4px; border-radius:var(--r-sm); }
-  .heatmap-cell-day   { font-size:8px; top:4px; left:5px; }
+  .heatmap-cell-day, .heatmap-week-lbl { font-size:8px; top:4px; left:5px; }
   .heatmap-cell-count { font-size:8px; letter-spacing:0; }
   .heatmap-cell-count-word { display:none; }
   .heatmap-cell-pnl   { font-size:9px; margin-top:2px; }
@@ -1230,7 +1232,6 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
   .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
   .heatmap-dow-week, .heatmap-week { margin-left:8px; }
   .heatmap-dow-week   { font-size:7px; letter-spacing:0; }
-  .heatmap-week-lbl   { font-size:7px; top:4px; letter-spacing:0; }
   .heatmap-week-count { font-size:8px; letter-spacing:0; }
   .heatmap-week-pnl   { font-size:8px; margin-top:2px; }
   body.pnl-open .heatmap-week-count { font-size:7px; }
