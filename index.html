@@ -205,7 +205,12 @@ nav {
   font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   color:var(--mt2); margin-bottom:var(--gap-title);
 }
-.chart-area { position:relative; width:100%; height:120px; }
+/* Sole user is the cumulative-P&L canvas. That card is the P&L card's companion
+   in .grid-2, so the row's height is set by whichever of the two is taller — the
+   plot takes all of it rather than sitting at a fixed height with dead space
+   beneath. The floor keeps it readable if it ever ends up the taller card. */
+.chart-card { display:flex; flex-direction:column; }
+.chart-area { position:relative; width:100%; flex:1; min-height:96px; }
 .chart-area canvas { position:absolute !important; top:0; left:0; width:100% !important; height:100% !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1370,9 +1375,9 @@ tr.broker-pending td:first-child { border-left:2px solid var(--p); }
               </div>
             </div>
           </div>
-          <div class="cbox">
+          <div class="cbox chart-card">
             <div class="cbox-l">Cumulative P&amp;L</div>
-            <div class="chart-area" style="height:90px;"><canvas id="chart-pnl"></canvas></div>
+            <div class="chart-area"><canvas id="chart-pnl"></canvas></div>
           </div>
         </div>
       </div>
@@ -2276,9 +2281,11 @@ function renderTrades() {
 }
 
 /* ─── P&L CARD ───────────────────────────────────────────────────────────── */
-// Signed money string. A true minus sign, not a hyphen, to match the mono
-// figures elsewhere; a zero prints bare because "−0.00" reads as a typo.
-function money(v) { return v === 0 ? '0.00' : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(2); }
+// Money magnitude, unsigned. Sign is carried by colour alone — the convention
+// the calendar cells have always used — so printing a glyph too would say the
+// same thing twice. setFigure() takes the real signed value separately, so
+// dropping the sign here never affects which colour a figure gets.
+function money(v) { return Math.abs(v).toFixed(2); }
 
 // Percentage change against the equivalent prior period. Divided by |prev| so
 // climbing out of a losing period reads as an improvement rather than an
@@ -2346,10 +2353,11 @@ function renderPnLCard(ft) {
   setPct('pnl-month-change', pctChange(round2(month), round2(monthWas)));
 }
 // Change rates round to whole percent — a P&L swing measured to two decimals
-// implies a precision the sample size doesn't support.
+// implies a precision the sample size doesn't support. Unsigned like the money
+// figures, for the same reason: the colour already says which way it went.
 function setPct(id, pct) {
   const v = pct === null ? null : Math.round(pct);
-  setFigure(id, v === null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + '%', v);
+  setFigure(id, v === null ? '—' : Math.abs(v) + '%', v);
 }
 
 function renderCumulativeChart(ft) {
@@ -2384,8 +2392,10 @@ function renderCumulativeChart(ft) {
     data.push(round2(cum));
   }
 
-  const PNL_GREEN = '#3ba585', PNL_RED = '#d63d5a';
-  const PNL_LINE = (data[data.length - 1] ?? 0) >= 0 ? PNL_GREEN : PNL_RED;
+  // Line takes the colour of where the curve ended up; the area under it is
+  // split at zero, green above and red below, from the same --seg-*-bg tokens
+  // the bars, wheels and calendar cells use.
+  const line = (data[data.length - 1] ?? 0) >= 0 ? cssToken('--win') : cssToken('--loss');
 
   State.charts['chart-pnl'] = new Chart(canvas.getContext('2d'), {
     type: 'line',
@@ -2393,18 +2403,21 @@ function renderCumulativeChart(ft) {
       labels,
       datasets: [{
         data,
-        borderColor: PNL_LINE,
+        borderColor: line,
         borderWidth: 1.5,
         pointRadius: data.length > 20 ? 0 : 2,
-        pointBackgroundColor: PNL_LINE,
-        pointBorderColor: PNL_LINE,
-        fill: false,
+        pointBackgroundColor: line,
+        pointBorderColor: line,
+        fill: { target:'origin', above: cssToken('--seg-win-bg'), below: cssToken('--seg-loss-bg') },
         tension: 0.3
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       animation: false,
+      // Only enough padding to stop a peak or the final point being clipped by
+      // the canvas edge — the plot otherwise runs to the full area.
+      layout: { padding: { top: 6, right: 3, bottom: 0, left: 0 } },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false }
@@ -2412,10 +2425,16 @@ function renderCumulativeChart(ft) {
       scales: {
         x: { display: false },
         y: {
-          grid: { color: 'rgba(255,255,255,.06)' },
+          // No axis rule: the horizontal gridlines already carry the scale, and
+          // a vertical border boxes the plot in against the card's own edge.
+          border: { display: false },
+          grid: { color: 'rgba(255,255,255,.06)', drawTicks: false },
           ticks: {
             color: '#707080', font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 },
-            callback: v => (v >= 0 ? '+' : '') + v
+            // Four gridlines keep the axis narrow, leaving the width to the curve.
+            // Unsigned like every other figure — but these labels carry no colour,
+            // so a negative keeps the minus it needs to be read at all.
+            maxTicksLimit: 4, padding: 6
           }
         }
       }
