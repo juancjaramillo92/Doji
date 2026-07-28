@@ -398,16 +398,26 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    midpoint, and the 28px of padding inside .pnl-net is mirrored by the 28px
    flex gap outside it — content sits the same distance from the rule on either
    side.
+
+   Vertical padding matches plain .cbox (16px) rather than setting its own, so
+   this card's titles start on the same line as every other card's in the row —
+   the Cumulative P&L chart beside it above all. The horizontal 26px stays,
+   since that is the divider's geometry and not the title's.
    ═══════════════════════════════════════════════════════════════════════════ */
-.pnl-card { padding:22px 26px; }
+.pnl-card { padding:16px 26px; }
 .pnl-card-inner { display:flex; align-items:stretch; gap:28px; }
 /* Two stacked figures share the left half: the account balance the last synced
    fill reported, then the journal's own net. */
+/* Both halves start at the top rather than centring their contents. Centring
+   floated each title to wherever its own column's content happened to balance,
+   so Current Balance and Performance landed at two different heights and
+   neither matched Cumulative P&L next door. Anchored to the top, all three
+   titles share one line and the card keeps the standard title rhythm. */
 .pnl-net {
-  flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;
+  flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start;
   gap:18px; padding-right:28px; border-right:1px solid var(--bd);
 }
-.pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; }
+.pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; }
 
 /* Balance is a fact, not a verdict — it stays neutral while the net figure
    below it takes the win/loss colouring. It carries the same grey as every
