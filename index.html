@@ -1445,17 +1445,37 @@ tr.broker-pending td:first-child {
      Position mirrors .heatmap-cell-day exactly — same offsets, opposite side —
      so the two corner items sit on one line. Colour is untouched: these still
      take the result palette, unlike the identity labels opposite them. */
+     Each count mirrors ITS OWN label rather than sharing one set of offsets:
+     day and week labels drop to 8px at top:4/left:5 on a phone, while the month
+     label stays at 10px and top:6/left:8 because month cells keep more room.
+     One shared rule put the counts at the day offsets in every cell, which is
+     why the month numbers sat high and small against their names. */
   body.pnl-open .heatmap-cell-count,
-  body.pnl-open .heatmap-week-count,
-  body.pnl-open .hm-mo-count {
+  body.pnl-open .heatmap-week-count {
     position:absolute; top:4px; right:5px;
     font-size:8px; min-height:0; margin:0;
   }
-  /* The amount is now the sole occupant of the centre, so it can carry the
+  body.pnl-open .hm-mo-count {
+    position:absolute; top:6px; right:8px;
+    font-size:10px; min-height:0; margin:0;
+  }
+
+  /* The amount is the sole occupant of the centre now, so it can carry the
      weight the count used to share. */
   body.pnl-open .heatmap-cell-pnl,
   body.pnl-open .heatmap-week-pnl,
   body.pnl-open .hm-mo-pnl { font-size:10px; margin-top:0; }
+
+  /* ── Centring the amount BELOW the label row ────────────────────────────
+     The labels are absolutely positioned, so they take no space in the flow —
+     which means the amount was centring against the whole cell and drifting up
+     under the label instead of sitting in the gap beneath it. Reserving the
+     label row as padding moves the centring axis down to where the empty space
+     actually is. Each value is that cell's label offset plus its text height,
+     minus the padding the cell already has. */
+  body.pnl-open .heatmap-cell-body { padding-top:10px; }
+  body.pnl-open .heatmap-week      { padding-top:14px; }
+  body.pnl-open .hm-mo             { padding-top:18px; }
   /* Eight columns on a phone: the week rail shrinks to the minimum that still
      fits its figures, and its separating margin comes in with it. */
   .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
@@ -1468,9 +1488,13 @@ tr.broker-pending td:first-child {
   .heatmap-dow-week   { font-size:7px; letter-spacing:0; }
   .heatmap-week-count { font-size:8px; letter-spacing:0; }
   .heatmap-week-pnl   { font-size:8px; margin-top:2px; }
+  /* A week total is the largest figure on the calendar and the week rail is its
+     narrowest column, so on a phone the cents are what push it out of shape.
+     Dropped in CSS rather than rounded in JS: the value stays exact, the tail
+     is simply not drawn, and the desktop view is untouched. */
+  .hm-cents { display:none; }
   body.pnl-open .heatmap-week-count { font-size:7px; }
-  .hm-mo-count { font-size:9px; }
-  .hm-mo-pnl   { font-size:9px; }
+  .hm-mo-pnl { font-size:9px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
      Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
@@ -3103,7 +3127,11 @@ function renderHeatmap() {
     wkN++;
     const cls   = wkTrades === 0 ? '' : resultFromPnl(wkPnl);
     const count = wkTrades > 0 ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
-    const pnl   = wkTrades > 0 ? '$' + Math.abs(round2(wkPnl)).toFixed(2) : '';
+    // Whole units and cents emitted separately so the phone stylesheet can drop
+    // the tail — same pattern as .heatmap-cell-count-word above.
+    const wkAbs = Math.abs(round2(wkPnl)).toFixed(2);
+    const pnl   = wkTrades > 0
+      ? `$${wkAbs.slice(0, -3)}<span class="hm-cents">${wkAbs.slice(-3)}</span>` : '';
     html += `
       <div class="heatmap-week ${cls}">
         <div class="heatmap-week-lbl">W${wkN}</div>
