@@ -19,9 +19,6 @@
   --p:#8b35b8;
   --p-gl:rgba(139,53,184,.07); --p-gl2:rgba(139,53,184,.16); --p-gl3:rgba(139,53,184,.30);
 
-  /* Gold accent — signature of the glossary's causal-chain blocks */
-  --gold:#e2b14e; --gold-dim:#9d7c38; --gold-gl:rgba(226,177,78,.10);
-
   /* Layered backgrounds — near-black, faint purple hue (kept, not neutralised) */
   --bg:#070611; --bg3:#141022;
   --s2:#141022; --s3:#1c1730;
@@ -46,7 +43,7 @@
   --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
 
   /* Radius scale */
-  --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-full:999px;
+  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-full:999px;
 
   /* Shared bar thickness — single source of truth for every win/loss
      distribution bar in the trades panel (session, discipline, R:R, emotions). */
@@ -93,7 +90,6 @@
   --gap-row:12px;      /* rhythm between stacked bar rows */
 
   /* Elevation */
-  --sh-1:0 1px 2px rgba(0,0,0,.4);
   --sh-2:0 4px 18px -8px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04) inset;
   --sh-3:0 16px 48px -14px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.06) inset;
 }
@@ -456,6 +452,12 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    what separates the two readings. */
 .pnl-net > div > .cbox-l            { margin-bottom:var(--gap-title); }
 .pnl-net > div:last-child > .cbox-l { margin-bottom:6px; }
+/* The balance title sets no fixed gap of its own. The figure below it centres
+   using equal auto margins, and a fixed margin here lands on the top side only
+   — pushing the figure down by half of it, which is exactly how it came to sit
+   low. The separation the title rhythm asks for is still there; it is produced
+   by the auto space, which is never smaller than the fixed value would be. */
+.pnl-net > div:first-child > .cbox-l { margin-bottom:0; }
 /* Equal auto margins centre the balance figure in whatever the title leaves. */
 .pnl-balance-number { margin-top:auto; margin-bottom:auto; }
 /* Empty unless there is no balance at all. Left in flow it would still carry
@@ -606,30 +608,29 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    three scales can be scanned without relearning anything.
    The month currently open below takes the accent rule, which makes the strip
    double as a position marker for the grid underneath it.
-   Month names sit ABOVE the cells in the same grid, exactly as the weekday
-   names sit above the day cells — one grid means the label and its cell can
-   never drift out of column, and the cell face is left to carry data only. */
+   The month name sits in the cell's top-left corner, in the same position and
+   the same type as a day number in a day cell — see the shared corner-label
+   rule further down. A month cell therefore identifies itself the way a day
+   cell does, at a different scale. */
 /* Sits between the header group (month title + its P&L figures) and the day
    grid, which makes the split read as header / calendar rather than as three
    loose strips. The margins are generous on purpose: three bands stacked at
    the top of one card need visible air between them or they read as one
    crowded block, and this is the seam where the header ends and the calendar
-   begins. Column count is fixed at 12, and the first twelve children are the
-   month names — see .hm-mo-name. */
+   begins. Twelve columns, twelve cells — each cell carries its own name in the
+   corner, so there is no separate header row to keep in step. */
 .heatmap-year {
   display:grid; grid-template-columns:repeat(12,1fr); gap:var(--seg-gap);
   margin:0 0 20px;
 }
-/* Same treatment as .heatmap-dow, which labels the day columns below. */
-.hm-mo-name {
-  font-family:var(--mono); font-size:8px; color:var(--mt);
-  padding:0 0 6px; text-align:center; letter-spacing:1px; text-transform:uppercase;
-}
+
+/* Taller than the label-above version was: the corner name now sits inside the
+   cell, so the centred figures need clearance beneath it. */
 .hm-mo {
   background:var(--glass-top), rgba(8,8,10,.55);
   border:1px solid var(--glass-bd); border-radius:var(--r-md);
-  box-shadow:var(--sh-2); box-sizing:border-box;
-  padding:7px 2px; min-height:52px;
+  box-shadow:var(--sh-2); box-sizing:border-box; position:relative;
+  padding:7px 2px; min-height:62px;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   cursor:pointer;
 }
@@ -728,9 +729,10 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 .heatmap-week.be   .heatmap-week-pnl { color:var(--be-tx); }
 body.pnl-open .heatmap-week-pnl   { display:block; }
 body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--mt); }
-/* The day number and the week ordinal are the same thing in two columns — the
-   cell's identity, pinned to its top-left corner. One rule keeps them aligned. */
-.heatmap-cell-day, .heatmap-week-lbl {
+/* The day number, the week ordinal and the month name are the same thing at
+   three scales — the cell's identity, pinned to its top-left corner. One rule
+   keeps all of them in the same place with the same weight. */
+.heatmap-cell-day, .heatmap-week-lbl, .hm-mo-lbl {
   position:absolute; top:6px; left:8px;
   font-family:var(--mono); font-size:10px; color:var(--mt); font-weight:500;
 }
@@ -1379,7 +1381,7 @@ tr.broker-pending td:first-child {
   /* Twelve across is unreadable on a phone, so the year folds to two rows of
      six — quarters still land in whole rows, and the cells stay tappable. */
   .heatmap-year { grid-template-columns:repeat(6,1fr); }
-  .hm-mo { min-height:46px; padding:6px 2px; }
+  .hm-mo { min-height:58px; padding:6px 2px; }
 
   /* ── Carousels ── */
   .period-row, .setup-donut-row, .emo-cat-row, .emo-during-grid {
@@ -2488,18 +2490,6 @@ const Charts = {
         }
       }
     };
-  },
-
-  percentYOptions() {
-    const o = Charts.baseOptions();
-    o.scales.y.min = 0;
-    o.scales.y.max = 100;
-    o.scales.y.ticks = {
-      callback: v => v + '%',
-      color: '#707080',
-      font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 }
-    };
-    return o;
   }
 };
 
@@ -3017,22 +3007,18 @@ function renderHeatmapYear(y, selMonth) {
   if (!host) return;
   const abbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const tot  = yearTotals(y);
-  // Twelve names, then twelve cells, in one 12-column grid — the same shape the
-  // day grid uses for its weekday header. Emitting both from here keeps a label
-  // and its cell in the same column by construction.
-  const names = abbr.map(a => `<div class="hm-mo-name">${a}</div>`).join('');
-  const cells = tot.map((t, m) => {
+  host.innerHTML = tot.map((t, m) => {
     const cls = ['hm-mo'];
     if (t.trades) cls.push(resultFromPnl(t.net));
     if (m === selMonth) cls.push('sel');
     return `
       <div class="${cls.join(' ')}" data-month="${m}" role="button" tabindex="0"
            aria-label="${abbr[m]} ${y}">
+        <div class="hm-mo-lbl">${abbr[m]}</div>
         <div class="hm-mo-count">${t.trades || ''}</div>
         <div class="hm-mo-pnl">${t.trades ? '$' + Math.abs(t.net).toFixed(2) : ''}</div>
       </div>`;
   }).join('');
-  host.innerHTML = names + cells;
 }
 
 function renderHeatmap() {
