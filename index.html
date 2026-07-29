@@ -65,6 +65,22 @@
   --seg-loss-bg:rgba(214,61,90,.12);
   --seg-be-bg:rgba(144,144,160,.10);
   --seg-be-bd:rgba(144,144,160,.5);
+  /* Hover fills — the result palette one step brighter. Tokenised because a
+     result colour appearing raw in three separate rules is exactly how a
+     palette drifts: one gets nudged, the others silently don't. */
+  --seg-win-hv:rgba(59,165,133,.22);
+  --seg-loss-hv:rgba(214,61,90,.22);
+  --seg-be-hv:rgba(144,144,160,.20);
+  /* Break-even figure text. Deliberately not --mt2: break-even is a result,
+     and its colour belongs with the other two results, not with muted text. */
+  --be-tx:rgba(170,170,185,1);
+  /* Standard translucent surface for pills, chips and inputs. */
+  --fill-1:rgba(255,255,255,.04);
+  /* The violet bloom behind every full-bleed surface. Held as the whole
+     gradient rather than just its colour, since all four users want the
+     identical geometry — four copies of one 90-character value was four
+     chances to mistype it. */
+  --aura:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
   /* Gap between adjacent chart segments, and between calendar cells. */
   --seg-gap:3px;
 
@@ -98,7 +114,7 @@ body {
 body::before {
   content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
   background:
-    radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+    var(--aura);
 }
 nav, .panels { position:relative; z-index:1; }
 button { font-family:inherit; }
@@ -413,9 +429,15 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    so Current Balance and Performance landed at two different heights and
    neither matched Cumulative P&L next door. Anchored to the top, all three
    titles share one line and the card keeps the standard title rhythm. */
+/* gap:0 is deliberate. With a fixed gap between the two blocks, the space a
+   figure could centre in stopped at its own block's edge, leaving the gap
+   outside the calculation — so the figure landed centred in its block but high
+   between the two titles, which is the distance actually being read. Dropping
+   the gap makes each block run title-to-title, and the auto margins below own
+   every pixel between them. */
 .pnl-net {
   flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start;
-  gap:18px; padding-right:28px; border-right:1px solid var(--bd);
+  gap:0; padding-right:28px; border-right:1px solid var(--bd);
 }
 .pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; }
 
@@ -425,9 +447,15 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    below in equal parts. Without this the figure sat hard against its title and
    read high, since all the leftover height pooled at the bottom of the block. */
 .pnl-net > div { flex:1; min-height:0; display:flex; flex-direction:column; }
-.pnl-balance-number { margin-top:auto; }
-.pnl-balance-at     { margin-bottom:auto; }
-.pnl-net-number     { margin-top:auto; margin-bottom:auto; }
+/* The title's standard 12px is dropped here and only here: with equal auto
+   margins above and below the figure, a fixed margin on one side would bias it
+   downward by exactly half that margin. The rhythm it was providing is now
+   provided by the auto space, which is never smaller. */
+.pnl-net > div > .cbox-l { margin-bottom:0; }
+.pnl-balance-number, .pnl-net-number { margin-top:auto; margin-bottom:auto; }
+/* Empty unless there is no balance at all. Left in flow it would still carry
+   its 6px top margin and pull the figure above it off centre by 3px. */
+.pnl-balance-at:empty { display:none; }
 
 /* Balance is a fact, not a verdict — it stays neutral while the net figure
    below it takes the win/loss colouring. It carries the same grey as every
@@ -546,9 +574,15 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    three scales can be scanned without relearning anything.
    The month currently open below takes the accent rule, which makes the strip
    double as a position marker for the grid underneath it. */
+/* Sits between the header group (month title + its P&L figures) and the day
+   grid, which makes the split read as header / calendar rather than as three
+   loose strips. Spacing is set so the air above and below matches once the
+   grid's own weekday header padding is counted — 12px from the block above
+   plus 4px here reads the same as 10px here plus the 6px inside the weekday
+   row. Uneven numbers, even gaps. */
 .heatmap-year {
   display:grid; grid-template-columns:repeat(12,1fr); gap:var(--seg-gap);
-  margin-bottom:14px;
+  margin:4px 0 10px;
 }
 .hm-mo {
   background:var(--glass-top), rgba(8,8,10,.55);
@@ -561,10 +595,18 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .hm-mo.win  { background:var(--seg-win-bg); }
 .hm-mo.loss { background:var(--seg-loss-bg); }
 .hm-mo.be   { background:var(--seg-be-bg); }
-.hm-mo.win:hover  { background:rgba(59,165,133,.22); }
-.hm-mo.loss:hover { background:rgba(214,61,90,.22); }
-.hm-mo.be:hover   { background:rgba(144,144,160,.20); }
-.hm-mo.sel { border-color:var(--p); }
+.hm-mo.win:hover  { background:var(--seg-win-hv); }
+.hm-mo.loss:hover { background:var(--seg-loss-hv); }
+.hm-mo.be:hover   { background:var(--seg-be-hv); }
+/* The month on show is outlined in its own result colour and lifted to the
+   hover fill — the same green/red the donuts and bars use, so the strip marks
+   position in the language the rest of the app already speaks rather than
+   introducing a separate accent for it. A month with no trades has no result
+   to borrow, so it takes the neutral bright rule instead. */
+.hm-mo.sel      { border-color:var(--bd2); }
+.hm-mo.sel.win  { border-color:var(--win);  background:var(--seg-win-hv); }
+.hm-mo.sel.loss { border-color:var(--loss); background:var(--seg-loss-hv); }
+.hm-mo.sel.be   { border-color:var(--seg-be-bd); background:var(--seg-be-hv); }
 .hm-mo-lbl {
   font-family:var(--mono); font-size:8px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt);
@@ -577,7 +619,7 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 }
 .hm-mo.win  .hm-mo-count { color:var(--win); }
 .hm-mo.loss .hm-mo-count { color:var(--loss); }
-.hm-mo.be   .hm-mo-count { color:rgba(170,170,185,1); }
+.hm-mo.be   .hm-mo-count { color:var(--be-tx); }
 .hm-mo-pnl {
   font-family:var(--mono); font-size:10px; font-weight:600; margin-top:2px;
   color:var(--mt2);
@@ -585,7 +627,7 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 }
 .hm-mo.win  .hm-mo-pnl { color:var(--win); }
 .hm-mo.loss .hm-mo-pnl { color:var(--loss); }
-.hm-mo.be   .hm-mo-pnl { color:rgba(170,170,185,1); }
+.hm-mo.be   .hm-mo-pnl { color:var(--be-tx); }
 body.pnl-open .hm-mo-pnl   { display:block; }
 body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 /* Seven day columns plus a week-summary column, set apart from the grid by a
@@ -619,9 +661,9 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 .heatmap-cell.win  { background:var(--seg-win-bg); }
 .heatmap-cell.loss { background:var(--seg-loss-bg); }
 .heatmap-cell.be   { background:var(--seg-be-bg); }
-.heatmap-cell.win:hover  { background:rgba(59,165,133,.22); }
-.heatmap-cell.loss:hover { background:rgba(214,61,90,.22); }
-.heatmap-cell.be:hover   { background:rgba(144,144,160,.20); }
+.heatmap-cell.win:hover  { background:var(--seg-win-hv); }
+.heatmap-cell.loss:hover { background:var(--seg-loss-hv); }
+.heatmap-cell.be:hover   { background:var(--seg-be-hv); }
 /* Only days that hold a trade are clickable (they open that day's entry). */
 .heatmap-cell.win, .heatmap-cell.loss, .heatmap-cell.be { cursor:pointer; }
 
@@ -638,7 +680,7 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 }
 .heatmap-week.win  .heatmap-week-count { color:var(--win); }
 .heatmap-week.loss .heatmap-week-count { color:var(--loss); }
-.heatmap-week.be   .heatmap-week-count { color:rgba(170,170,185,1); }
+.heatmap-week.be   .heatmap-week-count { color:var(--be-tx); }
 .heatmap-week-pnl {
   font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2);
@@ -646,7 +688,7 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 }
 .heatmap-week.win  .heatmap-week-pnl { color:var(--win); }
 .heatmap-week.loss .heatmap-week-pnl { color:var(--loss); }
-.heatmap-week.be   .heatmap-week-pnl { color:rgba(170,170,185,1); }
+.heatmap-week.be   .heatmap-week-pnl { color:var(--be-tx); }
 body.pnl-open .heatmap-week-pnl   { display:block; }
 body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--mt); }
 /* The day number and the week ordinal are the same thing in two columns — the
@@ -669,7 +711,7 @@ body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--
 }
 .heatmap-cell.win  .heatmap-cell-count { color:var(--win); }
 .heatmap-cell.loss .heatmap-cell-count { color:var(--loss); }
-.heatmap-cell.be   .heatmap-cell-count { color:rgba(170,170,185,1); }
+.heatmap-cell.be   .heatmap-cell-count { color:var(--be-tx); }
 .heatmap-cell-pnl {
   font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2); text-transform:uppercase;
@@ -677,7 +719,7 @@ body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--
 }
 .heatmap-cell.win  .heatmap-cell-pnl { color:var(--win); }
 .heatmap-cell.loss .heatmap-cell-pnl { color:var(--loss); }
-.heatmap-cell.be   .heatmap-cell-pnl { color:rgba(170,170,185,1); }
+.heatmap-cell.be   .heatmap-cell-pnl { color:var(--be-tx); }
 /* P&L view (P&L section open → body.pnl-open): every trade-bearing cell shows
    its day total and the count above it shrinks to a caption. No hover involved —
    the reveal is a mode, so it works identically on touch. */
@@ -755,7 +797,7 @@ td.c   { text-align:center; }
 .dir-pill {
   display:inline-block; font-family:var(--mono); font-size:8px; letter-spacing:1px;
   padding:3px 9px; text-transform:uppercase; font-weight:600; border-radius:var(--r-full);
-  color:var(--mt2); background:rgba(255,255,255,.04); border:1px solid var(--glass-bd);
+  color:var(--mt2); background:var(--fill-1); border:1px solid var(--glass-bd);
 }
 .del-btn {
   background:none; border:none; color:var(--loss); cursor:pointer;
@@ -919,7 +961,7 @@ td.c   { text-align:center; }
   display:flex; align-items:center; justify-content:space-between; gap:16px;
   border:1px solid var(--bd); border-radius:var(--r-md);
   background-color:var(--bg);
-  background-image:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+  background-image:var(--aura);
   background-attachment:fixed; background-repeat:no-repeat;
   padding:15px 18px;
 }
@@ -932,7 +974,7 @@ td.c   { text-align:center; }
 .jm-pnl-input {
   font-family:var(--mono); font-size:9px; letter-spacing:.5px;
   padding:6px 12px; border:1px solid var(--glass-bd);
-  color:var(--tx); border-radius:var(--r-full); background:rgba(255,255,255,.04);
+  color:var(--tx); border-radius:var(--r-full); background:var(--fill-1);
   width:76px; text-align:center; outline:none;
   -moz-appearance:textfield;
 }
@@ -976,7 +1018,7 @@ td.c   { text-align:center; }
 .jm-card {
   width:100%; border:1px solid var(--bd); border-radius:var(--r-md);
   background-color:var(--bg);
-  background-image:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+  background-image:var(--aura);
   background-attachment:fixed; background-repeat:no-repeat;
   padding:15px 18px;
   display:flex; flex-direction:column; align-items:center; gap:14px;
@@ -1023,7 +1065,7 @@ td.c   { text-align:center; }
   font-family:var(--mono); font-size:9px; letter-spacing:.3px; text-transform:uppercase;
   padding:6px 12px; border:1px solid var(--glass-bd);
   color:rgba(255,255,255,.75); cursor:pointer;
-  border-radius:var(--r-full); background:rgba(255,255,255,.04); white-space:nowrap;
+  border-radius:var(--r-full); background:var(--fill-1); white-space:nowrap;
 }
 .jf-emo-pill { width:90px; text-align:center; display:inline-block; }
 .jf-yn-pill  { width:56px; text-align:center; display:inline-block; }
@@ -1057,7 +1099,7 @@ td.c   { text-align:center; }
 }
 .jm-btn-save:hover { background:var(--p); border-color:var(--p); box-shadow:0 0 22px -4px var(--p-gl3); }
 .jm-btn-cancel {
-  background:rgba(255,255,255,.04); border:1px solid var(--bd2); color:var(--mt2);
+  background:var(--fill-1); border:1px solid var(--bd2); color:var(--mt2);
   cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
   text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
  width:110px;
@@ -1192,7 +1234,7 @@ td.c   { text-align:center; }
 }
 .login-overlay::before {
   content:''; position:absolute; inset:0; pointer-events:none;
-  background:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
+  background:var(--aura);
 }
 .login-overlay.open { display:flex; }
 .login-card {
@@ -1219,7 +1261,7 @@ td.c   { text-align:center; }
 .login-input {
   font-family:var(--mono); font-size:11px; letter-spacing:.5px;
   padding:11px 14px; border:1px solid var(--glass-bd);
-  color:var(--tx); border-radius:var(--r-sm); background:rgba(255,255,255,.04);
+  color:var(--tx); border-radius:var(--r-sm); background:var(--fill-1);
   width:100%; outline:none;
 }
 .login-input:focus { border-color:var(--p); background:var(--p-gl); box-shadow:0 0 16px -4px var(--p-gl3); }
@@ -1450,14 +1492,14 @@ tr.broker-pending td:first-child {
          missing its rules/emotions data. Tapping it opens the oldest one. -->
     <div id="broker-banner" class="broker-banner" style="display:none;" role="button" tabindex="0"></div>
 
-    <!-- P&L (collapsible — starts collapsed to keep money outcomes out of the
-         default view; opening it switches the whole journal into P&L view) -->
+    <!-- P&L (collapsible — starts OPEN; the section doubles as a view-mode
+         switch, so while it is open the whole journal runs in P&L view) -->
     <div style="margin-bottom:16px;">
       <div class="collapsible-hdr" data-collapse-target="ap-body" data-collapse-chev="ap-chev">
         <div class="sec-hd" style="margin:0;">P&amp;L</div>
-        <span id="ap-chev" class="chevron closed">&#x25B2;</span>
+        <span id="ap-chev" class="chevron">&#x25B2;</span>
       </div>
-      <div id="ap-body" style="display:none;">
+      <div id="ap-body">
         <div class="grid-2">
           <div class="cbox pnl-card">
             <div class="pnl-card-inner">
@@ -1829,14 +1871,18 @@ const CONFIG = Object.freeze({
 const State = {
   trades:   [],
   journals: [],
-  // Derived index: tradeId → journal. Rebuilt by rebuildJournalIndex() after
-  // any mutation. journalForTrade(t) reads from here so render
+  // Derived index: tradeId → journal. Rebuilt by rebuildIndexes() after
+  // any mutation by rebuildIndexes(). journalForTrade(t) reads from here so render
   // pipelines run in O(trades) instead of O(trades × journals).
   journalByTradeId: new Map(),
   // Derived index: tradeId → trade. Same rebuild lifecycle as the one above.
   // tradeForJournal(j) reads from here so journal→trade lookups are O(1)
   // instead of a State.trades.find() scan on every call.
   tradeById: new Map(),
+  // Derived index: ISO day → { tradeCount, pnl }. Same rebuild lifecycle again.
+  // dayData() reads from here rather than scanning, which is what keeps the
+  // heatmap at one pass over the trade set instead of one pass per day drawn.
+  dayIndex: new Map(),
   tradeLogPage: 0,
   // Chart instances keyed by canvas id (or logical name)
   charts: Object.create(null),
@@ -1855,7 +1901,7 @@ const Storage = {
   loadJournals()  { return safeJSON(CONFIG.STORE.journal, []); },
 
   saveTradesAndJournals() {
-    rebuildJournalIndex();
+    rebuildIndexes();
     try {
       localStorage.setItem(CONFIG.STORE.trades,  JSON.stringify(State.trades));
       localStorage.setItem(CONFIG.STORE.journal, JSON.stringify(State.journals));
@@ -2042,7 +2088,11 @@ const Phone = window.matchMedia('(max-width:640px)');
 // Rebuilds the tradeId→journal index. Called after any mutation that adds,
 // removes, or replaces trades/journals. Cheap (single pass) and makes every
 // downstream lookup O(1).
-function rebuildJournalIndex() {
+// Rebuilds every derived index in one place, so they cannot fall out of step
+// with each other or with the data. Called from Storage.saveTradesAndJournals(),
+// which every mutation path goes through, and from the two places that replace
+// State wholesale (boot and Cloud.pull).
+function rebuildIndexes() {
   State.journalByTradeId = new Map();
   for (const j of State.journals) {
     if (j && j.tradeId) State.journalByTradeId.set(j.tradeId, j);
@@ -2051,6 +2101,26 @@ function rebuildJournalIndex() {
   for (const t of State.trades) {
     if (t && t.id) State.tradeById.set(t.id, t);
   }
+  // Day totals. This one exists to kill a genuine hot path: dayData() used to
+  // scan the whole trade set on every call, and renderHeatmap() calls it once
+  // per day on screen — thirty-one full passes to draw a single month, redone
+  // on every re-render. One pass here answers all of them, and the cost moves
+  // from "per render" to "per mutation", which is far rarer.
+  // Must run after journalByTradeId: it reads P&L through journalForTrade().
+  State.dayIndex = new Map();
+  for (const t of State.trades) {
+    if (!t.openTime) continue;
+    const iso = t.openTime.slice(0, 10);
+    let d = State.dayIndex.get(iso);
+    if (!d) { d = { tradeCount: 0, pnl: 0 }; State.dayIndex.set(iso, d); }
+    d.tradeCount++;
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v !== null) d.pnl += v;
+  }
+  // Rounded once at the end rather than per addition, so the stored figure
+  // matches what a single round2 over the day's sum would give.
+  for (const d of State.dayIndex.values()) d.pnl = round2(d.pnl);
 }
 function journalForTrade(t)   { return t ? State.journalByTradeId.get(t.id) : undefined; }
 function tradeForJournal(j)   { return j ? State.tradeById.get(j.tradeId) : undefined; }
@@ -2745,7 +2815,6 @@ function ensureHeatmapStructure() {
   const host = $('calendar-heatmap');
   if (!host || host.dataset.ready) return;
   host.innerHTML = `
-    <div id="heatmap-year" class="heatmap-year"></div>
     <div class="heatmap-hdr">
       <button id="heatmap-prev" class="heatmap-nav-btn">&larr;</button>
       <span id="heatmap-title" class="heatmap-title"></span>
@@ -2757,6 +2826,7 @@ function ensureHeatmapStructure() {
       <span class="heatmap-month-stat"><span class="pm-lbl">Net</span><span class="pm-val" id="hm-net">—</span></span>
       <span class="heatmap-month-stat"><span class="pm-lbl">Trades</span><span class="pm-val" id="hm-trades">—</span></span>
     </div>
+    <div id="heatmap-year" class="heatmap-year"></div>
     <div id="heatmap-grid" class="heatmap-grid"></div>`;
   host.dataset.ready = '1';
   $('heatmap-prev').addEventListener('click', () => { Calendar.navigate('heatmap', -1); renderHeatmap(); });
@@ -3020,17 +3090,12 @@ function monthTotals(y, month) {
   }
   return { trades, gross: round2(gross), loss: round2(loss), net: round2(gross - loss) };
 }
-function dayData(isoDay) {
-  let tradeCount = 0, pnl = 0;
-  for (const t of State.trades) {
-    if (!t.openTime || t.openTime.slice(0, 10) !== isoDay) continue;
-    tradeCount++;
-    const j = journalForTrade(t);
-    const v = j ? safeNum(j.pnl) : null;
-    if (v !== null) pnl += v;
-  }
-  return { tradeCount, pnl: round2(pnl) };
-}
+// Frozen so a caller that treats the empty result as scratch space can't
+// corrupt every future empty day through the shared reference.
+const EMPTY_DAY = Object.freeze({ tradeCount: 0, pnl: 0 });
+// A read of the prebuilt index — see rebuildIndexes(). Returns the stored
+// object directly; callers read it and must not mutate it.
+function dayData(isoDay) { return State.dayIndex.get(isoDay) || EMPTY_DAY; }
 
 /* ─── SESSION & SETUP CHARTS ─────────────────────────────────────────────── */
 // Builds the per-session win/loss bars (segmented win → B/E → loss) for a
@@ -4249,7 +4314,7 @@ const Cloud = {
       State.trades   = Storage.loadTrades();
       State.journals = Storage.loadJournals();
       migrateData();
-      rebuildJournalIndex();
+      rebuildIndexes();
       // A background pull rebuilds the entire log, which can shorten the
       // document and drop the viewport out from under whatever was being read.
       // Reading the position immediately around a synchronous render leaves no
@@ -4341,6 +4406,7 @@ const Cloud = {
   _dirty:          Object.create(null),   // keys written locally, not yet confirmed
   _channel:        null,
   _channelDropped: false,
+  _pollTimer:      0,
 
   // A refresh rebuilds State and re-renders. Doing that under an open modal
   // would pull the ground out from under half-typed input, so a refresh that
@@ -4412,7 +4478,21 @@ const Cloud = {
     // Backstop for a desktop tab that is never closed, never loses focus, and
     // whose socket died quietly. Visible-only, so a backgrounded phone is
     // never woken for it.
-    setInterval(() => { if (!document.hidden) this.refresh(); }, this.REFRESH_POLL_MS);
+    this._pollTimer = setInterval(() => { if (!document.hidden) this.refresh(); }, this.REFRESH_POLL_MS);
+  },
+
+  // Nothing tears the app down today, so this is never called in the normal
+  // run. It exists because a timer and a socket with no matching stop are how
+  // a page-lifetime singleton quietly becomes a leak the first time something
+  // does start tearing down — and writing it after the fact means finding
+  // every handle again.
+  stop() {
+    clearInterval(this._pollTimer);
+    this._pollTimer = 0;
+    if (this._channel) {
+      try { this.sb.removeChannel(this._channel); } catch (e) {}
+      this._channel = null;
+    }
   },
 
   /* ─── Realtime ──────────────────────────────────────────────────────────
@@ -4738,20 +4818,38 @@ function toggleSection(bodyId, chevId) {
 /* ═══════════════════════════════════════════════════════════════════════════
    GLOBAL EVENT WIRING
    ═══════════════════════════════════════════════════════════════════════════ */
+/* ─── EVENT WIRING ─────────────────────────────────────────────────────────
+   Split by surface rather than kept as one 180-line list. wireEvents() is the
+   manifest and holds no bindings of its own; each function below owns exactly
+   one surface, so adding a control means editing the one function that surface
+   belongs to rather than finding the right stretch of a long file. All of them
+   run once, at boot.
+   ──────────────────────────────────────────────────────────────────────── */
+
+// Null-safe binding helper. The wire* functions fire once at boot; if any element
+// listed below has been renamed or removed in the markup we'd rather log a
+// warning and keep the rest of the app functional than crash the whole boot.
+const on = (id, event, handler) => {
+  const el = typeof id === 'string' ? $(id) : id;
+  if (el) el.addEventListener(event, handler);
+  else console.warn(`Doji: missing element for handler "${id}" (${event})`);
+};
+
 function wireEvents() {
+  wireChrome();
+  wireCalendars();
+  wireTradeLog();
+  wireJournalModal();
+  wireIOModal();
+  wireDayPopup();
+  wireToasts();
+  wireKeyboard();
+}
 
-  // Null-safe binding helper. wireEvents fires once at boot; if any element
-  // listed below has been renamed or removed in the markup we'd rather log a
-  // warning and keep the rest of the app functional than crash the whole boot.
-  const on = (id, event, handler) => {
-    const el = typeof id === 'string' ? $(id) : id;
-    if (el) el.addEventListener(event, handler);
-    else console.warn(`Doji: missing element for handler "${id}" (${event})`);
-  };
-
+// App shell: nav buttons, fullscreen, breakpoint redraw, section collapse.
+function wireChrome() {
   on('nav-io-btn',  'click', IO.openModal);
   on('nav-add-btn', 'click', () => Journal.open(null));
-
   /* Fullscreen toggle */
   const fsBtn  = $('nav-fs-btn');
   const fsOn   = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -4762,7 +4860,24 @@ function wireEvents() {
   });
   document.addEventListener('fullscreenchange', fsSync);
   document.addEventListener('webkitfullscreenchange', fsSync);
+  /* Redraw the month when the layout crosses the phone breakpoint — the grid
+     gains or loses its Saturday column there, which only the renderer builds. */
+  Phone.addEventListener('change', renderHeatmap);
+  /* Collapsible section headers */
+  // P&L starts open. The three places that encode this have to agree or the
+  // first click does nothing visible: the markup (no inline display:none, no
+  // .closed chevron), the section flag toggleSection() reads, and the body
+  // class the P&L-view CSS keys off. Set the latter two here so the flag
+  // matches what the markup already shows.
+  State.sections['ap-body'] = true;
+  document.body.classList.add('pnl-open');
+  $$('[data-collapse-target]').forEach(hdr => {
+    hdr.addEventListener('click', () => toggleSection(hdr.dataset.collapseTarget, hdr.dataset.collapseChev));
+  });
+}
 
+// Month stepping shared by the journal date picker and the heatmap.
+function wireCalendars() {
   /* Calendar nav (journal calendar via data-cal-target) */
   $$('[data-cal-nav]').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -4773,25 +4888,15 @@ function wireEvents() {
       if (target === 'journal') renderJournalCal();
     });
   });
+}
 
-  /* Redraw the month when the layout crosses the phone breakpoint — the grid
-     gains or loses its Saturday column there, which only the renderer builds. */
-  Phone.addEventListener('change', renderHeatmap);
-
-  /* Collapsible section headers */
-  // P&L starts collapsed (hidden by default) — process-first; record
-  // that initial state so the first toggle opens rather than re-hides it.
-  State.sections['ap-body'] = false;
-  $$('[data-collapse-target]').forEach(hdr => {
-    hdr.addEventListener('click', () => toggleSection(hdr.dataset.collapseTarget, hdr.dataset.collapseChev));
-  });
-
+// The broker banner and the trade table beneath it.
+function wireTradeLog() {
   /* Broker banner → open the oldest incomplete synced entry */
   on('broker-banner', 'click', () => {
     const pend = BrokerSync.pending();
     if (pend.length) Journal.openForTrade(pend[0].id);
   });
-
   /* Trade table delegation: row click opens journal, ✕ deletes, page nav */
   on('trade-table', 'click', e => {
     const delBtn = e.target.closest('[data-del]');
@@ -4813,8 +4918,10 @@ function wireEvents() {
     // Only the table slice changes — leave charts/donuts alone.
     renderTradeTable(State.trades.slice());
   });
+}
 
-
+// The entry modal: its shell, its header pills, and its dismissals.
+function wireJournalModal() {
   /* Journal modal: outside-click closes; form actions delegated */
   on('journal-modal', 'click', e => {
     if (e.target === $('journal-modal')) Journal.close();
@@ -4826,7 +4933,6 @@ function wireEvents() {
     if (action === 'cancel') Journal.close();
     // 'delete' is intentionally absent — the journal modal no longer offers it.
   });
-
   /* Journal header: session pill, date pill, calendar grid */
   on('jm-session-btn',   'click', () => toggleSessionMenu());
   on('jm-date-label',    'click', () => toggleJournalCal());
@@ -4845,7 +4951,6 @@ function wireEvents() {
     setDateLabel(cell.dataset.jcalDay);
     toggleJournalCal(false);
   });
-
   /* Close journal calendar / session menu when clicking outside */
   document.addEventListener('click', e => {
     const cal = $('jm-cal');
@@ -4859,7 +4964,10 @@ function wireEvents() {
       opts.classList.remove('open');
     }
   });
+}
 
+// Import / export panel.
+function wireIOModal() {
   /* I/O modal */
   on('io-close-btn',          'click',  IO.closeModal);
   on('io-import-btn',         'click',  () => $('io-import-file')?.click());
@@ -4869,7 +4977,10 @@ function wireEvents() {
   on('io-export-json-btn',    'click',  IO.exportJSON);
   on('io-restore-btn',        'click',  () => $('io-restore-file')?.click());
   on('io-restore-file',       'change', e => IO.importJSON(e.target));
+}
 
+// The per-day trade list opened from a calendar cell.
+function wireDayPopup() {
   /* Day picker popup */
   on('day-close-btn', 'click', closeDayPopup);
   on('day-modal', 'click', e => { if (e.target === $('day-modal')) closeDayPopup(); });
@@ -4879,13 +4990,18 @@ function wireEvents() {
     closeDayPopup();
     Journal.openForTrade(row.dataset.trade);
   });
+}
 
-
+// Delegated because the toast is rebuilt on every notifyUndo().
+function wireToasts() {
   /* Undo button inside the delete toast (re-created per notifyUndo → delegate) */
   on('notif', 'click', e => {
     if (e.target.closest('.notif-undo')) PendingDelete.undo();
   });
+}
 
+// Global shortcuts. Suppressed while typing — see the guard inside.
+function wireKeyboard() {
   /* Keyboard shortcuts */
   document.addEventListener('keydown', e => {
     const tag = (e.target.tagName || '').toLowerCase();
@@ -4907,6 +5023,7 @@ function wireEvents() {
   });
 }
 
+
 /* ═══════════════════════════════════════════════════════════════════════════
    DAY ROLLOVER WATCHER
    ───────────────────────────────────────────────────────────────────────────
@@ -4921,9 +5038,11 @@ function wireEvents() {
    ═══════════════════════════════════════════════════════════════════════════ */
 const DayWatcher = {
   current: null,
+  timer: 0,
   start() {
+    if (this.timer) return;   // guard against a double start duplicating the timer
     this.current = Dates.isoDay(new Date());
-    setInterval(() => this.check(), 30000); // 30s — cheap; only re-renders on a real flip
+    this.timer = setInterval(() => this.check(), 30000); // 30s — cheap; only re-renders on a real flip
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.check(); });
     window.addEventListener('focus', () => this.check());
   },
@@ -4956,7 +5075,9 @@ const DayWatcher = {
 const BackupWatcher = {
   STORE_KEY: 'doji_backupLastClose',
   lastClose: null,
+  timer: 0,
   start() {
+    if (this.timer) return;   // guard against a double start duplicating the timer
     // Phones and tablets never auto-download. The week marker below is stored
     // per-device, so skipping here doesn't consume the laptop's turn — the
     // laptop still fires its own backup the next time it's opened after the
@@ -4967,7 +5088,7 @@ const BackupWatcher = {
     }
     try { this.lastClose = localStorage.getItem(this.STORE_KEY); }
     catch (e) { this.lastClose = null; }
-    setInterval(() => this.check(), 30000); // 30s — matches DayWatcher; check is cheap
+    this.timer = setInterval(() => this.check(), 30000); // 30s — matches DayWatcher; check is cheap
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.check(); });
     window.addEventListener('focus', () => this.check());
     this.check();
@@ -5000,7 +5121,7 @@ const BackupWatcher = {
   State.trades   = Storage.loadTrades();
   State.journals = Storage.loadJournals();
   migrateData();
-  rebuildJournalIndex();
+  rebuildIndexes();
 
   // Calendar default cursors
   const now = new Date();
