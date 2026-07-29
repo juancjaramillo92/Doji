@@ -420,7 +420,12 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    the Cumulative P&L chart beside it above all. The horizontal 26px stays,
    since that is the divider's geometry and not the title's.
    ═══════════════════════════════════════════════════════════════════════════ */
-.pnl-card { padding:16px 26px; }
+/* Standard .cbox padding, exactly. The divider's geometry is set by the 28px
+   inside .pnl-net and the 28px flex gap outside it, both independent of the
+   card's own padding — so matching every other card here costs the rule
+   nothing and puts this card's titles the same distance from the corner as
+   Performance and Cumulative P&L. */
+.pnl-card { padding:16px 18px; }
 .pnl-card-inner { display:flex; align-items:stretch; gap:28px; }
 /* Two stacked figures share the left half: the account balance the last synced
    fill reported, then the journal's own net. */
@@ -429,30 +434,30 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    so Current Balance and Performance landed at two different heights and
    neither matched Cumulative P&L next door. Anchored to the top, all three
    titles share one line and the card keeps the standard title rhythm. */
-/* gap:0 is deliberate. With a fixed gap between the two blocks, the space a
-   figure could centre in stopped at its own block's edge, leaving the gap
-   outside the calculation — so the figure landed centred in its block but high
-   between the two titles, which is the distance actually being read. Dropping
-   the gap makes each block run title-to-title, and the auto margins below own
-   every pixel between them. */
+/* Both halves of the card run top-to-bottom on the same two anchors: a title
+   pinned to the top edge, and content pinned to the bottom. That is what puts
+   Current Balance level with Performance, and the Net P&L figure level with the
+   Month row opposite it — the alignment comes from the shared structure rather
+   than from matching numbers on each side. */
 .pnl-net {
-  flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start;
+  flex:1; min-width:0; display:flex; flex-direction:column;
   gap:0; padding-right:28px; border-right:1px solid var(--bd);
 }
-.pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; }
+.pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:space-between; }
 
-/* The two blocks split the column's height evenly. Inside each, the title keeps
-   its pinned top position and its standard 12px rhythm, while the figure centres
-   in whatever height is left over — the auto margins take the slack above and
-   below in equal parts. Without this the figure sat hard against its title and
-   read high, since all the leftover height pooled at the bottom of the block. */
-.pnl-net > div { flex:1; min-height:0; display:flex; flex-direction:column; }
-/* The title's standard 12px is dropped here and only here: with equal auto
-   margins above and below the figure, a fixed margin on one side would bias it
-   downward by exactly half that margin. The rhythm it was providing is now
-   provided by the auto space, which is never smaller. */
-.pnl-net > div > .cbox-l { margin-bottom:0; }
-.pnl-balance-number, .pnl-net-number { margin-top:auto; margin-bottom:auto; }
+/* The balance block absorbs every spare pixel; the Net block keeps its natural
+   height and is therefore pinned to the bottom of the column, level with the
+   Month row across the divider. */
+.pnl-net > div:first-child { flex:1; min-height:0; display:flex; flex-direction:column; }
+.pnl-net > div:last-child  { flex:none; }
+/* Current Balance takes the standard title rhythm, same as Performance and
+   Cumulative P&L. Net P&L sits tighter to its figure — it labels the number
+   directly beneath it rather than opening a block, and the long gap above is
+   what separates the two readings. */
+.pnl-net > div > .cbox-l            { margin-bottom:var(--gap-title); }
+.pnl-net > div:last-child > .cbox-l { margin-bottom:6px; }
+/* Equal auto margins centre the balance figure in whatever the title leaves. */
+.pnl-balance-number { margin-top:auto; margin-bottom:auto; }
 /* Empty unless there is no balance at all. Left in flow it would still carry
    its 6px top margin and pull the figure above it off centre by 3px. */
 .pnl-balance-at:empty { display:none; }
@@ -550,11 +555,38 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   SYNC STATUS DOT
+   ───────────────────────────────────────────────────────────────────────────
+   Background sync used to fail into console.error, which on a phone at 6am is
+   the same as failing silently. This is the smallest honest surface for it: a
+   dot that is nearly invisible when everything is fine and unmissable when it
+   isn't. Deliberately not a toast — a healthy sync happens constantly and must
+   never interrupt; only the unhealthy states earn attention.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sync-dot {
+  width:7px; height:7px; border-radius:var(--r-full); flex:none;
+  background:var(--mt); opacity:.35; margin-right:4px;
+  transition:background .2s, opacity .2s;
+}
+.sync-dot-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.sync-dot.busy  { background:var(--p);    opacity:.9; animation:brokerPulse 1.4s ease-in-out infinite; }
+.sync-dot.ok    { background:var(--win);  opacity:.55; }
+/* Amber, not red: unsent work is a state to notice, not a failure yet — the
+   data is safe locally and the next refresh will try again. */
+.sync-dot.stale { background:#d9a441;     opacity:.95; }
+.sync-dot.error { background:var(--loss); opacity:1; }
+@media (prefers-reduced-motion:reduce) { .sync-dot.busy { animation:none; } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
    P&L CALENDAR HEATMAP
    ═══════════════════════════════════════════════════════════════════════════ */
+/* The calendar card stacks three bands — month title, month figures, year strip
+   — before the day grid begins. Each needs its own air or they read as one
+   crowded header, so the spacing here is deliberately looser than the 12px
+   used between tighter elements elsewhere. */
 .heatmap-hdr {
   display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:12px;
+  margin-bottom:16px;
 }
 .heatmap-nav-btn {
   background:var(--s2); border:1px solid var(--bd); color:var(--mt2);
@@ -573,16 +605,25 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    invented here — a month reads the way a day and a week already read, so the
    three scales can be scanned without relearning anything.
    The month currently open below takes the accent rule, which makes the strip
-   double as a position marker for the grid underneath it. */
+   double as a position marker for the grid underneath it.
+   Month names sit ABOVE the cells in the same grid, exactly as the weekday
+   names sit above the day cells — one grid means the label and its cell can
+   never drift out of column, and the cell face is left to carry data only. */
 /* Sits between the header group (month title + its P&L figures) and the day
    grid, which makes the split read as header / calendar rather than as three
-   loose strips. Spacing is set so the air above and below matches once the
-   grid's own weekday header padding is counted — 12px from the block above
-   plus 4px here reads the same as 10px here plus the 6px inside the weekday
-   row. Uneven numbers, even gaps. */
+   loose strips. The margins are generous on purpose: three bands stacked at
+   the top of one card need visible air between them or they read as one
+   crowded block, and this is the seam where the header ends and the calendar
+   begins. Column count is fixed at 12, and the first twelve children are the
+   month names — see .hm-mo-name. */
 .heatmap-year {
   display:grid; grid-template-columns:repeat(12,1fr); gap:var(--seg-gap);
-  margin:4px 0 10px;
+  margin:0 0 20px;
+}
+/* Same treatment as .heatmap-dow, which labels the day columns below. */
+.hm-mo-name {
+  font-family:var(--mono); font-size:8px; color:var(--mt);
+  padding:0 0 6px; text-align:center; letter-spacing:1px; text-transform:uppercase;
 }
 .hm-mo {
   background:var(--glass-top), rgba(8,8,10,.55);
@@ -607,15 +648,11 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .hm-mo.sel.win  { border-color:var(--win);  background:var(--seg-win-hv); }
 .hm-mo.sel.loss { border-color:var(--loss); background:var(--seg-loss-hv); }
 .hm-mo.sel.be   { border-color:var(--seg-be-bd); background:var(--seg-be-hv); }
-.hm-mo-lbl {
-  font-family:var(--mono); font-size:8px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--mt);
-}
 /* Reserves its line whether or not the month traded, so an empty month keeps
    the same height as a busy one and the strip stays a straight rule. */
 .hm-mo-count {
   font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.5px;
-  color:var(--mt2); margin-top:4px; min-height:12px;
+  color:var(--mt2); min-height:12px;
 }
 .hm-mo.win  .hm-mo-count { color:var(--win); }
 .hm-mo.loss .hm-mo-count { color:var(--loss); }
@@ -731,7 +768,7 @@ body.pnl-open .heatmap-cell-count { font-size:7px; font-weight:400; color:var(--
    is grouped so the label sits tight to its value while the pairs stay apart. */
 .heatmap-month-pnl {
   display:none; justify-content:center; align-items:baseline;
-  gap:22px; margin:-6px 0 12px;
+  gap:22px; margin:-4px 0 20px;
 }
 body.pnl-open .heatmap-month-pnl { display:flex; }
 .heatmap-month-stat { display:inline-flex; align-items:baseline; gap:6px; }
@@ -1474,6 +1511,8 @@ tr.broker-pending td:first-child {
 <nav>
   <div class="logo">DOJI</div>
   <div class="nav-actions">
+    <span id="sync-dot" class="sync-dot" role="status" aria-live="polite"
+          title="Sync status"><span class="sync-dot-label"></span></span>
     <button id="nav-fs-btn" class="nav-icon-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
       <svg class="fs-ico fs-ico-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       <svg class="fs-ico fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8H5a2 2 0 0 1-2-2V3m18 5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m13-5h-3a2 2 0 0 0-2 2v3"/></svg>
@@ -2130,6 +2169,31 @@ function tradeForJournal(j)   { return j ? State.tradeById.get(j.tradeId) : unde
 // win or loss — but its dollar value is still summed into total P&L elsewhere
 // (pickPnls reads pnl directly and ignores this label).
 function resultFromPnl(pnl)   { return Math.abs(pnl) <= CONFIG.BE_THRESHOLD ? 'be' : (pnl > 0 ? 'win' : 'loss'); }
+
+/* ─── SCHEMA GUARDS ────────────────────────────────────────────────────────
+   The contract every record must satisfy to enter State, wherever it came
+   from — a restored backup, a spreadsheet import, or a cloud pull. Held in one
+   place because the three entry points must agree: a record the import path
+   rejects but the sync path accepts is a record that exists on one device and
+   not another. Keep in sync with Journal.save() and importRowsIntoState(),
+   which produce the shape these describe.
+   ──────────────────────────────────────────────────────────────────────── */
+const ID_RE = /^[A-Za-z0-9_\-]{1,64}$/;
+const Schema = {
+  isValidTrade(t) {
+    return !!t && typeof t === 'object'
+      && typeof t.id === 'string' && ID_RE.test(t.id);
+  },
+  isValidJournal(j) {
+    if (!j || typeof j !== 'object') return false;
+    if (typeof j.id      !== 'string' || !ID_RE.test(j.id))      return false;
+    if (typeof j.tradeId !== 'string' || !ID_RE.test(j.tradeId)) return false;
+    // If a P&L exists it must be a finite number. NaN / Infinity / garbage is
+    // rejected here so one corrupt record can't poison every chart downstream.
+    if (j.pnl != null && j.pnl !== '' && safeNum(j.pnl) === null) return false;
+    return true;
+  }
+};
 
 /* ─── MIGRATION ──────────────────────────────────────────────────────────── */
 // Fills missing fields on legacy entries. Idempotent.
@@ -2953,18 +3017,22 @@ function renderHeatmapYear(y, selMonth) {
   if (!host) return;
   const abbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const tot  = yearTotals(y);
-  host.innerHTML = tot.map((t, m) => {
+  // Twelve names, then twelve cells, in one 12-column grid — the same shape the
+  // day grid uses for its weekday header. Emitting both from here keeps a label
+  // and its cell in the same column by construction.
+  const names = abbr.map(a => `<div class="hm-mo-name">${a}</div>`).join('');
+  const cells = tot.map((t, m) => {
     const cls = ['hm-mo'];
     if (t.trades) cls.push(resultFromPnl(t.net));
     if (m === selMonth) cls.push('sel');
     return `
       <div class="${cls.join(' ')}" data-month="${m}" role="button" tabindex="0"
            aria-label="${abbr[m]} ${y}">
-        <div class="hm-mo-lbl">${abbr[m]}</div>
         <div class="hm-mo-count">${t.trades || ''}</div>
         <div class="hm-mo-pnl">${t.trades ? '$' + Math.abs(t.net).toFixed(2) : ''}</div>
       </div>`;
   }).join('');
+  host.innerHTML = names + cells;
 }
 
 function renderHeatmap() {
@@ -4048,8 +4116,8 @@ const IO = {
         // missing required fields is dropped rather than imported, so the rest
         // of the app doesn't need to defend against malformed objects coming
         // out of the persistence layer.
-        const validTrades   = data.trades.filter(IO._isValidTrade);
-        const validJournals = data.journals.filter(IO._isValidJournal);
+        const validTrades   = data.trades.filter(Schema.isValidTrade);
+        const validJournals = data.journals.filter(Schema.isValidJournal);
 
         State.trades   = validTrades;
         State.journals = validJournals;
@@ -4080,21 +4148,6 @@ const IO = {
     reader.readAsText(file);
   },
 
-  // Lightweight schema guards. Keep these in sync with Journal.save() and
-  // importRowsIntoState() — the shape they produce is the contract.
-  _isValidTrade(t) {
-    return t && typeof t === 'object'
-      && typeof t.id === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(t.id);
-  },
-  _isValidJournal(j) {
-    if (!j || typeof j !== 'object') return false;
-    if (typeof j.id      !== 'string' || !/^[A-Za-z0-9_\-]{1,64}$/.test(j.id))      return false;
-    if (typeof j.tradeId !== 'string' || !/^[A-Za-z0-9_\-]{1,64}$/.test(j.tradeId)) return false;
-    // If a P&L exists, it must be a finite number. NaN/Infinity/garbage rejected
-    // here so a corrupt backup can't poison every chart after restore.
-    if (j.pnl != null && j.pnl !== '' && safeNum(j.pnl) === null) return false;
-    return true;
-  }
 };
 
 // Append rows from an imported sheet straight into State.
@@ -4290,26 +4343,57 @@ const Cloud = {
       this.ready = true;
       this.subscribe();
       this.watch();
+      this.settle();
     } catch (e) {
       console.error('Doji Cloud: start failed', e);
       notify('⚠ Cloud sync failed — running on local copy.', true);
+      this.setStatus('error');
     }
   },
 
   // Cloud → local. Overwrites the localStorage cache with the cloud rows and
   // reboots app state through the normal load/migrate path so cloud data gets
   // the exact same treatment as locally-saved data.
+  // Cloud rows are not trusted. They arrive from another device running some
+  // other version of this app, and a bad migration or a truncated payload there
+  // would otherwise land in State unchecked — and then be pushed back up as if
+  // it were sound. Every record passes the same guard the import path uses.
+  // A payload that isn't even the right SHAPE (not an array) is refused
+  // outright and the local copy kept, because there is no partial reading of it
+  // that is safer than what is already on the device.
+  _sanitise(key, value) {
+    const guard = key === CONFIG.STORE.trades  ? Schema.isValidTrade
+                : key === CONFIG.STORE.journal ? Schema.isValidJournal
+                : null;
+    if (!guard) return { value, dropped: 0, refused: false };
+    if (!Array.isArray(value)) return { value: null, dropped: 0, refused: true };
+    const kept = value.filter(guard);
+    return { value: kept, dropped: value.length - kept.length, refused: false };
+  },
+
   async pull() {
     const { data, error } = await this.sb.from('app_state').select('key, value');
     if (error) throw error;
-    let touched = false;
+    let touched = false, dropped = 0, refused = 0;
     for (const row of (data || [])) {
       if (!Object.values(CONFIG.STORE).includes(row.key)) continue;
+      const clean = this._sanitise(row.key, row.value);
+      if (clean.refused) {
+        refused++;
+        console.error('Doji Cloud: refused malformed payload for ' + row.key);
+        continue;
+      }
+      dropped += clean.dropped;
       try {
-        localStorage.setItem(row.key, JSON.stringify(row.value));
+        localStorage.setItem(row.key, JSON.stringify(clean.value));
         touched = true;
       } catch (e) { console.error('Doji Cloud: cache write failed', e); }
     }
+    // Dropping records silently would be the worst of both worlds: the data is
+    // gone from this device either way, but only a visible warning gives the
+    // chance to restore from a backup before the pruned copy is pushed back up.
+    if (dropped) notify(`⚠ ${dropped} malformed record${dropped > 1 ? 's' : ''} skipped from cloud.`, true);
+    if (refused) notify('⚠ Cloud data unreadable — keeping local copy.', true);
     if (touched) {
       State.trades   = Storage.loadTrades();
       State.journals = Storage.loadJournals();
@@ -4340,11 +4424,14 @@ const Cloud = {
     this._dirty[key] = true;
     clearTimeout(this._pushTimers[key]);
     this._pushTimers[key] = setTimeout(async () => {
+      this.setStatus('busy');
       try {
         await this._flushKey(key);
+        this.settle();
       } catch (e) {
         console.error('Doji Cloud: push failed for ' + key, e);
         notify('⚠ Cloud save failed — data kept locally.', true);
+        this.setStatus('stale');   // the edit is safe locally, just not shared
       }
     }, 800);
   },
@@ -4407,6 +4494,7 @@ const Cloud = {
   _channel:        null,
   _channelDropped: false,
   _pollTimer:      0,
+  _status:         '',
 
   // A refresh rebuilds State and re-renders. Doing that under an open modal
   // would pull the ground out from under half-typed input, so a refresh that
@@ -4428,6 +4516,7 @@ const Cloud = {
     if (!force && now - this._lastRefresh < this.REFRESH_MIN_MS) return;
     this._refreshing  = true;
     this._lastRefresh = now;
+    this.setStatus('busy');
     try {
       // Unsent local edits go up before anything comes down. pull() overwrites
       // localStorage wholesale, so pulling first would erase a change that
@@ -4436,18 +4525,49 @@ const Cloud = {
       // again on the next signal rather than trading data for freshness.
       if (!await this._drain()) {
         console.warn('Doji Cloud: local changes still unsent — pull deferred');
+        this.setStatus('stale');
         return;
       }
       await this.pull();
       await BrokerSync.fetchPending();
+      this.settle();
     } catch (e) {
-      // Silent by design: a failed background refresh leaves the last good
-      // local copy on screen, and the next signal will try again. A toast on
-      // every flaky reconnect would be noise, not information.
+      // No toast: a failed background refresh leaves the last good local copy
+      // on screen and the next signal will retry, so interrupting for it would
+      // be noise. The dot carries it instead — visible if looked at, silent if
+      // not, which is the right weight for a recoverable background failure.
       console.error('Doji Cloud: refresh failed', e);
+      this.setStatus('error');
     } finally {
       this._refreshing = false;
     }
+  },
+
+  /* One writer for the status dot, so the indicator can't disagree with what
+     the sync layer actually did. Four states only:
+       busy   — a pull or push is in flight
+       ok     — everything this device has is confirmed in the cloud
+       stale  — local edits exist that haven't been accepted yet (offline, or a
+                push that failed); the data is safe here but not yet shared
+       error  — the last operation failed outright
+     Errors and staleness persist until something actually resolves them; they
+     are never cleared by a timer. */
+  setStatus(state) {
+    if (state === this._status) return;
+    this._status = state;
+    const el = $('sync-dot');
+    if (!el) return;
+    el.className = 'sync-dot ' + state;
+    const text = { busy:'Syncing', ok:'Synced', stale:'Unsaved changes', error:'Sync failed' }[state] || '';
+    el.title = text;
+    const lbl = el.querySelector('.sync-dot-label');
+    if (lbl) lbl.textContent = text;
+  },
+
+  // Derived rather than set by hand at each call site, so the dot always
+  // reflects the dirty set instead of whatever the last branch remembered.
+  settle() {
+    this.setStatus(Object.keys(this._dirty).length ? 'stale' : 'ok');
   },
 
   // Called by every modal on close.
