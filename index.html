@@ -1431,6 +1431,31 @@ tr.broker-pending td:first-child {
   .heatmap-cell-count-word { display:none; }
   .heatmap-cell-pnl   { font-size:9px; margin-top:2px; }
   body.pnl-open .heatmap-cell-count { font-size:7px; }
+
+  /* ── Corner counts (phone, P&L open) ────────────────────────────────────
+     A phone cell is roughly a third the area of a desktop one, and in P&L view
+     it was being asked to stack three things down its middle: the count, the
+     amount, and the identity label already sitting in the corner. Moving the
+     count to the OPPOSITE corner uses the two dead corners the cell already
+     had and leaves the centre to the amount alone — which is the figure being
+     scanned in this view anyway.
+     Applied only while the P&L section is open. With it closed the count is the
+     only thing in the cell, so it keeps the centre; nothing is gained by
+     pushing a lone number into a corner.
+     Position mirrors .heatmap-cell-day exactly — same offsets, opposite side —
+     so the two corner items sit on one line. Colour is untouched: these still
+     take the result palette, unlike the identity labels opposite them. */
+  body.pnl-open .heatmap-cell-count,
+  body.pnl-open .heatmap-week-count,
+  body.pnl-open .hm-mo-count {
+    position:absolute; top:4px; right:5px;
+    font-size:8px; min-height:0; margin:0;
+  }
+  /* The amount is now the sole occupant of the centre, so it can carry the
+     weight the count used to share. */
+  body.pnl-open .heatmap-cell-pnl,
+  body.pnl-open .heatmap-week-pnl,
+  body.pnl-open .hm-mo-pnl { font-size:10px; margin-top:0; }
   /* Eight columns on a phone: the week rail shrinks to the minimum that still
      fits its figures, and its separating margin comes in with it. */
   .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
@@ -1444,6 +1469,8 @@ tr.broker-pending td:first-child {
   .heatmap-week-count { font-size:8px; letter-spacing:0; }
   .heatmap-week-pnl   { font-size:8px; margin-top:2px; }
   body.pnl-open .heatmap-week-count { font-size:7px; }
+  .hm-mo-count { font-size:9px; }
+  .hm-mo-pnl   { font-size:9px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
      Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
