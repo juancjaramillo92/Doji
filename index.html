@@ -419,6 +419,16 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 }
 .pnl-stats { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; }
 
+/* The two blocks split the column's height evenly. Inside each, the title keeps
+   its pinned top position and its standard 12px rhythm, while the figure centres
+   in whatever height is left over — the auto margins take the slack above and
+   below in equal parts. Without this the figure sat hard against its title and
+   read high, since all the leftover height pooled at the bottom of the block. */
+.pnl-net > div { flex:1; min-height:0; display:flex; flex-direction:column; }
+.pnl-balance-number { margin-top:auto; }
+.pnl-balance-at     { margin-bottom:auto; }
+.pnl-net-number     { margin-top:auto; margin-bottom:auto; }
+
 /* Balance is a fact, not a verdict — it stays neutral while the net figure
    below it takes the win/loss colouring. It carries the same grey as every
    section title (--mt2), which is also .pnl-net-number's uncoloured state:
@@ -456,6 +466,24 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 }
 .pnl-stat-val.win  { color:var(--win); }
 .pnl-stat-val.loss { color:var(--loss); }
+
+/* Period rows carry two figures rather than one rate, so each needs its own
+   colour — a losing last week beside a winning current one is the whole point
+   of showing them together, and a single class on the row could not say that.
+   The period tags are deliberately quieter than the numbers: they are labels,
+   not data. Sized a step down from .pnl-stat-val so the pair still clears the
+   label on one line in the narrow half of the card. */
+.pnl-stat-pair { display:flex; align-items:baseline; gap:4px; white-space:nowrap; }
+.ps-tag {
+  font-family:var(--mono); font-size:7px; letter-spacing:.5px;
+  text-transform:uppercase; color:var(--mt);
+}
+.ps-fig { font-family:var(--mono); font-size:10px; font-weight:600; color:var(--mt2); }
+.ps-fig.win  { color:var(--win); }
+.ps-fig.loss { color:var(--loss); }
+/* Reads as "moved from → to". A hyphen here would sit against signed figures
+   and read as subtraction. */
+.ps-arrow { font-size:9px; color:var(--mt); margin:0 1px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    R:R BAR
@@ -509,6 +537,57 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
   font-family:var(--mono); font-size:11px; letter-spacing:1px; text-transform:uppercase;
   color:var(--mt2); font-weight:500;
 }
+
+/* ── Year strip ────────────────────────────────────────────────────────────
+   Twelve month cells above the day grid, assembled from exactly the same parts
+   as a day cell one zoom level down: result palette in the fill, trade count
+   above, P&L below it and hidden until the P&L section is open. Nothing new is
+   invented here — a month reads the way a day and a week already read, so the
+   three scales can be scanned without relearning anything.
+   The month currently open below takes the accent rule, which makes the strip
+   double as a position marker for the grid underneath it. */
+.heatmap-year {
+  display:grid; grid-template-columns:repeat(12,1fr); gap:var(--seg-gap);
+  margin-bottom:14px;
+}
+.hm-mo {
+  background:var(--glass-top), rgba(8,8,10,.55);
+  border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  box-shadow:var(--sh-2); box-sizing:border-box;
+  padding:7px 2px; min-height:52px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer;
+}
+.hm-mo.win  { background:var(--seg-win-bg); }
+.hm-mo.loss { background:var(--seg-loss-bg); }
+.hm-mo.be   { background:var(--seg-be-bg); }
+.hm-mo.win:hover  { background:rgba(59,165,133,.22); }
+.hm-mo.loss:hover { background:rgba(214,61,90,.22); }
+.hm-mo.be:hover   { background:rgba(144,144,160,.20); }
+.hm-mo.sel { border-color:var(--p); }
+.hm-mo-lbl {
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--mt);
+}
+/* Reserves its line whether or not the month traded, so an empty month keeps
+   the same height as a busy one and the strip stays a straight rule. */
+.hm-mo-count {
+  font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.5px;
+  color:var(--mt2); margin-top:4px; min-height:12px;
+}
+.hm-mo.win  .hm-mo-count { color:var(--win); }
+.hm-mo.loss .hm-mo-count { color:var(--loss); }
+.hm-mo.be   .hm-mo-count { color:rgba(170,170,185,1); }
+.hm-mo-pnl {
+  font-family:var(--mono); font-size:10px; font-weight:600; margin-top:2px;
+  color:var(--mt2);
+  display:none;                 /* revealed by body.pnl-open, same as day cells */
+}
+.hm-mo.win  .hm-mo-pnl { color:var(--win); }
+.hm-mo.loss .hm-mo-pnl { color:var(--loss); }
+.hm-mo.be   .hm-mo-pnl { color:rgba(170,170,185,1); }
+body.pnl-open .hm-mo-pnl   { display:block; }
+body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 /* Seven day columns plus a week-summary column, set apart from the grid by a
    margin so it reads as a separate rail rather than an eighth weekday. */
 .heatmap-grid {
@@ -984,13 +1063,6 @@ td.c   { text-align:center; }
  width:110px;
 }
 .jm-btn-cancel:hover { background:rgba(255,255,255,.08); border-color:var(--bd2); color:var(--tx); }
-.jm-btn-delete {
-  background:none; border:1px solid rgba(255,255,255,.15); color:var(--mt);
-  cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
-  text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
- width:110px;
-}
-.jm-btn-delete:hover { border-color:var(--loss); color:var(--loss); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    I/O MODAL
@@ -1225,6 +1297,11 @@ tr.broker-pending td:first-child {
   /* Companion boxes stack */
   .grid-2 { grid-template-columns:1fr; }
 
+  /* Twelve across is unreadable on a phone, so the year folds to two rows of
+     six — quarters still land in whole rows, and the cells stay tappable. */
+  .heatmap-year { grid-template-columns:repeat(6,1fr); }
+  .hm-mo { min-height:46px; padding:6px 2px; }
+
   /* ── Carousels ── */
   .period-row, .setup-donut-row, .emo-cat-row, .emo-during-grid {
     display:grid; grid-auto-flow:column; grid-auto-columns:100%;
@@ -1346,7 +1423,7 @@ tr.broker-pending td:first-child {
   .jf-setup-row { gap:10px; }
 
   .journal-form-actions { gap:8px; width:100%; }
-  .jm-btn-save, .jm-btn-cancel, .jm-btn-delete { width:auto; min-width:92px; padding:9px 14px; }
+  .jm-btn-save, .jm-btn-cancel { width:auto; min-width:92px; padding:9px 14px; }
 }
 </style>
 </head>
@@ -1400,8 +1477,16 @@ tr.broker-pending td:first-child {
                 <div class="pnl-stats-grid">
                   <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Profit</span><span id="pnl-gross-profit" class="pnl-stat-val">—</span></div>
                   <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Loss</span><span id="pnl-gross-loss" class="pnl-stat-val">—</span></div>
-                  <div class="pnl-stat"><span class="pnl-stat-lbl">Weekly Change</span><span id="pnl-week-change" class="pnl-stat-val">—</span></div>
-                  <div class="pnl-stat"><span class="pnl-stat-lbl">Monthly Change</span><span id="pnl-month-change" class="pnl-stat-val">—</span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Week</span><span class="pnl-stat-pair">
+                    <span class="ps-tag">LW</span><span id="pnl-week-prev"  class="ps-fig">—</span>
+                    <span class="ps-arrow">&rarr;</span>
+                    <span class="ps-tag">CW</span><span id="pnl-week-cur"   class="ps-fig">—</span>
+                  </span></div>
+                  <div class="pnl-stat"><span class="pnl-stat-lbl">Month</span><span class="pnl-stat-pair">
+                    <span class="ps-tag">LM</span><span id="pnl-month-prev" class="ps-fig">—</span>
+                    <span class="ps-arrow">&rarr;</span>
+                    <span class="ps-tag">CM</span><span id="pnl-month-cur"  class="ps-fig">—</span>
+                  </span></div>
                 </div>
               </div>
             </div>
@@ -2331,8 +2416,6 @@ function money(v) { return Math.abs(v).toFixed(2); }
 // inverted sign. A flat prior period has no baseline to measure against — that
 // returns null, which prints as a dash rather than a "0%" claiming the period
 // was unchanged when it is simply unmeasurable.
-function pctChange(cur, prev) { return prev === 0 ? null : (cur - prev) / Math.abs(prev) * 100; }
-
 // The single writer for every figure in this section and in the wheel money
 // columns. `sign` drives the colour, so the value's text and its colour can
 // never be derived from two different numbers.
@@ -2389,15 +2472,26 @@ function renderPnLCard(ft) {
   setFigure('pnl-net-number',   n ? money(round2(net))   : '—', net);
   setFigure('pnl-gross-profit', n ? money(round2(gross)) : '—', gross);
   setFigure('pnl-gross-loss',   n ? money(round2(-loss)) : '—', -loss);
-  setPct('pnl-week-change',  pctChange(round2(week),  round2(weekWas)));
-  setPct('pnl-month-change', pctChange(round2(month), round2(monthWas)));
+  // Both periods shown as money rather than as a percentage between them. A
+  // rate hides the size of what moved — +200% off a $2 week and +200% off a
+  // $200 week are the same number and not remotely the same event — and it
+  // breaks outright when the prior period is zero, which is most weeks early
+  // on. Two absolute figures carry the direction, the magnitude, and the base
+  // they moved from, and need no special case for an empty prior period.
+  setPeriodFigure('pnl-week-prev',  weekWas,  n);
+  setPeriodFigure('pnl-week-cur',   week,     n);
+  setPeriodFigure('pnl-month-prev', monthWas, n);
+  setPeriodFigure('pnl-month-cur',  month,    n);
 }
-// Change rates round to whole percent — a P&L swing measured to two decimals
-// implies a precision the sample size doesn't support. Unsigned like the money
-// figures, for the same reason: the colour already says which way it went.
-function setPct(id, pct) {
-  const v = pct === null ? null : Math.round(pct);
-  setFigure(id, v === null ? '—' : Math.abs(v) + '%', v);
+// Same money formatting as every other figure in the card, but writing into a
+// .ps-fig rather than a .pnl-stat-val, so each half of a pair colours itself.
+function setPeriodFigure(id, v, anyTrades) {
+  const el = $(id);
+  if (!el) return;
+  const amt = round2(v);
+  el.textContent = anyTrades ? money(amt) : '—';
+  el.classList.remove('win', 'loss');
+  if (anyTrades && amt) el.classList.add(amt > 0 ? 'win' : 'loss');
 }
 
 function renderCumulativeChart(ft) {
@@ -2651,6 +2745,7 @@ function ensureHeatmapStructure() {
   const host = $('calendar-heatmap');
   if (!host || host.dataset.ready) return;
   host.innerHTML = `
+    <div id="heatmap-year" class="heatmap-year"></div>
     <div class="heatmap-hdr">
       <button id="heatmap-prev" class="heatmap-nav-btn">&larr;</button>
       <span id="heatmap-title" class="heatmap-title"></span>
@@ -2672,6 +2767,14 @@ function ensureHeatmapStructure() {
   $('heatmap-grid').addEventListener('click', e => {
     const cell = e.target.closest('.heatmap-cell[data-day]');
     if (cell) openTradeForDay(cell.dataset.day);
+  });
+  // Clicking a month in the year strip opens that month below. Delegated on the
+  // strip for the same reason as the grid — only its innerHTML is replaced.
+  $('heatmap-year').addEventListener('click', e => {
+    const cell = e.target.closest('.hm-mo[data-month]');
+    if (!cell) return;
+    State.cal.heatmap.m = Number(cell.dataset.month);
+    renderHeatmap();
   });
 }
 // Opens the journal for a calendar day. A single trade opens its entry
@@ -2739,18 +2842,67 @@ function openDayPopup(isoDay, trades) {
   modal.setAttribute('aria-hidden', 'false');
 }
 
-function closeDayPopup() {
-  const modal = $('day-modal');
-  if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('aria-hidden', 'true');
-  Cloud.flushDeferred();   // run any sync held back while this was open
+/* Every modal closes through here. Behaviour that must run on close is
+   declared once instead of being copied into each modal's own handler, where a
+   modal added later would quietly miss it — draining a sync that was held back
+   while the modal held the screen is the current example, and it is exactly the
+   kind of thing that gets forgotten. Callers keep whatever extra work is
+   specific to them; only the shell is shared. */
+function closeModalShell(id) {
+  const m = $(id);
+  if (!m) return;
+  m.classList.remove('open');
+  m.setAttribute('aria-hidden', 'true');
+  Cloud.flushDeferred();
 }
+
+function closeDayPopup() { closeModalShell('day-modal'); }
+// One pass over the trade set for the whole year, rather than twelve calls to
+// monthTotals(). Counting semantics are deliberately identical to it — a trade
+// counts toward its month whether or not it has been journaled, while only a
+// journaled P&L moves the net — so the strip can never disagree with the month
+// stats it sits above.
+function yearTotals(y) {
+  const out = Array.from({ length: 12 }, () => ({ trades: 0, net: 0 }));
+  const prefix = String(y) + '-';
+  for (const t of State.trades) {
+    if (!t.openTime || !t.openTime.startsWith(prefix)) continue;
+    const m = Number(t.openTime.slice(5, 7)) - 1;
+    if (!(m >= 0 && m < 12)) continue;
+    out[m].trades++;
+    const j = journalForTrade(t);
+    const v = j ? safeNum(j.pnl) : null;
+    if (v !== null) out[m].net += v;
+  }
+  for (const o of out) o.net = round2(o.net);
+  return out;
+}
+
+function renderHeatmapYear(y, selMonth) {
+  const host = $('heatmap-year');
+  if (!host) return;
+  const abbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const tot  = yearTotals(y);
+  host.innerHTML = tot.map((t, m) => {
+    const cls = ['hm-mo'];
+    if (t.trades) cls.push(resultFromPnl(t.net));
+    if (m === selMonth) cls.push('sel');
+    return `
+      <div class="${cls.join(' ')}" data-month="${m}" role="button" tabindex="0"
+           aria-label="${abbr[m]} ${y}">
+        <div class="hm-mo-lbl">${abbr[m]}</div>
+        <div class="hm-mo-count">${t.trades || ''}</div>
+        <div class="hm-mo-pnl">${t.trades ? '$' + Math.abs(t.net).toFixed(2) : ''}</div>
+      </div>`;
+  }).join('');
+}
+
 function renderHeatmap() {
   ensureHeatmapStructure();
   const cur = State.cal.heatmap;
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   $('heatmap-title').textContent = `${months[cur.m]} ${cur.y}`;
+  renderHeatmapYear(cur.y, cur.m);
 
   // Saturday never trades — the journal's week runs Sunday → Friday close — so
   // on a phone it is dropped, handing its width to the six days that matter and
@@ -3354,11 +3506,9 @@ const Journal = {
   },
 
   close() {
-    $('journal-modal').classList.remove('open');
-    $('journal-modal').setAttribute('aria-hidden', 'true');
+    closeModalShell('journal-modal');
     document.body.style.overflow = '';
     renderTrades();
-    Cloud.flushDeferred();   // run any sync held back while this was open
   },
 
   save() {
@@ -3437,15 +3587,6 @@ const Journal = {
     Storage.saveTradesAndJournals();
     Journal.close();
     notify('Entry saved');
-  },
-
-  delete(id) {
-    const j = State.journals.find(x => x.id === id);
-    if (!j) return;
-    // No confirm dialog — close the modal and stage an undoable delete; the
-    // toast offers a CONFIG.UNDO_MS window to reverse it (see PendingDelete).
-    Journal.close();
-    PendingDelete.stage(j.tradeId);
   }
 };
 
@@ -3490,12 +3631,14 @@ function renderJournalForm(existing) {
       <label class="jf-pill-lbl" for="${id}">${escHtml(s)}</label>`;
   }).join('');
 
-  const buttons = Journal.editingId
-    ? `<button class="jm-btn-save"   data-jm-action="save">Save</button>
-       <button class="jm-btn-cancel" data-jm-action="cancel">Cancel</button>
-       <button class="jm-btn-delete" data-jm-action="delete">Delete</button>`
-    : `<button class="jm-btn-save"   data-jm-action="save">Save</button>
-       <button class="jm-btn-cancel" data-jm-action="cancel">Cancel</button>`;
+  // Save and Cancel only, editing or not. Delete used to sit third here, one
+  // button away from Cancel and similar enough to hit by accident — a
+  // destructive action should not share a row with the way out of a dialog.
+  // Deleting is now solely the ✕ in the trade log, which is deliberate to reach
+  // and still carries the Undo window (see PendingDelete).
+  const buttons =
+    `<button class="jm-btn-save"   data-jm-action="save">Save</button>
+     <button class="jm-btn-cancel" data-jm-action="cancel">Cancel</button>`;
 
   return `
     <div class="journal-form">
@@ -3650,12 +3793,9 @@ const IO = {
     m.setAttribute('aria-hidden', 'false');
   },
   closeModal() {
-    const m = $('io-modal');
-    m.classList.remove('open');
-    m.setAttribute('aria-hidden', 'true');
+    closeModalShell('io-modal');
     const status = $('io-import-status');
     if (status) { status.textContent = ''; status.className = 'io-import-status'; }
-    Cloud.flushDeferred();   // run any sync held back while this was open
   },
 
   // Inject a clickable <a download> into the section so the user can save it.
@@ -4110,29 +4250,67 @@ const Cloud = {
       State.journals = Storage.loadJournals();
       migrateData();
       rebuildJournalIndex();
+      // A background pull rebuilds the entire log, which can shorten the
+      // document and drop the viewport out from under whatever was being read.
+      // Reading the position immediately around a synchronous render leaves no
+      // window in which the user could have scrolled themselves, so restoring
+      // it can never fight them — and it only acts if the render actually moved
+      // them. Clamped, since the new document may genuinely be shorter.
+      const y = window.scrollY;
       renderTrades();
+      if (window.scrollY !== y) {
+        const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo(0, Math.min(y, max));
+      }
     }
   },
 
   // Local → cloud, debounced per key so a burst of edits lands as one upsert.
   push(key) {
     if (!this.ready) return;
+    // Marked dirty the moment a save is queued, not when it succeeds. That
+    // covers both halves of the same hazard: a write still sitting in the
+    // debounce timer, and a write that fired and failed. Either way the local
+    // copy is ahead of the cloud, and refresh() must not pull over it.
+    this._dirty[key] = true;
     clearTimeout(this._pushTimers[key]);
     this._pushTimers[key] = setTimeout(async () => {
-      const stamp = new Date().toISOString();
       try {
-        const value = JSON.parse(localStorage.getItem(key) ?? 'null');
-        const { error } = await this.sb.from('app_state')
-          .upsert({ key, value, updated_at: stamp });
-        if (error) throw error;
-        // Remembered so the realtime echo of this very write is recognised as
-        // our own and doesn't trigger a pointless pull. See _onRemoteState.
-        this._lastPushAt[key] = Date.parse(stamp);
+        await this._flushKey(key);
       } catch (e) {
         console.error('Doji Cloud: push failed for ' + key, e);
         notify('⚠ Cloud save failed — data kept locally.', true);
       }
     }, 800);
+  },
+
+  // The single write path. Immediate and undebounced — push() schedules it,
+  // _drain() retries it. Clears the dirty flag only on a confirmed write.
+  async _flushKey(key) {
+    const stamp = new Date().toISOString();
+    const value = JSON.parse(localStorage.getItem(key) ?? 'null');
+    const { error } = await this.sb.from('app_state')
+      .upsert({ key, value, updated_at: stamp });
+    if (error) throw error;
+    // Remembered so the realtime echo of this very write is recognised as
+    // our own and doesn't trigger a pointless pull. See _onRemoteState.
+    this._lastPushAt[key] = Date.parse(stamp);
+    delete this._dirty[key];
+  },
+
+  // Sends everything the cloud hasn't confirmed yet. Returns true only when
+  // nothing is left outstanding — the caller uses that to decide whether a
+  // pull is safe.
+  async _drain() {
+    for (const key of Object.keys(this._dirty)) {
+      clearTimeout(this._pushTimers[key]);   // this supersedes any queued write
+      try {
+        await this._flushKey(key);
+      } catch (e) {
+        console.error('Doji Cloud: retry failed for ' + key, e);
+      }
+    }
+    return Object.keys(this._dirty).length === 0;
   },
 
   /* ─── Live sync ─────────────────────────────────────────────────────────
@@ -4160,6 +4338,7 @@ const Cloud = {
   _deferred:       false,
   _lastRefresh:    0,
   _lastPushAt:     Object.create(null),
+  _dirty:          Object.create(null),   // keys written locally, not yet confirmed
   _channel:        null,
   _channelDropped: false,
 
@@ -4184,6 +4363,15 @@ const Cloud = {
     this._refreshing  = true;
     this._lastRefresh = now;
     try {
+      // Unsent local edits go up before anything comes down. pull() overwrites
+      // localStorage wholesale, so pulling first would erase a change that
+      // never reached the cloud — silently, with nothing left to recover from.
+      // If the drain can't clear (still offline), keep the local copy and try
+      // again on the next signal rather than trading data for freshness.
+      if (!await this._drain()) {
+        console.warn('Doji Cloud: local changes still unsent — pull deferred');
+        return;
+      }
       await this.pull();
       await BrokerSync.fetchPending();
     } catch (e) {
@@ -4263,7 +4451,14 @@ const Cloud = {
   // wasted pull after every single save. The write's own timestamp is exact
   // and survives the trip intact, so that is what identifies it.
   _onRemoteState(row) {
-    if (!row || !row.key) return;
+    // An unreadable payload still means something changed. Realtime replaces
+    // the record with an error stub once it exceeds max_record_bytes (1MB by
+    // default), and DELETEs arrive with an empty `new` — in both cases there is
+    // no key to inspect. Returning early there would have gone quiet exactly as
+    // the journal grew large enough to matter, so fall through to a refresh and
+    // let the debounce absorb any burst. The row is only ever read to recognise
+    // our own echo; the data itself always comes from pull().
+    if (!row || !row.key) { this.refresh(); return; }
     if (!Object.values(CONFIG.STORE).includes(row.key)) return;
     const mine = this._lastPushAt[row.key];
     if (mine && row.updated_at && Date.parse(row.updated_at) === mine) return; // own echo
@@ -4629,7 +4824,7 @@ function wireEvents() {
     if (!action) return;
     if (action === 'save')   Journal.save();
     if (action === 'cancel') Journal.close();
-    if (action === 'delete') Journal.delete(Journal.editingId);
+    // 'delete' is intentionally absent — the journal modal no longer offers it.
   });
 
   /* Journal header: session pill, date pill, calendar grid */
