@@ -1941,7 +1941,9 @@ const Storage = {
   loadTrades()    { return safeJSON(CONFIG.STORE.trades,  []); },
   loadJournals()  { return safeJSON(CONFIG.STORE.journal, []); },
 
-  saveTradesAndJournals() {
+  // Cache + indexes only, no cloud. Used when applying rows that just CAME from
+  // the cloud: saving them the normal way would push them straight back up.
+  persistLocal() {
     rebuildIndexes();
     try {
       localStorage.setItem(CONFIG.STORE.trades,  JSON.stringify(State.trades));
@@ -1949,8 +1951,11 @@ const Storage = {
     } catch (e) {
       notify('⚠ Storage full — export a JSON backup now.', true);
     }
-    Cloud.push(CONFIG.STORE.trades);
-    Cloud.push(CONFIG.STORE.journal);
+  },
+
+  saveTradesAndJournals() {
+    this.persistLocal();
+    Cloud.pushRecords();
   }
 };
 function safeJSON(key, fallback) {
@@ -4293,6 +4298,45 @@ const Cloud = {
   ready: false,
   _pushTimers: Object.create(null),
 
+  /* ─── Per-record sync ────────────────────────────────────────────────────
+     The cloud holds one row per trade and per journal rather than one row
+     holding every trade. Two devices editing different entries therefore write
+     different rows and stop overwriting each other — which whole-blob sync
+     could not avoid, since any edit rewrote the entire array.
+
+     Three pieces make it work:
+
+     SHADOW — a snapshot of what the cloud last confirmed, kept per record.
+       Comparing State against it is what identifies exactly which records
+       changed, so a save uploads only those. A record present in the shadow but
+       gone from State is a deletion, which is how tombstones get raised without
+       the app having to remember that it deleted something.
+
+     CURSOR — the newest updated_at this device has seen. Pulls ask only for
+       rows newer than it, so a refresh downloads what changed instead of the
+       whole journal. It grows every month you trade; this keeps it flat.
+
+     TOMBSTONES — deletes are a flag, never a row removal. See the SQL comment
+       in supabase/001_records.sql: without them a delete on one device is
+       undone by any other device that still holds the record.
+
+     Conflicts are still last-write-wins, but now per record rather than per
+     array — the same entry edited on two devices at once still resolves one
+     way, which for a single trader is the right trade-off.
+     ─────────────────────────────────────────────────────────────────────── */
+  TABLE:      'records',
+  SHADOW_KEY: 'doji_sync_shadow_v1',
+  CURSOR_KEY: 'doji_sync_cursor_v1',
+  PAGE:       1000,          // PostgREST default ceiling; pulls page past it
+  // The legacy blob keys keep being written as a rollback point. They are never
+  // read once records exist, so they cost one small write per save and buy the
+  // ability to drop back to the previous version of the app at any time.
+  MIRROR_LEGACY_BLOBS: true,
+
+  _uid:    null,
+  _shadow: { trade: Object.create(null), journal: Object.create(null) },
+  _cursor: '',
+
   configured() {
     return typeof window.supabase !== 'undefined'
         && CLOUD_CONFIG.URL && !CLOUD_CONFIG.URL.includes('YOUR-')
@@ -4324,7 +4368,16 @@ const Cloud = {
   async start() {
     Login.hide();
     try {
-      await this.pull();
+      // Every row is stamped with its owner and the primary key includes it, so
+      // the user id has to be known before anything can be written.
+      const { data: u, error: uerr } = await this.sb.auth.getUser();
+      if (uerr || !u || !u.user) throw uerr || new Error('no authenticated user');
+      this._uid = u.user.id;
+
+      this._loadSync();
+      // First run on this account moves the old blobs across. Afterwards this is
+      // a single cheap count that returns immediately.
+      if (!await this._migrateIfNeeded()) await this.pull();
       await BrokerSync.fetchPending();
       this.ready = true;
       this.subscribe();
@@ -4357,7 +4410,217 @@ const Cloud = {
     return { value: kept, dropped: value.length - kept.length, refused: false };
   },
 
+  /* ─── Shadow + cursor persistence ─────────────────────────────────────── */
+  _loadSync() {
+    try {
+      const sh = JSON.parse(localStorage.getItem(this.SHADOW_KEY) || 'null');
+      if (sh && sh.trade && sh.journal) this._shadow = sh;
+    } catch (e) { /* corrupt shadow just means a full re-push; not fatal */ }
+    try { this._cursor = localStorage.getItem(this.CURSOR_KEY) || ''; } catch (e) {}
+  },
+  _saveSync() {
+    try {
+      localStorage.setItem(this.SHADOW_KEY, JSON.stringify(this._shadow));
+      localStorage.setItem(this.CURSOR_KEY, this._cursor);
+    } catch (e) { console.error('Doji Cloud: sync bookkeeping write failed', e); }
+  },
+  // Timestamps are compared as parsed dates, not strings: Postgres may hand
+  // back a different but equivalent ISO format than the one we stored.
+  _advanceCursor(ts) {
+    if (!ts) return;
+    if (!this._cursor || Date.parse(ts) > Date.parse(this._cursor)) this._cursor = ts;
+  },
+
+  /* ─── Diff: what has changed since the cloud last confirmed anything ───── */
+  _changedRows() {
+    const live = {
+      trade:   new Map(State.trades.map(t   => [t.id, t])),
+      journal: new Map(State.journals.map(j => [j.id, j]))
+    };
+    const rows = [];
+    for (const kind of ['trade', 'journal']) {
+      for (const [id, rec] of live[kind]) {
+        // JSON comparison is exact and cheap. Key order is stable because
+        // every record is built by the same code path.
+        if (this._shadow[kind][id] !== JSON.stringify(rec))
+          rows.push({ user_id: this._uid, kind, rec_id: id, data: rec, deleted: false });
+      }
+      for (const id of Object.keys(this._shadow[kind])) {
+        // Known to the cloud, gone from State, not already tombstoned.
+        if (this._shadow[kind][id] !== null && !live[kind].has(id))
+          rows.push({ user_id: this._uid, kind, rec_id: id, data: {}, deleted: true });
+      }
+    }
+    return rows;
+  },
+
+  /* ─── Local → cloud ───────────────────────────────────────────────────── */
+  pushRecords() {
+    if (!this.ready) return;
+    // Marked dirty the moment a save is queued, not when it succeeds — that
+    // covers both a write still sitting in the debounce timer and one that
+    // fired and failed. Either way local is ahead, and refresh() must not pull
+    // over it. See _drain().
+    this._dirty.records = true;
+    clearTimeout(this._pushTimers.records);
+    this._pushTimers.records = setTimeout(async () => {
+      this.setStatus('busy');
+      try {
+        await this._flushRecords();
+        this.settle();
+      } catch (e) {
+        console.error('Doji Cloud: record push failed', e);
+        notify('⚠ Cloud save failed — data kept locally.', true);
+        this.setStatus('stale');   // safe on this device, just not shared yet
+      }
+    }, 800);
+  },
+
+  // The single write path. Immediate and undebounced; pushRecords() schedules
+  // it and _drain() retries it. The shadow advances only on a confirmed write,
+  // so a failure leaves the records marked as still needing to go up.
+  async _flushRecords() {
+    const rows = this._changedRows();
+    if (rows.length) {
+      const { data, error } = await this.sb.from(this.TABLE)
+        .upsert(rows, { onConflict: 'user_id,kind,rec_id' })
+        .select('kind, rec_id, updated_at');
+      if (error) throw error;
+      for (const r of rows)
+        this._shadow[r.kind][r.rec_id] = r.deleted ? null : JSON.stringify(r.data);
+      // Advancing from the server's own timestamps means the next pull will not
+      // hand our own writes straight back to us.
+      for (const r of (data || [])) this._advanceCursor(r.updated_at);
+      this._saveSync();
+    }
+    if (this.MIRROR_LEGACY_BLOBS) await this._mirrorBlobs();
+    delete this._dirty.records;
+  },
+
+  // Rollback insurance, not a sync path. Nothing reads these once records
+  // exist; they let the previous version of the app boot with current data.
+  async _mirrorBlobs() {
+    const stamp = new Date().toISOString();
+    const { error } = await this.sb.from('app_state').upsert([
+      { key: CONFIG.STORE.trades,  value: State.trades,   updated_at: stamp },
+      { key: CONFIG.STORE.journal, value: State.journals, updated_at: stamp }
+    ]);
+    if (error) throw error;
+    this._lastPushAt[CONFIG.STORE.trades]  = Date.parse(stamp);
+    this._lastPushAt[CONFIG.STORE.journal] = Date.parse(stamp);
+  },
+
+  /* ─── Cloud → local ───────────────────────────────────────────────────── */
+  // Pages past the PostgREST row ceiling, ordered by updated_at so the cursor
+  // can be advanced safely even if a later page fails.
+  async _fetchSince(cursor) {
+    const out = [];
+    for (let from = 0; ; from += this.PAGE) {
+      let q = this.sb.from(this.TABLE)
+        .select('kind, rec_id, data, deleted, updated_at')
+        .order('updated_at', { ascending: true })
+        .range(from, from + this.PAGE - 1);
+      if (cursor) q = q.gt('updated_at', cursor);
+      const { data, error } = await q;
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < this.PAGE) return out;
+    }
+  },
+
+  // Applies remote rows onto State. The shadow is updated in the same pass, so
+  // a record that just arrived is never diffed back out as a local change.
+  _applyRows(rows) {
+    const live = {
+      trade:   new Map(State.trades.map(t   => [t.id, t])),
+      journal: new Map(State.journals.map(j => [j.id, j]))
+    };
+    const guard = { trade: Schema.isValidTrade, journal: Schema.isValidJournal };
+    let dropped = 0, touched = false;
+
+    for (const r of rows) {
+      this._advanceCursor(r.updated_at);
+      if (!live[r.kind]) continue;                       // unknown kind: ignore
+      if (r.deleted) {
+        if (live[r.kind].delete(r.rec_id)) touched = true;
+        this._shadow[r.kind][r.rec_id] = null;
+        continue;
+      }
+      // Records arrive from another device running some other version of this
+      // app. A bad migration there must not land here unchecked and then be
+      // pushed back as if it were sound.
+      if (!guard[r.kind](r.data)) { dropped++; continue; }
+      live[r.kind].set(r.rec_id, r.data);
+      this._shadow[r.kind][r.rec_id] = JSON.stringify(r.data);
+      touched = true;
+    }
+
+    if (dropped) notify(`⚠ ${dropped} malformed record${dropped > 1 ? 's' : ''} skipped from cloud.`, true);
+    if (!touched) { this._saveSync(); return false; }
+
+    State.trades   = [...live.trade.values()];
+    State.journals = [...live.journal.values()];
+    migrateData();
+    Storage.persistLocal();     // local only — these rows came FROM the cloud
+    this._saveSync();
+    return true;
+  },
+
   async pull() {
+    const rows = await this._fetchSince(this._cursor);
+    if (!rows.length) return;
+    if (!this._applyRows(rows)) return;
+    // A background pull rebuilds the entire log, which can shorten the document
+    // and drop the viewport out from under whatever was being read. Reading the
+    // position immediately around a synchronous render leaves no window in
+    // which the user could have scrolled themselves, so restoring it can never
+    // fight them — and it only acts if the render actually moved them. Clamped,
+    // since the new document may genuinely be shorter.
+    const y = window.scrollY;
+    renderTrades();
+    if (window.scrollY !== y) {
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo(0, Math.min(y, max));
+    }
+  },
+
+  /* ─── One-time migration off the blob keys ────────────────────────────── */
+  // Runs when the records table is empty. Reads whatever the old blob keys
+  // hold, then uploads every record individually. Idempotent: once a single
+  // record row exists this never runs again, and re-running it against the
+  // same data produces identical rows.
+  async _migrateIfNeeded() {
+    const { count, error } = await this.sb.from(this.TABLE)
+      .select('rec_id', { count: 'exact', head: true });
+    if (error) throw error;
+    if (count) return false;
+
+    await this._pullLegacyBlobs();     // a fresh device may hold nothing locally
+    if (!State.trades.length && !State.journals.length) return false;
+
+    // Empty shadow means the diff below sees every record as new.
+    this._shadow = { trade: Object.create(null), journal: Object.create(null) };
+    await this._flushRecords();
+    console.info(`Doji: migrated ${State.trades.length} trades and ${State.journals.length} journals to per-record sync.`);
+    return true;
+  },
+
+  /* ─── Legacy blob reader ──────────────────────────────────────────────── */
+  // Only used by the migration above and as the fallback if the records table
+  // is unreachable. Cloud rows are not trusted: every record passes the same
+  // guard the import path uses, and a payload that isn't even the right SHAPE
+  // is refused outright in favour of the local copy.
+  _sanitise(key, value) {
+    const guard = key === CONFIG.STORE.trades  ? Schema.isValidTrade
+                : key === CONFIG.STORE.journal ? Schema.isValidJournal
+                : null;
+    if (!guard) return { value, dropped: 0, refused: false };
+    if (!Array.isArray(value)) return { value: null, dropped: 0, refused: true };
+    const kept = value.filter(guard);
+    return { value: kept, dropped: value.length - kept.length, refused: false };
+  },
+
+  async _pullLegacyBlobs() {
     const { data, error } = await this.sb.from('app_state').select('key, value');
     if (error) throw error;
     let touched = false, dropped = 0, refused = 0;
@@ -4375,9 +4638,6 @@ const Cloud = {
         touched = true;
       } catch (e) { console.error('Doji Cloud: cache write failed', e); }
     }
-    // Dropping records silently would be the worst of both worlds: the data is
-    // gone from this device either way, but only a visible warning gives the
-    // chance to restore from a backup before the pruned copy is pushed back up.
     if (dropped) notify(`⚠ ${dropped} malformed record${dropped > 1 ? 's' : ''} skipped from cloud.`, true);
     if (refused) notify('⚠ Cloud data unreadable — keeping local copy.', true);
     if (touched) {
@@ -4385,70 +4645,21 @@ const Cloud = {
       State.journals = Storage.loadJournals();
       migrateData();
       rebuildIndexes();
-      // A background pull rebuilds the entire log, which can shorten the
-      // document and drop the viewport out from under whatever was being read.
-      // Reading the position immediately around a synchronous render leaves no
-      // window in which the user could have scrolled themselves, so restoring
-      // it can never fight them — and it only acts if the render actually moved
-      // them. Clamped, since the new document may genuinely be shorter.
-      const y = window.scrollY;
-      renderTrades();
-      if (window.scrollY !== y) {
-        const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-        window.scrollTo(0, Math.min(y, max));
-      }
     }
   },
 
-  // Local → cloud, debounced per key so a burst of edits lands as one upsert.
-  push(key) {
-    if (!this.ready) return;
-    // Marked dirty the moment a save is queued, not when it succeeds. That
-    // covers both halves of the same hazard: a write still sitting in the
-    // debounce timer, and a write that fired and failed. Either way the local
-    // copy is ahead of the cloud, and refresh() must not pull over it.
-    this._dirty[key] = true;
-    clearTimeout(this._pushTimers[key]);
-    this._pushTimers[key] = setTimeout(async () => {
-      this.setStatus('busy');
-      try {
-        await this._flushKey(key);
-        this.settle();
-      } catch (e) {
-        console.error('Doji Cloud: push failed for ' + key, e);
-        notify('⚠ Cloud save failed — data kept locally.', true);
-        this.setStatus('stale');   // the edit is safe locally, just not shared
-      }
-    }, 800);
-  },
-
-  // The single write path. Immediate and undebounced — push() schedules it,
-  // _drain() retries it. Clears the dirty flag only on a confirmed write.
-  async _flushKey(key) {
-    const stamp = new Date().toISOString();
-    const value = JSON.parse(localStorage.getItem(key) ?? 'null');
-    const { error } = await this.sb.from('app_state')
-      .upsert({ key, value, updated_at: stamp });
-    if (error) throw error;
-    // Remembered so the realtime echo of this very write is recognised as
-    // our own and doesn't trigger a pointless pull. See _onRemoteState.
-    this._lastPushAt[key] = Date.parse(stamp);
-    delete this._dirty[key];
-  },
-
-  // Sends everything the cloud hasn't confirmed yet. Returns true only when
-  // nothing is left outstanding — the caller uses that to decide whether a
-  // pull is safe.
+  // Sends everything the cloud has not confirmed yet. Returns true only when
+  // nothing is left outstanding — refresh() uses that to decide whether a pull
+  // is safe, since pulling over an unsent local edit would erase it silently.
   async _drain() {
-    for (const key of Object.keys(this._dirty)) {
-      clearTimeout(this._pushTimers[key]);   // this supersedes any queued write
-      try {
-        await this._flushKey(key);
-      } catch (e) {
-        console.error('Doji Cloud: retry failed for ' + key, e);
-      }
+    if (!this._dirty.records) return true;
+    clearTimeout(this._pushTimers.records);   // this supersedes any queued write
+    try {
+      await this._flushRecords();
+    } catch (e) {
+      console.error('Doji Cloud: retry failed', e);
     }
-    return Object.keys(this._dirty).length === 0;
+    return !this._dirty.records;
   },
 
   /* ─── Live sync ─────────────────────────────────────────────────────────
@@ -4615,8 +4826,8 @@ const Cloud = {
         { event: 'INSERT', schema: 'public', table: 'broker_fills' },
         payload => { try { BrokerSync.ingest(payload.new); } catch (e) { console.error(e); } })
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'app_state' },
-        payload => { try { this._onRemoteState(payload.new); } catch (e) { console.error(e); } })
+        { event: '*', schema: 'public', table: 'records' },
+        payload => { try { this._onRemoteRecord(payload.new); } catch (e) { console.error(e); } })
       .subscribe(status => {
         if (status === 'SUBSCRIBED') {
           // Re-joined after a drop. Everything that changed while the socket
@@ -4631,23 +4842,22 @@ const Cloud = {
       });
   },
 
-  // Every push echoes back to its own author. Comparing payloads can't tell
-  // the echo apart: Postgres normalises jsonb key order, so the round-trip is
-  // equal in meaning but not as a string, and a byte compare would fire a
-  // wasted pull after every single save. The write's own timestamp is exact
-  // and survives the trip intact, so that is what identifies it.
-  _onRemoteState(row) {
-    // An unreadable payload still means something changed. Realtime replaces
-    // the record with an error stub once it exceeds max_record_bytes (1MB by
-    // default), and DELETEs arrive with an empty `new` — in both cases there is
-    // no key to inspect. Returning early there would have gone quiet exactly as
-    // the journal grew large enough to matter, so fall through to a refresh and
-    // let the debounce absorb any burst. The row is only ever read to recognise
-    // our own echo; the data itself always comes from pull().
-    if (!row || !row.key) { this.refresh(); return; }
-    if (!Object.values(CONFIG.STORE).includes(row.key)) return;
-    const mine = this._lastPushAt[row.key];
-    if (mine && row.updated_at && Date.parse(row.updated_at) === mine) return; // own echo
+  // Every write echoes back to its own author. With per-record rows the echo is
+  // identifiable exactly: if the incoming row already matches this device's
+  // shadow, this device is what put it there and re-pulling would be wasted
+  // work. A tombstone already known about is the same case.
+  //
+  // An unreadable payload still means something changed — realtime substitutes
+  // an error stub past max_record_bytes, and deletes arrive with an empty `new`.
+  // Falling through to a refresh there keeps the app from going quiet exactly as
+  // the data grows large enough to matter; the debounce absorbs any burst.
+  _onRemoteRecord(row) {
+    if (!row || !row.kind || !row.rec_id) { this.refresh(); return; }
+    const known = this._shadow[row.kind];
+    if (!known) return;
+    const mine = known[row.rec_id];
+    if (row.deleted) { if (mine === null) return; }
+    else if (mine !== undefined && mine === JSON.stringify(row.data)) return;   // own echo
     this.refresh({ force: true });
   }
 };
