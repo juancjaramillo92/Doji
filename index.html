@@ -1430,52 +1430,6 @@ tr.broker-pending td:first-child {
   .heatmap-cell-count { font-size:8px; letter-spacing:0; }
   .heatmap-cell-count-word { display:none; }
   .heatmap-cell-pnl   { font-size:9px; margin-top:2px; }
-  body.pnl-open .heatmap-cell-count { font-size:7px; }
-
-  /* ── Corner counts (phone, P&L open) ────────────────────────────────────
-     A phone cell is roughly a third the area of a desktop one, and in P&L view
-     it was being asked to stack three things down its middle: the count, the
-     amount, and the identity label already sitting in the corner. Moving the
-     count to the OPPOSITE corner uses the two dead corners the cell already
-     had and leaves the centre to the amount alone — which is the figure being
-     scanned in this view anyway.
-     Applied only while the P&L section is open. With it closed the count is the
-     only thing in the cell, so it keeps the centre; nothing is gained by
-     pushing a lone number into a corner.
-     Position mirrors .heatmap-cell-day exactly — same offsets, opposite side —
-     so the two corner items sit on one line. Colour is untouched: these still
-     take the result palette, unlike the identity labels opposite them. */
-     Each count mirrors ITS OWN label rather than sharing one set of offsets:
-     day and week labels drop to 8px at top:4/left:5 on a phone, while the month
-     label stays at 10px and top:6/left:8 because month cells keep more room.
-     One shared rule put the counts at the day offsets in every cell, which is
-     why the month numbers sat high and small against their names. */
-  body.pnl-open .heatmap-cell-count,
-  body.pnl-open .heatmap-week-count {
-    position:absolute; top:4px; right:5px;
-    font-size:8px; min-height:0; margin:0;
-  }
-  body.pnl-open .hm-mo-count {
-    position:absolute; top:6px; right:8px;
-    font-size:10px; min-height:0; margin:0;
-  }
-
-  /* The amount is the sole occupant of the centre now, so it can carry the
-     weight the count used to share. */
-  body.pnl-open .heatmap-cell-pnl,
-  body.pnl-open .heatmap-week-pnl,
-  body.pnl-open .hm-mo-pnl { font-size:10px; margin-top:0; }
-
-  /* ── Centring the amount BELOW the label row ────────────────────────────
-     The labels are absolutely positioned, so they take no space in the flow —
-     which means the amount was centring against the whole cell and drifting up
-     under the label instead of sitting in the gap beneath it. Reserving the
-     label row as padding moves the centring axis down to where the empty space
-     actually is. Each value is that cell's label offset plus its text height,
-     minus the padding the cell already has. */
-  body.pnl-open .heatmap-cell-body { padding-top:10px; }
-  body.pnl-open .heatmap-week      { padding-top:14px; }
-  body.pnl-open .hm-mo             { padding-top:18px; }
   /* Eight columns on a phone: the week rail shrinks to the minimum that still
      fits its figures, and its separating margin comes in with it. */
   .heatmap-grid { grid-template-columns:repeat(7,1fr) minmax(34px,.62fr); gap:2px; }
@@ -1488,13 +1442,51 @@ tr.broker-pending td:first-child {
   .heatmap-dow-week   { font-size:7px; letter-spacing:0; }
   .heatmap-week-count { font-size:8px; letter-spacing:0; }
   .heatmap-week-pnl   { font-size:8px; margin-top:2px; }
+  .hm-mo-count { font-size:10px; }
+  .hm-mo-pnl   { font-size:9px; }
   /* A week total is the largest figure on the calendar and the week rail is its
      narrowest column, so on a phone the cents are what push it out of shape.
      Dropped in CSS rather than rounded in JS: the value stays exact, the tail
      is simply not drawn, and the desktop view is untouched. */
   .hm-cents { display:none; }
-  body.pnl-open .heatmap-week-count { font-size:7px; }
-  .hm-mo-pnl { font-size:9px; }
+
+  /* ── The month cell reserves its label row at all times ─────────────────
+     Month cells are the tightest of the three scales: a 10px name in the corner
+     over a 58px box leaves little clear height, so anything centred on the BOX
+     reads as crammed against that name. Reserving the label row as padding
+     moves the centring axis down into the empty space below it.
+     Unconditional, because it is as true of a lone trade count as of an amount.
+     Day and week cells are roomier and centre fine on the box itself, so they
+     reserve the row only when the P&L view puts a second figure in them. */
+  .hm-mo { padding-top:18px; }
+
+  /* ── P&L view (phone) ───────────────────────────────────────────────────
+     Each cell now carries two figures plus its label. The count moves to the
+     corner OPPOSITE the label — a dead corner the cell already had — leaving
+     the middle to the amount alone.
+     Each count mirrors ITS OWN label's offsets and size, not one shared set:
+     day and week labels sit at 8px / top:4 / left:5, the month label at 10px /
+     top:6 / left:8. Pairing them this way is what puts each count on the same
+     line as the name across from it.
+     Colour is untouched — counts keep the result palette, unlike the muted
+     identity labels opposite them. */
+  body.pnl-open .heatmap-cell-count,
+  body.pnl-open .heatmap-week-count {
+    position:absolute; top:4px; right:5px;
+    font-size:8px; min-height:0; margin:0;
+  }
+  body.pnl-open .hm-mo-count {
+    position:absolute; top:6px; right:8px;
+    font-size:10px; min-height:0; margin:0;
+  }
+  /* Sole occupant of the middle now, so it carries the weight the count used
+     to share. */
+  body.pnl-open .heatmap-cell-pnl,
+  body.pnl-open .heatmap-week-pnl,
+  body.pnl-open .hm-mo-pnl { font-size:10px; margin-top:0; }
+  /* Day and week reserve their label row here only — see .hm-mo above. */
+  body.pnl-open .heatmap-cell-body { padding-top:10px; }
+  body.pnl-open .heatmap-week      { padding-top:14px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
      Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
