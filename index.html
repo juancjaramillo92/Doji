@@ -65,33 +65,31 @@
      the Chart.js arcs can't drift from the CSS. */
   --seg-win-bg:rgba(59,165,133,.12);
   --seg-loss-bg:rgba(214,61,90,.12);
-  /* Break-even — deep indigo, replacing the neutral grey that read as dust.
-     Leaning blue rather than magenta on purpose: the accent purple (--p) already
-     means "needs attention" on a calendar cell, and a break-even close to it
-     would compete.
-
-     The depth comes from the BASE being dark and saturated, not from more
-     opacity. These fills sit over a near-black card, so a light base — the first
-     attempt used rgb(96,104,168) — resolves to a pale wash with no colour left
-     in it. A deep base at the same low alpha lands dark AND unmistakably
-     indigo, which is what keeps break-even quieter than the green and red
-     while still belonging to the palette.
-
-     To retune: change the three rgb triplets below together, keeping the alphas.
-     Bluer/colder: 58,66,190. More violet: 96,58,190. */
-  --seg-be-bg:rgba(76,62,186,.20);
-  --seg-be-bd:rgba(76,62,186,.62);
+  /* Break-even — taken from the app's own surface ladder rather than given a
+     hue of its own. The palette's neutrals are already violet-tinted, not grey:
+     --bg #070611 → --s2 #141022 → --s3 #1c1730 → --bd #251d39 → --bd2 #342948.
+     Break-even sits on that ladder between --s2 and --s3, so it reads as the
+     card surface lifted a step — present, clearly not an outcome, and the same
+     family as every border and background around it.
+     This is why the earlier attempts missed. A neutral grey was off-brand
+     because the brand's neutral isn't grey. A saturated indigo was on-brand in
+     hue but announced itself as a colour, when the whole point of break-even is
+     that nothing happened. Solid values, not translucent: these are surface
+     tones now, and there is nothing to see through them to. */
+  --seg-be-bg:#181328;
+  --seg-be-bd:#3b3054;
   /* Hover fills — the result palette one step brighter. Tokenised because a
      result colour appearing raw in three separate rules is exactly how a
      palette drifts: one gets nudged, the others silently don't. */
   --seg-win-hv:rgba(59,165,133,.22);
   --seg-loss-hv:rgba(214,61,90,.22);
-  --seg-be-hv:rgba(76,62,186,.32);
+  --seg-be-hv:#221b39;
   /* Break-even figure text. Deliberately not --mt2: break-even is a result,
      and its colour belongs with the other two results, not with muted text. */
-  /* The figures stay light. Depth belongs to the fill and the border; text at
-     the fill's own darkness would be unreadable on top of it. */
-  --be-tx:rgba(166,158,240,1);
+  /* Identical to --mt2, the app's muted text. A break-even figure is a number
+     with no outcome attached, so it takes the same colour as everything else
+     that carries no verdict — section titles, column heads, the balance. */
+  --be-tx:#9a92b0;
   /* Standard translucent surface for pills, chips and inputs. */
   --fill-1:rgba(255,255,255,.04);
   /* The violet bloom behind every full-bleed surface. Held as the whole
