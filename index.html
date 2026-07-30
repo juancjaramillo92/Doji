@@ -65,31 +65,38 @@
      the Chart.js arcs can't drift from the CSS. */
   --seg-win-bg:rgba(59,165,133,.12);
   --seg-loss-bg:rgba(214,61,90,.12);
-  /* Break-even — taken from the app's own surface ladder rather than given a
-     hue of its own. The palette's neutrals are already violet-tinted, not grey:
-     --bg #070611 → --s2 #141022 → --s3 #1c1730 → --bd #251d39 → --bd2 #342948.
-     Break-even sits on that ladder between --s2 and --s3, so it reads as the
-     card surface lifted a step — present, clearly not an outcome, and the same
-     family as every border and background around it.
-     This is why the earlier attempts missed. A neutral grey was off-brand
-     because the brand's neutral isn't grey. A saturated indigo was on-brand in
-     hue but announced itself as a colour, when the whole point of break-even is
-     that nothing happened. Solid values, not translucent: these are surface
-     tones now, and there is nothing to see through them to. */
-  --seg-be-bg:#181328;
-  --seg-be-bd:#3b3054;
+  /* Break-even — dark and cool, sitting BELOW the surface ladder rather than on
+     it. Two things were making it read as earthy:
+
+     1. Every tone in the palette has red above green (--s2 #141022 is r20 g16
+        b34), which is what makes the violet family feel warm. Fine on a large
+        card; on a small tile at this brightness that warm cast is the muddiness.
+        Break-even now runs green at or above red, so it goes cool instead of
+        mauve without leaving the dark-blue-black family.
+     2. It was too close in brightness to its own border, so the tile had no
+        definition and the whole thing turned to haze. The fill drops and the
+        border lifts, which is what makes the edge crisp.
+
+     Deliberately the darkest of the three results: nothing happened, so it
+     should recede furthest. Solid values — these are surface tones, and there
+     is nothing to see through them to.
+
+     To retune: the red channel is the earthiness lever. Lower the first pair of
+     digits in the fill to go cooler, raise it to go warmer. */
+  --seg-be-bg:#0e1020;
+  --seg-be-bd:#333f63;
   /* Hover fills — the result palette one step brighter. Tokenised because a
      result colour appearing raw in three separate rules is exactly how a
      palette drifts: one gets nudged, the others silently don't. */
   --seg-win-hv:rgba(59,165,133,.22);
   --seg-loss-hv:rgba(214,61,90,.22);
-  --seg-be-hv:#221b39;
+  --seg-be-hv:#151a30;
   /* Break-even figure text. Deliberately not --mt2: break-even is a result,
      and its colour belongs with the other two results, not with muted text. */
-  /* Identical to --mt2, the app's muted text. A break-even figure is a number
-     with no outcome attached, so it takes the same colour as everything else
-     that carries no verdict — section titles, column heads, the balance. */
-  --be-tx:#9a92b0;
+  /* --mt2's role — a figure with no verdict attached — but shifted cool to match
+     the fill it sits on. The violet --mt2 on a cool tile was the warm/cold clash
+     that read as grubby. */
+  --be-tx:#9aa4c0;
   /* Standard translucent surface for pills, chips and inputs. */
   --fill-1:rgba(255,255,255,.04);
   /* The violet bloom behind every full-bleed surface. Held as the whole
