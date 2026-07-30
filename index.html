@@ -65,22 +65,33 @@
      the Chart.js arcs can't drift from the CSS. */
   --seg-win-bg:rgba(59,165,133,.12);
   --seg-loss-bg:rgba(214,61,90,.12);
-  /* Break-even. Indigo rather than the old neutral grey, which read as dust
-     against everything around it. Pushed toward blue on purpose: the accent
-     purple (--p) already means "needs attention" on a calendar cell, so a
-     break-even leaning magenta would compete with it. This sits cool and dark —
-     present in the palette, quiet beside the green and red that carry outcome. */
-  --seg-be-bg:rgba(96,104,168,.14);
-  --seg-be-bd:rgba(96,104,168,.55);
+  /* Break-even — deep indigo, replacing the neutral grey that read as dust.
+     Leaning blue rather than magenta on purpose: the accent purple (--p) already
+     means "needs attention" on a calendar cell, and a break-even close to it
+     would compete.
+
+     The depth comes from the BASE being dark and saturated, not from more
+     opacity. These fills sit over a near-black card, so a light base — the first
+     attempt used rgb(96,104,168) — resolves to a pale wash with no colour left
+     in it. A deep base at the same low alpha lands dark AND unmistakably
+     indigo, which is what keeps break-even quieter than the green and red
+     while still belonging to the palette.
+
+     To retune: change the three rgb triplets below together, keeping the alphas.
+     Bluer/colder: 58,66,190. More violet: 96,58,190. */
+  --seg-be-bg:rgba(76,62,186,.20);
+  --seg-be-bd:rgba(76,62,186,.62);
   /* Hover fills — the result palette one step brighter. Tokenised because a
      result colour appearing raw in three separate rules is exactly how a
      palette drifts: one gets nudged, the others silently don't. */
   --seg-win-hv:rgba(59,165,133,.22);
   --seg-loss-hv:rgba(214,61,90,.22);
-  --seg-be-hv:rgba(96,104,168,.26);
+  --seg-be-hv:rgba(76,62,186,.32);
   /* Break-even figure text. Deliberately not --mt2: break-even is a result,
      and its colour belongs with the other two results, not with muted text. */
-  --be-tx:rgba(158,166,222,1);
+  /* The figures stay light. Depth belongs to the fill and the border; text at
+     the fill's own darkness would be unreadable on top of it. */
+  --be-tx:rgba(166,158,240,1);
   /* Standard translucent surface for pills, chips and inputs. */
   --fill-1:rgba(255,255,255,.04);
   /* The violet bloom behind every full-bleed surface. Held as the whole
