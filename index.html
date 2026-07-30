@@ -44,6 +44,11 @@
 
   /* Radius scale */
   --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-full:999px;
+  /* Calendar cells only. A grid of many small tiles reads as a grid when the
+     corners are tight; at the card radius each tile starts to look like its own
+     little card and the rows stop scanning as rows. A separate token because
+     this is a deliberate exception to the card rounding, not a change to it. */
+  --r-cell:5px;
 
   /* Shared bar thickness — single source of truth for every win/loss
      distribution bar in the trades panel (session, discipline, R:R, emotions). */
@@ -60,17 +65,22 @@
      the Chart.js arcs can't drift from the CSS. */
   --seg-win-bg:rgba(59,165,133,.12);
   --seg-loss-bg:rgba(214,61,90,.12);
-  --seg-be-bg:rgba(144,144,160,.10);
-  --seg-be-bd:rgba(144,144,160,.5);
+  /* Break-even. Indigo rather than the old neutral grey, which read as dust
+     against everything around it. Pushed toward blue on purpose: the accent
+     purple (--p) already means "needs attention" on a calendar cell, so a
+     break-even leaning magenta would compete with it. This sits cool and dark —
+     present in the palette, quiet beside the green and red that carry outcome. */
+  --seg-be-bg:rgba(96,104,168,.14);
+  --seg-be-bd:rgba(96,104,168,.55);
   /* Hover fills — the result palette one step brighter. Tokenised because a
      result colour appearing raw in three separate rules is exactly how a
      palette drifts: one gets nudged, the others silently don't. */
   --seg-win-hv:rgba(59,165,133,.22);
   --seg-loss-hv:rgba(214,61,90,.22);
-  --seg-be-hv:rgba(144,144,160,.20);
+  --seg-be-hv:rgba(96,104,168,.26);
   /* Break-even figure text. Deliberately not --mt2: break-even is a result,
      and its colour belongs with the other two results, not with muted text. */
-  --be-tx:rgba(170,170,185,1);
+  --be-tx:rgba(158,166,222,1);
   /* Standard translucent surface for pills, chips and inputs. */
   --fill-1:rgba(255,255,255,.04);
   /* The violet bloom behind every full-bleed surface. Held as the whole
@@ -628,7 +638,7 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
    cell, so the centred figures need clearance beneath it. */
 .hm-mo {
   background:var(--glass-top), rgba(8,8,10,.55);
-  border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  border:1px solid var(--glass-bd); border-radius:var(--r-cell);
   box-shadow:var(--sh-2); box-sizing:border-box; position:relative;
   padding:7px 2px; min-height:62px;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -691,7 +701,7 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
    wheel — the standardisation lives in the fill, not the border. */
 .heatmap-cell, .heatmap-week {
   background:var(--glass-top), rgba(8,8,10,.55);
-  border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  border:1px solid var(--glass-bd); border-radius:var(--r-cell);
   min-height:80px; position:relative; box-sizing:border-box;
   display:flex; flex-direction:column;
 }
@@ -1378,6 +1388,14 @@ tr.broker-pending td:first-child {
   /* Companion boxes stack */
   .grid-2 { grid-template-columns:1fr; }
 
+  /* Fullscreen does nothing meaningful on a phone: browser chrome is already
+     minimal and the API is unreliable on iOS. Import/export is a desk task —
+     it reads and writes files, and the backup it produces wants somewhere to be
+     filed. Hidden rather than removed, so desktop keeps both and no markup
+     changes. Note this leaves the phone unable to export a backup, which is
+     deliberate: backups belong on the machine that keeps them. */
+  #nav-fs-btn, #nav-io-btn { display:none; }
+
   /* Twelve across is unreadable on a phone, so the year folds to two rows of
      six — quarters still land in whole rows, and the cells stay tappable. */
   .heatmap-year { grid-template-columns:repeat(6,1fr); }
@@ -1425,7 +1443,7 @@ tr.broker-pending td:first-child {
      bare count is unambiguous, and dropping it gives the day's P&L (which sits
      underneath) room to breathe. */
   .heatmap-cell, .heatmap-cell-empty, .heatmap-week { min-height:52px; }
-  .heatmap-cell, .heatmap-week { padding:4px; border-radius:var(--r-sm); }
+  .heatmap-cell, .heatmap-week { padding:4px; }   /* radius stays --r-cell */
   .heatmap-cell-day, .heatmap-week-lbl { font-size:8px; top:4px; left:5px; }
   .heatmap-cell-count { font-size:8px; letter-spacing:0; }
   .heatmap-cell-count-word { display:none; }
@@ -1560,7 +1578,12 @@ tr.broker-pending td:first-child {
           title="Sync status"><span class="sync-dot-label"></span></span>
     <button id="nav-fs-btn" class="nav-icon-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
       <svg class="fs-ico fs-ico-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-      <svg class="fs-ico fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8H5a2 2 0 0 1-2-2V3m18 5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m13-5h-3a2 2 0 0 0-2 2v3"/></svg>
+      <!-- Exit icon: four brackets pointing inward. Each is one absolute
+           subpath with sweep-flag 1, so all four corners curve the same way —
+           the previous version mixed a sweep-0 arc into the bottom-right
+           bracket and chained relative moves between subpaths, which drew that
+           corner turned inside out. -->
+      <svg class="fs-ico fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
     </button>
     <button id="nav-io-btn" class="nav-icon-btn" title="Import / Export" aria-label="Import / Export data">&#x21C5;</button>
     <button id="nav-add-btn" class="nav-add-btn" title="New entry" aria-label="New journal entry">+</button>
@@ -4484,19 +4507,38 @@ const Cloud = {
       trade:   new Map(State.trades.map(t   => [t.id, t])),
       journal: new Map(State.journals.map(j => [j.id, j]))
     };
+    const guard = { trade: Schema.isValidTrade, journal: Schema.isValidJournal };
     const rows = [];
+    let rejected = 0;
+
     for (const kind of ['trade', 'journal']) {
       for (const [id, rec] of live[kind]) {
-        // JSON comparison is exact and cheap. Key order is stable because
-        // every record is built by the same code path.
-        if (this._shadow[kind][id] !== JSON.stringify(rec))
-          rows.push({ user_id: this._uid, kind, rec_id: id, data: rec, deleted: false });
+        // JSON comparison is exact and cheap. Key order is stable because every
+        // record is built by the same code path.
+        if (this._shadow[kind][id] === JSON.stringify(rec)) continue;
+        // The same guard the inbound path applies, applied outbound. _applyRows()
+        // states that cloud rows are not trusted; the reasoning is symmetric, and
+        // trusting local State because "our own code wrote it" is exactly the
+        // assumption a bug breaks. The failure it prevents is worse than a bad
+        // read: an invalid record uploaded here would be rejected by every
+        // other device's inbound guard, forever — a poisoned row that no device
+        // will accept and none can clean up on its own.
+        if (!guard[kind](rec)) { rejected++; continue; }
+        rows.push({ user_id: this._uid, kind, rec_id: id, data: rec, deleted: false });
       }
       for (const id of Object.keys(this._shadow[kind])) {
         // Known to the cloud, gone from State, not already tombstoned.
+        // Deliberately NOT guarded: a tombstone carries no payload, and refusing
+        // to delete a record because it is malformed would strand the very rows
+        // most in need of removing.
         if (this._shadow[kind][id] !== null && !live[kind].has(id))
           rows.push({ user_id: this._uid, kind, rec_id: id, data: {}, deleted: true });
       }
+    }
+
+    if (rejected) {
+      console.warn(`Doji Cloud: ${rejected} local record(s) failed validation and were not synced. Normal use should never produce this.`);
+      notify(`⚠ ${rejected} record${rejected > 1 ? 's' : ''} could not be synced — check the console.`, true);
     }
     return rows;
   },
