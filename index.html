@@ -2210,9 +2210,7 @@ const Dates = {
 
   isOpen(mkt, date) {
     const h = Dates.hourIn(mkt.tz, date);
-    return mkt.open <= mkt.close
-      ? (h >= mkt.open && h < mkt.close)
-      : (h >= mkt.open || h < mkt.close);       // tolerate a wrapping session
+    return h >= mkt.open && h < mkt.close;
   },
 
   // Defaults to now, so the journal modal can still call it with no argument.
@@ -5149,6 +5147,16 @@ const Cloud = {
       });
   },
 
+  // Has this record been deleted? The shadow distinguishes three states:
+  // undefined (never seen), a JSON string (known and live), and null (deleted,
+  // tombstone raised). Exposed as a method so callers do not have to know that,
+  // or reach into _shadow — BrokerSync needs the answer before it rebuilds a
+  // trade, and that is the whole of its business with the sync internals.
+  isTombstoned(kind, id) {
+    const k = this._shadow && this._shadow[kind];
+    return !!k && k[id] === null;
+  },
+
   // Every write echoes back to its own author. With per-record rows the echo is
   // identifiable exactly: if the incoming row already matches this device's
   // shadow, this device is what put it there and re-pulling would be wasted
@@ -5290,6 +5298,22 @@ const BrokerSync = {
     const slug = String(fill.position_id).replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 48);
     const tid = slug ? 'bkrt_' + slug : uid();
     const jid = slug ? 'bkrj_' + slug : uid();
+
+    // A trade the trader has DELETED must stay deleted.
+    //
+    // Without this the sync resurrects it: the poll re-upserts every position
+    // inside its window every couple of minutes, each upsert arrives as a
+    // realtime UPDATE, the lookup above finds no trade because it was deleted —
+    // and this function dutifully creates it again. The trader deletes it, it
+    // comes back, forever.
+    //
+    // Trade ids are derived from the Position ID, so the tombstone is findable
+    // before the trade is rebuilt. Marking the row processed stops it being
+    // re-offered on every boot.
+    if (Cloud.isTombstoned('trade', tid)) {
+      this.markProcessed(fill.position_id);
+      return;
+    }
 
     // Session from the real entry instant when MCP supplied one. The email only
     // ever knew the close, which is what filed evening trades into the wrong
