@@ -115,13 +115,6 @@
   --gap-divider:14px;  /* padding below an internal divider line */
   --gap-row:12px;      /* rhythm between stacked bar rows */
 
-  /* Pop-up scrim — the single source of truth for how hard every modal dims
-     the page behind it. The journal card's own panels are opaque, so anything
-     that bled through did so in the gaps BETWEEN cards, which read as the
-     journal mixing into the pop-up. Near-opaque kills that while still reading
-     as an overlay rather than a page swap. One value, one place. */
-  --scrim:rgba(3,2,8,.95);
-
   /* Elevation */
   --sh-2:0 4px 18px -8px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04) inset;
   --sh-3:0 16px 48px -14px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.06) inset;
@@ -876,6 +869,17 @@ td.c   { text-align:center; }
   font-size:12px; padding:2px 5px; opacity:.4;
 }
 .del-btn:hover { opacity:1; }
+.lesson-cell {
+  font-size:9px; color:var(--mt2);
+}
+.lesson-cell.empty {
+  color:var(--mt); font-style:italic;
+}
+/* Final Lesson column: take all remaining width, truncate only at the edge */
+.lesson-col {
+  width:100%; max-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .rules-tick { color:var(--win); }
 .rules-cross { color:var(--loss); }
 /* Setup names ship as a full + initials pair; desktop shows the full text and
@@ -1009,13 +1013,8 @@ td.c   { text-align:center; }
    ═══════════════════════════════════════════════════════════════════════════ */
 .journal-modal {
   display:none; position:fixed; inset:0;
-  background:var(--scrim);
-  z-index:400; overflow-y:auto;
-  /* --kb is the on-screen keyboard's height, published by KeyboardInset (0
-     whenever no keyboard is up). Adding it as bottom padding turns the strip
-     the keyboard covers into scrollable space, so a field down there can be
-     brought fully above the keyboard instead of sitting under it. */
-  padding:24px 20px calc(24px + var(--kb, 0px));
+  background:rgba(4,3,9,.82);
+  z-index:400; overflow-y:auto; padding:24px 20px;
 }
 .journal-modal.open { display:flex; }
 .journal-modal-card {
@@ -1090,6 +1089,11 @@ td.c   { text-align:center; }
   display:flex; flex-direction:column; align-items:center; gap:14px;
 }
 .jm-card + .jm-card { margin-top:12px; }
+.jm-card-label {
+  align-self:center; text-align:center;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--mt2);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    JOURNAL FORM
@@ -1112,6 +1116,15 @@ td.c   { text-align:center; }
   font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   color:var(--mt2); margin-bottom:12px; display:block;
 }
+.journal-q-textarea {
+  width:100%; background:transparent; border:none;
+  border-radius:0;
+  color:#fff; font-size:13px; font-weight:300;
+  padding:8px 0; outline:none; line-height:1.9; resize:none; min-height:64px;
+  text-align:center;
+}
+.journal-q-textarea::placeholder { color:rgba(255,255,255,.2); text-transform:uppercase; font-size:8px; letter-spacing:1px; }
+
 .jf-pill-radio { display:none; }
 .jf-pill-lbl {
   font-family:var(--mono); font-size:9px; letter-spacing:.3px; text-transform:uppercase;
@@ -1163,7 +1176,7 @@ td.c   { text-align:center; }
    ═══════════════════════════════════════════════════════════════════════════ */
 .io-modal {
   display:none; position:fixed; inset:0;
-  background:var(--scrim);
+  background:rgba(4,3,9,.82);
   z-index:500; align-items:center; justify-content:center; padding:20px;
 }
 .io-modal.open { display:flex; }
@@ -1510,8 +1523,8 @@ tr.broker-pending td:first-child {
   body.pnl-open .heatmap-week      { padding-top:14px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
-     Setup, P&L. Rules/SLS/TPS and delete live in the entry itself (tap the
-     row); no sideways scrolling. Setup flips to its initials
+     Setup, P&L. Rules/SLS/TPS, the lesson, and delete live in the entry
+     itself (tap the row); no sideways scrolling. Setup flips to its initials
      form (B&R / S&R) and cell padding tightens so all 5 columns land inside
      the screen. */
   .tlog-wrap th:nth-child(n+6), .tlog-wrap td:nth-child(n+6) { display:none; }
@@ -1525,7 +1538,7 @@ tr.broker-pending td:first-child {
   .io-modal-body { padding:16px 14px; }
 
   /* Journal modal: full-bleed card. */
-  .journal-modal { padding:12px 8px calc(12px + var(--kb, 0px)); overflow-x:hidden; }
+  .journal-modal { padding:12px 8px; overflow-x:hidden; }
   .journal-modal-card { width:100%; max-width:100%; }
 
   /* Header stays a single row: Session · Short / P&L / Long · Date. Pills
@@ -1786,7 +1799,7 @@ tr.broker-pending td:first-child {
         </div>
         <div class="io-section-required">
           Required: <span class="req">Date, Direction</span> &nbsp;·&nbsp;
-          Optional: Session, Setup, P&amp;L, Followed Rules, Followed SLS, Followed TPS, Before Tags, During Tags
+          Optional: Session, Setup, P&amp;L, Followed Rules, Followed SLS, Followed TPS, Before Tags, During Tags, Final Lesson
         </div>
         <div class="io-section-actions">
           <input type="file" id="io-import-file" accept=".xlsx,.xls,.csv" class="hidden">
@@ -1799,7 +1812,7 @@ tr.broker-pending td:first-child {
       <div id="io-section-journal" class="io-section">
         <div class="io-section-label">Export Journal to Excel</div>
         <div class="io-section-desc">
-          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, discipline (rules / SLS / TPS), emotion tags (before &amp; during), and emotion tags (before &amp; during).
+          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, discipline (rules / SLS / TPS), emotion tags (before &amp; during), and final lesson.
         </div>
         <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
       </div>
@@ -2301,17 +2314,7 @@ function migrateData() {
       j.followedTPS = j.tpEarly === 'yes' ? 'no' : j.tpEarly === 'no' ? 'yes' : '';
       changed = true;
     }
-    // Final Lesson retirement (2026-07): the field is gone from the form, the
-    // log and both spreadsheets. Deleting the key here is what actually purges
-    // the DATA — a journal whose JSON no longer matches the sync shadow counts
-    // as changed, so the next push rewrites that cloud row's payload without
-    // it. No SQL migration is needed: `records.data` is a JSONB blob, so the
-    // field was never a column. `notes` goes with it — it existed only as the
-    // legacy source this field migrated FROM, and with the destination gone it
-    // has nowhere left to land. Idempotent: deleting an absent key is a no-op,
-    // which is what keeps this from re-flagging every record on every boot.
-    if ('finalLesson' in j) { delete j.finalLesson; changed = true; }
-    if ('notes'       in j) { delete j.notes;       changed = true; }
+    if (j.notes && !j.finalLesson) { j.finalLesson = j.notes; changed = true; }
     // Tag-vocabulary migration (2026-07): the emotion lists became
     // phase-specific. BEFORE retired Fear and Doubtful (replaced by Gun-shy
     // and Overwhelmed); DURING shrank to the management-error set. Per the
@@ -3061,150 +3064,10 @@ function closeModalShell(id) {
   if (!m) return;
   m.classList.remove('open');
   m.setAttribute('aria-hidden', 'true');
-  ZoomLock.release();
   Cloud.flushDeferred();
 }
 
 function closeDayPopup() { closeModalShell('day-modal'); }
-
-/* ─── Zoom lock (phones) ───────────────────────────────────────────────────
-   iOS Safari zooms the page whenever it focuses a field whose text is under
-   16px, and it does not zoom back out afterwards. Several fields here are
-   deliberately small — the P&L pill is 9px mono and lives in a single-row
-   header that has no room to grow — so raising type to dodge the trigger is
-   not an option for them.
-
-   The other half of that behaviour is that Safari only auto-zooms when the
-   page allows scaling past 1. Pinning maximum-scale to 1 for the duration of
-   the focus removes the zoom without touching a single font-size. It is set
-   on pointerdown, i.e. BEFORE the field takes focus — applied afterwards the
-   zoom has already happened and the lock just freezes it there.
-
-   The lock is temporary on purpose. Held permanently it would also block
-   pinch-zoom, which is an accessibility regression and not ours to make, so
-   the free viewport is restored the moment nothing is being typed into.
-   Desktop is skipped entirely: no touch keyboard, no auto-zoom, and browser
-   zoom (ctrl +/-) ignores the viewport meta anyway. */
-const ZoomLock = {
-  FREE:   'width=device-width,initial-scale=1',
-  LOCKED: 'width=device-width,initial-scale=1,maximum-scale=1',
-  _meta: null,
-  _on: false,
-
-  init() {
-    this._meta = document.querySelector('meta[name="viewport"]');
-    if (!this._meta) return;
-    // Coarse pointer = touch. Anything else has no focus-zoom to prevent.
-    if (!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches)) return;
-
-    // Capture phase: this has to win the race against focus.
-    document.addEventListener('pointerdown', e => {
-      if (this._isField(e.target)) this._set(true);
-    }, true);
-    // Backstop for focus that arrives without a tap — keyboard "next" between
-    // fields, or code calling .focus() itself.
-    document.addEventListener('focusin', e => {
-      if (this._isField(e.target)) this._set(true);
-    }, true);
-    // Release only once focus has actually left every field. The delay lets
-    // focus land on the NEXT field first, so moving between two inputs does
-    // not flicker the viewport open and shut between them.
-    document.addEventListener('focusout', () => {
-      setTimeout(() => { if (!this._isField(document.activeElement)) this._set(false); }, 150);
-    });
-  },
-
-  _isField(el) {
-    if (!el || !el.tagName) return false;
-    if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-    if (el.tagName !== 'INPUT') return false;
-    // Only the types that open a keyboard. A radio pill or a file button takes
-    // focus without any text entry, and locking on those would be noise.
-    return !/^(button|submit|reset|image|checkbox|radio|range|color|file)$/i
-      .test(el.type || 'text');
-  },
-
-  _set(on) {
-    if (on === this._on) return;      // rewriting the same value re-lays out for nothing
-    this._on = on;
-    this._meta.setAttribute('content', on ? this.LOCKED : this.FREE);
-  },
-
-  // Closing a modal can remove the focused field from the DOM, and a removed
-  // element does not reliably fire focusout — which would strand the page
-  // locked and un-pinchable. Every close routes through closeModalShell, so
-  // releasing there covers that gap.
-  release() { this._set(false); }
-};
-
-/* ─── Keyboard inset (phones) ──────────────────────────────────────────────
-   The page itself never scrolls (html,body are overflow:hidden) and the
-   modals are position:fixed, so when a phone keyboard opens they keep their
-   full-screen height and their lower third simply sits underneath it. The
-   browser's own attempt to reveal a focused field from down there is what
-   produced the lurch.
-
-   visualViewport reports the part of the screen the keyboard has NOT covered.
-   Two things follow from it:
-     • --kb, the covered height, published on :root. The journal modal adds it
-       as bottom padding, which turns the covered strip into scrollable space —
-       without it there is nowhere to scroll a low field TO.
-     • a nudge that scrolls the focused field into that visible band.
-   Zoom is ZoomLock's job; nothing here touches scale. Browsers without
-   visualViewport never see a keyboard and are left alone. */
-const KeyboardInset = {
-  PAD: 14,          // breathing room between the field and the keyboard
-  MIN_KB: 100,      // below this it is a browser-chrome shift, not a keyboard
-  _t: 0,
-
-  init() {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const settle = () => {
-      clearTimeout(this._t);
-      // The keyboard animates in; measuring mid-animation reads a height that
-      // is already stale by the time it is applied.
-      this._t = setTimeout(() => { this._publish(); this._reveal(); }, 140);
-    };
-    vv.addEventListener('resize', settle);
-    vv.addEventListener('scroll', settle);
-    document.addEventListener('focusin', settle);
-    document.addEventListener('focusout', () => {
-      clearTimeout(this._t);
-      this._t = setTimeout(() => this._publish(), 160);
-    });
-  },
-
-  _height() {
-    const vv = window.visualViewport;
-    const kb = window.innerHeight - vv.height - vv.offsetTop;
-    return kb > this.MIN_KB ? Math.round(kb) : 0;
-  },
-
-  _publish() {
-    document.documentElement.style.setProperty('--kb', this._height() + 'px');
-  },
-
-  _reveal() {
-    if (!this._height()) return;
-    const el = document.activeElement;
-    if (!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return;
-    const modal = el.closest('.journal-modal.open, .io-modal.open, .login-overlay.open');
-    if (!modal) return;
-
-    const vv  = window.visualViewport;
-    const r   = el.getBoundingClientRect();
-    const top = vv.offsetTop + this.PAD;
-    const bot = vv.offsetTop + vv.height - this.PAD;
-
-    let delta = 0;
-    if (r.bottom > bot)   delta = r.bottom - bot;   // hidden by the keyboard
-    else if (r.top < top) delta = r.top - top;      // pushed off the top edge
-    // A few pixels out is not worth a scroll animation, and reacting to every
-    // pixel is how a jitter loop starts.
-    if (Math.abs(delta) > 6) modal.scrollBy({ top: delta, behavior: 'smooth' });
-  }
-};
 // One pass over the trade set for the whole year, rather than twelve calls to
 // monthTotals(). Counting semantics are deliberately identical to it — a trade
 // counts toward its month whether or not it has been journaled, while only a
@@ -3699,7 +3562,7 @@ function renderTradeTable(ft) {
   const head = `
     <thead><tr>
       <th>Date</th><th>Dir</th><th>Session</th><th>Setup</th>
-      <th>P&amp;L</th><th class="c">Rules</th><th class="c">SLS</th><th class="c">TPS</th><th></th>
+      <th>P&amp;L</th><th class="c">Rules</th><th class="c">SLS</th><th class="c">TPS</th><th class="lesson-col">Final Lesson</th><th></th>
     </tr></thead>`;
 
   const body = page.map(t => {
@@ -3710,6 +3573,9 @@ function renderTradeTable(ft) {
     const rules = j ? yn(j.followedRules) : '—';
     const sls   = j ? yn(j.followedSLS)   : '—';
     const tps   = j ? yn(j.followedTPS)   : '—';
+    const lesson = j && j.finalLesson
+      ? `<span class="lesson-cell">${escHtml(j.finalLesson)}</span>`
+      : '<span class="lesson-cell empty">—</span>';
     const pnlNum  = j ? safeNum(j.pnl) : null;
     const pnlText = pnlNum !== null ? (pnlNum > 0 ? '+' : '') + pnlNum.toFixed(2) : '—';
     // Colour via resultFromPnl so a ±BE_THRESHOLD scratch renders neutral here,
@@ -3728,6 +3594,7 @@ function renderTradeTable(ft) {
       <td class="c">${rules}</td>
       <td class="c">${sls}</td>
       <td class="c">${tps}</td>
+      <td class="lesson-col">${lesson}</td>
       <td><button class="del-btn" data-del="${escHtml(t.id)}" title="Delete trade" aria-label="Delete trade">✕</button></td>
     </tr>`;
   }).join('');
@@ -3886,6 +3753,7 @@ const Journal = {
 
     const beforeTags = pickChecks('jf-before-tag');
     const duringTags = pickChecks('jf-during-tag');
+    const finalLesson = ($('jf-lesson')?.value || '').trim();
 
     const result = pnl !== null ? resultFromPnl(pnl) : null;
     const emotionTags = [...new Set([...beforeTags, ...duringTags])];
@@ -3899,7 +3767,7 @@ const Journal = {
       Object.assign(j, {
         updatedAt: now, session, direction, setup, pnl, result,
         followedRules, followedSLS, followedTPS,
-        beforeTags, duringTags, afterTags: [], emotionTags
+        beforeTags, duringTags, afterTags: [], emotionTags, finalLesson
       });
       const t = State.tradeById.get(j.tradeId);
       if (t) Object.assign(t, { direction, session, setup, result, openTime });
@@ -3920,7 +3788,7 @@ const Journal = {
         id: jid, tradeId: tid, createdAt: now, updatedAt: now,
         session, direction, setup, result, pnl,
         followedRules, followedSLS, followedTPS,
-        beforeTags, duringTags, afterTags: [], emotionTags
+        beforeTags, duringTags, afterTags: [], emotionTags, finalLesson
       };
       State.journals.push(newJ);
       BrokerSync.clearIfComplete(State.tradeById.get(tid), newJ);
@@ -3944,7 +3812,7 @@ function pickChecks(name) {
 function renderJournalForm(existing) {
   const j = existing || {
     setup: '', followedRules: '', followedSLS: '', followedTPS: '',
-    beforeTags: [], duringTags: []
+    beforeTags: [], duringTags: [], finalLesson: ''
   };
 
   // Section 1 — Discipline + Setup
@@ -3997,6 +3865,11 @@ function renderJournalForm(existing) {
           <label class="journal-q-label">During the trade</label>
           ${emotionChips('during', j.duringTags || [])}
         </div>
+      </div>
+      <div class="jm-card">
+        <span class="jm-card-label">Final Lesson</span>
+        <textarea class="journal-q-textarea" id="jf-lesson"
+          placeholder="What is the one thing you are taking away from this trade?">${escHtml(j.finalLesson || '')}</textarea>
       </div>
       <div class="journal-form-actions">${buttons}</div>
     </div>`;
@@ -4153,13 +4026,13 @@ const IO = {
     const template = [
       { 'Date':'2024-03-15','Direction':'BUY', 'Session':'London','Setup':'Support & Resistance',
         'P&L ($)':153, 'Followed Rules':'Yes','Followed SLS':'Yes','Followed TPS':'Yes',
-        'Before Tags':'Calm, Confident','During Tags':'Calm' },
+        'Before Tags':'Calm, Confident','During Tags':'Calm','Final Lesson':'Patience before entry pays off.' },
       { 'Date':'2024-03-16','Direction':'SELL','Session':'New York','Setup':'Break & Retest',
         'P&L ($)':-138,'Followed Rules':'No','Followed SLS':'No','Followed TPS':'No',
-        'Before Tags':'FOMO, Greed','During Tags':'Anxious' }
+        'Before Tags':'FOMO, Greed','During Tags':'Anxious','Final Lesson':'Never chase. If you miss it, the next one is coming.' }
     ];
     const ws = XLSX.utils.json_to_sheet(template);
-    ws['!cols'] = [{wch:12},{wch:10},{wch:12},{wch:22},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25}];
+    ws['!cols'] = [{wch:12},{wch:10},{wch:12},{wch:22},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25},{wch:50}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Trades');
     const wbout = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
@@ -4236,12 +4109,13 @@ const IO = {
         'Followed SLS':   yn(j.followedSLS),
         'Followed TPS':   yn(j.followedTPS),
         'Before Tags':    (j.beforeTags || []).join(', '),
-        'During Tags':    (j.duringTags || []).join(', ')
+        'During Tags':    (j.duringTags || []).join(', '),
+        'Final Lesson':   j.finalLesson || ''
       };
     });
 
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25}];
+    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25},{wch:50}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Journal');
     const wbout = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
@@ -4478,7 +4352,8 @@ function importRowsIntoState(rows) {
       followedSLS:   parseYN(colByName(row, ['followedsls','followed sls'])),
       followedTPS:   parseYN(colByName(row, ['followedtps','followed tps'])),
       beforeTags, duringTags, afterTags: [],
-      emotionTags: [...new Set([...beforeTags, ...duringTags])]
+      emotionTags: [...new Set([...beforeTags, ...duringTags])],
+      finalLesson: colByName(row, ['finallesson','final lesson'])
     });
     added++;
   }
@@ -5053,7 +4928,7 @@ const Cloud = {
     if (this._channel) { try { this.sb.removeChannel(this._channel); } catch (e) {} }
     this._channel = this.sb.channel('doji-sync')
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'broker_fills' },
+        { event: '*', schema: 'public', table: 'broker_fills' },
         payload => { try { BrokerSync.ingest(payload.new); } catch (e) { console.error(e); } })
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'records' },
@@ -5154,24 +5029,56 @@ const Login = {
    ═══════════════════════════════════════════════════════════════════════════ */
 const BrokerSync = {
   async fetchPending() {
+    // Recent rows regardless of processed state. Anything already ingested
+    // routes to applyUpdate, which no-ops when nothing changed — so a re-read
+    // is cheap, and it lets a late correction (the email's swap-inclusive P&L,
+    // or an exit added to a position that was open last time) land on boot
+    // rather than waiting for the next realtime event.
+    const since = new Date(Date.now() - 7 * 86400000).toISOString();
     const { data, error } = await Cloud.sb.from('broker_fills')
-      .select('*').eq('processed', false).order('fill_time', { ascending: true });
+      .select('*')
+      .or(`processed.eq.false,mcp_synced_at.gte.${since}`)
+      .order('entry_time', { ascending: true, nullsFirst: false });
     if (error) { console.error('Doji BrokerSync: fetch failed', error); return; }
     for (const fill of (data || [])) this.ingest(fill);
   },
 
   ingest(fill) {
     if (!fill || !fill.position_id) return;
-    // Dedup on Position ID — a re-delivered email or a realtime+fetch overlap
-    // must never mint a second trade.
-    if (State.trades.some(t => t.brokerPositionId === fill.position_id)) {
-      this.markProcessed(fill.position_id);
-      return;
-    }
-    const pnl    = safeNum(fill.net_pnl);
+
+    // A row this device already has a trade for is an UPDATE, not a duplicate.
+    // Three things legitimately revisit the same position: the MCP poll adding
+    // an exit to a position that was still open, the broker email arriving
+    // with the swap-inclusive P&L, and a realtime+fetch overlap. Only the last
+    // is a no-op, and applyUpdate is idempotent, so all three take one path.
+    // The old behaviour — skip anything already seen — would have discarded
+    // the exit and the P&L along with it.
+    const existing = State.trades.find(t => t.brokerPositionId === fill.position_id);
+    if (existing) { this.applyUpdate(existing, fill); return; }
+
+    // P&L preference: the broker email is authoritative because it includes
+    // swap. computed_pnl (derived from MCP deals) is exact to the cent whenever
+    // no rollover was crossed, and is what shows until the email lands.
+    const pnl    = safeNum(fill.net_pnl) ?? safeNum(fill.computed_pnl);
     const result = pnl !== null ? resultFromPnl(pnl) : null;
-    const openTime = fill.fill_time || new Date().toISOString();
+
+    // Which day the trade is FILED under. open_day is the New-York civil day
+    // of ENTRY, computed server-side so every device agrees regardless of its
+    // own clock. Kept in the app's existing "<day>T09:30:00.000Z" convention:
+    // openTime has never been a real timestamp for journal-entered trades and
+    // must not start being one here, because the heatmap, day picker and
+    // journal date seeding all slice it as a UTC date. Feeding it a true
+    // instant would refile a 21:05 New York entry onto the following day —
+    // precisely the bug this whole change exists to remove.
+    //
+    // Fallback chain: MCP's open_day, then the entry instant, then the old
+    // fill_time behaviour so an email-only row still lands somewhere sane.
+    const entryTime = fill.entry_time || null;
+    const openTime  = fill.open_day
+      ? fill.open_day + 'T09:30:00.000Z'
+      : (entryTime || fill.fill_time || new Date().toISOString());
     const now = new Date().toISOString();
+
     // IDs derived from the Position ID rather than drawn at random, so two
     // devices ingesting the same fill in the same moment produce identical
     // records instead of two differently-keyed copies of one trade. Whichever
@@ -5182,19 +5089,33 @@ const BrokerSync = {
     const tid = slug ? 'bkrt_' + slug : uid();
     const jid = slug ? 'bkrj_' + slug : uid();
 
+    // Session from the real entry instant when MCP supplied one. The email only
+    // ever knew the close, which is what filed evening trades into the wrong
+    // session; entry_time is the fix.
+    const sessionAnchor = entryTime ? new Date(entryTime) : new Date(openTime);
+
     const trade = {
       id: tid,
+      // Direction from the MCP entry deal when present. Never from a position
+      // object or a closing order — for a closed position both report the
+      // CLOSING side, which is the exact inverse of the truth.
       direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
       result,
-      session: this.detectSession(new Date(openTime)),
+      session: this.detectSession(sessionAnchor),
       setup: '',
       openTime,
-      openPrice: safeNum(fill.fill_price),
-      exitPrice: null, rr: null,
+      openPrice: safeNum(fill.entry_price) ?? safeNum(fill.fill_price),
+      exitPrice: safeNum(fill.exit_price),
+      rr: null,
       source: 'broker',
       brokerPositionId: fill.position_id,
       brokerPending: true
     };
+    // True instants, kept alongside the filing anchor. Display only — nothing
+    // sorts or groups on them, so they can be exact without breaking anything.
+    if (entryTime)      trade.entryTime = entryTime;
+    if (fill.exit_time) trade.exitTime  = fill.exit_time;
+
     // Account balance after the fill, when the broker's email carries one.
     // Held on the trade rather than in a key of its own: it then backs up,
     // restores and cloud-syncs with the trades for free, and deleting a fill
@@ -5208,11 +5129,64 @@ const BrokerSync = {
       session: '', direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
       setup: '', result, pnl,
       followedRules: '', followedSLS: '', followedTPS: '',
-      beforeTags: [], duringTags: [], afterTags: [], emotionTags: []
+      beforeTags: [], duringTags: [], afterTags: [], emotionTags: [],
+      finalLesson: ''
     });
     Storage.saveTradesAndJournals();
     this.markProcessed(fill.position_id);
     renderTrades();
+  },
+
+  // Folds a revisited broker row onto the trade that already exists.
+  //
+  // Deliberately narrow: it only touches fields the BROKER owns. Setup,
+  // emotions, discipline answers and the final lesson are the trader's, and a
+  // sync must never overwrite them — a position closing hours later cannot be
+  // allowed to disturb notes already written about it. This is also what makes
+  // the historical backfill safe to run over trades that are already journaled.
+  applyUpdate(trade, fill) {
+    const j = journalForTrade(trade);
+    let changed = false;
+
+    const entryTime = fill.entry_time || null;
+    if (entryTime && trade.entryTime !== entryTime) {
+      trade.entryTime = entryTime;
+      trade.session   = this.detectSession(new Date(entryTime));
+      changed = true;
+    }
+    if (fill.open_day) {
+      const openTime = fill.open_day + 'T09:30:00.000Z';
+      if (trade.openTime !== openTime) { trade.openTime = openTime; changed = true; }
+    }
+    if (fill.direction === 'BUY' || fill.direction === 'SELL') {
+      if (trade.direction !== fill.direction) {
+        trade.direction = fill.direction;
+        if (j) j.direction = fill.direction;
+        changed = true;
+      }
+    }
+    const entryPrice = safeNum(fill.entry_price);
+    if (entryPrice !== null && trade.openPrice !== entryPrice) { trade.openPrice = entryPrice; changed = true; }
+
+    const exitPrice = safeNum(fill.exit_price);
+    if (exitPrice !== null && trade.exitPrice !== exitPrice) { trade.exitPrice = exitPrice; changed = true; }
+    if (fill.exit_time && trade.exitTime !== fill.exit_time) { trade.exitTime = fill.exit_time; changed = true; }
+
+    const balance = safeNum(fill.balance);
+    if (balance !== null && trade.brokerBalance !== balance) { trade.brokerBalance = balance; changed = true; }
+
+    // Resolving the P&L. Email wins over computed because it carries swap.
+    const pnl = safeNum(fill.net_pnl) ?? safeNum(fill.computed_pnl);
+    if (pnl !== null && j && j.pnl !== pnl) {
+      j.pnl        = pnl;
+      j.result     = resultFromPnl(pnl);
+      j.updatedAt  = new Date().toISOString();
+      trade.result = j.result;
+      changed = true;
+    }
+
+    if (changed) { Storage.saveTradesAndJournals(); renderTrades(); }
+    this.markProcessed(fill.position_id);
   },
 
   async markProcessed(positionId) {
@@ -5679,8 +5653,6 @@ const BackupWatcher = {
   renderTrades();
   DayWatcher.start();
   BackupWatcher.start();
-  ZoomLock.init();
-  KeyboardInset.init();
 
   // Cloud last: everything above is fully functional local-only. If cloud is
   // unconfigured or unreachable, the app runs exactly as before.
