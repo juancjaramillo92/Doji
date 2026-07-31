@@ -311,9 +311,15 @@ nav {
   font-family:var(--mono); font-size:9px; font-weight:600;
   line-height:1.1; letter-spacing:.5px; white-space:nowrap;
 }
-.period-counts-left  .pc-w { color:var(--win); }
-.period-counts-right .pc-l { color:var(--loss); }
-.period-counts-right .pc-b { color:var(--mt2); }
+/* Colour follows the class, never the side, so the counts can be re-sided
+   without a matching CSS edit. Sides are set in markup and mirror the arcs:
+   mountResultDonut plots [win, loss, be] clockwise from twelve o'clock, so the
+   win arc sweeps the RIGHT half and the loss/BE arcs land on the LEFT — B above
+   L, since BE closes the ring at the upper left. Each figure therefore sits
+   beside the colour it counts. */
+.pc-w { color:var(--win); }
+.pc-l { color:var(--loss); }
+.pc-b { color:var(--mt2); }
 
 /* ── Per-wheel money column (P&L view only) ────────────────────────────────
    Only present while the P&L section is open (body.pnl-open), the same mode
@@ -363,6 +369,20 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 }
 .pm-val.win  { color:var(--win); }
 .pm-val.loss { color:var(--loss); }
+
+/* ── Always-on figure strip (setup + emotion wheels) ───────────────────────
+   Same four-column grid as .period-money, same .pm-lbl / .pm-val primitives —
+   only the reveal rule differs. The period wheels' strip carries dollars, so it
+   hides behind body.pnl-open; these carry percentages, which are never money
+   and so never need gating. Applied alongside .period-money (class="period-money
+   period-stats") to inherit the grid rather than restate it; this rule follows
+   it in source order, so display:grid wins over its display:none.
+
+   .has-stats is the ungated twin of the body.pnl-open host rule: the strip is
+   flex:1 0 100%, which only claims its own line if the host wraps, and the host
+   only spans the column if it is width:100%. */
+.period-stats { display:grid; }
+.period-host.has-stats { width:100%; flex-wrap:wrap; justify-content:center; padding:0; }
 
 /* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
    each win/loss wheel and reuse the session-bar segment styling for a
@@ -1655,15 +1675,15 @@ tr.broker-pending td:first-child {
         <div class="period-label">All Time</div>
         <div class="period-host">
           <div class="period-counts-left">
-            <span class="pc-w" id="cnt-w-total">— W</span>
+            <span class="pc-b" id="cnt-b-total">— B</span>
+            <span class="pc-l" id="cnt-l-total">— L</span>
           </div>
           <div class="period-donut-wrap">
             <canvas id="chart-period-total" width="108" height="108"></canvas>
             <div class="period-center"><div class="period-pnl" id="pnl-total">—</div></div>
           </div>
           <div class="period-counts-right">
-            <span class="pc-l" id="cnt-l-total">— L</span>
-            <span class="pc-b" id="cnt-b-total">— B</span>
+            <span class="pc-w" id="cnt-w-total">— W</span>
           </div>
           <div class="period-money">
             <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-total">—</span>
@@ -1678,15 +1698,15 @@ tr.broker-pending td:first-child {
         <div class="period-label">This Week</div>
         <div class="period-host">
           <div class="period-counts-left">
-            <span class="pc-w" id="cnt-w-week">— W</span>
+            <span class="pc-b" id="cnt-b-week">— B</span>
+            <span class="pc-l" id="cnt-l-week">— L</span>
           </div>
           <div class="period-donut-wrap">
             <canvas id="chart-period-week" width="108" height="108"></canvas>
             <div class="period-center"><div class="period-pnl" id="pnl-week">—</div></div>
           </div>
           <div class="period-counts-right">
-            <span class="pc-l" id="cnt-l-week">— L</span>
-            <span class="pc-b" id="cnt-b-week">— B</span>
+            <span class="pc-w" id="cnt-w-week">— W</span>
           </div>
           <div class="period-money">
             <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-week">—</span>
@@ -1701,15 +1721,15 @@ tr.broker-pending td:first-child {
         <div class="period-label">This Month</div>
         <div class="period-host">
           <div class="period-counts-left">
-            <span class="pc-w" id="cnt-w-month">— W</span>
+            <span class="pc-b" id="cnt-b-month">— B</span>
+            <span class="pc-l" id="cnt-l-month">— L</span>
           </div>
           <div class="period-donut-wrap">
             <canvas id="chart-period-month" width="108" height="108"></canvas>
             <div class="period-center"><div class="period-pnl" id="pnl-month">—</div></div>
           </div>
           <div class="period-counts-right">
-            <span class="pc-l" id="cnt-l-month">— L</span>
-            <span class="pc-b" id="cnt-b-month">— B</span>
+            <span class="pc-w" id="cnt-w-month">— W</span>
           </div>
           <div class="period-money">
             <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-month">—</span>
@@ -2138,6 +2158,10 @@ const Dates = {
   // when inside the day is exactly what distinguishes an Asian-session entry
   // from a New York one. Shown under the date so the session label is legible
   // rather than something to take on trust.
+  // Entry clock, rendered in New York wall time. Surfaced in the trade log with
+  // an "ET" suffix, NOT "NY": the row's neighbouring SESSION column already uses
+  // NY as a session abbreviation (AS / LN / NY / LN+NY), so "21:05 NY" reads as
+  // a session claim rather than a timezone one. ET carries no such collision.
   nyTime(iso) {
     if (!iso) return '';
     const p = Dates.nyParts(new Date(iso));
@@ -2543,6 +2567,7 @@ const Calendar = {
    To keep the journal cohesive, every wheel and bar is built from one shared
    primitive. Do NOT hand-roll a new Chart config or bar markup — reuse these:
      • Result wheel (W/L/B doughnut) → mountResultDonut(canvasId, [w, l, bes])
+     • Figures under a wheel          → resultPctStrip(pctSplit([w,l,b]), total)
      • Win/loss distribution bars     → sessionBarsHtml(list)  (.sess-wr-* classes)
      • Compliance bars (followed %)   → disciplineBar(label, followed, n)
      • Bar thickness                  → --bar-h token   (CSS)
@@ -2566,7 +2591,47 @@ const SEG_BD = parseFloat(cssToken('--seg-bd')) || 1.5;
 // they're built identically and can't drift, the wheel analogue of the shared
 // bar styling. counts = [wins, losses, bes]; an all-zero set renders a hollow
 // placeholder ring. Destroys any prior instance on the same canvas first.
+// Whole-number percentage split for a set of counts, guaranteed to total 100
+// (largest-remainder / Hare quota). Rounding each share independently is the
+// obvious approach and the wrong one: three even thirds round to 33/33/33 and
+// the strip reads 99%, which looks like a counting bug in a journal whose whole
+// value is that its numbers can be trusted. Floor everything, then hand the
+// leftover points to the largest fractional parts first.
+//
+// Returns null when there is nothing to split, so callers render an em-dash
+// rather than a misleading 0%. Callers should also drive the wheel's centre
+// label off THIS win figure, not a separate Math.round, so the ring and the
+// strip can never disagree by a point.
 const DONUT_CUTOUT = '68%';
+function pctSplit(counts) {
+  const total = counts.reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  const exact = counts.map(c => c / total * 100);
+  const out   = exact.map(Math.floor);
+  const order = exact.map((v, i) => [v - Math.floor(v), i])
+                     .sort((a, b) => b[0] - a[0]);
+  let rem = 100 - out.reduce((a, b) => a + b, 0);
+  for (let k = 0; rem > 0; k++, rem--) out[order[k % out.length][1]]++;
+  return out;
+}
+
+// Canonical figure strip that sits beneath a result wheel — the percentage twin
+// of the period wheels' money strip, and built from the same .period-money grid
+// and .pm-lbl / .pm-val spans so the two are typographically identical. `pct` is
+// a pctSplit() result (or null for an empty wheel); `total` is the trade count.
+// Win is green and Loss red, matching the arcs and the counts beside them; BE
+// and Trades stay neutral, exactly as Net and Trades do in the money strip.
+function resultPctStrip(pct, total) {
+  const v = i => pct ? pct[i] + '%' : '—';
+  return `
+    <div class="period-money period-stats">
+      <span class="pm-lbl">Win %</span><span class="pm-val win">${v(0)}</span>
+      <span class="pm-lbl">Loss %</span><span class="pm-val loss">${v(1)}</span>
+      <span class="pm-lbl">BE %</span><span class="pm-val">${v(2)}</span>
+      <span class="pm-lbl">Trades</span><span class="pm-val">${total}</span>
+    </div>`;
+}
+
 function mountResultDonut(canvasId, counts) {
   Charts.destroy(canvasId);
   const canvas = $(canvasId);
@@ -3512,9 +3577,11 @@ function renderSetupTable(ft) {
     const l = list.filter(t => t.result === 'loss').length;
     const b = list.filter(t => t.result === 'be').length;
     const total = w + l + b;
-    const wr = total ? Math.round(w / total * 100) : null;
+    // One split feeds both the ring's centre label and its figure strip.
+    const pct = pctSplit([w, l, b]);
+    const wr  = pct ? pct[0] : null;
     const cid = 'chart-setup-' + setup.replace(/[^a-z0-9]/gi, '');
-    return { setup, list, w, l, b, total, wr, cid };
+    return { setup, list, w, l, b, total, pct, wr, cid };
   });
 
   host.innerHTML = `
@@ -3524,18 +3591,19 @@ function renderSetupTable(ft) {
         return `
           <div class="setup-donut-col">
             <div class="setup-donut-label">${escHtml(s.setup)}</div>
-            <div class="period-host">
+            <div class="period-host has-stats">
               <div class="period-counts-left">
-                <span class="pc-w">${s.w} W</span>
+                <span class="pc-b">${s.b} B</span>
+                <span class="pc-l">${s.l} L</span>
               </div>
               <div class="period-donut-wrap">
                 <canvas id="${s.cid}" width="108" height="108"></canvas>
                 <div class="period-center"><div class="period-pnl">${wrText}</div></div>
               </div>
               <div class="period-counts-right">
-                <span class="pc-l">${s.l} L</span>
-                <span class="pc-b">${s.b} B</span>
+                <span class="pc-w">${s.w} W</span>
               </div>
+              ${resultPctStrip(s.pct, s.total)}
             </div>
             <div class="setup-sess">${sessionBarsHtml(s.list)}</div>
           </div>`;
@@ -3669,23 +3737,25 @@ function renderEmotionBars(ft) {
     <div class="emo-cat-row">
       ${catCounts.map((cc, i) => {
         const decided = cc.win + cc.loss + cc.be;
-        const wr = decided ? Math.round(cc.win / decided * 100) : null;
-        const wrText  = wr === null ? '—' : wr + '%';
+        // One split feeds both the ring's centre label and its figure strip.
+        const pct     = pctSplit([cc.win, cc.loss, cc.be]);
+        const wrText  = pct ? pct[0] + '%' : '—';
         return `
           <div class="emo-cat-col">
             <div class="emo-cat-label">${cc.grp.name}</div>
-            <div class="period-host">
+            <div class="period-host has-stats">
               <div class="period-counts-left">
-                <span class="pc-w">${cc.win} W</span>
+                <span class="pc-b">${cc.be} B</span>
+                <span class="pc-l">${cc.loss} L</span>
               </div>
               <div class="period-donut-wrap">
                 <canvas id="chart-emo-cat-${i}" width="108" height="108"></canvas>
                 <div class="period-center"><div class="period-pnl">${wrText}</div></div>
               </div>
               <div class="period-counts-right">
-                <span class="pc-l">${cc.loss} L</span>
-                <span class="pc-b">${cc.be} B</span>
+                <span class="pc-w">${cc.win} W</span>
               </div>
+              ${resultPctStrip(pct, decided)}
             </div>
             <div class="emo-cat-bars">${barsFor(cc.grp)}</div>
           </div>`;
@@ -3788,7 +3858,7 @@ function renderTradeTable(ft) {
     const sessionAbbr = t.session ? (CONFIG.SESSION_ABBR[t.session] || t.session) : '—';
 
     return `<tr data-trade="${escHtml(t.id)}"${t.brokerPending ? ' class="broker-pending"' : ''}>
-      <td>${date}${entryClock ? `<span class="tlog-time">${entryClock} NY</span>` : ''}</td>
+      <td>${date}${entryClock ? `<span class="tlog-time">${entryClock} ET</span>` : ''}</td>
       <td><span class="dir-pill">${escHtml(t.direction || '—')}</span></td>
       <td>${escHtml(sessionAbbr)}</td>
       <td>${setupCellHtml(t.setup)}</td>
