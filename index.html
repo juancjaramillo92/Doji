@@ -2167,24 +2167,66 @@ const Dates = {
   // offset — Colombia never shifts but New York does, so for half the year the
   // old local mapping ran one hour off. This is only the modal's DEFAULT; the
   // session pill can always be overridden by hand.
-  // Single source of truth for session classification. Previously this logic
-  // existed twice with DIFFERENT boundaries — 17:00/05:00 here and 18:00/04:00
-  // in BrokerSync — so the same instant was classified differently depending on
-  // whether the trade arrived by hand or by sync, putting a seam through every
-  // session statistic. Now one function, called by both.
+  // Single source of truth for session classification.
   //
-  // Boundaries (New York wall clock, DST-correct via nyParts):
-  //   Asian 18:00–03:00 · Asia+London 03:00–04:00 · London 04:00–08:00
-  //   London+NY 08:00–12:00 · New York 12:00–18:00
+  // Derived from the four financial centres' ACTUAL local business hours rather
+  // than from hardcoded New-York hours. This matters: London opens at 08:00
+  // London time, which is 03:00 in New York for most of the year but 02:00 or
+  // 04:00 during the two or three weeks when US and UK daylight saving are
+  // misaligned. A fixed NY-hour table is silently an hour wrong in those
+  // windows — the same class of bug the Colombia note below describes, applied
+  // to the other centres. Asking each timezone for its own wall clock removes
+  // it permanently.
   //
+  // Session hours, local to each centre (the standard interbank convention):
+  //   Sydney    07:00–16:00  Australia/Sydney
+  //   Tokyo     09:00–18:00  Asia/Tokyo
+  //   London    08:00–17:00  Europe/London
+  //   New York  08:00–17:00  America/New_York
+  //
+  // The five buckets fall out of which centres are open at once. Order of
+  // testing matters — the overlaps are the more specific case and must be
+  // checked before the single-centre ones.
+  //
+  // Between the New York close and the Sydney open no centre is trading. The
+  // app has no bucket for that, and it is the quietest stretch of the day, so
+  // it is folded into Asian — the session it immediately precedes.
+  MARKET_HOURS: {
+    sydney: { tz: 'Australia/Sydney',   open: 7, close: 16 },
+    tokyo:  { tz: 'Asia/Tokyo',         open: 9, close: 18 },
+    london: { tz: 'Europe/London',      open: 8, close: 17 },
+    ny:     { tz: 'America/New_York',   open: 8, close: 17 }
+  },
+
+  // Wall-clock hour (0–23) at `date` in an arbitrary IANA zone, DST-correct.
+  hourIn(tz, date) {
+    const p = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: '2-digit', hour12: false
+    }).formatToParts(date);
+    let h = +(p.find(x => x.type === 'hour')?.value ?? 0);
+    if (h === 24) h = 0;                        // some engines emit '24' at midnight
+    return h;
+  },
+
+  isOpen(mkt, date) {
+    const h = Dates.hourIn(mkt.tz, date);
+    return mkt.open <= mkt.close
+      ? (h >= mkt.open && h < mkt.close)
+      : (h >= mkt.open || h < mkt.close);       // tolerate a wrapping session
+  },
+
   // Defaults to now, so the journal modal can still call it with no argument.
   detectSession(date = new Date()) {
-    const h = Dates.nyParts(date).hour;
-    if (h >= 18 || h < 3) return 'Asian';
-    if (h < 4)  return 'Asia+London';
-    if (h < 8)  return 'London';
-    if (h < 12) return 'London+NY';
-    return 'New York';
+    const M = Dates.MARKET_HOURS;
+    const london = Dates.isOpen(M.london, date);
+    const ny     = Dates.isOpen(M.ny,     date);
+    const asia   = Dates.isOpen(M.tokyo,  date) || Dates.isOpen(M.sydney, date);
+
+    if (london && ny)   return 'London+NY';
+    if (london && asia) return 'Asia+London';
+    if (london)         return 'London';
+    if (ny)             return 'New York';
+    return 'Asian';
   },
 
   // ─── Weekly forex-close anchor (Friday 17:00 America/New_York) ──────────────
