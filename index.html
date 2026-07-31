@@ -371,17 +371,21 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .pm-val.loss { color:var(--loss); }
 
 /* ── Always-on figure strip (setup + emotion wheels) ───────────────────────
-   Same four-column grid as .period-money, same .pm-lbl / .pm-val primitives —
-   only the reveal rule differs. The period wheels' strip carries dollars, so it
-   hides behind body.pnl-open; these carry percentages, which are never money
-   and so never need gating. Applied alongside .period-money (class="period-money
-   period-stats") to inherit the grid rather than restate it; this rule follows
-   it in source order, so display:grid wins over its display:none.
+   Same grid and same .pm-lbl / .pm-val primitives as .period-money — only the
+   reveal rule and the column count differ. The period wheels' strip carries
+   dollars, so it hides behind body.pnl-open; these carry percentages, which are
+   never money and so never need gating. Applied alongside .period-money
+   (class="period-money period-stats") to inherit the grid rather than restate
+   it; this rule follows it in source order, so display:grid wins over its
+   display:none.
 
    .has-stats is the ungated twin of the body.pnl-open host rule: the strip is
    flex:1 0 100%, which only claims its own line if the host wraps, and the host
    only spans the column if it is width:100%. */
-.period-stats { display:grid; }
+/* The money strip is fixed at four figures; this one carries three, so it drops
+   the inherited track list and lets grid-auto-flow:column mint one equal column
+   per figure — adding or removing a figure then needs no CSS change. */
+.period-stats { display:grid; grid-template-columns:none; grid-auto-columns:1fr; }
 .period-host.has-stats { width:100%; flex-wrap:wrap; justify-content:center; padding:0; }
 
 /* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
@@ -877,68 +881,78 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
    would otherwise add a phantom row beneath it inside the grid cell. */
 .log-split > .tlog-wrap { margin-bottom:0; }
 
-/* The card is a plain .cbox with its padding removed: the padding moves onto
-   .roll-col so each panel carries its own, which is what lets the panels scroll
-   edge-to-edge instead of sliding inside a padded window. */
+/* Padding is carried by the inner bands rather than the card, so the header
+   rules can run edge to edge exactly as the trade table's thead border does.
+   ═══ Alignment with the trade log ═══
+   The two cards sit in one grid row and are read as a pair, so their internal
+   bands are pinned to each other rather than merely starting at the same y:
+     .roll-topbar  ⟷ .tlog-hdr   (pagination bar)   — same 10px/18px padding,
+                                  and .roll-range is given the pagination
+                                  button's exact box metrics so the two bars
+                                  resolve to the same height by construction
+                                  instead of by a number that could drift.
+     .roll-head    ⟷ thead th    (column titles)    — same 16px/10px padding,
+                                  same 9px mono type, same bottom rule.
+     .roll-list rows ⟷ tbody tr  (data rows)        — same vertical padding and
+                                  the same faint purple separator.
+   Row heights cannot match one-for-one — a log row carrying an entry clock runs
+   two lines and a roll row never does — so the guarantee is the rhythm and the
+   three anchors, not a row-by-row lockstep. */
 .roll-card { padding:0; overflow:hidden; }
 
-/* Carousel at EVERY width, unlike the analytic rows — the two panels are one
-   reading of two ranges, so showing both side by side would halve the width
-   each gets and say nothing the swipe doesn't. */
-.roll-row {
-  display:grid; grid-auto-flow:column; grid-auto-columns:100%;
-  overflow-x:auto; overflow-y:hidden;
-  scroll-snap-type:x mandatory;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
+.roll-topbar {
+  display:flex; align-items:center; justify-content:flex-end;
+  padding:10px 18px; white-space:nowrap;
 }
-.roll-row::-webkit-scrollbar { display:none; }
-.roll-col {
-  scroll-snap-align:center; scroll-snap-stop:always;
-  min-width:0; padding:16px 18px 0;
-}
-.roll-row + .snap-dots { display:flex; justify-content:center; gap:6px; padding:16px 0; }
-
-.roll-hdr {
-  display:flex; align-items:baseline; justify-content:space-between;
-  gap:12px; margin-bottom:var(--gap-title);
-}
-/* .cbox-l carries a bottom margin for the stacked case; here the header row owns
-   the spacing, so cancel it or the gap doubles. */
-.roll-hdr .cbox-l { margin-bottom:0; }
-/* Purple marks the range the panel is reporting — the same accent the active
-   nav tab and carousel dot use for "this is the one you're looking at". */
+/* Metrics copied from .tlog-pag-btn — font size, padding and a transparent
+   1px border standing in for the button's real one — so this bar and the
+   pagination bar opposite are the same height without either hardcoding it.
+   Purple marks the range being reported, the same accent the active nav tab
+   and carousel dot use for "this is the one you are looking at". */
 .roll-range {
-  font-family:var(--mono); font-size:9px; font-weight:600;
+  font-family:var(--mono); font-size:8px; font-weight:600;
   letter-spacing:1px; text-transform:uppercase; color:var(--p);
+  padding:3px 10px; border:1px solid transparent;
 }
-.roll-list { display:flex; flex-direction:column; gap:11px; }
+/* The log hides its pagination bar entirely on a single page. When it does,
+   this bar must go too or the roll-forward sits a bar-height lower than the
+   table it is meant to line up with. */
+.log-split:has(.tlog-hdr:has(.tlog-pagination:empty)) .roll-topbar { display:none; }
 
-/* The reconciliation's closing line. Heavier and ruled off because it is the
-   one figure in the panel that is a RESULT rather than an input — everything
-   above it is a term in the sum that produces it. */
-.roll-total { margin-top:var(--gap-divider); padding-top:var(--gap-divider); border-top:1px solid var(--glass-bd); }
+/* Same box as `thead th`: 16px above, 10px below, a rule underneath. th:first-child
+   zeroes its left padding and the table sits in an 18px-padded wrapper, so 18px
+   here lands on the identical content edge. */
+.roll-head {
+  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
+  color:var(--mt); padding:16px 18px 10px;
+  border-bottom:1px solid var(--glass-bd);
+}
+.roll-list { padding:0 18px; }
+/* Matches `td` vertical padding and the tbody row separator. Separators are put
+   on the TOP of each row after the first rather than the bottom of every row:
+   with border-bottom, the closing total's own heavier rule would stack directly
+   on top of the previous row's faint one and read as a doubled line. */
+.roll-list .pnl-stat { padding:9px 0; }
+.roll-list .pnl-stat + .pnl-stat { border-top:1px solid rgba(139,53,184,.04); }
+/* The card's bottom edge closes the last list; 9px keeps the final row off it by
+   the same margin `td` gives every row above. */
+.roll-list:last-child { padding-bottom:9px; }
+
+/* The reconciliation's closing line. Heavier because it is the one figure in
+   the block that is a RESULT rather than an input — everything above it is a
+   term in the sum that produces it. Two classes deep to outrank the sibling
+   separator rule above, which it replaces rather than adds to. */
+.roll-list .roll-total { border-top:1px solid var(--glass-bd); }
 .roll-total .pnl-stat-lbl { color:var(--mt2); }
 .roll-total .pnl-stat-val { font-size:14px; }
 
-/* Everything below the rule is context, NOT arithmetic. The separation is the
-   point: the four lines above reconcile exactly (start + profit − loss = end)
-   and adding a fifth term to that block would break an identity the trader
-   should be able to check by eye. Best/worst, averages and profit factor
-   describe the same trades from a different angle and belong outside the sum. */
-.roll-memo {
-  margin-top:var(--gap-divider); padding-top:var(--gap-divider);
-  border-top:1px solid var(--glass-bd);
-  display:flex; flex-direction:column; gap:11px;
-}
-.roll-memo-title { margin-bottom:2px; }
-.roll-foot {
-  padding:14px 0 16px;
-  font-family:var(--mono); font-size:7px; letter-spacing:.5px;
-  color:var(--mt); line-height:1.5;
-}
+/* Everything below the second header is context, NOT arithmetic. The separation
+   is the point: the four lines above reconcile exactly (start + profit − loss =
+   end) and adding a fifth term to that block would break an identity meant to be
+   checkable by eye. Best/worst and the averages describe the same trades from a
+   different angle and belong outside the sum. */
 .roll-empty {
-  padding:6px 0 18px;
+  padding:16px 18px 18px;
   font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
 }
 
@@ -1483,11 +1497,9 @@ tr.broker-pending td:first-child {
    re-renders by the Carousel module). Companion pairs (.grid-2) stack
    vertically — they're two halves of one card, not siblings to flick through.
    ═══════════════════════════════════════════════════════════════════════════ */
-/* Swipe-position dots. The dot styling lives in the base layer because the
-   carousel pattern is no longer mobile-only — the roll-forward panels swipe at
-   every width (see LOG + ROLL-FORWARD SPLIT). Only the CONTAINER's visibility is
-   width-dependent: hidden by default, switched on inside the mobile layer for
-   the analytic rows and unconditionally for .roll-row. */
+/* Swipe-position dots. The dot styling lives in the base layer while the
+   container's visibility is switched on inside the mobile layer, where the
+   analytic rows become carousels. */
 .snap-dots { display:none; }
 .snap-dot {
   width:6px; height:6px; border-radius:50%;
@@ -1501,11 +1513,10 @@ tr.broker-pending td:first-child {
 
   /* Companion boxes stack */
   .grid-2 { grid-template-columns:1fr; }
-  /* Log and roll-forward stack too: side by side would leave the table roughly
-     140px wide. The roll-forward goes FIRST — on a phone the summary is the
-     glance you came for, and the log is what you scroll to. */
+  /* Log and roll-forward stack: side by side would leave the table roughly
+     140px wide. Source order is kept, so the roll-forward lands beneath the log
+     exactly as every other right-hand column in the journal does. */
   .log-split { grid-template-columns:1fr; }
-  .log-split > .roll-card { order:-1; }
 
   /* Fullscreen does nothing meaningful on a phone: browser chrome is already
      minimal and the API is unreliable on iOS. Import/export is a desk task —
@@ -2663,7 +2674,7 @@ const Calendar = {
    To keep the journal cohesive, every wheel and bar is built from one shared
    primitive. Do NOT hand-roll a new Chart config or bar markup — reuse these:
      • Result wheel (W/L/B doughnut) → mountResultDonut(canvasId, [w, l, bes])
-     • Figures under a wheel          → resultPctStrip(pctSplit([w,l,b]), total)
+     • Figures under a wheel          → resultPctStrip(pctSplit([w,l,b]))
      • Win/loss distribution bars     → sessionBarsHtml(list)  (.sess-wr-* classes)
      • Compliance bars (followed %)   → disciplineBar(label, followed, n)
      • Bar thickness                  → --bar-h token   (CSS)
@@ -2714,17 +2725,23 @@ function pctSplit(counts) {
 // Canonical figure strip that sits beneath a result wheel — the percentage twin
 // of the period wheels' money strip, and built from the same .period-money grid
 // and .pm-lbl / .pm-val spans so the two are typographically identical. `pct` is
-// a pctSplit() result (or null for an empty wheel); `total` is the trade count.
-// Win is green and Loss red, matching the arcs and the counts beside them; BE
-// and Trades stay neutral, exactly as Net and Trades do in the money strip.
-function resultPctStrip(pct, total) {
+// a pctSplit() result, or null for an empty wheel.
+//
+// The strip is ALL rates and the wheel is ALL quantities — that split is the
+// whole point of the arrangement. Win rate used to sit in the wheel's hub with
+// the counts around it and the rates below, which put a percentage inside a ring
+// of tallies and a tally (trades) inside a row of percentages: two mixed
+// readings instead of two clean ones. Now the hub carries the trade count, the
+// figures beside the arcs carry W/L/B counts, and every number below the wheel
+// is a rate. Nothing was dropped — the trade count moved into the hub rather
+// than out of the panel.
+function resultPctStrip(pct) {
   const v = i => pct ? pct[i] + '%' : '—';
   return `
     <div class="period-money period-stats">
-      <span class="pm-lbl">Win %</span><span class="pm-val win">${v(0)}</span>
+      <span class="pm-lbl">Win Rate</span><span class="pm-val win">${v(0)}</span>
       <span class="pm-lbl">Loss %</span><span class="pm-val loss">${v(1)}</span>
       <span class="pm-lbl">BE %</span><span class="pm-val">${v(2)}</span>
-      <span class="pm-lbl">Trades</span><span class="pm-val">${total}</span>
     </div>`;
 }
 
@@ -3674,17 +3691,17 @@ function renderSetupTable(ft) {
     const l = list.filter(t => t.result === 'loss').length;
     const b = list.filter(t => t.result === 'be').length;
     const total = w + l + b;
-    // One split feeds both the ring's centre label and its figure strip.
     const pct = pctSplit([w, l, b]);
-    const wr  = pct ? pct[0] : null;
     const cid = 'chart-setup-' + setup.replace(/[^a-z0-9]/gi, '');
-    return { setup, list, w, l, b, total, pct, wr, cid };
+    return { setup, list, w, l, b, total, pct, cid };
   });
 
   host.innerHTML = `
     <div class="setup-donut-row">
       ${stats.map(s => {
-        const wrText  = s.wr === null ? '—' : s.wr + '%';
+        // The hub is a QUANTITY — see resultPctStrip. Dash rather than 0 when
+        // the wheel is a hollow placeholder, matching the strip beneath it.
+        const hub = s.total || '—';
         return `
           <div class="setup-donut-col">
             <div class="setup-donut-label">${escHtml(s.setup)}</div>
@@ -3695,12 +3712,12 @@ function renderSetupTable(ft) {
               </div>
               <div class="period-donut-wrap">
                 <canvas id="${s.cid}" width="108" height="108"></canvas>
-                <div class="period-center"><div class="period-pnl">${wrText}</div></div>
+                <div class="period-center"><div class="period-pnl">${hub}</div></div>
               </div>
               <div class="period-counts-right">
                 <span class="pc-w">${s.w} W</span>
               </div>
-              ${resultPctStrip(s.pct, s.total)}
+              ${resultPctStrip(s.pct)}
             </div>
             <div class="setup-sess">${sessionBarsHtml(s.list)}</div>
           </div>`;
@@ -3834,9 +3851,8 @@ function renderEmotionBars(ft) {
     <div class="emo-cat-row">
       ${catCounts.map((cc, i) => {
         const decided = cc.win + cc.loss + cc.be;
-        // One split feeds both the ring's centre label and its figure strip.
         const pct     = pctSplit([cc.win, cc.loss, cc.be]);
-        const wrText  = pct ? pct[0] + '%' : '—';
+        const hub     = decided || '—';
         return `
           <div class="emo-cat-col">
             <div class="emo-cat-label">${cc.grp.name}</div>
@@ -3847,12 +3863,12 @@ function renderEmotionBars(ft) {
               </div>
               <div class="period-donut-wrap">
                 <canvas id="chart-emo-cat-${i}" width="108" height="108"></canvas>
-                <div class="period-center"><div class="period-pnl">${wrText}</div></div>
+                <div class="period-center"><div class="period-pnl">${hub}</div></div>
               </div>
               <div class="period-counts-right">
                 <span class="pc-w">${cc.win} W</span>
               </div>
-              ${resultPctStrip(pct, decided)}
+              ${resultPctStrip(pct)}
             </div>
             <div class="emo-cat-bars">${barsFor(cc.grp)}</div>
           </div>`;
@@ -3910,9 +3926,11 @@ function renderDuringMgmt(ft) {
 
 
 /* ─── RANGE ROLL-FORWARD ─────────────────────────────────────────────────── */
-/* Two swipeable panels beside the trade log — this week and this month — each
-   answering "where did the P&L start this range, what happened inside it, and
-   where did it end".
+/* One panel beside the trade log, reporting the current month: where the P&L
+   started the range, what happened inside it, and where it ended.
+ *
+ * Written against a `period` rather than hardcoding the month, so a second
+ * range is a call site away — periodCutoff already understands 'week'.
  *
  * P&L, NOT BALANCE. The trader asked for it this way and it matters: balance is
  * contaminated by deposits and withdrawals, so a funded account shows a rising
@@ -3940,8 +3958,6 @@ function rollForwardStats(ft, period) {
   let gross = 0, loss = 0, n = 0;         // inside the range
   let wins = 0, losses = 0;
   let best = null, worst = null;
-  let commission = 0, commissionN = 0;
-  const inRange = [];
 
   for (const t of ft) {
     const j = journalForTrade(t);
@@ -3953,27 +3969,6 @@ function rollForwardStats(ft, period) {
     if (v >= 0) { gross += v; wins++; } else { loss -= v; losses++; }
     if (best  === null || v > best)  best  = v;
     if (worst === null || v < worst) worst = v;
-    // Costs are a MEMO, never a term in the sum — see the note on .roll-memo
-    // and the footnote this drives. Counted separately so the panel can say how
-    // much of the range it actually covers.
-    if (typeof t.brokerCommission === 'number') { commission += t.brokerCommission; commissionN++; }
-    inRange.push(t);
-  }
-
-  // Deepest peak-to-trough dip of the running P&L curve WITHIN the range. Worst
-  // trade answers "what was the single biggest hit"; this answers "how far down
-  // did the range actually go", which is a different question whenever a string
-  // of small losses adds up to more than any one of them. Ordered by entry
-  // instant where there is one, falling back to the filing day — same ordering
-  // the trade log uses, so the curve matches the sequence on screen.
-  inRange.sort((a, b) =>
-    String(a.entryTime || a.openTime).localeCompare(String(b.entryTime || b.openTime)));
-  let run = 0, peak = 0, dd = 0;
-  for (const t of inRange) {
-    const v = safeNum(journalForTrade(t)?.pnl) ?? 0;
-    run += v;
-    if (run > peak) peak = run;
-    if (peak - run > dd) dd = peak - run;
   }
 
   return {
@@ -3983,13 +3978,7 @@ function rollForwardStats(ft, period) {
     change: gross - loss,
     best, worst,
     avgWin:  wins   ? gross / wins   : null,
-    avgLoss: losses ? loss  / losses : null,
-    // Undefined rather than infinite when nothing was lost: one number cannot
-    // express "made money and lost none", and printing ∞ or a huge ratio would
-    // invite comparison against a range where it is finite.
-    pf: loss > 0 ? gross / loss : null,
-    dd,
-    commission, commissionN
+    avgLoss: losses ? loss  / losses : null
   };
 }
 
@@ -4006,61 +3995,34 @@ function renderRollForward(ft) {
   const host = $('roll-forward');
   if (!host) return;
 
-  const RANGES = [
-    { key: 'week',  label: 'This Week'  },
-    { key: 'month', label: 'This Month' }
-  ];
+  const s = rollForwardStats(ft, 'month');
+
+  // Signed where the sign is information (a figure that can go either way),
+  // neutral where it is not. Gross profit is always ≥ 0 and gross loss always
+  // ≤ 0, so colouring them is decoration; opening, closing and the change
+  // genuinely carry a direction.
+  const recon =
+      rollRow('P&amp;L at range start', money(round2(s.opening)), s.opening)
+    + rollRow('+ Gross profit',         money(round2(s.gross)),   s.n ? 1 : 0)
+    + rollRow('&minus; Gross loss',     money(round2(s.loss)),    s.n ? -1 : 0)
+    + rollRow('= P&amp;L at range end', money(round2(s.closing)), s.closing, 'roll-total');
+
+  const detail = !s.n ? `<div class="roll-empty">No closed trades this month yet.</div>` : `
+    <div class="roll-head">In this range</div>
+    <div class="roll-list">
+      ${rollRow('Net change',  money(round2(s.change)), s.change)}
+      ${rollRow('Trades',      String(s.n), 0)}
+      ${rollRow('Best trade',  money(round2(s.best)),  s.best)}
+      ${rollRow('Worst trade', money(round2(s.worst)), s.worst)}
+      ${rollRow('Avg win',     s.avgWin  === null ? '—' : money(round2(s.avgWin)),  s.avgWin  === null ? 0 : 1)}
+      ${rollRow('Avg loss',    s.avgLoss === null ? '—' : money(round2(s.avgLoss)), s.avgLoss === null ? 0 : -1)}
+    </div>`;
 
   host.innerHTML = `
-    <div class="roll-row" id="roll-row">
-      ${RANGES.map(r => {
-        const s = rollForwardStats(ft, r.key);
-        // Signed where the sign is information (a figure that can go either
-        // way), neutral where it is not. Gross profit is always ≥ 0 and gross
-        // loss always ≤ 0, so colouring them is decoration; opening, closing
-        // and the change genuinely carry a direction.
-        const recon =
-            rollRow('P&amp;L at range start', money(round2(s.opening)), s.opening)
-          + rollRow('+ Gross profit',         money(round2(s.gross)),   s.n ? 1 : 0)
-          + rollRow('&minus; Gross loss',     money(round2(s.loss)),    s.n ? -1 : 0)
-          + rollRow('= P&amp;L at range end', money(round2(s.closing)), s.closing, 'roll-total');
-
-        const memo = !s.n ? '' : `
-          <div class="roll-memo">
-            <div class="cbox-l roll-memo-title">In this range</div>
-            ${rollRow('Net change',    money(round2(s.change)), s.change)}
-            ${rollRow('Trades',        String(s.n), 0)}
-            ${rollRow('Best trade',    money(round2(s.best)),  s.best)}
-            ${rollRow('Worst trade',   money(round2(s.worst)), s.worst)}
-            ${rollRow('Avg win',       s.avgWin  === null ? '—' : money(round2(s.avgWin)),  s.avgWin  === null ? 0 : 1)}
-            ${rollRow('Avg loss',      s.avgLoss === null ? '—' : money(round2(s.avgLoss)), s.avgLoss === null ? 0 : -1)}
-            ${rollRow('Profit factor', s.pf === null ? '—' : s.pf.toFixed(2), 0)}
-            ${rollRow('Max drawdown',  money(round2(s.dd)), s.dd > 0 ? -1 : 0)}
-            ${s.commissionN
-              ? rollRow('Commissions', money(round2(s.commission)), s.commission ? -1 : 0)
-              : ''}
-          </div>
-          ${s.commissionN ? `
-            <div class="roll-foot">
-              Commissions are already inside every P&amp;L above &mdash; shown here as
-              context, not as a term in the sum.
-              ${s.commissionN < s.n ? `Broker data covers ${s.commissionN} of ${s.n} trades.` : ''}
-            </div>` : ''}`;
-
-        const body = s.n
-          ? recon + memo
-          : recon + `<div class="roll-empty">No closed trades in this range yet.</div>`;
-
-        return `
-          <div class="roll-col">
-            <div class="roll-hdr">
-              <div class="cbox-l">Range roll-forward</div>
-              <div class="roll-range">${r.label}</div>
-            </div>
-            <div class="roll-list">${body}</div>
-          </div>`;
-      }).join('')}
-    </div>`;
+    <div class="roll-topbar"><span class="roll-range">This Month</span></div>
+    <div class="roll-head">Range roll-forward</div>
+    <div class="roll-list">${recon}</div>
+    ${detail}`;
 }
 
 
@@ -5698,11 +5660,12 @@ const BrokerSync = {
     // way the balance is, and for the same reasons — it rides along with
     // backup, restore and cloud sync for free.
     //
-    // It is NOT subtracted anywhere: the P&L this app records is already net of
-    // it (net_pnl from the email includes swap and costs; computed_pnl is
-    // derived from the deals, which carry them too). Deducting it again would
-    // double-count. It exists purely so the roll-forward can show what the
-    // costs came to, clearly marked as a memo.
+    // RECORDED, NOT DISPLAYED. Nothing reads it today; it is captured because
+    // the value only exists at sync time, so a panel that wants it later can
+    // have history instead of starting from the day it was added. It must never
+    // be subtracted from anything: the P&L this app records is already net of it
+    // (net_pnl from the email includes swap and costs; computed_pnl is derived
+    // from the deals, which carry them too), so deducting it would double-count.
     const comm = brokerCommission(fill);
     if (comm !== null) trade.brokerCommission = comm;
 
@@ -5837,10 +5800,7 @@ const Carousel = {
       ['period', document.getElementById('period-row')],
       ['setup',  document.querySelector('#setup-table .setup-donut-row')],
       ['emo',    document.querySelector('#emo-cat-wheels .emo-cat-row')],
-      ['during', document.querySelector('#emo-during-mgmt .emo-during-grid')],
-      // Unlike the four above, this one swipes at every width — its dots are
-      // shown by a base-layer rule rather than the mobile one.
-      ['roll',   document.querySelector('#roll-forward .roll-row')]
+      ['during', document.querySelector('#emo-during-mgmt .emo-during-grid')]
     ];
     for (const [key, el] of rows) {
       if (!el || el.dataset.carousel) continue;
