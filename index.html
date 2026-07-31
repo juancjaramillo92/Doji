@@ -556,6 +556,11 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 /* ═══════════════════════════════════════════════════════════════════════════
    R:R BAR
    ═══════════════════════════════════════════════════════════════════════════ */
+.tlog-time {
+  display:block; margin-top:2px;
+  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
+}
+
 .rr-bar-wrap {
   background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
   padding:16px 18px; margin-bottom:var(--gap-section);
@@ -2135,6 +2140,16 @@ const Dates = {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-GB', opts || { day:'2-digit', month:'short', year:'2-digit' });
   },
+  // Entry clock time in New York, "HH:MM". The trade log files a trade under a
+  // civil day, which deliberately says nothing about WHEN inside that day — and
+  // when inside the day is exactly what distinguishes an Asian-session entry
+  // from a New York one. Shown under the date so the session label is legible
+  // rather than something to take on trust.
+  nyTime(iso) {
+    if (!iso) return '';
+    const p = Dates.nyParts(new Date(iso));
+    return String(p.hour).padStart(2, '0') + ':' + String(p.minute).padStart(2, '0');
+  },
   isoDay(d) {
     // YYYY-MM-DD in local time
     const y = d.getFullYear();
@@ -2152,10 +2167,21 @@ const Dates = {
   // offset — Colombia never shifts but New York does, so for half the year the
   // old local mapping ran one hour off. This is only the modal's DEFAULT; the
   // session pill can always be overridden by hand.
-  detectSession() {
-    const h = Dates.nyParts(new Date()).hour;
-    if (h >= 17 || h < 3) return 'Asian';
-    if (h < 5)  return 'Asia+London';
+  // Single source of truth for session classification. Previously this logic
+  // existed twice with DIFFERENT boundaries — 17:00/05:00 here and 18:00/04:00
+  // in BrokerSync — so the same instant was classified differently depending on
+  // whether the trade arrived by hand or by sync, putting a seam through every
+  // session statistic. Now one function, called by both.
+  //
+  // Boundaries (New York wall clock, DST-correct via nyParts):
+  //   Asian 18:00–03:00 · Asia+London 03:00–04:00 · London 04:00–08:00
+  //   London+NY 08:00–12:00 · New York 12:00–18:00
+  //
+  // Defaults to now, so the journal modal can still call it with no argument.
+  detectSession(date = new Date()) {
+    const h = Dates.nyParts(date).hour;
+    if (h >= 18 || h < 3) return 'Asian';
+    if (h < 4)  return 'Asia+London';
     if (h < 8)  return 'London';
     if (h < 12) return 'London+NY';
     return 'New York';
@@ -2281,7 +2307,7 @@ function migrateData() {
   for (const j of State.journals) {
     if (!j.beforeTags)  { j.beforeTags  = []; changed = true; }
     if (!j.duringTags)  { j.duringTags  = []; changed = true; }
-    if (!j.afterTags)   { j.afterTags   = []; changed = true; }
+    if ('afterTags' in j) { delete j.afterTags; changed = true; }
     if (!j.emotionTags) { j.emotionTags = []; changed = true; }
     if (j.followedSLS == null) { j.followedSLS = ''; changed = true; }
     if (j.followedTPS == null) { j.followedTPS = ''; changed = true; }
@@ -2415,7 +2441,13 @@ function round2(v)  { return Math.round(v * 100) / 100; }
 // truth so every consumer agrees on "recent" and "in order".
 function tradeLogTime(t) {
   const j = journalForTrade(t);
-  return new Date(j?.createdAt || t?.openTime || 0).getTime();
+  // entryTime first: it is the real execution instant from the broker, unique
+  // per trade and correct however long ago the trade happened. createdAt is the
+  // moment the RECORD was written, which for anything imported or backfilled is
+  // "whenever the backfill ran" — every historical trade would collide on one
+  // timestamp and sort at random. openTime is a fixed 09:30Z per day and
+  // collides for same-day trades, so it stays the last resort.
+  return new Date(t?.entryTime || j?.createdAt || t?.openTime || 0).getTime();
 }
 
 // Coerce j.pnl to a number, returning null if it isn't a finite number.
@@ -3705,6 +3737,9 @@ function renderTradeTable(ft) {
   const body = page.map(t => {
     const j = journalForTrade(t);
     const date    = Dates.fmt(t.openTime, { day:'2-digit', month:'short', year:'2-digit' });
+    // Broker-synced trades carry a true execution instant; hand-logged ones do
+    // not, and render the date alone exactly as before.
+    const entryClock = t.entryTime ? Dates.nyTime(t.entryTime) : '';
     const yn = v => v === 'yes' ? '<span class="rules-tick">✓</span>'
                   : v === 'no'  ? '<span class="rules-cross">✕</span>' : '—';
     const rules = j ? yn(j.followedRules) : '—';
@@ -3720,7 +3755,7 @@ function renderTradeTable(ft) {
     const sessionAbbr = t.session ? (CONFIG.SESSION_ABBR[t.session] || t.session) : '—';
 
     return `<tr data-trade="${escHtml(t.id)}"${t.brokerPending ? ' class="broker-pending"' : ''}>
-      <td>${date}</td>
+      <td>${date}${entryClock ? `<span class="tlog-time">${entryClock} NY</span>` : ''}</td>
       <td><span class="dir-pill">${escHtml(t.direction || '—')}</span></td>
       <td>${escHtml(sessionAbbr)}</td>
       <td>${setupCellHtml(t.setup)}</td>
@@ -3899,7 +3934,7 @@ const Journal = {
       Object.assign(j, {
         updatedAt: now, session, direction, setup, pnl, result,
         followedRules, followedSLS, followedTPS,
-        beforeTags, duringTags, afterTags: [], emotionTags
+        beforeTags, duringTags, emotionTags
       });
       const t = State.tradeById.get(j.tradeId);
       if (t) Object.assign(t, { direction, session, setup, result, openTime });
@@ -3910,7 +3945,7 @@ const Journal = {
       if (!Journal.linkedTradeId) {
         State.trades.push({
           id: tid, direction, result, session, setup,
-          openTime, openPrice: null, exitPrice: null, rr: null, source: 'journal'
+          openTime, openPrice: null, exitPrice: null, source: 'journal'
         });
       } else {
         const t = State.tradeById.get(tid);
@@ -3920,7 +3955,7 @@ const Journal = {
         id: jid, tradeId: tid, createdAt: now, updatedAt: now,
         session, direction, setup, result, pnl,
         followedRules, followedSLS, followedTPS,
-        beforeTags, duringTags, afterTags: [], emotionTags
+        beforeTags, duringTags, emotionTags
       };
       State.journals.push(newJ);
       BrokerSync.clearIfComplete(State.tradeById.get(tid), newJ);
@@ -4456,7 +4491,7 @@ function importRowsIntoState(rows) {
 
     State.trades.push({
       id: tid, direction: dir, result, session, setup,
-      openTime: isoDate, openPrice: null, exitPrice: null, rr: null, source: 'import'
+      openTime: isoDate, openPrice: null, exitPrice: null, source: 'import'
     });
 
     const beforeRaw = colByName(row, ['beforetags','before tags']).split(',').map(s => s.trim()).filter(Boolean);
@@ -4477,7 +4512,7 @@ function importRowsIntoState(rows) {
       followedRules: parseYN(colByName(row, ['followedrules','followed rules'])),
       followedSLS:   parseYN(colByName(row, ['followedsls','followed sls'])),
       followedTPS:   parseYN(colByName(row, ['followedtps','followed tps'])),
-      beforeTags, duringTags, afterTags: [],
+      beforeTags, duringTags,
       emotionTags: [...new Set([...beforeTags, ...duringTags])]
     });
     added++;
@@ -5226,12 +5261,11 @@ const BrokerSync = {
       // CLOSING side, which is the exact inverse of the truth.
       direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
       result,
-      session: this.detectSession(sessionAnchor),
+      session: Dates.detectSession(sessionAnchor),
       setup: '',
       openTime,
       openPrice: safeNum(fill.entry_price) ?? safeNum(fill.fill_price),
       exitPrice: safeNum(fill.exit_price),
-      rr: null,
       source: 'broker',
       brokerPositionId: fill.position_id,
       brokerPending: true
@@ -5254,7 +5288,7 @@ const BrokerSync = {
       session: '', direction: fill.direction === 'SELL' ? 'SELL' : 'BUY',
       setup: '', result, pnl,
       followedRules: '', followedSLS: '', followedTPS: '',
-      beforeTags: [], duringTags: [], afterTags: [], emotionTags: []
+      beforeTags: [], duringTags: [], emotionTags: []
     });
     Storage.saveTradesAndJournals();
     this.markProcessed(fill.position_id);
@@ -5275,7 +5309,7 @@ const BrokerSync = {
     const entryTime = fill.entry_time || null;
     if (entryTime && trade.entryTime !== entryTime) {
       trade.entryTime = entryTime;
-      trade.session   = this.detectSession(new Date(entryTime));
+      trade.session   = Dates.detectSession(new Date(entryTime));
       changed = true;
     }
     if (fill.open_day) {
@@ -5319,19 +5353,6 @@ const BrokerSync = {
         .update({ processed: true }).eq('position_id', positionId);
       if (error) throw error;
     } catch (e) { console.error('Doji BrokerSync: markProcessed failed', e); }
-  },
-
-  // Session estimate from the fill's New-York wall-clock hour. The email only
-  // knows the close, so this is a best guess the trader can correct in the
-  // entry. Boundaries (NY time): Asian 18:00–03:00 · Asia+London 03:00–04:00
-  // · London 04:00–08:00 · London+NY 08:00–12:00 · New York 12:00–18:00.
-  detectSession(date) {
-    const h = Dates.nyParts(date).hour;
-    if (h >= 18 || h < 3) return 'Asian';
-    if (h < 4)  return 'Asia+London';
-    if (h < 8)  return 'London';
-    if (h < 12) return 'London+NY';
-    return 'New York';
   },
 
   // Completion contract for a broker-synced entry.
