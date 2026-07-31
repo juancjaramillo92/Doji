@@ -172,12 +172,6 @@ nav {
 #nav-fs-btn .fs-ico-exit { display:none; }
 #nav-fs-btn.is-fs .fs-ico-enter { display:none; }
 #nav-fs-btn.is-fs .fs-ico-exit { display:inline; }
-.nav-add-btn {
-  font-family:var(--mono); padding:4px 11px; border:1px solid var(--p); border-radius:var(--r-sm);
-  background:var(--p-gl2); color:var(--p); cursor:pointer; line-height:1;
-  font-size:18px;
-}
-.nav-add-btn:hover { background:rgba(139,53,184,.3); box-shadow:0 0 18px -2px var(--p-gl3); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PANELS
@@ -1594,7 +1588,6 @@ tr.broker-pending td:first-child {
       <svg class="fs-ico fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
     </button>
     <button id="nav-io-btn" class="nav-icon-btn" title="Import / Export" aria-label="Import / Export data">&#x21C5;</button>
-    <button id="nav-add-btn" class="nav-add-btn" title="New entry" aria-label="New journal entry">+</button>
   </div>
 </nav>
 
@@ -3754,7 +3747,7 @@ function renderTradeTable(ft) {
   const host = $('trade-table');
   const pag  = $('tlog-pagination');
   if (!ft.length) {
-    host.innerHTML = '<div class="empty-msg">No trades yet. Tap <b style="color:var(--p)">+</b> to log your first trade.</div>';
+    host.innerHTML = '<div class="empty-msg">No trades yet. Trades appear here automatically when your broker fills them.</div>';
     pag.innerHTML = '';
     return;
   }
@@ -3879,9 +3872,13 @@ const Journal = {
   // tradeId we should attach a new entry to (set by openForTrade).
   linkedTradeId: null,
 
-  open(existing) {
+  // linkedTradeId must be set BEFORE the form renders, not after: the session
+  // pill is seeded during the render and needs the trade to read it from.
+  // Assigning it afterwards, as openForTrade used to, left the seed with nothing
+  // to look at and silently fell back to the clock.
+  open(existing, linkedId) {
     Journal.editingId     = existing ? existing.id : null;
-    Journal.linkedTradeId = null;
+    Journal.linkedTradeId = linkedId || null;
 
     $('jm-body').innerHTML = renderJournalForm(existing);
 
@@ -3890,7 +3887,22 @@ const Journal = {
     const dir = existing ? existing.direction : '';
     $('jmd-buy').checked  = dir === 'BUY';
     $('jmd-sell').checked = dir === 'SELL';
-    setSessionPill((existing && existing.session) || Dates.detectSession());
+    // Seed the session from the TRADE, not from the clock.
+    //
+    // A broker-synced journal is created with session:'' — the trade carries the
+    // session, derived from the real entry instant, and the journal skeleton has
+    // nothing yet. Falling straight through to detectSession() therefore showed
+    // whatever session it happened to be at the moment the entry was opened, and
+    // save() then wrote that onto the trade. Journalling a 21:00 Asian entry the
+    // next morning silently relabelled it London+NY — destroying the one field
+    // this sync exists to get right. The linked trade is checked first now, and
+    // the clock is only the last resort.
+    const seedTrade = existing ? State.tradeById.get(existing.tradeId)
+                   : Journal.linkedTradeId ? State.tradeById.get(Journal.linkedTradeId)
+                   : null;
+    setSessionPill((existing && existing.session)
+                || (seedTrade && seedTrade.session)
+                || Dates.detectSession());
     // Seed the date picker from the day the trade is actually filed under (its
     // openTime), NOT from createdAt. createdAt is a UTC ISO stamp, so for an
     // evening trade in the Americas its date is already the next calendar day —
@@ -3916,11 +3928,8 @@ const Journal = {
     const t = State.tradeById.get(tradeId);
     if (!t) return;
     const j = journalForTrade(t);
-    if (j) Journal.open(j);
-    else {
-      Journal.open(null);
-      Journal.linkedTradeId = tradeId;
-    }
+    if (j) Journal.open(j, tradeId);
+    else   Journal.open(null, tradeId);
   },
 
   close() {
@@ -3980,17 +3989,16 @@ const Journal = {
       if (t) Object.assign(t, { direction, session, setup, result, openTime });
       BrokerSync.clearIfComplete(t, j);
     } else {
-      const tid = Journal.linkedTradeId || uid();
+      // Every entry now belongs to a trade that already exists — the broker sync
+      // creates the trade, the journal only ever fills it in. The old branch that
+      // minted a trade from nothing went with the + button; without an entry
+      // point it was unreachable code that could only ever produce a record the
+      // sync cannot match to a position.
+      const tid = Journal.linkedTradeId;
+      if (!tid) { notify('No trade linked to this entry.', true); return; }
       const jid = uid();
-      if (!Journal.linkedTradeId) {
-        State.trades.push({
-          id: tid, direction, result, session, setup,
-          openTime, openPrice: null, exitPrice: null, source: 'journal'
-        });
-      } else {
-        const t = State.tradeById.get(tid);
-        if (t) Object.assign(t, { direction, session, setup, result, openTime });
-      }
+      const t = State.tradeById.get(tid);
+      if (t) Object.assign(t, { direction, session, setup, result, openTime });
       const newJ = {
         id: jid, tradeId: tid, createdAt: now, updatedAt: now,
         session, direction, setup, result, pnl,
@@ -5336,10 +5344,12 @@ const BrokerSync = {
       brokerPositionId: fill.position_id,
       brokerPending: true
     };
-    // True instants, kept alongside the filing anchor. Display only — nothing
-    // sorts or groups on them, so they can be exact without breaking anything.
-    if (entryTime)      trade.entryTime = entryTime;
-    if (fill.exit_time) trade.exitTime  = fill.exit_time;
+    // The true entry instant, kept alongside the filing anchor. openTime is a
+    // fixed 09:30Z per civil day and so collides for every same-day trade;
+    // entryTime is unique per trade, which is what makes the trade log sortable
+    // and the session label derivable. The exit instant is not kept: nothing
+    // reads it, and exitPrice already signals that a position has closed.
+    if (entryTime) trade.entryTime = entryTime;
 
     // Account balance after the fill, when the broker's email carries one.
     // Held on the trade rather than in a key of its own: it then backs up,
@@ -5394,7 +5404,6 @@ const BrokerSync = {
 
     const exitPrice = safeNum(fill.exit_price);
     if (exitPrice !== null && trade.exitPrice !== exitPrice) { trade.exitPrice = exitPrice; changed = true; }
-    if (fill.exit_time && trade.exitTime !== fill.exit_time) { trade.exitTime = fill.exit_time; changed = true; }
 
     const balance = safeNum(fill.balance);
     if (balance !== null && trade.brokerBalance !== balance) { trade.brokerBalance = balance; changed = true; }
@@ -5579,7 +5588,6 @@ function wireEvents() {
 // App shell: nav buttons, fullscreen, breakpoint redraw, section collapse.
 function wireChrome() {
   on('nav-io-btn',  'click', IO.openModal);
-  on('nav-add-btn', 'click', () => Journal.open(null));
   /* Fullscreen toggle */
   const fsBtn  = $('nav-fs-btn');
   const fsOn   = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -5745,10 +5753,6 @@ function wireKeyboard() {
       if ($('io-modal').classList.contains('open'))      IO.closeModal();
       if ($('day-modal').classList.contains('open'))     closeDayPopup();
       return;
-    }
-    if (e.key === 'n' || e.key === 'N') {
-      e.preventDefault();
-      Journal.open(null);
     }
   });
 }
