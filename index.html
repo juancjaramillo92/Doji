@@ -3951,29 +3951,69 @@ function rollForwardStats(ft, period) {
 
   let opening = 0;                        // cumulative net P&L before the range
   let gross = 0, loss = 0, n = 0;         // inside the range
-  let wins = 0, losses = 0;
   let best = null, worst = null;
+  // Averages run on the RESULT LABEL, not on the sign of the P&L — the one
+  // place in this function where the two must differ.
+  //
+  // gross / loss stay sign-based because that is what makes start + profit −
+  // loss come out exactly equal to end; every dollar has to land on one side or
+  // the other or the reconciliation stops reconciling. But a scratch trade
+  // inside the ±BE_THRESHOLD band is a dollar and not a win: bucketing it with
+  // the winners adds ~nothing to the numerator and a full 1 to the denominator,
+  // so a handful of break-evens halves an average win that should read $57.
+  // Separate accumulators keep the sum honest and the averages honest at once.
+  let winSum = 0, winN = 0, lossSum = 0, lossN = 0;
+  // Account balance either side of the range boundary. Two separate watermarks
+  // rather than one running figure: the opener is the last balance the broker
+  // reported BEFORE the range, the latest is simply the newest one on file.
+  // Tracked by timestamp instead of by array order because State.trades is in
+  // insertion order, and a backfill can insert an old fill after a new one.
+  let openBal = null, openBalAt = '';
+  let lastBal = null, lastBalAt = '';
 
   for (const t of ft) {
+    const stamp  = String(t.entryTime || t.openTime || '');
+    const before = t.openTime && new Date(t.openTime) < start;
+
+    // Balance rides on the fill that reported it, so it counts whether or not
+    // its journal entry has been filled in yet — hence this sits outside the
+    // P&L guard below.
+    if (typeof t.brokerBalance === 'number') {
+      if (stamp > lastBalAt) { lastBal = t.brokerBalance; lastBalAt = stamp; }
+      if (before && stamp > openBalAt) { openBal = t.brokerBalance; openBalAt = stamp; }
+    }
+
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
     if (v === null || !t.openTime) continue;
-    if (new Date(t.openTime) < start) { opening += v; continue; }
+    if (before) { opening += v; continue; }
 
     n++;
-    if (v >= 0) { gross += v; wins++; } else { loss -= v; losses++; }
+    if (v >= 0) gross += v; else loss -= v;
     if (best  === null || v > best)  best  = v;
     if (worst === null || v < worst) worst = v;
+
+    // Prefer the stored label so the panel agrees with the wheels and the trade
+    // log; derive it when a record predates the field. Break-evens match neither
+    // branch and are excluded from both averages, which is the point.
+    const label = t.result || resultFromPnl(v);
+    if      (label === 'win')  { winSum  += v; winN++; }
+    else if (label === 'loss') { lossSum -= v; lossN++; }
   }
 
+  // Inclusive last day of the range, for the label. Day 0 of the NEXT month is
+  // the last day of this one, which sidesteps leap years and 30/31 entirely.
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+
   return {
-    start, n, opening,
+    start, end, n, opening,
     gross, loss,
     closing: opening + gross - loss,
     change: gross - loss,
     best, worst,
-    avgWin:  wins   ? gross / wins   : null,
-    avgLoss: losses ? loss  / losses : null
+    avgWin:  winN  ? winSum  / winN  : null,
+    avgLoss: lossN ? lossSum / lossN : null,
+    openBal, lastBal
   };
 }
 
@@ -3991,6 +4031,21 @@ function renderRollForward(ft) {
   if (!host) return;
 
   const s = rollForwardStats(ft, 'month');
+
+  // Three context rows above the reconciliation. They are deliberately NOT part
+  // of it: balance and cumulative P&L answer different questions and only track
+  // each other while no money moves in or out of the account. A deposit lifts
+  // both balance figures and leaves every P&L line untouched, which is exactly
+  // why the sum below is built from P&L alone. Read together they still make a
+  // useful cross-check — with no transfers in the range, the two balances
+  // should differ by the net change.
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const range = `${s.start.getDate()}–${s.end.getDate()} ${MO[s.start.getMonth()]} ${String(s.start.getFullYear()).slice(2)}`;
+
+  const context =
+      rollRow('Range',                  range, 0)
+    + rollRow('Balance at range start', s.openBal === null ? '—' : money(round2(s.openBal)), 0)
+    + rollRow('Latest balance',         s.lastBal === null ? '—' : money(round2(s.lastBal)), 0);
 
   // Signed where the sign is information (a figure that can go either way),
   // neutral where it is not. Gross profit is always ≥ 0 and gross loss always
@@ -4019,7 +4074,7 @@ function renderRollForward(ft) {
       <div class="roll-range">This Month</div>
     </div>
     <div class="roll-body">
-      <div class="roll-list">${recon}</div>
+      <div class="roll-list">${context}${recon}</div>
       ${memo}
     </div>`;
 }
