@@ -869,90 +869,73 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
    ───────────────────────────────────────────────────────────────────────────
    The log takes the wider half because its content is a table whose column
    count is fixed; the roll-forward is a label/value list that reads fine narrow
-   and would only grow whitespace if given more. align-items:start stops the
-   shorter card stretching to match the taller one — they are independent
-   readings, not two halves of one figure.
+   and would only grow whitespace if given more. align-items:stretch squares the
+   two cards off against each other — the roll-forward has fewer rows than the
+   log has, so left to itself it stops short and the pair reads ragged. The
+   surplus height goes into the gaps between its rows, not into a void beneath
+   the last one.
    ═══════════════════════════════════════════════════════════════════════════ */
 .log-split {
   display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
-  gap:var(--gap-section); align-items:start; margin-bottom:var(--gap-section);
+  gap:var(--gap-section); align-items:stretch; margin-bottom:var(--gap-section);
 }
 /* The gap owns the spacing between the two cards; the log's own bottom margin
    would otherwise add a phantom row beneath it inside the grid cell. */
 .log-split > .tlog-wrap { margin-bottom:0; }
 
-/* Padding is carried by the inner bands rather than the card, so the header
-   rules can run edge to edge exactly as the trade table's thead border does.
-   ═══ Alignment with the trade log ═══
-   The two cards sit in one grid row and are read as a pair, so their internal
-   bands are pinned to each other rather than merely starting at the same y:
-     .roll-topbar  ⟷ .tlog-hdr   (pagination bar)   — same 10px/18px padding,
-                                  and .roll-range is given the pagination
-                                  button's exact box metrics so the two bars
-                                  resolve to the same height by construction
-                                  instead of by a number that could drift.
-     .roll-head    ⟷ thead th    (column titles)    — same 16px/10px padding,
-                                  same 9px mono type, same bottom rule.
-     .roll-list rows ⟷ tbody tr  (data rows)        — same vertical padding and
-                                  the same faint purple separator.
-   Row heights cannot match one-for-one — a log row carrying an entry clock runs
-   two lines and a roll row never does — so the guarantee is the rhythm and the
-   three anchors, not a row-by-row lockstep. */
-.roll-card { padding:0; overflow:hidden; }
+/* The card fills the log's height rather than shrink-wrapping its rows: the two
+   sit in one grid row and a short summary column beside a tall table reads as a
+   layout accident. .log-split is align-items:stretch for that reason, and the
+   two groups below take the slack as breathing room between rows rather than as
+   dead space under the last one. */
+.roll-card { display:flex; flex-direction:column; }
+/* The render host is a passthrough — it must carry the flex chain or the body
+   below it has no surplus height to distribute. */
+.roll-card > #roll-forward { flex:1; display:flex; flex-direction:column; }
+.roll-body { flex:1; display:flex; flex-direction:column; gap:var(--gap-divider); }
 
-.roll-topbar {
-  display:flex; align-items:center; justify-content:flex-end;
-  padding:10px 18px; white-space:nowrap;
+.roll-hdr {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:12px; margin-bottom:var(--gap-title);
 }
-/* Metrics copied from .tlog-pag-btn — font size, padding and a transparent
-   1px border standing in for the button's real one — so this bar and the
-   pagination bar opposite are the same height without either hardcoding it.
-   Purple marks the range being reported, the same accent the active nav tab
+/* .cbox-l carries a bottom margin for the stacked case; here the header row owns
+   the spacing, so cancel it or the gap doubles. */
+.roll-hdr .cbox-l { margin-bottom:0; }
+/* Purple marks the range being reported — the same accent the active nav tab
    and carousel dot use for "this is the one you are looking at". */
 .roll-range {
-  font-family:var(--mono); font-size:8px; font-weight:600;
+  font-family:var(--mono); font-size:9px; font-weight:600;
   letter-spacing:1px; text-transform:uppercase; color:var(--p);
-  padding:3px 10px; border:1px solid transparent;
 }
-/* The log hides its pagination bar entirely on a single page. When it does,
-   this bar must go too or the roll-forward sits a bar-height lower than the
-   table it is meant to line up with. */
-.log-split:has(.tlog-hdr:has(.tlog-pagination:empty)) .roll-topbar { display:none; }
-
-/* Same box as `thead th`: 16px above, 10px below, a rule underneath. th:first-child
-   zeroes its left padding and the table sits in an 18px-padded wrapper, so 18px
-   here lands on the identical content edge. */
-.roll-head {
-  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
-  color:var(--mt); padding:16px 18px 10px;
-  border-bottom:1px solid var(--glass-bd);
+/* 11px is the floor, not the gap: space-between spreads the rows over whatever
+   height the log gives the card, and the gap only takes over when there is no
+   slack left to share. */
+.roll-list {
+  flex:1; display:flex; flex-direction:column;
+  justify-content:space-between; gap:11px;
 }
-.roll-list { padding:0 18px; }
-/* Matches `td` vertical padding and the tbody row separator. Separators are put
-   on the TOP of each row after the first rather than the bottom of every row:
-   with border-bottom, the closing total's own heavier rule would stack directly
-   on top of the previous row's faint one and read as a doubled line. */
-.roll-list .pnl-stat { padding:9px 0; }
-.roll-list .pnl-stat + .pnl-stat { border-top:1px solid rgba(139,53,184,.04); }
-/* The card's bottom edge closes the last list; 9px keeps the final row off it by
-   the same margin `td` gives every row above. */
-.roll-list:last-child { padding-bottom:9px; }
 
-/* The reconciliation's closing line. Heavier because it is the one figure in
-   the block that is a RESULT rather than an input — everything above it is a
-   term in the sum that produces it. Two classes deep to outrank the sibling
-   separator rule above, which it replaces rather than adds to. */
-.roll-list .roll-total { border-top:1px solid var(--glass-bd); }
+/* The reconciliation's closing line. Heavier and ruled off because it is the one
+   figure in the block that is a RESULT rather than an input — everything above
+   it is a term in the sum that produces it. */
+.roll-total { margin-top:var(--gap-divider); padding-top:var(--gap-divider); border-top:1px solid var(--glass-bd); }
 .roll-total .pnl-stat-lbl { color:var(--mt2); }
 .roll-total .pnl-stat-val { font-size:14px; }
 
-/* Everything below the second header is context, NOT arithmetic. The separation
-   is the point: the four lines above reconcile exactly (start + profit − loss =
-   end) and adding a fifth term to that block would break an identity meant to be
+/* Everything below the rule is context, NOT arithmetic. The separation is the
+   point: the four lines above reconcile exactly (start + profit − loss = end)
+   and adding a fifth term to that block would break an identity meant to be
    checkable by eye. Best/worst and the averages describe the same trades from a
    different angle and belong outside the sum. */
+.roll-memo {
+  flex:1; padding-top:var(--gap-divider);
+  border-top:1px solid var(--glass-bd);
+  display:flex; flex-direction:column;
+  justify-content:space-between; gap:11px;
+}
+.roll-memo-title { margin-bottom:2px; }
 .roll-empty {
-  padding:16px 18px 18px;
+  padding:6px 0 0;
   font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
 }
 
@@ -1788,10 +1771,10 @@ tr.broker-pending td:first-child {
             <span class="pc-w" id="cnt-w-total">— W</span>
           </div>
           <div class="period-money">
+            <span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-total">—</span>
             <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-total">—</span>
             <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-total">—</span>
             <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-total">—</span>
-            <span class="pm-lbl">Trades</span><span class="pm-val" id="pm-t-total">—</span>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-total"></div>
@@ -1811,10 +1794,10 @@ tr.broker-pending td:first-child {
             <span class="pc-w" id="cnt-w-week">— W</span>
           </div>
           <div class="period-money">
+            <span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-week">—</span>
             <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-week">—</span>
             <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-week">—</span>
             <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-week">—</span>
-            <span class="pm-lbl">Trades</span><span class="pm-val" id="pm-t-week">—</span>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-week"></div>
@@ -1834,10 +1817,10 @@ tr.broker-pending td:first-child {
             <span class="pc-w" id="cnt-w-month">— W</span>
           </div>
           <div class="period-money">
+            <span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-month">—</span>
             <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-month">—</span>
             <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-month">—</span>
             <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-month">—</span>
-            <span class="pm-lbl">Trades</span><span class="pm-val" id="pm-t-month">—</span>
           </div>
         </div>
         <div class="period-disc" id="disc-bars-month"></div>
@@ -3106,10 +3089,18 @@ function renderPeriodDonut(period, ft) {
   const losses = list.filter(t => t.result === 'loss').length;
   const bes    = list.filter(t => t.result === 'be').length;
   const total  = wins + losses + bes;
-  const wr     = total ? Math.round(wins / total * 100) : null;
+  // Same largest-remainder split the setup and emotion wheels use, so a win rate
+  // means the same thing and rounds the same way everywhere in the journal.
+  const pct    = pctSplit([wins, losses, bes]);
 
-  const wrEl = $('pnl-' + period);
-  if (wrEl) wrEl.textContent = wr !== null ? wr + '%' : '—';
+  // The hub is a QUANTITY and the strip beneath carries the rate — the same
+  // division of labour as the setup and emotion wheels. The count shown is the
+  // wheel's own total (wins + losses + break-evens), which is what the arcs are
+  // drawn from. Note that is NOT the same as the money row's old Trades figure,
+  // which counted journaled P&L entries: a trade logged without a figure is a
+  // slice on the wheel but not a dollar in the split below.
+  const hubEl = $('pnl-' + period);
+  if (hubEl) hubEl.textContent = total || '—';
   $('cnt-w-' + period).textContent = wins   + ' W';
   $('cnt-l-' + period).textContent = losses + ' L';
   $('cnt-b-' + period).textContent = bes    + ' B';
@@ -3119,8 +3110,8 @@ function renderPeriodDonut(period, ft) {
   // Profit − Loss = Net here too. It deliberately does NOT match the W / L
   // counts above it: those use the ±BE_THRESHOLD result label, so a scratch
   // trade sits under B on the wheel while its dollars still land in Profit or
-  // Loss below. Trades counts journaled P&L entries — a trade logged without a
-  // figure is not money.
+  // Loss below. `mn` counts journaled P&L entries — a trade logged without a
+  // figure is not money — and is used only to decide dash vs. figure.
   let mn = 0, gross = 0, loss = 0;
   for (const t of list) {
     const j = journalForTrade(t);
@@ -3129,10 +3120,14 @@ function renderPeriodDonut(period, ft) {
     mn++;
     if (v >= 0) gross += v; else loss -= v;
   }
+  // Win rate leads the strip. Its denominator is the WHEEL's trade count, not
+  // the money rows' — the three dollar figures below it are a different
+  // population (journaled P&L only), which is why the rate is written from
+  // `pct` rather than from `mn`.
+  setFigure('pm-wr-' + period, pct ? pct[0] + '%' : '—', pct ? 1 : 0);
   setFigure('pm-p-' + period, mn ? money(round2(gross))        : '—', gross);
   setFigure('pm-l-' + period, mn ? money(round2(-loss))        : '—', -loss);
   setFigure('pm-n-' + period, mn ? money(round2(gross - loss)) : '—', gross - loss);
-  setFigure('pm-t-' + period, mn ? String(mn) : '—', 0);
 
   // Discipline compliance for this same timeframe — denominator is journaled
   // trades in the period, so the bars track Rules / SLS / TPS adherence over
@@ -4007,9 +4002,9 @@ function renderRollForward(ft) {
     + rollRow('&minus; Gross loss',     money(round2(s.loss)),    s.n ? -1 : 0)
     + rollRow('= P&amp;L at range end', money(round2(s.closing)), s.closing, 'roll-total');
 
-  const detail = !s.n ? `<div class="roll-empty">No closed trades this month yet.</div>` : `
-    <div class="roll-head">In this range</div>
-    <div class="roll-list">
+  const memo = !s.n ? `<div class="roll-empty">No closed trades this month yet.</div>` : `
+    <div class="roll-memo">
+      <div class="cbox-l roll-memo-title">In this range</div>
       ${rollRow('Net change',  money(round2(s.change)), s.change)}
       ${rollRow('Trades',      String(s.n), 0)}
       ${rollRow('Best trade',  money(round2(s.best)),  s.best)}
@@ -4019,10 +4014,14 @@ function renderRollForward(ft) {
     </div>`;
 
   host.innerHTML = `
-    <div class="roll-topbar"><span class="roll-range">This Month</span></div>
-    <div class="roll-head">Range roll-forward</div>
-    <div class="roll-list">${recon}</div>
-    ${detail}`;
+    <div class="roll-hdr">
+      <div class="cbox-l">Range roll-forward</div>
+      <div class="roll-range">This Month</div>
+    </div>
+    <div class="roll-body">
+      <div class="roll-list">${recon}</div>
+      ${memo}
+    </div>`;
 }
 
 
