@@ -934,10 +934,11 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
   justify-content:space-between; gap:11px;
 }
 .roll-memo-title { margin-bottom:2px; }
-.roll-empty {
-  padding:6px 0 0;
-  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
-}
+/* A dashed value is a placeholder, not a reading. Dimmed so an empty row reads
+   as empty at a glance and is never mistaken for a real figure of zero. Scoped
+   to the card so the shared .pnl-stat-val elsewhere is untouched — same pattern
+   as .sess-wr-pct.dim and .period-disc-pct.dim. */
+.roll-card .pnl-stat-val.dim { color:var(--mt2); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TABLE
@@ -2155,10 +2156,14 @@ function safeJSON(key, fallback) {
 //      touchscreen laptop still reports pointer:fine for its mouse, so it
 //      correctly stays desktop-class.
 //   3. UA string, for engines exposing neither of the above (Safari).
-// Known gap: iPadOS 13+ presents itself as a Mac with a trackpad and reads as
-// desktop. The manual export in the I/O panel covers anything this gets wrong,
-// and the check fails open for the same reason — a spare backup costs nothing,
-// a missing one costs the journal.
+//   4. A "Macintosh" UA that also reports touch points. iPadOS 13+ deliberately
+//      presents itself as a desktop Mac and passes every check above; a real Mac
+//      reports maxTouchPoints 0, because a trackpad is a pointer and not a touch
+//      digitiser, and that holds for Touch Bar models too. So the pair
+//      Macintosh + touch is an iPad and nothing else.
+// The manual export in the I/O panel covers anything this still gets wrong, and
+// the check fails open for the same reason — a spare backup costs nothing, a
+// missing one costs the journal.
 const Device = {
   isDesktop() {
     try {
@@ -2169,6 +2174,7 @@ const Device = {
         if (mq.media !== 'not all' && mq.matches) return false;
       }
       if (/Android|iPhone|iPod|iPad|Windows Phone|Mobile/i.test(navigator.userAgent)) return false;
+      if (/Macintosh/i.test(navigator.userAgent) && (navigator.maxTouchPoints || 0) > 1) return false;
       return true;
     } catch (e) {
       return true;
@@ -2361,6 +2367,40 @@ const Dates = {
     const mm = String(base.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(base.getUTCDate()).padStart(2, '0');
     return `${yy}-${mm}-${dd}`;
+  },
+
+  // ─── Trading-week OPEN anchor (Sunday 17:00 America/New_York) ───────────────
+  // Gold trades Sunday 17:00 → Friday 17:00 New York. This returns the opening
+  // Sunday of the week `date` belongs to, as UTC midnight of that Sunday's New
+  // York civil day.
+  //
+  // WHY A CIVIL DAY AND NOT THE 17:00 INSTANT. Trades are filed under
+  // `openTime`, which is `<day>T09:30:00.000Z` — a filing anchor, not a real
+  // timestamp (see the openTime note in BrokerSync.ingest). A Sunday 18:00 New
+  // York entry is therefore stored as Sunday 09:30Z, which is EARLIER in the day
+  // than the 17:00 open it actually happened after. Comparing against a true
+  // 17:00 instant would drop the first trades of every week. The cutoff has to
+  // live in the same civil-day space the records do, so it is Sunday 00:00Z and
+  // every 09:30Z filing on that Sunday or later clears it.
+  //
+  // WHY SUNDAY BEFORE 17:00 COUNTS AS THE PREVIOUS WEEK. Between the Friday
+  // close and the Sunday open the market is shut, and that gap is exactly when
+  // the week gets reviewed. Anchoring on the calendar Sunday instead of the
+  // open, as the old local-midnight version did, blanked the "This Week" wheel
+  // and both week figures on the P&L card every Sunday — the week that had just
+  // finished vanished from the moment it became reviewable. Rolling back a
+  // further seven days during the gap keeps the just-closed week on screen until
+  // the market actually reopens.
+  //
+  // New York wall time throughout, via nyParts, so the boundary is identical on
+  // every device regardless of where it is or what its clock is set to.
+  weekOpenCutoff(date = new Date()) {
+    const p = Dates.nyParts(date);
+    let back = p.weekday;                          // Sun=0 … Sat=6
+    if (p.weekday === 0 && p.hour < 17) back = 7;  // Sun pre-open → previous week
+    const base = new Date(Date.UTC(p.y, p.m - 1, p.d));
+    base.setUTCDate(base.getUTCDate() - back);
+    return base;                                   // UTC midnight, opening Sunday
   }
 };
 
@@ -2871,7 +2911,11 @@ function setFigure(id, text, sign) {
 function renderPnLCard(ft) {
   const weekStart  = periodCutoff('week');
   const monthStart = periodCutoff('month');
-  const weekPrior  = new Date(weekStart);  weekPrior.setDate(weekStart.getDate() - 7);
+  // Exactly seven days back in absolute time. weekStart is now UTC midnight of
+  // the opening Sunday, so a local setDate() here would read a local date that
+  // may be the Saturday and could drift an hour across a DST change. Subtracting
+  // the milliseconds lands on the previous week's open every time.
+  const weekPrior  = new Date(weekStart.getTime() - 7 * 86400000);
   const monthPrior = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
 
   let n = 0, net = 0, gross = 0, loss = 0;
@@ -3023,12 +3067,13 @@ function renderCumulativeChart(ft) {
 function periodCutoff(period) {
   const now = new Date();
   if (period === 'week') {
-    // Trading week runs Sunday → Friday close.
-    // Roll back to the most recent Sunday at midnight.
-    const d = new Date(now);
-    d.setDate(now.getDate() - now.getDay()); // 0=Sun … 6=Sat
-    d.setHours(0, 0, 0, 0);
-    return d;
+    // The XAUUSD trading week: opens Sunday 17:00 New York, closes Friday 17:00
+    // New York. Delegated to Dates so this app has ONE definition of a trading
+    // week — lastForexCloseKey (which drives the weekly backup) reads the other
+    // end of the same week off the same nyParts clock. The previous version rolled
+    // back to local Sunday midnight, which was neither New York nor the market's
+    // open, and emptied the week bucket every Sunday.
+    return Dates.weekOpenCutoff(now);
   }
   if (period === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
   return null;
@@ -4017,13 +4062,21 @@ function rollForwardStats(ft, period) {
   };
 }
 
+// The placeholder a row shows when it has no figure yet. A single constant
+// because rollRow recognises it to decide what to dim — a stray '-' or 'n/a' at
+// one call site would render as a live value.
+const DASH = '—';
+
 // One label/value row in the house style. `sign` colours the value the same way
 // setFigure does for the P&L card; pass 0 to leave it neutral.
 function rollRow(label, text, sign, cls) {
   const c = sign > 0 ? ' win' : sign < 0 ? ' loss' : '';
+  // Placeholder rows dim themselves off the value they were handed, so no call
+  // site has to remember to pass a flag alongside its own em-dash.
+  const d = text === DASH ? ' dim' : '';
   return `<div class="pnl-stat${cls ? ' ' + cls : ''}">`
        + `<span class="pnl-stat-lbl">${label}</span>`
-       + `<span class="pnl-stat-val${c}">${text}</span></div>`;
+       + `<span class="pnl-stat-val${c}${d}">${text}</span></div>`;
 }
 
 function renderRollForward(ft) {
@@ -4044,8 +4097,8 @@ function renderRollForward(ft) {
 
   const context =
       rollRow('Range',                  range, 0)
-    + rollRow('Balance at range start', s.openBal === null ? '—' : money(round2(s.openBal)), 0)
-    + rollRow('Latest balance',         s.lastBal === null ? '—' : money(round2(s.lastBal)), 0);
+    + rollRow('Balance at range start', s.openBal === null ? DASH : money(round2(s.openBal)), 0)
+    + rollRow('Latest balance',         s.lastBal === null ? DASH : money(round2(s.lastBal)), 0);
 
   // Signed where the sign is information (a figure that can go either way),
   // neutral where it is not. Gross profit is always ≥ 0 and gross loss always
@@ -4057,15 +4110,35 @@ function renderRollForward(ft) {
     + rollRow('&minus; Gross loss',     money(round2(s.loss)),    s.n ? -1 : 0)
     + rollRow('= P&amp;L at range end', money(round2(s.closing)), s.closing, 'roll-total');
 
-  const memo = !s.n ? `<div class="roll-empty">No closed trades this month yet.</div>` : `
+  // ALL SIX ROWS, ALWAYS. An empty range dashes its values; it does not drop the
+  // rows and replace them with a message. Two reasons, and the layout one is the
+  // reason this was rewritten:
+  //
+  //  • Height. .roll-list and .roll-memo are both flex:1 with space-between, so
+  //    they share whatever height the trade log gives the card. Collapsing six
+  //    rows to one line handed that reclaimed space straight to the
+  //    reconciliation above, which stretched its gaps and threw the whole panel
+  //    out of alignment with the log beside it. Every 1st of the month the
+  //    section visibly broke and then healed itself on the first closed trade.
+  //  • Legibility. A dashed row still names the statistic. "Avg loss —" tells
+  //    the trader the panel tracks average loss and has nothing to report yet;
+  //    "No closed trades this month" tells them neither.
+  //
+  // Same convention as sessionBarsHtml, which renders every session and dims the
+  // ones with no trades rather than omitting them, for the same height reason.
+  //
+  // Net change stays a real $0.00 rather than a dash: zero closed trades IS a
+  // net change of zero, and it keeps the row consistent with the gross profit /
+  // gross loss lines above, which have always shown $0.00 on an empty range.
+  const memo = `
     <div class="roll-memo">
       <div class="cbox-l roll-memo-title">In this range</div>
       ${rollRow('Net change',  money(round2(s.change)), s.change)}
       ${rollRow('Trades',      String(s.n), 0)}
-      ${rollRow('Best trade',  money(round2(s.best)),  s.best)}
-      ${rollRow('Worst trade', money(round2(s.worst)), s.worst)}
-      ${rollRow('Avg win',     s.avgWin  === null ? '—' : money(round2(s.avgWin)),  s.avgWin  === null ? 0 : 1)}
-      ${rollRow('Avg loss',    s.avgLoss === null ? '—' : money(round2(s.avgLoss)), s.avgLoss === null ? 0 : -1)}
+      ${rollRow('Best trade',  s.best    === null ? DASH : money(round2(s.best)),    s.best)}
+      ${rollRow('Worst trade', s.worst   === null ? DASH : money(round2(s.worst)),   s.worst)}
+      ${rollRow('Avg win',     s.avgWin  === null ? DASH : money(round2(s.avgWin)),  s.avgWin  === null ? 0 : 1)}
+      ${rollRow('Avg loss',    s.avgLoss === null ? DASH : money(round2(s.avgLoss)), s.avgLoss === null ? 0 : -1)}
     </div>`;
 
   host.innerHTML = `
@@ -5259,17 +5332,9 @@ const Cloud = {
   /* ─── Legacy blob reader ──────────────────────────────────────────────── */
   // Only used by the migration above and as the fallback if the records table
   // is unreachable. Cloud rows are not trusted: every record passes the same
-  // guard the import path uses, and a payload that isn't even the right SHAPE
-  // is refused outright in favour of the local copy.
-  _sanitise(key, value) {
-    const guard = key === CONFIG.STORE.trades  ? Schema.isValidTrade
-                : key === CONFIG.STORE.journal ? Schema.isValidJournal
-                : null;
-    if (!guard) return { value, dropped: 0, refused: false };
-    if (!Array.isArray(value)) return { value: null, dropped: 0, refused: true };
-    const kept = value.filter(guard);
-    return { value: kept, dropped: value.length - kept.length, refused: false };
-  },
+  // guard the import path uses (_sanitise, defined once above), and a payload
+  // that isn't even the right SHAPE is refused outright in favour of the local
+  // copy.
 
   async _pullLegacyBlobs() {
     const { data, error } = await this.sb.from('app_state').select('key, value');
