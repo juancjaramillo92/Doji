@@ -890,24 +890,11 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
    dead space under the last one. */
 .roll-card {
   display:flex; flex-direction:column;
-  /* Width of BOTH figure columns, in BOTH blocks. .roll-list and .roll-memo are
-     separate flex containers, so auto-sized columns would each fit their own
-     content — the memo's "3" under Trades is far narrower than the list's
-     "1284.50", and the two grids would stop lining up down the card. One width
-     declared here is what keeps every figure on the same two right edges. Lives
-     on the card rather than in :root because exactly one component uses it,
-     unlike --bar-h which every bar in the journal shares.
-     72px holds the widest thing either column carries, which is not a figure but
-     the "1–31 AUG 26" header: 11 characters of 9px mono plus its letter-spacing.
-
-     --roll-gap is the space between columns. It matters more than it looks:
-     both figures are right-aligned inside their own column, so the visible
-     distance between two long numbers is this gap plus whatever slack the right
-     column has left over. At 10px a pair of seven-digit figures read as one
-     run-on number. Raised so the two months stay legible as two months, at the
-     cost of the label column, which is 1fr and absorbs the difference. */
-  --roll-col:72px;
-  --roll-gap:22px;
+  /* Space between the three columns. Both figures are right-aligned inside their
+     own column, so the visible distance between two long numbers is this gap
+     plus whatever slack the right-hand column has left over — at 10px a pair of
+     seven-digit figures read as one run-on number. */
+  --roll-gap:24px;
 }
 /* The render host is a passthrough — it must carry the flex chain or the body
    below it has no surplus height to distribute. */
@@ -917,9 +904,19 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
 /* Label, then this month, then last month. A grid rather than the flex row
    .pnl-stat uses: two figure columns have to land on the same edges in the
    reconciliation and in the memo below it, and justify-content:space-between
-   cannot promise that across two separate containers. */
+   cannot promise that across two separate containers.
+   Proportions, not pixels, for two reasons. The columns have to line up between
+   .roll-list and .roll-memo, which are separate flex containers — content-sized
+   columns would each fit their own content and the memo's "3" under Trades would
+   sit somewhere different from the list's "1284.50". Equal fractions land on the
+   same edges in both without either knowing what the other holds. And a fixed
+   width would hand every spare pixel on a wide card to the label, which is what
+   left the figures huddled against the right edge with a void down the middle;
+   giving the figure columns a share of the row is what spreads them out. 2fr
+   still leaves the label the most room, since it carries the longest string in
+   the panel ("Balance at range start"). */
 .roll-row {
-  display:grid; grid-template-columns:1fr var(--roll-col) var(--roll-col);
+  display:grid; grid-template-columns:2fr 1fr 1fr;
   align-items:baseline; gap:var(--roll-gap);
 }
 /* Flex handed the value the right edge for free; the grid has to be told. */
