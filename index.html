@@ -208,25 +208,6 @@ nav {
 }
 .icon-btn:hover { color:var(--tx); }
 
-/* Generic chevron used in collapsible headers */
-.chevron {
-  font-family:var(--mono); font-size:10px; color:var(--mt);
-}
-.chevron.closed { transform:rotate(180deg); }
-
-/* Section header line */
-.sec-hd {
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
-  color:var(--mt2); margin-bottom:var(--gap-title); display:flex; align-items:center; gap:8px;
-}
-.sec-hd::after {
-  content:''; flex:0 0 28px; height:1px;
-  background:linear-gradient(90deg,var(--p),transparent);
-}
-/* Collapsible section headers carry a chevron on the right; drop the accent
-   dash so the title sits clean next to it. */
-.collapsible-hdr .sec-hd::after { content:none; }
-
 /* ═══════════════════════════════════════════════════════════════════════════
    GRIDS & CARDS
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -278,18 +259,23 @@ nav {
    Single source of truth for every in-section metric label (period / setup /
    session / emotion). The RULES / STOP LOSS / TAKE PROFIT treatment: mono, 9px,
    1px tracking, uppercase, --mt, normal weight, left-aligned. Change here and
-   every label across the journal moves together. Section headers (.sec-hd /
-   .cbox-l) are a separate, dimmer tier and intentionally excluded. */
+   every label across the journal moves together. Section headers (.cbox-l) are
+   a separate, dimmer tier and intentionally excluded. */
 .period-label, .period-disc-lbl, .setup-donut-label, .sess-wr-label,
 .emo-cat-label, .emo-row-name {
   font-family:var(--mono); font-size:9px; font-weight:400;
   letter-spacing:1px; text-transform:uppercase; color:var(--mt);
 }
 .period-label { align-self:flex-start; }
+/* The wheel sits on one line and its figure strip claims the next: the strip is
+   flex:1 0 100%, so it only gets a line of its own if the host wraps, and it
+   only spans the column if the host is full width. .period-col centres its
+   children, so without width:100% the row would shrink-wrap and the strip with
+   it. Every host in the journal is arranged this way — the period wheels, the
+   setup wheels and the emotion wheels alike. */
 .period-host {
-  position:relative; display:flex; align-items:center;
-  justify-content:space-between; gap:14px;
-  padding:0 6px;
+  position:relative; display:flex; align-items:center; justify-content:center;
+  flex-wrap:wrap; width:100%; gap:14px;
 }
 .period-donut-wrap { position:relative; width:108px; height:108px; flex-shrink:0; }
 /* Chart.js canvases carry no interaction here (tooltips/clicks disabled), so
@@ -321,27 +307,7 @@ nav {
 .pc-l { color:var(--loss); }
 .pc-b { color:var(--mt2); }
 
-/* ── Per-wheel money column (P&L view only) ────────────────────────────────
-   Only present while the P&L section is open (body.pnl-open), the same mode
-   that reveals dollar figures in the calendar — one reveal, consistent on
-   touch and desktop.
-
-   It is taken out of flow rather than added as a fourth flex item so the wheel
-   stays optically centred instead of being shoved off-centre by whatever the
-   figures happen to measure. That requires .period-host to be full width:
-   .period-col centres its children, so the row otherwise shrink-wraps its own
-   content and right:0 would land beside the counts rather than at the column
-   edge. width:100% + padding:0 puts right:0 on the column's 14px content edge —
-   the same inset .period-label sits at on the left, which it reaches via
-   align-self:flex-start for the same underlying reason.
-
-   Each row reads value-then-label (+631.70 PROFIT), right-aligned, so the
-   labels form the terminating edge. */
-/* ── Per-wheel money column (P&L view only) ────────────────────────────────
-   Only present while the P&L section is open (body.pnl-open), the same mode
-   that reveals dollar figures in the calendar — one reveal, consistent on
-   touch and desktop.
-
+/* ── Per-wheel money strip ─────────────────────────────────────────────────
    A strip beneath the wheel at every width: the row wraps, the strip claims a
    full line, and its four figures sit in equal columns, each label over its
    value. That leaves the wheel centred on the line above with nothing competing
@@ -349,16 +315,11 @@ nav {
    one edge — so a narrow column and a wide one differ only in how much air the
    four columns get, never in arrangement. One layout, no breakpoint. */
 .period-money {
-  display:none; flex:1 0 100%;
+  display:grid; flex:1 0 100%;
   grid-template-columns:repeat(4,1fr); grid-template-rows:auto auto;
   grid-auto-flow:column; justify-items:center; align-items:baseline;
   row-gap:3px; column-gap:8px;
 }
-body.pnl-open .period-money { display:grid; }
-/* Full width so the strip has a line to claim; wrap so it gets one; centred so
-   the wheel sits mid-column above it. .period-col centres its children, so
-   without width:100% the row would shrink-wrap and the strip with it. */
-body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center; padding:0; }
 .pm-lbl {
   font-family:var(--mono); font-size:7px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt);
@@ -370,23 +331,14 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .pm-val.win  { color:var(--win); }
 .pm-val.loss { color:var(--loss); }
 
-/* ── Always-on figure strip (setup + emotion wheels) ───────────────────────
-   Same grid and same .pm-lbl / .pm-val primitives as .period-money — only the
-   reveal rule and the column count differ. The period wheels' strip carries
-   dollars, so it hides behind body.pnl-open; these carry percentages, which are
-   never money and so never need gating. Applied alongside .period-money
-   (class="period-money period-stats") to inherit the grid rather than restate
-   it; this rule follows it in source order, so display:grid wins over its
-   display:none.
-
-   .has-stats is the ungated twin of the body.pnl-open host rule: the strip is
-   flex:1 0 100%, which only claims its own line if the host wraps, and the host
-   only spans the column if it is width:100%. */
-/* The money strip is fixed at four figures; this one carries three, so it drops
-   the inherited track list and lets grid-auto-flow:column mint one equal column
-   per figure — adding or removing a figure then needs no CSS change. */
-.period-stats { display:grid; grid-template-columns:none; grid-auto-columns:1fr; }
-.period-host.has-stats { width:100%; flex-wrap:wrap; justify-content:center; padding:0; }
+/* ── Percentage figure strip (setup + emotion wheels) ──────────────────────
+   Same grid and the same .pm-lbl / .pm-val primitives as .period-money — only
+   the column count differs. Applied alongside it (class="period-money
+   period-stats") to inherit the grid rather than restate it. The money strip is
+   fixed at four figures; this one carries three, so it drops the inherited track
+   list and lets grid-auto-flow:column mint one equal column per figure — adding
+   or removing a figure then needs no CSS change. */
+.period-stats { grid-template-columns:none; grid-auto-columns:1fr; }
 
 /* Per-period discipline bars (Rules / Stop Loss / Take Profit) — sit beneath
    each win/loss wheel and reuse the session-bar segment styling for a
@@ -441,11 +393,6 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .cal-day.sel-single { border-radius:50%; }
 
 .empty-msg { padding:20px 14px; font-size:12px; color:var(--mt2); }
-
-.collapsible-hdr {
-  display:flex; align-items:center; justify-content:space-between;
-  cursor:pointer; margin-bottom:7px; white-space:nowrap;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    P&L CARD — net figure + performance stats
@@ -659,8 +606,7 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 /* ── Year strip ────────────────────────────────────────────────────────────
    Twelve month cells above the day grid, assembled from exactly the same parts
    as a day cell one zoom level down: result palette in the fill, trade count
-   above, P&L below it and hidden until the P&L section is open. Nothing new is
-   invented here — a month reads the way a day and a week already read, so the
+   above, P&L below it. Nothing new is invented here — a month reads the way a day and a week already read, so the
    three scales can be scanned without relearning anything.
    The month currently open below takes the accent rule, which makes the strip
    double as a position marker for the grid underneath it.
@@ -707,9 +653,11 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .hm-mo.sel.be   { border-color:var(--seg-be-bd); background:var(--seg-be-hv); }
 /* Reserves its line whether or not the month traded, so an empty month keeps
    the same height as a busy one and the strip stays a straight rule. */
+/* The count is a caption under the amount, so it takes the lighter weight; the
+   result-coloured rules below still override its colour when the month has one. */
 .hm-mo-count {
-  font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.5px;
-  color:var(--mt2); min-height:12px;
+  font-family:var(--mono); font-size:8px; font-weight:400; letter-spacing:.5px;
+  color:var(--mt); min-height:12px;
 }
 .hm-mo.win  .hm-mo-count { color:var(--win); }
 .hm-mo.loss .hm-mo-count { color:var(--loss); }
@@ -717,13 +665,10 @@ body.pnl-open .period-host  { width:100%; flex-wrap:wrap; justify-content:center
 .hm-mo-pnl {
   font-family:var(--mono); font-size:10px; font-weight:600; margin-top:2px;
   color:var(--mt2);
-  display:none;                 /* revealed by body.pnl-open, same as day cells */
 }
 .hm-mo.win  .hm-mo-pnl { color:var(--win); }
 .hm-mo.loss .hm-mo-pnl { color:var(--loss); }
 .hm-mo.be   .hm-mo-pnl { color:var(--be-tx); }
-body.pnl-open .hm-mo-pnl   { display:block; }
-body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 /* Seven day columns plus a week-summary column, set apart from the grid by a
    margin so it reads as a separate rail rather than an eighth weekday. */
 .heatmap-grid {
@@ -769,8 +714,8 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 .heatmap-week.loss { background:var(--seg-loss-bg); }
 .heatmap-week.be   { background:var(--seg-be-bg); }
 .heatmap-week-count {
-  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
-  color:var(--mt2); text-transform:uppercase;
+  font-family:var(--mono); font-size:7px; font-weight:400; letter-spacing:.5px;
+  color:var(--mt); text-transform:uppercase;
 }
 .heatmap-week.win  .heatmap-week-count { color:var(--win); }
 .heatmap-week.loss .heatmap-week-count { color:var(--loss); }
@@ -778,13 +723,10 @@ body.pnl-open .hm-mo-count { font-size:8px; font-weight:400; color:var(--mt); }
 .heatmap-week-pnl {
   font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2);
-  display:none;                 /* revealed by body.pnl-open, same as day cells */
 }
 .heatmap-week.win  .heatmap-week-pnl { color:var(--win); }
 .heatmap-week.loss .heatmap-week-pnl { color:var(--loss); }
 .heatmap-week.be   .heatmap-week-pnl { color:var(--be-tx); }
-body.pnl-open .heatmap-week-pnl   { display:block; }
-body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--mt); }
 /* The day number, the week ordinal and the month name are the same thing at
    three scales — the cell's identity, pinned to its top-left corner. One rule
    keeps all of them in the same place with the same weight. */
@@ -797,12 +739,11 @@ body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--
   display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
 /* Cell body reads top-down: trade count, then the day's P&L beneath it. The
-   count leads because it is the only thing shown in the default view — the $
-   amount stays hidden until the P&L section is open, keeping day-to-day money
-   out of the default line of sight. */
+   amount carries the weight and the count sits above it as a caption — two
+   readings of the same day, largest first. */
 .heatmap-cell-count {
-  font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.5px;
-  color:var(--mt2); text-transform:uppercase;
+  font-family:var(--mono); font-size:7px; font-weight:400; letter-spacing:.5px;
+  color:var(--mt); text-transform:uppercase;
 }
 .heatmap-cell.win  .heatmap-cell-count { color:var(--win); }
 .heatmap-cell.loss .heatmap-cell-count { color:var(--loss); }
@@ -810,25 +751,18 @@ body.pnl-open .heatmap-week-count { font-size:7px; font-weight:400; color:var(--
 .heatmap-cell-pnl {
   font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2); text-transform:uppercase;
-  display:none;                 /* revealed by body.pnl-open (P&L view) */
 }
 .heatmap-cell.win  .heatmap-cell-pnl { color:var(--win); }
 .heatmap-cell.loss .heatmap-cell-pnl { color:var(--loss); }
 .heatmap-cell.be   .heatmap-cell-pnl { color:var(--be-tx); }
-/* P&L view (P&L section open → body.pnl-open): every trade-bearing cell shows
-   its day total and the count above it shrinks to a caption. No hover involved —
-   the reveal is a mode, so it works identically on touch. */
-body.pnl-open .heatmap-cell-pnl   { display:block; }
-body.pnl-open .heatmap-cell-count { font-size:7px; font-weight:400; color:var(--mt); }
 /* Month totals under the heatmap title — profit, loss, net and trade count on
-   one centred line, only present in P&L view. Reuses .pm-lbl / .pm-val from the
-   wheel money columns: same kind of figure, so the same typography. Each pair
-   is grouped so the label sits tight to its value while the pairs stay apart. */
+   one centred line. Reuses .pm-lbl / .pm-val from the wheel money strips: same
+   kind of figure, so the same typography. Each pair is grouped so the label sits
+   tight to its value while the pairs stay apart. */
 .heatmap-month-pnl {
-  display:none; justify-content:center; align-items:baseline;
+  display:flex; justify-content:center; align-items:baseline;
   gap:22px; margin:-4px 0 20px;
 }
-body.pnl-open .heatmap-month-pnl { display:flex; }
 .heatmap-month-stat { display:inline-flex; align-items:baseline; gap:6px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1606,38 +1540,37 @@ tr.broker-pending td:first-child {
      over a 58px box leaves little clear height, so anything centred on the BOX
      reads as crammed against that name. Reserving the label row as padding
      moves the centring axis down into the empty space below it.
-     Unconditional, because it is as true of a lone trade count as of an amount.
      Day and week cells are roomier and centre fine on the box itself, so they
-     reserve the row only when the P&L view puts a second figure in them. */
+     reserve the row in their own rule below rather than here. */
   .hm-mo { padding-top:18px; }
 
-  /* ── P&L view (phone) ───────────────────────────────────────────────────
-     Each cell now carries two figures plus its label. The count moves to the
-     corner OPPOSITE the label — a dead corner the cell already had — leaving
-     the middle to the amount alone.
+  /* ── Heatmap cells (phone) ──────────────────────────────────────────────
+     Each cell carries two figures plus its label. The count moves to the corner
+     OPPOSITE the label — a dead corner the cell already had — leaving the
+     middle to the amount alone.
      Each count mirrors ITS OWN label's offsets and size, not one shared set:
      day and week labels sit at 8px / top:4 / left:5, the month label at 10px /
      top:6 / left:8. Pairing them this way is what puts each count on the same
      line as the name across from it.
      Colour is untouched — counts keep the result palette, unlike the muted
      identity labels opposite them. */
-  body.pnl-open .heatmap-cell-count,
-  body.pnl-open .heatmap-week-count {
+  .heatmap-cell-count,
+  .heatmap-week-count {
     position:absolute; top:4px; right:5px;
     font-size:8px; min-height:0; margin:0;
   }
-  body.pnl-open .hm-mo-count {
+  .hm-mo-count {
     position:absolute; top:6px; right:8px;
     font-size:10px; min-height:0; margin:0;
   }
   /* Sole occupant of the middle now, so it carries the weight the count used
      to share. */
-  body.pnl-open .heatmap-cell-pnl,
-  body.pnl-open .heatmap-week-pnl,
-  body.pnl-open .hm-mo-pnl { font-size:10px; margin-top:0; }
+  .heatmap-cell-pnl,
+  .heatmap-week-pnl,
+  .hm-mo-pnl { font-size:10px; margin-top:0; }
   /* Day and week reserve their label row here only — see .hm-mo above. */
-  body.pnl-open .heatmap-cell-body { padding-top:10px; }
-  body.pnl-open .heatmap-week      { padding-top:14px; }
+  .heatmap-cell-body { padding-top:10px; }
+  .heatmap-week { padding-top:14px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
      Setup, P&L. Rules/SLS/TPS and delete live in the entry itself (tap the
@@ -1731,52 +1664,44 @@ tr.broker-pending td:first-child {
          missing its rules/emotions data. Tapping it opens the oldest one. -->
     <div id="broker-banner" class="broker-banner" style="display:none;" role="button" tabindex="0"></div>
 
-    <!-- P&L (collapsible — starts OPEN; the section doubles as a view-mode
-         switch, so while it is open the whole journal runs in P&L view) -->
-    <div style="margin-bottom:16px;">
-      <div class="collapsible-hdr" data-collapse-target="ap-body" data-collapse-chev="ap-chev">
-        <div class="sec-hd" style="margin:0;">P&amp;L</div>
-        <span id="ap-chev" class="chevron">&#x25B2;</span>
-      </div>
-      <div id="ap-body">
-        <div class="grid-2">
-          <div class="cbox pnl-card">
-            <div class="pnl-card-inner">
-              <div class="pnl-net">
-                <div>
-                  <div class="cbox-l">Current Balance</div>
-                  <div id="pnl-balance-number" class="pnl-balance-number">—</div>
-                  <div id="pnl-balance-at" class="pnl-balance-at"></div>
-                </div>
-                <div>
-                  <div class="cbox-l">Net P&amp;L<span id="pnl-net-count" class="pnl-net-count"></span></div>
-                  <div id="pnl-net-number" class="pnl-net-number">—</div>
-                </div>
-              </div>
-              <div class="pnl-stats">
-                <div class="cbox-l">Performance</div>
-                <div class="pnl-stats-grid">
-                  <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Profit</span><span id="pnl-gross-profit" class="pnl-stat-val">—</span></div>
-                  <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Loss</span><span id="pnl-gross-loss" class="pnl-stat-val">—</span></div>
-                  <div class="pnl-stat"><span class="pnl-stat-lbl">Week</span><span class="pnl-stat-pair">
-                    <span class="ps-tag">LW</span><span id="pnl-week-prev"  class="ps-fig">—</span>
-                    <span class="ps-arrow">&rarr;</span>
-                    <span class="ps-tag">CW</span><span id="pnl-week-cur"   class="ps-fig">—</span>
-                  </span></div>
-                  <div class="pnl-stat"><span class="pnl-stat-lbl">Month</span><span class="pnl-stat-pair">
-                    <span class="ps-tag">LM</span><span id="pnl-month-prev" class="ps-fig">—</span>
-                    <span class="ps-arrow">&rarr;</span>
-                    <span class="ps-tag">CM</span><span id="pnl-month-cur"  class="ps-fig">—</span>
-                  </span></div>
-                </div>
-              </div>
+    <!-- P&L -->
+    <div class="cbox-l">P&amp;L</div>
+    <div class="grid-2">
+      <div class="cbox pnl-card">
+        <div class="pnl-card-inner">
+          <div class="pnl-net">
+            <div>
+              <div class="cbox-l">Current Balance</div>
+              <div id="pnl-balance-number" class="pnl-balance-number">—</div>
+              <div id="pnl-balance-at" class="pnl-balance-at"></div>
+            </div>
+            <div>
+              <div class="cbox-l">Net P&amp;L<span id="pnl-net-count" class="pnl-net-count"></span></div>
+              <div id="pnl-net-number" class="pnl-net-number">—</div>
             </div>
           </div>
-          <div class="cbox chart-card">
-            <div class="cbox-l">Cumulative P&amp;L</div>
-            <div class="chart-area"><canvas id="chart-pnl"></canvas></div>
+          <div class="pnl-stats">
+            <div class="cbox-l">Performance</div>
+            <div class="pnl-stats-grid">
+              <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Profit</span><span id="pnl-gross-profit" class="pnl-stat-val">—</span></div>
+              <div class="pnl-stat"><span class="pnl-stat-lbl">Gross Loss</span><span id="pnl-gross-loss" class="pnl-stat-val">—</span></div>
+              <div class="pnl-stat"><span class="pnl-stat-lbl">Week</span><span class="pnl-stat-pair">
+                <span class="ps-tag">LW</span><span id="pnl-week-prev"  class="ps-fig">—</span>
+                <span class="ps-arrow">&rarr;</span>
+                <span class="ps-tag">CW</span><span id="pnl-week-cur"   class="ps-fig">—</span>
+              </span></div>
+              <div class="pnl-stat"><span class="pnl-stat-lbl">Month</span><span class="pnl-stat-pair">
+                <span class="ps-tag">LM</span><span id="pnl-month-prev" class="ps-fig">—</span>
+                <span class="ps-arrow">&rarr;</span>
+                <span class="ps-tag">CM</span><span id="pnl-month-cur"  class="ps-fig">—</span>
+              </span></div>
+            </div>
           </div>
         </div>
+      </div>
+      <div class="cbox chart-card">
+        <div class="cbox-l">Cumulative P&amp;L</div>
+        <div class="chart-area"><canvas id="chart-pnl"></canvas></div>
       </div>
     </div>
 
@@ -2130,8 +2055,6 @@ const State = {
   tradeLogPage: 0,
   // Chart instances keyed by canvas id (or logical name)
   charts: Object.create(null),
-  // Collapsed-section open/closed flags (default open = true)
-  sections: Object.create(null),
   // Calendar view-state — separate cursor per surface
   cal: {
     journal:  { y: 0, m: 0, sel: '' },
@@ -3175,8 +3098,7 @@ function renderPeriodDonut(period, ft) {
   $('cnt-l-' + period).textContent = losses + ' L';
   $('cnt-b-' + period).textContent = bes    + ' B';
 
-  // Money column beside the wheel — revealed with the P&L section (CSS-only).
-  // Splits on the sign of each P&L exactly as the Performance box does, so
+  // Money strip beneath the wheel. Splits on the sign of each P&L exactly as the Performance box does, so
   // Profit − Loss = Net here too. It deliberately does NOT match the W / L
   // counts above it: those use the ±BE_THRESHOLD result label, so a scratch
   // trade sits under B on the wheel while its dollars still land in Profit or
@@ -3654,7 +3576,7 @@ function renderHeatmap() {
   }
   grid.innerHTML = html;
 
-  // Month strip for P&L view. Trades counts every trade stamped to the month —
+  // Month totals strip. Trades counts every trade stamped to the month —
   // the same set the day cells count, so the cells' counts sum to it. Profit and
   // loss split on the sign of each trade's P&L, so Profit − Loss = Net, and Net
   // equals the sum of the week cells, which equals the sum of the day cells.
@@ -3770,7 +3692,7 @@ function renderSetupTable(ft) {
         return `
           <div class="setup-donut-col">
             <div class="setup-donut-label">${escHtml(s.setup)}</div>
-            <div class="period-host has-stats">
+            <div class="period-host">
               <div class="period-counts-left">
                 <span class="pc-b">${s.b} B</span>
                 <span class="pc-l">${s.l} L</span>
@@ -3921,7 +3843,7 @@ function renderEmotionBars(ft) {
         return `
           <div class="emo-cat-col">
             <div class="emo-cat-label">${cc.grp.name}</div>
-            <div class="period-host has-stats">
+            <div class="period-host">
               <div class="period-counts-left">
                 <span class="pc-b">${cc.be} B</span>
                 <span class="pc-l">${cc.loss} L</span>
@@ -6032,29 +5954,6 @@ const Carousel = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   COLLAPSIBLE SECTIONS & TABS
-   ═══════════════════════════════════════════════════════════════════════════ */
-function toggleSection(bodyId, chevId) {
-  const body = $(bodyId); if (!body) return;
-  const chev = $(chevId);
-  const open = State.sections[bodyId] !== false;
-  State.sections[bodyId] = !open;
-  body.style.display = open ? 'none' : '';
-  if (chev) chev.classList.toggle('closed', open);
-  // The P&L section doubles as a view-mode switch: while it's open the whole
-  // journal runs in P&L view (heatmap cells show day totals, the heatmap
-  // header shows the month total). CSS keys off this one body class.
-  if (bodyId === 'ap-body') document.body.classList.toggle('pnl-open', !open);
-  // Revealing a section: charts rendered while display:none computed a 0×0
-  // size, so nudge any Chart.js instances inside to redraw at full size.
-  if (open === false) {
-    body.querySelectorAll('canvas').forEach(c => {
-      if (c.id && State.charts[c.id]) State.charts[c.id].resize();
-    });
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
    GLOBAL EVENT WIRING
    ═══════════════════════════════════════════════════════════════════════════ */
 /* ─── EVENT WIRING ─────────────────────────────────────────────────────────
@@ -6085,7 +5984,7 @@ function wireEvents() {
   wireKeyboard();
 }
 
-// App shell: nav buttons, fullscreen, breakpoint redraw, section collapse.
+// App shell: nav buttons, fullscreen, breakpoint redraw.
 function wireChrome() {
   on('nav-io-btn',  'click', IO.openModal);
   /* Fullscreen toggle */
@@ -6101,17 +6000,6 @@ function wireChrome() {
   /* Redraw the month when the layout crosses the phone breakpoint — the grid
      gains or loses its Saturday column there, which only the renderer builds. */
   Phone.addEventListener('change', renderHeatmap);
-  /* Collapsible section headers */
-  // P&L starts open. The three places that encode this have to agree or the
-  // first click does nothing visible: the markup (no inline display:none, no
-  // .closed chevron), the section flag toggleSection() reads, and the body
-  // class the P&L-view CSS keys off. Set the latter two here so the flag
-  // matches what the markup already shows.
-  State.sections['ap-body'] = true;
-  document.body.classList.add('pnl-open');
-  $$('[data-collapse-target]').forEach(hdr => {
-    hdr.addEventListener('click', () => toggleSection(hdr.dataset.collapseTarget, hdr.dataset.collapseChev));
-  });
 }
 
 // Month stepping shared by the journal date picker and the heatmap.
