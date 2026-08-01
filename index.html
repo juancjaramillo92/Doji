@@ -888,25 +888,45 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
    layout accident. .log-split is align-items:stretch for that reason, and the
    two groups below take the slack as breathing room between rows rather than as
    dead space under the last one. */
-.roll-card { display:flex; flex-direction:column; }
+.roll-card {
+  display:flex; flex-direction:column;
+  /* Width of BOTH figure columns, in BOTH blocks. .roll-list and .roll-memo are
+     separate flex containers, so auto-sized columns would each fit their own
+     content — the memo's "3" under Trades is far narrower than the list's
+     "1284.50", and the two grids would stop lining up down the card. One width
+     declared here is what keeps every figure on the same two right edges. Lives
+     on the card rather than in :root because exactly one component uses it,
+     unlike --bar-h which every bar in the journal shares.
+     72px holds the widest thing either column carries, which is not a figure but
+     the "1–31 AUG 26" header: 11 characters of 9px mono plus its letter-spacing. */
+  --roll-col:72px;
+}
 /* The render host is a passthrough — it must carry the flex chain or the body
    below it has no surplus height to distribute. */
 .roll-card > #roll-forward { flex:1; display:flex; flex-direction:column; }
 .roll-body { flex:1; display:flex; flex-direction:column; gap:var(--gap-divider); }
 
-.roll-hdr {
-  display:flex; align-items:baseline; justify-content:space-between;
-  gap:12px; margin-bottom:var(--gap-title);
+/* Label, then this month, then last month. A grid rather than the flex row
+   .pnl-stat uses: two figure columns have to land on the same edges in the
+   reconciliation and in the memo below it, and justify-content:space-between
+   cannot promise that across two separate containers. */
+.roll-row {
+  display:grid; grid-template-columns:1fr var(--roll-col) var(--roll-col);
+  align-items:baseline; gap:10px;
 }
-/* .cbox-l carries a bottom margin for the stacked case; here the header row owns
-   the spacing, so cancel it or the gap doubles. */
-.roll-hdr .cbox-l { margin-bottom:0; }
+/* Flex handed the value the right edge for free; the grid has to be told. */
+.roll-row .pnl-stat-val { text-align:right; }
+
 /* Purple marks the range being reported — the same accent the active nav tab
-   and carousel dot use for "this is the one you are looking at". */
+   and carousel dot use for "this is the one you are looking at". Last month is
+   a benchmark and not the range being reported, so it takes the same type
+   muted; the colour keeps meaning what it means everywhere else. */
 .roll-range {
   font-family:var(--mono); font-size:9px; font-weight:600;
   letter-spacing:1px; text-transform:uppercase; color:var(--p);
+  text-align:right;
 }
+.roll-range.prior { color:var(--mt); }
 /* 11px is the floor, not the gap: space-between spreads the rows over whatever
    height the log gives the card, and the gap only takes over when there is no
    slack left to share. */
@@ -1857,7 +1877,7 @@ tr.broker-pending td:first-child {
       <div id="emo-during-mgmt" class="emo-during"></div>
     </div>
 
-    <!-- Trade log (left) + swipeable range roll-forward (right) -->
+    <!-- Trade log (left) + range roll-forward (right) -->
     <div class="log-split">
       <div class="tlog-wrap">
         <div class="tlog-hdr">
@@ -3966,11 +3986,16 @@ function renderDuringMgmt(ft) {
 
 
 /* ─── RANGE ROLL-FORWARD ─────────────────────────────────────────────────── */
-/* One panel beside the trade log, reporting the current month: where the P&L
-   started the range, what happened inside it, and where it ended.
+/* One panel beside the trade log, reporting the current month against the last
+   one: where the P&L started each range, what happened inside it, and where it
+   ended.
  *
- * Written against a `period` rather than hardcoding the month, so a second
- * range is a call site away — periodCutoff already understands 'week'.
+ * Takes an explicit half-open window [start, end) rather than a period name.
+ * The current month could be left unbounded at the top — no trade is filed in
+ * the future — but a closed month cannot, and one rule that works for both is
+ * worth more than a special case. Half-open is what puts every trade in exactly
+ * one column: last month's `end` IS this month's `start`, so nothing can be
+ * counted twice or fall between them.
  *
  * P&L, NOT BALANCE. The trader asked for it this way and it matters: balance is
  * contaminated by deposits and withdrawals, so a funded account shows a rising
@@ -3991,9 +4016,7 @@ function renderDuringMgmt(ft) {
  * all rather than four unrelated statistics, so it is checked by eye every time
  * the panel is read; a break-even trade landing on the wrong side of it would
  * make the panel silently fail to add up. Same convention as renderPnLCard. */
-function rollForwardStats(ft, period) {
-  const start = periodCutoff(period);
-
+function rollForwardStats(ft, start, end) {
   let opening = 0;                        // cumulative net P&L before the range
   let gross = 0, loss = 0, n = 0;         // inside the range
   let best = null, worst = null;
@@ -4008,17 +4031,27 @@ function rollForwardStats(ft, period) {
   // so a handful of break-evens halves an average win that should read $57.
   // Separate accumulators keep the sum honest and the averages honest at once.
   let winSum = 0, winN = 0, lossSum = 0, lossN = 0;
-  // Account balance either side of the range boundary. Two separate watermarks
-  // rather than one running figure: the opener is the last balance the broker
-  // reported BEFORE the range, the latest is simply the newest one on file.
-  // Tracked by timestamp instead of by array order because State.trades is in
-  // insertion order, and a backfill can insert an old fill after a new one.
+  // Account balance at each end of the range: the last one the broker reported
+  // before the range opened, and the last one it reported before the range
+  // closed. One rule read at the two boundaries, which is what makes last
+  // month's closing balance and this month's opening balance the same figure —
+  // the same instant is being asked about from either side.
+  //
+  // Two watermarks rather than one running figure, tracked by timestamp instead
+  // of by array order, because State.trades is in insertion order and a backfill
+  // can insert an old fill after a new one.
   let openBal = null, openBalAt = '';
   let lastBal = null, lastBalAt = '';
 
   for (const t of ft) {
-    const stamp  = String(t.entryTime || t.openTime || '');
-    const before = t.openTime && new Date(t.openTime) < start;
+    // A trade with no openTime cannot be placed on either side of a boundary,
+    // so it is out of the panel entirely — for the balance as much as for the
+    // P&L. renderPnLCard already skips it the same way.
+    if (!t.openTime) continue;
+    const at     = new Date(t.openTime);
+    const stamp  = String(t.entryTime || t.openTime);
+    const before = at < start;
+    if (at >= end) continue;
 
     // Balance rides on the fill that reported it, so it counts whether or not
     // its journal entry has been filled in yet — hence this sits outside the
@@ -4030,7 +4063,7 @@ function rollForwardStats(ft, period) {
 
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
-    if (v === null || !t.openTime) continue;
+    if (v === null) continue;
     if (before) { opening += v; continue; }
 
     n++;
@@ -4046,12 +4079,8 @@ function rollForwardStats(ft, period) {
     else if (label === 'loss') { lossSum -= v; lossN++; }
   }
 
-  // Inclusive last day of the range, for the label. Day 0 of the NEXT month is
-  // the last day of this one, which sidesteps leap years and 30/31 entirely.
-  const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-
   return {
-    start, end, n, opening,
+    n, opening,
     gross, loss,
     closing: opening + gross - loss,
     change: gross - loss,
@@ -4062,53 +4091,87 @@ function rollForwardStats(ft, period) {
   };
 }
 
-// The placeholder a row shows when it has no figure yet. A single constant
-// because rollRow recognises it to decide what to dim — a stray '-' or 'n/a' at
+// The placeholder a cell shows when it has no figure yet. A single constant
+// because rollCell recognises it to decide what to dim — a stray '-' or 'n/a' at
 // one call site would render as a live value.
 const DASH = '—';
 
-// One label/value row in the house style. `sign` colours the value the same way
-// setFigure does for the P&L card; pass 0 to leave it neutral.
-function rollRow(label, text, sign, cls) {
+// One row in the house style: the label, then the same statistic for this month
+// and for last. Each cell is a [text, sign] pair — `sign` colours the value the
+// same way setFigure does for the P&L card, so pass 0 to leave it neutral. The
+// two are separate because the sign is not always readable off the text: gross
+// loss prints unsigned and still colours red, and an empty range colours nothing
+// at all.
+function rollRow(label, cur, prev, cls) {
+  return `<div class="roll-row${cls ? ' ' + cls : ''}">`
+       + `<span class="pnl-stat-lbl">${label}</span>`
+       + rollCell(cur) + rollCell(prev) + `</div>`;
+}
+function rollCell([text, sign]) {
   const c = sign > 0 ? ' win' : sign < 0 ? ' loss' : '';
-  // Placeholder rows dim themselves off the value they were handed, so no call
+  // Placeholder cells dim themselves off the value they were handed, so no call
   // site has to remember to pass a flag alongside its own em-dash.
   const d = text === DASH ? ' dim' : '';
-  return `<div class="pnl-stat${cls ? ' ' + cls : ''}">`
-       + `<span class="pnl-stat-lbl">${label}</span>`
-       + `<span class="pnl-stat-val${c}${d}">${text}</span></div>`;
+  return `<span class="pnl-stat-val${c}${d}">${text}</span>`;
 }
 
 function renderRollForward(ft) {
   const host = $('roll-forward');
   if (!host) return;
 
-  const s = rollForwardStats(ft, 'month');
+  // Three month boundaries, two half-open windows. Last month's end IS this
+  // month's start, which is the property the panel is built to show: July's
+  // closing P&L and August's opening P&L are the same number one row apart, and
+  // so are the two balances. Read on the diagonal, and if the pair ever
+  // disagrees something upstream has gone wrong.
+  const curStart  = periodCutoff('month');
+  const prevStart = new Date(curStart.getFullYear(), curStart.getMonth() - 1, 1);
+  const nextStart = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 1);
 
-  // Three context rows above the reconciliation. They are deliberately NOT part
+  const cur  = rollForwardStats(ft, curStart,  nextStart);
+  const prev = rollForwardStats(ft, prevStart, curStart);
+
+  // "1–31 AUG 26". Day 0 of the month the window ends in is the last day of the
+  // month it covers, which sidesteps leap years and 30/31 entirely.
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const rangeLabel = (start, end) =>
+    `1–${new Date(end.getFullYear(), end.getMonth(), 0).getDate()} `
+    + `${MO[start.getMonth()]} ${String(start.getFullYear()).slice(2)}`;
+
+  // Every figure in the panel is either money or a dash; null means nothing to
+  // report yet, and rollCell dims the cell off the dash without being told.
+  const fig = v => v === null ? DASH : money(round2(v));
+
+  // The ranges head the columns rather than sitting in a row of their own: with
+  // two periods on every line, naming them once at the top is what stops each
+  // row from having to say which is which.
+  const head =
+      `<div class="roll-row">`
+    + `<span></span>`
+    + `<span class="roll-range">${rangeLabel(curStart, nextStart)}</span>`
+    + `<span class="roll-range prior">${rangeLabel(prevStart, curStart)}</span>`
+    + `</div>`;
+
+  // Two context rows above the reconciliation. They are deliberately NOT part
   // of it: balance and cumulative P&L answer different questions and only track
   // each other while no money moves in or out of the account. A deposit lifts
   // both balance figures and leaves every P&L line untouched, which is exactly
   // why the sum below is built from P&L alone. Read together they still make a
   // useful cross-check — with no transfers in the range, the two balances
   // should differ by the net change.
-  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const range = `${s.start.getDate()}–${s.end.getDate()} ${MO[s.start.getMonth()]} ${String(s.start.getFullYear()).slice(2)}`;
-
   const context =
-      rollRow('Range',                  range, 0)
-    + rollRow('Balance at range start', s.openBal === null ? DASH : money(round2(s.openBal)), 0)
-    + rollRow('Latest balance',         s.lastBal === null ? DASH : money(round2(s.lastBal)), 0);
+      rollRow('Balance at range start', [fig(cur.openBal), 0], [fig(prev.openBal), 0])
+    + rollRow('Balance at range end',   [fig(cur.lastBal), 0], [fig(prev.lastBal), 0]);
 
   // Signed where the sign is information (a figure that can go either way),
   // neutral where it is not. Gross profit is always ≥ 0 and gross loss always
   // ≤ 0, so colouring them is decoration; opening, closing and the change
   // genuinely carry a direction.
   const recon =
-      rollRow('P&amp;L at range start', money(round2(s.opening)), s.opening)
-    + rollRow('+ Gross profit',         money(round2(s.gross)),   s.n ? 1 : 0)
-    + rollRow('&minus; Gross loss',     money(round2(s.loss)),    s.n ? -1 : 0)
-    + rollRow('= P&amp;L at range end', money(round2(s.closing)), s.closing, 'roll-total');
+      rollRow('P&amp;L at range start', [fig(cur.opening), cur.opening],  [fig(prev.opening), prev.opening])
+    + rollRow('+ Gross profit',         [fig(cur.gross),   cur.n ? 1 : 0], [fig(prev.gross),  prev.n ? 1 : 0])
+    + rollRow('&minus; Gross loss',     [fig(cur.loss),    cur.n ? -1 : 0], [fig(prev.loss),  prev.n ? -1 : 0])
+    + rollRow('= P&amp;L at range end', [fig(cur.closing), cur.closing],  [fig(prev.closing), prev.closing], 'roll-total');
 
   // ALL SIX ROWS, ALWAYS. An empty range dashes its values; it does not drop the
   // rows and replace them with a message. Two reasons, and the layout one is the
@@ -4133,21 +4196,20 @@ function renderRollForward(ft) {
   const memo = `
     <div class="roll-memo">
       <div class="cbox-l roll-memo-title">In this range</div>
-      ${rollRow('Net change',  money(round2(s.change)), s.change)}
-      ${rollRow('Trades',      String(s.n), 0)}
-      ${rollRow('Best trade',  s.best    === null ? DASH : money(round2(s.best)),    s.best)}
-      ${rollRow('Worst trade', s.worst   === null ? DASH : money(round2(s.worst)),   s.worst)}
-      ${rollRow('Avg win',     s.avgWin  === null ? DASH : money(round2(s.avgWin)),  s.avgWin  === null ? 0 : 1)}
-      ${rollRow('Avg loss',    s.avgLoss === null ? DASH : money(round2(s.avgLoss)), s.avgLoss === null ? 0 : -1)}
+      ${rollRow('Net change',  [fig(cur.change), cur.change],   [fig(prev.change), prev.change])}
+      ${rollRow('Trades',      [String(cur.n), 0],              [String(prev.n), 0])}
+      ${rollRow('Best trade',  [fig(cur.best), cur.best],       [fig(prev.best), prev.best])}
+      ${rollRow('Worst trade', [fig(cur.worst), cur.worst],     [fig(prev.worst), prev.worst])}
+      ${rollRow('Avg win',     [fig(cur.avgWin),  cur.avgWin  === null ? 0 : 1],
+                               [fig(prev.avgWin), prev.avgWin === null ? 0 : 1])}
+      ${rollRow('Avg loss',    [fig(cur.avgLoss),  cur.avgLoss  === null ? 0 : -1],
+                               [fig(prev.avgLoss), prev.avgLoss === null ? 0 : -1])}
     </div>`;
 
   host.innerHTML = `
-    <div class="roll-hdr">
-      <div class="cbox-l">Range roll-forward</div>
-      <div class="roll-range">This Month</div>
-    </div>
+    <div class="cbox-l">Range roll-forward</div>
     <div class="roll-body">
-      <div class="roll-list">${context}${recon}</div>
+      <div class="roll-list">${head}${context}${recon}</div>
       ${memo}
     </div>`;
 }
