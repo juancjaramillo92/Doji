@@ -898,8 +898,16 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
      on the card rather than in :root because exactly one component uses it,
      unlike --bar-h which every bar in the journal shares.
      72px holds the widest thing either column carries, which is not a figure but
-     the "1–31 AUG 26" header: 11 characters of 9px mono plus its letter-spacing. */
+     the "1–31 AUG 26" header: 11 characters of 9px mono plus its letter-spacing.
+
+     --roll-gap is the space between columns. It matters more than it looks:
+     both figures are right-aligned inside their own column, so the visible
+     distance between two long numbers is this gap plus whatever slack the right
+     column has left over. At 10px a pair of seven-digit figures read as one
+     run-on number. Raised so the two months stay legible as two months, at the
+     cost of the label column, which is 1fr and absorbs the difference. */
   --roll-col:72px;
+  --roll-gap:22px;
 }
 /* The render host is a passthrough — it must carry the flex chain or the body
    below it has no surplus height to distribute. */
@@ -912,7 +920,7 @@ body.pnl-open .heatmap-month-pnl { display:flex; }
    cannot promise that across two separate containers. */
 .roll-row {
   display:grid; grid-template-columns:1fr var(--roll-col) var(--roll-col);
-  align-items:baseline; gap:10px;
+  align-items:baseline; gap:var(--roll-gap);
 }
 /* Flex handed the value the right edge for free; the grid has to be told. */
 .roll-row .pnl-stat-val { text-align:right; }
