@@ -2537,6 +2537,18 @@ function migrateData() {
   }
   for (const t of State.trades) {
     if (!t.source) { t.source = 'journal'; changed = true; }
+    // Commission repair (2026-08). brokerCommission() used to divide by 100 a
+    // second time — the Edge Function already converts cTrader's hundredths to
+    // dollars before writing — so every value stored before that fix is 1/100th
+    // of the truth. A real commission is never below a cent (the smallest on
+    // file is $0.07), so anything under that is unambiguously an un-repaired
+    // record. Idempotent: a repaired 0.14 no longer matches, so this cannot
+    // compound. Trades still inside the broker's sync window repair themselves
+    // through applyUpdate anyway; this is for the ones that have aged out of it.
+    if (typeof t.brokerCommission === 'number' && t.brokerCommission > 0 && t.brokerCommission < 0.01) {
+      t.brokerCommission = round2(t.brokerCommission * 100);
+      changed = true;
+    }
   }
   // Re-derive result from pnl so the two can't drift. pnl is the source of
   // truth; result is a denormalized cache held on BOTH the journal and its
@@ -5615,15 +5627,21 @@ const Login = {
    ═══════════════════════════════════════════════════════════════════════════ */
 // Commission on a broker fill, in dollars.
 //
-// The broker reports it in HUNDREDTHS and signed as a debit: `commission: -7`
-// is seven cents off the account, not seven dollars on it. Both readings are
-// plausible integers, which is exactly what makes the mistake a 100× one and
-// worth isolating in a single named function rather than repeating /100 at each
-// call site. Returned as a POSITIVE magnitude, matching how gross loss is
-// carried elsewhere in this file — the sign lives in the label, not the number.
+// ALREADY IN DOLLARS WHEN IT REACHES US. cTrader reports hundredths — a raw
+// `commission: -7` is seven cents — but the Edge Function converts before it
+// writes (`usdFromCents`), so broker_fills.commission holds -0.14, not -14. This
+// function used to divide by 100 a second time and stored every commission at
+// 1/100th of its value. Neither file was wrong alone; they were wrong together,
+// which is why it survived a read of each.
+//
+// The email parser never writes this column, so the Edge Function is the only
+// source and dollars is the only format to expect.
+//
+// Returned as a POSITIVE magnitude, matching how gross loss is carried elsewhere
+// in this file — the sign lives in the label, not the number.
 function brokerCommission(fill) {
   const c = safeNum(fill.commission);
-  return c === null ? null : round2(Math.abs(c) / 100);
+  return c === null ? null : round2(Math.abs(c));
 }
 
 const BrokerSync = {
