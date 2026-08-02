@@ -20,8 +20,7 @@
   --p-gl:rgba(139,53,184,.07); --p-gl2:rgba(139,53,184,.16); --p-gl3:rgba(139,53,184,.30);
 
   /* Layered backgrounds — near-black, faint purple hue (kept, not neutralised) */
-  --bg:#070611; --bg3:#141022;
-  --s2:#141022; --s3:#1c1730;
+  --bg:#070611; --s2:#141022;
 
   /* Borders — dim purple lines */
   --bd:#251d39; --bd2:#342948;
@@ -30,8 +29,7 @@
   --tx:#e8e6f0; --mt:#6f6788; --mt2:#9a92b0;
 
   /* Win / Loss */
-  --win:#3ba585;  --wgl:rgba(59,165,133,.09);
-  --loss:#d63d5a; --lgl:rgba(214,61,90,.09);
+  --win:#3ba585; --loss:#d63d5a;
 
   /* Glass surfaces — purple-tinted translucent glass */
   --glass:#0a0813;             /* solid dark card surface — flat, no translucency */
@@ -43,7 +41,7 @@
   --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
 
   /* Radius scale */
-  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-full:999px;
+  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-full:999px;
   /* Calendar cells only. A grid of many small tiles reads as a grid when the
      corners are tight; at the card radius each tile starts to look like its own
      little card and the rows stop scanning as rows. A separate token because
@@ -217,6 +215,10 @@ nav {
   padding:16px 18px;
   border-radius:var(--r-md); box-shadow:var(--sh-2);
 }
+/* A card standing alone in the panel flow takes the section rhythm. Cards inside
+   a grid (.grid-2, .log-split) get their spacing from the grid gap instead, which
+   is why this is opt-in rather than part of .cbox. */
+.cbox.section { margin-bottom:var(--gap-section); }
 /* Cards whose body is a divided column grid (setup / emotions). The 4px here
    plus each column's 14px lands content on the same 18px edge as plain cards,
    so columned and non-columned sections share one left margin. */
@@ -521,11 +523,6 @@ nav {
 /* ═══════════════════════════════════════════════════════════════════════════
    R:R BAR
    ═══════════════════════════════════════════════════════════════════════════ */
-.tlog-time {
-  display:block; margin-top:2px;
-  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
-}
-
 .rr-bar-wrap {
   background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
   padding:16px 18px; margin-bottom:var(--gap-section);
@@ -776,6 +773,11 @@ nav {
   display:flex; align-items:center; justify-content:space-between;
   padding:10px 18px; white-space:nowrap;
 }
+/* Entry clock beneath the date in a log row. */
+.tlog-time {
+  display:block; margin-top:2px;
+  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
+}
 /* Pagination only renders when there's more than one page. On a single page
    the bar is empty, so collapse it — otherwise it leaves a hollow gap above
    the column titles that doesn't match the other sections' top spacing. */
@@ -1003,7 +1005,6 @@ td.c   { text-align:center; }
 .emo-row-pcts .win  { color:var(--win); }
 .emo-row-pcts .loss { color:var(--loss); }
 .emo-row-pcts .sep  { color:var(--mt); }
-/* Phase qualifier (before/during) in phase-split row labels. */
 .emo-row-track {
   height:var(--bar-h); border-radius:3px;
   overflow:hidden;
@@ -1182,6 +1183,16 @@ td.c   { text-align:center; }
 .jf-pill-lbl:hover { border-color:rgba(255,255,255,.3); color:#fff; background:rgba(255,255,255,.07); }
 .jf-pill-radio:checked + .jf-pill-lbl {
   border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3);
+}
+
+/* A pill showing a value this app does not own — the date on a broker-synced
+   trade. Dimmed and inert rather than hidden: the day is still worth reading, it
+   simply is not yours to set. */
+.jf-pill-lbl.is-locked {
+  cursor:default; color:var(--mt); border-style:dashed;
+}
+.jf-pill-lbl.is-locked:hover {
+  border-color:var(--glass-bd); color:var(--mt); background:var(--fill-1);
 }
 
 /* Emotion chip layout — 3 columns separated by vertical dividers */
@@ -1643,13 +1654,13 @@ tr.broker-pending td:first-child {
     <span id="sync-dot" class="sync-dot" role="status" aria-live="polite"
           title="Sync status"><span class="sync-dot-label"></span></span>
     <button id="nav-fs-btn" class="nav-icon-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-      <svg class="fs-ico fs-ico-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+      <svg class="fs-ico-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       <!-- Exit icon: four brackets pointing inward. Each is one absolute
            subpath with sweep-flag 1, so all four corners curve the same way —
            the previous version mixed a sweep-0 arc into the bottom-right
            bracket and chained relative moves between subpaths, which drew that
            corner turned inside out. -->
-      <svg class="fs-ico fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+      <svg class="fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
     </button>
     <button id="nav-io-btn" class="nav-icon-btn" title="Import / Export" aria-label="Import / Export data">&#x21C5;</button>
   </div>
@@ -1790,22 +1801,22 @@ tr.broker-pending td:first-child {
     </div>
 
     <!-- P&L Heatmap Calendar -->
-    <div class="cbox" style="margin-bottom:var(--gap-section);">
+    <div class="cbox section">
       <div id="calendar-heatmap"></div>
     </div>
 
     <!-- Setup & Session Win Rate (each setup's wheel + its per-session bars) -->
-    <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+    <div class="cbox cols section">
       <div id="setup-table"></div>
     </div>
 
     <!-- Emotions by outcome (before-phase) -->
-    <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+    <div class="cbox cols section">
       <div id="emo-cat-wheels"></div>
     </div>
 
     <!-- During-the-trade discipline (per management emotion) -->
-    <div class="cbox cols" style="margin-bottom:var(--gap-section);">
+    <div class="cbox cols section">
       <div id="emo-during-mgmt" class="emo-during"></div>
     </div>
 
@@ -1844,6 +1855,9 @@ tr.broker-pending td:first-child {
         <div class="io-section-desc">
           Accepts <b>.xlsx</b> or <b>.csv</b> files.
           Download the template to see the exact format expected.
+          For <b>historical backfill only</b> — imported trades carry no broker
+          position id, so the sync can never match them and re-importing the same
+          file adds every row again.
         </div>
         <div class="io-section-required">
           Required: <span class="req">Date, Direction</span> &nbsp;·&nbsp;
@@ -1860,7 +1874,7 @@ tr.broker-pending td:first-child {
       <div id="io-section-journal" class="io-section">
         <div class="io-section-label">Export Journal to Excel</div>
         <div class="io-section-desc">
-          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, discipline (rules / SLS / TPS), emotion tags (before &amp; during), and emotion tags (before &amp; during).
+          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, discipline (rules / SLS / TPS), and emotion tags (before &amp; during).
         </div>
         <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
       </div>
@@ -1903,9 +1917,9 @@ tr.broker-pending td:first-child {
         <span id="jm-date-label" class="jf-pill-lbl" style="cursor:pointer;white-space:nowrap;">—</span>
         <div id="jm-cal" class="jm-cal-wrap">
           <div class="cal-hdr">
-            <button class="cal-nav-btn" data-cal-nav="-1" data-cal-target="journal">&lsaquo;</button>
+            <button class="cal-nav-btn" data-jcal-nav="-1" aria-label="Previous month">&lsaquo;</button>
             <span class="cal-title" id="journal-cal-title"></span>
-            <button class="cal-nav-btn" data-cal-nav="1"  data-cal-target="journal">&rsaquo;</button>
+            <button class="cal-nav-btn" data-jcal-nav="1"  aria-label="Next month">&rsaquo;</button>
           </div>
           <div class="cal-dows">
             <span class="cal-dow">Su</span><span class="cal-dow">Mo</span><span class="cal-dow">Tu</span><span class="cal-dow">We</span><span class="cal-dow">Th</span><span class="cal-dow">Fr</span><span class="cal-dow">Sa</span>
@@ -2013,9 +2027,9 @@ const CONFIG = Object.freeze({
     // SL/TP compliance on trades where a member was felt DURING the trade.
     // The positives' management record lives here; the negatives' lives in the
     // separate "During the Trade" card.
-    { name:'Positive', members:['Calm','Confident'], duringDiscipline:true,         border:'#3ba585', bg:'rgba(59,165,133,.20)' },
-    { name:'Fear',     members:['Hesitant','Anxious','Gun-shy','Overwhelmed'],      border:'#8b35b8', bg:'rgba(139,53,184,.25)' },
-    { name:'Reactive', members:['Revenge','Greed','Bored','FOMO'],                  border:'#d63d5a', bg:'rgba(214,61,90,.20)'  }
+    { name:'Positive', members:['Calm','Confident'], duringDiscipline:true },
+    { name:'Fear',     members:['Hesitant','Anxious','Gun-shy','Overwhelmed'] },
+    { name:'Reactive', members:['Revenge','Greed','Bored','FOMO'] }
   ],
   // Negative DURING tags — the management-error drivers shown in the
   // "During the Trade" discipline subsection.
@@ -2043,16 +2057,20 @@ const State = {
   trades:   [],
   journals: [],
   // Derived index: tradeId → journal. Rebuilt by rebuildIndexes() after
-  // any mutation by rebuildIndexes(). journalForTrade(t) reads from here so render
-  // pipelines run in O(trades) instead of O(trades × journals).
+  // any mutation. journalForTrade(t) reads from here so render pipelines run in
+  // O(trades) instead of O(trades × journals).
   journalByTradeId: new Map(),
   // Derived index: tradeId → trade. Same rebuild lifecycle as the one above.
   // tradeForJournal(j) reads from here so journal→trade lookups are O(1)
   // instead of a State.trades.find() scan on every call.
   tradeById: new Map(),
-  // Derived index: ISO day → { tradeCount, pnl }. Same rebuild lifecycle again.
-  // dayData() reads from here rather than scanning, which is what keeps the
-  // heatmap at one pass over the trade set instead of one pass per day drawn.
+  // Derived index: ISO day → { tradeCount, pnlCount, pnl, pending }. Same rebuild
+  // lifecycle again. dayData() reads from here rather than scanning, which is what
+  // keeps the heatmap at one pass over the trade set instead of one pass per day
+  // drawn. pnlCount is separate from tradeCount because a day can hold trades that
+  // have no P&L yet, and a sum of nothing is not a break-even day. pending rides
+  // along for the same reason the totals do: the alternative is a scan of the whole
+  // trade set inside the heatmap's per-day loop.
   dayIndex: new Map(),
   tradeLogPage: 0,
   // Chart instances keyed by canvas id (or logical name)
@@ -2169,6 +2187,27 @@ function uid() {
        + Math.random().toString(36).slice(2, 6);
 }
 
+// Null-safe binding helper. The wire* functions fire once at boot; if any element
+// listed below has been renamed or removed in the markup we'd rather log a
+// warning and keep the rest of the app functional than crash the whole boot.
+const on = (id, event, handler) => {
+  const el = typeof id === 'string' ? $(id) : id;
+  if (el) el.addEventListener(event, handler);
+  else console.warn(`Doji: missing element for handler "${id}" (${event})`);
+};
+
+// Enter and Space on a focusable [role=button] must do what a click does. Bound
+// through one helper so a surface cannot end up announcing itself as a button and
+// then ignoring the keyboard — which is worse than not claiming to be one.
+const onActivate = (id, handler) => {
+  on(id, 'click', handler);
+  on(id, 'keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    handler(e);
+  });
+};
+
 /* ─── NOTIFICATION ───────────────────────────────────────────────────────── */
 let _notifTimer = 0;
 function notify(msg, isError) {
@@ -2195,15 +2234,14 @@ function notifyUndo(msg) {
 
 /* ─── DATE UTILITIES ─────────────────────────────────────────────────────── */
 const Dates = {
+  // Formats in the MACHINE's local time, which is safe only because openTime is
+  // pinned at 09:30Z: that clears midnight in either direction for every offset
+  // from UTC−9 to UTC+14. The margin is the reason for the hour, not the market —
+  // 00:00Z would render as the previous day anywhere west of Greenwich.
   fmt(iso, opts) {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-GB', opts || { day:'2-digit', month:'short', year:'2-digit' });
   },
-  // Entry clock time in New York, "HH:MM". The trade log files a trade under a
-  // civil day, which deliberately says nothing about WHEN inside that day — and
-  // when inside the day is exactly what distinguishes an Asian-session entry
-  // from a New York one. Shown under the date so the session label is legible
-  // rather than something to take on trust.
   // Entry clock, rendered in New York wall time. Surfaced in the trade log with
   // an "ET" suffix, NOT "NY": the row's neighbouring SESSION column already uses
   // NY as a session abbreviation (AS / LN / NY / LN+NY), so "21:05 NY" reads as
@@ -2363,9 +2401,6 @@ const Dates = {
 const Phone = window.matchMedia('(max-width:640px)');
 
 /* ─── LOOKUPS ────────────────────────────────────────────────────────────── */
-// Rebuilds the tradeId→journal index. Called after any mutation that adds,
-// removes, or replaces trades/journals. Cheap (single pass) and makes every
-// downstream lookup O(1).
 // Rebuilds every derived index in one place, so they cannot fall out of step
 // with each other or with the data. Called from Storage.saveTradesAndJournals(),
 // which every mutation path goes through, and from the two places that replace
@@ -2390,11 +2425,12 @@ function rebuildIndexes() {
     if (!t.openTime) continue;
     const iso = t.openTime.slice(0, 10);
     let d = State.dayIndex.get(iso);
-    if (!d) { d = { tradeCount: 0, pnl: 0 }; State.dayIndex.set(iso, d); }
+    if (!d) { d = { tradeCount: 0, pnlCount: 0, pnl: 0, pending: false }; State.dayIndex.set(iso, d); }
     d.tradeCount++;
+    if (t.brokerPending) d.pending = true;
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
-    if (v !== null) d.pnl += v;
+    if (v !== null) { d.pnlCount++; d.pnl += v; }
   }
   // Rounded once at the end rather than per addition, so the stored figure
   // matches what a single round2 over the day's sum would give.
@@ -2405,8 +2441,9 @@ function tradeForJournal(j)   { return j ? State.tradeById.get(j.tradeId) : unde
 // Maps a numeric P&L to its outcome class. Single source of truth so the
 // win / loss / break-even rule can't drift between the calendar, log and journal.
 // A scratch within ±CONFIG.BE_THRESHOLD of zero counts as break-even, not a
-// win or loss — but its dollar value is still summed into total P&L elsewhere
-// (pickPnls reads pnl directly and ignores this label).
+// win or loss — but its dollar value is still summed into total P&L elsewhere:
+// every money figure in the app splits on the SIGN of the P&L and ignores this
+// label, which is what makes gross profit − gross loss come out equal to net.
 function resultFromPnl(pnl)   { return Math.abs(pnl) <= CONFIG.BE_THRESHOLD ? 'be' : (pnl > 0 ? 'win' : 'loss'); }
 
 /* ─── SCHEMA GUARDS ────────────────────────────────────────────────────────
@@ -2523,48 +2560,28 @@ function migrateData() {
    STATS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-// Returns { n, wins, losses, be, wr, rr, avgWin, avgLoss, avgPnl, totalPnl }
-// avgWin / avgLoss are absolute-value averages (rejecting null P&L).
-// avgPnl is the signed average across trades that have P&L.
-// rr = avgWin / avgLoss (clamped to 9.99 when there are no losses).
+// Returns { n, wins, losses, be, wr } — the outcome counts and the rate over them.
+//
+// It used to compute five money figures as well (rr, avgWin, avgLoss, avgPnl,
+// totalPnl) that no caller ever read, and one of them was a trap: calcStats.rr was
+// NOT the ratio anyone saw, because renderRRBar computes its own with a different
+// zero-case. Two numbers called R:R, one of them invisible, is how a fix gets made
+// in the wrong place. The averages that ARE displayed are the roll-forward's, which
+// it accumulates itself on the result label.
 function calcStats(list) {
-  const out = { n:0, wins:0, losses:0, be:0, wr:0, rr:0, avgWin:0, avgLoss:0, avgPnl:0, totalPnl:0 };
+  const out = { n:0, wins:0, losses:0, be:0, wr:0 };
   if (!list.length) return out;
 
-  const winners = list.filter(t => t.result === 'win');
-  const losers  = list.filter(t => t.result === 'loss');
-  const breaks  = list.filter(t => t.result === 'be');
-
   out.n      = list.length;
-  out.wins   = winners.length;
-  out.losses = losers.length;
-  out.be     = breaks.length;
+  out.wins   = list.filter(t => t.result === 'win').length;
+  out.losses = list.filter(t => t.result === 'loss').length;
+  out.be     = list.filter(t => t.result === 'be').length;
   // Win rate is taken over DECIDED trades (win + loss + B/E). Trades with no
   // P&L logged (result === null) are excluded, so this % always matches the
   // win/loss wheels, which only ever plot win/loss/B/E segments.
   const decided = out.wins + out.losses + out.be;
   out.wr     = decided ? (out.wins / decided) * 100 : 0;
-
-  const winAbs  = pickPnls(winners).map(Math.abs);
-  const lossAbs = pickPnls(losers).map(Math.abs);
-  const allPnl  = pickPnls(list);
-
-  out.avgWin   = mean(winAbs);
-  out.avgLoss  = mean(lossAbs);
-  out.avgPnl   = mean(allPnl);
-  out.totalPnl = sum(allPnl);
-  out.rr       = out.avgLoss > 0 ? round2(out.avgWin / out.avgLoss) : (out.avgWin > 0 ? 9.99 : 0);
   return out;
-}
-function pickPnls(trades) {
-  const r = [];
-  for (const t of trades) {
-    const j = journalForTrade(t);
-    if (!j) continue;
-    const v = safeNum(j.pnl);
-    if (v !== null) r.push(v);
-  }
-  return r;
 }
 function mean(arr)  { return arr.length ? sum(arr) / arr.length : 0; }
 function sum(arr)   { let s = 0; for (const v of arr) s += v; return s; }
@@ -2587,6 +2604,30 @@ function tradeLogTime(t) {
   return new Date(t?.entryTime || j?.createdAt || t?.openTime || 0).getTime();
 }
 
+// The account balance the broker last reported at or before `cutoff` (a Date, or
+// null for "the newest on file"). ONE rule, read at whatever boundary the caller
+// needs, so the P&L card's Current Balance and the roll-forward's two balance rows
+// can never answer the same question differently.
+//
+// Ordered on the true execution instant, NOT on openTime. openTime is a fixed
+// 09:30Z per civil day, so every trade on a day ties on it and a strict comparison
+// hands the day to whichever fill happens to sit first in State.trades — which is
+// insertion order, and a backfill can insert an old fill after a new one. entryTime
+// is unique per trade; openTime is only the fallback for records that predate it.
+//
+// The balance rides on the fill that reported it, so a trade counts here whether or
+// not its journal has been filled in.
+function balanceAsOf(trades, cutoff) {
+  let balance = null, at = '';
+  for (const t of trades) {
+    if (typeof t.brokerBalance !== 'number' || !t.openTime) continue;
+    if (cutoff && new Date(t.openTime) >= cutoff) continue;
+    const stamp = String(t.entryTime || t.openTime);
+    if (stamp > at) { balance = t.brokerBalance; at = stamp; }
+  }
+  return balance;
+}
+
 // Coerce j.pnl to a number, returning null if it isn't a finite number.
 // Use this everywhere a P&L value flows into arithmetic — `parseFloat` alone
 // will silently produce NaN for strings like "—" or "abc", and one NaN can
@@ -2597,19 +2638,21 @@ function safeNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Most-recent streak among the supplied trades, plus the all-time max win streak.
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CALENDAR — single month-grid renderer used by:
-     • Trade-filter date picker (range select)
-     • Journal modal (single date)
-     • P&L heatmap (full-size cells with P&L info)
+   CALENDAR — month-grid maths shared by the two surfaces that need it.
 
-   The differences are all in the cell renderer, so we expose a renderCell hook.
+   render() draws a plain 7-column grid and is used by the journal modal's date
+   picker alone; the cell markup is the caller's, via the renderCell hook. The
+   heatmap does NOT use it — it emits a week-summary column and drops Saturday, so
+   it builds its own grid and borrows only navigate().
+
+   navigate() steps a cursor in State.cal and is used by both. A target with no
+   State.cal entry would throw here rather than silently do nothing, which is the
+   right failure for a typo in a surface name.
    ═══════════════════════════════════════════════════════════════════════════ */
 const Calendar = {
-  // opts: { gridId, titleId, year, month, renderCell(date, iso) -> string }
+  // opts: { gridId, titleId, year, month, renderCell(date, iso, dayNum) -> string }
   render(opts) {
     const grid  = $(opts.gridId);
     const title = $(opts.titleId);
@@ -2666,11 +2709,8 @@ const RESULT_BORDER = Object.freeze([cssToken('--win'),        cssToken('--loss'
 // bars use, so donut arcs and bar segments always share one border thickness.
 const SEG_BD = parseFloat(cssToken('--seg-bd')) || 1.5;
 
-// Canonical result wheel (win / loss / break-even doughnut). Single source of
-// truth for EVERY wheel in the journal — period wheels and setup wheels — so
-// they're built identically and can't drift, the wheel analogue of the shared
-// bar styling. counts = [wins, losses, bes]; an all-zero set renders a hollow
-// placeholder ring. Destroys any prior instance on the same canvas first.
+const DONUT_CUTOUT = '68%';
+
 // Whole-number percentage split for a set of counts, guaranteed to total 100
 // (largest-remainder / Hare quota). Rounding each share independently is the
 // obvious approach and the wrong one: three even thirds round to 33/33/33 and
@@ -2682,7 +2722,6 @@ const SEG_BD = parseFloat(cssToken('--seg-bd')) || 1.5;
 // rather than a misleading 0%. Callers should also drive the wheel's centre
 // label off THIS win figure, not a separate Math.round, so the ring and the
 // strip can never disagree by a point.
-const DONUT_CUTOUT = '68%';
 function pctSplit(counts) {
   const total = counts.reduce((a, b) => a + b, 0);
   if (!total) return null;
@@ -2718,6 +2757,11 @@ function resultPctStrip(pct) {
     </div>`;
 }
 
+// Canonical result wheel (win / loss / break-even doughnut). Single source of
+// truth for EVERY wheel in the journal — period, setup and emotion-category
+// wheels alike — so they're built identically and can't drift, the wheel analogue
+// of the shared bar styling. counts = [wins, losses, bes]; an all-zero set renders
+// a hollow placeholder ring. Destroys any prior instance on the same canvas first.
 function mountResultDonut(canvasId, counts) {
   Charts.destroy(canvasId);
   const canvas = $(canvasId);
@@ -2765,31 +2809,6 @@ const Charts = {
         if (existing) { try { existing.destroy(); } catch {} }
       }
     }
-  },
-
-  // Common scale theming shared by line + bar charts. Tooltips disabled —
-  // chart values are always shown directly in the surrounding UI.
-  baseOptions() {
-    return {
-      responsive: true, maintainAspectRatio: false,
-      animation: false,
-      // No hover interaction anywhere — points/bars must not enlarge or recolour.
-      events: [],
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false }
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(255,255,255,.06)' },
-          ticks: { color: '#707080', font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 }, maxTicksLimit: 8 }
-        },
-        y: {
-          grid: { color: 'rgba(255,255,255,.06)' },
-          ticks: { color: '#707080', font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 } }
-        }
-      }
-    };
   }
 };
 
@@ -2868,17 +2887,15 @@ function renderPnLCard(ft) {
   const weekPrior  = new Date(weekStart.getTime() - 7 * 86400000);
   const monthPrior = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
 
+  // Newest balance on file, through the same rule the roll-forward reads at its
+  // two range boundaries. It is a separate pass because it answers a different
+  // question to the P&L buckets below — a fill counts for the balance whether or
+  // not its entry has been journaled.
+  const balance = balanceAsOf(ft, null);
+
   let n = 0, net = 0, gross = 0, loss = 0;
   let week = 0, weekWas = 0, month = 0, monthWas = 0;
-  let balance = null, balanceAt = '';
   for (const t of ft) {
-    // The account balance rides on the fill that reported it, so the newest
-    // one wins — independently of the P&L buckets below, since a fill counts
-    // for the balance whether or not its entry has been journaled yet.
-    // openTime is always a UTC ISO string here, so it sorts lexicographically.
-    if (typeof t.brokerBalance === 'number' && t.openTime > balanceAt) {
-      balance = t.brokerBalance; balanceAt = t.openTime;
-    }
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
     if (v === null) continue;
@@ -3029,6 +3046,13 @@ function periodCutoff(period) {
   return null;
 }
 
+// A discipline question is a data point only once it has been answered. Every
+// broker fill arrives with all three blank, so a blank has to mean "not asked
+// yet", never "missed" — otherwise an entry that is never filled in permanently
+// depresses every compliance rate it touches. Single source of truth: the period
+// bars, the during-trade card and the Positive column all read it through here.
+const isAnswered = v => v === 'yes' || v === 'no';
+
 // Builds one compliance bar (Rules / Stop Loss / Take Profit) using the exact
 // session-bar segment language: green = followed, red = missed, last-segment
 // rounding, solo handling. Straight percentage regardless of sample size; an
@@ -3123,17 +3147,24 @@ function renderPeriodDonut(period, ft) {
   setFigure('pm-l-' + period, mn ? money(round2(-loss))        : '—', -loss);
   setFigure('pm-n-' + period, mn ? money(round2(gross - loss)) : '—', gross - loss);
 
-  // Discipline compliance for this same timeframe — denominator is journaled
-  // trades in the period, so the bars track Rules / SLS / TPS adherence over
-  // All Time / Week / Month alongside the win/loss wheel above.
+  // Discipline compliance for this same timeframe, tracking Rules / SLS / TPS
+  // adherence over All Time / Week / Month alongside the win/loss wheel above.
+  //
+  // Each bar's denominator is the trades where THAT question was actually
+  // answered — same rule as the during-trade card and the Positive column, which
+  // ask the same question of a different population. Counting a blank as a miss
+  // is what a shared journal count would do, and every broker fill arrives with
+  // three blanks: an unfilled entry would then drag all three bars down and keep
+  // them there for anything never got round to.
   const discHost = $('disc-bars-' + period);
   if (discHost) {
     const js = list.map(journalForTrade).filter(Boolean);
-    const dn = js.length;
+    const bar = (label, key) => {
+      const answered = js.filter(j => isAnswered(j[key]));
+      return disciplineBar(label, answered.filter(j => j[key] === 'yes').length, answered.length);
+    };
     discHost.innerHTML =
-      disciplineBar('Rules',       js.filter(j => j.followedRules === 'yes').length, dn) +
-      disciplineBar('Stop Loss',   js.filter(j => j.followedSLS   === 'yes').length, dn) +
-      disciplineBar('Take Profit', js.filter(j => j.followedTPS   === 'yes').length, dn);
+      bar('Rules', 'followedRules') + bar('Stop Loss', 'followedSLS') + bar('Take Profit', 'followedTPS');
   }
 
   mountResultDonut(canvasId, [wins, losses, bes]);
@@ -3205,13 +3236,13 @@ function ensureHeatmapStructure() {
   // Clicking a day that holds a trade opens that entry's journal modal — the
   // same path as clicking its row in the trade log. Delegated on the grid,
   // which persists across re-renders (only its innerHTML is replaced).
-  $('heatmap-grid').addEventListener('click', e => {
+  onActivate('heatmap-grid', e => {
     const cell = e.target.closest('.heatmap-cell[data-day]');
     if (cell) openTradeForDay(cell.dataset.day);
   });
   // Clicking a month in the year strip opens that month below. Delegated on the
   // strip for the same reason as the grid — only its innerHTML is replaced.
-  $('heatmap-year').addEventListener('click', e => {
+  onActivate('heatmap-year', e => {
     const cell = e.target.closest('.hm-mo[data-month]');
     if (!cell) return;
     State.cal.heatmap.m = Number(cell.dataset.month);
@@ -3300,151 +3331,20 @@ function closeModalShell(id) {
 
 function closeDayPopup() { closeModalShell('day-modal'); }
 
-/* ─── Zoom lock (phones) ───────────────────────────────────────────────────
-   iOS Safari zooms the page whenever it focuses a field whose text is under
-   16px, and it does not zoom back out afterwards. Several fields here are
-   deliberately small — the P&L pill is 9px mono and lives in a single-row
-   header that has no room to grow — so raising type to dodge the trigger is
-   not an option for them.
-
-   The other half of that behaviour is that Safari only auto-zooms when the
-   page allows scaling past 1. Pinning maximum-scale to 1 for the duration of
-   the focus removes the zoom without touching a single font-size. It is set
-   on pointerdown, i.e. BEFORE the field takes focus — applied afterwards the
-   zoom has already happened and the lock just freezes it there.
-
-   The lock is temporary on purpose. Held permanently it would also block
-   pinch-zoom, which is an accessibility regression and not ours to make, so
-   the free viewport is restored the moment nothing is being typed into.
-   Desktop is skipped entirely: no touch keyboard, no auto-zoom, and browser
-   zoom (ctrl +/-) ignores the viewport meta anyway. */
-const ZoomLock = {
-  FREE:   'width=device-width,initial-scale=1',
-  LOCKED: 'width=device-width,initial-scale=1,maximum-scale=1',
-  _meta: null,
-  _on: false,
-
-  init() {
-    this._meta = document.querySelector('meta[name="viewport"]');
-    if (!this._meta) return;
-    // Coarse pointer = touch. Anything else has no focus-zoom to prevent.
-    if (!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches)) return;
-
-    // Capture phase: this has to win the race against focus.
-    document.addEventListener('pointerdown', e => {
-      if (this._isField(e.target)) this._set(true);
-    }, true);
-    // Backstop for focus that arrives without a tap — keyboard "next" between
-    // fields, or code calling .focus() itself.
-    document.addEventListener('focusin', e => {
-      if (this._isField(e.target)) this._set(true);
-    }, true);
-    // Release only once focus has actually left every field. The delay lets
-    // focus land on the NEXT field first, so moving between two inputs does
-    // not flicker the viewport open and shut between them.
-    document.addEventListener('focusout', () => {
-      setTimeout(() => { if (!this._isField(document.activeElement)) this._set(false); }, 150);
-    });
-  },
-
-  _isField(el) {
-    if (!el || !el.tagName) return false;
-    if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-    if (el.tagName !== 'INPUT') return false;
-    // Only the types that open a keyboard. A radio pill or a file button takes
-    // focus without any text entry, and locking on those would be noise.
-    return !/^(button|submit|reset|image|checkbox|radio|range|color|file)$/i
-      .test(el.type || 'text');
-  },
-
-  _set(on) {
-    if (on === this._on) return;      // rewriting the same value re-lays out for nothing
-    this._on = on;
-    this._meta.setAttribute('content', on ? this.LOCKED : this.FREE);
-  },
-
-  // Closing a modal can remove the focused field from the DOM, and a removed
-  // element does not reliably fire focusout — which would strand the page
-  // locked and un-pinchable. Every close routes through closeModalShell, so
-  // releasing there covers that gap.
-  release() { this._set(false); }
-};
-
-/* ─── Keyboard inset (phones) ──────────────────────────────────────────────
-   The page itself never scrolls (html,body are overflow:hidden) and the
-   modals are position:fixed, so when a phone keyboard opens they keep their
-   full-screen height and their lower third simply sits underneath it. The
-   browser's own attempt to reveal a focused field from down there is what
-   produced the lurch.
-
-   visualViewport reports the part of the screen the keyboard has NOT covered.
-   Two things follow from it:
-     • --kb, the covered height, published on :root. The journal modal adds it
-       as bottom padding, which turns the covered strip into scrollable space —
-       without it there is nowhere to scroll a low field TO.
-     • a nudge that scrolls the focused field into that visible band.
-   Zoom is ZoomLock's job; nothing here touches scale. Browsers without
-   visualViewport never see a keyboard and are left alone. */
-const KeyboardInset = {
-  PAD: 14,          // breathing room between the field and the keyboard
-  MIN_KB: 100,      // below this it is a browser-chrome shift, not a keyboard
-  _t: 0,
-
-  init() {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const settle = () => {
-      clearTimeout(this._t);
-      // The keyboard animates in; measuring mid-animation reads a height that
-      // is already stale by the time it is applied.
-      this._t = setTimeout(() => { this._publish(); this._reveal(); }, 140);
-    };
-    vv.addEventListener('resize', settle);
-    vv.addEventListener('scroll', settle);
-    document.addEventListener('focusin', settle);
-    document.addEventListener('focusout', () => {
-      clearTimeout(this._t);
-      this._t = setTimeout(() => this._publish(), 160);
-    });
-  },
-
-  _height() {
-    const vv = window.visualViewport;
-    const kb = window.innerHeight - vv.height - vv.offsetTop;
-    return kb > this.MIN_KB ? Math.round(kb) : 0;
-  },
-
-  _publish() {
-    document.documentElement.style.setProperty('--kb', this._height() + 'px');
-  },
-
-  _reveal() {
-    if (!this._height()) return;
-    const el = document.activeElement;
-    if (!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return;
-    const modal = el.closest('.journal-modal.open, .io-modal.open, .login-overlay.open');
-    if (!modal) return;
-
-    const vv  = window.visualViewport;
-    const r   = el.getBoundingClientRect();
-    const top = vv.offsetTop + this.PAD;
-    const bot = vv.offsetTop + vv.height - this.PAD;
-
-    let delta = 0;
-    if (r.bottom > bot)   delta = r.bottom - bot;   // hidden by the keyboard
-    else if (r.top < top) delta = r.top - top;      // pushed off the top edge
-    // A few pixels out is not worth a scroll animation, and reacting to every
-    // pixel is how a jitter loop starts.
-    if (Math.abs(delta) > 6) modal.scrollBy({ top: delta, behavior: 'smooth' });
-  }
-};
-// One pass over the trade set for the whole year, rather than twelve calls to
-// monthTotals(). Counting semantics are deliberately identical to it — a trade
-// counts toward its month whether or not it has been journaled, while only a
-// journaled P&L moves the net — so the strip can never disagree with the month
-// stats it sits above.
+// One pass over the trade set for the whole year. It is the sole month aggregator:
+// the year strip and the month totals line beneath the title both read it, which is
+// what makes them impossible to disagree.
+//
+// Buckets on the openTime string prefix, exactly as the day cells do, rather than
+// on the Date comparison the period wheels use — a calendar view has to agree with
+// its own cells above all else.
+//
+// A trade counts toward its month's `trades` whether or not it has been journaled;
+// only a journaled P&L moves the money. The two are counted separately so callers
+// can tell "no trades" from "trades, no P&L yet".
 function yearTotals(y) {
-  const out = Array.from({ length: 12 }, () => ({ trades: 0, net: 0 }));
+  const out = Array.from({ length: 12 },
+    () => ({ trades: 0, pnlCount: 0, gross: 0, loss: 0, net: 0 }));
   const prefix = String(y) + '-';
   for (const t of State.trades) {
     if (!t.openTime || !t.openTime.startsWith(prefix)) continue;
@@ -3453,27 +3353,38 @@ function yearTotals(y) {
     out[m].trades++;
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
-    if (v !== null) out[m].net += v;
+    if (v === null) continue;
+    out[m].pnlCount++;
+    // Split on the SIGN, not the result label, so gross − loss = net exactly —
+    // the same convention the P&L card and the roll-forward use, and what lets the
+    // month strip be checked against the totals beneath it.
+    if (v >= 0) out[m].gross += v; else out[m].loss -= v;
   }
-  for (const o of out) o.net = round2(o.net);
+  for (const o of out) {
+    o.gross = round2(o.gross);
+    o.loss  = round2(o.loss);
+    o.net   = round2(o.gross - o.loss);
+  }
   return out;
 }
 
-function renderHeatmapYear(y, selMonth) {
+function renderHeatmapYear(y, selMonth, tot) {
   const host = $('heatmap-year');
   if (!host) return;
   const abbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const tot  = yearTotals(y);
   host.innerHTML = tot.map((t, m) => {
     const cls = ['hm-mo'];
-    if (t.trades) cls.push(resultFromPnl(t.net));
+    // Result and amount come from the months that have a P&L; the count comes from
+    // every trade. A month holding only open positions shows its count and a dash.
+    if (t.pnlCount) cls.push(resultFromPnl(t.net));
     if (m === selMonth) cls.push('sel');
+    const pnl = t.pnlCount ? '$' + Math.abs(t.net).toFixed(2) : (t.trades ? '—' : '');
     return `
       <div class="${cls.join(' ')}" data-month="${m}" role="button" tabindex="0"
            aria-label="${abbr[m]} ${y}">
         <div class="hm-mo-lbl">${abbr[m]}</div>
         <div class="hm-mo-count">${t.trades || ''}</div>
-        <div class="hm-mo-pnl">${t.trades ? '$' + Math.abs(t.net).toFixed(2) : ''}</div>
+        <div class="hm-mo-pnl">${pnl}</div>
       </div>`;
   }).join('');
 }
@@ -3483,7 +3394,11 @@ function renderHeatmap() {
   const cur = State.cal.heatmap;
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   $('heatmap-title').textContent = `${months[cur.m]} ${cur.y}`;
-  renderHeatmapYear(cur.y, cur.m);
+  // One pass over the trade set answers both the year strip and the month figures
+  // below it, which is also what guarantees they agree: the strip's selected cell
+  // and the totals line are literally the same object read twice.
+  const yr = yearTotals(cur.y);
+  renderHeatmapYear(cur.y, cur.m, yr);
 
   // Saturday never trades — the journal's week runs Sunday → Friday close — so
   // on a phone it is dropped, handing its width to the six days that matter and
@@ -3522,24 +3437,28 @@ function renderHeatmap() {
   // positions, not dates, so the summary always lands in the last column no
   // matter which weekday the month starts on. Week totals accumulate from the
   // same dayData() reads that fill the cells, so the two can never disagree.
-  let slot = 0, wkN = 0, wkPnl = 0, wkTrades = 0;
+  let slot = 0, wkN = 0, wkPnl = 0, wkPnlN = 0, wkTrades = 0;
 
   const flushWeek = () => {
     wkN++;
-    const cls   = wkTrades === 0 ? '' : resultFromPnl(wkPnl);
+    // Same split as a day cell: the count is every trade in the week, the amount
+    // and its colour come only from the ones that have a P&L. A week of open
+    // positions shows its count against a dash, not a $0.00 break-even.
+    const cls   = wkPnlN === 0 ? '' : resultFromPnl(wkPnl);
     const count = wkTrades > 0 ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
     // Whole units and cents emitted separately so the phone stylesheet can drop
     // the tail — same pattern as .heatmap-cell-count-word above.
     const wkAbs = Math.abs(round2(wkPnl)).toFixed(2);
-    const pnl   = wkTrades > 0
-      ? `$${wkAbs.slice(0, -3)}<span class="hm-cents">${wkAbs.slice(-3)}</span>` : '';
+    const pnl   = wkPnlN > 0
+      ? `$${wkAbs.slice(0, -3)}<span class="hm-cents">${wkAbs.slice(-3)}</span>`
+      : wkTrades > 0 ? '—' : '';
     html += `
       <div class="heatmap-week ${cls}">
         <div class="heatmap-week-lbl">W${wkN}</div>
         <div class="heatmap-week-count">${count}</div>
         <div class="heatmap-week-pnl">${pnl}</div>
       </div>`;
-    wkPnl = 0; wkTrades = 0;
+    wkPnl = 0; wkPnlN = 0; wkTrades = 0;
   };
   const blank = () => { html += '<div class="heatmap-cell-empty"></div>'; slot++; };
 
@@ -3550,16 +3469,27 @@ function renderHeatmap() {
   for (let i = 0; i < (visible.length ? visible[0].wd : firstDay); i++) blank();
 
   for (const { d, iso, data } of visible) {
-    let cls = data.tradeCount === 0 ? '' : resultFromPnl(data.pnl);
-    // A day holding any incomplete broker-synced trade pulses purple until
-    // its rules/emotions data is filled in.
-    if (State.trades.some(t => t.brokerPending && t.openTime && t.openTime.slice(0, 10) === iso)) cls += ' pending';
-    const pnlText   = data.tradeCount > 0 ? '$' + Math.abs(data.pnl).toFixed(2) : '';
+    // A day whose trades have no P&L yet has no result to show. Printing $0.00
+    // there would read as a day of scratches rather than as a day still open, so
+    // it takes the em-dash placeholder and no result colour — the same rule the
+    // empty bars and roll-forward rows follow.
+    let cls = data.pnlCount === 0 ? '' : resultFromPnl(data.pnl);
+    // A day holding any incomplete broker-synced trade pulses purple until its
+    // rules/emotions data is filled in. Read off the prebuilt index rather than
+    // scanned for: this loop runs once per day on screen, and a scan of the whole
+    // trade set inside it is thirty-one full passes to draw one month.
+    if (data.pending) cls += ' pending';
+    const pnlText   = data.pnlCount > 0 ? '$' + Math.abs(data.pnl).toFixed(2)
+                    : data.tradeCount > 0 ? '—' : '';
     // The word "trade(s)" lives in its own span so the phone stylesheet can
     // drop it — on a month grid the bare count is unambiguous.
     const countText = data.tradeCount > 0 ? `${data.tradeCount}<span class="heatmap-cell-count-word"> trade${data.tradeCount > 1 ? 's' : ''}</span>` : '';
+    // Focusable only when the cell opens something. Every day carrying a role and
+    // a tab stop would put thirty-one of them in the way of the trade log for the
+    // sake of a handful that do anything.
+    const opens = data.tradeCount > 0 ? ` role="button" tabindex="0" aria-label="${iso}"` : '';
     html += `
-      <div class="heatmap-cell ${cls}" data-day="${iso}">
+      <div class="heatmap-cell ${cls}" data-day="${iso}"${opens}>
         <div class="heatmap-cell-day">${d}</div>
         <div class="heatmap-cell-body">
           <div class="heatmap-cell-count">${countText}</div>
@@ -3567,7 +3497,7 @@ function renderHeatmap() {
         </div>
       </div>`;
 
-    if (data.tradeCount > 0) { wkTrades += data.tradeCount; wkPnl += data.pnl; }
+    if (data.tradeCount > 0) { wkTrades += data.tradeCount; wkPnlN += data.pnlCount; wkPnl += data.pnl; }
     slot++;
     if (slot % cols === 0) flushWeek();
   }
@@ -3578,32 +3508,17 @@ function renderHeatmap() {
   }
   grid.innerHTML = html;
 
-  // Month totals strip. Trades counts every trade stamped to the month —
-  // the same set the day cells count, so the cells' counts sum to it. Profit and
-  // loss split on the sign of each trade's P&L, so Profit − Loss = Net, and Net
-  // equals the sum of the week cells, which equals the sum of the day cells.
-  const m = monthTotals(cur.y, cur.m);
-  setFigure('hm-profit', m.trades ? money(m.gross) : '—', m.gross);
-  setFigure('hm-loss',   m.trades ? money(m.loss)  : '—', -m.loss);
-  setFigure('hm-net',    m.trades ? money(m.net)   : '—', m.net);
-  setFigure('hm-trades', m.trades ? String(m.trades) : '—', 0);
-}
-
-// Month aggregates keyed on the stamped date, matching how the day cells bucket
-// (openTime string prefix) rather than the Date comparison the period wheels use —
-// a calendar view has to agree with its own cells above all else.
-function monthTotals(y, month) {
-  const prefix = `${y}-${String(month + 1).padStart(2, '0')}`;
-  let trades = 0, gross = 0, loss = 0;
-  for (const t of State.trades) {
-    if (!t.openTime || t.openTime.slice(0, 7) !== prefix) continue;
-    trades++;
-    const j = journalForTrade(t);
-    const v = j ? safeNum(j.pnl) : null;
-    if (v === null) continue;
-    if (v >= 0) gross += v; else loss -= v;
-  }
-  return { trades, gross: round2(gross), loss: round2(loss), net: round2(gross - loss) };
+  // Month totals strip, read straight off the year pass above. Trades counts every
+  // trade stamped to the month — the same set the day cells count, so the cells'
+  // counts sum to it. Profit and loss split on the sign of each trade's P&L, so
+  // Profit − Loss = Net, and Net equals the sum of the week cells, which equals the
+  // sum of the day cells. The money figures dash when nothing in the month has a
+  // P&L yet, matching the cells above them.
+  const m = yr[cur.m];
+  setFigure('hm-profit', m.pnlCount ? money(m.gross) : '—', m.gross);
+  setFigure('hm-loss',   m.pnlCount ? money(m.loss)  : '—', -m.loss);
+  setFigure('hm-net',    m.pnlCount ? money(m.net)   : '—', m.net);
+  setFigure('hm-trades', m.trades   ? String(m.trades) : '—', 0);
 }
 // Frozen so a caller that treats the empty result as scratch space can't
 // corrupt every future empty day through the shared reference.
@@ -3743,10 +3658,16 @@ function renderEmotionBars(ft) {
   const posDisc = { slsYes:0, slsN:0, tpsYes:0, tpsN:0 };
   const positiveMembers = new Set(CONFIG.EMOTION_GROUPS.find(g => g.duringDiscipline).members);
 
+  // Only a RESOLVED trade has an outcome to tally. t.result is null for anything
+  // with no P&L logged — an open position journalled on entry, which the app
+  // deliberately allows — and an else-branch here would file every one of those
+  // under break-even, inflating the B/E arc and dragging every win rate with it.
+  // Nothing is counted for a trade that has not resolved yet; it simply arrives
+  // in these charts when it closes.
   const tally = (bucket, result) => {
-    if (result === 'win')       bucket.win++;
+    if      (result === 'win')  bucket.win++;
     else if (result === 'loss') bucket.loss++;
-    else                        bucket.be++;
+    else if (result === 'be')   bucket.be++;
   };
 
   for (const t of ft) {
@@ -3758,13 +3679,15 @@ function renderEmotionBars(ft) {
 
     for (const cc of catCounts) {
       if (!cc.grp.members.some(m => beforeSet.has(m))) continue;
+      // total counts every trade touching the category, resolved or not; the
+      // win/loss/be buckets count only the resolved ones.
       cc.total++;
       tally(cc, t.result);
     }
 
     if ((j.duringTags || []).some(tag => positiveMembers.has(tag))) {
-      if (j.followedSLS === 'yes' || j.followedSLS === 'no') { posDisc.slsN++; if (j.followedSLS === 'yes') posDisc.slsYes++; }
-      if (j.followedTPS === 'yes' || j.followedTPS === 'no') { posDisc.tpsN++; if (j.followedTPS === 'yes') posDisc.tpsYes++; }
+      if (isAnswered(j.followedSLS)) { posDisc.slsN++; if (j.followedSLS === 'yes') posDisc.slsYes++; }
+      if (isAnswered(j.followedTPS)) { posDisc.tpsN++; if (j.followedTPS === 'yes') posDisc.tpsYes++; }
     }
   }
 
@@ -3789,8 +3712,10 @@ function renderEmotionBars(ft) {
         <div class="bar-empty"></div>
       </div>`;
     }
-    const rate     = Math.round(c.win  / decided * 100);
-    const lossRate = Math.round(c.loss / decided * 100);
+    // Through pctSplit, not a pair of independent Math.rounds, so a rate here
+    // means the same thing and rounds the same way as every other rate in the
+    // journal — the wheel above this bar is split by the identical call.
+    const [rate, lossRate] = pctSplit([c.win, c.loss, c.be]);
     return `<div class="emo-row">
       <div class="emo-row-head">
         <span class="emo-row-name">${labelHtml}</span>
@@ -3890,9 +3815,9 @@ function renderDuringMgmt(ft) {
       const d = data[tag];
       d.total++;
       // Denominators are ANSWERED trades only — an unanswered SLS/TPS field
-      // shouldn't dilute the compliance rate.
-      if (j.followedSLS === 'yes' || j.followedSLS === 'no') { d.slsN++; if (j.followedSLS === 'yes') d.slsYes++; }
-      if (j.followedTPS === 'yes' || j.followedTPS === 'no') { d.tpsN++; if (j.followedTPS === 'yes') d.tpsYes++; }
+      // shouldn't dilute the compliance rate. See isAnswered.
+      if (isAnswered(j.followedSLS)) { d.slsN++; if (j.followedSLS === 'yes') d.slsYes++; }
+      if (isAnswered(j.followedTPS)) { d.tpsN++; if (j.followedTPS === 'yes') d.tpsYes++; }
     }
   }
 
@@ -3960,35 +3885,14 @@ function rollForwardStats(ft, start, end) {
   // so a handful of break-evens halves an average win that should read $57.
   // Separate accumulators keep the sum honest and the averages honest at once.
   let winSum = 0, winN = 0, lossSum = 0, lossN = 0;
-  // Account balance at each end of the range: the last one the broker reported
-  // before the range opened, and the last one it reported before the range
-  // closed. One rule read at the two boundaries, which is what makes last
-  // month's closing balance and this month's opening balance the same figure —
-  // the same instant is being asked about from either side.
-  //
-  // Two watermarks rather than one running figure, tracked by timestamp instead
-  // of by array order, because State.trades is in insertion order and a backfill
-  // can insert an old fill after a new one.
-  let openBal = null, openBalAt = '';
-  let lastBal = null, lastBalAt = '';
 
   for (const t of ft) {
-    // A trade with no openTime cannot be placed on either side of a boundary,
-    // so it is out of the panel entirely — for the balance as much as for the
-    // P&L. renderPnLCard already skips it the same way.
+    // A trade with no openTime cannot be placed on either side of a boundary, so
+    // it is out of the panel entirely. renderPnLCard skips it the same way.
     if (!t.openTime) continue;
     const at     = new Date(t.openTime);
-    const stamp  = String(t.entryTime || t.openTime);
     const before = at < start;
     if (at >= end) continue;
-
-    // Balance rides on the fill that reported it, so it counts whether or not
-    // its journal entry has been filled in yet — hence this sits outside the
-    // P&L guard below.
-    if (typeof t.brokerBalance === 'number') {
-      if (stamp > lastBalAt) { lastBal = t.brokerBalance; lastBalAt = stamp; }
-      if (before && stamp > openBalAt) { openBal = t.brokerBalance; openBalAt = stamp; }
-    }
 
     const j = journalForTrade(t);
     const v = j ? safeNum(j.pnl) : null;
@@ -4016,7 +3920,14 @@ function rollForwardStats(ft, start, end) {
     best, worst,
     avgWin:  winN  ? winSum  / winN  : null,
     avgLoss: lossN ? lossSum / lossN : null,
-    openBal, lastBal
+    // The balance at each end of the range: the last one the broker reported
+    // before the range opened, and the last one before it closed. One rule read at
+    // the two boundaries, which is what makes last month's closing balance and
+    // this month's opening balance the same figure — the same instant asked about
+    // from either side. For the current month the closing read is simply the
+    // newest fill on file, since the range end is in the future.
+    openBal: balanceAsOf(ft, start),
+    lastBal: balanceAsOf(ft, end)
   };
 }
 
@@ -4160,8 +4071,12 @@ function renderTradeTable(ft) {
   // logging timestamp, down to the ms), giving a stable newest-on-top order.
   const sorted     = [...ft].sort((a, b) => tradeLogTime(b) - tradeLogTime(a));
   const totalPages = Math.ceil(sorted.length / CONFIG.PER_PAGE);
-  if (State.tradeLogPage >= totalPages) State.tradeLogPage = totalPages - 1;
-  const page = sorted.slice(State.tradeLogPage * CONFIG.PER_PAGE, (State.tradeLogPage + 1) * CONFIG.PER_PAGE);
+  // Clamped for this draw only. Deleting the last trade on the last page can leave
+  // the stored page past the end, and the table has to cope — but no renderer
+  // writes to State, so the correction lives in the local read. The stored page is
+  // clamped where it is changed, in the pagination handler.
+  const page0 = Math.min(State.tradeLogPage, totalPages - 1);
+  const page  = sorted.slice(page0 * CONFIG.PER_PAGE, (page0 + 1) * CONFIG.PER_PAGE);
 
   const head = `
     <thead><tr>
@@ -4205,12 +4120,12 @@ function renderTradeTable(ft) {
   host.innerHTML = `<table>${head}<tbody>${body}</tbody></table>`;
 
   if (totalPages > 1) {
-    const start = State.tradeLogPage * CONFIG.PER_PAGE + 1;
-    const end   = Math.min((State.tradeLogPage + 1) * CONFIG.PER_PAGE, sorted.length);
+    const start = page0 * CONFIG.PER_PAGE + 1;
+    const end   = Math.min((page0 + 1) * CONFIG.PER_PAGE, sorted.length);
     pag.innerHTML = `
       <span class="tlog-pag-info">${start}–${end} of ${sorted.length}</span>
-      <button class="tlog-pag-btn" data-page="prev" ${State.tradeLogPage === 0 ? 'disabled' : ''}>← Prev</button>
-      <button class="tlog-pag-btn" data-page="next" ${State.tradeLogPage === totalPages - 1 ? 'disabled' : ''}>Next →</button>`;
+      <button class="tlog-pag-btn" data-page="prev" ${page0 === 0 ? 'disabled' : ''}>← Prev</button>
+      <button class="tlog-pag-btn" data-page="next" ${page0 === totalPages - 1 ? 'disabled' : ''}>Next →</button>`;
   } else {
     pag.innerHTML = '';
   }
@@ -4233,7 +4148,7 @@ const PendingDelete = {
   stage(tradeId) {
     PendingDelete.commit();  // finalise any previous pending delete first
     const t = State.tradeById.get(tradeId) || null;
-    const j = State.journals.find(x => x.tradeId === tradeId) || null;
+    const j = State.journalByTradeId.get(tradeId) || null;
     if (!t && !j) return;
     State.trades   = State.trades.filter(x => x.id !== tradeId);
     State.journals = State.journals.filter(x => x.tradeId !== tradeId);
@@ -4320,6 +4235,15 @@ const Journal = {
       seedDay = Dates.isoDay(new Date());
     }
     setDateLabel(seedDay);
+    // The filing day of a synced trade belongs to the broker: applyUpdate rewrites
+    // openTime from open_day on every poll, so a date picked here would be
+    // reverted within minutes and the entry would appear to move on its own. Lock
+    // the pill rather than let it lie. save() carries the matching write-side
+    // guard.
+    const dateEl = $('jm-date-label');
+    const brokerOwned = !!(seedTrade && seedTrade.brokerPositionId);
+    dateEl.classList.toggle('is-locked', brokerOwned);
+    dateEl.title = brokerOwned ? 'Filed by your broker from the entry deal' : '';
 
     $('journal-modal').classList.add('open');
     $('journal-modal').setAttribute('aria-hidden', 'false');
@@ -4388,7 +4312,7 @@ const Journal = {
         beforeTags, duringTags, emotionTags
       });
       const t = State.tradeById.get(j.tradeId);
-      if (t) Object.assign(t, { direction, session, setup, result, openTime });
+      if (t) Object.assign(t, tradePatch(t, { direction, session, setup, result }, openTime));
       BrokerSync.clearIfComplete(t, j);
     } else {
       // Every entry now belongs to a trade that already exists — the broker sync
@@ -4400,7 +4324,7 @@ const Journal = {
       if (!tid) { notify('No trade linked to this entry.', true); return; }
       const jid = uid();
       const t = State.tradeById.get(tid);
-      if (t) Object.assign(t, { direction, session, setup, result, openTime });
+      if (t) Object.assign(t, tradePatch(t, { direction, session, setup, result }, openTime));
       const newJ = {
         id: jid, tradeId: tid, createdAt: now, updatedAt: now,
         session, direction, setup, result, pnl,
@@ -4416,6 +4340,17 @@ const Journal = {
     notify('Entry saved');
   }
 };
+
+// What a journal save is allowed to write back onto its trade. openTime is the
+// one field that depends on who owns the trade: on a synced one the broker sets
+// the filing day from its own entry deal and rewrites it on every poll, so writing
+// the picker's value would be undone silently. The pill is locked for those trades
+// (see Journal.open); this is the same rule on the write side, so the two cannot
+// drift.
+function tradePatch(trade, fields, openTime) {
+  if (!trade.brokerPositionId) fields.openTime = openTime;
+  return fields;
+}
 
 function pickRadio(name) {
   const el = document.querySelector(`input[name="${name}"]:checked`);
@@ -4547,7 +4482,7 @@ function setSessionPill(s) {
     const b = document.createElement('button');
     b.type      = 'button';
     b.className = 'jm-session-opt' + (isSel ? ' sel' : '');
-    b.innerHTML = `<span class="opt-name">${escHtml(name)}</span>${right}`;
+    b.innerHTML = `<span>${escHtml(name)}</span>${right}`;
     b.addEventListener('click', () => { setSessionPill(x); toggleSessionMenu(false); });
     opts.appendChild(b);
   }
@@ -4673,6 +4608,8 @@ const IO = {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'' });
         if (!rows.length) {
           status.textContent = '✗ No rows found.';
+          status.className   = 'io-import-status loss';
+          input.value = '';
           return;
         }
 
@@ -4936,12 +4873,19 @@ function importRowsIntoState(rows) {
     if (setup   && !CONFIG.SETUPS.includes(setup))     setup   = null;
 
     const result  = pnl !== null ? resultFromPnl(pnl) : null;
-    const isoDate = dateVal.toISOString();
+    // The filing anchor, in the app's one convention: the civil day at a fixed
+    // 09:30Z. parseDate returns a local-noon Date, so toISOString() on it would
+    // stamp an arbitrary time of day that varies with the importing machine's
+    // offset — the exact class of day-shift the anchor exists to remove, arriving
+    // through the one path that used to sidestep it. createdAt keeps the true
+    // instant so imported rows still sort sensibly against each other.
+    const isoDate  = dateVal.toISOString();
+    const openTime = Dates.isoDay(dateVal) + 'T09:30:00.000Z';
     const tid = uid(), jid = uid();
 
     State.trades.push({
       id: tid, direction: dir, result, session, setup,
-      openTime: isoDate, openPrice: null, exitPrice: null, source: 'import'
+      openTime, openPrice: null, exitPrice: null, source: 'import'
     });
 
     const beforeRaw = colByName(row, ['beforetags','before tags']).split(',').map(s => s.trim()).filter(Boolean);
@@ -5073,7 +5017,17 @@ const Cloud = {
       this._loadSync();
       // First run on this account moves the old blobs across. Afterwards this is
       // a single cheap count that returns immediately.
-      if (!await this._migrateIfNeeded()) await this.pull();
+      if (!await this._migrateIfNeeded()) {
+        // Anything saved before this point went through pushRecords() while
+        // `ready` was still false, which returns without even marking the record
+        // dirty — a journal entry made offline, an import run signed out, a
+        // migrateData() rewrite on boot. Nothing would carry it up until some
+        // unrelated later save happened to, and until then the dot would read
+        // `ok` while local was ahead of the cloud. Flushing first costs a diff
+        // against the shadow and, with nothing outstanding, no request at all.
+        await this._flushRecords();
+        await this.pull();
+      }
       await BrokerSync.fetchPending();
       this.ready = true;
       this.subscribe();
@@ -5152,6 +5106,12 @@ const Cloud = {
         if (!guard[kind](rec)) { rejected++; continue; }
         rows.push({ user_id: this._uid, kind, rec_id: id, data: rec, deleted: false });
       }
+      // The shadow keeps its `null` entries for the life of the install, and they
+      // must NOT be pruned to keep it small: BrokerSync.isTombstoned() reads them,
+      // and it is the only thing stopping the poller rebuilding a deleted trade
+      // every two minutes, forever. Dropping a null here would make that trade
+      // reappear. The growth is one small key per trade ever deleted, which is the
+      // correct price for the guard.
       for (const id of Object.keys(this._shadow[kind])) {
         // Known to the cloud, gone from State, not already tombstoned.
         // Deliberately NOT guarded: a tombstone carries no payload, and refusing
@@ -5208,7 +5168,14 @@ const Cloud = {
       for (const r of (data || [])) this._advanceCursor(r.updated_at);
       this._saveSync();
     }
-    if (this.MIRROR_LEGACY_BLOBS) await this._mirrorBlobs();
+    // Rollback insurance, and deliberately not fatal. A throw here would leave
+    // _dirty.records set even though the per-record write above succeeded, and
+    // _drain() would then report unsent work forever — which stops refresh()
+    // pulling at all. Insurance must not be able to block the thing it insures.
+    if (this.MIRROR_LEGACY_BLOBS) {
+      try { await this._mirrorBlobs(); }
+      catch (e) { console.error('Doji Cloud: legacy blob mirror failed (records are safe)', e); }
+    }
     delete this._dirty.records;
   },
 
@@ -5275,8 +5242,13 @@ const Cloud = {
 
     State.trades   = [...live.trade.values()];
     State.journals = [...live.journal.values()];
+    // migrateData() may itself rewrite records (a retired field, a stale result),
+    // and it saves through the normal path when it does — so a migration performed
+    // here does propagate back up, which is what keeps two devices on different
+    // versions converging. The write below is the local-only one: these rows came
+    // FROM the cloud and must not be echoed straight back.
     migrateData();
-    Storage.persistLocal();     // local only — these rows came FROM the cloud
+    Storage.persistLocal();
     this._saveSync();
     return true;
   },
@@ -5531,7 +5503,10 @@ const Cloud = {
     this._channel = this.sb.channel('doji-sync')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'broker_fills' },
-        payload => { try { BrokerSync.ingest(payload.new); } catch (e) { console.error(e); } })
+        payload => {
+          try { if (BrokerSync.ingest(payload.new)) BrokerSync.commit(); }
+          catch (e) { console.error(e); }
+        })
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'records' },
         payload => { try { this._onRemoteRecord(payload.new); } catch (e) { console.error(e); } })
@@ -5665,11 +5640,26 @@ const BrokerSync = {
       .or(`processed.eq.false,mcp_synced_at.gte.${since}`)
       .order('entry_time', { ascending: true, nullsFirst: false });
     if (error) { console.error('Doji BrokerSync: fetch failed', error); return; }
-    for (const fill of (data || [])) this.ingest(fill);
+    // One save and one render for the whole batch. Each ingest used to do both
+    // itself, so a week's worth of fills arriving at once meant a localStorage
+    // write and a full chart teardown per row — eight Chart.js instances rebuilt
+    // a dozen times over to draw one panel.
+    let touched = false;
+    for (const fill of (data || [])) touched = this.ingest(fill) || touched;
+    if (touched) this.commit();
   },
 
+  // Persist and redraw after ingest work. Called once per batch by fetchPending
+  // and once per row by the realtime handler, which is the only reason ingest()
+  // reports what it did instead of doing this itself.
+  commit() {
+    Storage.saveTradesAndJournals();
+    renderTrades();
+  },
+
+  // Returns true when State changed, so the caller knows whether to commit().
   ingest(fill) {
-    if (!fill || !fill.position_id) return;
+    if (!fill || !fill.position_id) return false;
 
     // A row this device already has a trade for is an UPDATE, not a duplicate.
     // Three things legitimately revisit the same position: the MCP poll adding
@@ -5678,8 +5668,17 @@ const BrokerSync = {
     // no-op, and applyUpdate is idempotent, so all three take one path. The old
     // behaviour — skip anything already seen — would have discarded the exit
     // and the P&L along with it.
-    const existing = State.trades.find(t => t.brokerPositionId === fill.position_id);
-    if (existing) { this.applyUpdate(existing, fill); return; }
+    // Ids are derived from the position id below, so the trade this row belongs to
+    // is findable by key rather than by scanning every trade for a matching
+    // brokerPositionId. Keying the dedup and the tombstone check off the SAME
+    // derived id is the point: when those two disagreed about how a position id is
+    // spelled, the app minted bkrt_PID… and bkrt_… and every trade appeared twice.
+    const slug = String(fill.position_id).replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 48);
+    const tid = slug ? 'bkrt_' + slug : uid();
+    const jid = slug ? 'bkrj_' + slug : uid();
+
+    const existing = State.tradeById.get(tid);
+    if (existing) return this.applyUpdate(existing, fill);
 
     // P&L preference: the broker email is authoritative because it includes
     // swap. computed_pnl (derived from MCP deals) is exact to the cent whenever
@@ -5704,15 +5703,12 @@ const BrokerSync = {
       : (entryTime || fill.fill_time || new Date().toISOString());
     const now = new Date().toISOString();
 
-    // IDs derived from the Position ID rather than drawn at random, so two
-    // devices ingesting the same fill in the same moment produce identical
-    // records instead of two differently-keyed copies of one trade. Whichever
-    // push lands last, the merge is then idempotent and a duplicate is
-    // impossible rather than merely unlikely. Falls back to a random id if the
-    // Position ID carries nothing usable, which would otherwise collide.
-    const slug = String(fill.position_id).replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 48);
-    const tid = slug ? 'bkrt_' + slug : uid();
-    const jid = slug ? 'bkrj_' + slug : uid();
+    // The ids above are derived from the Position ID rather than drawn at random,
+    // so two devices ingesting the same fill in the same moment produce identical
+    // records instead of two differently-keyed copies of one trade. Whichever push
+    // lands last, the merge is then idempotent and a duplicate is impossible
+    // rather than merely unlikely. Falls back to a random id if the Position ID
+    // carries nothing usable, which would otherwise collide.
 
     // A trade the trader has DELETED must stay deleted.
     //
@@ -5722,12 +5718,12 @@ const BrokerSync = {
     // and this function dutifully creates it again. The trader deletes it, it
     // comes back, forever.
     //
-    // Trade ids are derived from the Position ID, so the tombstone is findable
-    // before the trade is rebuilt. Marking the row processed stops it being
-    // re-offered on every boot.
+    // The tombstone is keyed on the same derived id the lookup uses, so it is
+    // findable before the trade is rebuilt. Marking the row processed stops it
+    // being re-offered on every boot.
     if (Cloud.isTombstoned('trade', tid)) {
       this.markProcessed(fill.position_id);
-      return;
+      return false;
     }
 
     // Session from the real entry instant when MCP supplied one. The email only
@@ -5787,9 +5783,8 @@ const BrokerSync = {
       followedRules: '', followedSLS: '', followedTPS: '',
       beforeTags: [], duringTags: [], emotionTags: []
     });
-    Storage.saveTradesAndJournals();
     this.markProcessed(fill.position_id);
-    renderTrades();
+    return true;
   },
 
   // Folds a revisited broker row onto the trade that already exists.
@@ -5799,6 +5794,7 @@ const BrokerSync = {
   // overwrite them — a position closing hours later cannot be allowed to
   // disturb what was already recorded about it. That is also what makes the
   // historical backfill safe to run across trades that are already journaled.
+  // Returns true when State changed — same contract as ingest(), same reason.
   applyUpdate(trade, fill) {
     const j = journalForTrade(trade);
     let changed = false;
@@ -5842,8 +5838,8 @@ const BrokerSync = {
       changed = true;
     }
 
-    if (changed) { Storage.saveTradesAndJournals(); renderTrades(); }
     this.markProcessed(fill.position_id);
+    return changed;
   },
 
   async markProcessed(positionId) {
@@ -5861,17 +5857,30 @@ const BrokerSync = {
       && j.duringTags && j.duringTags.length);
   },
 
-  // Called from Journal.save() with the just-saved pair.
+  // Called from Journal.save() with the just-saved pair. Evaluated in BOTH
+  // directions: clearing the flag when an entry becomes complete, and raising it
+  // again when an edit takes a required field back out. One-way clearing left a
+  // trade that had lost its last during-tag out of the banner and out of the
+  // purple styling while genuinely missing data — the completeness contract read
+  // only on the side that flattered it.
+  //
+  // Scoped to synced trades, identified by brokerPositionId rather than by
+  // source: a broker trade minted before `source` existed migrates to
+  // 'journal', and gating on that would strand it purple forever. Anything
+  // already carrying the flag is evaluated too, whatever it is.
   clearIfComplete(trade, journal) {
-    if (trade && trade.brokerPending && this.isComplete(journal)) {
-      delete trade.brokerPending;
-    }
+    if (!trade || (!trade.brokerPositionId && !trade.brokerPending)) return;
+    if (this.isComplete(journal)) delete trade.brokerPending;
+    else trade.brokerPending = true;
   },
 
+  // Oldest first — the banner opens pending()[0]. Ordered on tradeLogTime, not
+  // openTime: openTime is a fixed 09:30Z per civil day, so every trade on a day
+  // ties on it and "the oldest" would be whichever sat first in State.trades.
   pending() {
     return State.trades
       .filter(t => t.brokerPending)
-      .sort((a, b) => new Date(a.openTime) - new Date(b.openTime));
+      .sort((a, b) => tradeLogTime(a) - tradeLogTime(b));
   }
 };
 
@@ -5955,25 +5964,155 @@ const Carousel = {
   }
 };
 
+/* ─── Zoom lock (phones) ───────────────────────────────────────────────────
+   iOS Safari zooms the page whenever it focuses a field whose text is under
+   16px, and it does not zoom back out afterwards. Several fields here are
+   deliberately small — the P&L pill is 9px mono and lives in a single-row
+   header that has no room to grow — so raising type to dodge the trigger is
+   not an option for them.
+
+   The other half of that behaviour is that Safari only auto-zooms when the
+   page allows scaling past 1. Pinning maximum-scale to 1 for the duration of
+   the focus removes the zoom without touching a single font-size. It is set
+   on pointerdown, i.e. BEFORE the field takes focus — applied afterwards the
+   zoom has already happened and the lock just freezes it there.
+
+   The lock is temporary on purpose. Held permanently it would also block
+   pinch-zoom, which is an accessibility regression and not ours to make, so
+   the free viewport is restored the moment nothing is being typed into.
+   Desktop is skipped entirely: no touch keyboard, no auto-zoom, and browser
+   zoom (ctrl +/-) ignores the viewport meta anyway. */
+const ZoomLock = {
+  FREE:   'width=device-width,initial-scale=1',
+  LOCKED: 'width=device-width,initial-scale=1,maximum-scale=1',
+  _meta: null,
+  _on: false,
+
+  init() {
+    this._meta = document.querySelector('meta[name="viewport"]');
+    if (!this._meta) return;
+    // Coarse pointer = touch. Anything else has no focus-zoom to prevent.
+    if (!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches)) return;
+
+    // Capture phase: this has to win the race against focus.
+    document.addEventListener('pointerdown', e => {
+      if (this._isField(e.target)) this._set(true);
+    }, true);
+    // Backstop for focus that arrives without a tap — keyboard "next" between
+    // fields, or code calling .focus() itself.
+    document.addEventListener('focusin', e => {
+      if (this._isField(e.target)) this._set(true);
+    }, true);
+    // Release only once focus has actually left every field. The delay lets
+    // focus land on the NEXT field first, so moving between two inputs does
+    // not flicker the viewport open and shut between them.
+    document.addEventListener('focusout', () => {
+      setTimeout(() => { if (!this._isField(document.activeElement)) this._set(false); }, 150);
+    });
+  },
+
+  _isField(el) {
+    if (!el || !el.tagName) return false;
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+    if (el.tagName !== 'INPUT') return false;
+    // Only the types that open a keyboard. A radio pill or a file button takes
+    // focus without any text entry, and locking on those would be noise.
+    return !/^(button|submit|reset|image|checkbox|radio|range|color|file)$/i
+      .test(el.type || 'text');
+  },
+
+  _set(on) {
+    if (on === this._on) return;      // rewriting the same value re-lays out for nothing
+    this._on = on;
+    this._meta.setAttribute('content', on ? this.LOCKED : this.FREE);
+  },
+
+  // Closing a modal can remove the focused field from the DOM, and a removed
+  // element does not reliably fire focusout — which would strand the page
+  // locked and un-pinchable. Every close routes through closeModalShell, so
+  // releasing there covers that gap.
+  release() { this._set(false); }
+};
+
+/* ─── Keyboard inset (phones) ──────────────────────────────────────────────
+   The page itself never scrolls (html,body are overflow:hidden) and the
+   modals are position:fixed, so when a phone keyboard opens they keep their
+   full-screen height and their lower third simply sits underneath it. The
+   browser's own attempt to reveal a focused field from down there is what
+   produced the lurch.
+
+   visualViewport reports the part of the screen the keyboard has NOT covered.
+   Two things follow from it:
+     • --kb, the covered height, published on :root. The journal modal adds it
+       as bottom padding, which turns the covered strip into scrollable space —
+       without it there is nowhere to scroll a low field TO.
+     • a nudge that scrolls the focused field into that visible band.
+   Zoom is ZoomLock's job; nothing here touches scale. Browsers without
+   visualViewport never see a keyboard and are left alone. */
+const KeyboardInset = {
+  PAD: 14,          // breathing room between the field and the keyboard
+  MIN_KB: 100,      // below this it is a browser-chrome shift, not a keyboard
+  _t: 0,
+
+  init() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const settle = () => {
+      clearTimeout(this._t);
+      // The keyboard animates in; measuring mid-animation reads a height that
+      // is already stale by the time it is applied.
+      this._t = setTimeout(() => { this._publish(); this._reveal(); }, 140);
+    };
+    vv.addEventListener('resize', settle);
+    vv.addEventListener('scroll', settle);
+    document.addEventListener('focusin', settle);
+    document.addEventListener('focusout', () => {
+      clearTimeout(this._t);
+      this._t = setTimeout(() => this._publish(), 160);
+    });
+  },
+
+  _height() {
+    const vv = window.visualViewport;
+    const kb = window.innerHeight - vv.height - vv.offsetTop;
+    return kb > this.MIN_KB ? Math.round(kb) : 0;
+  },
+
+  _publish() {
+    document.documentElement.style.setProperty('--kb', this._height() + 'px');
+  },
+
+  _reveal() {
+    if (!this._height()) return;
+    const el = document.activeElement;
+    if (!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return;
+    const modal = el.closest('.journal-modal.open, .io-modal.open, .login-overlay.open');
+    if (!modal) return;
+
+    const vv  = window.visualViewport;
+    const r   = el.getBoundingClientRect();
+    const top = vv.offsetTop + this.PAD;
+    const bot = vv.offsetTop + vv.height - this.PAD;
+
+    let delta = 0;
+    if (r.bottom > bot)   delta = r.bottom - bot;   // hidden by the keyboard
+    else if (r.top < top) delta = r.top - top;      // pushed off the top edge
+    // A few pixels out is not worth a scroll animation, and reacting to every
+    // pixel is how a jitter loop starts.
+    if (Math.abs(delta) > 6) modal.scrollBy({ top: delta, behavior: 'smooth' });
+  }
+};
+
 /* ═══════════════════════════════════════════════════════════════════════════
    GLOBAL EVENT WIRING
-   ═══════════════════════════════════════════════════════════════════════════ */
-/* ─── EVENT WIRING ─────────────────────────────────────────────────────────
+   ───────────────────────────────────────────────────────────────────────────
    Split by surface rather than kept as one 180-line list. wireEvents() is the
    manifest and holds no bindings of its own; each function below owns exactly
    one surface, so adding a control means editing the one function that surface
    belongs to rather than finding the right stretch of a long file. All of them
-   run once, at boot.
-   ──────────────────────────────────────────────────────────────────────── */
-
-// Null-safe binding helper. The wire* functions fire once at boot; if any element
-// listed below has been renamed or removed in the markup we'd rather log a
-// warning and keep the rest of the app functional than crash the whole boot.
-const on = (id, event, handler) => {
-  const el = typeof id === 'string' ? $(id) : id;
-  if (el) el.addEventListener(event, handler);
-  else console.warn(`Doji: missing element for handler "${id}" (${event})`);
-};
+   run once, at boot. The `on` / `onActivate` binding helpers live up in DOM
+   HELPERS — the heatmap wires itself through them too.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function wireEvents() {
   wireChrome();
@@ -6004,16 +6143,15 @@ function wireChrome() {
   Phone.addEventListener('change', renderHeatmap);
 }
 
-// Month stepping shared by the journal date picker and the heatmap.
+// Month stepping for the journal date picker. The heatmap's own arrows are wired
+// in ensureHeatmapStructure, next to the grid they redraw, so there is no surface
+// to dispatch between here.
 function wireCalendars() {
-  /* Calendar nav (journal calendar via data-cal-target) */
-  $$('[data-cal-nav]').forEach(btn => {
+  $$('[data-jcal-nav]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const target = btn.dataset.calTarget;
-      const dir    = parseInt(btn.dataset.calNav, 10);
-      Calendar.navigate(target, dir);
-      if (target === 'journal') renderJournalCal();
+      Calendar.navigate('journal', parseInt(btn.dataset.jcalNav, 10));
+      renderJournalCal();
     });
   });
 }
@@ -6021,7 +6159,7 @@ function wireCalendars() {
 // The broker banner and the trade table beneath it.
 function wireTradeLog() {
   /* Broker banner → open the oldest incomplete synced entry */
-  on('broker-banner', 'click', () => {
+  onActivate('broker-banner', () => {
     const pend = BrokerSync.pending();
     if (pend.length) Journal.openForTrade(pend[0].id);
   });
@@ -6041,8 +6179,13 @@ function wireTradeLog() {
   on('tlog-pagination', 'click', e => {
     const btn = e.target.closest('[data-page]');
     if (!btn) return;
-    if (btn.dataset.page === 'prev' && State.tradeLogPage > 0) State.tradeLogPage--;
-    if (btn.dataset.page === 'next') State.tradeLogPage++;
+    // The stored page can be past the end after a delete emptied the last page —
+    // renderTradeTable clamps its own read but writes nothing back, so the
+    // correction happens here, where the value is actually changed.
+    const last = Math.max(0, Math.ceil(State.trades.length / CONFIG.PER_PAGE) - 1);
+    State.tradeLogPage = Math.min(State.tradeLogPage, last);
+    if (btn.dataset.page === 'prev') State.tradeLogPage = Math.max(0, State.tradeLogPage - 1);
+    if (btn.dataset.page === 'next') State.tradeLogPage = Math.min(last, State.tradeLogPage + 1);
     // Only the table slice changes — leave charts/donuts alone.
     renderTradeTable(State.trades.slice());
   });
@@ -6063,19 +6206,12 @@ function wireJournalModal() {
   });
   /* Journal header: session pill, date pill, calendar grid */
   on('jm-session-btn',   'click', () => toggleSessionMenu());
-  on('jm-date-label',    'click', () => toggleJournalCal());
-  on('journal-cal-grid', 'click', e => {
-    const cell = e.target.closest('[data-jcal-day]');
-    if (cell) {
-      setDateLabel(cell.dataset.jcalDay);
-      toggleJournalCal(false);
-    }
+  on('jm-date-label',    'click', () => {
+    if (!$('jm-date-label').classList.contains('is-locked')) toggleJournalCal();
   });
-  on('journal-cal-grid', 'keydown', e => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
+  onActivate('journal-cal-grid', e => {
     const cell = e.target.closest('[data-jcal-day]');
     if (!cell) return;
-    e.preventDefault();
     setDateLabel(cell.dataset.jcalDay);
     toggleJournalCal(false);
   });
@@ -6142,7 +6278,6 @@ function wireKeyboard() {
       if ($('journal-modal').classList.contains('open')) Journal.close();
       if ($('io-modal').classList.contains('open'))      IO.closeModal();
       if ($('day-modal').classList.contains('open'))     closeDayPopup();
-      return;
     }
   });
 }
