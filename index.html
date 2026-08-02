@@ -3374,9 +3374,9 @@ function renderHeatmapYear(y, selMonth, tot) {
   const abbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   host.innerHTML = tot.map((t, m) => {
     const cls = ['hm-mo'];
-    // Result and amount come from the months that have a P&L; the count comes from
-    // every trade. A month holding only open positions shows its count and a dash.
-    if (t.pnlCount) cls.push(resultFromPnl(t.net));
+    // Same rule as a day and a week cell: the fill follows the month's trades, the
+    // amount follows only the ones that have a P&L.
+    if (t.trades) cls.push(resultFromPnl(t.net));
     if (m === selMonth) cls.push('sel');
     const pnl = t.pnlCount ? '$' + Math.abs(t.net).toFixed(2) : (t.trades ? '—' : '');
     return `
@@ -3441,10 +3441,9 @@ function renderHeatmap() {
 
   const flushWeek = () => {
     wkN++;
-    // Same split as a day cell: the count is every trade in the week, the amount
-    // and its colour come only from the ones that have a P&L. A week of open
-    // positions shows its count against a dash, not a $0.00 break-even.
-    const cls   = wkPnlN === 0 ? '' : resultFromPnl(wkPnl);
+    // Same split as a day cell: the fill follows the week's trades, the amount
+    // follows only the ones that have a P&L.
+    const cls   = wkTrades === 0 ? '' : resultFromPnl(wkPnl);
     const count = wkTrades > 0 ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
     // Whole units and cents emitted separately so the phone stylesheet can drop
     // the tail — same pattern as .heatmap-cell-count-word above.
@@ -3469,11 +3468,12 @@ function renderHeatmap() {
   for (let i = 0; i < (visible.length ? visible[0].wd : firstDay); i++) blank();
 
   for (const { d, iso, data } of visible) {
-    // A day whose trades have no P&L yet has no result to show. Printing $0.00
-    // there would read as a day of scratches rather than as a day still open, so
-    // it takes the em-dash placeholder and no result colour — the same rule the
-    // empty bars and roll-forward rows follow.
-    let cls = data.pnlCount === 0 ? '' : resultFromPnl(data.pnl);
+    // Any day holding a trade takes a result fill; a day holding none stays the
+    // neutral card. The fill is the trader's own convention and is deliberately
+    // NOT gated on whether a P&L has been logged — a day with trades is a day that
+    // happened, and it keeps its place in the grid's colour rhythm either way.
+    // Only the AMOUNT waits for a P&L (see pnlText below).
+    let cls = data.tradeCount === 0 ? '' : resultFromPnl(data.pnl);
     // A day holding any incomplete broker-synced trade pulses purple until its
     // rules/emotions data is filled in. Read off the prebuilt index rather than
     // scanned for: this loop runs once per day on screen, and a scan of the whole
@@ -3521,8 +3521,10 @@ function renderHeatmap() {
   setFigure('hm-trades', m.trades   ? String(m.trades) : '—', 0);
 }
 // Frozen so a caller that treats the empty result as scratch space can't
-// corrupt every future empty day through the shared reference.
-const EMPTY_DAY = Object.freeze({ tradeCount: 0, pnl: 0 });
+// corrupt every future empty day through the shared reference. Carries the full
+// dayIndex shape — a caller must not have to know which fields an empty day
+// happens to omit.
+const EMPTY_DAY = Object.freeze({ tradeCount: 0, pnlCount: 0, pnl: 0, pending: false });
 // A read of the prebuilt index — see rebuildIndexes(). Returns the stored
 // object directly; callers read it and must not mutate it.
 function dayData(isoDay) { return State.dayIndex.get(isoDay) || EMPTY_DAY; }
@@ -3652,7 +3654,7 @@ function renderEmotionBars(ft) {
   // Category-level counts: each trade counted ONCE per category it touches
   // (trade-level dedup, not a sum of member bars), on before-phase presence —
   // so every wheel reconciles with the before-only bars beneath it.
-  const catCounts = CONFIG.EMOTION_GROUPS.map(grp => ({ grp, win:0, loss:0, be:0, total:0 }));
+  const catCounts = CONFIG.EMOTION_GROUPS.map(grp => ({ grp, win:0, loss:0, be:0 }));
   // SL/TP compliance on trades where a POSITIVE emotion was felt during the
   // trade (answered questions only — blanks don't dilute the rate).
   const posDisc = { slsYes:0, slsN:0, tpsYes:0, tpsN:0 };
@@ -3679,9 +3681,6 @@ function renderEmotionBars(ft) {
 
     for (const cc of catCounts) {
       if (!cc.grp.members.some(m => beforeSet.has(m))) continue;
-      // total counts every trade touching the category, resolved or not; the
-      // win/loss/be buckets count only the resolved ones.
-      cc.total++;
       tally(cc, t.result);
     }
 
