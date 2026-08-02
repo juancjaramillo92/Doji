@@ -1075,11 +1075,7 @@ td.c   { text-align:center; }
   display:none; position:fixed; inset:0;
   background:var(--scrim);
   z-index:400; overflow-y:auto;
-  /* --kb is the on-screen keyboard's height, published by KeyboardInset (0
-     whenever no keyboard is up). Adding it as bottom padding turns the strip
-     the keyboard covers into scrollable space, so a field down there can be
-     brought fully above the keyboard instead of sitting under it. */
-  padding:24px 20px calc(24px + var(--kb, 0px));
+  padding:24px 20px;
 }
 .journal-modal.open { display:flex; }
 .journal-modal-card {
@@ -1193,12 +1189,6 @@ td.c   { text-align:center; }
 /* A pill showing a value this app does not own — the date on a broker-synced
    trade. Dimmed and inert rather than hidden: the day is still worth reading, it
    simply is not yours to set. */
-.jf-pill-lbl.is-locked {
-  cursor:default; color:var(--mt); border-style:dashed;
-}
-.jf-pill-lbl.is-locked:hover {
-  border-color:var(--glass-bd); color:var(--mt); background:var(--fill-1);
-}
 
 /* Emotion chip layout — 3 columns separated by vertical dividers */
 .jf-emo-cols {
@@ -1375,7 +1365,11 @@ td.c   { text-align:center; }
   text-transform:uppercase; color:var(--mt);
 }
 .login-input {
-  font-family:var(--mono); font-size:11px; letter-spacing:.5px;
+  /* 16px is the iOS auto-zoom threshold: Safari zooms on focusing anything
+     smaller and never zooms back. These are the only text fields left in the
+     app, so keeping them at or above it removes the behaviour entirely rather
+     than needing code to suppress it. */
+  font-family:var(--mono); font-size:16px; letter-spacing:.5px;
   padding:11px 14px; border:1px solid var(--glass-bd);
   color:var(--tx); border-radius:var(--r-sm); background:var(--fill-1);
   width:100%; outline:none;
@@ -1594,7 +1588,7 @@ tr.broker-pending td:first-child {
   .io-modal-body { padding:16px 14px; }
 
   /* Journal modal: full-bleed card. */
-  .journal-modal { padding:12px 8px calc(12px + var(--kb, 0px)); overflow-x:hidden; }
+  .journal-modal { padding:12px 8px; overflow-x:hidden; }
   .journal-modal-card { width:100%; max-width:100%; }
 
   /* Header stays a single row: Session · Short / P&L / Long · Date. Pills
@@ -1664,7 +1658,7 @@ tr.broker-pending td:first-child {
 <div class="panels">
 
   <!-- ═══ TRADES (sole panel — the Rules tab was retired) ═══ -->
-  <div class="panel active" id="panel-trades">
+  <div class="panel active">
 
     <!-- Broker-sync banner: appears while any auto-synced trade is still
          missing its rules/emotions data. Tapping it opens the oldest one. -->
@@ -1821,7 +1815,7 @@ tr.broker-pending td:first-child {
         <div class="tlog-hdr">
           <div id="tlog-pagination" class="tlog-pagination"></div>
         </div>
-        <div id="tlog-body">
+        <div>
           <div class="tw" id="trade-table"></div>
         </div>
       </div>
@@ -3791,7 +3785,6 @@ function closeModal(id) {
   if (!m) return;
   m.classList.remove('open');
   m.setAttribute('aria-hidden', 'true');
-  ZoomLock.release();
   Data.flushDeferred();
 }
 
@@ -4013,117 +4006,7 @@ const Carousel = {
   }
 };
 
-/* iOS Safari zooms whenever it focuses a field under 16px and never zooms back.
-   Several fields here are deliberately small, so raising the type is not an
-   option. Safari only auto-zooms when the page allows scaling past 1, so pinning
-   maximum-scale for the duration of the focus removes the zoom without touching
-   a font size. Set on pointerdown — applied after focus, the zoom has already
-   happened and the lock just freezes it there. Temporary on purpose: held
-   permanently it would also block pinch-zoom, which is not ours to take away. */
-const ZoomLock = {
-  FREE:   'width=device-width,initial-scale=1',
-  LOCKED: 'width=device-width,initial-scale=1,maximum-scale=1',
-  meta: null,
-  on: false,
 
-  init() {
-    ZoomLock.meta = document.querySelector('meta[name="viewport"]');
-    if (!ZoomLock.meta) return;
-    if (!window.matchMedia('(pointer:coarse)').matches) return;   // touch input only
-
-    document.addEventListener('pointerdown', e => {
-      if (ZoomLock.isField(e.target)) ZoomLock.set(true);
-    }, true);                                    // capture: must beat focus
-    document.addEventListener('focusin', e => {
-      if (ZoomLock.isField(e.target)) ZoomLock.set(true);
-    }, true);
-    // The delay lets focus land on the NEXT field first, so moving between two
-    // inputs does not flicker the viewport open and shut between them.
-    document.addEventListener('focusout', () => {
-      setTimeout(() => { if (!ZoomLock.isField(document.activeElement)) ZoomLock.set(false); }, 150);
-    });
-  },
-
-  isField(el) {
-    if (!el?.tagName) return false;
-    if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-    if (el.tagName !== 'INPUT') return false;
-    // Only the types that open a keyboard — a radio pill takes focus without
-    // any text entry, and locking on those would be noise.
-    return !/^(button|submit|reset|image|checkbox|radio|range|color|file)$/i.test(el.type || 'text');
-  },
-
-  set(on) {
-    if (on === ZoomLock.on) return;              // rewriting re-lays out for nothing
-    ZoomLock.on = on;
-    ZoomLock.meta.setAttribute('content', on ? ZoomLock.LOCKED : ZoomLock.FREE);
-  },
-
-  // Closing a modal can remove the focused field from the DOM, and a removed
-  // element does not reliably fire focusout — which would strand the page
-  // locked and un-pinchable. Every close routes through closeModal.
-  release() { ZoomLock.set(false); }
-};
-
-/* The page never scrolls and the modals are fixed, so when a phone keyboard
-   opens they keep their full height and their lower third sits underneath it.
-   visualViewport reports the part of the screen the keyboard has NOT covered:
-   --kb publishes the covered height as bottom padding, which turns that strip
-   into scrollable space, and the nudge scrolls the focused field into the band
-   that is still visible. */
-const KeyboardInset = {
-  PAD: 14,
-  MIN: 100,        // below this it is a browser-chrome shift, not a keyboard
-  t: 0,
-
-  init() {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    // The keyboard animates in; measuring mid-animation reads a height that is
-    // already stale by the time it is applied.
-    const settle = () => {
-      clearTimeout(KeyboardInset.t);
-      KeyboardInset.t = setTimeout(() => { KeyboardInset.publish(); KeyboardInset.reveal(); }, 140);
-    };
-    vv.addEventListener('resize', settle);
-    vv.addEventListener('scroll', settle);
-    document.addEventListener('focusin', settle);
-    document.addEventListener('focusout', () => {
-      clearTimeout(KeyboardInset.t);
-      KeyboardInset.t = setTimeout(KeyboardInset.publish, 160);
-    });
-  },
-
-  height() {
-    const vv = window.visualViewport;
-    const kb = window.innerHeight - vv.height - vv.offsetTop;
-    return kb > KeyboardInset.MIN ? Math.round(kb) : 0;
-  },
-
-  publish() {
-    document.documentElement.style.setProperty('--kb', KeyboardInset.height() + 'px');
-  },
-
-  reveal() {
-    if (!KeyboardInset.height()) return;
-    const el = document.activeElement;
-    if (!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return;
-    const modal = el.closest('.journal-modal.open, .io-modal.open, .login-overlay.open');
-    if (!modal) return;
-
-    const vv = window.visualViewport;
-    const r  = el.getBoundingClientRect();
-    const top = vv.offsetTop + KeyboardInset.PAD;
-    const bot = vv.offsetTop + vv.height - KeyboardInset.PAD;
-
-    let delta = 0;
-    if (r.bottom > bot)   delta = r.bottom - bot;
-    else if (r.top < top) delta = r.top - top;
-    // A few pixels out is not worth an animation, and reacting to every pixel
-    // is how a jitter loop starts.
-    if (Math.abs(delta) > 6) modal.scrollBy({ top: delta, behavior: 'smooth' });
-  }
-};
 
 /* ═══════════════════════════════════════════════════════════════════════════
    WATCHERS
@@ -4257,8 +4140,6 @@ function wire() {
    ═══════════════════════════════════════════════════════════════════════════ */
 (async function boot() {
   wire();
-  ZoomLock.init();
-  KeyboardInset.init();
 
   DayWatcher.day = Dates.today();
   try { BackupWatcher.last = localStorage.getItem(BackupWatcher.KEY); } catch (e) {}
