@@ -361,46 +361,6 @@ nav {
 .period-disc-pct.dim  { color:var(--mt2); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CALENDAR WIDGET (shared by the journal-modal date picker and the heatmap)
-   ═══════════════════════════════════════════════════════════════════════════ */
-.cal-hdr {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:12px;
-}
-.cal-nav-btn {
-  background:none; border:none; color:var(--mt2); cursor:pointer;
-  font-size:14px; padding:0 6px; line-height:1;
-}
-.cal-title {
-  font-family:var(--mono); font-size:9px; letter-spacing:2px;
-  text-transform:uppercase; color:var(--tx);
-}
-.cal-dows {
-  display:grid; grid-template-columns:repeat(7,1fr);
-  margin-bottom:4px;
-}
-.cal-dow {
-  font-family:var(--mono); font-size:7px; color:var(--mt);
-  text-align:center;
-}
-.cal-grid {
-  display:grid; grid-template-columns:repeat(7,1fr); gap:2px;
-}
-.cal-day {
-  font-family:var(--mono); font-size:9px; padding:4px 2px;
-  text-align:center; cursor:pointer; border-radius:4px;
-  color:var(--tx); user-select:none; position:relative;
-}
-.cal-day.empty { cursor:default; }
-.cal-day.muted { color:var(--mt2); }
-.cal-day:hover:not(.empty):not(.sel) { background:rgba(139,53,184,.2); }
-.cal-day.today { color:var(--p); }
-.cal-day.sel { background:var(--p); color:#fff; }
-.cal-day.sel-single { border-radius:50%; }
-
-.empty-msg { padding:20px 14px; font-size:12px; color:var(--mt2); }
-
-/* ═══════════════════════════════════════════════════════════════════════════
    P&L CARD — net figure + performance stats
    ───────────────────────────────────────────────────────────────────────────
    The right half used to hold the daily max-drawdown meter. That widget was
@@ -1129,13 +1089,6 @@ td.c   { text-align:center; }
 .jm-session-opt.sel { color:var(--p); background:var(--p-gl); }
 .jm-session-opt.sel:hover { background:var(--p-gl2); }
 
-.jm-cal-wrap {
-  display:none; position:absolute; top:calc(100% + 8px); right:0;
-  background:var(--glass-top), var(--glass);
-  border:1px solid var(--glass-bd); border-radius:var(--r-md);
-  z-index:200; padding:12px; min-width:220px; box-shadow:var(--sh-3);
-}
-.jm-cal-wrap.open { display:block; }
 
 .jm-body { padding:0; }
 
@@ -1186,9 +1139,20 @@ td.c   { text-align:center; }
   border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3);
 }
 
-/* A pill showing a value this app does not own — the date on a broker-synced
-   trade. Dimmed and inert rather than hidden: the day is still worth reading, it
-   simply is not yours to set. */
+/* Controls showing a value this app does not own: the direction, the P&L and the
+   filing date all belong to the broker, which rewrites them on every poll. Dimmed
+   and inert rather than hidden — the value is worth reading, it simply is not
+   yours to set. Without this they render as ordinary editable fields that
+   silently ignore every click. */
+.jf-pill-radio:disabled + .jf-pill-lbl,
+.jf-pill-radio:disabled:checked + .jf-pill-lbl,
+.jm-pnl-input:disabled,
+#jm-date-label {
+  opacity:.55; cursor:default; pointer-events:none;
+}
+.jf-pill-radio:disabled:checked + .jf-pill-lbl {
+  border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:none;
+}
 
 /* Emotion chip layout — 3 columns separated by vertical dividers */
 .jf-emo-cols {
@@ -1883,17 +1847,6 @@ tr.broker-pending td:first-child {
       </div>
       <div class="jm-hdr-right">
         <span id="jm-date-label" class="jf-pill-lbl" style="cursor:pointer;white-space:nowrap;">—</span>
-        <div id="jm-cal" class="jm-cal-wrap">
-          <div class="cal-hdr">
-            <button class="cal-nav-btn" data-jcal-nav="-1" aria-label="Previous month">&lsaquo;</button>
-            <span class="cal-title" id="journal-cal-title"></span>
-            <button class="cal-nav-btn" data-jcal-nav="1"  aria-label="Next month">&rsaquo;</button>
-          </div>
-          <div class="cal-dows">
-            <span class="cal-dow">Su</span><span class="cal-dow">Mo</span><span class="cal-dow">Tu</span><span class="cal-dow">We</span><span class="cal-dow">Th</span><span class="cal-dow">Fr</span><span class="cal-dow">Sa</span>
-          </div>
-          <div class="cal-grid" id="journal-cal-grid"></div>
-        </div>
       </div>
     </div>
     <div id="jm-body" class="jm-body"></div>
@@ -2323,7 +2276,8 @@ function balanceAt(list, day) {
 const Data = {
   sb: null,
   uid: null,
-  rows: [],
+  all: [],          // every row, deleted included — the backup needs them
+  rows: [],         // what renders: the live ones
   byId: new Map(),
   byDay: new Map(),
   offline: false,
@@ -2351,12 +2305,16 @@ const Data = {
 
   async load() {
     try {
+      // Deleted rows are fetched too. Nothing renders them, but the backup is a
+      // restore point and a restore without them would let the poller rebuild
+      // every trade that was ever removed.
       const { data, error } = await this.sb
-        .from('trades').select('*').eq('deleted', false).order('open_day', { ascending: false });
+        .from('trades').select('*').order('open_day', { ascending: false });
       if (error) throw error;
-      this.rows = data || [];
+      this.all  = data || [];
+      this.rows = this.all.filter(t => !t.deleted);
       this.offline = false;
-      try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.rows)); } catch (e) {}
+      try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.all)); } catch (e) {}
       status('ok');
     } catch (e) {
       // Falling back rather than failing: the snapshot is the last thing the
@@ -2364,8 +2322,9 @@ const Data = {
       // refused while offline, which is the whole reason no reconciliation is
       // needed when the connection returns.
       console.warn('Doji: load failed, using snapshot', e);
-      try { this.rows = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
-      catch (err) { this.rows = []; }
+      try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
+      catch (err) { this.all = []; }
+      this.rows = this.all.filter(t => !t.deleted);
       this.offline = true;
       status('offline');
     }
@@ -3482,42 +3441,6 @@ function renderTable(rows) {
     pag.innerHTML = '';
   }
 }
-/* ═══════════════════════════════════════════════════════════════════════════
-   CALENDAR — month-grid maths for the journal's date picker.
-
-   The heatmap does not use this: it emits a week-summary column and drops
-   Saturday, so it builds its own grid.
-   ═══════════════════════════════════════════════════════════════════════════ */
-const Calendar = {
-  cursor: { y: new Date().getFullYear(), m: new Date().getMonth(), sel: '' },
-
-  render(renderCell) {
-    const grid  = $('journal-cal-grid');
-    const title = $('journal-cal-title');
-    if (!grid) return;
-    const { y, m } = Calendar.cursor;
-    if (title) title.textContent = `${CONFIG.MONTHS[m]} ${y}`;
-
-    const first  = new Date(y, m, 1).getDay();
-    const daysIn = new Date(y, m + 1, 0).getDate();
-
-    let html = '';
-    for (let i = 0; i < first; i++) html += '<span class="cal-day empty"></span>';
-    for (let d = 1; d <= daysIn; d++) {
-      const date = new Date(y, m, d);
-      const iso  = `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      html += renderCell(date, iso, d);
-    }
-    grid.innerHTML = html;
-  },
-
-  step(dir) {
-    const c = Calendar.cursor;
-    c.m += dir;
-    if (c.m > 11) { c.m = 0;  c.y++; }
-    if (c.m < 0)  { c.m = 11; c.y--; }
-  }
-};
 
 /* ═══════════════════════════════════════════════════════════════════════════
    JOURNAL — the entry modal
@@ -3560,7 +3483,6 @@ const Journal = {
     closeModal('journal-modal');
     Journal.id = null;
     toggleSessionMenu(false);
-    toggleCalendar(false);
   },
 
   async save() {
@@ -3706,37 +3628,12 @@ function toggleSessionMenu(force) {
 // the date and the calendar is read-only, which is the same rule the save path
 // enforces by simply not sending the column.
 function setDateLabel(day) {
-  Calendar.cursor.sel = day;
   const span = $('jm-date-label');
   if (span) span.textContent = new Date(day + 'T12:00:00')
     .toLocaleDateString('en-GB', { day:'2-digit', month:'short' }).toUpperCase();
 }
 
-function toggleCalendar(force) {
-  const wrap = $('jm-cal');
-  if (!wrap) return;
-  const open = force === undefined ? !wrap.classList.contains('open') : !!force;
-  if (open) {
-    const sel = Calendar.cursor.sel;
-    const d = sel ? new Date(sel + 'T12:00:00') : new Date();
-    Calendar.cursor.y = d.getFullYear();
-    Calendar.cursor.m = d.getMonth();
-    renderCalendar();
-  }
-  wrap.classList.toggle('open', open);
-}
 
-function renderCalendar() {
-  const today = Dates.today();
-  Calendar.render((date, iso, d) => {
-    const cls = ['cal-day'];
-    if      (iso === Calendar.cursor.sel) cls.push('sel', 'sel-single');
-    else if (iso === today)               cls.push('today');
-    else                                  cls.push('muted');
-    const label = date.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
-    return `<span class="${cls.join(' ')}" role="button" tabindex="0" aria-label="${esc(label)}">${d}</span>`;
-  });
-}
 
 /* ─── Day picker ─────────────────────────────────────────────────────────────
    A calendar day holding one trade opens it directly; two or more open a small
@@ -3838,6 +3735,15 @@ const IO = {
     m.setAttribute('aria-hidden', 'false');
   },
 
+  // `pnl` is a generated column and cannot be written back, so it is dropped
+  // here rather than left to fail one row at a time during a restore.
+  payload() {
+    return {
+      exported_at: new Date().toISOString(),
+      trades: Data.all.map(({ pnl, ...row }) => row)
+    };
+  },
+
   showLink(uri, filename, sectionId) {
     const host = $(sectionId);
     if (!host) return;
@@ -3886,7 +3792,7 @@ const IO = {
   // replacing the database from a file is a job for the SQL editor, done
   // knowingly, not a click away from an export.
   backup() {
-    const payload = { exported_at: new Date().toISOString(), trades: Data.rows };
+    const payload = IO.payload();
     const uri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
     IO.showLink(uri, 'doji-backup-' + Dates.today() + '.json', 'io-section-json');
     notify('Backup ready');
@@ -3896,8 +3802,7 @@ const IO = {
   // download can be blocked silently and there is no API to detect it, so the
   // toast asks the trader to verify rather than asserting success.
   download(filename) {
-    const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), trades: Data.rows }, null, 2)],
-      { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(IO.payload(), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
@@ -4093,16 +3998,10 @@ function wire() {
 
   // Journal modal
   on('jm-session-btn', 'click', e => { e.stopPropagation(); toggleSessionMenu(); });
-  on('jm-date-label',  'click', e => { e.stopPropagation(); toggleCalendar(); });
-  $$('[data-jcal-nav]').forEach(btn => btn.addEventListener('click', e => {
-    e.stopPropagation();
-    Calendar.step(parseInt(btn.dataset.jcalNav, 10));
-    renderCalendar();
-  }));
   on('journal-modal', 'click', e => { if (e.target.id === 'journal-modal') Journal.close(); });
   // A tap anywhere else closes whichever popover is open. Bound once here
   // rather than per popover, so a third one added later is covered.
-  document.addEventListener('click', () => { toggleSessionMenu(false); toggleCalendar(false); });
+  document.addEventListener('click', () => toggleSessionMenu(false));
 
   // Other modals
   on('io-close-btn',  'click', () => closeModal('io-modal'));
