@@ -18,6 +18,8 @@
   /* Purple accent */
   --p:#8b35b8;
   --p-gl:rgba(139,53,184,.07); --p-gl2:rgba(139,53,184,.16); --p-gl3:rgba(139,53,184,.30);
+  --p-gl4:rgba(139,53,184,.42);   /* pending-cell hover — the fourth accent step */
+  --p-hair:rgba(139,53,184,.04);  /* table row rule */
 
   /* Layered backgrounds — near-black, faint purple hue (kept, not neutralised) */
   --bg:#070611; --s2:#141022;
@@ -34,7 +36,6 @@
   /* Glass surfaces — purple-tinted translucent glass */
   --glass:#0a0813;             /* solid dark card surface — flat, no translucency */
   --glass-bd:#251d39;
-  --glass-top:linear-gradient(transparent, transparent);
 
   /* Type */
   --ui:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
@@ -99,8 +100,30 @@
      the fill it sits on. The violet --mt2 on a cool tile was the warm/cold clash
      that read as grubby. */
   --be-tx:#9aa4c0;
-  /* Standard translucent surface for pills, chips and inputs. */
-  --fill-1:rgba(255,255,255,.04);
+  /* The translucent-white ladder. Every neutral surface, hover and hairline in
+     the app comes from one of these five — before this existed the same seven
+     alphas were written out as raw rgba() in seventeen places, which is exactly
+     the drift the rest of these tokens exist to stop. */
+  --fill-0:rgba(255,255,255,.02);   /* inset panels (io section, day row)      */
+  --fill-1:rgba(255,255,255,.04);   /* pills, chips, inputs                    */
+  --fill-2:rgba(255,255,255,.07);   /* hover on a --fill-1 surface             */
+  --fill-3:rgba(255,255,255,.08);   /* hover on a --fill-2 surface             */
+  --row-hv:rgba(255,255,255,.03);   /* table row hover                         */
+  --hair:rgba(255,255,255,.10);     /* in-card divider rule                    */
+  --hair-2:rgba(255,255,255,.07);   /* dimmer divider (emotion column tops)    */
+  --bd-hi:rgba(255,255,255,.30);    /* pill border on hover                    */
+  /* Bright text — the only two tones in the app lighter than --tx. --tx-hi sits
+     on an accent fill, --tx-max only on solid --p. */
+  --tx-hi:#f0eeff; --tx-max:#fff;
+  --pill-tx:rgba(255,255,255,.75);
+  /* Amber: "notice this", one step short of --loss. Sole user is the sync dot's
+     offline state — reading a cached copy is a state, not a failure. */
+  --warn:#d9a441;
+  /* The unfilled calendar cell — a shade below --glass so a day with no result
+     recedes behind the ones that have one. */
+  --cell-bg:rgba(8,8,10,.55);
+  /* --win at two alphas, for the export-ready confirmation strip. */
+  --win-gl:rgba(59,165,133,.08); --win-bd:rgba(59,165,133,.25);
   /* The violet bloom behind every full-bleed surface. Held as the whole
      gradient rather than just its colour, since all four users want the
      identical geometry — four copies of one 90-character value was four
@@ -108,6 +131,10 @@
   --aura:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
   /* Gap between adjacent chart segments, and between calendar cells. */
   --seg-gap:3px;
+  /* The hairline BETWEEN two segments inside one bar track — a different
+     measure to --seg-gap, which separates whole tiles. Tokenised because it was
+     written as a bare 1px in four separate track rules. */
+  --seg-hair:1px;
 
   /* Spacing scale — single source of truth for section rhythm. Every
      section gap / title gap / internal divider / bar-row gap pulls from one
@@ -150,6 +177,62 @@ body::before {
 nav, .panels { position:relative; z-index:1; }
 button { font-family:inherit; }
 input,textarea { font-family:inherit; }
+/* The app had no focus indicator anywhere in 1,500 lines of CSS. :focus-visible
+   is the whole reason this is safe to add late: the browser only matches it for
+   keyboard/AT navigation, so a mouse user never sees a ring appear. */
+:focus-visible { outline:2px solid var(--p); outline-offset:2px; border-radius:2px; }
+/* Rows and cells that act as buttons opt into the same ring. */
+tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visible,
+.hm-mo:focus-visible { outline:2px solid var(--p); outline-offset:-2px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY — the shared type primitives
+   ───────────────────────────────────────────────────────────────────────────
+   Every figure and every label in the app is mono, and every uppercase label
+   sits at one of three sizes. Both facts used to be restated inside each
+   component rule — font-family:var(--mono) alone appeared 56 times — which is
+   the same drift the colour tokens exist to prevent, one declaration lower
+   down.
+
+   Collected here so a type change is one edit. Component rules below now
+   declare only what makes them DIFFERENT (weight, colour, alignment); a rule
+   that still states its own size or tracking is a deliberate exception rather
+   than a copy.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.nav-icon-btn, .btn, .cbox-l, .period-label, .period-disc-lbl, .setup-donut-label,
+.sess-wr-label, .emo-cat-label, .emo-row-name, .period-pnl,
+.period-counts-left span, .period-counts-right span, .pm-lbl, .pm-val,
+.period-disc-pct, .pnl-balance-number, .pnl-balance-at, .pnl-net-number,
+.pnl-net-count, .pnl-stat-lbl, .pnl-stat-val, .ps-tag, .ps-fig, .rr-bar-label,
+.heatmap-title, .hm-mo-count, .hm-mo-pnl, .hm-mo-lbl, .heatmap-dow,
+.heatmap-week-count, .heatmap-week-pnl, .heatmap-week-lbl, .heatmap-cell-day,
+.heatmap-cell-count, .heatmap-cell-pnl, .tlog-time, .tlog-pag-info,
+.tlog-pag-btn, .roll-range, thead th, td, .dir-pill, .sess-wr-pct,
+.emo-row-pcts, .jm-pnl-input, .jm-session-opt, .journal-q-label, .jf-pill-lbl,
+.jm-btn-save, .jm-btn-cancel, .io-modal-title, .io-section-label,
+.export-ready-link span, .export-ready-link a, .day-trade-sub, .day-trade-pnl,
+.notif, .notif-undo, .login-sub, .login-input, .login-err, .broker-banner b,
+.broker-banner-cta {
+  font-family:var(--mono);
+}
+
+/* Tier 1 — section headings and buttons. Widest tracking, used where a label
+   opens a block rather than annotating a figure. */
+.btn, .cbox-l, .rr-bar-label, .journal-q-label, .jm-btn-save, .jm-btn-cancel,
+.io-section-label, .login-sub {
+  font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+}
+
+/* Tier 2 — in-block labels. A name sitting beside or above its own figure. */
+thead th, .notif-undo, .broker-banner-cta, .period-label, .period-disc-lbl,
+.setup-donut-label, .sess-wr-label, .emo-cat-label, .emo-row-name, .roll-range {
+  font-size:9px; letter-spacing:1px; text-transform:uppercase;
+}
+
+/* Tier 3 — captions under or inside a figure. The quietest tier. */
+.pnl-stat-lbl, .heatmap-dow, .day-trade-sub {
+  font-size:8px; letter-spacing:1px; text-transform:uppercase;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NAV
@@ -165,7 +248,7 @@ nav {
 }
 .nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
 .nav-icon-btn {
-  font-family:var(--mono); padding:6px 10px; border:1px solid var(--bd); border-radius:var(--r-sm);
+  padding:6px 10px; border:1px solid var(--bd); border-radius:var(--r-sm);
   background:transparent; color:var(--mt2); cursor:pointer; line-height:1;
   font-size:14px;
 }
@@ -187,21 +270,15 @@ nav {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   UTILITY
-   ═══════════════════════════════════════════════════════════════════════════ */
-.hidden { display:none !important; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
    BUTTONS
    ═══════════════════════════════════════════════════════════════════════════ */
 .btn {
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   padding:8px 15px; border:1px solid var(--bd2); background:transparent; color:var(--mt2);
   cursor:pointer; border-radius:var(--r-sm);
 }
 .btn:hover { border-color:var(--p); color:var(--p); }
-.btn.primary { background:var(--p); color:#fff; border-color:var(--p); font-weight:600; }
-.btn.primary:hover { background:var(--p); color:#fff; box-shadow:0 0 22px -4px var(--p-gl3); }
+.btn.primary { background:var(--p); color:var(--tx-max); border-color:var(--p); font-weight:600; }
+.btn.primary:hover { background:var(--p); color:var(--tx-max); box-shadow:0 0 22px -4px var(--p-gl3); }
 .btn.r4 { border-radius:var(--r-sm); }
 
 .icon-btn {
@@ -215,7 +292,7 @@ nav {
    ═══════════════════════════════════════════════════════════════════════════ */
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:var(--gap-section); }
 .cbox {
-  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
+  background:var(--glass); border:1px solid var(--glass-bd);
   padding:16px 18px;
   border-radius:var(--r-md); box-shadow:var(--sh-2);
 }
@@ -228,7 +305,6 @@ nav {
    so columned and non-columned sections share one left margin. */
 .cbox.cols { padding:16px 4px; }
 .cbox-l {
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   color:var(--mt2); margin-bottom:var(--gap-title);
 }
 /* Sole user is the cumulative-P&L canvas. That card is the P&L card's companion
@@ -243,7 +319,7 @@ nav {
    PERIOD DONUTS (All Time / Week / Month)
    ═══════════════════════════════════════════════════════════════════════════ */
 .period-card {
-  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
+  background:var(--glass); border:1px solid var(--glass-bd);
   margin-bottom:var(--gap-section); border-radius:var(--r-md); overflow:hidden;
   box-shadow:var(--sh-2);
 }
@@ -269,8 +345,8 @@ nav {
    a separate, dimmer tier and intentionally excluded. */
 .period-label, .period-disc-lbl, .setup-donut-label, .sess-wr-label,
 .emo-cat-label, .emo-row-name {
-  font-family:var(--mono); font-size:9px; font-weight:400;
-  letter-spacing:1px; text-transform:uppercase; color:var(--mt);
+  font-weight:400;
+  color:var(--mt);
 }
 .period-label { align-self:flex-start; }
 /* The wheel sits on one line and its figure strip claims the next: the strip is
@@ -291,7 +367,7 @@ nav {
   position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; pointer-events:none;
 }
-.period-pnl { font-family:var(--mono); font-size:9px; font-weight:600; line-height:1; color:var(--mt2); }
+.period-pnl { font-size:9px; font-weight:600; line-height:1; color:var(--mt2); }
 .period-counts-left,
 .period-counts-right {
   display:flex; flex-direction:column; gap:4px; flex-shrink:0;
@@ -300,7 +376,7 @@ nav {
 .period-counts-right { align-items:flex-start; }
 .period-counts-left span,
 .period-counts-right span {
-  font-family:var(--mono); font-size:9px; font-weight:600;
+  font-size:9px; font-weight:600;
   line-height:1.1; letter-spacing:.5px; white-space:nowrap;
 }
 /* Colour follows the class, never the side, so the counts can be re-sided
@@ -327,11 +403,11 @@ nav {
   row-gap:3px; column-gap:8px;
 }
 .pm-lbl {
-  font-family:var(--mono); font-size:7px; letter-spacing:1px;
+  font-size:7px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt);
 }
 .pm-val {
-  font-family:var(--mono); font-size:10px; font-weight:600;
+  font-size:10px; font-weight:600;
   line-height:1.1; letter-spacing:.5px; white-space:nowrap; color:var(--mt2);
 }
 .pm-val.win  { color:var(--win); }
@@ -355,7 +431,7 @@ nav {
 }
 .period-disc-row  { display:flex; flex-direction:column; gap:5px; }
 .period-disc-head { display:flex; justify-content:space-between; align-items:baseline; }
-.period-disc-pct { font-family:var(--mono); font-size:10px; font-weight:500; }
+.period-disc-pct { font-size:10px; font-weight:500; }
 .period-disc-pct.win  { color:var(--win); }
 .period-disc-pct.loss { color:var(--loss); }
 .period-disc-pct.dim  { color:var(--mt2); }
@@ -433,21 +509,21 @@ nav {
    section title (--mt2), which is also .pnl-net-number's uncoloured state:
    nothing in the panel is pure white, so the balance isn't either. */
 .pnl-balance-number {
-  font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
+  font-size:24px; font-weight:700; line-height:1;
   color:var(--mt2);
 }
 .pnl-balance-at {
-  font-family:var(--mono); font-size:8px; letter-spacing:.5px;
+  font-size:8px; letter-spacing:.5px;
   color:var(--mt); margin-top:6px;
 }
 .pnl-net-number {
-  font-size:24px; font-weight:700; font-family:var(--mono); line-height:1;
+  font-size:24px; font-weight:700; line-height:1;
   color:var(--mt2);
 }
 .pnl-net-number.win  { color:var(--win); }
 .pnl-net-number.loss { color:var(--loss); }
 .pnl-net-count {
-  font-family:var(--mono); font-size:8px; color:var(--mt);
+  font-size:8px; color:var(--mt);
   margin-left:8px; letter-spacing:.5px;
 }
 
@@ -456,11 +532,10 @@ nav {
 .pnl-stats-grid { display:flex; flex-direction:column; gap:11px; }
 .pnl-stat { display:flex; align-items:baseline; justify-content:space-between; gap:16px; }
 .pnl-stat-lbl {
-  font-family:var(--mono); font-size:8px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--mt); white-space:nowrap;
+  color:var(--mt); white-space:nowrap;
 }
 .pnl-stat-val {
-  font-family:var(--mono); font-size:11px; font-weight:600;
+  font-size:11px; font-weight:600;
   white-space:nowrap; color:var(--mt2);
 }
 .pnl-stat-val.win  { color:var(--win); }
@@ -474,10 +549,10 @@ nav {
    label on one line in the narrow half of the card. */
 .pnl-stat-pair { display:flex; align-items:baseline; gap:4px; white-space:nowrap; }
 .ps-tag {
-  font-family:var(--mono); font-size:7px; letter-spacing:.5px;
+  font-size:7px; letter-spacing:.5px;
   text-transform:uppercase; color:var(--mt);
 }
-.ps-fig { font-family:var(--mono); font-size:10px; font-weight:600; color:var(--mt2); }
+.ps-fig { font-size:10px; font-weight:600; color:var(--mt2); }
 .ps-fig.win  { color:var(--win); }
 .ps-fig.loss { color:var(--loss); }
 /* Reads as "moved from → to". A hyphen here would sit against signed figures
@@ -488,19 +563,18 @@ nav {
    R:R BAR
    ═══════════════════════════════════════════════════════════════════════════ */
 .rr-bar-wrap {
-  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd);
+  background:var(--glass); border:1px solid var(--glass-bd);
   padding:16px 18px; margin-bottom:var(--gap-section);
   border-radius:var(--r-md); box-shadow:var(--sh-2);
 }
 .rr-bar-label {
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   color:var(--mt2); margin-bottom:var(--gap-title);
   display:flex; justify-content:space-between; align-items:center;
 }
-.rr-bar-segments { display:flex; gap:3px; width:100%; margin:10px 0; }
+.rr-bar-segments { display:flex; gap:var(--seg-gap); width:100%; margin:10px 0; }
 .rr-bar-segment-row {
   width:100%; height:var(--bar-h); border-radius:3px;
-  overflow:hidden; display:flex; gap:1px;
+  overflow:hidden; display:flex; gap:var(--seg-hair);
 }
 .rr-bar-seg-win {
   background:var(--seg-win-bg); border:var(--seg-bd) solid var(--win);
@@ -534,13 +608,19 @@ nav {
   background:var(--mt); opacity:.35; margin-right:4px;
   transition:background .2s, opacity .2s;
 }
+/* Screen-reader-only text. Same clip-path pattern as .sync-dot-label and the
+   journal's pill inputs — three users now, so it earns a name. */
+.sr-only {
+  position:absolute; width:1px; height:1px;
+  overflow:hidden; clip-path:inset(50%); white-space:nowrap;
+}
 .sync-dot-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .sync-dot.busy  { background:var(--p);    opacity:.9; animation:brokerPulse 1.4s ease-in-out infinite; }
 .sync-dot.ok    { background:var(--win);  opacity:.55; }
 /* Amber, not red: reading a cached copy is a state to notice, not a failure.
    The journal draws normally; only saving is refused until the connection is
    back, which is the whole difference this dot has to carry. */
-.sync-dot.offline { background:#d9a441;   opacity:.95; }
+.sync-dot.offline { background:var(--warn);  opacity:.95; }
 .sync-dot.error { background:var(--loss); opacity:1; }
 @media (prefers-reduced-motion:reduce) { .sync-dot.busy { animation:none; } }
 
@@ -561,7 +641,7 @@ nav {
 }
 .heatmap-nav-btn:hover { border-color:var(--p); background:var(--p-gl); }
 .heatmap-title {
-  font-family:var(--mono); font-size:11px; letter-spacing:1px; text-transform:uppercase;
+  font-size:11px; letter-spacing:1px; text-transform:uppercase;
   color:var(--mt2); font-weight:500;
 }
 
@@ -591,7 +671,7 @@ nav {
 /* Taller than the label-above version was: the corner name now sits inside the
    cell, so the centred figures need clearance beneath it. */
 .hm-mo {
-  background:var(--glass-top), rgba(8,8,10,.55);
+  background:var(--cell-bg);
   border:1px solid var(--glass-bd); border-radius:var(--r-cell);
   box-shadow:var(--sh-2); box-sizing:border-box; position:relative;
   padding:7px 2px; min-height:62px;
@@ -618,14 +698,14 @@ nav {
 /* The count is a caption under the amount, so it takes the lighter weight; the
    result-coloured rules below still override its colour when the month has one. */
 .hm-mo-count {
-  font-family:var(--mono); font-size:8px; font-weight:400; letter-spacing:.5px;
+  font-size:8px; font-weight:400; letter-spacing:.5px;
   color:var(--mt); min-height:12px;
 }
 .hm-mo.win  .hm-mo-count { color:var(--win); }
 .hm-mo.loss .hm-mo-count { color:var(--loss); }
 .hm-mo.be   .hm-mo-count { color:var(--be-tx); }
 .hm-mo-pnl {
-  font-family:var(--mono); font-size:10px; font-weight:600; margin-top:2px;
+  font-size:10px; font-weight:600; margin-top:2px;
   color:var(--mt2);
 }
 .hm-mo.win  .hm-mo-pnl { color:var(--win); }
@@ -638,8 +718,8 @@ nav {
   gap:var(--seg-gap);
 }
 .heatmap-dow {
-  font-family:var(--mono); font-size:8px; color:var(--mt);
-  padding:6px 0; text-align:center; letter-spacing:1px; text-transform:uppercase;
+  color:var(--mt);
+  padding:6px 0; text-align:center;
 }
 .heatmap-dow-week, .heatmap-week { margin-left:14px; }
 /* The week header labels a different axis to the weekday names, so it takes
@@ -653,7 +733,7 @@ nav {
    --seg-*-bg palette, so a win is the same green here as in every bar and
    wheel — the standardisation lives in the fill, not the border. */
 .heatmap-cell, .heatmap-week {
-  background:var(--glass-top), rgba(8,8,10,.55);
+  background:var(--cell-bg);
   border:1px solid var(--glass-bd); border-radius:var(--r-cell);
   min-height:80px; position:relative; box-sizing:border-box;
   display:flex; flex-direction:column;
@@ -676,14 +756,14 @@ nav {
 .heatmap-week.loss { background:var(--seg-loss-bg); }
 .heatmap-week.be   { background:var(--seg-be-bg); }
 .heatmap-week-count {
-  font-family:var(--mono); font-size:7px; font-weight:400; letter-spacing:.5px;
+  font-size:7px; font-weight:400; letter-spacing:.5px;
   color:var(--mt); text-transform:uppercase;
 }
 .heatmap-week.win  .heatmap-week-count { color:var(--win); }
 .heatmap-week.loss .heatmap-week-count { color:var(--loss); }
 .heatmap-week.be   .heatmap-week-count { color:var(--be-tx); }
 .heatmap-week-pnl {
-  font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
+  font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2);
 }
 .heatmap-week.win  .heatmap-week-pnl { color:var(--win); }
@@ -694,7 +774,7 @@ nav {
    keeps all of them in the same place with the same weight. */
 .heatmap-cell-day, .heatmap-week-lbl, .hm-mo-lbl {
   position:absolute; top:6px; left:8px;
-  font-family:var(--mono); font-size:10px; color:var(--mt); font-weight:500;
+  font-size:10px; color:var(--mt); font-weight:500;
 }
 .heatmap-cell-body {
   text-align:center; flex:1; width:100%;
@@ -704,14 +784,14 @@ nav {
    amount carries the weight and the count sits above it as a caption — two
    readings of the same day, largest first. */
 .heatmap-cell-count {
-  font-family:var(--mono); font-size:7px; font-weight:400; letter-spacing:.5px;
+  font-size:7px; font-weight:400; letter-spacing:.5px;
   color:var(--mt); text-transform:uppercase;
 }
 .heatmap-cell.win  .heatmap-cell-count { color:var(--win); }
 .heatmap-cell.loss .heatmap-cell-count { color:var(--loss); }
 .heatmap-cell.be   .heatmap-cell-count { color:var(--be-tx); }
 .heatmap-cell-pnl {
-  font-family:var(--mono); font-size:11px; font-weight:600; margin-top:3px;
+  font-size:11px; font-weight:600; margin-top:3px;
   color:var(--mt2); text-transform:uppercase;
 }
 .heatmap-cell.win  .heatmap-cell-pnl { color:var(--win); }
@@ -731,7 +811,7 @@ nav {
    TRADE LOG
    ═══════════════════════════════════════════════════════════════════════════ */
 .tlog-wrap {
-  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd); margin-bottom:var(--gap-section);
+  background:var(--glass); border:1px solid var(--glass-bd); margin-bottom:var(--gap-section);
   border-radius:var(--r-md); box-shadow:var(--sh-2); overflow:hidden;
 }
 .tlog-hdr {
@@ -741,7 +821,7 @@ nav {
 /* Entry clock beneath the date in a log row. */
 .tlog-time {
   display:block; margin-top:2px;
-  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--mt);
+  font-size:9px; letter-spacing:.5px; color:var(--mt);
 }
 /* Pagination only renders when there's more than one page. On a single page
    the bar is empty, so collapse it — otherwise it leaves a hollow gap above
@@ -751,10 +831,10 @@ nav {
   display:flex; align-items:center; gap:6px;
 }
 .tlog-pag-info {
-  font-family:var(--mono); font-size:8px; color:var(--mt);
+  font-size:8px; color:var(--mt);
 }
 .tlog-pag-btn {
-  font-family:var(--mono); font-size:8px;
+  font-size:8px;
   padding:3px 10px; border:1px solid var(--bd);
   background:transparent; color:var(--mt2); cursor:pointer;
 }
@@ -764,6 +844,13 @@ nav {
    running to the margin. First/last cell padding is zeroed below so the text
    still lands on the shared 18px content edge. */
 .tw { overflow-x:auto; padding:0 18px; }
+/* The zero-trades message. It used to have no rule at all and rendered as
+   unstyled 13px body copy — the one string in the panel that ignored the
+   house treatment. */
+.empty-msg {
+  padding:26px 0 30px; text-align:center;
+  font-size:11px; line-height:1.7; color:var(--mt);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    LOG + ROLL-FORWARD SPLIT
@@ -828,8 +915,8 @@ nav {
    a benchmark and not the range being reported, so it takes the same type
    muted; the colour keeps meaning what it means everywhere else. */
 .roll-range {
-  font-family:var(--mono); font-size:9px; font-weight:600;
-  letter-spacing:1px; text-transform:uppercase; color:var(--p);
+  font-weight:600;
+  color:var(--p);
   text-align:right;
 }
 .roll-range.prior { color:var(--mt); }
@@ -871,7 +958,6 @@ nav {
    ═══════════════════════════════════════════════════════════════════════════ */
 table { width:100%; border-collapse:collapse; }
 thead th {
-  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
   color:var(--mt); padding:16px 12px 10px; text-align:left;
   border-bottom:1px solid var(--glass-bd); background:transparent; white-space:nowrap;
 }
@@ -879,12 +965,12 @@ th:first-child, td:first-child { padding-left:0; }
 th:last-child,  td:last-child  { padding-right:0; }
 thead th.c { text-align:center; }
 tbody tr {
-  border-bottom:1px solid rgba(139,53,184,.04);
+  border-bottom:1px solid var(--p-hair);
  cursor:pointer;
 }
-tbody tr:hover { background:rgba(255,255,255,.03); }
+tbody tr:hover { background:var(--row-hv); }
 td {
-  padding:9px 12px; font-family:var(--mono); font-size:10px;
+  padding:9px 12px; font-size:10px;
   color:var(--mt2); white-space:nowrap; text-transform:uppercase;
 }
 td.win { color:var(--win); }
@@ -892,7 +978,7 @@ td.loss{ color:var(--loss); }
 td.c   { text-align:center; }
 
 .dir-pill {
-  display:inline-block; font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  display:inline-block; font-size:8px; letter-spacing:1px;
   padding:3px 9px; text-transform:uppercase; font-weight:600; border-radius:var(--r-full);
   color:var(--mt2); background:var(--fill-1); border:1px solid var(--glass-bd);
 }
@@ -934,7 +1020,7 @@ td.c   { text-align:center; }
 .sess-wr-label { text-align:left; }
 .sess-wr-track {
   height:var(--bar-h); border-radius:3px; overflow:hidden;
-  display:flex; gap:1px;
+  display:flex; gap:var(--seg-hair);
 }
 .sess-wr-seg-win {
   background:var(--seg-win-bg); border:var(--seg-bd) solid var(--win);
@@ -952,7 +1038,7 @@ td.c   { text-align:center; }
 .sess-wr-track .sess-wr-seg-last       { border-radius:0 3px 3px 0; }
 .sess-wr-track.solo > *                { border-radius:3px; }
 .sess-wr-pct {
-  font-family:var(--mono); font-size:10px; font-weight:500; text-align:left;
+  font-size:10px; font-weight:500; text-align:left;
 }
 .sess-wr-pct.win  { color:var(--win); }
 .sess-wr-pct.loss { color:var(--loss); }
@@ -966,7 +1052,7 @@ td.c   { text-align:center; }
 .emo-row:last-child { margin-bottom:0; }
 .emo-row-head { display:flex; justify-content:space-between; align-items:baseline; }
 /* .emo-row-name typography comes from the shared metric-label rule */
-.emo-row-pcts { font-family:var(--mono); font-size:10px; font-weight:500; }
+.emo-row-pcts { font-size:10px; font-weight:500; }
 .emo-row-pcts .win  { color:var(--win); }
 .emo-row-pcts .loss { color:var(--loss); }
 .emo-row-pcts .sep  { color:var(--mt); }
@@ -974,7 +1060,7 @@ td.c   { text-align:center; }
   height:var(--bar-h); border-radius:3px;
   overflow:hidden;
 }
-.emo-row-bar { display:flex; gap:1px; height:100%; }
+.emo-row-bar { display:flex; gap:var(--seg-hair); height:100%; width:100%; }
 .emo-row-bar > div { box-sizing:border-box; }
 .emo-row-bar .seg-win  { background:var(--seg-win-bg);  border:var(--seg-bd) solid var(--win); }
 .emo-row-bar .seg-be   { background:var(--seg-be-bg);   border:var(--seg-bd) solid var(--seg-be-bd); }
@@ -982,7 +1068,7 @@ td.c   { text-align:center; }
 /* Untraded emotion: muted label + the shared .bar-empty placeholder, so an
    empty per-emotion row matches every other empty bar in the panel. */
 .emo-row.is-empty .emo-row-name,
-.emo-row.is-empty .emo-row-pcts.no-data { color:var(--mt); font-family:var(--mono); }
+.emo-row.is-empty .emo-row-pcts.no-data { color:var(--mt); }
 
 /* Emotion category wheels (Positive / Fear / Reactive) — a row of result
    wheels above the per-emotion bars, divided like the period/setup columns.
@@ -1002,7 +1088,7 @@ td.c   { text-align:center; }
    Reuses the .emo-row primitive (same --bar-h thickness + seg colors). */
 .emo-cat-bars {
   width:100%; margin-top:8px; padding-top:var(--gap-divider);
-  border-top:1px solid rgba(255,255,255,.07);
+  border-top:1px solid var(--hair-2);
 }
 .emo-cat-bars:empty { display:none; }
 /* disciplineBar rows (Positive column's SL/TP) space themselves via parent
@@ -1058,7 +1144,7 @@ td.c   { text-align:center; }
   position:relative;
 }
 .jm-pnl-input {
-  font-family:var(--mono); font-size:9px; letter-spacing:.5px;
+  font-size:9px; letter-spacing:.5px;
   padding:6px 12px; border:1px solid var(--glass-bd);
   color:var(--tx); border-radius:var(--r-full); background:var(--fill-1);
   width:76px; text-align:center; outline:none;
@@ -1066,25 +1152,25 @@ td.c   { text-align:center; }
 }
 .jm-pnl-input::-webkit-outer-spin-button,
 .jm-pnl-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.jm-pnl-input:focus { border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3); }
+.jm-pnl-input:focus { border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3); }
 
 .jm-session-wrap { position:relative; }
 .jm-session-opts {
   position:absolute; top:calc(100% + 8px); left:0; z-index:60;
   min-width:166px;
-  background:var(--glass-top), var(--glass); border:1px solid var(--glass-bd); border-radius:var(--r-md);
+  background:var(--glass); border:1px solid var(--glass-bd); border-radius:var(--r-md);
   box-shadow:var(--sh-3);
   padding:5px; display:none; flex-direction:column; gap:2px;
 }
 .jm-session-opts.open { display:flex; }
 .jm-session-opt {
-  font-family:var(--mono); font-size:10px; letter-spacing:.6px; text-transform:uppercase;
+  font-size:10px; letter-spacing:.6px; text-transform:uppercase;
   display:flex; align-items:center; justify-content:space-between; gap:14px;
   width:100%; text-align:left; cursor:pointer;
   padding:8px 11px; border:none; border-radius:var(--r-sm);
   background:transparent; color:var(--mt2);
 }
-.jm-session-opt:hover { background:var(--p-gl2); color:#f0eeff; }
+.jm-session-opt:hover { background:var(--p-gl2); color:var(--tx-hi); }
 .jm-session-opt .opt-check { font-size:9px; color:var(--p); }
 .jm-session-opt.sel { color:var(--p); background:var(--p-gl); }
 .jm-session-opt.sel:hover { background:var(--p-gl2); }
@@ -1108,6 +1194,12 @@ td.c   { text-align:center; }
    JOURNAL FORM
    ═══════════════════════════════════════════════════════════════════════════ */
 .journal-form { display:flex; flex-direction:column; align-items:center; width:100%; }
+/* One emotion phase — its heading and its chip columns. Was an inline
+   width:100%;text-align:center on two sibling divs in journalForm(). */
+.jf-phase { width:100%; text-align:center; }
+/* The Y/N question label sits directly on its buttons rather than opening a
+   block, so it drops the shared label gap. Was an inline margin-bottom:0. */
+.jf-yn-item .journal-q-label { margin-bottom:0; }
 
 .jf-yn-row {
   display:flex; gap:40px; justify-content:center; flex-wrap:wrap;
@@ -1122,21 +1214,33 @@ td.c   { text-align:center; }
 }
 
 .journal-q-label {
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   color:var(--mt2); margin-bottom:12px; display:block;
 }
-.jf-pill-radio { display:none; }
+/* Visually hidden rather than display:none. display:none takes the input out of
+   the tab order AND out of the accessibility tree, which meant every answer in
+   the journal form — the three Y/N groups, both setups, every emotion chip —
+   could only be set with a mouse. Same clip-path pattern as .sync-dot-label.
+   Nothing changes visually: the label still carries the whole appearance. */
+.jf-pill-radio {
+  position:absolute; width:1px; height:1px;
+  overflow:hidden; clip-path:inset(50%); white-space:nowrap;
+}
+/* :focus-visible, not :focus — a mouse click never triggers it, so this ring
+   only ever appears for someone actually navigating by keyboard. */
+.jf-pill-radio:focus-visible + .jf-pill-lbl {
+  outline:2px solid var(--p); outline-offset:2px;
+}
 .jf-pill-lbl {
-  font-family:var(--mono); font-size:9px; letter-spacing:.3px; text-transform:uppercase;
+  font-size:9px; letter-spacing:.3px; text-transform:uppercase;
   padding:6px 12px; border:1px solid var(--glass-bd);
-  color:rgba(255,255,255,.75); cursor:pointer;
+  color:var(--pill-tx); cursor:pointer;
   border-radius:var(--r-full); background:var(--fill-1); white-space:nowrap;
 }
 .jf-emo-pill { width:90px; text-align:center; display:inline-block; }
 .jf-yn-pill  { width:56px; text-align:center; display:inline-block; }
-.jf-pill-lbl:hover { border-color:rgba(255,255,255,.3); color:#fff; background:rgba(255,255,255,.07); }
+.jf-pill-lbl:hover { border-color:var(--bd-hi); color:var(--tx-max); background:var(--fill-2); }
 .jf-pill-radio:checked + .jf-pill-lbl {
-  border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3);
+  border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3);
 }
 
 /* Controls showing a value this app does not own: the direction, the P&L and the
@@ -1150,8 +1254,13 @@ td.c   { text-align:center; }
 #jm-date-label {
   opacity:.55; cursor:default; pointer-events:none;
 }
+/* The filing day is read-only, so it takes no cursor of its own. It used to
+   carry an inline cursor:pointer sitting directly against the pointer-events:
+   none above — an element advertising itself as clickable while the rule two
+   lines up made it inert. */
+#jm-date-label { white-space:nowrap; }
 .jf-pill-radio:disabled:checked + .jf-pill-lbl {
-  border-color:var(--p); color:#f0eeff; background:var(--p-gl2); box-shadow:none;
+  border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:none;
 }
 
 /* Emotion chip layout — 3 columns separated by vertical dividers */
@@ -1163,7 +1272,7 @@ td.c   { text-align:center; }
 }
 .jf-emo-row { display:flex; gap:6px; }
 .jf-emo-divider {
-  width:1px; background:rgba(255,255,255,.1); align-self:stretch;
+  width:1px; background:var(--hair); align-self:stretch;
   margin:0 14px; flex-shrink:0;
 }
 
@@ -1172,19 +1281,19 @@ td.c   { text-align:center; }
   justify-content:center;
 }
 .jm-btn-save {
-  background:var(--p); border:1px solid var(--p); color:#fff;
-  cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
-  text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
+  background:var(--p); border:1px solid var(--p); color:var(--tx-max);
+  cursor:pointer;
+  padding:9px 0; border-radius:var(--r-full);
   width:110px;
 }
 .jm-btn-save:hover { background:var(--p); border-color:var(--p); box-shadow:0 0 22px -4px var(--p-gl3); }
 .jm-btn-cancel {
   background:var(--fill-1); border:1px solid var(--bd2); color:var(--mt2);
-  cursor:pointer; font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
-  text-transform:uppercase; padding:9px 0; border-radius:var(--r-full);
+  cursor:pointer;
+  padding:9px 0; border-radius:var(--r-full);
  width:110px;
 }
-.jm-btn-cancel:hover { background:rgba(255,255,255,.08); border-color:var(--bd2); color:var(--tx); }
+.jm-btn-cancel:hover { background:var(--fill-3); border-color:var(--bd2); color:var(--tx); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    I/O MODAL
@@ -1206,7 +1315,7 @@ td.c   { text-align:center; }
   padding:14px 20px; border-bottom:1px solid var(--bd);
 }
 .io-modal-title {
-  font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase;
+  font-size:9px; letter-spacing:2px; text-transform:uppercase;
   color:var(--mt2);
 }
 .io-modal-body {
@@ -1215,10 +1324,9 @@ td.c   { text-align:center; }
 }
 .io-section {
   border:1px solid var(--bd); padding:16px; border-radius:var(--r-md);
-  background:rgba(255,255,255,.02);
+  background:var(--fill-0);
 }
 .io-section-label {
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
   color:var(--mt2); margin-bottom:6px;
 }
 .io-section-desc {
@@ -1231,15 +1339,15 @@ td.c   { text-align:center; }
 
 .export-ready-link {
   margin-top:10px; padding:10px 12px;
-  background:rgba(59,165,133,.08); border:1px solid rgba(59,165,133,.25);
+  background:var(--win-gl); border:1px solid var(--win-bd);
   display:flex; align-items:center; justify-content:space-between;
   border-radius:var(--r-sm);
 }
 .export-ready-link span {
-  font-family:var(--mono); font-size:8px; color:var(--win);
+  font-size:8px; color:var(--win);
 }
 .export-ready-link a {
-  font-family:var(--mono); font-size:8px; letter-spacing:1px; text-transform:uppercase;
+  font-size:8px; letter-spacing:1px; text-transform:uppercase;
   background:var(--win); color:var(--bg);
   padding:6px 15px; text-decoration:none; font-weight:700; border-radius:var(--r-full);
 }
@@ -1248,13 +1356,17 @@ td.c   { text-align:center; }
    DAY PICKER POPUP  (calendar day with 2+ trades — reuses .io-modal shell)
    ═══════════════════════════════════════════════════════════════════════════ */
 .day-modal-card { max-width:420px; }
-.day-modal-title .win  { color:var(--win); }
-.day-modal-title .loss { color:var(--loss); }
+/* Matched on the ID, not a class. This was `.day-modal-title` for a long time
+   and therefore matched nothing — the element is `id="day-modal-title"`, so the
+   day total rendered permanently uncoloured while openDay() dutifully emitted
+   the win/loss span. */
+#day-modal-title .win  { color:var(--win); }
+#day-modal-title .loss { color:var(--loss); }
 .day-trade-list { display:flex; flex-direction:column; gap:8px; }
 .day-trade-row {
   display:flex; align-items:center; justify-content:space-between; gap:12px;
   padding:11px 13px; border:1px solid var(--bd); border-radius:var(--r-md);
-  background:rgba(255,255,255,.02); cursor:pointer;
+  background:var(--fill-0); cursor:pointer;
 }
 .day-trade-row:hover { border-color:var(--p); background:var(--p-gl); }
 .day-trade-left { display:flex; align-items:center; gap:10px; min-width:0; }
@@ -1264,10 +1376,9 @@ td.c   { text-align:center; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .day-trade-sub {
-  font-family:var(--mono); font-size:8px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--mt2);
+  color:var(--mt2);
 }
-.day-trade-pnl { font-family:var(--mono); font-size:13px; font-weight:600; flex-shrink:0; }
+.day-trade-pnl { font-size:13px; font-weight:600; flex-shrink:0; }
 .day-trade-pnl.win  { color:var(--win); }
 .day-trade-pnl.loss { color:var(--loss); }
 
@@ -1278,7 +1389,7 @@ td.c   { text-align:center; }
   position:fixed; bottom:22px; right:22px;
   background:var(--bg);
   border:1px solid var(--p); color:var(--p);
-  font-family:var(--mono); font-size:10px; padding:11px 18px;
+  font-size:10px; padding:11px 18px;
   border-radius:var(--r-full); box-shadow:var(--sh-3);
   z-index:600; opacity:0;
   pointer-events:none;
@@ -1287,12 +1398,37 @@ td.c   { text-align:center; }
 .notif.err { border-color:var(--loss); color:var(--loss); }
 /* Inline Undo button carried by the delete toast (see notifyUndo). */
 .notif-undo {
-  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
   margin-left:12px; padding:3px 11px; cursor:pointer;
   background:transparent; color:var(--p); border:1px solid var(--p);
   border-radius:var(--r-full);
 }
 .notif-undo:hover { background:var(--p-gl2); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT STATE
+   ───────────────────────────────────────────────────────────────────────────
+   Covers the gap between "page parsed" and "first render", and the dead end
+   where a CDN never answered. Sits above the panel and below every modal, so
+   the login overlay still takes precedence when there is no session.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.boot-msg {
+  position:fixed; inset:0; z-index:300;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  background:var(--bg);
+  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--mt);
+  text-align:center; padding:24px;
+}
+.boot-msg.done { display:none; }
+/* Reuses the sync dot's pulse so the two "working" signals are one language. */
+.boot-dot {
+  width:7px; height:7px; border-radius:var(--r-full); flex:none;
+  background:var(--p); opacity:.9;
+  animation:brokerPulse 1.4s ease-in-out infinite;
+}
+.boot-msg.failed .boot-dot { background:var(--loss); animation:none; }
+.boot-msg.failed #boot-text { color:var(--loss); text-transform:none; letter-spacing:.5px; }
+@media (prefers-reduced-motion:reduce) { .boot-dot { animation:none; } }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    LOGIN OVERLAY
@@ -1310,7 +1446,7 @@ td.c   { text-align:center; }
 .login-card {
   position:relative; width:100%; max-width:320px;
   display:flex; flex-direction:column; gap:12px;
-  background:var(--glass-top), var(--glass);
+  background:var(--glass);
   border:1px solid var(--glass-bd); border-radius:var(--r-lg);
   box-shadow:var(--sh-3);
   padding:32px 28px 28px;
@@ -1325,15 +1461,14 @@ td.c   { text-align:center; }
 .login-word { font-weight:800; font-size:18px; letter-spacing:3px; color:var(--p); }
 .login-sub {
   text-align:center; margin-bottom:10px;
-  font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
-  text-transform:uppercase; color:var(--mt);
+  color:var(--mt);
 }
 .login-input {
   /* 16px is the iOS auto-zoom threshold: Safari zooms on focusing anything
      smaller and never zooms back. These are the only text fields left in the
      app, so keeping them at or above it removes the behaviour entirely rather
      than needing code to suppress it. */
-  font-family:var(--mono); font-size:16px; letter-spacing:.5px;
+  font-size:16px; letter-spacing:.5px;
   padding:11px 14px; border:1px solid var(--glass-bd);
   color:var(--tx); border-radius:var(--r-sm); background:var(--fill-1);
   width:100%; outline:none;
@@ -1343,7 +1478,7 @@ td.c   { text-align:center; }
 .login-btn[disabled] { opacity:.5; cursor:default; }
 .login-err {
   min-height:14px; text-align:center;
-  font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--loss);
+  font-size:9px; letter-spacing:.5px; color:var(--loss);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1357,16 +1492,16 @@ td.c   { text-align:center; }
   display:flex; align-items:center; gap:10px;
   margin-bottom:var(--gap-section); padding:12px 16px; cursor:pointer;
   background:var(--p-gl2); border:1px solid var(--p); border-radius:var(--r-md);
-  color:#f0eeff; font-size:12px;
+  color:var(--tx-hi); font-size:12px;
   animation:brokerPulse 2.4s ease-in-out infinite;
 }
-.broker-banner b { color:var(--p); font-family:var(--mono); font-size:11px; letter-spacing:.5px; }
+.broker-banner b { color:var(--p); font-size:11px; letter-spacing:.5px; }
 .broker-banner .broker-banner-cta {
-  margin-left:auto; font-family:var(--mono); font-size:9px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--p); white-space:nowrap;
+  margin-left:auto;
+  color:var(--p); white-space:nowrap;
 }
 @keyframes brokerPulse {
-  0%, 100% { box-shadow:0 0 0 0 rgba(139,53,184,0); }
+  0%, 100% { box-shadow:0 0 0 0 transparent; }
   50%      { box-shadow:0 0 18px -2px var(--p-gl3); }
 }
 /* A day holding an unfilled trade takes the purple outright rather than
@@ -1375,12 +1510,12 @@ td.c   { text-align:center; }
    moment the entry is complete. Declared after the .win/.loss/.be fills above
    so it overrides them on equal specificity. */
 .heatmap-cell.pending {
-  background:rgba(139,53,184,.30);
+  background:var(--p-gl3);
   border-color:var(--p);
   cursor:pointer;   /* a pending day may carry no result class of its own yet */
   animation:brokerPulse 2.4s ease-in-out infinite;
 }
-.heatmap-cell.pending:hover { background:rgba(139,53,184,.42); }
+.heatmap-cell.pending:hover { background:var(--p-gl4); }
 
 tr.broker-pending td { background:var(--p-gl); }
 /* The accent is drawn as an inset shadow rather than a border so it consumes
@@ -1615,11 +1750,12 @@ tr.broker-pending td:first-child {
            corner turned inside out. -->
       <svg class="fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
     </button>
-    <button id="nav-io-btn" class="nav-icon-btn" title="Import / Export" aria-label="Import / Export data">&#x21C5;</button>
+    <button id="nav-io-btn" class="nav-icon-btn" title="Export" aria-label="Export data">&#x21C5;</button>
   </div>
 </nav>
 
-<div class="panels">
+<h1 class="sr-only">Doji — XAUUSD trading journal</h1>
+<main class="panels">
 
   <!-- ═══ TRADES (sole panel — the Rules tab was retired) ═══ -->
   <div class="panel active">
@@ -1671,78 +1807,12 @@ tr.broker-pending td:first-child {
       </div>
     </div>
 
-    <!-- Period wheels + per-period discipline bars (Rules / Stop Loss / Take Profit) -->
-    <div class="period-card"><div class="period-row" id="period-row">
-      <div class="period-col" data-period="total">
-        <div class="period-label">All Time</div>
-        <div class="period-host">
-          <div class="period-counts-left">
-            <span class="pc-b" id="cnt-b-total">— B</span>
-            <span class="pc-l" id="cnt-l-total">— L</span>
-          </div>
-          <div class="period-donut-wrap">
-            <canvas id="chart-period-total" width="108" height="108"></canvas>
-            <div class="period-center"><div class="period-pnl" id="pnl-total">—</div></div>
-          </div>
-          <div class="period-counts-right">
-            <span class="pc-w" id="cnt-w-total">— W</span>
-          </div>
-          <div class="period-money">
-            <span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-total">—</span>
-            <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-total">—</span>
-            <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-total">—</span>
-            <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-total">—</span>
-          </div>
-        </div>
-        <div class="period-disc" id="disc-bars-total"></div>
-      </div>
-      <div class="period-col" data-period="week">
-        <div class="period-label">This Week</div>
-        <div class="period-host">
-          <div class="period-counts-left">
-            <span class="pc-b" id="cnt-b-week">— B</span>
-            <span class="pc-l" id="cnt-l-week">— L</span>
-          </div>
-          <div class="period-donut-wrap">
-            <canvas id="chart-period-week" width="108" height="108"></canvas>
-            <div class="period-center"><div class="period-pnl" id="pnl-week">—</div></div>
-          </div>
-          <div class="period-counts-right">
-            <span class="pc-w" id="cnt-w-week">— W</span>
-          </div>
-          <div class="period-money">
-            <span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-week">—</span>
-            <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-week">—</span>
-            <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-week">—</span>
-            <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-week">—</span>
-          </div>
-        </div>
-        <div class="period-disc" id="disc-bars-week"></div>
-      </div>
-      <div class="period-col" data-period="month">
-        <div class="period-label">This Month</div>
-        <div class="period-host">
-          <div class="period-counts-left">
-            <span class="pc-b" id="cnt-b-month">— B</span>
-            <span class="pc-l" id="cnt-l-month">— L</span>
-          </div>
-          <div class="period-donut-wrap">
-            <canvas id="chart-period-month" width="108" height="108"></canvas>
-            <div class="period-center"><div class="period-pnl" id="pnl-month">—</div></div>
-          </div>
-          <div class="period-counts-right">
-            <span class="pc-w" id="cnt-w-month">— W</span>
-          </div>
-          <div class="period-money">
-            <span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-month">—</span>
-            <span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-month">—</span>
-            <span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-month">—</span>
-            <span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-month">—</span>
-          </div>
-        </div>
-        <div class="period-disc" id="disc-bars-month"></div>
-      </div>
-    </div></div>
+    <!-- Period wheels + per-period discipline bars (Rules / Stop Loss / Take
+         Profit). Three visually identical columns, so the markup is generated
+         from CONFIG.PERIODS by renderPeriods() rather than written out three
+         times — see the note there. Adding a fourth window is now one array
+         entry instead of 23 lines of copy-paste plus twelve new IDs. -->
+    <div class="period-card"><div class="period-row" id="period-row"></div></div>
 
     <!-- R:R bar -->
     <div class="rr-bar-wrap">
@@ -1791,14 +1861,14 @@ tr.broker-pending td:first-child {
   </div>
 
 
-</div>
+</main>
 <!-- /panels -->
 
 <!-- ═══ I/O MODAL ═══ -->
 <div id="io-modal" class="io-modal" role="dialog" aria-modal="true" aria-labelledby="io-modal-title" aria-hidden="true">
   <div class="io-modal-card">
     <div class="io-modal-hdr">
-      <span id="io-modal-title" class="io-modal-title">Data Import / Export</span>
+      <span id="io-modal-title" class="io-modal-title">Export</span>
       <button id="io-close-btn" class="icon-btn" aria-label="Close">✕</button>
     </div>
     <div class="io-modal-body">
@@ -1846,7 +1916,7 @@ tr.broker-pending td:first-child {
         <label for="jmd-buy"  class="jf-pill-lbl">Long</label>
       </div>
       <div class="jm-hdr-right">
-        <span id="jm-date-label" class="jf-pill-lbl" style="cursor:pointer;white-space:nowrap;">—</span>
+        <span id="jm-date-label" class="jf-pill-lbl">—</span>
       </div>
     </div>
     <div id="jm-body" class="jm-body"></div>
@@ -1883,6 +1953,16 @@ tr.broker-pending td:first-child {
     <button id="login-btn" class="btn primary login-btn">Sign in</button>
     <div id="login-err" class="login-err"></div>
   </div>
+</div>
+
+<!-- Boot state. The panel used to go straight from empty to full, so the gap
+     showed a dashboard of em-dashes — indistinguishable from "connected, no
+     trades". It also covers the case where the CDN is unreachable, which
+     previously threw at Data.init() and left a permanently blank page with the
+     explanation only in the console. -->
+<div id="boot-msg" class="boot-msg">
+  <span class="boot-dot"></span>
+  <span id="boot-text">Loading your journal…</span>
 </div>
 
 <div class="notif" id="notif"></div>
@@ -1950,6 +2030,15 @@ const CONFIG = Object.freeze({
   ],
   DURING_NEGATIVE: ['Panic','Anxious','Greed','Impatient'],
 
+  // The three windows the wheel row reports. Order is the display order; `key`
+  // is what periodStart() switches on and what every generated id is built
+  // from. This list is the whole definition of that row — see periodShell().
+  PERIODS: [
+    { key: 'total', label: 'All Time'   },
+    { key: 'week',  label: 'This Week'  },
+    { key: 'month', label: 'This Month' }
+  ],
+
   SESSIONS: ['Asian','Asia+London','London','London+NY','New York'],
   SESSION_ABBR: { 'Asian':'AS', 'Asia+London':'AS+LN', 'London':'LN', 'London+NY':'LN+NY', 'New York':'NY' },
   SETUPS: ['Break & Retest','Support & Resistance'],
@@ -1962,6 +2051,13 @@ const CONFIG = Object.freeze({
   // what keeps gross profit minus gross loss equal to net. Break-evens sit in
   // the win-rate denominator, so scratches drag it down rather than vanishing.
   BE: 3,
+  // The same question one scale up. A day, a week or a month that nets a few
+  // dollars is also "nothing happened", but $3 is the noise floor of ONE fill
+  // and not of thirty — the aggregate cells used to reuse BE directly, which
+  // labelled a whole month break-even on a $2.40 net. Kept as a separate
+  // number so the two rules can be tuned independently, and so the reuse is
+  // now a decision rather than an accident.
+  BE_AGG: 10,
 
   PER_PAGE: 10,
   UNDO_MS: 7000,
@@ -1969,8 +2065,7 @@ const CONFIG = Object.freeze({
 });
 
 /* ─── DOM ────────────────────────────────────────────────────────────────── */
-const $  = id  => document.getElementById(id);
-const $$ = sel => document.querySelectorAll(sel);
+const $ = id => document.getElementById(id);
 
 const esc = s => String(s ?? '')
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -2159,15 +2254,34 @@ const Dates = {
 const resultOf = t =>
   t.pnl == null ? null : Math.abs(t.pnl) <= CONFIG.BE ? 'be' : t.pnl > 0 ? 'win' : 'loss';
 
+// The same verdict over a SUM rather than a single fill — a calendar day, a
+// week rail cell, a month tile. Wider dead band (CONFIG.BE_AGG), because the
+// per-trade scratch threshold is calibrated to one fill's cost and slippage,
+// not to the total of a month's worth of them. `n` is the count of trades in
+// the aggregate that actually carry a P&L: zero of them means there is nothing
+// to judge and the cell shows no result colour at all.
+const aggregateResult = (pnl, n) =>
+  !n ? '' : Math.abs(pnl) <= CONFIG.BE_AGG ? 'be' : pnl > 0 ? 'win' : 'loss';
+
 // The day a trade is filed under. open_day when the poller supplied one; the
 // New York civil day of the closing fill otherwise. Nothing else has a claim.
 const dayOf = t => t.open_day || Dates.nyDay(t.fill_time);
 
-// The trader's session if they set one, the entry instant's otherwise. Derived
-// at read time rather than stamped on arrival, so a fill nobody has opened yet
-// still carries a session, and a hand-set pill wins permanently once touched.
+// The trader's session if they set one, the entry instant's otherwise, and the
+// CLOSING instant as a last resort. Derived at read time rather than stamped on
+// arrival, so a fill nobody has opened yet still carries a session, and a
+// hand-set pill wins permanently once touched.
+//
+// The fill_time fallback is the "session seam" the README describes, and it was
+// documented long before it was implemented — this used to return null there,
+// which is how setSessionPill's `|| CONFIG.SESSIONS[0]` came to write the
+// literal string 'Asian' onto every trade the poller never reached. A close-
+// derived session is imperfect and openly so; a hardcoded one is a fabrication.
+// Flag it whenever session data is read for a pattern spanning that boundary.
 const sessionOf = t =>
-  t.session || (t.entry_time ? Dates.session(new Date(t.entry_time)) : null);
+  t.session
+  || (t.entry_time ? Dates.session(new Date(t.entry_time)) : null)
+  || (t.fill_time  ? Dates.session(new Date(t.fill_time))  : null);
 
 // A journal is complete when the trader has answered everything only they can:
 // the setup, all three discipline questions, and at least one emotion in each
@@ -2184,13 +2298,16 @@ const round2 = v => Math.round(v * 100) / 100;
 // definition of a win rate in the app: taken over DECIDED trades, so a trade
 // with no P&L is absent from both sides rather than counted as a loss.
 function counts(list) {
-  const out = { n: list.length, win: 0, loss: 0, be: 0, wr: 0 };
+  const out = { win: 0, loss: 0, be: 0, decided: 0, wr: 0 };
   for (const t of list) {
     const r = resultOf(t);
     if (r) out[r]++;
   }
-  const decided = out.win + out.loss + out.be;
-  out.wr = decided ? (out.win / decided) * 100 : 0;
+  // `decided` is returned rather than left to each caller: it used to be
+  // recomputed as win+loss+be at three separate call sites, while the `n` this
+  // object did return (list.length) was read by none of them.
+  out.decided = out.win + out.loss + out.be;
+  out.wr = out.decided ? (out.win / out.decided) * 100 : 0;
   return out;
 }
 
@@ -2283,11 +2400,25 @@ const Data = {
   offline: false,
   channel: null,
   refreshing: false,
+  queued: false,     // a change landed mid-refresh; run one more pass after
+  deferred: false,   // a change landed while a modal was open; flush on close
 
   // Journal columns, and the definitive list. A save sends these and nothing
   // else, which is the mechanism that stops the app writing broker-owned data —
   // enforced here rather than trusted to each call site.
   OWNED: ['setup','session','followed_rules','followed_sl','followed_tp','before_tags','during_tags'],
+
+  // The two array columns are guaranteed non-null from here on. Every consumer
+  // — isComplete, renderEmotions, renderDuring, the xlsx export — reaches
+  // straight for .length / .some / .join / new Set(), so a single row carrying
+  // a NULL array (a hand-insert, or the restore INSERT in the README) used to
+  // throw and blank whichever render step touched it first. Coerced once at the
+  // boundary rather than guarded at fifteen call sites.
+  norm(row) {
+    if (!Array.isArray(row.before_tags)) row.before_tags = [];
+    if (!Array.isArray(row.during_tags)) row.during_tags = [];
+    return row;
+  },
 
   init() {
     this.sb = window.supabase.createClient(SUPABASE.URL, SUPABASE.KEY);
@@ -2311,22 +2442,22 @@ const Data = {
       const { data, error } = await this.sb
         .from('trades').select('*').order('open_day', { ascending: false });
       if (error) throw error;
-      this.all  = data || [];
+      this.all  = (data || []).map(this.norm);
       this.rows = this.all.filter(t => !t.deleted);
       this.offline = false;
       try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.all)); } catch (e) {}
-      status('ok');
+      setSyncStatus('ok');
     } catch (e) {
       // Falling back rather than failing: the snapshot is the last thing the
       // database confirmed, so it is safe to read and safe to draw. Writes are
       // refused while offline, which is the whole reason no reconciliation is
       // needed when the connection returns.
       console.warn('Doji: load failed, using snapshot', e);
-      try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
+      try { this.all = (JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []).map(this.norm); }
       catch (err) { this.all = []; }
       this.rows = this.all.filter(t => !t.deleted);
       this.offline = true;
-      status('offline');
+      setSyncStatus('offline');
     }
     this.index();
   },
@@ -2359,17 +2490,17 @@ const Data = {
     const patch = {};
     for (const k of this.OWNED) if (k in fields) patch[k] = fields[k];
 
-    status('busy');
+    setSyncStatus('busy');
     const { data, error } = await this.sb
       .from('trades').update(patch).eq('id', id).select().single();
     if (error) {
       console.error('Doji: save failed', error);
       notify('Save failed — nothing was changed.', true);
-      status('error');
+      setSyncStatus('error');
       return false;
     }
-    this.replace(data);
-    status('ok');
+    this.replace(this.norm(data));
+    setSyncStatus('ok');
     return true;
   },
 
@@ -2378,17 +2509,18 @@ const Data = {
   // poller never sends this column, so the flag survives every later write.
   async remove(id) {
     if (this.offline) { notify('Offline — changes are not saved.', true); return false; }
-    status('busy');
+    setSyncStatus('busy');
     const { error } = await this.sb.from('trades').update({ deleted: true }).eq('id', id);
     if (error) {
       console.error('Doji: delete failed', error);
       notify('Delete failed.', true);
-      status('error');
+      setSyncStatus('error');
       return false;
     }
     this.rows = this.rows.filter(t => t.id !== id);
+    this.mark(id, true);
     this.index();
-    status('ok');
+    setSyncStatus('ok');
     return true;
   },
 
@@ -2396,15 +2528,29 @@ const Data = {
     const { data, error } = await this.sb
       .from('trades').update({ deleted: false }).eq('id', id).select().single();
     if (error) { console.error('Doji: restore failed', error); return false; }
-    this.rows.push(data);
-    this.index();
+    this.replace(this.norm(data));
     return true;
   },
 
+  /* `all` is what the backup exports; `rows` is what renders. Both have to move
+     together. They did not: all was written ONLY by load(), so a save, a delete
+     or a restore updated rows and left all holding the pre-edit value. Realtime
+     usually hid it by triggering a reload within a second — but with the socket
+     down, or offline, a backup taken straight after an edit exported the old
+     row. For a file whose stated purpose is being a genuine restore point, that
+     is the one thing it cannot get wrong. */
   replace(row) {
     const i = this.rows.findIndex(t => t.id === row.id);
     if (i === -1) this.rows.push(row); else this.rows[i] = row;
+    const j = this.all.findIndex(t => t.id === row.id);
+    if (j === -1) this.all.push(row); else this.all[j] = row;
     this.index();
+  },
+
+  // Soft-delete flag, applied to the backup copy as well as the rendered one.
+  mark(id, deleted) {
+    const row = this.all.find(t => t.id === id);
+    if (row) row.deleted = deleted;
   },
 
   /* Realtime is the fast path; refresh is the floor underneath it. Every
@@ -2433,11 +2579,19 @@ const Data = {
   // is open would pull the ground out from under half-typed input. Held rather
   // than dropped: Journal.close() flushes it.
   async refresh() {
-    if (this.refreshing) return;
+    // A change arriving while a refresh is in flight used to be discarded. The
+    // five-minute timer meant nothing was lost permanently, but a burst of
+    // poller upserts could leave the panel stale for that long. Queued now: the
+    // in-flight pass sets `queued` and runs exactly one more when it lands,
+    // however many events piled up behind it.
+    if (this.refreshing) { this.queued = true; return; }
     if (modalOpen()) { this.deferred = true; return; }
     this.refreshing = true;
     try { await this.load(); render(); }
-    finally { this.refreshing = false; }
+    finally {
+      this.refreshing = false;
+      if (this.queued) { this.queued = false; this.refresh(); }
+    }
   },
 
   flushDeferred() {
@@ -2454,7 +2608,12 @@ const modalOpen = () =>
 
 // One writer for the status dot, so the indicator cannot disagree with what the
 // data layer actually did.
-function status(state) {
+//
+// Named setSyncStatus, not status: a top-level `function status()` in a classic
+// script shadows the legacy Window.status attribute. It happens to work in every
+// current browser, but it is the same family of footgun as a global named
+// `name`, `top`, `length` or `close`, and it costs nothing to avoid.
+function setSyncStatus(state) {
   const el = $('sync-dot');
   if (!el) return;
   el.className = 'sync-dot ' + state;
@@ -2501,22 +2660,40 @@ function destroyChart(id) {
 
 // counts = [wins, losses, break-evens]. An all-zero set draws a hollow
 // placeholder ring rather than nothing, so an empty panel keeps its shape.
-function mountDonut(id, counts) {
-  destroyChart(id);
-  const canvas = $(id);
-  if (!canvas) return;
+//
+// A wheel that already exists is UPDATED rather than torn down and rebuilt.
+// render() runs on every realtime event, every tab focus and every five
+// minutes; the old path destroyed and reconstructed nine Chart instances each
+// time, which is the single most expensive thing the app did on a timer. The
+// canvas is the same element across renders in every case except the setup and
+// emotion wheels, whose hosts replace their innerHTML — those legitimately mint
+// a new canvas, which is why the identity check is against the canvas and not
+// just the id.
+function donutData(counts) {
   const has = counts.reduce((a, b) => a + b, 0) > 0;
+  return {
+    data:            has ? counts : [1],
+    backgroundColor: has ? RESULT_FILL   : [EMPTY_FILL],
+    borderColor:     has ? RESULT_BORDER : [EMPTY_BORDER],
+    borderWidth:     has ? SEG_BD : 1
+  };
+}
+
+function mountDonut(id, counts) {
+  const canvas = $(id);
+  if (!canvas) { destroyChart(id); return; }
+
+  const existing = charts[id];
+  if (existing && existing.canvas === canvas) {
+    Object.assign(existing.data.datasets[0], donutData(counts));
+    existing.update('none');
+    return;
+  }
+
+  destroyChart(id);
   charts[id] = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
-    data: {
-      labels: ['W','L','B/E'],
-      datasets: [{
-        data:            has ? counts : [1],
-        backgroundColor: has ? RESULT_FILL   : [EMPTY_FILL],
-        borderColor:     has ? RESULT_BORDER : [EMPTY_BORDER],
-        borderWidth:     has ? SEG_BD : 1
-      }]
-    },
+    data: { labels: ['W','L','B/E'], datasets: [donutData(counts)] },
     options: {
       responsive: false, cutout: DONUT_CUTOUT, animation: false,
       events: [],                                   // segments never light up on hover
@@ -2529,14 +2706,64 @@ function mountDonut(id, counts) {
 // division is the point of the arrangement: a percentage inside a ring of
 // tallies and a tally inside a row of percentages is two mixed readings where
 // there should be two clean ones.
+//
+// Both strips return SPANS ONLY. The grid that lays them out lives on the host
+// element, which is emitted once by the shell and refilled on each render —
+// that is what keeps the donut canvas beside it stable across renders, and
+// therefore what lets mountDonut reuse its Chart instead of rebuilding it.
 function pctStrip(pct) {
   const v = i => pct ? pct[i] + '%' : '—';
+  return `<span class="pm-lbl">Win Rate</span><span class="pm-val win">${v(0)}</span>`
+       + `<span class="pm-lbl">Loss Rate</span><span class="pm-val loss">${v(1)}</span>`
+       + `<span class="pm-lbl">BE Rate</span><span class="pm-val">${v(2)}</span>`;
+}
+
+// The four-figure money strip under a period wheel. Same primitives, one more
+// column, and the figures carry a sign so setFigure can colour them.
+function moneyStrip(key) {
+  return `<span class="pm-lbl">Win Rate</span><span class="pm-val" id="pm-wr-${key}">—</span>`
+       + `<span class="pm-lbl">Profit</span><span class="pm-val" id="pm-p-${key}">—</span>`
+       + `<span class="pm-lbl">Loss</span><span class="pm-val" id="pm-l-${key}">—</span>`
+       + `<span class="pm-lbl">Net</span><span class="pm-val" id="pm-n-${key}">—</span>`;
+}
+
+/* One result wheel with its tallies and its figure strip. Emitted by every
+   shell below — the period columns, the setup columns and the emotion category
+   columns are the same component at three populations, and this block used to
+   be written out three separate times: once as 66 lines of hand-maintained
+   HTML in the body, and twice as near-identical template literals here.
+
+   `key` gives every part of the wheel a stable id, which is the whole point:
+   the shell runs once, so the canvas is the same element on every subsequent
+   render and the Chart behind it is updated rather than rebuilt. */
+function wheelBlock(key, stripHTML, stripCls) {
   return `
-    <div class="period-money period-stats">
-      <span class="pm-lbl">Win Rate</span><span class="pm-val win">${v(0)}</span>
-      <span class="pm-lbl">Loss Rate</span><span class="pm-val loss">${v(1)}</span>
-      <span class="pm-lbl">BE Rate</span><span class="pm-val">${v(2)}</span>
+    <div class="period-host">
+      <div class="period-counts-left">
+        <span class="pc-b" id="cnt-b-${key}">— B</span>
+        <span class="pc-l" id="cnt-l-${key}">— L</span>
+      </div>
+      <div class="period-donut-wrap">
+        <canvas id="chart-${key}" width="108" height="108"></canvas>
+        <div class="period-center"><div class="period-pnl" id="hub-${key}">—</div></div>
+      </div>
+      <div class="period-counts-right">
+        <span class="pc-w" id="cnt-w-${key}">— W</span>
+      </div>
+      <div class="period-money ${stripCls}" id="strip-${key}">${stripHTML}</div>
     </div>`;
+}
+
+// The counterpart to wheelBlock: everything a wheel shows, from one counts()
+// result. The hub carries a QUANTITY — the wheel's own decided total, which is
+// what the arcs are drawn from — while the strip beside it carries rates.
+function paintWheel(key, c) {
+  const set = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
+  set('hub-'   + key, c.decided || '—');
+  set('cnt-w-' + key, c.win  + ' W');
+  set('cnt-l-' + key, c.loss + ' L');
+  set('cnt-b-' + key, c.be   + ' B');
+  mountDonut('chart-' + key, [c.win, c.loss, c.be]);
 }
 
 // Shared segment language for every horizontal bar: proportional widths, the
@@ -2590,7 +2817,7 @@ function disciplineBar(label, followed, n) {
 function sessionBars(list) {
   const rows = CONFIG.SESSIONS.map(s => {
     const c = counts(list.filter(t => sessionOf(t) === s));
-    const decided = c.win + c.loss + c.be;
+    const decided = c.decided;
     const abbr = CONFIG.SESSION_ABBR[s];
     if (!decided) {
       return `
@@ -2765,13 +2992,13 @@ function shiftMonth(day, by) {
 
 /* ─── Cumulative curve ───────────────────────────────────────────────────── */
 function renderCurve(rows) {
-  destroyChart('chart-pnl');
   const canvas = $('chart-pnl');
-  if (!canvas) return;
+  if (!canvas) { destroyChart('chart-pnl'); return; }
 
   const pts = rows.filter(t => t.pnl != null)
     .sort((a, b) => sortKey(a) < sortKey(b) ? -1 : 1);
   if (!pts.length) {
+    destroyChart('chart-pnl');
     canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
     return;
   }
@@ -2786,6 +3013,19 @@ function renderCurve(rows) {
 
   // The line takes the colour of where the curve ended up.
   const line = data[data.length - 1] >= 0 ? cssToken('--win') : cssToken('--loss');
+
+  // Same reuse rule as the wheels: this canvas is static markup and therefore
+  // the same element on every pass, so the chart is only ever built once.
+  const existing = charts['chart-pnl'];
+  if (existing) {
+    existing.data.labels = labels;
+    Object.assign(existing.data.datasets[0], {
+      data, borderColor: line, pointBackgroundColor: line, pointBorderColor: line,
+      pointRadius: data.length > 20 ? 0 : 2
+    });
+    existing.update('none');
+    return;
+  }
 
   charts['chart-pnl'] = new Chart(canvas.getContext('2d'), {
     type: 'line',
@@ -2819,40 +3059,62 @@ function renderCurve(rows) {
   });
 }
 
-/* ─── Period wheels ──────────────────────────────────────────────────────── */
+/* ─── Period wheels ──────────────────────────────────────────────────────────
+   All Time / This Week / This Month. Three visually identical columns, so the
+   markup is generated from CONFIG.PERIODS instead of written out three times.
+
+   It used to live in the body as 66 lines of hand-maintained HTML addressed by
+   36 hard-coded ids (pm-wr-week, cnt-b-total, …) — the exact component
+   renderSetups already built in a loop two hundred lines below. Adding a
+   fourth window meant editing markup in three places; it is now one array
+   entry.
+
+   The shell runs ONCE, like heatmapShell. That is deliberate and not just
+   tidiness: a canvas that survives the render is a Chart that can be updated
+   instead of destroyed and rebuilt.
+   ─────────────────────────────────────────────────────────────────────────── */
 function periodStart(period) {
   if (period === 'week')  return Dates.weekStart();
   if (period === 'month') return Dates.monthStart();
   return null;
 }
 
+function periodShell() {
+  const host = $('period-row');
+  if (!host || host.dataset.ready) return;
+  host.innerHTML = CONFIG.PERIODS.map(({ key, label }) => `
+    <div class="period-col" data-period="${key}">
+      <div class="period-label">${label}</div>
+      ${wheelBlock(key, moneyStrip(key), '')}
+      <div class="period-disc" id="disc-bars-${key}"></div>
+    </div>`).join('');
+  host.dataset.ready = '1';
+}
+
 function renderPeriods(rows) {
-  for (const period of ['total','week','month']) {
-    const from = periodStart(period);
+  periodShell();
+  for (const { key } of CONFIG.PERIODS) {
+    const from = periodStart(key);
     const list = from ? rows.filter(t => { const d = dayOf(t); return d && d >= from; }) : rows;
 
     const c   = counts(list);
     const pct = pctSplit([c.win, c.loss, c.be]);
-    const decided = c.win + c.loss + c.be;
 
-    // The hub carries a QUANTITY — the wheel's own total, which is what the
-    // arcs are drawn from. Note that is not the money rows' count: a trade
-    // logged without a figure is a slice on the wheel but not a dollar below.
-    $('pnl-' + period).textContent   = decided || '—';
-    $('cnt-w-' + period).textContent = c.win  + ' W';
-    $('cnt-l-' + period).textContent = c.loss + ' L';
-    $('cnt-b-' + period).textContent = c.be   + ' B';
-
+    // Note the hub is not the money rows' count: a trade logged without a
+    // figure is a slice on the wheel but not a dollar below.
     const m = money(list);
-    setFigure('pm-wr-' + period, pct ? pct[0] + '%' : '—', pct ? 1 : 0);
-    setFigure('pm-p-' + period, m.n ? fmtMoney(m.gross) : '—', m.gross);
-    setFigure('pm-l-' + period, m.n ? fmtMoney(m.loss)  : '—', -m.loss);
-    setFigure('pm-n-' + period, m.n ? fmtMoney(m.net)   : '—', m.net);
+    setFigure('pm-wr-' + key, pct ? pct[0] + '%' : '—', pct ? 1 : 0);
+    setFigure('pm-p-'  + key, m.n ? fmtMoney(m.gross) : '—', m.gross);
+    setFigure('pm-l-'  + key, m.n ? fmtMoney(m.loss)  : '—', -m.loss);
+    setFigure('pm-n-'  + key, m.n ? fmtMoney(m.net)   : '—', m.net);
 
-    const host = $('disc-bars-' + period);
-    if (host) host.innerHTML = disciplineBars(list);
+    const disc = $('disc-bars-' + key);
+    if (disc) disc.innerHTML = disciplineBars(list);
 
-    mountDonut('chart-period-' + period, [c.win, c.loss, c.be]);
+    // Wheel last, deliberately. render() catches per STEP, not per widget, so
+    // anything that can throw goes after everything that cannot — a chart
+    // library that failed to load must not take the figures beside it with it.
+    paintWheel(key, c);
   }
 }
 
@@ -2963,54 +3225,39 @@ function yearTotals(y) {
   return out;
 }
 
-function renderHeatmap() {
-  heatmapShell();
-  const cur = View.heatmap;
-  $('heatmap-title').textContent = `${CONFIG.MONTHS[cur.m]} ${cur.y}`;
+/* renderHeatmap was one 107-line function doing three jobs. Split at its own
+   seams: read the month, lay out the grid, write the totals. */
 
-  const totals = yearTotals(cur.y);
-  renderYearStrip(cur.y, cur.m, totals);
-
-  const daysIn = new Date(cur.y, cur.m + 1, 0).getDate();
-  const first  = new Date(cur.y, cur.m, 1).getDay();
-
-  // Read every day once up front: the Saturday decision needs the counts before
-  // the grid can be laid out, and the cells need them again while emitting.
+// Every day of the month read once. Done up front because the Saturday decision
+// needs the counts BEFORE the grid can be laid out, and the cells need them
+// again while emitting.
+function heatmapDays(y, m) {
+  const daysIn = new Date(y, m + 1, 0).getDate();
   const days = [];
   let satTrades = 0;
   for (let d = 1; d <= daysIn; d++) {
-    const iso = `${cur.y}-${String(cur.m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const wd  = new Date(cur.y, cur.m, d).getDay();
+    const iso = `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const wd  = new Date(y, m, d).getDay();
     const data = Data.day(iso);
     days.push({ d, iso, wd, data });
     if (wd === 6) satTrades += data.list.length;
   }
+  return { days, satTrades };
+}
 
-  // Saturday never trades — the week runs Sunday to the Friday close — so on a
-  // phone it hands its width to the six days that matter. Dropped only when
-  // genuinely empty: a trade mis-stamped to a Saturday must never become
-  // invisible and unclickable.
-  const showSat = !Phone.matches || satTrades > 0;
-  const visible = showSat ? days : days.filter(x => x.wd !== 6);
-  const cols    = showSat ? 7 : 6;
-
-  const grid = $('heatmap-grid');
-  grid.classList.toggle('no-sat', !showSat);
-
-  const dows = showSat ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-                       : ['Sun','Mon','Tue','Wed','Thu','Fri'];
+// The day grid plus its week rail. Emitted week by week: `cols` day slots
+// (leading and trailing blanks included) then that week's summary cell. `slot`
+// counts positions rather than dates, so the summary always lands in the last
+// column whichever weekday the month opens on.
+function heatmapGrid(visible, cols, first, dows) {
   let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('')
            + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
 
-  // Emitted week by week: `cols` day slots (leading and trailing blanks
-  // included) then that week's summary cell. `slot` counts positions rather
-  // than dates, so the summary always lands in the last column whichever
-  // weekday the month opens on.
   let slot = 0, wkN = 0, wkPnl = 0, wkPnlN = 0, wkTrades = 0;
 
   const flushWeek = () => {
     wkN++;
-    const cls   = wkTrades === 0 ? '' : resultOf({ pnl: wkPnl }) || '';
+    const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN);
     const count = wkTrades ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
     const abs   = Math.abs(round2(wkPnl)).toFixed(2);
     // Units and cents in separate spans so the phone stylesheet can drop the
@@ -3036,7 +3283,7 @@ function renderHeatmap() {
     // A day holding trades takes a result fill whether or not a P&L is logged —
     // a day with trades is a day that happened, and it keeps its place in the
     // grid's colour rhythm either way. Only the AMOUNT waits for a figure.
-    let cls = n === 0 ? '' : (resultOf({ pnl: data.pnl }) || '');
+    let cls = n === 0 ? '' : aggregateResult(data.pnl, data.pnlN);
     if (data.pending) cls += ' pending';
 
     const pnlText   = data.pnlN ? '$' + Math.abs(data.pnl).toFixed(2) : n ? '—' : '';
@@ -3062,7 +3309,35 @@ function renderHeatmap() {
     while (slot % cols !== 0) blank();
     flushWeek();
   }
-  grid.innerHTML = html;
+  return html;
+}
+
+function renderHeatmap() {
+  heatmapShell();
+  const cur = View.heatmap;
+  const title = $('heatmap-title');
+  if (title) title.textContent = `${CONFIG.MONTHS[cur.m]} ${cur.y}`;
+
+  const totals = yearTotals(cur.y);
+  renderYearStrip(cur.y, cur.m, totals);
+
+  const { days, satTrades } = heatmapDays(cur.y, cur.m);
+
+  // Saturday never trades — the week runs Sunday to the Friday close — so on a
+  // phone it hands its width to the six days that matter. Dropped only when
+  // genuinely empty: a trade mis-stamped to a Saturday must never become
+  // invisible and unclickable.
+  const showSat = !Phone.matches || satTrades > 0;
+  const visible = showSat ? days : days.filter(x => x.wd !== 6);
+  const cols    = showSat ? 7 : 6;
+  const dows    = showSat ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                          : ['Sun','Mon','Tue','Wed','Thu','Fri'];
+
+  const grid = $('heatmap-grid');
+  if (grid) {
+    grid.classList.toggle('no-sat', !showSat);
+    grid.innerHTML = heatmapGrid(visible, cols, new Date(cur.y, cur.m, 1).getDay(), dows);
+  }
 
   const m = totals[cur.m];
   setFigure('hm-profit', m.pnlN ? fmtMoney(m.gross) : '—', m.gross);
@@ -3076,7 +3351,7 @@ function renderYearStrip(y, selMonth, totals) {
   if (!host) return;
   host.innerHTML = totals.map((t, m) => {
     const cls = ['hm-mo'];
-    if (t.trades) cls.push(resultOf({ pnl: t.net }) || '');
+    if (t.trades) cls.push(aggregateResult(t.net, t.pnlN));
     if (m === selMonth) cls.push('sel');
     const pnl = t.pnlN ? '$' + Math.abs(t.net).toFixed(2) : (t.trades ? '—' : '');
     return `
@@ -3089,44 +3364,42 @@ function renderYearStrip(y, selMonth, totals) {
   }).join('');
 }
 
-/* ─── Setups ─────────────────────────────────────────────────────────────── */
-function renderSetups(rows) {
+/* ─── Setups ─────────────────────────────────────────────────────────────────
+   One wheel per setup with its per-session bars beneath. Shell once, paint per
+   render — same reason as the period row: a stable canvas is a reusable Chart.
+   ─────────────────────────────────────────────────────────────────────────── */
+const setupKey = setup => 'setup-' + setup.replace(/[^a-z0-9]/gi, '');
+
+function setupShell() {
   const host = $('setup-table');
-  if (!host) return;
-
-  const stats = CONFIG.SETUPS.map(setup => {
-    const list = rows.filter(t => t.setup === setup);
-    const c = counts(list);
-    return { setup, list, c, cid: 'chart-setup-' + setup.replace(/[^a-z0-9]/gi, '') };
-  });
-
+  if (!host || host.dataset.ready) return;
   host.innerHTML = `
     <div class="setup-donut-row">
-      ${stats.map(s => {
-        const decided = s.c.win + s.c.loss + s.c.be;
+      ${CONFIG.SETUPS.map(setup => {
+        const key = setupKey(setup);
         return `
           <div class="setup-donut-col">
-            <div class="setup-donut-label">${esc(s.setup)}</div>
-            <div class="period-host">
-              <div class="period-counts-left">
-                <span class="pc-b">${s.c.be} B</span>
-                <span class="pc-l">${s.c.loss} L</span>
-              </div>
-              <div class="period-donut-wrap">
-                <canvas id="${s.cid}" width="108" height="108"></canvas>
-                <div class="period-center"><div class="period-pnl">${decided || '—'}</div></div>
-              </div>
-              <div class="period-counts-right">
-                <span class="pc-w">${s.c.win} W</span>
-              </div>
-              ${pctStrip(pctSplit([s.c.win, s.c.loss, s.c.be]))}
-            </div>
-            <div class="setup-sess">${sessionBars(s.list)}</div>
+            <div class="setup-donut-label">${esc(setup)}</div>
+            ${wheelBlock(key, '', 'period-stats')}
+            <div class="setup-sess" id="sess-${key}"></div>
           </div>`;
       }).join('')}
     </div>`;
+  host.dataset.ready = '1';
+}
 
-  for (const s of stats) mountDonut(s.cid, [s.c.win, s.c.loss, s.c.be]);
+function renderSetups(rows) {
+  setupShell();
+  for (const setup of CONFIG.SETUPS) {
+    const key  = setupKey(setup);
+    const list = rows.filter(t => t.setup === setup);
+    const c    = counts(list);
+    const strip = $('strip-' + key);
+    if (strip) strip.innerHTML = pctStrip(pctSplit([c.win, c.loss, c.be]));
+    const sess = $('sess-' + key);
+    if (sess) sess.innerHTML = sessionBars(list);
+    paintWheel(key, c);   // last — see renderPeriods
+  }
 }
 
 /* ─── Emotions (before phase) ────────────────────────────────────────────────
@@ -3135,11 +3408,15 @@ function renderSetups(rows) {
    out?". The Positive column additionally carries SL/TP compliance from trades
    where Calm or Confident was felt DURING — the positives' management record,
    mirroring the negatives' in the card below.
-   ─────────────────────────────────────────────────────────────────────────── */
-function renderEmotions(rows) {
-  const host = $('emo-cat-wheels');
-  if (!host) return;
 
+   Split into tally / emit. This was one 107-line function doing four jobs:
+   per-emotion counts, category counts, positive-phase discipline, and three
+   columns of markup. The seam is where the arithmetic stops and the HTML
+   starts, which is also where the two halves can be read independently.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// One pass over the trade set, three tallies out.
+function emotionTally(rows) {
   const per = {};
   for (const e of CONFIG.BEFORE) per[e] = { win: 0, loss: 0, be: 0 };
   // Category counts dedupe at the TRADE level rather than summing member bars,
@@ -3165,83 +3442,87 @@ function renderEmotions(rows) {
       if (t.followed_tp != null) { posDisc.tpN++; if (t.followed_tp) posDisc.tpYes++; }
     }
   }
+  return { per, cats, posDisc };
+}
 
-  const seg = (cls, v) => v > 0 ? `<div class="${cls}" style="flex:${v};"></div>` : '';
-
-  // One win/be/loss bar. An untraded emotion renders muted with an empty track
-  // so every column keeps the same row count and rhythm.
-  const barRow = (label, c) => {
-    const decided = c.win + c.be + c.loss;
-    if (!decided) {
-      return `<div class="emo-row is-empty">
-        <div class="emo-row-head">
-          <span class="emo-row-name">${label}</span>
-          <span class="emo-row-pcts no-data">—</span>
-        </div>
-        <div class="bar-empty"></div>
-      </div>`;
-    }
-    // Through pctSplit rather than a pair of independent roundings, so a rate
-    // here means the same thing as every other rate in the journal — the wheel
-    // above this bar is split by the identical call.
-    const [win, loss] = pctSplit([c.win, c.loss, c.be]);
-    return `<div class="emo-row">
+// One win/be/loss bar. An untraded emotion renders muted with an empty track so
+// every column keeps the same row count and rhythm.
+function emotionBar(label, c) {
+  const decided = c.win + c.be + c.loss;
+  if (!decided) {
+    return `<div class="emo-row is-empty">
       <div class="emo-row-head">
         <span class="emo-row-name">${label}</span>
-        <span class="emo-row-pcts"><span class="win">${win}%</span> <span class="sep">/</span> <span class="loss">${loss}%</span></span>
+        <span class="emo-row-pcts no-data">—</span>
       </div>
-      <div class="emo-row-track">
-        <div class="emo-row-bar" style="width:100%;">
-          ${seg('seg-win', c.win)}${seg('seg-be', c.be)}${seg('seg-loss', c.loss)}
-        </div>
-      </div>
+      <div class="bar-empty"></div>
     </div>`;
-  };
+  }
+  // Through pctSplit rather than a pair of independent roundings, so a rate here
+  // means the same thing as every other rate in the journal — the wheel above
+  // this bar is split by the identical call.
+  const [win, loss] = pctSplit([c.win, c.loss, c.be]);
+  const seg = (cls, v) => v > 0 ? `<div class="${cls}" style="flex:${v};"></div>` : '';
+  return `<div class="emo-row">
+    <div class="emo-row-head">
+      <span class="emo-row-name">${label}</span>
+      <span class="emo-row-pcts"><span class="win">${win}%</span> <span class="sep">/</span> <span class="loss">${loss}%</span></span>
+    </div>
+    <div class="emo-row-track">
+      <div class="emo-row-bar">
+        ${seg('seg-win', c.win)}${seg('seg-be', c.be)}${seg('seg-loss', c.loss)}
+      </div>
+    </div>
+  </div>`;
+}
 
+// Traded first, best win rate down; untraded sinks to the bottom in config
+// order so the column never reshuffles for no reason.
+function emotionRows(grp, per) {
   const decidedOf = e => per[e].win + per[e].loss + per[e].be;
+  return grp.members.slice().sort((x, y) => {
+    const dx = decidedOf(x), dy = decidedOf(y);
+    if (!dx && !dy) return 0;
+    if (!dx) return 1;
+    if (!dy) return -1;
+    return (per[y].win / dy) - (per[x].win / dx);
+  }).map(e => emotionBar(e, per[e])).join('');
+}
 
-  // Traded first, best win rate down; untraded sinks to the bottom in config
-  // order so the column never reshuffles for no reason.
-  const memberRows = grp => grp.members.slice().sort((a, b) => {
-    const da = decidedOf(a), db = decidedOf(b);
-    if (!da && !db) return 0;
-    if (!da) return 1;
-    if (!db) return -1;
-    return (per[b].win / db) - (per[a].win / da);
-  }).map(e => barRow(e, per[e])).join('');
-
+function emotionShell() {
+  const host = $('emo-cat-wheels');
+  if (!host || host.dataset.ready) return;
   host.innerHTML = `
     <div class="emo-cat-row">
-      ${cats.map((cc, i) => {
-        const decided = cc.win + cc.loss + cc.be;
-        let bars = memberRows(cc.grp);
-        if (cc.grp.discipline) {
-          bars += disciplineBar('Stop Loss',   posDisc.slYes, posDisc.slN)
-                + disciplineBar('Take Profit', posDisc.tpYes, posDisc.tpN);
-        }
-        return `
-          <div class="emo-cat-col">
-            <div class="emo-cat-label">${cc.grp.name}</div>
-            <div class="period-host">
-              <div class="period-counts-left">
-                <span class="pc-b">${cc.be} B</span>
-                <span class="pc-l">${cc.loss} L</span>
-              </div>
-              <div class="period-donut-wrap">
-                <canvas id="chart-emo-cat-${i}" width="108" height="108"></canvas>
-                <div class="period-center"><div class="period-pnl">${decided || '—'}</div></div>
-              </div>
-              <div class="period-counts-right">
-                <span class="pc-w">${cc.win} W</span>
-              </div>
-              ${pctStrip(pctSplit([cc.win, cc.loss, cc.be]))}
-            </div>
-            <div class="emo-cat-bars">${bars}</div>
-          </div>`;
-      }).join('')}
+      ${CONFIG.GROUPS.map((grp, i) => `
+        <div class="emo-cat-col">
+          <div class="emo-cat-label">${grp.name}</div>
+          ${wheelBlock('emo-' + i, '', 'period-stats')}
+          <div class="emo-cat-bars" id="bars-emo-${i}"></div>
+        </div>`).join('')}
     </div>`;
+  host.dataset.ready = '1';
+}
 
-  cats.forEach((cc, i) => mountDonut('chart-emo-cat-' + i, [cc.win, cc.loss, cc.be]));
+function renderEmotions(rows) {
+  emotionShell();
+  const { per, cats, posDisc } = emotionTally(rows);
+
+  cats.forEach((cc, i) => {
+    const strip = $('strip-emo-' + i);
+    if (strip) strip.innerHTML = pctStrip(pctSplit([cc.win, cc.loss, cc.be]));
+
+    let bars = emotionRows(cc.grp, per);
+    if (cc.grp.discipline) {
+      bars += disciplineBar('Stop Loss',   posDisc.slYes, posDisc.slN)
+            + disciplineBar('Take Profit', posDisc.tpYes, posDisc.tpN);
+    }
+    const host = $('bars-emo-' + i);
+    if (host) host.innerHTML = bars;
+
+    paintWheel('emo-' + i, { win: cc.win, loss: cc.loss, be: cc.be,
+                             decided: cc.win + cc.loss + cc.be });   // last
+  });
 }
 
 /* ─── During the trade ───────────────────────────────────────────────────────
@@ -3412,7 +3693,9 @@ function renderTable(rows) {
     const pnlTxt = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
     const clock  = t.entry_time ? Dates.nyTime(t.entry_time) : '';
     const sess   = sessionOf(t);
-    return `<tr data-trade="${esc(t.id)}"${isComplete(t) ? '' : ' class="broker-pending"'}>
+    // The row opens the entry, so it says so and answers the keyboard. It was
+    // clickable-but-inert to anything except a mouse.
+    return `<tr data-trade="${esc(t.id)}" role="button" tabindex="0"${isComplete(t) ? '' : ' class="broker-pending"'}>
       <td>${Dates.fmt(dayOf(t))}${clock ? `<span class="tlog-time">${clock} ET</span>` : ''}</td>
       <td><span class="dir-pill">${esc(t.direction || '—')}</span></td>
       <td>${esc(sess ? CONFIG.SESSION_ABBR[sess] : '—')}</td>
@@ -3458,7 +3741,17 @@ const Journal = {
     if (!t) return;
     Journal.id = id;
 
-    setSessionPill(sessionOf(t) || CONFIG.SESSIONS[0]);
+    // Populated from the derived session so the pill shows something useful,
+    // but marked untouched — see the save path below.
+    //
+    // The `|| CONFIG.SESSIONS[0]` that used to sit here is gone. Combined with
+    // the unconditional save it was the actual mechanism of the frozen-session
+    // bug: a row with no entry_time derived nothing, fell back to the FIRST
+    // entry in the list, and was written as 'Asian' regardless of when it
+    // happened. sessionOf now falls back to the close, and on the vanishing
+    // chance it still returns nothing the pill says so instead of inventing.
+    const derived = sessionOf(t);
+    setSessionPill(derived, false);
     setDateLabel(dayOf(t) || Dates.today());
 
     // Direction and P&L are the broker's. Shown because they are the two facts
@@ -3472,11 +3765,7 @@ const Journal = {
     if (pnl) { pnl.value = t.pnl == null ? '' : t.pnl; pnl.disabled = true; }
 
     $('jm-body').innerHTML = journalForm(t);
-    wireForm();
-
-    const modal = $('journal-modal');
-    modal.classList.add('open');
-    modal.setAttribute('aria-hidden', 'false');
+    openModal('journal-modal');
   },
 
   close() {
@@ -3489,8 +3778,20 @@ const Journal = {
     const t = Data.byId.get(Journal.id);
     if (!t) { notify('Trade not found.', true); return; }
 
+    // Session is the one journal column with a DERIVED fallback, so writing it
+    // unconditionally is not harmless. The pill is populated from sessionOf(),
+    // which returns the derived value when t.session is null — so the old
+    // `dataset.value || null` sent that derived value back as an explicit
+    // override on the first save, whether or not the trader had touched the
+    // control. Every journalled trade became permanently hand-set.
+    //
+    // That is not cosmetic. Fills the poller never reached derive their session
+    // from CLOSE time rather than entry time, and the documented repair is a
+    // wide-lookback re-sync — which cannot fix a row whose override already
+    // won. Untouched now means null, and null still means "derive it".
+    const btn = $('jm-session-btn');
     const ok = await Data.save(Journal.id, {
-      session:        $('jm-session-btn').dataset.value || null,
+      session:        btn.dataset.touched === '1' ? (btn.dataset.value || null) : (t.session ?? null),
       setup:          pickRadio('jf-setup') || null,
       followed_rules: pickYN('followed_rules'),
       followed_sl:    pickYN('followed_sl'),
@@ -3525,7 +3826,7 @@ function journalForm(t) {
       <input type="radio" class="jf-pill-radio" name="${name}" id="${name}-${v}" value="${v}"${val === bool ? ' checked' : ''}>
       <label class="jf-pill-lbl jf-yn-pill" for="${name}-${v}">${text}</label>`).join('');
     return `<div class="jf-yn-item">
-      <label class="journal-q-label" style="margin-bottom:0;">${label}</label>
+      <label class="journal-q-label">${label}</label>
       <div class="jf-yn-buttons">${opts}</div>
     </div>`;
   }).join('');
@@ -3548,11 +3849,11 @@ function journalForm(t) {
         <div class="jf-setup-row">${setups}</div>
       </div>
       <div class="jm-card">
-        <div style="width:100%;text-align:center;">
+        <div class="jf-phase">
           <label class="journal-q-label">Before the trade</label>
           ${chips('before', t.before_tags)}
         </div>
-        <div style="width:100%;text-align:center;">
+        <div class="jf-phase">
           <label class="journal-q-label">During the trade</label>
           ${chips('during', t.during_tags)}
         </div>
@@ -3591,29 +3892,26 @@ function chips(phase, selected) {
   </div>`;
 }
 
-function wireForm() {
-  on($('jm-body'), 'click', e => {
-    const action = e.target.closest('[data-jm-action]')?.dataset.jmAction;
-    if (action === 'save')   Journal.save();
-    if (action === 'cancel') Journal.close();
-  });
-}
-
 /* ─── Header pills ───────────────────────────────────────────────────────── */
 // Every session is listed, including the current one, so the menu never
 // reorders and the active choice stays visible.
-function setSessionPill(s) {
+// `touched` records whether this value came from the trader or from the
+// derivation. Only a click on an option sets it.
+function setSessionPill(s, touched) {
   const btn = $('jm-session-btn'), opts = $('jm-session-opts');
   if (!btn || !opts) return;
-  btn.textContent = CONFIG.SESSION_ABBR[s] || s;
-  btn.dataset.value = s;
+  // A null session is a real state — no entry time and no fill time — and it
+  // shows as an em-dash. Saving it sends null, which means "keep deriving".
+  btn.textContent = s ? (CONFIG.SESSION_ABBR[s] || s) : '—';
+  btn.dataset.value = s || '';
+  btn.dataset.touched = touched ? '1' : '0';
   opts.innerHTML = '';
   for (const x of CONFIG.SESSIONS) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'jm-session-opt' + (x === s ? ' sel' : '');
     b.innerHTML = `<span>${esc(x.replace('+', ' + '))}</span>` + (x === s ? '<span class="opt-check">✓</span>' : '');
-    b.addEventListener('click', () => { setSessionPill(x); toggleSessionMenu(false); });
+    b.addEventListener('click', () => { setSessionPill(x, true); toggleSessionMenu(false); });
     opts.appendChild(b);
   }
 }
@@ -3644,11 +3942,11 @@ function openDay(day) {
   if (!list.length) return;
   if (list.length === 1) { Journal.open(list[0].id); return; }
 
-  const modal = $('day-modal'), host = $('day-trade-list');
-  if (!modal || !host) return;
+  const host = $('day-trade-list');
+  if (!host) return;
 
   const m = money(list);
-  const res = m.n ? resultOf({ pnl: m.net }) : '';
+  const res = aggregateResult(m.net, m.n);
   const dateStr = Dates.fmt(day, { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
   $('day-modal-title').innerHTML = `${dateStr} &nbsp;·&nbsp; ${list.length} trades`
     + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${(m.net > 0 ? '+' : '') + m.net.toFixed(2)}</span>` : '');
@@ -3658,7 +3956,7 @@ function openDay(day) {
     const pnl = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
     const sess = sessionOf(t);
     const dir = t.direction === 'BUY' ? 'Long' : t.direction === 'SELL' ? 'Short' : '—';
-    return `<div class="day-trade-row" data-trade="${esc(t.id)}">
+    return `<div class="day-trade-row" data-trade="${esc(t.id)}" role="button" tabindex="0">
       <div class="day-trade-left">
         <span class="dir-pill">${dir}</span>
         <div class="day-trade-meta">
@@ -3670,18 +3968,36 @@ function openDay(day) {
     </div>`;
   }).join('');
 
-  modal.classList.add('open');
-  modal.setAttribute('aria-hidden', 'false');
+  openModal('day-modal');
 }
 
-/* Every modal closes through here, so behaviour that must run on close is
-   declared once rather than copied into each handler — where a modal added
-   later would quietly miss it. */
+/* Every modal opens and closes through this pair. closeModal already existed
+   for exactly this reason — "where a modal added later would quietly miss it"
+   — while opening was hand-rolled in three places (Journal.open, IO.open,
+   openDay), each repeating the class + aria-hidden pair and none of them
+   touching focus. Focus now moves into the dialog on open and returns to
+   whatever opened it on close, which is also what makes Escape land somewhere
+   sensible instead of on the document. */
+let lastFocus = null;
+
+function openModal(id) {
+  const m = $(id);
+  if (!m) return;
+  lastFocus = document.activeElement;
+  m.classList.add('open');
+  m.setAttribute('aria-hidden', 'false');
+  // First focusable inside the dialog, falling back to the dialog itself.
+  const first = m.querySelector('button, input, [tabindex]:not([tabindex="-1"])');
+  (first || m).focus?.({ preventScroll: true });
+}
+
 function closeModal(id) {
   const m = $(id);
   if (!m) return;
   m.classList.remove('open');
   m.setAttribute('aria-hidden', 'true');
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus?.({ preventScroll: true });
+  lastFocus = null;
   Data.flushDeferred();
 }
 
@@ -3729,11 +4045,7 @@ const PendingDelete = {
    run once, not in a button that can be pressed twice.
    ═══════════════════════════════════════════════════════════════════════════ */
 const IO = {
-  open() {
-    const m = $('io-modal');
-    m.classList.add('open');
-    m.setAttribute('aria-hidden', 'false');
-  },
+  open() { openModal('io-modal'); },
 
   // `pnl` is a generated column and cannot be written back, so it is dropped
   // here rather than left to fail one row at a time during a restore.
@@ -3744,13 +4056,30 @@ const IO = {
     };
   },
 
-  showLink(uri, filename, sectionId) {
+  /* Blob URLs, not data: URIs. The two export buttons used to build data: URIs
+     — base64 for the xlsx, encodeURIComponent for the JSON — while the weekly
+     auto-backup already used a Blob for the identical job. A percent-encoded
+     JSON backup holds the whole file twice in memory as a string and runs into
+     a URL-length ceiling; a Blob has neither problem. One mechanism now. */
+  urls: new Set(),
+
+  blobUrl(data, type) {
+    const url = URL.createObjectURL(new Blob([data], { type }));
+    IO.urls.add(url);
+    return url;
+  },
+
+  showLink(url, filename, sectionId) {
     const host = $(sectionId);
     if (!host) return;
+    // Revoking the previous link's URL here rather than on a timer: it stays
+    // valid for exactly as long as the anchor offering it is on screen.
+    const prev = host.querySelector('.export-ready-link a');
+    if (prev) { URL.revokeObjectURL(prev.href); IO.urls.delete(prev.href); }
     host.querySelector('.export-ready-link')?.remove();
     const div = document.createElement('div');
     div.className = 'export-ready-link';
-    div.innerHTML = `<span>Ready</span><a href="${uri}" download="${filename}">↓ Download</a>`;
+    div.innerHTML = `<span>Ready</span><a href="${url}" download="${filename}">↓ Download</a>`;
     host.appendChild(div);
   },
 
@@ -3779,9 +4108,9 @@ const IO = {
     ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Journal');
-    const out = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
+    const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
     IO.showLink(
-      'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + out,
+      IO.blobUrl(out, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
       'doji-journal-' + Dates.today() + '.xlsx', 'io-section-journal');
     notify(`Journal ready — ${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`);
   },
@@ -3792,9 +4121,8 @@ const IO = {
   // replacing the database from a file is a job for the SQL editor, done
   // knowingly, not a click away from an export.
   backup() {
-    const payload = IO.payload();
-    const uri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
-    IO.showLink(uri, 'doji-backup-' + Dates.today() + '.json', 'io-section-json');
+    const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
+    IO.showLink(url, 'doji-backup-' + Dates.today() + '.json', 'io-section-json');
     notify('Backup ready');
   },
 
@@ -3802,8 +4130,8 @@ const IO = {
   // download can be blocked silently and there is no API to detect it, so the
   // toast asks the trader to verify rather than asserting success.
   download(filename) {
-    const blob = new Blob([JSON.stringify(IO.payload(), null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(IO.payload(), null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
@@ -3837,8 +4165,10 @@ const Login = {
       const { error } = await Data.sb.auth.signInWithPassword({ email, password: pass });
       if (error) { err.textContent = 'Wrong email or password.'; return; }
       Login.hide();
+      bootState('Loading your journal…');
       await Data.start();
       render();
+      bootState(null);
     } catch (e) {
       console.error('Doji login:', e);
       err.textContent = 'Could not reach the server. Try again.';
@@ -3848,6 +4178,10 @@ const Login = {
   },
   async signOut() {
     await Data.sb.auth.signOut();
+    // The snapshot is a full copy of the trade history in plaintext. Signing
+    // out and leaving it behind means the next person to open the app sees the
+    // login screen and the previous session's data one keypress apart.
+    try { localStorage.removeItem(CONFIG.SNAPSHOT); } catch (e) {}
     location.reload();
   }
 };
@@ -3962,12 +4296,15 @@ const BackupWatcher = {
 function wire() {
   // Chrome
   on('nav-io-btn', 'click', IO.open);
+  // Both halves guarded. `(a || b).call(x)` throws outright where neither
+  // exists, which is a TypeError on a chrome button rather than a no-op.
+  const root = document.documentElement;
+  const enter = root.requestFullscreen || root.webkitRequestFullscreen;
+  const exit  = document.exitFullscreen || document.webkitExitFullscreen;
   const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
   const fsSync = () => $('nav-fs-btn')?.classList.toggle('is-fs', fsOn());
-  on('nav-fs-btn', 'click', () => {
-    if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    else { const r = document.documentElement; (r.requestFullscreen || r.webkitRequestFullscreen).call(r); }
-  });
+  if (!enter || !exit) $('nav-fs-btn')?.remove();   // no API: no button, no handler
+  else on('nav-fs-btn', 'click', () => { fsOn() ? exit.call(document) : enter.call(root); });
   document.addEventListener('fullscreenchange', fsSync);
   document.addEventListener('webkitfullscreenchange', fsSync);
   // The heatmap gains or loses its Saturday column at the breakpoint, which is
@@ -3982,7 +4319,7 @@ function wire() {
     const first = pending(Data.rows).sort((a, b) => sortKey(a) < sortKey(b) ? -1 : 1)[0];
     if (first) Journal.open(first.id);
   });
-  on('trade-table', 'click', e => {
+  onActivate('trade-table', e => {
     const del = e.target.closest('[data-del]');
     if (del) { PendingDelete.stage(del.dataset.del); return; }
     const row = e.target.closest('tr[data-trade]');
@@ -3996,7 +4333,19 @@ function wire() {
     renderTable(Data.rows);
   });
 
-  // Journal modal
+  // Journal modal.
+  //
+  // The form handler is bound HERE, once, rather than in a wireForm() called
+  // from Journal.open(). #jm-body is a persistent element — only its innerHTML
+  // is replaced — so re-binding on every open stacked a fresh listener each
+  // time: after five opens, one click on Save fired Journal.save() five times,
+  // meaning five UPDATE round-trips, five renders and five toasts. The handler
+  // was already fully delegated, so nothing but the binding site changes.
+  on('jm-body', 'click', e => {
+    const action = e.target.closest('[data-jm-action]')?.dataset.jmAction;
+    if (action === 'save')   Journal.save();
+    if (action === 'cancel') Journal.close();
+  });
   on('jm-session-btn', 'click', e => { e.stopPropagation(); toggleSessionMenu(); });
   on('journal-modal', 'click', e => { if (e.target.id === 'journal-modal') Journal.close(); });
   // A tap anywhere else closes whichever popover is open. Bound once here
@@ -4008,7 +4357,7 @@ function wire() {
   on('io-modal',      'click', e => { if (e.target.id === 'io-modal') closeModal('io-modal'); });
   on('day-close-btn', 'click', () => closeModal('day-modal'));
   on('day-modal',     'click', e => { if (e.target.id === 'day-modal') closeModal('day-modal'); });
-  on('day-trade-list','click', e => {
+  onActivate('day-trade-list', e => {
     const row = e.target.closest('[data-trade]');
     if (!row) return;
     closeModal('day-modal');
@@ -4037,7 +4386,34 @@ function wire() {
 /* ═══════════════════════════════════════════════════════════════════════════
    BOOT
    ═══════════════════════════════════════════════════════════════════════════ */
+// One writer for the boot banner, so the three states it can be in cannot
+// disagree with what actually happened.
+function bootState(text, failed) {
+  const el = $('boot-msg'), t = $('boot-text');
+  if (!el) return;
+  if (!text) { el.classList.add('done'); return; }
+  if (t) t.textContent = text;
+  el.classList.toggle('failed', !!failed);
+  el.classList.remove('done');
+}
+
 (async function boot() {
+  // The three libraries are plain blocking scripts with no fallback. If the CDN
+  // is unreachable, window.supabase is undefined and Data.init() throws before
+  // anything renders — which used to mean a permanently blank page with the
+  // only explanation in a console nobody has open on a phone.
+  //
+  // Supabase is fatal: it is the data. Chart.js and SheetJS are not — the
+  // heatmap, the log and the roll-forward all draw without them, and render()
+  // already isolates each step, so the app degrades to "no wheels" instead of
+  // refusing to start.
+  if (!window.supabase) {
+    bootState('Could not load the app. Check your connection and reload.', true);
+    return;
+  }
+  if (!window.Chart) console.warn('Doji: Chart.js unavailable — charts will not draw');
+  if (!window.XLSX)  console.warn('Doji: SheetJS unavailable — xlsx export will fail');
+
   wire();
 
   DayWatcher.day = Dates.today();
@@ -4050,15 +4426,27 @@ function wire() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   window.addEventListener('focus', tick);
 
-  const { data } = await Data.init();
-  if (!data?.session) { Login.show(); return; }   // Login.submit continues from here
+  let data;
+  try {
+    ({ data } = await Data.init());
+  } catch (e) {
+    console.error('Doji: init failed', e);
+    bootState('Could not reach the server. Check your connection and reload.', true);
+    return;
+  }
+
+  // The login overlay is its own full-screen surface, so the boot banner stands
+  // down rather than sitting behind it.
+  if (!data?.session) { bootState(null); Login.show(); return; }
 
   try {
     await Data.start();
     render();
+    bootState(null);
     BackupWatcher.check();
   } catch (e) {
     console.error('Doji: start failed', e);
+    bootState(null);
     Login.show();
   }
 })();
