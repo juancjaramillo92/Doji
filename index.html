@@ -10,6 +10,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- The other two origins the app talks to. Without these, the DNS lookup and
+     TLS handshake for each one start only when something needs them — jsDelivr
+     when the parser reaches the script tags at the bottom of the body, Supabase
+     after 325 KB of library JS has parsed and Data.init() runs. Started here
+     they overlap the HTML parse instead.
+     Supabase is the one that pays every time: connections do not survive a page
+     load, so that handshake is paid on every open. jsDelivr serves the two
+     libraries immutable for a year, so its handshake usually never happens at
+     all — this only helps a cold or evicted cache.
+     `crossorigin` is required on both and is not decoration: the script tags
+     are crossorigin="anonymous" and the Supabase calls are CORS fetches, and a
+     preconnect without it opens a separate connection that then goes unused. -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://gujhyogvkzjgnrodyuse.supabase.co" crossorigin>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS
@@ -1735,6 +1749,24 @@ tr.broker-pending td:first-child {
 </head>
 <body>
 
+<!-- Boot state. The panel used to go straight from empty to full, so the gap
+     showed a dashboard of em-dashes — indistinguishable from "connected, no
+     trades". It also covers the case where the CDN is unreachable, which
+     previously threw at Data.init() and left a permanently blank page with the
+     explanation only in the console.
+
+     FIRST in the body, deliberately. The browser paints as it parses, and this
+     block used to sit 226 lines down, after every card and modal — so on a warm
+     cache the empty shell painted for a frame or two before the overlay that
+     covers it had been parsed. That flash was the bug, not a timing race.
+     Position is free to change because stacking here is decided by z-index and
+     never by source order: everything this covers is 0–60, everything that
+     covers it is 400–600, and there are no ties. -->
+<div id="boot-msg" class="boot-msg">
+  <span class="boot-dot"></span>
+  <span id="boot-text">Loading your journal…</span>
+</div>
+
 <nav>
   <div class="logo">DOJI</div>
   <div class="nav-actions">
@@ -1952,16 +1984,6 @@ tr.broker-pending td:first-child {
     <button id="login-btn" class="btn primary login-btn">Sign in</button>
     <div id="login-err" class="login-err"></div>
   </div>
-</div>
-
-<!-- Boot state. The panel used to go straight from empty to full, so the gap
-     showed a dashboard of em-dashes — indistinguishable from "connected, no
-     trades". It also covers the case where the CDN is unreachable, which
-     previously threw at Data.init() and left a permanently blank page with the
-     explanation only in the console. -->
-<div id="boot-msg" class="boot-msg">
-  <span class="boot-dot"></span>
-  <span id="boot-text">Loading your journal…</span>
 </div>
 
 <div class="notif" id="notif"></div>
@@ -2443,10 +2465,17 @@ const Data = {
     return this.sb.auth.getSession();
   },
 
+  // getUser() asks the auth server and load() asks PostgREST; neither needs the
+  // other's answer, so they overlap rather than queue. That is one whole round
+  // trip off every cold open, on top of the token refresh getSession() already
+  // has to pay whenever the app has been closed for more than an hour.
+  // The throw still lands before subscribe(), watch() and the caller's render(),
+  // so an expired session reaches the login gate exactly as it did before. The
+  // doomed select it now fires alongside is caught inside load(), which paints
+  // the snapshot into `rows` — nothing renders it, and sign-out deletes it.
   async start() {
-    const { data, error } = await this.sb.auth.getUser();
+    const [{ data, error }] = await Promise.all([this.sb.auth.getUser(), this.load()]);
     if (error || !data?.user) throw error || new Error('not authenticated');
-    await this.load();
     this.subscribe();
     this.watch();
   },
