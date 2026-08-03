@@ -1899,7 +1899,7 @@ tr.broker-pending td:first-child {
 
 <!-- ═══ JOURNAL MODAL ═══ -->
 <div id="journal-modal" class="journal-modal" role="dialog" aria-modal="true" aria-label="Trade journal entry" aria-hidden="true">
-  <div class="journal-modal-card" id="journal-modal-card">
+  <div class="journal-modal-card">
     <div class="jm-hdr">
       <div class="jm-hdr-left">
         <div class="jm-session-wrap">
@@ -1967,14 +1967,16 @@ tr.broker-pending td:first-child {
 <div class="notif" id="notif"></div>
 
 <!-- Served from jsDelivr because it mirrors the npm artifacts byte-for-byte,
-     which lets the SRI hashes below be computed (and re-verified) straight from
-     the official npm tarballs. chart.umd.js in the 4.4.0 package IS the
-     minified build — npm ships no separate .min for 4.4.0. -->
+     which lets the SRI hash below be computed (and re-verified) straight from
+     the official npm tarball. chart.umd.js in the 4.4.0 package IS the
+     minified build — npm ships no separate .min for 4.4.0.
+
+     SheetJS used to sit here too. It is the largest of the three and is needed
+     only when the trader exports, so it blocked every open for a feature used
+     weekly. loadXLSX() injects it on first use with the same pin and the same
+     hash. -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"
   integrity="sha512-6HrPqAvK+lZElIZ4mZ64fyxIBTsaX5zAFZg2V/2WT+iKPrFzTzvx6QAsLW2OaLwobhMYBog/+bvmIEEGXi0p1w=="
-  crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
-  integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA=="
   crossorigin="anonymous"></script>
 <!-- Pinned, deliberately without an SRI hash — the two are separate defences and
      only one of them is worth its cost here.
@@ -2409,7 +2411,6 @@ function balanceAt(list, day) {
    ─────────────────────────────────────────────────────────────────────────── */
 const Data = {
   sb: null,
-  uid: null,
   all: [],          // every row, deleted included — the backup needs them
   rows: [],         // what renders: the live ones
   byId: new Map(),
@@ -2442,10 +2443,26 @@ const Data = {
     return this.sb.auth.getSession();
   },
 
+  // The stored copy, drawn before the network answers. It is the last state the
+  // database confirmed, so it is safe to read and safe to draw — and drawing it
+  // turns the auth and fetch round trips that follow into a background refresh
+  // rather than two seconds of banner over an empty panel. Returns false when
+  // there is nothing stored (a first run, or a fresh sign-in), so boot knows to
+  // leave the banner up rather than flashing an empty dashboard.
+  hydrate() {
+    let stored;
+    try { stored = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)); }
+    catch (e) { return false; }
+    if (!Array.isArray(stored) || !stored.length) return false;
+    this.all  = stored.map(this.norm);
+    this.rows = this.all.filter(t => !t.deleted);
+    this.index();
+    return true;
+  },
+
   async start() {
     const { data, error } = await this.sb.auth.getUser();
     if (error || !data?.user) throw error || new Error('not authenticated');
-    this.uid = data.user.id;
     await this.load();
     this.subscribe();
     this.watch();
@@ -4081,6 +4098,27 @@ const PendingDelete = {
    a real one waiting to happen. Historical backfill belongs in the database,
    run once, not in a button that can be pressed twice.
    ═══════════════════════════════════════════════════════════════════════════ */
+// SheetJS, fetched the first time the trader exports. Same pin and same SRI
+// hash the blocking tag carried; the only change is when it arrives. The
+// promise is cached so a second export reuses the loaded library, and cleared
+// on failure so a retry is not stuck on a rejected one.
+let xlsxLoading = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve();
+  if (xlsxLoading) return xlsxLoading;
+
+  xlsxLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.integrity = 'sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==';
+    s.crossOrigin = 'anonymous';
+    s.onload  = () => resolve();
+    s.onerror = () => { xlsxLoading = null; reject(new Error('SheetJS failed to load')); };
+    document.head.appendChild(s);
+  });
+  return xlsxLoading;
+}
+
 const IO = {
   open() { openModal('io-modal'); },
 
@@ -4120,8 +4158,14 @@ const IO = {
     host.appendChild(div);
   },
 
-  journal() {
+  async journal() {
     if (!Data.rows.length) { notify('No entries to export', true); return; }
+    // Only on the first export of the session — loadXLSX resolves immediately
+    // once the library is in memory.
+    if (!window.XLSX) notify('Preparing export…');
+    try { await loadXLSX(); }
+    catch (e) { notify('Could not load the spreadsheet library', true); return; }
+
     const yn  = v => v === true ? 'Yes' : v === false ? 'No' : '';
     const res = t => ({ win:'Win', loss:'Loss', be:'Break Even' })[resultOf(t)] || '';
 
@@ -4435,21 +4479,21 @@ function bootState(text, failed) {
 }
 
 (async function boot() {
-  // The three libraries are plain blocking scripts with no fallback. If the CDN
-  // is unreachable, window.supabase is undefined and Data.init() throws before
-  // anything renders — which used to mean a permanently blank page with the
-  // only explanation in a console nobody has open on a phone.
+  // The two remaining libraries are plain blocking scripts with no fallback. If
+  // the CDN is unreachable, window.supabase is undefined and Data.init() throws
+  // before anything renders — which used to mean a permanently blank page with
+  // the only explanation in a console nobody has open on a phone.
   //
-  // Supabase is fatal: it is the data. Chart.js and SheetJS are not — the
-  // heatmap, the log and the roll-forward all draw without them, and render()
-  // already isolates each step, so the app degrades to "no wheels" instead of
-  // refusing to start.
+  // Supabase is fatal: it is the data. Chart.js is not — the heatmap, the log
+  // and the roll-forward all draw without it, and render() already isolates
+  // each step, so the app degrades to "no wheels" instead of refusing to start.
+  // SheetJS is not checked here because it is not loaded here; loadXLSX()
+  // reports its own failure to the trader who asked for the export.
   if (!window.supabase) {
     bootState('Could not load the app. Check your connection and reload.', true);
     return;
   }
   if (!window.Chart) console.warn('Doji: Chart.js unavailable — charts will not draw');
-  if (!window.XLSX)  console.warn('Doji: SheetJS unavailable — xlsx export will fail');
 
   wire();
 
@@ -4475,6 +4519,16 @@ function bootState(text, failed) {
   // The login overlay is its own full-screen surface, so the boot banner stands
   // down rather than sitting behind it.
   if (!data?.session) { bootState(null); Login.show(); return; }
+
+  // Draw what is already on the device before waiting on anything. The two
+  // round trips below — validate the token, fetch the trades — used to run
+  // against an empty panel with a banner over it. The dot says Syncing so the
+  // figures on screen are not mistaken for confirmed ones.
+  if (Data.hydrate()) {
+    render();
+    bootState(null);
+    setSyncStatus('busy');
+  }
 
   try {
     await Data.start();
