@@ -64,7 +64,7 @@
      of EVERY win / loss / break-even surface in the panel: bar segments, donut
      arcs, and calendar day + week cells. Flat 12% fill against a full-strength
      border is the house treatment; change it here and bars, wheels and the
-     heatmap all move together. mountResultDonut() reads these same vars, so
+     heatmap all move together. mountDonut() reads these same vars, so
      the Chart.js arcs can't drift from the CSS. */
   --seg-win-bg:rgba(59,165,133,.12);
   --seg-loss-bg:rgba(214,61,90,.12);
@@ -380,7 +380,7 @@ nav {
 }
 /* Colour follows the class, never the side, so the counts can be re-sided
    without a matching CSS edit. Sides are set in markup and mirror the arcs:
-   mountResultDonut plots [win, loss, be] clockwise from twelve o'clock, so the
+   mountDonut plots [win, loss, be] clockwise from twelve o'clock, so the
    win arc sweeps the RIGHT half and the loss/BE arcs land on the LEFT — B above
    L, since BE closes the ring at the upper left. Each figure therefore sits
    beside the colour it counts. */
@@ -1071,7 +1071,7 @@ td.c   { text-align:center; }
 
 /* Emotion category wheels (Positive / Fear / Reactive) — a row of result
    wheels above the per-emotion bars, divided like the period/setup columns.
-   Wheels themselves are built by mountResultDonut for cross-journal cohesion. */
+   Wheels themselves are built by mountDonut for cross-journal cohesion. */
 .emo-cat-row {
   display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;
 }
@@ -2327,6 +2327,11 @@ function counts(list) {
 // on the result label. That is what makes profit − loss come out exactly equal
 // to net: every dollar has to land on one side or the other, and a scratch is
 // still a dollar even though it is not a win.
+//
+// The single definition of that split. renderPnLCard and rangeStats each used
+// to carry their own copy of the same line, so one rule about what counts as
+// profit lived in three places and the P&L card, the day pop-up and the
+// roll-forward could have drifted apart without anything failing.
 function money(list) {
   let gross = 0, loss = 0, n = 0;
   for (const t of list) {
@@ -2659,9 +2664,17 @@ const cssToken = n => getComputedStyle(document.documentElement).getPropertyValu
 const RESULT_FILL   = Object.freeze([cssToken('--seg-win-bg'), cssToken('--seg-loss-bg'), cssToken('--seg-be-bg')]);
 const RESULT_BORDER = Object.freeze([cssToken('--win'), cssToken('--loss'), cssToken('--seg-be-bd')]);
 const SEG_BD        = parseFloat(cssToken('--seg-bd'));
-const EMPTY_FILL    = cssToken('--seg-empty-bg') || 'rgba(255,255,255,.04)';
-const EMPTY_BORDER  = cssToken('--seg-empty-bd') || 'rgba(255,255,255,.06)';
+const EMPTY_FILL    = cssToken('--seg-empty-bg');
+const EMPTY_BORDER  = cssToken('--seg-empty-bd');
 const DONUT_CUTOUT  = '68%';
+
+// The equity curve's axis furniture. Chart.js cannot read a CSS variable, so
+// the three values it needs are resolved here alongside the wheel palette —
+// the curve used to restate them as literals and was the one surface in the
+// app that would not follow a palette change.
+const CURVE_GRID = cssToken('--hair-2');
+const CURVE_TICK = cssToken('--mt');
+const MONO       = cssToken('--mono');
 
 const charts = Object.create(null);
 
@@ -2896,6 +2909,14 @@ const setupCell = s => !s ? '—'
 // filing day is the last resort and collides for everything on the same day.
 const sortKey = t => t.entry_time || t.fill_time || (dayOf(t) || '') + 'T00:00:00Z';
 
+// Oldest first. Ties return 0 rather than falling through to "greater": two
+// pre-poller rows filed on the same day carry the identical key, and a
+// comparator that never reports equality lets them swap places between renders.
+const byKey = (a, b) => {
+  const x = sortKey(a), y = sortKey(b);
+  return x < y ? -1 : x > y ? 1 : 0;
+};
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RENDER — one function per component
 
@@ -2955,12 +2976,12 @@ function renderPnLCard(rows) {
   const mo    = Dates.monthStart();
   const moPrev = shiftMonth(mo, -1);
 
-  let n = 0, net = 0, gross = 0, loss = 0;
+  // The four period cells are plain sums — no sign split, so this loop does not
+  // need one. Everything that does comes from money().
+  const m = money(rows);
   let week = 0, weekWas = 0, month = 0, monthWas = 0;
   for (const t of rows) {
     if (t.pnl == null) continue;
-    n++; net += t.pnl;
-    if (t.pnl >= 0) gross += t.pnl; else loss -= t.pnl;
     const d = dayOf(t);
     if (!d) continue;
     if      (d >= wk)     week    += t.pnl;
@@ -2972,20 +2993,20 @@ function renderPnLCard(rows) {
   const balance = balanceAt(rows, null);
   $('pnl-balance-number').textContent = balance == null ? '—' : balance.toFixed(2);
   $('pnl-balance-at').textContent     = balance == null ? 'awaiting a synced fill' : '';
-  $('pnl-net-count').textContent      = n || '';
+  $('pnl-net-count').textContent      = m.n || '';
 
-  setFigure('pnl-net-number',   n ? fmtMoney(net)   : '—', net);
-  setFigure('pnl-gross-profit', n ? fmtMoney(gross) : '—', gross);
-  setFigure('pnl-gross-loss',   n ? fmtMoney(loss)  : '—', -loss);
+  setFigure('pnl-net-number',   m.n ? fmtMoney(m.net)   : '—', m.net);
+  setFigure('pnl-gross-profit', m.n ? fmtMoney(m.gross) : '—', m.gross);
+  setFigure('pnl-gross-loss',   m.n ? fmtMoney(m.loss)  : '—', -m.loss);
 
   for (const [id, v] of [['pnl-week-prev', weekWas], ['pnl-week-cur', week],
                          ['pnl-month-prev', monthWas], ['pnl-month-cur', month]]) {
     const el = $(id);
     if (!el) continue;
     const amt = round2(v);
-    el.textContent = n ? fmtMoney(amt) : '—';
+    el.textContent = m.n ? fmtMoney(amt) : '—';
     el.classList.remove('win','loss');
-    if (n && amt) el.classList.add(amt > 0 ? 'win' : 'loss');
+    if (m.n && amt) el.classList.add(amt > 0 ? 'win' : 'loss');
   }
 }
 
@@ -3007,8 +3028,7 @@ function renderCurve(rows) {
   const canvas = $('chart-pnl');
   if (!canvas) { destroyChart('chart-pnl'); return; }
 
-  const pts = rows.filter(t => t.pnl != null)
-    .sort((a, b) => sortKey(a) < sortKey(b) ? -1 : 1);
+  const pts = rows.filter(t => t.pnl != null).sort(byKey);
   if (!pts.length) {
     destroyChart('chart-pnl');
     canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
@@ -3059,10 +3079,10 @@ function renderCurve(rows) {
           // flatten itself against the top of a 0–600 axis.
           grace: '8%',
           border: { display: false },
-          grid: { color: 'rgba(255,255,255,.06)', drawTicks: false },
+          grid: { color: CURVE_GRID, drawTicks: false },
           ticks: {
-            color: '#707080',
-            font: { family: "'JetBrains Mono','SF Mono',Consolas,monospace", size: 8 },
+            color: CURVE_TICK,
+            font: { family: MONO, size: 8 },
             maxTicksLimit: 4, padding: 6
           }
         }
@@ -3216,25 +3236,24 @@ function stepMonth(dir) {
   if (h.m < 0)  { h.m = 11; h.y--; }
 }
 
-// Month totals for a year, from one pass over the trade set. Split on the sign
-// of each P&L so profit − loss = net, and so the strip can be checked against
-// the day cells that sum into it.
+// Month totals for a year, from one pass over the trade set. `trades` counts
+// every row filed in the month; everything else is money()'s, so the strip can
+// be checked against the day cells that sum into it and the one rule about what
+// counts as profit is not restated here.
 function yearTotals(y) {
-  const out = Array.from({ length: 12 }, () => ({ trades: 0, pnlN: 0, gross: 0, loss: 0, net: 0 }));
+  const buckets = Array.from({ length: 12 }, () => ({ trades: 0, list: [] }));
   const prefix = String(y) + '-';
   for (const t of Data.rows) {
     const d = dayOf(t);
     if (!d || !d.startsWith(prefix)) continue;
-    const m = Number(d.slice(5, 7)) - 1;
-    out[m].trades++;
-    if (t.pnl == null) continue;
-    out[m].pnlN++;
-    if (t.pnl >= 0) out[m].gross += t.pnl; else out[m].loss -= t.pnl;
+    const b = buckets[Number(d.slice(5, 7)) - 1];
+    b.trades++;
+    if (t.pnl != null) b.list.push(t);
   }
-  for (const o of out) {
-    o.gross = round2(o.gross); o.loss = round2(o.loss); o.net = round2(o.gross - o.loss);
-  }
-  return out;
+  return buckets.map(b => {
+    const m = money(b.list);
+    return { trades: b.trades, pnlN: m.n, gross: m.gross, loss: m.loss, net: m.net };
+  });
 }
 
 /* renderHeatmap was one 107-line function doing three jobs. Split at its own
@@ -3580,29 +3599,29 @@ function renderDuring(rows) {
    upstream has gone wrong.
    ─────────────────────────────────────────────────────────────────────────── */
 function rangeStats(rows, start, end) {
-  let opening = 0, gross = 0, loss = 0, n = 0;
+  let opening = 0;
   let best = null, worst = null;
-  // gross and loss stay sign-based because that is what makes start + profit −
-  // loss come out exactly equal to end. The averages run on the result label,
-  // because a scratch is a dollar but not a win: bucketing it with the winners
-  // adds nothing to the numerator and a full one to the denominator.
   const inRange = [];
 
   for (const t of rows) {
     const d = dayOf(t);
     if (!d || t.pnl == null || d >= end) continue;
     if (d < start) { opening += t.pnl; continue; }
-    n++;
     inRange.push(t);
-    if (t.pnl >= 0) gross += t.pnl; else loss -= t.pnl;
     if (best  === null || t.pnl > best)  best  = t.pnl;
     if (worst === null || t.pnl < worst) worst = t.pnl;
   }
 
+  // Two different questions over the same rows. money() is sign-based, because
+  // that is what makes start + profit − loss come out exactly equal to end;
+  // averages() runs on the result label, because a scratch is a dollar but not
+  // a win, and bucketing it with the winners adds nothing to the numerator and
+  // a full one to the denominator.
+  const m = money(inRange);
   const { avgWin, avgLoss } = averages(inRange);
   return {
-    n, opening: round2(opening), gross: round2(gross), loss: round2(loss),
-    closing: round2(opening + gross - loss), change: round2(gross - loss),
+    n: m.n, opening: round2(opening), gross: m.gross, loss: m.loss,
+    closing: round2(opening + m.net), change: m.net,
     best, worst, avgWin, avgLoss,
     openBal: balanceAt(rows, start), lastBal: balanceAt(rows, end)
   };
@@ -3689,7 +3708,7 @@ function renderTable(rows) {
     return;
   }
 
-  const sorted = [...rows].sort((a, b) => sortKey(a) < sortKey(b) ? 1 : -1);
+  const sorted = [...rows].sort((a, b) => byKey(b, a));   // newest first
   const pages  = Math.ceil(sorted.length / CONFIG.PER_PAGE);
   // Clamped for this draw only — deleting the last trade on the last page can
   // leave the stored page past the end. No renderer writes state, so the
@@ -3969,7 +3988,7 @@ function openDay(day) {
   $('day-modal-title').innerHTML = `${dateStr} &nbsp;·&nbsp; ${list.length} trades`
     + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${(m.net > 0 ? '+' : '') + m.net.toFixed(2)}</span>` : '');
 
-  host.innerHTML = [...list].sort((a, b) => sortKey(a) < sortKey(b) ? 1 : -1).map(t => {
+  host.innerHTML = [...list].sort((a, b) => byKey(b, a)).map(t => {
     const r = resultOf(t);
     const pnl = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
     const sess = sessionOf(t);
@@ -4107,7 +4126,7 @@ const IO = {
     const res = t => ({ win:'Win', loss:'Loss', be:'Break Even' })[resultOf(t)] || '';
 
     const rows = [...Data.rows]
-      .sort((a, b) => sortKey(a) < sortKey(b) ? -1 : 1)
+      .sort(byKey)
       .map(t => ({
         'Date':           Dates.fmt(dayOf(t), { day:'2-digit', month:'short', year:'numeric' }),
         'Direction':      t.direction || '',
@@ -4334,7 +4353,7 @@ function wire() {
 
   // Banner and trade log
   onActivate('broker-banner', () => {
-    const first = pending(Data.rows).sort((a, b) => sortKey(a) < sortKey(b) ? -1 : 1)[0];
+    const first = pending(Data.rows).sort(byKey)[0];
     if (first) Journal.open(first.id);
   });
   onActivate('trade-table', e => {
