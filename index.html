@@ -175,8 +175,7 @@ body::before {
     var(--aura);
 }
 nav, .panels { position:relative; z-index:1; }
-button { font-family:inherit; }
-input,textarea { font-family:inherit; }
+button, input, textarea { font-family:inherit; }
 /* The app had no focus indicator anywhere in 1,500 lines of CSS. :focus-visible
    is the whole reason this is safe to add late: the browser only matches it for
    keyboard/AT navigation, so a mouse user never sees a ring appear. */
@@ -212,7 +211,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 .jm-btn-save, .jm-btn-cancel, .io-modal-title, .io-section-label,
 .export-ready-link span, .export-ready-link a, .day-trade-sub, .day-trade-pnl,
 .notif, .notif-undo, .login-sub, .login-input, .login-err, .broker-banner b,
-.broker-banner-cta {
+.broker-banner-cta, .boot-msg {
   font-family:var(--mono);
 }
 
@@ -1415,7 +1414,7 @@ td.c   { text-align:center; }
   position:fixed; inset:0; z-index:300;
   display:flex; align-items:center; justify-content:center; gap:10px;
   background:var(--bg);
-  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  font-size:10px; letter-spacing:1px;
   text-transform:uppercase; color:var(--mt);
   text-align:center; padding:24px;
 }
@@ -1977,9 +1976,19 @@ tr.broker-pending td:first-child {
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
   integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA=="
   crossorigin="anonymous"></script>
-<!-- Supabase client (floating v2 — no SRI possible on a floating tag; pin a
-     version + hash before shipping publicly if you want byte-level integrity). -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
+<!-- Pinned, deliberately without an SRI hash — the two are separate defences and
+     only one of them is worth its cost here.
+     The tag used to be a floating @2, which meant jsDelivr silently served
+     whatever Supabase shipped last. The real exposure there was never a
+     supply-chain attack; it was DRIFT — the client changing behaviour overnight
+     with no action taken and no way to tell what changed. Pinning closes that
+     completely for one character.
+     An integrity hash would additionally prove the bytes were untampered, but it
+     has to be recomputed on every version bump and a forgotten one fails closed
+     with no message. Chart.js and SheetJS carry hashes because they are pinned
+     and effectively frozen; this one moves. Bump the version deliberately, and
+     add a hash here if this ever leaves a single-user setting. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/dist/umd/supabase.js"
   crossorigin="anonymous"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2018,7 +2027,10 @@ const CONFIG = Object.freeze({
   // discipline once money is moving. Gun-shy describes a decision not yet made;
   // Panic only exists once it has been. The database enforces both lists.
   BEFORE: ['Calm','Confident','Anxious','Hesitant','Gun-shy','Overwhelmed','Revenge','Greed','Bored','FOMO'],
-  DURING: ['Calm','Confident','Panic','Anxious','Greed','Impatient'],
+  // There is no DURING list. It used to sit here and was read by nothing: the
+  // during vocabulary is exactly the Positive group plus DURING_NEGATIVE, and
+  // both of those are declared below and actually used. A third copy of the
+  // same six names could only ever drift from them.
 
   // Four distinct fear-objects, not four synonyms: Anxious is fear in the body
   // with no object, Hesitant is fear about THIS setup, Gun-shy is fear carried
@@ -3876,20 +3888,26 @@ function chips(phase, selected) {
       <input type="checkbox" class="jf-pill-radio" name="jf-${phase}-tag" id="${id}" value="${e}"${sel.has(e) ? ' checked' : ''}>
       <label class="jf-pill-lbl jf-emo-pill" for="${id}">${e}</label>`;
   };
-  const col = rows => `<div class="jf-emo-col">${rows.map(r => `<div class="jf-emo-row">${r.map(pill).join('')}</div>`).join('')}</div>`;
-  const div = '<div class="jf-emo-divider"></div>';
+  // A column of two stacks; a column of four pairs up into a 2×2. That is the
+  // only difference between the shapes, so it is the only thing stated here.
+  const col = members => members.length <= 2
+    ? `<div class="jf-emo-col">${members.map(pill).join('')}</div>`
+    : `<div class="jf-emo-col">${members.reduce((rows, m, i) =>
+        (i % 2 ? rows[rows.length - 1].push(m) : rows.push([m]), rows), [])
+        .map(r => `<div class="jf-emo-row">${r.map(pill).join('')}</div>`).join('')}</div>`;
 
-  if (phase === 'during') {
-    return `<div class="jf-emo-cols">
-      <div class="jf-emo-col">${pill('Calm')}${pill('Confident')}</div>${div}
-      ${col([['Panic','Anxious'], ['Greed','Impatient']])}
-    </div>`;
-  }
-  return `<div class="jf-emo-cols">
-    <div class="jf-emo-col">${pill('Calm')}${pill('Confident')}</div>${div}
-    ${col([['Hesitant','Anxious'], ['Gun-shy','Overwhelmed']])}${div}
-    ${col([['Revenge','Greed'], ['Bored','FOMO']])}
-  </div>`;
+  // All sixteen emotion names used to be written out again here, in the same
+  // column groupings CONFIG.GROUPS already describes — a second copy of the
+  // vocabulary that the database enforces and the analytics read from. The
+  // columns ARE the groups; the layout was never independent information.
+  const positives = CONFIG.GROUPS.find(g => g.discipline).members;
+  const columns = phase === 'during'
+    ? [positives, CONFIG.DURING_NEGATIVE]
+    : CONFIG.GROUPS.map(g => g.members);
+
+  return `<div class="jf-emo-cols">${
+    columns.map(col).join('<div class="jf-emo-divider"></div>')
+  }</div>`;
 }
 
 /* ─── Header pills ───────────────────────────────────────────────────────── */
