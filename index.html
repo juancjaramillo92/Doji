@@ -2443,23 +2443,6 @@ const Data = {
     return this.sb.auth.getSession();
   },
 
-  // The stored copy, drawn before the network answers. It is the last state the
-  // database confirmed, so it is safe to read and safe to draw — and drawing it
-  // turns the auth and fetch round trips that follow into a background refresh
-  // rather than two seconds of banner over an empty panel. Returns false when
-  // there is nothing stored (a first run, or a fresh sign-in), so boot knows to
-  // leave the banner up rather than flashing an empty dashboard.
-  hydrate() {
-    let stored;
-    try { stored = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)); }
-    catch (e) { return false; }
-    if (!Array.isArray(stored) || !stored.length) return false;
-    this.all  = stored.map(this.norm);
-    this.rows = this.all.filter(t => !t.deleted);
-    this.index();
-    return true;
-  },
-
   async start() {
     const { data, error } = await this.sb.auth.getUser();
     if (error || !data?.user) throw error || new Error('not authenticated');
@@ -4519,16 +4502,6 @@ function bootState(text, failed) {
   // The login overlay is its own full-screen surface, so the boot banner stands
   // down rather than sitting behind it.
   if (!data?.session) { bootState(null); Login.show(); return; }
-
-  // Draw what is already on the device before waiting on anything. The two
-  // round trips below — validate the token, fetch the trades — used to run
-  // against an empty panel with a banner over it. The dot says Syncing so the
-  // figures on screen are not mistaken for confirmed ones.
-  if (Data.hydrate()) {
-    render();
-    bootState(null);
-    setSyncStatus('busy');
-  }
 
   try {
     await Data.start();
