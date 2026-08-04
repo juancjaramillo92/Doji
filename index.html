@@ -6,19 +6,17 @@
 <meta name="description" content="Doji — XAUUSD Emotion-Based Trading Journal">
 <meta name="theme-color" content="#070611">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
-<!-- Home screen. iOS already runs this standalone without any
-     apple-mobile-web-app meta tag, so these two are only about how the shortcut
-     looks and is named. Neither affects the grey frame between the OS handing
-     over and the first paint — that gap belongs to the web view starting up,
-     and an apple-touch-startup-image did not reach it either.
-     apple-touch-icon is a separate link from the manifest's icon list because
-     iOS reads the home-screen icon from the tag, not the manifest. Both point
-     at the same file rather than shipping a second size, so there is one icon
-     to change and no chance of two drifting apart. The SVG favicon above stays:
-     it is the browser tab, a different surface.
-     iOS reads all of this once, when the shortcut is created. Changing it means
-     deleting the home-screen icon and adding it back. -->
-<link rel="manifest" href="/manifest.webmanifest">
+<!-- Home screen. iOS already runs this standalone with no apple-mobile-web-app
+     meta tag, and takes the label under the icon from <title>, so a manifest
+     turned out to earn nothing here: its name matched the title, its
+     display mode matched the default, and its background_color — the reason it
+     was added — never reached the grey frame between the OS handing over and
+     the first paint. Neither did an apple-touch-startup-image. That gap belongs
+     to the web view starting up and is not addressable from this file.
+     What is left is the icon, which iOS reads from this tag rather than from a
+     manifest icon list. The SVG favicon above stays: browser tab, different
+     surface. iOS reads this once, when the shortcut is created — changing the
+     icon means deleting it from the home screen and adding it back. -->
 <link rel="apple-touch-icon" href="/icon-512.png">
 <title>Doji</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -189,10 +187,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 /* Declares the document dark, so the browser's own chrome inside it matches the
-   app — scrollbars, and the login inputs, which iOS otherwise draws light. It
-   is NOT what fixed the launch-screen flash: that grey is painted by iOS before
-   this file exists, and `background_color` in the manifest is what covers it.
-   No background here — body sets it and it propagates to the canvas. */
+   app — scrollbars, and the login inputs, which iOS otherwise draws light. That
+   is the whole of what it earns. It was added to kill the grey frame on launch
+   and did not: that frame is painted before this file exists. No background
+   here either — body sets it and it propagates to the canvas. */
 html { color-scheme:dark; }
 html,body { height:100%; overflow:hidden; }
 body {
