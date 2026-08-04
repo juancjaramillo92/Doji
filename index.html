@@ -19,6 +19,18 @@
      it is the browser tab, a different surface. -->
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-512.png">
+<!-- The launch screen. iOS on this device ignores the manifest's
+     background_color and wants a startup image instead — an exact-pixel PNG per
+     screen size, matched by media query, silently ignored if the dimensions are
+     one pixel off. 1290×2796 is the iPhone 15 Pro Max: 430×932 points at 3×.
+     Deliberately one file for one phone rather than the full device matrix,
+     because there is one user. A NEW PHONE MEANS A NEW FILE AND A NEW QUERY —
+     nothing breaks loudly, the grey just comes back.
+     Solid --bg rather than artwork: .boot-msg paints an opaque field of the
+     same colour, so there is nothing to see at the handover. -->
+<link rel="apple-touch-startup-image"
+      media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)"
+      href="/launch-1290x2796.png">
 <title>Doji</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
