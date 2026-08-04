@@ -1,0 +1,17 @@
+{
+  "name": "Doji",
+  "short_name": "Doji",
+  "description": "XAUUSD Emotion-Based Trading Journal",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070611",
+  "theme_color": "#070611",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
