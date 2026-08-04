@@ -6,36 +6,26 @@
 <meta name="description" content="Doji — XAUUSD Emotion-Based Trading Journal">
 <meta name="theme-color" content="#070611">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
-<!-- Home screen. iOS already runs this standalone with no apple-mobile-web-app
-     meta tag, and takes the label under the icon from <title>, so a manifest
-     turned out to earn nothing here: its name matched the title, its
-     display mode matched the default, and its background_color — the reason it
-     was added — never reached the grey frame between the OS handing over and
-     the first paint. Neither did an apple-touch-startup-image. That gap belongs
-     to the web view starting up and is not addressable from this file.
-     What is left is the icon, which iOS reads from this tag rather than from a
-     manifest icon list. The SVG favicon above stays: browser tab, different
-     surface. iOS reads this once, when the shortcut is created — changing the
-     icon means deleting it from the home screen and adding it back. -->
+<!-- Home screen icon. iOS reads it from this tag, not from a web app manifest —
+     there was one here and it earned nothing, since iOS already runs this
+     standalone and takes the label from <title>. The SVG favicon above stays:
+     browser tab, different surface. iOS reads this once, when the shortcut is
+     created, so changing the icon means re-adding it to the home screen. -->
 <link rel="apple-touch-icon" href="/icon-512.png">
 <title>Doji</title>
+<!-- Preconnect the four origins this page talks to, so DNS and TLS overlap the
+     HTML parse rather than starting when the parser or Data.init() reaches them.
+     Supabase is the one that matters: connections do not survive a page load, so
+     that handshake is paid on every open. jsDelivr serves its two libraries
+     immutable for a year, so its handshake usually never happens at all.
+     `crossorigin` is load-bearing, not decoration — the script tags are
+     crossorigin="anonymous" and the Supabase calls are CORS fetches, and a
+     preconnect without it opens a second connection that then goes unused. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- The other two origins the app talks to. Without these, the DNS lookup and
-     TLS handshake for each one start only when something needs them — jsDelivr
-     when the parser reaches the script tags at the bottom of the body, Supabase
-     after 325 KB of library JS has parsed and Data.init() runs. Started here
-     they overlap the HTML parse instead.
-     Supabase is the one that pays every time: connections do not survive a page
-     load, so that handshake is paid on every open. jsDelivr serves the two
-     libraries immutable for a year, so its handshake usually never happens at
-     all — this only helps a cold or evicted cache.
-     `crossorigin` is required on both and is not decoration: the script tags
-     are crossorigin="anonymous" and the Supabase calls are CORS fetches, and a
-     preconnect without it opens a separate connection that then goes unused. -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://gujhyogvkzjgnrodyuse.supabase.co" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS
@@ -186,11 +176,9 @@
    RESET & BASE
    ═══════════════════════════════════════════════════════════════════════════ */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-/* Declares the document dark, so the browser's own chrome inside it matches the
-   app — scrollbars, and the login inputs, which iOS otherwise draws light. That
-   is the whole of what it earns. It was added to kill the grey frame on launch
-   and did not: that frame is painted before this file exists. No background
-   here either — body sets it and it propagates to the canvas. */
+/* Declares the document dark so the browser's own chrome inside it matches —
+   scrollbars, and the login inputs, which iOS otherwise draws light. No
+   background here: body sets it and it propagates to the canvas. */
 html { color-scheme:dark; }
 html,body { height:100%; overflow:hidden; }
 body {
@@ -1773,13 +1761,11 @@ tr.broker-pending td:first-child {
      previously threw at Data.init() and left a permanently blank page with the
      explanation only in the console.
 
-     FIRST in the body, deliberately. The browser paints as it parses, and this
-     block used to sit 226 lines down, after every card and modal — so on a warm
-     cache the empty shell painted for a frame or two before the overlay that
-     covers it had been parsed. That flash was the bug, not a timing race.
-     Position is free to change because stacking here is decided by z-index and
-     never by source order: everything this covers is 0–60, everything that
-     covers it is 400–600, and there are no ties. -->
+     First in the body, deliberately: the browser paints as it parses, so an
+     overlay declared after everything it covers can be a frame late. Position
+     is free to change because stacking here is decided by z-index and never by
+     source order — everything this covers is 0–60, everything that covers it is
+     400–600, and there are no ties. -->
 <div id="boot-msg" class="boot-msg">
   <span class="boot-dot"></span>
   <span id="boot-text">Loading your journal…</span>
@@ -2483,14 +2469,12 @@ const Data = {
     return this.sb.auth.getSession();
   },
 
-  // getUser() asks the auth server and load() asks PostgREST; neither needs the
-  // other's answer, so they overlap rather than queue. That is one whole round
-  // trip off every cold open, on top of the token refresh getSession() already
-  // has to pay whenever the app has been closed for more than an hour.
-  // The throw still lands before subscribe(), watch() and the caller's render(),
-  // so an expired session reaches the login gate exactly as it did before. The
-  // doomed select it now fires alongside is caught inside load(), which paints
-  // the snapshot into `rows` — nothing renders it, and sign-out deletes it.
+  // getUser() asks the auth server, load() asks PostgREST, and neither needs the
+  // other's answer — so they overlap rather than queue, taking a whole round
+  // trip off every open. Two consequences worth knowing before reordering this:
+  // the throw still lands before subscribe(), watch() and the caller's render(),
+  // and an expired session now fires a select that will be refused, which
+  // load() catches into the snapshot. Nothing renders it; sign-out deletes it.
   async start() {
     const [{ data, error }] = await Promise.all([this.sb.auth.getUser(), this.load()]);
     if (error || !data?.user) throw error || new Error('not authenticated');
