@@ -7,30 +7,19 @@
 <meta name="theme-color" content="#070611">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
 <!-- Home screen. iOS already runs this standalone without any
-     apple-mobile-web-app meta tag, so the only thing missing was the launch
-     screen: with no manifest, `background_color` has no value and the OS paints
-     its own light-grey default in the gap before the first frame. That gap is
-     the launch screen, painted before the document exists — which is why
-     nothing inside the page could reach it.
+     apple-mobile-web-app meta tag, so these two are only about how the shortcut
+     looks and is named. Neither affects the grey frame between the OS handing
+     over and the first paint — that gap belongs to the web view starting up,
+     and an apple-touch-startup-image did not reach it either.
      apple-touch-icon is a separate link from the manifest's icon list because
      iOS reads the home-screen icon from the tag, not the manifest. Both point
      at the same file rather than shipping a second size, so there is one icon
      to change and no chance of two drifting apart. The SVG favicon above stays:
-     it is the browser tab, a different surface. -->
+     it is the browser tab, a different surface.
+     iOS reads all of this once, when the shortcut is created. Changing it means
+     deleting the home-screen icon and adding it back. -->
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-512.png">
-<!-- The launch screen. iOS on this device ignores the manifest's
-     background_color and wants a startup image instead — an exact-pixel PNG per
-     screen size, matched by media query, silently ignored if the dimensions are
-     one pixel off. 1290×2796 is the iPhone 15 Pro Max: 430×932 points at 3×.
-     Deliberately one file for one phone rather than the full device matrix,
-     because there is one user. A NEW PHONE MEANS A NEW FILE AND A NEW QUERY —
-     nothing breaks loudly, the grey just comes back.
-     Solid --bg rather than artwork: .boot-msg paints an opaque field of the
-     same colour, so there is nothing to see at the handover. -->
-<link rel="apple-touch-startup-image"
-      media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)"
-      href="/launch-1290x2796.png">
 <title>Doji</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
