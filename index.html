@@ -6,6 +6,19 @@
 <meta name="description" content="Doji — XAUUSD Emotion-Based Trading Journal">
 <meta name="theme-color" content="#070611">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
+<!-- Home screen. iOS already runs this standalone without any
+     apple-mobile-web-app meta tag, so the only thing missing was the launch
+     screen: with no manifest, `background_color` has no value and the OS paints
+     its own light-grey default in the gap before the first frame. That gap is
+     the launch screen, painted before the document exists — which is why
+     nothing inside the page could reach it.
+     apple-touch-icon is a separate link from the manifest's icon list because
+     iOS reads the home-screen icon from the tag, not the manifest. Both point
+     at the same file rather than shipping a second size, so there is one icon
+     to change and no chance of two drifting apart. The SVG favicon above stays:
+     it is the browser tab, a different surface. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-512.png">
 <title>Doji</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,14 +187,12 @@
    RESET & BASE
    ═══════════════════════════════════════════════════════════════════════════ */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-/* The whiteish flash before the boot screen. Between navigation and this app's
-   first paint the browser paints a canvas of its own, and with no color-scheme
-   declared it assumes a light document and paints it white. The window is not
-   brief: the Google Fonts stylesheet is render-blocking and cross-origin, so
-   nothing paints until it answers. `background` belongs on html in its own
-   right rather than propagating up from body, which only happens once body's
-   rule is in force — which is exactly the moment being waited on. */
-html { color-scheme:dark; background:var(--bg); }
+/* Declares the document dark, so the browser's own chrome inside it matches the
+   app — scrollbars, and the login inputs, which iOS otherwise draws light. It
+   is NOT what fixed the launch-screen flash: that grey is painted by iOS before
+   this file exists, and `background_color` in the manifest is what covers it.
+   No background here — body sets it and it propagates to the canvas. */
+html { color-scheme:dark; }
 html,body { height:100%; overflow:hidden; }
 body {
   background:var(--bg); color:var(--tx);
