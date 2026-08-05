@@ -3455,6 +3455,13 @@ function pickYN(name) {
 const pickRadio  = name => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
 
 function journalForm(t) {
+  const setups = CONFIG.SETUPS.map(s => {
+    const id = 'jf-setup-' + s.replace(/[^a-z0-9]/gi, '');
+    return `
+      <input type="radio" class="jf-pill-radio" name="jf-setup" id="${id}" value="${esc(s)}"${t.setup === s ? ' checked' : ''}>
+      <label class="jf-pill-lbl" for="${id}">${esc(s)}</label>`;
+  }).join('');
+
   const yn = [
     ['followed_rules', 'Followed rules?', t.followed_rules],
     ['followed_sl',    'Followed SLS?',   t.followed_sl],
@@ -3469,13 +3476,6 @@ function journalForm(t) {
     </div>`;
   }).join('');
 
-  const setups = CONFIG.SETUPS.map(s => {
-    const id = 'jf-setup-' + s.replace(/[^a-z0-9]/gi, '');
-    return `
-      <input type="radio" class="jf-pill-radio" name="jf-setup" id="${id}" value="${esc(s)}"${t.setup === s ? ' checked' : ''}>
-      <label class="jf-pill-lbl" for="${id}">${esc(s)}</label>`;
-  }).join('');
-
   // Save and Cancel only. Delete used to sit third here, one button from Cancel
   // and similar enough to hit by accident — a destructive action should not
   // share a row with the way out of a dialog. Deleting is the ✕ in the log,
@@ -3483,8 +3483,8 @@ function journalForm(t) {
   return `
     <div class="journal-form">
       <div class="jm-card">
-        <div class="jf-yn-row">${yn}</div>
         <div class="jf-setup-row">${setups}</div>
+        <div class="jf-yn-row">${yn}</div>
       </div>
       <div class="journal-form-actions">
         <button class="jm-btn-save"   data-jm-action="save">Save</button>
