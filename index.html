@@ -3588,7 +3588,11 @@ const PendingDelete = {
     const id = PendingDelete.id;
     PendingDelete.id = null;
     if (!id) return;
+    // The id is cleared above whatever happens, so a second press of Undo is
+    // inert and the toast is already gone. The message therefore has to state
+    // where the trade ended up rather than invite a retry that cannot work.
     if (await Data.restore(id)) { render(); notify('Trade restored'); }
+    else notify('Restore failed — the trade is still deleted.', true);
   },
 
   commit() {
