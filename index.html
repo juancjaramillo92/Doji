@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Doji — XAUUSD Emotion-Based Trading Journal">
+<meta name="description" content="Doji — XAUUSD Trading Journal">
 <meta name="theme-color" content="#070611">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
 <!-- Home screen icon. iOS reads it from this tag, not from a web app manifest —
@@ -66,10 +66,10 @@
   --r-cell:5px;
 
   /* Shared bar thickness — single source of truth for every win/loss
-     distribution bar in the trades panel (session, discipline, R:R, emotions). */
+     distribution bar in the trades panel (session, discipline, R:R). */
   --bar-h:10px;
   /* Shared segment border thickness — every chart segment (donut arcs, R:R,
-     session, discipline, emotion bars, calendar day cells) uses this so the
+     session and discipline bars, calendar day cells) uses this so the
      "margin" weight is identical across all charts. */
   --seg-bd:1.5px;
   /* The hollow placeholder ring, for a wheel with nothing to plot yet. Here
@@ -126,7 +126,7 @@
   --fill-3:rgba(255,255,255,.08);   /* hover on a --fill-2 surface             */
   --row-hv:rgba(255,255,255,.03);   /* table row hover                         */
   --hair:rgba(255,255,255,.10);     /* in-card divider rule                    */
-  --hair-2:rgba(255,255,255,.07);   /* dimmer divider (emotion column tops)    */
+  --hair-2:rgba(255,255,255,.07);   /* equity-curve grid lines                 */
   --bd-hi:rgba(255,255,255,.30);    /* pill border on hover                    */
   /* Bright text — the only two tones in the app lighter than --tx. --tx-hi sits
      on an accent fill, --tx-max only on solid --p. */
@@ -219,7 +219,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
    than a copy.
    ═══════════════════════════════════════════════════════════════════════════ */
 .nav-icon-btn, .btn, .cbox-l, .period-label, .period-disc-lbl, .setup-donut-label,
-.sess-wr-label, .emo-cat-label, .emo-row-name, .period-pnl,
+.sess-wr-label, .period-pnl,
 .period-counts-left span, .period-counts-right span, .pm-lbl, .pm-val,
 .period-disc-pct, .pnl-balance-number, .pnl-balance-at, .pnl-net-number,
 .pnl-net-count, .pnl-stat-lbl, .pnl-stat-val, .ps-tag, .ps-fig, .rr-bar-label,
@@ -227,7 +227,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 .heatmap-week-count, .heatmap-week-pnl, .heatmap-week-lbl, .heatmap-cell-day,
 .heatmap-cell-count, .heatmap-cell-pnl, .tlog-time, .tlog-pag-info,
 .tlog-pag-btn, .roll-range, thead th, td, .dir-pill, .sess-wr-pct,
-.emo-row-pcts, .jm-pnl-input, .jm-session-opt, .journal-q-label, .jf-pill-lbl,
+.jm-pnl-input, .jm-session-opt, .journal-q-label, .jf-pill-lbl,
 .jm-btn-save, .jm-btn-cancel, .io-modal-title, .io-section-label,
 .export-ready-link span, .export-ready-link a, .day-trade-sub, .day-trade-pnl,
 .notif, .notif-undo, .login-sub, .login-input, .login-err, .broker-banner b,
@@ -244,7 +244,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 
 /* Tier 2 — in-block labels. A name sitting beside or above its own figure. */
 thead th, .notif-undo, .broker-banner-cta, .period-label, .period-disc-lbl,
-.setup-donut-label, .sess-wr-label, .emo-cat-label, .emo-row-name, .roll-range {
+.setup-donut-label, .sess-wr-label, .roll-range {
   font-size:9px; letter-spacing:1px; text-transform:uppercase;
 }
 
@@ -319,7 +319,7 @@ nav {
    a grid (.grid-2, .log-split) get their spacing from the grid gap instead, which
    is why this is opt-in rather than part of .cbox. */
 .cbox.section { margin-bottom:var(--gap-section); }
-/* Cards whose body is a divided column grid (setup / emotions). The 4px here
+/* Cards whose body is a divided column grid (the setup columns). The 4px here
    plus each column's 14px lands content on the same 18px edge as plain cards,
    so columned and non-columned sections share one left margin. */
 .cbox.cols { padding:16px 4px; }
@@ -358,12 +358,11 @@ nav {
 .period-col:first-child { border-left:none; }
 /* ── Unified metric-label typography ─────────────────────────────────────────
    Single source of truth for every in-section metric label (period / setup /
-   session / emotion). The RULES / STOP LOSS / TAKE PROFIT treatment: mono, 9px,
+   session). The RULES / STOP LOSS / TAKE PROFIT treatment: mono, 9px,
    1px tracking, uppercase, --mt, normal weight, left-aligned. Change here and
    every label across the journal moves together. Section headers (.cbox-l) are
    a separate, dimmer tier and intentionally excluded. */
-.period-label, .period-disc-lbl, .setup-donut-label, .sess-wr-label,
-.emo-cat-label, .emo-row-name {
+.period-label, .period-disc-lbl, .setup-donut-label, .sess-wr-label {
   font-weight:400;
   color:var(--mt);
 }
@@ -372,8 +371,8 @@ nav {
    flex:1 0 100%, so it only gets a line of its own if the host wraps, and it
    only spans the column if the host is full width. .period-col centres its
    children, so without width:100% the row would shrink-wrap and the strip with
-   it. Every host in the journal is arranged this way — the period wheels, the
-   setup wheels and the emotion wheels alike. */
+   it. Every host in the journal is arranged this way — the period wheels and
+   the setup wheels alike. */
 .period-host {
   position:relative; display:flex; align-items:center; justify-content:center;
   flex-wrap:wrap; width:100%; gap:14px;
@@ -432,7 +431,7 @@ nav {
 .pm-val.win  { color:var(--win); }
 .pm-val.loss { color:var(--loss); }
 
-/* ── Percentage figure strip (setup + emotion wheels) ──────────────────────
+/* ── Percentage figure strip (setup wheels) ────────────────────────────────
    Same grid and the same .pm-lbl / .pm-val primitives as .period-money — only
    the column count differs. Applied alongside it (class="period-money
    period-stats") to inherit the grid rather than restate it. The money strip is
@@ -604,7 +603,7 @@ nav {
   border-radius:0 3px 3px 0; box-sizing:border-box;
 }
 /* Shared empty-bar placeholder — the single faint outlined track that EVERY
-   bar (R:R, session, discipline, per-emotion) shows when no trades are logged,
+   bar (R:R, session, discipline) shows when no trades are logged,
    so the empty panel is uniform. Same gray fill + border weight as a
    break-even segment, dimmed to .4. */
 .bar-empty {
@@ -1064,76 +1063,6 @@ td.c   { text-align:center; }
 .sess-wr-pct.dim  { color:var(--mt2); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   EMOTION BARS (per-emotion win/loss by outcome)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-.emo-row { display:flex; flex-direction:column; gap:5px; margin-bottom:var(--gap-row); }
-.emo-row:last-child { margin-bottom:0; }
-.emo-row-head { display:flex; justify-content:space-between; align-items:baseline; }
-/* .emo-row-name typography comes from the shared metric-label rule */
-.emo-row-pcts { font-size:10px; font-weight:500; }
-.emo-row-pcts .win  { color:var(--win); }
-.emo-row-pcts .loss { color:var(--loss); }
-.emo-row-pcts .sep  { color:var(--mt); }
-.emo-row-track {
-  height:var(--bar-h); border-radius:3px;
-  overflow:hidden;
-}
-.emo-row-bar { display:flex; gap:var(--seg-hair); height:100%; width:100%; }
-.emo-row-bar > div { box-sizing:border-box; }
-.emo-row-bar .seg-win  { background:var(--seg-win-bg);  border:var(--seg-bd) solid var(--win); }
-.emo-row-bar .seg-be   { background:var(--seg-be-bg);   border:var(--seg-bd) solid var(--seg-be-bd); }
-.emo-row-bar .seg-loss { background:var(--seg-loss-bg); border:var(--seg-bd) solid var(--loss); }
-/* Untraded emotion: muted label + the shared .bar-empty placeholder, so an
-   empty per-emotion row matches every other empty bar in the panel. */
-.emo-row.is-empty .emo-row-name,
-.emo-row.is-empty .emo-row-pcts.no-data { color:var(--mt); }
-
-/* Emotion category wheels (Positive / Fear / Reactive) — a row of result
-   wheels above the per-emotion bars, divided like the period/setup columns.
-   Wheels themselves are built by mountDonut for cross-journal cohesion. */
-.emo-cat-row {
-  display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;
-}
-.emo-cat-col {
-  display:flex; flex-direction:column; align-items:center; gap:8px;
-  padding:0 14px;
-}
-.emo-cat-col + .emo-cat-col { border-left:1px solid var(--glass-bd); }
-.emo-cat-label {
-  display:flex; align-items:center; gap:6px; align-self:flex-start;
-}
-/* Per-emotion bars stacked under each category wheel, in the same column.
-   Reuses the .emo-row primitive (same --bar-h thickness + seg colors). */
-.emo-cat-bars {
-  width:100%; margin-top:8px; padding-top:var(--gap-divider);
-  border-top:1px solid var(--hair-2);
-}
-.emo-cat-bars:empty { display:none; }
-/* disciplineBar rows (Positive column's SL/TP) space themselves via parent
-   flex-gap in their native homes; here spacing comes from row margins, so
-   give them the same --gap-row rhythm the .emo-row rows use. */
-.emo-cat-bars .period-disc-row { margin-bottom:var(--gap-row); }
-.emo-cat-bars .period-disc-row:last-child { margin-bottom:0; }
-/* "During the Trade" discipline card — one column per management emotion
-   (Panic / Anxious / Greed / Impatient), each holding two compliance bars
-   (Stop Loss, Take Profit) built by the shared disciplineBar primitive.
-   Lives in its own cbox directly under the emotions-by-outcome card. */
-.emo-during:empty { display:none; }
-.emo-during-grid {
-  display:grid; grid-template-columns:repeat(4, 1fr); gap:0;
-}
-.emo-during-col {
-  display:flex; flex-direction:column; gap:var(--gap-row);
-  padding:0 14px;
-}
-.emo-during-col > .emo-cat-label { margin-bottom:2px; }
-.emo-during-col + .emo-during-col { border-left:1px solid var(--glass-bd); }
-/* Quiet trade-count next to each during-emotion label — one tier dimmer than
-   the label itself, same mono type inherited from the parent. */
-.emo-during-n { color:var(--mt2); font-weight:400; margin-left:6px; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
    JOURNAL MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
 .journal-modal {
@@ -1207,15 +1136,11 @@ td.c   { text-align:center; }
   padding:15px 18px;
   display:flex; flex-direction:column; align-items:center; gap:14px;
 }
-.jm-card + .jm-card { margin-top:12px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    JOURNAL FORM
    ═══════════════════════════════════════════════════════════════════════════ */
 .journal-form { display:flex; flex-direction:column; align-items:center; width:100%; }
-/* One emotion phase — its heading and its chip columns. Was an inline
-   width:100%;text-align:center on two sibling divs in journalForm(). */
-.jf-phase { width:100%; text-align:center; }
 /* The Y/N question label sits directly on its buttons rather than opening a
    block, so it drops the shared label gap. Was an inline margin-bottom:0. */
 .jf-yn-item .journal-q-label { margin-bottom:0; }
@@ -1237,8 +1162,8 @@ td.c   { text-align:center; }
 }
 /* Visually hidden rather than display:none. display:none takes the input out of
    the tab order AND out of the accessibility tree, which meant every answer in
-   the journal form — the three Y/N groups, both setups, every emotion chip —
-   could only be set with a mouse. Same clip-path pattern as .sync-dot-label.
+   the journal form — the three Y/N groups and both setups — could only be
+   set with a mouse. Same clip-path pattern as .sync-dot-label.
    Nothing changes visually: the label still carries the whole appearance. */
 .jf-pill-radio {
   position:absolute; width:1px; height:1px;
@@ -1255,7 +1180,6 @@ td.c   { text-align:center; }
   color:var(--pill-tx); cursor:pointer;
   border-radius:var(--r-full); background:var(--fill-1); white-space:nowrap;
 }
-.jf-emo-pill { width:90px; text-align:center; display:inline-block; }
 .jf-yn-pill  { width:56px; text-align:center; display:inline-block; }
 .jf-pill-lbl:hover { border-color:var(--bd-hi); color:var(--tx-max); background:var(--fill-2); }
 .jf-pill-radio:checked + .jf-pill-lbl {
@@ -1280,19 +1204,6 @@ td.c   { text-align:center; }
 #jm-date-label { white-space:nowrap; }
 .jf-pill-radio:disabled:checked + .jf-pill-lbl {
   border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:none;
-}
-
-/* Emotion chip layout — 3 columns separated by vertical dividers */
-.jf-emo-cols {
-  display:flex; align-items:center; justify-content:center; width:100%;
-}
-.jf-emo-col {
-  display:flex; flex-direction:column; align-items:center; gap:6px;
-}
-.jf-emo-row { display:flex; gap:6px; }
-.jf-emo-divider {
-  width:1px; background:var(--hair); align-self:stretch;
-  margin:0 14px; flex-shrink:0;
 }
 
 .journal-form-actions {
@@ -1502,7 +1413,7 @@ td.c   { text-align:center; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    BROKER SYNC — pending-entry states
-   A synced trade that still lacks its rules/emotions data is flagged in
+   A synced trade that still lacks its setup and rules data is flagged in
    purple wherever it appears (banner, heatmap cell, trade-log row). Once the
    entry is completed the flag clears and everything reverts to the journal's
    normal colours.
@@ -1551,9 +1462,8 @@ tr.broker-pending td:first-child {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MOBILE LAYER (≤640px)
-   One breakpoint. Multi-column analytic rows (period wheels, setup wheels,
-   emotion category wheels, during-trade discipline) become horizontal
-   swipe carousels: native CSS scroll-snap, one column per swipe, whichever
+   One breakpoint. Multi-column analytic rows (period wheels, setup wheels)
+   become horizontal swipe carousels: native CSS scroll-snap, one column per swipe, whichever
    slide you leave in view stays in view (position persisted across
    re-renders by the Carousel module). Companion pairs (.grid-2) stack
    vertically — they're two halves of one card, not siblings to flick through.
@@ -1593,7 +1503,7 @@ tr.broker-pending td:first-child {
   .hm-mo { min-height:58px; padding:6px 2px; }
 
   /* ── Carousels ── */
-  .period-row, .setup-donut-row, .emo-cat-row, .emo-during-grid {
+  .period-row, .setup-donut-row {
     display:grid; grid-auto-flow:column; grid-auto-columns:100%;
     grid-template-columns:none;
     overflow-x:auto; overflow-y:hidden;
@@ -1601,15 +1511,13 @@ tr.broker-pending td:first-child {
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
   }
-  .period-row::-webkit-scrollbar, .setup-donut-row::-webkit-scrollbar,
-  .emo-cat-row::-webkit-scrollbar, .emo-during-grid::-webkit-scrollbar { display:none; }
-  .period-col, .setup-donut-col, .emo-cat-col, .emo-during-col {
+  .period-row::-webkit-scrollbar, .setup-donut-row::-webkit-scrollbar { display:none; }
+  .period-col, .setup-donut-col {
     scroll-snap-align:center; scroll-snap-stop:always;
     min-width:0;
   }
   /* Column dividers read as card edges mid-swipe — drop them on mobile. */
-  .period-col, .setup-donut-col + .setup-donut-col,
-  .emo-cat-col + .emo-cat-col, .emo-during-col + .emo-during-col { border-left:none; }
+  .period-col, .setup-donut-col + .setup-donut-col { border-left:none; }
 
   /* One spacing rule for every carousel: 16px clearance above the dots and
      16px to the card's bottom edge. In .cbox cards that's the dots' own
@@ -1717,31 +1625,29 @@ tr.broker-pending td:first-child {
   .jm-hdr .jf-pill-lbl { padding:6px 8px; letter-spacing:.2px; }
   .jm-pnl-input { width:54px; padding:6px 6px; }
 
-  /* Form cards: wide control rows (Y/N trio, setup pills, emotion columns,
-     action buttons) must never spill past the card edge. Each becomes a
+  /* Form cards: wide control rows (Y/N trio, setup pills, action buttons)
+     must never spill past the card edge. Each becomes a
      horizontal swipe strip: centred while it fits (the auto margins on the
      first/last child do that), left-anchored and scrollable once it doesn't —
      flex-start is what keeps the leading buttons reachable, since centring an
      overflowing flex row clips its start unscrollably. */
   .jm-card { padding:14px 10px; overflow:hidden; }
-  .jf-emo-cols, .jf-yn-row, .jf-setup-row, .journal-form-actions {
+  .jf-yn-row, .jf-setup-row, .journal-form-actions {
     max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
     justify-content:flex-start; flex-wrap:nowrap;
     scrollbar-width:none; padding-bottom:2px;
   }
-  .jf-emo-cols::-webkit-scrollbar, .jf-yn-row::-webkit-scrollbar,
-  .jf-setup-row::-webkit-scrollbar, .journal-form-actions::-webkit-scrollbar { display:none; }
-  .jf-emo-cols > *, .jf-yn-row > *, .jf-setup-row > *, .journal-form-actions > * { flex-shrink:0; }
+  .jf-yn-row::-webkit-scrollbar, .jf-setup-row::-webkit-scrollbar,
+  .journal-form-actions::-webkit-scrollbar { display:none; }
+  .jf-yn-row > *, .jf-setup-row > *, .journal-form-actions > * { flex-shrink:0; }
   /* Auto margins on the end children centre each strip while it fits and
-     collapse to 0 once it overflows. "During the trade" (305px of chips) has
-     slack and stays centred; only "Before the trade" (520px across 3 columns)
-     becomes a side-scroller, with its leading chips still reachable at
-     scrollLeft 0. Divider spacing is left at its desktop value — trimming it
-     saves 16px of swipe on one row and costs spacing consistency everywhere. */
-  .jf-emo-cols > :first-child, .jf-yn-row > :first-child,
-  .jf-setup-row > :first-child, .journal-form-actions > :first-child { margin-left:auto; }
-  .jf-emo-cols > :last-child, .jf-yn-row > :last-child,
-  .jf-setup-row > :last-child, .journal-form-actions > :last-child { margin-right:auto; }
+     collapse to 0 once it overflows. Every row here fits at 640px; the setup
+     pills are the pair that can outgrow the card on the narrowest phones, and
+     flex-start is what keeps the first of them reachable at scrollLeft 0. */
+  .jf-yn-row > :first-child, .jf-setup-row > :first-child,
+  .journal-form-actions > :first-child { margin-left:auto; }
+  .jf-yn-row > :last-child, .jf-setup-row > :last-child,
+  .journal-form-actions > :last-child { margin-right:auto; }
   /* All three discipline questions fit one row once the Yes/No pills give back
      their desktop width — no swiping needed for the most-used control. */
   .jf-yn-row { gap:10px; }
@@ -1796,7 +1702,7 @@ tr.broker-pending td:first-child {
   <div class="panel active">
 
     <!-- Broker-sync banner: appears while any auto-synced trade is still
-         missing its rules/emotions data. Tapping it opens the oldest one. -->
+         missing its setup and rules data. Tapping it opens the oldest one. -->
     <div id="broker-banner" class="broker-banner" style="display:none;" role="button" tabindex="0"></div>
 
     <!-- P&L: balance + net and the cumulative curve beside it. No section title,
@@ -1868,16 +1774,6 @@ tr.broker-pending td:first-child {
       <div id="setup-table"></div>
     </div>
 
-    <!-- Emotions by outcome (before-phase) -->
-    <div class="cbox cols section">
-      <div id="emo-cat-wheels"></div>
-    </div>
-
-    <!-- During-the-trade discipline (per management emotion) -->
-    <div class="cbox cols section">
-      <div id="emo-during-mgmt" class="emo-during"></div>
-    </div>
-
     <!-- Trade log (left) + range roll-forward (right) -->
     <div class="log-split">
       <div class="tlog-wrap">
@@ -1911,7 +1807,7 @@ tr.broker-pending td:first-child {
       <div id="io-section-journal" class="io-section">
         <div class="io-section-label">Export Journal to Excel</div>
         <div class="io-section-desc">
-          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, discipline (rules / SLS / TPS), and emotion tags (before &amp; during).
+          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, and discipline (rules / SLS / TPS).
         </div>
         <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
       </div>
@@ -2050,26 +1946,6 @@ const SUPABASE = {
 };
 
 const CONFIG = Object.freeze({
-  // Phase-specific vocabularies. BEFORE is the state the trade was ENTERED in
-  // and is causal to the outcome; DURING is only what attacks stop and target
-  // discipline once money is moving. Gun-shy describes a decision not yet made;
-  // Panic only exists once it has been. The database enforces both lists.
-  BEFORE: ['Calm','Confident','Anxious','Hesitant','Gun-shy','Overwhelmed','Revenge','Greed','Bored','FOMO'],
-  // There is no DURING list. It used to sit here and was read by nothing: the
-  // during vocabulary is exactly the Positive group plus DURING_NEGATIVE, and
-  // both of those are declared below and actually used. A third copy of the
-  // same six names could only ever drift from them.
-
-  // Four distinct fear-objects, not four synonyms: Anxious is fear in the body
-  // with no object, Hesitant is fear about THIS setup, Gun-shy is fear carried
-  // from the last loss, Overwhelmed is fear from conflicting information.
-  GROUPS: [
-    { name: 'Positive', members: ['Calm','Confident'], discipline: true },
-    { name: 'Fear',     members: ['Hesitant','Anxious','Gun-shy','Overwhelmed'] },
-    { name: 'Reactive', members: ['Revenge','Greed','Bored','FOMO'] }
-  ],
-  DURING_NEGATIVE: ['Panic','Anxious','Greed','Impatient'],
-
   // The three windows the wheel row reports. Order is the display order; `key`
   // is what periodStart() switches on and what every generated id is built
   // from. This list is the whole definition of that row — see periodShell().
@@ -2324,12 +2200,10 @@ const sessionOf = t =>
   || (t.fill_time  ? Dates.session(new Date(t.fill_time))  : null);
 
 // A journal is complete when the trader has answered everything only they can:
-// the setup, all three discipline questions, and at least one emotion in each
-// phase. P&L is deliberately not required — an open position can be journalled
-// before it closes.
+// the setup and all three discipline questions. P&L is deliberately not
+// required — an open position can be journalled before it closes.
 const isComplete = t =>
-  !!t.setup && t.followed_rules != null && t.followed_sl != null && t.followed_tp != null
-  && t.before_tags.length > 0 && t.during_tags.length > 0;
+  !!t.setup && t.followed_rules != null && t.followed_sl != null && t.followed_tp != null;
 
 /* ─── STATS ──────────────────────────────────────────────────────────────── */
 const round2 = v => Math.round(v * 100) / 100;
@@ -2450,19 +2324,7 @@ const Data = {
   // Journal columns, and the definitive list. A save sends these and nothing
   // else, which is the mechanism that stops the app writing broker-owned data —
   // enforced here rather than trusted to each call site.
-  OWNED: ['setup','session','followed_rules','followed_sl','followed_tp','before_tags','during_tags'],
-
-  // The two array columns are guaranteed non-null from here on. Every consumer
-  // — isComplete, renderEmotions, renderDuring, the xlsx export — reaches
-  // straight for .length / .some / .join / new Set(), so a single row carrying
-  // a NULL array (a hand-insert, or the restore INSERT in the README) used to
-  // throw and blank whichever render step touched it first. Coerced once at the
-  // boundary rather than guarded at fifteen call sites.
-  norm(row) {
-    if (!Array.isArray(row.before_tags)) row.before_tags = [];
-    if (!Array.isArray(row.during_tags)) row.during_tags = [];
-    return row;
-  },
+  OWNED: ['setup','session','followed_rules','followed_sl','followed_tp'],
 
   init() {
     this.sb = window.supabase.createClient(SUPABASE.URL, SUPABASE.KEY);
@@ -2547,7 +2409,7 @@ const Data = {
       setSyncStatus('error');
       return false;
     }
-    this.replace(this.norm(data));
+    this.replace(data);
     setSyncStatus('ok');
     return true;
   },
@@ -2576,7 +2438,7 @@ const Data = {
     const { data, error } = await this.sb
       .from('trades').update({ deleted: false }).eq('id', id).select().single();
     if (error) { console.error('Doji: restore failed', error); return false; }
-    this.replace(this.norm(data));
+    this.replace(data);
     return true;
   },
 
@@ -2721,10 +2583,10 @@ function destroyChart(id) {
 // render() runs on every realtime event, every tab focus and every five
 // minutes; the old path destroyed and reconstructed nine Chart instances each
 // time, which is the single most expensive thing the app did on a timer. The
-// canvas is the same element across renders in every case except the setup and
-// emotion wheels, whose hosts replace their innerHTML — those legitimately mint
-// a new canvas, which is why the identity check is against the canvas and not
-// just the id.
+// canvas is the same element across renders in every case except the setup
+// wheels, whose host replaces its innerHTML — those legitimately mint a new
+// canvas, which is why the identity check is against the canvas and not just
+// the id.
 function donutData(counts) {
   const has = counts.reduce((a, b) => a + b, 0) > 0;
   return {
@@ -2784,10 +2646,10 @@ function moneyStrip(key) {
 }
 
 /* One result wheel with its tallies and its figure strip. Emitted by every
-   shell below — the period columns, the setup columns and the emotion category
-   columns are the same component at three populations, and this block used to
-   be written out three separate times: once as 66 lines of hand-maintained
-   HTML in the body, and twice as near-identical template literals here.
+   shell below — the period columns and the setup columns are the same component
+   at two populations, and this block used to be written out separately for each:
+   once as 66 lines of hand-maintained HTML in the body, and again as a
+   near-identical template literal here.
 
    `key` gives every part of the wheel a stable id, which is the whole point:
    the shell runs once, so the canvas is the same element on every subsequent
@@ -2971,8 +2833,6 @@ function render() {
     () => renderRR(rows),
     () => renderHeatmap(),
     () => renderSetups(rows),
-    () => renderEmotions(rows),
-    () => renderDuring(rows),
     () => renderRollForward(rows),
     () => renderTable(rows)
   ];
@@ -2991,7 +2851,7 @@ function renderBanner(rows) {
   const n = pending(rows).length;
   if (!n) { el.style.display = 'none'; return; }
   el.innerHTML = `<b>${n}</b> New trade${n > 1 ? 's' : ''} synced from your broker. `
-               + `Fill in the rules &amp; emotions data.`
+               + `Fill in the setup &amp; rules data.`
                + `<span class="broker-banner-cta">Open entry →</span>`;
   el.style.display = 'flex';
 }
@@ -3464,165 +3324,6 @@ function renderSetups(rows) {
   }
 }
 
-/* ─── Emotions (before phase) ────────────────────────────────────────────────
-   Every column here reads BEFORE tags only. The entry state is the causal
-   phase, so these charts answer "what state did I enter in, and how did it turn
-   out?". The Positive column additionally carries SL/TP compliance from trades
-   where Calm or Confident was felt DURING — the positives' management record,
-   mirroring the negatives' in the card below.
-
-   Split into tally / emit. This was one 107-line function doing four jobs:
-   per-emotion counts, category counts, positive-phase discipline, and three
-   columns of markup. The seam is where the arithmetic stops and the HTML
-   starts, which is also where the two halves can be read independently.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-// One pass over the trade set, three tallies out.
-function emotionTally(rows) {
-  const per = {};
-  for (const e of CONFIG.BEFORE) per[e] = { win: 0, loss: 0, be: 0 };
-  // Category counts dedupe at the TRADE level rather than summing member bars,
-  // so every wheel reconciles with the bars beneath it.
-  const cats = CONFIG.GROUPS.map(grp => ({ grp, win: 0, loss: 0, be: 0 }));
-  const posDisc = { slYes: 0, slN: 0, tpYes: 0, tpN: 0 };
-  const positives = new Set(CONFIG.GROUPS.find(g => g.discipline).members);
-
-  // Only a RESOLVED trade has an outcome to tally. A trade with no P&L is an
-  // open position journalled on entry, which the app deliberately allows — an
-  // else-branch here would file every one of those under break-even and drag
-  // every win rate with it.
-  const tally = (b, r) => { if (r) b[r]++; };
-
-  for (const t of rows) {
-    const r = resultOf(t);
-    const before = new Set(t.before_tags);
-    for (const tag of before) if (per[tag]) tally(per[tag], r);
-    for (const cc of cats) if (cc.grp.members.some(m => before.has(m))) tally(cc, r);
-
-    if (t.during_tags.some(tag => positives.has(tag))) {
-      if (t.followed_sl != null) { posDisc.slN++; if (t.followed_sl) posDisc.slYes++; }
-      if (t.followed_tp != null) { posDisc.tpN++; if (t.followed_tp) posDisc.tpYes++; }
-    }
-  }
-  return { per, cats, posDisc };
-}
-
-// One win/be/loss bar. An untraded emotion renders muted with an empty track so
-// every column keeps the same row count and rhythm.
-function emotionBar(label, c) {
-  const decided = c.win + c.be + c.loss;
-  if (!decided) {
-    return `<div class="emo-row is-empty">
-      <div class="emo-row-head">
-        <span class="emo-row-name">${label}</span>
-        <span class="emo-row-pcts no-data">—</span>
-      </div>
-      <div class="bar-empty"></div>
-    </div>`;
-  }
-  // Through pctSplit rather than a pair of independent roundings, so a rate here
-  // means the same thing as every other rate in the journal — the wheel above
-  // this bar is split by the identical call.
-  const [win, loss] = pctSplit([c.win, c.loss, c.be]);
-  const seg = (cls, v) => v > 0 ? `<div class="${cls}" style="flex:${v};"></div>` : '';
-  return `<div class="emo-row">
-    <div class="emo-row-head">
-      <span class="emo-row-name">${label}</span>
-      <span class="emo-row-pcts"><span class="win">${win}%</span> <span class="sep">/</span> <span class="loss">${loss}%</span></span>
-    </div>
-    <div class="emo-row-track">
-      <div class="emo-row-bar">
-        ${seg('seg-win', c.win)}${seg('seg-be', c.be)}${seg('seg-loss', c.loss)}
-      </div>
-    </div>
-  </div>`;
-}
-
-// Traded first, best win rate down; untraded sinks to the bottom in config
-// order so the column never reshuffles for no reason.
-function emotionRows(grp, per) {
-  const decidedOf = e => per[e].win + per[e].loss + per[e].be;
-  return grp.members.slice().sort((x, y) => {
-    const dx = decidedOf(x), dy = decidedOf(y);
-    if (!dx && !dy) return 0;
-    if (!dx) return 1;
-    if (!dy) return -1;
-    return (per[y].win / dy) - (per[x].win / dx);
-  }).map(e => emotionBar(e, per[e])).join('');
-}
-
-function emotionShell() {
-  const host = $('emo-cat-wheels');
-  if (!host || host.dataset.ready) return;
-  host.innerHTML = `
-    <div class="emo-cat-row">
-      ${CONFIG.GROUPS.map((grp, i) => `
-        <div class="emo-cat-col">
-          <div class="emo-cat-label">${grp.name}</div>
-          ${wheelBlock('emo-' + i, '', 'period-stats')}
-          <div class="emo-cat-bars" id="bars-emo-${i}"></div>
-        </div>`).join('')}
-    </div>`;
-  host.dataset.ready = '1';
-}
-
-function renderEmotions(rows) {
-  emotionShell();
-  const { per, cats, posDisc } = emotionTally(rows);
-
-  cats.forEach((cc, i) => {
-    const strip = $('strip-emo-' + i);
-    if (strip) strip.innerHTML = pctStrip(pctSplit([cc.win, cc.loss, cc.be]));
-
-    let bars = emotionRows(cc.grp, per);
-    if (cc.grp.discipline) {
-      bars += disciplineBar('Stop Loss',   posDisc.slYes, posDisc.slN)
-            + disciplineBar('Take Profit', posDisc.tpYes, posDisc.tpN);
-    }
-    const host = $('bars-emo-' + i);
-    if (host) host.innerHTML = bars;
-
-    paintWheel('emo-' + i, { win: cc.win, loss: cc.loss, be: cc.be,
-                             decided: cc.win + cc.loss + cc.be });   // last
-  });
-}
-
-/* ─── During the trade ───────────────────────────────────────────────────────
-   During tags are causal to DISCIPLINE, not to outcome. Whether a during-
-   negative predicts a loss is mostly an echo of entry quality, so this card
-   charts them against SL/TP compliance instead — the thing they actually drive.
-   ─────────────────────────────────────────────────────────────────────────── */
-function renderDuring(rows) {
-  const host = $('emo-during-mgmt');
-  if (!host) return;
-
-  const data = {};
-  for (const e of CONFIG.DURING_NEGATIVE) data[e] = { slYes:0, slN:0, tpYes:0, tpN:0, total:0 };
-
-  for (const t of rows) {
-    for (const tag of new Set(t.during_tags)) {
-      const d = data[tag];
-      if (!d) continue;
-      d.total++;
-      if (t.followed_sl != null) { d.slN++; if (t.followed_sl) d.slYes++; }
-      if (t.followed_tp != null) { d.tpN++; if (t.followed_tp) d.tpYes++; }
-    }
-  }
-
-  host.innerHTML = `
-    <div class="emo-during-grid">
-      ${CONFIG.DURING_NEGATIVE.map(e => {
-        const d = data[e];
-        return `
-          <div class="emo-during-col">
-            <div class="emo-cat-label">${e}${d.total ? `<span class="emo-during-n">${d.total}</span>` : ''}</div>
-            ${disciplineBar('Stop Loss',   d.slYes, d.slN)}
-            ${disciplineBar('Take Profit', d.tpYes, d.tpN)}
-          </div>`;
-      }).join('')}
-    </div>`;
-}
-
 /* ─── Range roll-forward ─────────────────────────────────────────────────────
    This month against last: where the P&L started each range, what happened
    inside it, where it ended. Last month's end IS this month's start, one row
@@ -3857,9 +3558,7 @@ const Journal = {
       setup:          pickRadio('jf-setup') || null,
       followed_rules: pickYN('followed_rules'),
       followed_sl:    pickYN('followed_sl'),
-      followed_tp:    pickYN('followed_tp'),
-      before_tags:    pickChecks('jf-before-tag'),
-      during_tags:    pickChecks('jf-during-tag')
+      followed_tp:    pickYN('followed_tp')
     });
     if (!ok) return;
 
@@ -3876,7 +3575,6 @@ function pickYN(name) {
   return v === 'yes' ? true : v === 'no' ? false : null;
 }
 const pickRadio  = name => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
-const pickChecks = name => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(el => el.value);
 
 function journalForm(t) {
   const yn = [
@@ -3910,54 +3608,11 @@ function journalForm(t) {
         <div class="jf-yn-row">${yn}</div>
         <div class="jf-setup-row">${setups}</div>
       </div>
-      <div class="jm-card">
-        <div class="jf-phase">
-          <label class="journal-q-label">Before the trade</label>
-          ${chips('before', t.before_tags)}
-        </div>
-        <div class="jf-phase">
-          <label class="journal-q-label">During the trade</label>
-          ${chips('during', t.during_tags)}
-        </div>
-      </div>
       <div class="journal-form-actions">
         <button class="jm-btn-save"   data-jm-action="save">Save</button>
         <button class="jm-btn-cancel" data-jm-action="cancel">Cancel</button>
       </div>
     </div>`;
-}
-
-// Columns divide the positives from the negatives, and the negatives pair by
-// kind. The during picker is deliberately the shorter one — only the states
-// that exist while holding a position and that drive management errors.
-function chips(phase, selected) {
-  const sel = new Set(selected);
-  const pill = e => {
-    const id = `jf-${phase}-${e.toLowerCase().replace(/\s/g,'-')}`;
-    return `
-      <input type="checkbox" class="jf-pill-radio" name="jf-${phase}-tag" id="${id}" value="${e}"${sel.has(e) ? ' checked' : ''}>
-      <label class="jf-pill-lbl jf-emo-pill" for="${id}">${e}</label>`;
-  };
-  // A column of two stacks; a column of four pairs up into a 2×2. That is the
-  // only difference between the shapes, so it is the only thing stated here.
-  const col = members => members.length <= 2
-    ? `<div class="jf-emo-col">${members.map(pill).join('')}</div>`
-    : `<div class="jf-emo-col">${members.reduce((rows, m, i) =>
-        (i % 2 ? rows[rows.length - 1].push(m) : rows.push([m]), rows), [])
-        .map(r => `<div class="jf-emo-row">${r.map(pill).join('')}</div>`).join('')}</div>`;
-
-  // All sixteen emotion names used to be written out again here, in the same
-  // column groupings CONFIG.GROUPS already describes — a second copy of the
-  // vocabulary that the database enforces and the analytics read from. The
-  // columns ARE the groups; the layout was never independent information.
-  const positives = CONFIG.GROUPS.find(g => g.discipline).members;
-  const columns = phase === 'during'
-    ? [positives, CONFIG.DURING_NEGATIVE]
-    : CONFIG.GROUPS.map(g => g.members);
-
-  return `<div class="jf-emo-cols">${
-    columns.map(col).join('<div class="jf-emo-divider"></div>')
-  }</div>`;
 }
 
 /* ─── Header pills ───────────────────────────────────────────────────────── */
@@ -4194,13 +3849,11 @@ const IO = {
         'Result':         res(t),
         'Followed Rules': yn(t.followed_rules),
         'Followed SLS':   yn(t.followed_sl),
-        'Followed TPS':   yn(t.followed_tp),
-        'Before Tags':    t.before_tags.join(', '),
-        'During Tags':    t.during_tags.join(', ')
+        'Followed TPS':   yn(t.followed_tp)
       }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:25},{wch:25}];
+    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Journal');
     const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
@@ -4295,9 +3948,7 @@ const Carousel = {
   refresh() {
     const rows = [
       ['period', $('period-row')],
-      ['setup',  document.querySelector('#setup-table .setup-donut-row')],
-      ['emo',    document.querySelector('#emo-cat-wheels .emo-cat-row')],
-      ['during', document.querySelector('#emo-during-mgmt .emo-during-grid')]
+      ['setup',  document.querySelector('#setup-table .setup-donut-row')]
     ];
     for (const [key, el] of rows) {
       if (!el || el.dataset.carousel) continue;
