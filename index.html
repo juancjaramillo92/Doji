@@ -1099,6 +1099,11 @@ td.c   { text-align:center; }
    block, so it drops the shared label gap. Was an inline margin-bottom:0. */
 .jf-yn-item .journal-q-label { margin-bottom:0; }
 
+/* The two rows carry different gaps because they hold different shapes. A Y/N
+   item is a label over a pair of pills and already reads as one block, so it
+   needs the wider separation to stay one; the setup pills are single pills and
+   at the same 40px they drift apart instead of reading as a choice between
+   two. */
 .jf-yn-row {
   display:flex; gap:40px; justify-content:center; flex-wrap:wrap;
 }
@@ -1108,7 +1113,7 @@ td.c   { text-align:center; }
 .jf-yn-buttons { display:flex; gap:6px; }
 
 .jf-setup-row {
-  display:flex; justify-content:center; gap:14px;
+  display:flex; justify-content:center; gap:22px;
 }
 
 .journal-q-label {
@@ -1155,7 +1160,7 @@ td.c   { text-align:center; }
   background:var(--fill-1); border:1px solid var(--bd2); color:var(--mt2);
   cursor:pointer;
   padding:9px 0; border-radius:var(--r-full);
- width:110px;
+  width:110px;
 }
 .jm-btn-cancel:hover { background:var(--fill-3); border-color:var(--bd2); color:var(--tx); }
 
@@ -1574,11 +1579,13 @@ tr.broker-pending td:first-child {
   .journal-form-actions > :first-child { margin-left:auto; }
   .jf-yn-row > :last-child, .jf-setup-row > :last-child,
   .journal-form-actions > :last-child { margin-right:auto; }
-  /* All three discipline questions fit one row once the Yes/No pills give back
-     their desktop width — no swiping needed for the most-used control. */
-  .jf-yn-row { gap:10px; }
+  /* Both rows tighten to the same gap here — the desktop distinction between
+     them costs more width than it buys on a phone. The Yes/No pills give back
+     some of that width in return, which is what keeps all three discipline
+     questions on one row without swiping. Anything that still overflows becomes
+     a swipe strip rather than being clipped, per the rule above. */
+  .jf-yn-row, .jf-setup-row { gap:18px; }
   .jf-yn-pill { width:44px; }
-  .jf-setup-row { gap:10px; }
 
   .journal-form-actions { gap:8px; width:100%; }
   .jm-btn-save, .jm-btn-cancel { width:auto; min-width:92px; padding:9px 14px; }
