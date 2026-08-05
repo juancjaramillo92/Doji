@@ -1101,11 +1101,11 @@ td.c   { text-align:center; }
 
 /* The two rows carry different gaps because they hold different shapes. A Y/N
    item is a label over a pair of pills and already reads as one block, so it
-   needs the wider separation to stay one; the setup pills are single pills and
-   at the same 40px they drift apart instead of reading as a choice between
-   two. */
+   takes the wider separation to stay one; the setup pills are single pills and
+   at the same gap they drift apart instead of reading as a choice between two.
+   The ratio inverts on mobile — see the breakpoint. */
 .jf-yn-row {
-  display:flex; gap:40px; justify-content:center; flex-wrap:wrap;
+  display:flex; gap:30px; justify-content:center; flex-wrap:wrap;
 }
 .jf-yn-item {
   display:flex; flex-direction:column; align-items:center; gap:10px;
@@ -1579,12 +1579,14 @@ tr.broker-pending td:first-child {
   .journal-form-actions > :first-child { margin-left:auto; }
   .jf-yn-row > :last-child, .jf-setup-row > :last-child,
   .journal-form-actions > :last-child { margin-right:auto; }
-  /* Both rows tighten to the same gap here — the desktop distinction between
-     them costs more width than it buys on a phone. The Yes/No pills give back
-     some of that width in return, which is what keeps all three discipline
-     questions on one row without swiping. Anything that still overflows becomes
-     a swipe strip rather than being clipped, per the rule above. */
-  .jf-yn-row, .jf-setup-row { gap:21px; }
+  /* Both rows tighten, and the gap between the Y/N groups stays the wider of
+     the two for the same reason it does on desktop — three blocks need more
+     separating than two pills. The Yes/No pills give back the width that costs,
+     which is what keeps all three discipline questions on one row without
+     swiping. Anything that still overflows becomes a swipe strip rather than
+     being clipped, per the rule above. */
+  .jf-yn-row { gap:25px; }
+  .jf-setup-row { gap:21px; }
   .jf-yn-pill { width:44px; }
 
   .journal-form-actions { gap:8px; width:100%; }
