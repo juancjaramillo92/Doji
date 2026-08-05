@@ -227,7 +227,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 .heatmap-week-count, .heatmap-week-pnl, .heatmap-week-lbl, .heatmap-cell-day,
 .heatmap-cell-count, .heatmap-cell-pnl, .tlog-time, .tlog-pag-info,
 .tlog-pag-btn, .roll-range, thead th, td, .dir-pill, .sess-wr-pct,
-.jm-pnl-input, .jm-session-opt, .journal-q-label, .jf-pill-lbl,
+.journal-q-label, .jf-pill-lbl,
 .jm-btn-save, .jm-btn-cancel, .io-modal-title, .io-section-label,
 .export-ready-link span, .export-ready-link a, .day-trade-sub, .day-trade-pnl,
 .notif, .notif-undo, .login-sub, .login-input, .login-err, .broker-banner b,
@@ -1072,60 +1072,12 @@ td.c   { text-align:center; }
   padding:24px 20px;
 }
 .journal-modal.open { display:flex; }
+/* position:relative is the containing block for the visually-hidden radios
+   inside the form, which are absolutely positioned. */
 .journal-modal-card {
   width:fit-content; max-width:100%; margin:auto;
   position:relative;
-  display:flex; flex-direction:column; gap:12px;
 }
-.jm-hdr {
-  display:flex; align-items:center; justify-content:space-between; gap:16px;
-  border:1px solid var(--bd); border-radius:var(--r-md);
-  background-color:var(--bg);
-  background-image:var(--aura);
-  background-attachment:fixed; background-repeat:no-repeat;
-  padding:15px 18px;
-}
-.jm-hdr-left   { flex:1; display:flex; align-items:center; }
-.jm-hdr-center { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.jm-hdr-right  {
-  flex:1; display:flex; align-items:center; justify-content:flex-end;
-  position:relative;
-}
-.jm-pnl-input {
-  font-size:9px; letter-spacing:.5px;
-  padding:6px 12px; border:1px solid var(--glass-bd);
-  color:var(--tx); border-radius:var(--r-full); background:var(--fill-1);
-  width:76px; text-align:center; outline:none;
-  -moz-appearance:textfield;
-}
-.jm-pnl-input::-webkit-outer-spin-button,
-.jm-pnl-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.jm-pnl-input:focus { border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3); }
-
-.jm-session-wrap { position:relative; }
-.jm-session-opts {
-  position:absolute; top:calc(100% + 8px); left:0; z-index:60;
-  min-width:166px;
-  background:var(--glass); border:1px solid var(--glass-bd); border-radius:var(--r-md);
-  box-shadow:var(--sh-3);
-  padding:5px; display:none; flex-direction:column; gap:2px;
-}
-.jm-session-opts.open { display:flex; }
-.jm-session-opt {
-  font-size:10px; letter-spacing:.6px; text-transform:uppercase;
-  display:flex; align-items:center; justify-content:space-between; gap:14px;
-  width:100%; text-align:left; cursor:pointer;
-  padding:8px 11px; border:none; border-radius:var(--r-sm);
-  background:transparent; color:var(--mt2);
-}
-.jm-session-opt:hover { background:var(--p-gl2); color:var(--tx-hi); }
-.jm-session-opt .opt-check { font-size:9px; color:var(--p); }
-.jm-session-opt.sel { color:var(--p); background:var(--p-gl); }
-.jm-session-opt.sel:hover { background:var(--p-gl2); }
-
-
-.jm-body { padding:0; }
-
 /* Sectioned form cards — bordered, floating boxes (no outer card, no titles
    except the lesson) so each thing recorded reads as its own panel. */
 .jm-card {
@@ -1134,7 +1086,9 @@ td.c   { text-align:center; }
   background-image:var(--aura);
   background-attachment:fixed; background-repeat:no-repeat;
   padding:15px 18px;
-  display:flex; flex-direction:column; align-items:center; gap:14px;
+  /* The card's two rows are the only things in the modal, so they get more air
+     between them than a row inside a dense panel would. */
+  display:flex; flex-direction:column; align-items:center; gap:24px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1184,26 +1138,6 @@ td.c   { text-align:center; }
 .jf-pill-lbl:hover { border-color:var(--bd-hi); color:var(--tx-max); background:var(--fill-2); }
 .jf-pill-radio:checked + .jf-pill-lbl {
   border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:0 0 16px -4px var(--p-gl3);
-}
-
-/* Controls showing a value this app does not own: the direction, the P&L and the
-   filing date all belong to the broker, which rewrites them on every poll. Dimmed
-   and inert rather than hidden — the value is worth reading, it simply is not
-   yours to set. Without this they render as ordinary editable fields that
-   silently ignore every click. */
-.jf-pill-radio:disabled + .jf-pill-lbl,
-.jf-pill-radio:disabled:checked + .jf-pill-lbl,
-.jm-pnl-input:disabled,
-#jm-date-label {
-  opacity:.55; cursor:default; pointer-events:none;
-}
-/* The filing day is read-only, so it takes no cursor of its own. It used to
-   carry an inline cursor:pointer sitting directly against the pointer-events:
-   none above — an element advertising itself as clickable while the rule two
-   lines up made it inert. */
-#jm-date-label { white-space:nowrap; }
-.jf-pill-radio:disabled:checked + .jf-pill-lbl {
-  border-color:var(--p); color:var(--tx-hi); background:var(--p-gl2); box-shadow:none;
 }
 
 .journal-form-actions {
@@ -1617,14 +1551,6 @@ tr.broker-pending td:first-child {
   .journal-modal { padding:12px 8px; overflow-x:hidden; }
   .journal-modal-card { width:100%; max-width:100%; }
 
-  /* Header stays a single row: Session · Short / P&L / Long · Date. Pills
-     shed horizontal padding and the P&L input narrows so all five fit. */
-  .jm-hdr { flex-wrap:nowrap; gap:8px; padding:10px 10px; }
-  .jm-hdr-left, .jm-hdr-right { flex:0 0 auto; }
-  .jm-hdr-center { flex:1 1 auto; justify-content:center; gap:4px; min-width:0; }
-  .jm-hdr .jf-pill-lbl { padding:6px 8px; letter-spacing:.2px; }
-  .jm-pnl-input { width:54px; padding:6px 6px; }
-
   /* Form cards: wide control rows (Y/N trio, setup pills, action buttons)
      must never spill past the card edge. Each becomes a
      horizontal swipe strip: centred while it fits (the auto margins on the
@@ -1832,25 +1758,7 @@ tr.broker-pending td:first-child {
 <!-- ═══ JOURNAL MODAL ═══ -->
 <div id="journal-modal" class="journal-modal" role="dialog" aria-modal="true" aria-label="Trade journal entry" aria-hidden="true">
   <div class="journal-modal-card">
-    <div class="jm-hdr">
-      <div class="jm-hdr-left">
-        <div class="jm-session-wrap">
-          <button id="jm-session-btn" class="jf-pill-lbl"></button>
-          <div id="jm-session-opts" class="jm-session-opts"></div>
-        </div>
-      </div>
-      <div class="jm-hdr-center">
-        <input type="radio" class="jf-pill-radio" name="jm-direction" id="jmd-sell" value="SELL">
-        <label for="jmd-sell" class="jf-pill-lbl">Short</label>
-        <input id="jm-pnl" class="jm-pnl-input" type="number" step="0.01" placeholder="P&amp;L">
-        <input type="radio" class="jf-pill-radio" name="jm-direction" id="jmd-buy"  value="BUY">
-        <label for="jmd-buy"  class="jf-pill-lbl">Long</label>
-      </div>
-      <div class="jm-hdr-right">
-        <span id="jm-date-label" class="jf-pill-lbl">—</span>
-      </div>
-    </div>
-    <div id="jm-body" class="jm-body"></div>
+    <div id="jm-body"></div>
   </div>
 </div>
 
@@ -2183,21 +2091,18 @@ const aggregateResult = (pnl, n) =>
 // New York civil day of the closing fill otherwise. Nothing else has a claim.
 const dayOf = t => t.open_day || Dates.nyDay(t.fill_time);
 
-// The trader's session if they set one, the entry instant's otherwise, and the
-// CLOSING instant as a last resort. Derived at read time rather than stamped on
-// arrival, so a fill nobody has opened yet still carries a session, and a
-// hand-set pill wins permanently once touched.
+// The entry instant's session, with the CLOSING instant as a last resort.
+// Derived at read time rather than stored, so it is never stale and a fill
+// nobody has opened yet still carries one.
 //
-// The fill_time fallback is the "session seam" the README describes, and it was
-// documented long before it was implemented — this used to return null there,
-// which is how setSessionPill's `|| CONFIG.SESSIONS[0]` came to write the
-// literal string 'Asian' onto every trade the poller never reached. A close-
-// derived session is imperfect and openly so; a hardcoded one is a fabrication.
-// Flag it whenever session data is read for a pattern spanning that boundary.
+// The fill_time fallback is the "session seam" the README describes: fills the
+// poller never reached have no entry_time, so their session comes from when
+// they closed rather than when they opened. Imperfect and openly so — the
+// alternative was returning nothing at all. Flag it whenever session data is
+// read for a pattern spanning that boundary.
 const sessionOf = t =>
-  t.session
-  || (t.entry_time ? Dates.session(new Date(t.entry_time)) : null)
-  || (t.fill_time  ? Dates.session(new Date(t.fill_time))  : null);
+  (t.entry_time ? Dates.session(new Date(t.entry_time)) : null)
+  || (t.fill_time ? Dates.session(new Date(t.fill_time)) : null);
 
 // A journal is complete when the trader has answered everything only they can:
 // the setup and all three discipline questions. P&L is deliberately not
@@ -2324,7 +2229,7 @@ const Data = {
   // Journal columns, and the definitive list. A save sends these and nothing
   // else, which is the mechanism that stops the app writing broker-owned data —
   // enforced here rather than trusted to each call site.
-  OWNED: ['setup','session','followed_rules','followed_sl','followed_tp'],
+  OWNED: ['setup','followed_rules','followed_sl','followed_tp'],
 
   init() {
     this.sb = window.supabase.createClient(SUPABASE.URL, SUPABASE.KEY);
@@ -3499,34 +3404,13 @@ function renderTable(rows) {
 const Journal = {
   id: null,
 
+  // Everything the modal asks for is the trader's. The broker's own columns are
+  // not shown here at all: the poller rewrites them every two minutes, so a
+  // control over them could only ever lie, and the trade log already reads them.
   open(id) {
     const t = Data.byId.get(id);
     if (!t) return;
     Journal.id = id;
-
-    // Populated from the derived session so the pill shows something useful,
-    // but marked untouched — see the save path below.
-    //
-    // The `|| CONFIG.SESSIONS[0]` that used to sit here is gone. Combined with
-    // the unconditional save it was the actual mechanism of the frozen-session
-    // bug: a row with no entry_time derived nothing, fell back to the FIRST
-    // entry in the list, and was written as 'Asian' regardless of when it
-    // happened. sessionOf now falls back to the close, and on the vanishing
-    // chance it still returns nothing the pill says so instead of inventing.
-    const derived = sessionOf(t);
-    setSessionPill(derived, false);
-    setDateLabel(dayOf(t) || Dates.today());
-
-    // Direction and P&L are the broker's. Shown because they are the two facts
-    // that identify which trade this is, and disabled because writing them here
-    // would be undone by the next poll.
-    const dir = t.direction === 'SELL' ? $('jmd-sell') : $('jmd-buy');
-    if (t.direction && dir) dir.checked = true;
-    for (const el of [$('jmd-buy'), $('jmd-sell')]) if (el) el.disabled = true;
-
-    const pnl = $('jm-pnl');
-    if (pnl) { pnl.value = t.pnl == null ? '' : t.pnl; pnl.disabled = true; }
-
     $('jm-body').innerHTML = journalForm(t);
     openModal('journal-modal');
   },
@@ -3534,27 +3418,12 @@ const Journal = {
   close() {
     closeModal('journal-modal');
     Journal.id = null;
-    toggleSessionMenu(false);
   },
 
   async save() {
-    const t = Data.byId.get(Journal.id);
-    if (!t) { notify('Trade not found.', true); return; }
+    if (!Data.byId.has(Journal.id)) { notify('Trade not found.', true); return; }
 
-    // Session is the one journal column with a DERIVED fallback, so writing it
-    // unconditionally is not harmless. The pill is populated from sessionOf(),
-    // which returns the derived value when t.session is null — so the old
-    // `dataset.value || null` sent that derived value back as an explicit
-    // override on the first save, whether or not the trader had touched the
-    // control. Every journalled trade became permanently hand-set.
-    //
-    // That is not cosmetic. Fills the poller never reached derive their session
-    // from CLOSE time rather than entry time, and the documented repair is a
-    // wide-lookback re-sync — which cannot fix a row whose override already
-    // won. Untouched now means null, and null still means "derive it".
-    const btn = $('jm-session-btn');
     const ok = await Data.save(Journal.id, {
-      session:        btn.dataset.touched === '1' ? (btn.dataset.value || null) : (t.session ?? null),
       setup:          pickRadio('jf-setup') || null,
       followed_rules: pickYN('followed_rules'),
       followed_sl:    pickYN('followed_sl'),
@@ -3614,47 +3483,6 @@ function journalForm(t) {
       </div>
     </div>`;
 }
-
-/* ─── Header pills ───────────────────────────────────────────────────────── */
-// Every session is listed, including the current one, so the menu never
-// reorders and the active choice stays visible.
-// `touched` records whether this value came from the trader or from the
-// derivation. Only a click on an option sets it.
-function setSessionPill(s, touched) {
-  const btn = $('jm-session-btn'), opts = $('jm-session-opts');
-  if (!btn || !opts) return;
-  // A null session is a real state — no entry time and no fill time — and it
-  // shows as an em-dash. Saving it sends null, which means "keep deriving".
-  btn.textContent = s ? (CONFIG.SESSION_ABBR[s] || s) : '—';
-  btn.dataset.value = s || '';
-  btn.dataset.touched = touched ? '1' : '0';
-  opts.innerHTML = '';
-  for (const x of CONFIG.SESSIONS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'jm-session-opt' + (x === s ? ' sel' : '');
-    b.innerHTML = `<span>${esc(x.replace('+', ' + '))}</span>` + (x === s ? '<span class="opt-check">✓</span>' : '');
-    b.addEventListener('click', () => { setSessionPill(x, true); toggleSessionMenu(false); });
-    opts.appendChild(b);
-  }
-}
-function toggleSessionMenu(force) {
-  const opts = $('jm-session-opts');
-  if (!opts) return;
-  opts.classList.toggle('open', force === undefined ? !opts.classList.contains('open') : !!force);
-}
-
-// The filing day is the broker's — the poller writes it from its own entry deal
-// and would overwrite anything picked here within two minutes. The pill shows
-// the date and the calendar is read-only, which is the same rule the save path
-// enforces by simply not sending the column.
-function setDateLabel(day) {
-  const span = $('jm-date-label');
-  if (span) span.textContent = new Date(day + 'T12:00:00')
-    .toLocaleDateString('en-GB', { day:'2-digit', month:'short' }).toUpperCase();
-}
-
-
 
 /* ─── Day picker ─────────────────────────────────────────────────────────────
    A calendar day holding one trade opens it directly; two or more open a small
@@ -4092,11 +3920,7 @@ function wire() {
     if (action === 'save')   Journal.save();
     if (action === 'cancel') Journal.close();
   });
-  on('jm-session-btn', 'click', e => { e.stopPropagation(); toggleSessionMenu(); });
   on('journal-modal', 'click', e => { if (e.target.id === 'journal-modal') Journal.close(); });
-  // A tap anywhere else closes whichever popover is open. Bound once here
-  // rather than per popover, so a third one added later is covered.
-  document.addEventListener('click', () => toggleSessionMenu(false));
 
   // Other modals
   on('io-close-btn',  'click', () => closeModal('io-modal'));
