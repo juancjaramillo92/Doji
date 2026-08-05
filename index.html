@@ -121,7 +121,7 @@
      alphas were written out as raw rgba() in seventeen places, which is exactly
      the drift the rest of these tokens exist to stop. */
   --fill-0:rgba(255,255,255,.02);   /* inset panels (io section, day row)      */
-  --fill-1:rgba(255,255,255,.04);   /* pills, chips, inputs                    */
+  --fill-1:rgba(255,255,255,.04);   /* pills, inputs                           */
   --fill-2:rgba(255,255,255,.07);   /* hover on a --fill-1 surface             */
   --fill-3:rgba(255,255,255,.08);   /* hover on a --fill-2 surface             */
   --row-hv:rgba(255,255,255,.03);   /* table row hover                         */
@@ -2352,7 +2352,7 @@ const Data = {
       const { data, error } = await this.sb
         .from('trades').select('*').order('open_day', { ascending: false });
       if (error) throw error;
-      this.all  = (data || []).map(this.norm);
+      this.all  = data || [];
       this.rows = this.all.filter(t => !t.deleted);
       this.offline = false;
       try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.all)); } catch (e) {}
@@ -2363,7 +2363,7 @@ const Data = {
       // refused while offline, which is the whole reason no reconciliation is
       // needed when the connection returns.
       console.warn('Doji: load failed, using snapshot', e);
-      try { this.all = (JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []).map(this.norm); }
+      try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
       catch (err) { this.all = []; }
       this.rows = this.all.filter(t => !t.deleted);
       this.offline = true;
