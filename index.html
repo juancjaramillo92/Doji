@@ -1863,13 +1863,14 @@ const SUPABASE = {
 };
 
 const CONFIG = Object.freeze({
-  // The three windows the wheel row reports. Order is the display order; `key`
-  // is what periodStart() switches on and what every generated id is built
-  // from. This list is the whole definition of that row — see periodShell().
+  // The three windows the wheel row reports. Order is the display order and
+  // reads narrowest to widest, left to right; `key` is what periodStart()
+  // switches on and what every generated id is built from. This list is the
+  // whole definition of that row — see periodShell().
   PERIODS: [
-    { key: 'total', label: 'All Time'   },
+    { key: 'month', label: 'This Month' },
     { key: 'week',  label: 'This Week'  },
-    { key: 'month', label: 'This Month' }
+    { key: 'total', label: 'All Time'   }
   ],
 
   SESSIONS: ['Asian','Asia+London','London','London+NY','New York'],
