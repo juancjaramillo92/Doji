@@ -8,16 +8,17 @@
 
    Run:  node --experimental-strip-types --test test/
 
-   WHAT IS NOT COVERED, said plainly: mcpInit, mcpCall and upsert all reach the
-   network on their first line and are not exported. The transport is verified
-   in production by the fact that rows arrive; the arithmetic is verified here.
+   WHAT IS NOT COVERED, said plainly: mcpInit, mcpCall, upsert and writeBalance
+   all reach the network on their first line and are not exported. The transport
+   is verified in production by the fact that rows arrive; the arithmetic is
+   verified here.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
-  lookbackFor, foldHours, secretMatches, parseSse, marketOpen
+  lookbackFor, foldHours, balanceTarget, secretMatches, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
@@ -163,6 +164,53 @@ test('the fold window is always wider than the write window', () => {
   assert.equal(foldHours(48), 120);
   assert.equal(foldHours(700), 720);      // clamped, and still ≥ its write window
   assert.ok(foldHours(6) > 6);
+});
+
+/* ─── Balance ────────────────────────────────────────────────────────────── */
+
+// get_balance answers "what is the account worth now"; the column asks "what
+// was it worth after this fill". Those agree only while nothing has happened in
+// between, which is the whole of what balanceTarget enforces.
+//
+// The poll runs an hour past T0, so a close at minute 55 is five minutes old
+// and one at minute 45 is fifteen — the same minutes-past-T0 vocabulary the
+// deals above use.
+const POLL  = T0 + 60 * 60_000;
+const close = (min) => ({ id: 'PID' + min, at: T0 + min * 60_000 });
+
+test('balanceTarget offers a balance only to a close the poller has just seen', () => {
+  assert.equal(balanceTarget([], POLL), null);                // nothing closed: no call at all
+  assert.equal(balanceTarget([close(55)], POLL), 'PID55');    // five minutes old
+  assert.equal(balanceTarget([close(50)], POLL), 'PID50');    // exactly on the bound
+  assert.equal(balanceTarget([close(49)], POLL), null);       // eleven minutes: nothing written
+});
+
+test('two closes in one run: only the later one ended at that balance', () => {
+  // There is a single figure to hand and the earlier position did not end at
+  // it — giving both the same balance overstates the first by the second's P&L.
+  assert.equal(balanceTarget([close(52), close(58)], POLL), 'PID58');
+  assert.equal(balanceTarget([close(58), close(52)], POLL), 'PID58');   // order-independent
+});
+
+test('a backfill writes no balance at all', () => {
+  // ?force=1&hours=200 folds positions that closed days ago. Every one fails
+  // the age test, so no historical balance — email-written or otherwise — is
+  // overwritten. This bound is what makes a repair safe to run.
+  assert.equal(balanceTarget([close(-72 * 60), close(-24 * 60)], POLL), null);
+});
+
+test('a fully closed position ends on a deal opposite its direction', () => {
+  // The handler takes the LATEST deal's timestamp as the close time rather than
+  // re-splitting on side. That holds only because outstanding open volume keeps
+  // isClosed false, so the claim is asserted here rather than assumed there.
+  const deals = [
+    deal({ side: 'SELL', price: 3400.00, min: 0 }),
+    deal({ side: 'BUY',  price: 3371.38, min: 29, dealId: 2 })
+  ];
+  const row    = foldPosition(deals, USER);
+  const latest = deals.reduce((a, b) => b.executionTimestamp > a.executionTimestamp ? b : a);
+  assert.notEqual(row.exit_price, null);
+  assert.notEqual(latest.tradeSide, row.direction);
 });
 
 /* ─── Authorisation ──────────────────────────────────────────────────────── */
