@@ -11,10 +11,11 @@
      standalone and takes the label from <title>. The SVG favicon above stays:
      browser tab, different surface. iOS reads this once, when the shortcut is
      created, so changing the icon means re-adding it to the home screen. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="/icon-512.png">
 <link rel="apple-touch-startup-image"
-media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
-href="/startup-probe.png">
+      media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+      href="/startup-probe.png">
 <title>Doji</title>
 <!-- Preconnect the four origins this page talks to, so DNS and TLS overlap the
      HTML parse rather than starting when the parser or Data.init() reaches them.
