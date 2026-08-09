@@ -6,16 +6,12 @@
 <meta name="description" content="Doji — XAUUSD Trading Journal">
 <meta name="theme-color" content="#070611">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23070611' rx='6'/><text x='16' y='23' font-family='SF Pro Display,Helvetica Neue,Arial,sans-serif' font-size='22' font-weight='700' fill='%238b35b8' text-anchor='middle'>D</text></svg>">
-<!-- Home screen icon, and the manifest for the launch frame. iOS paints
-     `background_color` while the web view starts up — the one frame this page
-     cannot reach from its own CSS, because there is no document yet. Without it
-     that frame is grey against a #070611 app. iOS caches the icon, the label and
-     the manifest once, at shortcut creation, so nothing here takes effect until
-     the shortcut is deleted and re-added; a change that looks like it did nothing
-     is usually the cached copy. The SVG favicon above stays: browser tab,
-     different surface. -->
+<!-- Home screen icon. iOS reads it from this tag, not from a web app manifest —
+     there was one here and it earned nothing, since iOS already runs this
+     standalone and takes the label from <title>. The SVG favicon above stays:
+     browser tab, different surface. iOS reads this once, when the shortcut is
+     created, so changing the icon means re-adding it to the home screen. -->
 <link rel="apple-touch-icon" href="/icon-512.png">
-<link rel="manifest" href="/manifest.webmanifest">
 <title>Doji</title>
 <!-- Preconnect the four origins this page talks to, so DNS and TLS overlap the
      HTML parse rather than starting when the parser or Data.init() reaches them.
