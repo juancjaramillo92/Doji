@@ -603,10 +603,17 @@ nav {
   color:var(--mt);
   padding:6px 0; text-align:center;
 }
+/* The market is shut, so the column heading recedes. Saturday stays at full
+   weight — it trades, and on a phone it is dropped only when genuinely empty. */
+.heatmap-dow-closed { opacity:.55; }
 .heatmap-dow-week, .heatmap-week { margin-left:14px; }
 /* A different axis to the weekday names, so it takes the accent. */
 .heatmap-dow-week { color:var(--p); }
-.heatmap-cell-empty { min-height:80px; }
+/* Days outside the month. A wash and no border: the grid keeps its rectangle,
+   and nothing here competes with the dashed week rail. */
+.heatmap-cell-empty {
+  min-height:80px; background:var(--fill-0); border-radius:var(--r-cell);
+}
 /* Result colour lives in the fill only; borders stay the neutral card rule at
    every state. An outline in the result colour makes the grid a wall of
    competing edges, and the fill plus the coloured figures already carry the
@@ -617,10 +624,24 @@ nav {
   min-height:80px; position:relative; box-sizing:border-box;
   display:flex; flex-direction:column;
 }
-.heatmap-cell { box-shadow:var(--sh-2); padding:6px; justify-content:center; }
+.heatmap-cell { box-shadow:var(--sh-2); padding:6px; justify-content:center; overflow:hidden; }
 .heatmap-cell.win  { background:var(--seg-win-bg); }
 .heatmap-cell.loss { background:var(--seg-loss-bg); }
 .heatmap-cell.be   { background:var(--seg-be-bg); }
+/* ── Magnitude ─────────────────────────────────────────────────────────────
+   The fill says which way the day went; this says by how much. Width is the
+   day's |net| against the largest |net| in the month on show, so the scale is
+   the month's own — a quiet month is not flattened by a loud one somewhere else
+   in the year. Full-strength colour, because 12% over three pixels is nothing.
+   Absolute, so it costs the cell no layout and the amount stays centred; the
+   cell's overflow clips its ends to the corner radius. */
+.hm-mag {
+  position:absolute; left:0; bottom:0; height:3px;
+  background:var(--mt2);
+}
+.heatmap-cell.win  .hm-mag { background:var(--win); }
+.heatmap-cell.loss .hm-mag { background:var(--loss); }
+.heatmap-cell.be   .hm-mag { background:var(--seg-be-bd); }
 .heatmap-cell.win:hover  { background:var(--seg-win-hv); }
 .heatmap-cell.loss:hover { background:var(--seg-loss-hv); }
 .heatmap-cell.be:hover   { background:var(--seg-be-hv); }
@@ -666,6 +687,10 @@ nav {
   text-align:center; flex:1; width:100%;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
+/* Today. Not the accent — purple already means unfinished on this grid — so the
+   day number takes the brightest text tone instead, which is the one step the
+   corner labels have left. */
+.heatmap-cell.today .heatmap-cell-day { color:var(--tx); font-weight:600; }
 /* Count then amount, largest first: the amount carries the weight and the count
    sits above it as a caption. */
 .heatmap-cell-count {
@@ -2827,22 +2852,27 @@ function yearTotals(y) {
 function heatmapDays(y, m) {
   const daysIn = new Date(y, m + 1, 0).getDate();
   const days = [];
-  let satTrades = 0;
+  let satTrades = 0, peak = 0;
   for (let d = 1; d <= daysIn; d++) {
     const iso = `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const wd  = new Date(y, m, d).getDay();
     const data = Data.day(iso);
     days.push({ d, iso, wd, data });
     if (wd === 6) satTrades += data.list.length;
+    // The magnitude bars are scaled to the biggest day in THIS month, so a width
+    // answers "how does this day compare with my month" rather than "with the
+    // loudest day I ever had".
+    if (data.pnlN) peak = Math.max(peak, Math.abs(data.pnl));
   }
-  return { days, satTrades };
+  return { days, satTrades, peak };
 }
 
 // Week by week: `cols` day slots then that week's summary. `slot` counts
 // positions rather than dates, so the summary lands in the last column
 // whichever weekday the month opens on.
-function heatmapGrid(visible, cols, first, dows) {
-  let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('')
+function heatmapGrid(visible, cols, first, dows, peak) {
+  const today = Dates.today();
+  let html = dows.map((d, i) => `<div class="heatmap-dow${i === 0 ? ' heatmap-dow-closed' : ''}">${d}</div>`).join('')
            + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
 
   let slot = 0, wkN = 0, wkPnl = 0, wkPnlN = 0, wkBe = 0, wkTrades = 0;
@@ -2875,6 +2905,7 @@ function heatmapGrid(visible, cols, first, dows) {
     // keeps its place in the colour rhythm. Only the AMOUNT waits for a figure.
     let cls = n === 0 ? '' : aggregateResult(data.pnl, data.pnlN, data.be);
     if (data.pending) cls += ' pending';
+    if (iso === today) cls += ' today';
 
     const pnlText   = data.pnlN ? '$' + Math.abs(data.pnl).toFixed(2) : n ? '—' : '';
     const countText = n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
@@ -2889,6 +2920,7 @@ function heatmapGrid(visible, cols, first, dows) {
           <div class="heatmap-cell-count">${countText}</div>
           <div class="heatmap-cell-pnl">${pnlText}</div>
         </div>
+        ${data.pnlN && peak ? `<div class="hm-mag" style="width:${Math.abs(data.pnl) / peak * 100}%"></div>` : ''}
       </div>`;
 
     if (n) { wkTrades += n; wkPnlN += data.pnlN; wkPnl += data.pnl; wkBe += data.be; }
@@ -2911,7 +2943,7 @@ function renderHeatmap() {
   const totals = yearTotals(cur.y);
   renderYearStrip(cur.y, cur.m, totals);
 
-  const { days, satTrades } = heatmapDays(cur.y, cur.m);
+  const { days, satTrades, peak } = heatmapDays(cur.y, cur.m);
 
   // Saturday never trades, so on a phone it hands its width to the six that do.
   // Dropped only when genuinely empty — a trade mis-stamped there must never
@@ -2925,7 +2957,7 @@ function renderHeatmap() {
   const grid = $('heatmap-grid');
   if (grid) {
     grid.classList.toggle('no-sat', !showSat);
-    grid.innerHTML = heatmapGrid(visible, cols, new Date(cur.y, cur.m, 1).getDay(), dows);
+    grid.innerHTML = heatmapGrid(visible, cols, new Date(cur.y, cur.m, 1).getDay(), dows, peak);
   }
 
   const m = totals[cur.m];
