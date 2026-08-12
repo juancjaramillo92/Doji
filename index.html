@@ -179,7 +179,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 .sess-wr-label, .period-pnl,
 .period-counts-left span, .period-counts-right span, .pm-lbl, .pm-val,
 .period-disc-pct, .pnl-balance-number, .pnl-balance-at, .pnl-net-number,
-.pnl-net-count, .pnl-stat-lbl, .pnl-stat-val, .ps-tag, .ps-fig, .rr-bar-label,
+.pnl-net-count, .pnl-stat-lbl, .pnl-stat-val, .ps-tag, .ps-fig,
 .heatmap-title, .hm-mo-count, .hm-mo-pnl, .hm-mo-lbl, .heatmap-dow,
 .heatmap-week-count, .heatmap-week-pnl, .heatmap-week-lbl, .heatmap-cell-day,
 .heatmap-cell-count, .heatmap-cell-pnl, .tlog-time, .tlog-pag-info,
@@ -193,7 +193,7 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 }
 
 /* Tier 1 — where a label opens a block rather than annotating a figure. */
-.btn, .cbox-l, .rr-bar-label, .journal-q-label, .jm-btn-save, .jm-btn-cancel,
+.btn, .cbox-l, .journal-q-label, .jm-btn-save, .jm-btn-cancel,
 .io-section-label, .login-sub {
   font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
 }
@@ -378,6 +378,13 @@ nav {
    mints one column per figure — adding a figure needs no CSS change. */
 .period-stats { grid-template-columns:none; grid-auto-columns:1fr; }
 
+/* Above each wheel, mirroring .period-disc below it — the wheel is framed by a
+   rule on both sides rather than sitting on top of one. */
+.period-rr {
+  width:100%; margin-bottom:8px;
+  padding-bottom:var(--gap-divider); border-bottom:1px solid var(--glass-bd);
+}
+
 /* Beneath each wheel, reusing the session-bar segments for one green-followed /
    red- missed read. */
 .period-disc {
@@ -483,39 +490,6 @@ nav {
 .ps-fig.loss { color:var(--loss); }
 /* Reads as "moved from → to". A hyphen against signed figures reads as minus. */
 .ps-arrow { font-size:9px; color:var(--mt); margin:0 1px; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   R:R BAR
-   ═══════════════════════════════════════════════════════════════════════════ */
-.rr-bar-wrap {
-  background:var(--glass); border:1px solid var(--glass-bd);
-  padding:16px 18px; margin-bottom:var(--gap-section);
-  border-radius:var(--r-md); box-shadow:var(--sh-2);
-}
-.rr-bar-label {
-  color:var(--mt2); margin-bottom:var(--gap-title);
-  display:flex; justify-content:space-between; align-items:center;
-}
-.rr-bar-segments { display:flex; gap:var(--seg-gap); width:100%; margin:10px 0; }
-.rr-bar-segment-row {
-  width:100%; height:var(--bar-h); border-radius:3px;
-  overflow:hidden; display:flex; gap:var(--seg-hair);
-}
-.rr-bar-seg-win {
-  background:var(--seg-win-bg); border:var(--seg-bd) solid var(--win);
-  border-radius:3px 0 0 3px; box-sizing:border-box;
-}
-.rr-bar-seg-loss {
-  background:var(--seg-loss-bg); border:var(--seg-bd) solid var(--loss);
-  border-radius:0 3px 3px 0; box-sizing:border-box;
-}
-/* The track every bar shows when no trades are logged — a break-even segment
-   dimmed to .4, so the empty panel is uniform. */
-.bar-empty {
-  width:100%; height:var(--bar-h); border-radius:3px; box-sizing:border-box;
-  background:var(--seg-be-bg); border:var(--seg-bd) solid var(--seg-be-bd);
-  opacity:.4;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SYNC STATUS DOT
@@ -655,8 +629,16 @@ nav {
 
 /* ── Week summary cell ─────────────────────────────────────────────────────
    Same material as a day cell, read-only. Its ordinal sits where a day number
-   does — see the shared .heatmap-cell-day rule. */
-.heatmap-week { padding:6px 4px; align-items:center; justify-content:center; }
+   does — see the shared .heatmap-cell-day rule.
+
+   Dashed, and the only cell in the grid that is: it holds no trade of its own,
+   so the broken edge says derived where the day cells say recorded. It also
+   carries no --sh-2, which is the same statement in the other register — a
+   summary does not sit on the surface the days sit on. */
+.heatmap-week {
+  padding:6px 4px; align-items:center; justify-content:center;
+  border-style:dashed;
+}
 .heatmap-week.win  { background:var(--seg-win-bg); }
 .heatmap-week.loss { background:var(--seg-loss-bg); }
 .heatmap-week.be   { background:var(--seg-be-bg); }
@@ -920,6 +902,13 @@ td.c   { text-align:center; }
 .sess-wr-pct.win  { color:var(--win); }
 .sess-wr-pct.loss { color:var(--loss); }
 .sess-wr-pct.dim  { color:var(--mt2); }
+/* The track every bar shows when it has nothing to plot — a break-even segment
+   dimmed to .4, so the empty panel is uniform. */
+.bar-empty {
+  width:100%; height:var(--bar-h); border-radius:3px; box-sizing:border-box;
+  background:var(--seg-be-bg); border:var(--seg-bd) solid var(--seg-be-bd);
+  opacity:.4;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    JOURNAL MODAL
@@ -1508,14 +1497,6 @@ tr.broker-pending td:first-child {
          from CONFIG.PERIODS by renderPeriods() rather than written out three
          times — see the note there. Adding a fourth window is one array entry. -->
     <div class="period-card"><div class="period-row" id="period-row"></div></div>
-
-    <div class="rr-bar-wrap">
-      <div class="rr-bar-label">
-        <span id="rr-bar-label-txt">RR Ratio</span>
-        <span id="rr-bar-value"></span>
-      </div>
-      <div id="rr-bar-segments" class="rr-bar-segments"></div>
-    </div>
 
     <div class="cbox section">
       <div id="calendar-heatmap"></div>
@@ -2522,7 +2503,6 @@ function render() {
     () => renderPnLCard(rows),
     () => renderCurve(rows),
     () => renderPeriods(rows),
-    () => renderRR(rows),
     () => renderHeatmap(),
     () => renderSetups(rows),
     () => renderRollForward(rows),
@@ -2692,6 +2672,7 @@ function periodShell() {
   host.innerHTML = CONFIG.PERIODS.map(({ key, label }) => `
     <div class="period-col" data-period="${key}">
       <div class="period-label">${label}</div>
+      <div class="period-rr" id="rr-bar-${key}"></div>
       ${wheelBlock(key, moneyStrip(key), '')}
       <div class="period-disc" id="disc-bars-${key}"></div>
     </div>`).join('');
@@ -2714,6 +2695,9 @@ function renderPeriods(rows) {
     setFigure('pm-p-'  + key, m.n ? fmtMoney(m.gross) : '—', m.gross);
     setFigure('pm-l-'  + key, m.n ? fmtMoney(m.loss)  : '—', -m.loss);
     setFigure('pm-n-'  + key, m.n ? fmtMoney(m.net)   : '—', m.net);
+
+    const rr = $('rr-bar-' + key);
+    if (rr) rr.innerHTML = rrBar(list);
 
     const disc = $('disc-bars-' + key);
     if (disc) disc.innerHTML = disciplineBars(list);
@@ -2738,31 +2722,39 @@ function disciplineBars(list) {
    Realised, not planned: average win over average loss from closed P&L. The
    planned ratio is not recoverable — the broker reports only the FINAL stop, so
    a stop moved to break-even has overwritten the original risk.
+
+   The same head and track as disciplineBar, so the row above the wheel and the
+   three below it are one component carrying different figures. Per period, not
+   once for the account: the whole point of the row is that a window can be read
+   against the windows either side of it.
    ─────────────────────────────────────────────────────────────────────────── */
-function renderRR(rows) {
-  const label = $('rr-bar-label-txt'), value = $('rr-bar-value'), seg = $('rr-bar-segments');
-  const { avgWin, avgLoss } = averages(rows);
+function rrBar(list) {
+  const { avgWin, avgLoss } = averages(list);
+  // .pm-val rather than .period-disc-pct: a ratio is not a percentage, and the
+  // generic figure class already carries the muted tone with no modifier.
+  const head = fig => `
+      <div class="period-disc-head">
+        <span class="period-disc-lbl">RR Ratio</span>
+        <span class="pm-val">${fig}</span>
+      </div>`;
 
   if (avgWin === null && avgLoss === null) {
-    label.textContent = 'RR Ratio — log trades with P&L to see this';
-    value.textContent = '';
-    seg.innerHTML = '<div class="bar-empty"></div>';
-    return;
+    return `<div class="period-disc-row">${head('—')}<div class="bar-empty"></div></div>`;
   }
 
   // No losses means no ratio, only a direction. The figure caps rather than
   // dividing by zero — a ceiling, not a value.
   const RR_CAP = 9.99;
   const ratio = avgLoss ? (avgWin || 0) / avgLoss : (avgWin ? RR_CAP : 1);
-
-  label.textContent = 'RR Ratio';
-  value.textContent = ratio.toFixed(2) + ':1';
-
   const total = ratio + 1;
-  seg.innerHTML = `
-    <div class="rr-bar-segment-row">
-      <div class="rr-bar-seg-win"  style="width:${(ratio / total * 100).toFixed(1)}%;"></div>
-      <div class="rr-bar-seg-loss" style="width:${(1 / total * 100).toFixed(1)}%;"></div>
+  const { html, track } = segments([
+    { cls: 'sess-wr-seg-win',  v: ratio / total * 100 },
+    { cls: 'sess-wr-seg-loss', v: 1     / total * 100 }
+  ]);
+  return `
+    <div class="period-disc-row">
+      ${head(ratio.toFixed(2) + ':1')}
+      <div class="sess-wr-track ${track}" title="avg win $${fmtMoney(avgWin || 0)} / avg loss $${fmtMoney(avgLoss || 0)}">${html}</div>
     </div>`;
 }
 
