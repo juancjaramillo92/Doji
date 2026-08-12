@@ -100,7 +100,6 @@
   --fill-2:rgba(255,255,255,.07);   /* hover on a --fill-1 surface             */
   --fill-3:rgba(255,255,255,.08);   /* hover on a --fill-2 surface             */
   --row-hv:rgba(255,255,255,.03);   /* table row hover                         */
-  --hair:rgba(255,255,255,.10);     /* in-card divider rule                    */
   --hair-2:rgba(255,255,255,.07);   /* equity-curve grid lines                 */
   --bd-hi:rgba(255,255,255,.30);    /* pill border on hover                    */
   /* The only two tones lighter than --tx. --tx-hi sits on an accent fill, --tx-
@@ -1731,6 +1730,11 @@ let notifTimer = 0;
 function notify(msg, isError) {
   const el = $('notif');
   if (!el) return;
+  // An Undo offer owns the toast for its whole window — overwriting it strands
+  // PendingDelete's timer with no button left to cancel it, and there is no
+  // other undelete path in the UI. An error still gets through: a silent
+  // failure is worse than a lost undo.
+  if (PendingDelete.id && !isError) return;
   el.textContent = msg;
   el.className = 'notif show' + (isError ? ' err' : '');
   clearTimeout(notifTimer);
@@ -1749,7 +1753,9 @@ function notifyUndo(msg) {
 /* ─── DATES ──────────────────────────────────────────────────────────────────
    Everything with a market meaning resolves against New York wall time via Intl,
    so boundaries are identical on every device and correct across every
-   daylight-saving shift. The machine's own clock only formats dates for reading.
+   daylight-saving shift. No civil date is read off the machine's own clock: a
+   laptop on Pacific time would otherwise roll the day over three hours late and
+   file a trade under yesterday.
 
    open_day is a DATE column, so a filing day needs no timezone reasoning — it is
    already the civil day.
@@ -1836,8 +1842,16 @@ const Dates = {
   },
 
   today() {
-    const n = new Date();
-    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+    const p = Dates.nyParts(new Date());
+    return `${p.y}-${String(p.m).padStart(2,'0')}-${String(p.d).padStart(2,'0')}`;
+  },
+
+  // The month the New York calendar is in, zero-based to match View.heatmap.
+  // Both the opening position and the rollover target come from here, so the
+  // grid can never open on a different month from the one a trade files under.
+  nyMonth() {
+    const p = Dates.nyParts(new Date());
+    return { y: p.y, m: p.m - 1 };
   },
 
   // Gold trades Sunday 17:00 → Friday 17:00 New York. Returns the opening
@@ -2054,7 +2068,7 @@ const Data = {
       // Nothing renders them, but a restore without them lets the poller
       // rebuild every trade ever removed.
       const { data, error } = await this.sb
-        .from('trades').select('*').order('open_day', { ascending: false });
+        .from('trades').select('*');
       if (error) throw error;
       this.all  = data || [];
       this.rows = this.all.filter(t => !t.deleted);
@@ -2498,7 +2512,7 @@ const byKey = (a, b) => {
 
 const View = {
   page: 0,
-  heatmap: { y: new Date().getFullYear(), m: new Date().getMonth() }
+  heatmap: Dates.nyMonth()
 };
 
 function render() {
@@ -3190,11 +3204,11 @@ function pickYN(name) {
   const v = pickRadio(name);
   return v === 'yes' ? true : v === 'no' ? false : null;
 }
-const pickRadio  = name => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
+const pickRadio  = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
 
 function journalForm(t) {
   const setups = CONFIG.SETUPS.map(s => {
-    const id = 'jf-setup-' + s.replace(/[^a-z0-9]/gi, '');
+    const id = 'jf-' + setupKey(s);
     return `
       <input type="radio" class="jf-pill-radio" name="jf-setup" id="${id}" value="${esc(s)}"${t.setup === s ? ' checked' : ''}>
       <label class="jf-pill-lbl" for="${id}">${esc(s)}</label>`;
@@ -3380,12 +3394,8 @@ const IO = {
      weekly auto-backup. A percent-encoded JSON backup holds the whole file
      twice in memory as a string and runs into a URL-length ceiling; a Blob has
      neither problem. */
-  urls: new Set(),
-
   blobUrl(data, type) {
-    const url = URL.createObjectURL(new Blob([data], { type }));
-    IO.urls.add(url);
-    return url;
+    return URL.createObjectURL(new Blob([data], { type }));
   },
 
   showLink(url, filename, sectionId) {
@@ -3394,7 +3404,7 @@ const IO = {
     // Revoked here rather than on a timer, so a URL stays valid exactly as long
     // as the anchor offering it is on screen.
     const prev = host.querySelector('.export-ready-link a');
-    if (prev) { URL.revokeObjectURL(prev.href); IO.urls.delete(prev.href); }
+    if (prev) URL.revokeObjectURL(prev.href);
     host.querySelector('.export-ready-link')?.remove();
     const div = document.createElement('div');
     div.className = 'export-ready-link';
@@ -3450,8 +3460,7 @@ const IO = {
   // A gesture-less download can be blocked silently with no API to detect it,
   // so the toast asks the trader to verify rather than asserting success.
   download(filename) {
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(IO.payload(), null, 2)], { type: 'application/json' }));
+    const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
     const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
@@ -3579,10 +3588,7 @@ const DayWatcher = {
     DayWatcher.day = today;
     // Only at a real boundary — someone paging back mid-month is never yanked
     // forward.
-    if (prevMonth && today.slice(0, 7) !== prevMonth) {
-      const now = new Date();
-      View.heatmap = { y: now.getFullYear(), m: now.getMonth() };
-    }
+    if (prevMonth && today.slice(0, 7) !== prevMonth) View.heatmap = Dates.nyMonth();
     render();
   }
 };
