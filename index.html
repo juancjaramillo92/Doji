@@ -1685,15 +1685,17 @@ const CONFIG = Object.freeze({
   MONTHS: ['January','February','March','April','May','June','July','August','September','October','November','December'],
   MONTHS_ABBR: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
 
-  // Any P&L within this of zero is a scratch. It changes the LABEL only — the
-  // dollars still flow into every money figure, which keeps gross profit minus
-  // gross loss equal to net. Break-evens sit in the win-rate denominator, so
-  // scratches drag it down rather than vanishing.
+  // A scratch is measured in PRICE, not in dollars: an exit within this much of
+  // the entry price went nowhere, whatever size was on. Read against P&L the
+  // same band tightens as the account scales — $3 of P&L is $3 of gold at 0.01
+  // lots and three cents of gold at 1.00 — so the rule would quietly mean
+  // something different every time size changed.
+  //
+  // It changes the LABEL only. The dollars still flow into every money figure,
+  // which keeps gross profit minus gross loss equal to net, and break-evens sit
+  // in the win-rate denominator, so scratches drag it down rather than
+  // vanishing.
   BE: 3,
-  // The same question one scale up. $3 is the noise floor of ONE fill, not of
-  // thirty: reusing BE here would label a whole month break-even on a $2.40
-  // net.
-  BE_AGG: 10,
 
   PER_PAGE: 10,
   UNDO_MS: 7000,
@@ -1877,16 +1879,27 @@ const Dates = {
 
 // null when there is no P&L yet: a trade can be journalled before it closes,
 // and a missing figure is not a break-even.
-const resultOf = t =>
-  t.pnl == null ? null : Math.abs(t.pnl) <= CONFIG.BE ? 'be' : t.pnl > 0 ? 'win' : 'loss';
+//
+// The scratch test wants both prices, and the pre-sync rows have neither — for
+// those the same $3 is read against P&L, which is the only measure they have
+// ever had. Win and loss always come from the sign of the P&L: price distance is
+// unsigned, and it is the account that decides which way a trade went.
+const resultOf = t => {
+  if (t.pnl == null) return null;
+  const scratch = t.entry_price != null && t.exit_price != null
+    ? Math.abs(t.exit_price - t.entry_price) <= CONFIG.BE
+    : Math.abs(t.pnl) <= CONFIG.BE;
+  return scratch ? 'be' : t.pnl > 0 ? 'win' : 'loss';
+};
 
 // The same verdict over a SUM — a calendar day, a week cell, a month tile.
-// Wider dead band, because the per-trade threshold is calibrated to one fill's
-// cost and slippage. `n` counts trades in the aggregate that actually carry a
-// P&L: zero means there is nothing to judge and the cell takes no result
-// colour.
-const aggregateResult = (pnl, n) =>
-  !n ? '' : Math.abs(pnl) <= CONFIG.BE_AGG ? 'be' : pnl > 0 ? 'win' : 'loss';
+// Several trades have no single entry and exit between them, so a cell cannot
+// measure price distance and inherits instead: it is a scratch only when every
+// decided trade inside it was one. `n` counts trades in the aggregate that
+// actually carry a P&L, `be` how many of those were scratches; zero decided
+// means there is nothing to judge and the cell takes no result colour.
+const aggregateResult = (pnl, n, be) =>
+  !n ? '' : be === n ? 'be' : pnl > 0 ? 'win' : 'loss';
 
 // open_day when the poller supplied one, the New York civil day of the closing
 // fill otherwise. Nothing else has a claim.
@@ -2072,10 +2085,10 @@ const Data = {
       const day = dayOf(t);
       if (!day) continue;
       let d = this.byDay.get(day);
-      if (!d) { d = { list: [], pnl: 0, pnlN: 0, pending: false }; this.byDay.set(day, d); }
+      if (!d) { d = { list: [], pnl: 0, pnlN: 0, be: 0, pending: false }; this.byDay.set(day, d); }
       d.list.push(t);
       if (!isComplete(t)) d.pending = true;
-      if (t.pnl != null) { d.pnl += t.pnl; d.pnlN++; }
+      if (t.pnl != null) { d.pnl += t.pnl; d.pnlN++; if (resultOf(t) === 'be') d.be++; }
     }
     for (const d of this.byDay.values()) d.pnl = round2(d.pnl);
   },
@@ -2195,7 +2208,7 @@ const Data = {
   }
 };
 
-const EMPTY_DAY = Object.freeze({ list: [], pnl: 0, pnlN: 0, pending: false });
+const EMPTY_DAY = Object.freeze({ list: [], pnl: 0, pnlN: 0, be: 0, pending: false });
 
 const modalOpen = () =>
   ['journal-modal','io-modal','day-modal'].some(id => $(id)?.classList.contains('open'));
@@ -2796,7 +2809,8 @@ function yearTotals(y) {
   }
   return buckets.map(b => {
     const m = money(b.list);
-    return { trades: b.trades, pnlN: m.n, gross: m.gross, loss: m.loss, net: m.net };
+    return { trades: b.trades, pnlN: m.n, be: counts(b.list).be,
+             gross: m.gross, loss: m.loss, net: m.net };
   });
 }
 
@@ -2825,11 +2839,11 @@ function heatmapGrid(visible, cols, first, dows) {
   let html = dows.map(d => `<div class="heatmap-dow">${d}</div>`).join('')
            + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
 
-  let slot = 0, wkN = 0, wkPnl = 0, wkPnlN = 0, wkTrades = 0;
+  let slot = 0, wkN = 0, wkPnl = 0, wkPnlN = 0, wkBe = 0, wkTrades = 0;
 
   const flushWeek = () => {
     wkN++;
-    const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN);
+    const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN, wkBe);
     const count = wkTrades ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
     const abs   = Math.abs(round2(wkPnl)).toFixed(2);
     // Separate spans so the phone stylesheet can drop the tail.
@@ -2841,7 +2855,7 @@ function heatmapGrid(visible, cols, first, dows) {
         <div class="heatmap-week-count">${count}</div>
         <div class="heatmap-week-pnl">${pnl}</div>
       </div>`;
-    wkPnl = 0; wkPnlN = 0; wkTrades = 0;
+    wkPnl = 0; wkPnlN = 0; wkBe = 0; wkTrades = 0;
   };
   const blank = () => { html += '<div class="heatmap-cell-empty"></div>'; slot++; };
 
@@ -2853,7 +2867,7 @@ function heatmapGrid(visible, cols, first, dows) {
     const n = data.list.length;
     // A result fill whether or not a P&L is logged: the day happened, so it
     // keeps its place in the colour rhythm. Only the AMOUNT waits for a figure.
-    let cls = n === 0 ? '' : aggregateResult(data.pnl, data.pnlN);
+    let cls = n === 0 ? '' : aggregateResult(data.pnl, data.pnlN, data.be);
     if (data.pending) cls += ' pending';
 
     const pnlText   = data.pnlN ? '$' + Math.abs(data.pnl).toFixed(2) : n ? '—' : '';
@@ -2871,7 +2885,7 @@ function heatmapGrid(visible, cols, first, dows) {
         </div>
       </div>`;
 
-    if (n) { wkTrades += n; wkPnlN += data.pnlN; wkPnl += data.pnl; }
+    if (n) { wkTrades += n; wkPnlN += data.pnlN; wkPnl += data.pnl; wkBe += data.be; }
     slot++;
     if (slot % cols === 0) flushWeek();
   }
@@ -2920,7 +2934,7 @@ function renderYearStrip(y, selMonth, totals) {
   if (!host) return;
   host.innerHTML = totals.map((t, m) => {
     const cls = ['hm-mo'];
-    if (t.trades) cls.push(aggregateResult(t.net, t.pnlN));
+    if (t.trades) cls.push(aggregateResult(t.net, t.pnlN, t.be));
     if (m === selMonth) cls.push('sel');
     const pnl = t.pnlN ? '$' + Math.abs(t.net).toFixed(2) : (t.trades ? '—' : '');
     return `
@@ -3230,7 +3244,7 @@ function openDay(day) {
   if (!host) return;
 
   const m = money(list);
-  const res = aggregateResult(m.net, m.n);
+  const res = aggregateResult(m.net, m.n, counts(list).be);
   const dateStr = Dates.fmt(day, { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
   $('day-modal-title').innerHTML = `${dateStr} &nbsp;·&nbsp; ${list.length} trades`
     + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${(m.net > 0 ? '+' : '') + m.net.toFixed(2)}</span>` : '');
