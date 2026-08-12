@@ -2762,13 +2762,17 @@ function disciplineBars(list) {
 function rrBar(list) {
   const { avgWin, avgLoss } = averages(list);
   // Under the track, not over it: the column's own "This Month" heading sits
-  // directly above, and two labels on consecutive lines read as one confused
-  // one. .pm-val rather than .period-disc-pct: a ratio is not a percentage, and
-  // the generic figure class already carries the muted tone with no modifier.
+  // directly above, and two labels on consecutive lines read as one confused one.
+  //
+  // The figure takes the LABEL's class, not a figure class. It is the only grey
+  // number in a column whose other three figures are green or red, so at the
+  // brighter figure tone it read as the loudest thing in the box. Carrying the
+  // label's own rule rather than a copy of its size and colour is what keeps the
+  // two ends of this row identical when either is retuned.
   const head = fig => `
       <div class="period-disc-head">
         <span class="period-disc-lbl">RR Ratio</span>
-        <span class="pm-val">${fig}</span>
+        <span class="period-disc-lbl">${fig}</span>
       </div>`;
 
   if (avgWin === null && avgLoss === null) {
