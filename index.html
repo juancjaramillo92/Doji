@@ -378,12 +378,10 @@ nav {
    mints one column per figure — adding a figure needs no CSS change. */
 .period-stats { grid-template-columns:none; grid-auto-columns:1fr; }
 
-/* Above each wheel, mirroring .period-disc below it — the wheel is framed by a
-   rule on both sides rather than sitting on top of one. */
-.period-rr {
-  width:100%; margin-bottom:8px;
-  padding-bottom:var(--gap-divider); border-bottom:1px solid var(--glass-bd);
-}
+/* Above each wheel. No rule of its own — .period-disc's is the only divider in
+   the column — but it keeps the 8px so the wheel sits the same distance from the
+   bar above it as from the rule below. */
+.period-rr { width:100%; margin-bottom:8px; }
 
 /* Beneath each wheel, reusing the session-bar segments for one green-followed /
    red- missed read. */
@@ -612,7 +610,11 @@ nav {
 .heatmap-dow-week, .heatmap-week { margin-left:14px; }
 /* A different axis to the weekday names, so it takes the accent. */
 .heatmap-dow-week { color:var(--p); }
-.heatmap-cell-empty { min-height:80px; }
+/* Days outside the month. A wash and no border: the grid keeps its rectangle,
+   and nothing here competes with the dashed week rail. */
+.heatmap-cell-empty {
+  min-height:80px; background:var(--fill-0); border-radius:var(--r-cell);
+}
 /* Result colour lives in the fill only; borders stay the neutral card rule at
    every state. An outline in the result colour makes the grid a wall of
    competing edges, and the fill plus the coloured figures already carry the
