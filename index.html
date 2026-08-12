@@ -603,17 +603,16 @@ nav {
   color:var(--mt);
   padding:6px 0; text-align:center;
 }
-/* The market is shut, so the column heading recedes. Saturday stays at full
-   weight — it trades, and on a phone it is dropped only when genuinely empty. */
+/* Saturday is the one day gold is shut: the week runs Sunday 17:00 New York to
+   Friday 17:00, which is the same boundary Dates.weekStart works from. So the
+   Saturday heading recedes and Sunday keeps full weight. On a phone the column
+   is dropped outright when nothing landed in it, and then there is no heading
+   here to dim. */
 .heatmap-dow-closed { opacity:.55; }
 .heatmap-dow-week, .heatmap-week { margin-left:14px; }
 /* A different axis to the weekday names, so it takes the accent. */
 .heatmap-dow-week { color:var(--p); }
-/* Days outside the month. A wash and no border: the grid keeps its rectangle,
-   and nothing here competes with the dashed week rail. */
-.heatmap-cell-empty {
-  min-height:80px; background:var(--fill-0); border-radius:var(--r-cell);
-}
+.heatmap-cell-empty { min-height:80px; }
 /* Result colour lives in the fill only; borders stay the neutral card rule at
    every state. An outline in the result colour makes the grid a wall of
    competing edges, and the fill plus the coloured figures already carry the
@@ -624,26 +623,31 @@ nav {
   min-height:80px; position:relative; box-sizing:border-box;
   display:flex; flex-direction:column;
 }
-.heatmap-cell { box-shadow:var(--sh-2); padding:6px; justify-content:center; overflow:hidden; }
+.heatmap-cell { box-shadow:var(--sh-2); padding:6px; justify-content:center; }
 .heatmap-cell.win  { background:var(--seg-win-bg); }
 .heatmap-cell.loss { background:var(--seg-loss-bg); }
 .heatmap-cell.be   { background:var(--seg-be-bg); }
-/* ── Magnitude ─────────────────────────────────────────────────────────────
-   The fill says which way the day went; this says by how much. Width is the
-   day's |net| against the largest |net| in the month on show, so the scale is
-   the month's own — a quiet month is not flattened by a loud one somewhere else
-   in the year. Full-strength colour, because 12% over three pixels is nothing.
-   Absolute, so it costs the cell no layout and the amount stays centred; the
-   cell's overflow clips its ends to the corner radius. */
-.hm-mag {
-  position:absolute; left:0; bottom:0; height:3px;
-  background:var(--mt2);
-}
-.heatmap-cell.win  .hm-mag { background:var(--win); }
-.heatmap-cell.loss .hm-mag { background:var(--loss); }
-.heatmap-cell.be   .hm-mag { background:var(--seg-be-bd); }
-.heatmap-cell.win:hover  { background:var(--seg-win-hv); }
-.heatmap-cell.loss:hover { background:var(--seg-loss-hv); }
+/* ── Fill intensity ────────────────────────────────────────────────────────
+   The result says which way the day went; how strongly it is filled says by how
+   much. --hm-i is set per cell by heatmapGrid: the day's |net| against the
+   largest |net| in the month on show, floored so the quietest day is still
+   plainly coloured. The scale is the month's own, so a calm month is not washed
+   out by a loud one elsewhere in the year.
+
+   Mixed rather than tokenised: three fixed bands would need an alpha for every
+   band AND every band's hover, twelve tokens for what is one multiplication.
+   The flat --seg-*-bg above stays as the fallback declaration, so a browser
+   without color-mix() gets exactly what this grid looked like before.
+
+   Break-even is deliberately NOT scaled: a scratch is a day where nothing
+   happened, so there is no magnitude to show, and --seg-be-bg is opaque rather
+   than an alpha over the card. */
+.heatmap-cell.win  { background:color-mix(in srgb, var(--win)  calc(var(--hm-i) * 26%), transparent); }
+.heatmap-cell.loss { background:color-mix(in srgb, var(--loss) calc(var(--hm-i) * 26%), transparent); }
+/* A flat ten points above whatever the cell already sits at, so hovering a quiet
+   day can never land on a loud day's fill. */
+.heatmap-cell.win:hover  { background:color-mix(in srgb, var(--win)  calc(var(--hm-i) * 26% + 10%), transparent); }
+.heatmap-cell.loss:hover { background:color-mix(in srgb, var(--loss) calc(var(--hm-i) * 26% + 10%), transparent); }
 .heatmap-cell.be:hover   { background:var(--seg-be-hv); }
 /* Only days that hold a trade are clickable (they open that day's entry). */
 .heatmap-cell.win, .heatmap-cell.loss, .heatmap-cell.be { cursor:pointer; }
@@ -2755,8 +2759,10 @@ function disciplineBars(list) {
    ─────────────────────────────────────────────────────────────────────────── */
 function rrBar(list) {
   const { avgWin, avgLoss } = averages(list);
-  // .pm-val rather than .period-disc-pct: a ratio is not a percentage, and the
-  // generic figure class already carries the muted tone with no modifier.
+  // Under the track, not over it: the column's own "This Month" heading sits
+  // directly above, and two labels on consecutive lines read as one confused
+  // one. .pm-val rather than .period-disc-pct: a ratio is not a percentage, and
+  // the generic figure class already carries the muted tone with no modifier.
   const head = fig => `
       <div class="period-disc-head">
         <span class="period-disc-lbl">RR Ratio</span>
@@ -2764,7 +2770,7 @@ function rrBar(list) {
       </div>`;
 
   if (avgWin === null && avgLoss === null) {
-    return `<div class="period-disc-row">${head('—')}<div class="bar-empty"></div></div>`;
+    return `<div class="period-disc-row"><div class="bar-empty"></div>${head('—')}</div>`;
   }
 
   // No losses means no ratio, only a direction. The figure caps rather than
@@ -2778,8 +2784,8 @@ function rrBar(list) {
   ]);
   return `
     <div class="period-disc-row">
-      ${head(ratio.toFixed(2) + ':1')}
       <div class="sess-wr-track ${track}" title="avg win $${fmtMoney(avgWin || 0)} / avg loss $${fmtMoney(avgLoss || 0)}">${html}</div>
+      ${head(ratio.toFixed(2) + ':1')}
     </div>`;
 }
 
@@ -2872,7 +2878,7 @@ function heatmapDays(y, m) {
 // whichever weekday the month opens on.
 function heatmapGrid(visible, cols, first, dows, peak) {
   const today = Dates.today();
-  let html = dows.map((d, i) => `<div class="heatmap-dow${i === 0 ? ' heatmap-dow-closed' : ''}">${d}</div>`).join('')
+  let html = dows.map((d, i) => `<div class="heatmap-dow${i === 6 ? ' heatmap-dow-closed' : ''}">${d}</div>`).join('')
            + '<div class="heatmap-dow heatmap-dow-week">Week</div>';
 
   let slot = 0, wkN = 0, wkPnl = 0, wkPnlN = 0, wkBe = 0, wkTrades = 0;
@@ -2912,15 +2918,18 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     // Focusable only when the cell opens something, or thirty-one tab stops sit
     // in front of the trade log.
     const opens = n ? ` role="button" tabindex="0" aria-label="${iso}"` : '';
+    // Only a cell carrying a P&L takes a result colour, so only a cell carrying
+    // one needs the intensity the colour is mixed at.
+    const intensity = data.pnlN && peak
+      ? ` style="--hm-i:${round2(0.4 + 0.6 * Math.abs(data.pnl) / peak)}"` : '';
 
     html += `
-      <div class="heatmap-cell ${cls}" data-day="${iso}"${opens}>
+      <div class="heatmap-cell ${cls}" data-day="${iso}"${opens}${intensity}>
         <div class="heatmap-cell-day">${d}</div>
         <div class="heatmap-cell-body">
           <div class="heatmap-cell-count">${countText}</div>
           <div class="heatmap-cell-pnl">${pnlText}</div>
         </div>
-        ${data.pnlN && peak ? `<div class="hm-mag" style="width:${Math.abs(data.pnl) / peak * 100}%"></div>` : ''}
       </div>`;
 
     if (n) { wkTrades += n; wkPnlN += data.pnlN; wkPnl += data.pnl; wkBe += data.be; }
