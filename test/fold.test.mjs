@@ -6,7 +6,7 @@
    under plain Node runs nothing — that guard exists for this file and nothing
    else, which is why it is exercised by the mere fact that this import works.
 
-   Run:  node --experimental-strip-types --test test/
+   Run:  npm test
 
    WHAT IS NOT COVERED, said plainly: mcpInit, mcpCall, upsert and writeBalance
    all reach the network on their first line and are not exported. The transport
