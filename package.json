@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types --test test/"
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^30.0.1"
