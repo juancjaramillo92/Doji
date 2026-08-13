@@ -4,7 +4,7 @@
    index.html booted in jsdom against synthetic trades. See test/boot.mjs for
    how a single-file app with no exports is got at.
 
-   Run:  node --experimental-strip-types --test test/
+   Run:  npm test
 
    WHAT IS NOT COVERED, said plainly. These tests assert on values and on
    emitted markup; they cannot see pixels, so a renderer that produces correct
