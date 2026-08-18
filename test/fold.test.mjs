@@ -1,17 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — Edge Function tests
    ───────────────────────────────────────────────────────────────────────────
-   Covers the pure exports of supabase/functions/doji-mcp-sync/index.ts. The
-   file guards every Deno touch behind env() and Deno?.serve, so importing it
-   under plain Node runs nothing — that guard exists for this file and nothing
-   else, which is why it is exercised by the mere fact that this import works.
+   Covers the pure exports of supabase/functions/doji-mcp-sync/index.ts and of
+   supabase/functions/_shared/telegram.ts. Both guard every Deno touch behind
+   env() and Deno?.serve, so importing them under plain Node runs nothing — that
+   guard exists for this file and nothing else, which is why it is exercised by
+   the mere fact that these imports work.
 
    Run:  npm test
 
    WHAT IS NOT COVERED, said plainly: mcpInit, mcpCall, upsert and writeBalance
    all reach the network on their first line and are not exported. The transport
    is verified in production by the fact that rows arrive; the arithmetic is
-   verified here.
+   verified here. The same goes for the two Telegram functions — sendMessage,
+   editMessageText and the PATCH are network on their first line, so what is
+   tested is what they decide, not what they send.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +23,8 @@ import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget, secretMatches, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
+
+import { SETUPS, parseCallback, renderMessage } from '../supabase/functions/_shared/telegram.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -291,4 +296,130 @@ test('the Sunday open moves with New York, not with UTC', () => {
 test('midweek is open around the clock', () => {
   assert.equal(marketOpen(new Date(Date.UTC(2026, 7, 5, 6, 0))), true);     // Wed 02:00 NY
   assert.equal(marketOpen(new Date(Date.UTC(2026, 7, 5, 21, 0))), true);    // Wed 17:00 NY
+});
+
+/* ─── Telegram: callback_data ────────────────────────────────────────────────
+   The grammar is the whole state store — there is no session table and no
+   stored message id — so a payload that parses wrong writes the wrong column to
+   the wrong trade, silently.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('a tap names one journal column and its value', () => {
+  assert.deepEqual(parseCallback('PID562780708|setup|Break & Retest'),
+    { id: 'PID562780708', column: 'setup', value: 'Break & Retest' });
+  assert.deepEqual(parseCallback('PID562780708|rules|1'),
+    { id: 'PID562780708', column: 'followed_rules', value: true });
+  assert.deepEqual(parseCallback('PID562780708|sl|0'),
+    { id: 'PID562780708', column: 'followed_sl', value: false });
+  assert.deepEqual(parseCallback('PID562780708|tp|1'),
+    { id: 'PID562780708', column: 'followed_tp', value: true });
+});
+
+test('[Edit] carries no column, so it writes nothing', () => {
+  assert.deepEqual(parseCallback('PID562780708|edit'),
+    { id: 'PID562780708', column: null, value: null });
+});
+
+test('only the four journal columns are reachable from a button', () => {
+  // The one guarantee that matters: no payload can name a broker column. If
+  // this ever passes for something outside Data.OWNED, the fourth writer has
+  // stopped being confined to the journal half.
+  for (const field of ['direction', 'pnl', 'net_pnl', 'deleted', 'user_id', 'balance']) {
+    assert.equal(parseCallback(`PID1|${field}|1`), null, field);
+  }
+});
+
+test('a setup outside the vocabulary is refused before it reaches the column', () => {
+  assert.equal(parseCallback('PID1|setup|Liquidity Sweep'), null);
+});
+
+test('a discipline answer is 1 or 0 and nothing else', () => {
+  // 'true', 'yes' and '' would each become a boolean under a looser parse, and
+  // an empty string would land as `false` — a no the trader never gave.
+  for (const v of ['true', 'yes', '', '2', 'null']) {
+    assert.equal(parseCallback(`PID1|sl|${v}`), null, v);
+  }
+});
+
+test('a malformed payload parses to null rather than to something', () => {
+  assert.equal(parseCallback(''), null);
+  assert.equal(parseCallback('PID1'), null);
+  assert.equal(parseCallback('PID1|reopen'), null);              // not the edit action
+  assert.equal(parseCallback('1|sl|1'), null);                   // id without the PID prefix
+  assert.equal(parseCallback('PIDx|sl|1'), null);                // id without a position
+  assert.equal(parseCallback('PID1|sl|1|extra'), null);          // a fourth part
+});
+
+/* ─── Telegram: the keyboard ─────────────────────────────────────────────── */
+
+const open = {
+  id: 'PID562780708', direction: 'SELL', entry_price: 3400, entry_time: T0_ISO(),
+  setup: null, followed_rules: null, followed_sl: null, followed_tp: null
+};
+function T0_ISO() { return new Date(Date.UTC(2026, 6, 30, 14, 0, 0)).toISOString(); }
+const settled = { ...open, setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: false };
+
+test('every button fits inside Telegram\'s 64-byte callback_data cap', () => {
+  // Measured in BYTES, not characters, and over the longest setup name there
+  // is — the value travels inside the payload, so the vocabulary sets the
+  // budget. Worst case today is 39.
+  const rows = [
+    ...renderMessage(open, false).reply_markup.inline_keyboard,
+    ...renderMessage(settled, false).reply_markup.inline_keyboard
+  ];
+  const longest = Math.max(...SETUPS.map(s => s.length));
+  assert.equal(longest, 'Support & Resistance'.length);   // the budget this was measured against
+  for (const row of rows) {
+    for (const btn of row) {
+      const bytes = new TextEncoder().encode(btn.callback_data).length;
+      assert.ok(bytes <= 64, `${btn.callback_data} is ${bytes} bytes`);
+    }
+  }
+});
+
+test('an unanswered trade opens on the full keyboard, one row per question', () => {
+  const rows = renderMessage(open, false).reply_markup.inline_keyboard;
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows[0].map(b => b.text), [...SETUPS]);
+  assert.deepEqual(rows.slice(1).map(r => r.length), [2, 2, 2]);
+});
+
+test('the fourth answer settles the message to one [Edit] row', () => {
+  const rows = renderMessage(settled, false).reply_markup.inline_keyboard;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0][0].text, 'Edit');
+  assert.equal(rows[0][0].callback_data, 'PID562780708|edit');
+});
+
+test('the row count is what tells the webhook whether the form is open', () => {
+  // The message IS the state — there is nowhere else it could be read from.
+  // Settled-and-expanded must be indistinguishable from open, or a correction
+  // to two fields needs [Edit] pressed twice.
+  assert.equal(renderMessage(settled, true).reply_markup.inline_keyboard.length, 4);
+  assert.equal(renderMessage(open, true).reply_markup.inline_keyboard.length, 4);
+});
+
+/* ─── Telegram: the message ──────────────────────────────────────────────── */
+
+test('an unanswered discipline column draws as unanswered, never as no', () => {
+  // The null-is-not-no rule, in the one place it is shown to a person. A
+  // message that drew a blank as ✗ would teach the trader the opposite of what
+  // the column means.
+  const text = renderMessage({ ...open, followed_sl: false }, false).text;
+  assert.match(text, /Rules: —/);
+  assert.match(text, /Stop: ✗/);
+  assert.match(text, /Setup: —/);
+});
+
+test('the message heads with the New York clock, not the UTC one', () => {
+  // 21:05 New York on 30 July is 01:05 UTC on the 31st, the same fill nyDay is
+  // tested against. The header has to agree with the day the trade is filed on.
+  const evening = { ...open, entry_time: new Date(Date.UTC(2026, 6, 31, 1, 5)).toISOString() };
+  assert.match(renderMessage(evening, false).text, /^SELL 3400\.00 · 30 Jul, 21:05 NY$/m);
+});
+
+test('the settled summary is one line and carries all four answers', () => {
+  const text = renderMessage(settled, false).text;
+  assert.equal(text.includes('\n'), false);
+  assert.equal(text, 'SELL 3400.00 · Break & Retest · rules ✓ stop ✓ target ✗');
 });

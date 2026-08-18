@@ -6,10 +6,10 @@ and you say so. The README is the contract for how the app behaves; this file is
 how to work on it.
 
 Doji is a personal XAUUSD trading journal: one `index.html` of ~4,000 lines, one
-flat namespace, **no build step, no bundler**. Three writers share one Supabase
-table — the app, the cTrader poller (Edge Function), and the email parser (Apps
-Script). Journal columns and broker columns never meet; that single idea is what
-the whole design rests on.
+flat namespace, **no build step, no bundler**. Four writers share one Supabase
+table — the app, the cTrader poller (Edge Function), the email parser (Apps
+Script), and the Telegram bot (two more Edge Functions). Journal columns and
+broker columns never meet; that single idea is what the whole design rests on.
 
 ---
 
@@ -86,7 +86,8 @@ npm install   # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6+. `test/fold.test.mjs` covers the Edge Function's pure logic;
+Node 22.6+. `test/fold.test.mjs` covers the pure logic of the poller and of
+`functions/_shared/telegram.ts`;
 `test/app.test.mjs` boots `index.html` in jsdom with a recording Supabase
 stand-in. They do **not** cover pixels, realtime, auth, the xlsx export, or the
 Apps Script — so a good deal of what a change can break is only caught by
@@ -136,101 +137,36 @@ overwrites it. Repairs are `?force=1&hours=N`; the signature of a sliced row is
 
 ---
 
-## Pending work — the Telegram journaling bot
+## The Telegram journal — shipped
 
-Goal: when a trade opens, the trader gets a Telegram message and answers the
-whole journal from it — setup and all three discipline booleans — without opening
-the app.
+`README.md` carries the full account; this is what constrains code you write
+near it.
 
-### Decisions already made (do not relitigate)
-
-- **Transport is a Telegram bot, not WhatsApp.** WhatsApp needs a business number
-  and its 24-hour window forces pre-approved templates; a Telegram bot has its
-  own identity, needs no new number, and can message freely once the trader has
-  sent `/start` once.
-- **Fires at trade open**, i.e. `after insert on trades`. The poller mints the
-  row from the entry deal alone, so setup and the three booleans are null at that
-  point. An open position may be journalled before it closes — the README already
-  allows this.
-- **All four answers at open.** The trader follows SL and TP strictly, so
-  answering `followed_sl`/`followed_tp` at open is intended behaviour, and a
-  missed case is corrected later via the message's Edit button. No second message
-  at close.
-- **One self-editing message.** Inline keyboard, four rows (setup + rules + stop
-  + target), answered in any order. Each tap writes one column and `editMessageText`
-  redraws the message in place; the fourth answer settles it to a one-line summary
-  carrying an `[Edit]` button that restores the full keyboard. One thread entry,
-  not five.
-- **`[Edit]` button only — no text-reply path.** Editing reopens the same
-  keyboard via `callback_data`; there is no natural-language parsing of replies.
-  (A text-reply path would need a stored `tg_message_id` and phrase
-  interpretation — rejected as fragile. Revisit only if attaching a free-text
-  *note* to a trade becomes a wanted feature, which is a different thing.)
-
-### How it hangs together
-
-- **`callback_data` grammar:** `PID562780708|setup|Break & Retest`,
-  `PID562780708|sl|1`. Under Telegram's 64-byte cap with room to spare, and it
-  carries the trade id, the field and the value — so **no schema change** and no
-  session table. The callback payload also carries `chat.id` and
-  `message.message_id`, which is what `editMessageText` targets.
-- **The insert trigger must be guarded** or a restore-from-backup fires it for
-  every row in the file. Proposed guard: `when (new.entry_time > now() -
-  interval '1 hour')` — a live fill is always minutes old; a restored historical
-  row and a null-`entry_time` pre-sync row are both excluded. A `?force=1`
-  backfill is an UPDATE on existing ids, so it stays silent on its own. **Confirm
-  this against the real column types and the restore SQL before trusting it.**
-- **Two Edge Functions.** Send: invoked by the trigger via `pg_net`, reads the
-  bot token and chat id, posts the message. Webhook: `verify_jwt = false` (Meta…
-  Telegram calls it unauthenticated), validates the
-  `X-Telegram-Bot-Api-Secret-Token` header against the stored secret, writes the
-  answer, returns 200 **fast** or Telegram retries. Both should read like the
-  poller wrote them — same imports, same secret reads, same error handling.
-- **The write is a fourth writer, strictly inside the journal half.** Service
-  role, `update trades set … where id = $1`, sending only the four `Data.OWNED`
-  columns. Nothing to arbitrate. The resulting `updated_at` broadcast re-renders
-  any open browser tab for free.
-- **Secrets live in Supabase Edge Function secrets, never in the repo:**
-  `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Names are
-  read verbatim in code, so keep them exact. (Same discipline as `DOJI_EMAIL` /
-  `DOJI_PASSWORD` in the Apps Script — value never in the file.)
-
-### Two failure modes to code for, not discover
-
-- A **double-tap** sends two identical webhook calls; the second `editMessageText`
-  returns `400 message is not modified`. That must not be treated as fatal.
-- The webhook must **return 200 quickly** or Telegram redelivers, producing the
-  same tap twice anyway.
-
-### A data-integrity note worth a comment in the code
-
-Answering `followed_sl`/`followed_tp` at open records *intent*, not *outcome*.
-The field only measures respect if the edit is actually made on the occasions it
-is needed; a missed edit reads as compliance, biasing exactly those two bars
-upward. This is the mirror of the `null`-is-not-`no` rule the app already
-protects, and whoever documents the feature should say so.
+- **It is the fourth writer and it stays in the journal half.** The webhook maps
+  a button's field to a column through the same four names as `Data.OWNED`. No
+  broker column is nameable from a tap, so there is nothing to arbitrate.
+- **`callback_data` is the entire state store.** `PID562780708|setup|Break &
+  Retest`, `PID562780708|edit` — trade, field, value, 39 bytes at worst against
+  Telegram's 64. No session table, no `tg_message_id`, no schema change. Whether
+  a settled message has been reopened is read off the keyboard already on it:
+  four rows open, one row settled.
+- **The trigger guard is load-bearing.** `when (new.entry_time > now() -
+  interval '1 hour')` on `after insert`. Verified against the real column types
+  and the restore SQL: an `on conflict do update` is not an insert, restored rows
+  carry historical `entry_time`, and an email-first row has none at all, so
+  `null > anything` keeps it silent.
+- **Answering `followed_sl`/`followed_tp` at open records intent, not outcome**,
+  and biases those two bars upward when a needed edit is never made. The mirror
+  of the `null`-is-not-`no` rule.
+- **Everything either function decides lives in
+  `supabase/functions/_shared/telegram.ts`**, because that is the part a test can
+  reach. `secretMatches` is duplicated there rather than imported from the
+  poller: that file calls `Deno.serve` at module scope, so importing it would
+  start a second poller inside whichever function imported it.
 
 ---
 
-## What this file's author could NOT verify
+## On handback
 
-This context was assembled from `README.md`, `index.html` and the design
-conversation — **not** from the schema, the Edge Function or the test files,
-which were not readable at the time. Before trusting any of the Telegram plan,
-a Code session should:
-
-1. Confirm the trigger idiom and the `entry_time` guard against the real
-   `supabase/001_trades.sql` — column types, the `updated_at` trigger, and the
-   restore-from-backup `insert … on conflict` path.
-2. Match the two new Edge Functions to the poller's actual idiom in
-   `supabase/functions/doji-mcp-sync/index.ts` — imports, secret reads, error
-   and truncation handling.
-3. Cover the `callback_data` parse and the keyboard builder in
-   `test/fold.test.mjs` against the `boot.mjs` harness — and break each on
-   purpose first, per the rule above.
-4. Verify whether Telegram caps editing a bot's own message in a private chat.
-   If there is a cap, the `[Edit]` button on an old trade fails and must fall
-   back to sending a fresh message rather than editing the old one.
-
-State plainly, on handback, what was changed, what was verified by running, what
-by reading, and what could not be verified.
+State plainly what was changed, what was verified by running, what by reading,
+and what could not be verified.

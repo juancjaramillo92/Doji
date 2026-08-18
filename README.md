@@ -44,7 +44,11 @@ index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for index.html
 supabase/001_trades.sql                 the schema
+supabase/002_telegram.sql               the trade-open trigger
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
+supabase/functions/doji-telegram-send/  Edge Function: the trade-open message
+supabase/functions/doji-telegram-webhook/   Edge Function: a tap on its buttons
+supabase/functions/_shared/telegram.ts  what the message says and its buttons carry
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs both suites on every push
@@ -69,17 +73,24 @@ test/                                   node:test suites — see Tests
         ┌──────────────────────────────────────────────┐
         │                   trades                     │
         │            one row per position              │
-        └──────────────────┬───────────────────────────┘
-                           │ read · realtime · update
-                           ▼
-                    ┌──────────────┐
-                    │     Doji     │
-                    └──────────────┘
+        └────┬───────────────────────┬─────────────────┘
+             │ after insert          │ read · realtime · update
+             │ (entry_time < 1h)     ▼
+             │                       ┌──────────────┐
+             │                       │     Doji     │
+             ▼                       └──────────────┘
+      ┌──────────────┐
+      │   Telegram   │   a tap writes setup and the three
+      │ one message  │   discipline answers back to trades
+      │  per trade   │
+      └──────────────┘
 ```
 
-Three writers, one table. Journal columns and broker columns never meet, so
-between the app and the other two there is nothing to arbitrate at all — that is
-the single idea the whole design rests on.
+Four writers, one table. Journal columns and broker columns never meet, so
+between the journal half and the broker half there is nothing to arbitrate at
+all — that is the single idea the whole design rests on. The Telegram bot is a
+writer on the journal side, the app's side, and reaches the same four columns
+through the same list.
 
 `balance` is the one column two writers share, and the arbitration for it is a
 filter rather than a rule anybody has to remember: the poller writes it only
@@ -123,7 +134,8 @@ have history rather than starting from the day it was added.
 
 ### Journal-owned
 
-Written by the app alone. The poller never sends these keys.
+Written by the app and by the Telegram bot. Neither broker writer ever sends
+these keys.
 
 | Column | Meaning |
 |---|---|
@@ -378,6 +390,74 @@ the notifications on regardless of whether you read them.
 
 ---
 
+## The Telegram journal
+
+When a position opens, the trader gets one Telegram message and answers the
+whole journal from it — setup and all three discipline booleans — without
+opening the app. `supabase/002_telegram.sql` holds the trigger;
+`doji-telegram-send` posts the message; `doji-telegram-webhook` handles a tap;
+`_shared/telegram.ts` holds everything either of them decides.
+
+**One message, edited in place.** Four rows of buttons, answerable in any order.
+Each tap writes one column and redraws the message, and the fourth answer
+settles it to a one-line summary with an `[Edit]` button that opens the keyboard
+again. One thread entry per trade, not five. There is no text-reply path — a tap
+is the whole vocabulary.
+
+**It fires at open, not at close.** The poller mints the row from the entry deal
+alone, so all four answers are null at that point and the message asks for all
+four. The app has always allowed journalling an open position; this is that,
+from the notification.
+
+**`callback_data` is the entire state store.** `PID562780708|setup|Break &
+Retest`, `PID562780708|sl|1`, `PID562780708|edit` — the trade, the field and the
+value, in 39 bytes at worst against Telegram's 64-byte cap. So there is no
+session table, no `tg_message_id` column and no schema change: the callback also
+carries the chat and message ids that `editMessageText` needs. A tap is
+self-describing, and a redeploy in the middle of answering costs nothing.
+
+The one thing the row cannot say is whether a settled message has been reopened.
+That is read off the keyboard already on it — four rows means open, one row
+means settled — so correcting two fields does not need `[Edit]` pressed twice.
+The consequence, stated rather than discovered: a message reopened with `[Edit]`
+stays open. Only the fourth answer settles it, and a reopened message has no
+fourth answer left to give.
+
+**The write is the fourth writer and it stays in the journal half.** The webhook
+maps a button's field to a column through the same four names as `Data.OWNED`,
+so no broker column is nameable from a tap and there is nothing to arbitrate.
+`updated_at` moves, and the realtime subscription the app already holds
+re-renders any open tab for free.
+
+**The trigger guard is load-bearing.** `when (new.entry_time > now() - interval
+'1 hour')`. Without it, restoring from backup messages you once per row in the
+file. A live fill is seconds old; everything else fails the test — restored rows
+carry historical `entry_time`, an `on conflict do update` is not an insert at
+all, a `?force=1` backfill updates existing ids, and the poller's own re-upserts
+inside its six-hour write window are updates too. One message per trade, and the
+mechanism is Postgres's rather than a de-dupe check.
+
+A row the poller never reached — minted by the email parser, which sends no
+`entry_time` — gets no message, ever. `null > anything` is NULL, so the trigger
+stays silent. That is right: there was no open event to prompt from.
+
+**Answering `followed_sl` and `followed_tp` at open records intent, not
+outcome.** The message arrives seconds after the fill, long before either level
+is anywhere near. Those two columns only measure respect if the edit is actually
+made on the occasions it is needed — a missed edit reads as compliance, so those
+two bars bias upward and nothing in the data shows it. It is the same shape as
+the `null`-is-not-`no` rule: an answer nobody gave must not be counted as one.
+
+**Two failure modes are coded for rather than discovered.** A double tap sends
+the identical update twice and the second `editMessageText` returns `400 message
+is not modified` — the correct outcome, reported as an error, and treated as
+success. Any *other* edit failure falls back to a fresh message, which is also
+the answer if Telegram caps how long a bot may edit its own message. And every
+path answers 200: Telegram redelivers anything else, and a write that failed is
+better retried by the trader's own second tap than by a redelivery loop.
+
+---
+
 ## Application structure
 
 `index.html` is organised in labelled sections, in dependency order — nothing
@@ -475,6 +555,22 @@ ground out from under it.
 5. Schedule it with pg_cron every 2 minutes.
 6. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
    Properties, never in the file. Trigger `syncPepperstone` every minute.
+7. For the Telegram journal: create the bot with BotFather and send it `/start`
+   once, so it may message you unprompted. Deploy both Telegram functions
+   `--no-verify-jwt`, and set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+   `TELEGRAM_WEBHOOK_SECRET` in secrets — values never in the repo, the same
+   discipline as the Apps Script's.
+8. Point Telegram at the webhook, passing the same secret it will check:
+
+   ```
+   POST https://api.telegram.org/bot<token>/setWebhook
+        url=https://<project>.supabase.co/functions/v1/doji-telegram-webhook
+        secret_token=<TELEGRAM_WEBHOOK_SECRET>
+   ```
+
+9. Run `supabase/002_telegram.sql`. It reads `DOJI_CRON_SECRET` from Vault under
+   that name — the same secret and the same read the poller's cron job uses — so
+   the trigger holds no database power either.
 
 ---
 
@@ -499,7 +595,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen` |
+| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`, and the Telegram `parseCallback` and `renderMessage` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 
@@ -510,6 +606,13 @@ are exercised but realtime and the auth paths are not. `mcpInit`, `mcpCall` and
 `upsert` reach the network on their first line and are not exported. The xlsx
 export needs SheetJS from a CDN and is not exercised. And the Apps Script has no
 coverage at all.
+
+The Telegram functions are covered only where they decide something.
+`parseCallback` and `renderMessage` are pure and are tested hard; `sendMessage`,
+`editMessageText` and the PATCH reach the network on their first line, so the
+double tap, the fresh-message fallback and the chat check are verified by
+reading. So is the trigger — nothing here runs Postgres, so its guard is argued
+against the real column types and the restore SQL rather than executed.
 
 Four gaps are worth naming rather than leaving to be rediscovered. Soft delete
 has no test of its own — `Data.mark` and the `deleted` path are touched only
@@ -524,7 +627,10 @@ against deliberately broken copies before being trusted: the fold tests against
 an inverted entry deal, a double-counted commission, a fold window collapsed to
 the write window, a `balanceTarget` with its age bound removed, one that returns
 the earliest close instead of the latest, and a secret comparison that ignores
-length; the client tests
+length; the Telegram tests against a setup whitelist removed, a discipline
+answer that accepts anything, `direction` added to the reachable columns, `sl`
+and `tp` swapped, a loosened trade id, `null` drawn as `no`, the clock reverted
+to UTC, a keyboard row dropped, and a message that never settles; the client tests
 against a widened break-even band, break-evens dropped from the win-rate
 denominator, a stray column in `Data.OWNED`, a session derived from the close,
 an inverted filing anchor and a throwing renderer. Every one of those was
