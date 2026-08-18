@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- Fires when the poller mints a row from an entry deal, and asks the trader the
 -- four journal questions in Telegram. Separate from 001_trades.sql because it
--- depends on two things that file does not: doji-telegram-send deployed, and
+-- depends on two things that file does not: doji-telegram deployed, and
 -- DOJI_CRON_SECRET in Vault.
 --
 -- Run once, in the SQL editor, after both exist.
@@ -48,7 +48,7 @@ begin
   end if;
 
   perform net.http_post(
-    url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-telegram-send',
+    url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-telegram',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-doji-key', secret),
     body    := jsonb_build_object(
       'id',             new.id,

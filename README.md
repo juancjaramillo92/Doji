@@ -46,9 +46,7 @@ vercel.json                             no-cache header for index.html
 supabase/001_trades.sql                 the schema
 supabase/002_telegram.sql               the trade-open trigger
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
-supabase/functions/doji-telegram-send/  Edge Function: the trade-open message
-supabase/functions/doji-telegram-webhook/   Edge Function: a tap on its buttons
-supabase/functions/_shared/telegram.ts  what the message says and its buttons carry
+supabase/functions/doji-telegram/       Edge Function: the Telegram journal
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs both suites on every push
@@ -394,9 +392,15 @@ the notifications on regardless of whether you read them.
 
 When a position opens, the trader gets one Telegram message and answers the
 whole journal from it — setup and all three discipline booleans — without
-opening the app. `supabase/002_telegram.sql` holds the trigger;
-`doji-telegram-send` posts the message; `doji-telegram-webhook` handles a tap;
-`_shared/telegram.ts` holds everything either of them decides.
+opening the app. `supabase/002_telegram.sql` holds the trigger and
+`doji-telegram` is the Edge Function behind it.
+
+**One function, two callers**, told apart by which secret they present:
+`x-doji-key` is the trigger saying a position opened, `x-telegram-bot-api-secret-token`
+is Telegram reporting a tap. They were briefly two functions and share
+everything that matters — the keyboard, the message, the `callback_data`
+grammar — so splitting them meant deploying that code twice and keeping the
+copies in step.
 
 **One message, edited in place.** Four rows of buttons, answerable in any order.
 Each tap writes one column and redraws the message, and the fourth answer
@@ -556,15 +560,15 @@ ground out from under it.
 6. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
    Properties, never in the file. Trigger `syncPepperstone` every minute.
 7. For the Telegram journal: create the bot with BotFather and send it `/start`
-   once, so it may message you unprompted. Deploy both Telegram functions
+   once, so it may message you unprompted. Deploy `doji-telegram`
    `--no-verify-jwt`, and set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
    `TELEGRAM_WEBHOOK_SECRET` in secrets — values never in the repo, the same
    discipline as the Apps Script's.
-8. Point Telegram at the webhook, passing the same secret it will check:
+8. Point Telegram at the same function, passing the secret it will check:
 
    ```
    POST https://api.telegram.org/bot<token>/setWebhook
-        url=https://<project>.supabase.co/functions/v1/doji-telegram-webhook
+        url=https://<project>.supabase.co/functions/v1/doji-telegram
         secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```
 
@@ -607,11 +611,11 @@ are exercised but realtime and the auth paths are not. `mcpInit`, `mcpCall` and
 export needs SheetJS from a CDN and is not exercised. And the Apps Script has no
 coverage at all.
 
-The Telegram functions are covered only where they decide something.
+The Telegram function is covered only where it decides something.
 `parseCallback` and `renderMessage` are pure and are tested hard; `sendMessage`,
 `editMessageText` and the PATCH reach the network on their first line, so the
-double tap, the fresh-message fallback and the chat check are verified by
-reading. So is the trigger — nothing here runs Postgres, so its guard is argued
+double tap, the fresh-message fallback, the chat check and the secret that
+picks which half runs are verified by reading. So is the trigger — nothing here runs Postgres, so its guard is argued
 against the real column types and the restore SQL rather than executed.
 
 Four gaps are worth naming rather than leaving to be rediscovered. Soft delete
