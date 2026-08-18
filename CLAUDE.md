@@ -60,8 +60,10 @@ Every change is:
 - **Deployed from `main`, not from a dashboard.** `.github/workflows/deploy-functions.yml`
   pushes every Edge Function on a push that touches `supabase/functions/**`, and
   `supabase/config.toml` holds `verify_jwt`. Never tell anyone to paste a
-  function into the dashboard editor — that is how the running code and the
-  committed code came apart in the first place. The SQL stays manual on purpose.
+  function into the dashboard editor: a hand-deployed function can differ from
+  the committed one with nothing to reveal it, and every later change is then
+  reasoned about from a file that is not what runs. The SQL stays manual on
+  purpose.
 - **Dependency-free.** No new libraries in the app. Three CDN scripts only
   (Chart.js and Supabase client are blocking tags; SheetJS is fetched on first
   export by `loadXLSX()`). `jsdom` is a dev dependency and never ships. A fourth
