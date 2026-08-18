@@ -1,0 +1,45 @@
+# Deploys every Edge Function in supabase/functions on a push to main, so the
+# repository is the source of truth for what is running — the same arrangement
+# Vercel already gives index.html.
+#
+# Before this existed the functions were pasted into the dashboard by hand, and
+# nothing connected the deployed code to the committed code. A repo that claims
+# to describe a running system while the system runs something else is worse
+# than no repo at all: every later change is reasoned about from a file that is
+# not the truth.
+name: deploy functions
+
+on:
+  push:
+    branches: [main]
+    # Only when the functions or this workflow actually change. A README edit
+    # has no business redeploying anything.
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/deploy-functions.yml'
+  # Manual re-run, for the first deploy and for re-pushing unchanged code after
+  # a dashboard edit has been made by mistake.
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # No function name: every function under supabase/functions goes, so one
+      # of them cannot silently fall behind the other.
+      #
+      # --no-verify-jwt duplicates what supabase/config.toml already says, and
+      # deliberately. Both functions authorise their own callers in code, and if
+      # either mechanism stops being honoured on its own, a deploy that quietly
+      # turned JWT verification back on would break the live Telegram webhook
+      # and the cron poller at once. Two statements of one setting is the
+      # cheaper mistake.
+      - run: supabase functions deploy --project-ref gujhyogvkzjgnrodyuse --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
