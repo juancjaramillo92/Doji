@@ -43,6 +43,7 @@ default or duplicated something already in the head. Left alone deliberately.
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for index.html
+supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_telegram.sql               the trade-open trigger
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -50,6 +51,7 @@ supabase/functions/doji-telegram/       Edge Function: the Telegram journal
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs both suites on every push
+.github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 ```
 
 ---
@@ -550,6 +552,35 @@ ground out from under it.
 
 ---
 
+## Deployment
+
+**`index.html` is served by Vercel from `main`, and the Edge Functions follow
+the same rule.** `.github/workflows/deploy-functions.yml` runs
+`supabase functions deploy` on any push to `main` that touches
+`supabase/functions/**` or `supabase/config.toml`. It needs one repository
+secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
+
+Every function goes on each run rather than only the changed one, so the two
+cannot drift apart from each other. `verify_jwt` lives in `supabase/config.toml`
+rather than in a dashboard toggle, which is what makes the committed file the
+whole description of how a function is deployed.
+
+**This is worth the machinery for one reason.** Both functions were pasted into
+the dashboard by hand, and nothing tied the running code to the committed code —
+so the repository could describe a system while the system ran something else,
+and every later change would be reasoned about from a file that was not the
+truth. That failure is silent, which is what makes it expensive.
+
+**Two things are still deliberately manual.** The SQL is run knowingly in the
+SQL editor, never by a robot: `001_trades.sql` and `002_telegram.sql` are not
+under `supabase/migrations/`, so nothing applies them automatically, and a
+schema change that lands because a file was committed is exactly the accident
+the Operating section argues against for restores. The Apps Script is deployed
+from the Apps Script editor; it holds no secrets in the file and nothing reads
+it from here.
+
+---
+
 ## Setup from scratch
 
 1. Run `supabase/001_trades.sql` in the SQL editor.
@@ -560,10 +591,10 @@ ground out from under it.
 6. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
    Properties, never in the file. Trigger `syncPepperstone` every minute.
 7. For the Telegram journal: create the bot with BotFather and send it `/start`
-   once, so it may message you unprompted. Deploy `doji-telegram`
-   `--no-verify-jwt`, and set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
-   `TELEGRAM_WEBHOOK_SECRET` in secrets — values never in the repo, the same
-   discipline as the Apps Script's.
+   once, so it may message you unprompted. Set `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_CHAT_ID` and `TELEGRAM_WEBHOOK_SECRET` in Edge Function secrets —
+   values never in the repo, the same discipline as the Apps Script's. The
+   function itself deploys from `main`; see **Deployment**.
 8. Point Telegram at the same function, passing the secret it will check:
 
    ```
@@ -592,7 +623,8 @@ dev dependency — the application itself still installs nothing and still has n
 build step.
 
 The suites run on every push through `.github/workflows/test.yml`, so a red run
-is attached to the commit that caused it rather than found later. The script
+is attached to the commit that caused it rather than found later. A second
+workflow deploys the Edge Functions — see **Deployment** below. The script
 globs `test/*.test.mjs` — one level, deliberately, since `boot.mjs` is a harness
 and not a suite. A test added in a subfolder would not match and would silently
 not run.
