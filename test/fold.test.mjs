@@ -2,7 +2,7 @@
    DOJI — Edge Function tests
    ───────────────────────────────────────────────────────────────────────────
    Covers the pure exports of supabase/functions/doji-mcp-sync/index.ts and of
-   supabase/functions/_shared/telegram.ts. Both guard every Deno touch behind
+   supabase/functions/doji-telegram/index.ts. Both guard every Deno touch behind
    env() and Deno?.serve, so importing them under plain Node runs nothing — that
    guard exists for this file and nothing else, which is why it is exercised by
    the mere fact that these imports work.
@@ -12,9 +12,9 @@
    WHAT IS NOT COVERED, said plainly: mcpInit, mcpCall, upsert and writeBalance
    all reach the network on their first line and are not exported. The transport
    is verified in production by the fact that rows arrive; the arithmetic is
-   verified here. The same goes for the two Telegram functions — sendMessage,
+   verified here. The same goes for the Telegram function — sendMessage,
    editMessageText and the PATCH are network on their first line, so what is
-   tested is what they decide, not what they send.
+   tested is what it decides, not what it sends.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,7 +24,7 @@ import {
   lookbackFor, foldHours, balanceTarget, secretMatches, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, parseCallback, renderMessage } from '../supabase/functions/_shared/telegram.ts';
+import { SETUPS, parseCallback, renderMessage } from '../supabase/functions/doji-telegram/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 

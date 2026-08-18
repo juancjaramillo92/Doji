@@ -8,7 +8,7 @@ how to work on it.
 Doji is a personal XAUUSD trading journal: one `index.html` of ~4,000 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, the cTrader poller (Edge Function), the email parser (Apps
-Script), and the Telegram bot (two more Edge Functions). Journal columns and
+Script), and the Telegram bot (one more Edge Function). Journal columns and
 broker columns never meet; that single idea is what the whole design rests on.
 
 ---
@@ -87,7 +87,7 @@ npm test
 ```
 
 Node 22.6+. `test/fold.test.mjs` covers the pure logic of the poller and of
-`functions/_shared/telegram.ts`;
+`functions/doji-telegram/index.ts`;
 `test/app.test.mjs` boots `index.html` in jsdom with a recording Supabase
 stand-in. They do **not** cover pixels, realtime, auth, the xlsx export, or the
 Apps Script — so a good deal of what a change can break is only caught by
@@ -158,11 +158,14 @@ near it.
 - **Answering `followed_sl`/`followed_tp` at open records intent, not outcome**,
   and biases those two bars upward when a needed edit is never made. The mirror
   of the `null`-is-not-`no` rule.
-- **Everything either function decides lives in
-  `supabase/functions/_shared/telegram.ts`**, because that is the part a test can
-  reach. `secretMatches` is duplicated there rather than imported from the
-  poller: that file calls `Deno.serve` at module scope, so importing it would
-  start a second poller inside whichever function imported it.
+- **One function, two callers**, told apart by which secret is on the request:
+  `x-doji-key` from the trigger, `x-telegram-bot-api-secret-token` from
+  Telegram. The two halves share the keyboard, the message and the grammar, so
+  two functions meant deploying that code twice. The pure parts are exported so
+  a test can reach them, and `Deno.serve` is guarded so the import runs nothing.
+  `secretMatches` is a second copy rather than an import from the poller: that
+  file calls `Deno.serve` at module scope, so importing it would start a second
+  poller inside this function.
 
 ---
 
