@@ -26,8 +26,9 @@
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SUPABASE_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM } from "./prompt.ts";
-
-const env = (k: string): string => (globalThis as any).Deno?.env?.get(k) ?? "";
+// env, secretMatches and json live in _shared/edge.ts — one definition each,
+// for the reason that file gives.
+import { env, secretMatches, json } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
 const WEBHOOK_SECRET = env("EUGENIA_WEBHOOK_SECRET");
@@ -73,14 +74,15 @@ export const greeting = (brief: Brief) =>
     : 'Buenos dias jefesito, todays news below';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
-   A full briefing is seven sections long and will not fit. Splitting is not
-   optional, and splitting badly is worse than not splitting: a break mid-
-   sentence reads as a bug.
+   The prompt aims at 2,500 characters, so most briefings now arrive as one
+   message and this does nothing. It stays for the ones that do not — a heavy
+   calendar week, or a Sunday — because splitting badly is worse than not
+   splitting: a break mid-sentence reads as a bug.
 
    So the split prefers a blank line, then any newline, then — only if a single
-   paragraph is itself over the limit — a hard cut. Paragraph boundaries are
-   what the prompt asks Eugenia to write toward, which is why the first choice
-   is nearly always the one taken.
+   paragraph is itself over the limit — a hard cut. The prompt puts a blank line
+   between sections and nowhere else, which is why the first choice is nearly
+   always the one taken.
    ───────────────────────────────────────────────────────────────────────── */
 export const TG_LIMIT = 4096;
 
@@ -160,7 +162,19 @@ async function readTrades(days: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 interface Turn { role: 'user' | 'assistant'; content: string }
 
-async function call(messages: any[]) {
+/* THE BRIEFING AND A QUESTION ARE NOT THE SAME AMOUNT OF WORK, AND WERE PRICED
+   AS IF THEY WERE. Effort sets how deeply the model thinks before it writes,
+   and at "high" — the API default — "how many trades did I take this week"
+   bought a minute of reasoning to produce one sentence. The briefing earns that
+   depth: a dozen searches, seven sections, one shot a day. A reply does not.
+
+   Medium rather than low for the reply, because the journal is the half that
+   punishes carelessness — `null` is not `no`, break-even is a price band and
+   not a number, and a fast wrong reading of his discipline is worse than a slow
+   right one. Low is for work with no way to be subtly wrong. */
+type Effort = 'medium' | 'high';
+
+async function call(messages: any[], effort: Effort) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -181,7 +195,7 @@ async function call(messages: any[]) {
         TRADES_TOOL,
       ],
       thinking: { type: "adaptive" },
-      output_config: { effort: "high" },
+      output_config: { effort },
     }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -193,11 +207,11 @@ async function call(messages: any[]) {
 // for the case where that assumption is wrong rather than as a working limit.
 const MAX_ROUNDS = 4;
 
-async function ask(messages: Turn[]): Promise<string> {
+async function ask(messages: Turn[], effort: Effort): Promise<string> {
   const convo: any[] = [...messages];
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const body = await call(convo);
+    const body = await call(convo, effort);
     // A refusal stops the turn with no usable content, so it is checked before
     // the blocks are read rather than surfacing as an empty message.
     if (body.stop_reason === "refusal") {
@@ -257,7 +271,12 @@ const sbHeaders = (prefer?: string) => {
    question for no gain — what a follow-up needs is the briefing it follows and
    the exchange since, not last Tuesday's calendar. Twelve covers a morning's
    conversation and keeps the cost of a one-line question near the cost of a
-   one-line question. */
+   one-line question.
+
+   IT HAS TO BE EVEN. remember() writes a question and its answer together, so
+   the table is always a whole number of pairs; an odd window would start on an
+   assistant turn, and the Messages API requires the first message to be a user
+   one. Nothing enforces that but this sentence. */
 const HISTORY = 12;
 
 async function recent(): Promise<Turn[]> {
@@ -286,9 +305,8 @@ async function postBriefing(url: URL): Promise<Response> {
   // failure, and a way to exercise the whole path without waiting for 08:00.
   // It changes nothing else, and the answer comes back in the response rather
   // than only in Telegram, which is what makes a failure readable.
-  const due = url.searchParams.get("force") === "1"
-    ? briefDue(new Date()) ?? 'weekday'
-    : briefDue(new Date());
+  const forced = url.searchParams.get("force") === "1";
+  const due = briefDue(new Date()) ?? (forced ? 'weekday' : null);
   // The job runs hourly; twenty-three of those hours are not a briefing hour.
   if (!due) return json({ ok: true, skipped: "not a briefing hour" });
 
@@ -296,7 +314,7 @@ async function postBriefing(url: URL): Promise<Response> {
     ? "Today's briefing, please — the full structure. It is Sunday evening, the gold week is about to open."
     : "Today's briefing, please — the full structure.";
 
-  const brief = await ask([{ role: 'user', content: asked }]);
+  const brief = await ask([{ role: 'user', content: asked }], 'high');
   await say(`${greeting(due)}\n\n${brief}`);
   // Stored so a follow-up question has the briefing it follows.
   await remember([{ role: 'user', content: asked }, { role: 'assistant', content: brief }]);
@@ -328,12 +346,27 @@ async function handleMessage(update: any): Promise<void> {
       return;
     }
 
-    // Typing shows immediately; a briefing-grade answer takes a while and a
-    // silent bot reads as a broken one. Best effort — it is a courtesy.
-    await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+    // TELEGRAM'S TYPING INDICATOR LASTS FIVE SECONDS AND CANNOT BE EXTENDED, so
+    // one call at the start leaves a thirty-second answer looking like a dead
+    // bot for twenty-five of them — which is exactly how it was read the first
+    // time it ran long. Re-sent until there is something to send. It makes
+    // nothing faster; it makes the wait legible. Best effort, so a failed ping
+    // is swallowed rather than taking the answer down with it.
+    const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+    typing();
+    const keepTyping = setInterval(typing, 4_500);
 
-    const history = await recent();
-    const answer = await ask([...history, { role: 'user', content: msg.text }]);
+    let answer: string;
+    try {
+      const history = await recent();
+      answer = await ask([...history, { role: 'user', content: msg.text }], 'medium');
+    } finally {
+      // Stopped the moment there is something to send, not after sending it —
+      // otherwise a ping fires between the message landing and the write, and
+      // she reads as about to say more.
+      clearInterval(keepTyping);
+    }
+
     await say(answer);
     await remember([{ role: 'user', content: msg.text }, { role: 'assistant', content: answer }]);
   } catch (err) {
@@ -375,12 +408,12 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   }
 
   try {
-    if (fromTelegram !== null && secretMatches(fromTelegram, WEBHOOK_SECRET)) {
+    if (secretMatches(fromTelegram, WEBHOOK_SECRET)) {
       // Answer first, work after. See handleMessage.
       background(handleMessage(await req.json()));
       return json({ ok: true });
     }
-    if (fromCron !== null && secretMatches(fromCron, CRON_SECRET)) {
+    if (secretMatches(fromCron, CRON_SECRET)) {
       return await postBriefing(new URL(req.url));
     }
     return json({ ok: false, error: "unauthorized" }, 401);
@@ -391,18 +424,3 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });
-
-// Its own copy rather than an import from doji-telegram, for the reason that
-// file gives about doji-mcp-sync: importing a module that calls Deno.serve at
-// its top level would start that function's server inside this one.
-export function secretMatches(presented: string | null, expected: string): boolean {
-  if (!expected || !presented) return false;
-  const a = new TextEncoder().encode(presented);
-  const b = new TextEncoder().encode(expected);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-  return diff === 0;
-}
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

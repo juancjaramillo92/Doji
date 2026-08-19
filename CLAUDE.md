@@ -11,8 +11,8 @@ flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, the cTrader poller (Edge Function), the email parser (Apps
 Script), and Gladys, the Telegram journal bot (one more Edge Function). Journal
 columns and broker columns never meet; that single idea is what the whole design
-rests on. Eugenia, the market bot, is a fifth Edge Function and writes to none
-of it — she owns only her own conversation history.
+rests on. Eugenia, the market bot, would be the fifth writer and is not: she
+owns only her own conversation history.
 
 ---
 
@@ -153,10 +153,10 @@ code you write near it:
   and one reopened with `[Edit]` both draw four rows. Only the row as it stood
   *before* the tap can tell them apart — that is `staysOpen`, and getting it
   wrong shipped a bot whose message could never settle.
-- **`secretMatches` is a second copy rather than an import from the poller.**
-  That file calls `Deno.serve` at module scope, so importing it would start a
-  second poller inside this function. `Deno.serve` here is guarded for the
-  mirror-image reason: so the test can import the module without serving.
+- **`Deno.serve` is guarded so the test can import the module without serving.**
+  That guard is also why the three shared primitives live in `_shared/edge.ts`
+  and not in one of the functions: importing a module that serves at its top
+  level would start that function inside the caller.
 - **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
   `Data.OWNED`, so no broker column is nameable from a tap. A test asserts
   exactly that; do not widen it without widening the test.
@@ -182,8 +182,13 @@ code you write near it:
 - **Her schedule is `briefDue`, not a cron expression.** Hourly job, New York
   clock, because pg_cron is UTC and a fixed expression is wrong for half the
   year.
-- **A briefing exceeds Telegram's 4,096 characters.** `chunk` splits it and the
-  parts go sequentially; Telegram does not promise ordering.
+- **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
+  the parts go sequentially; Telegram does not promise ordering. The prompt aims
+  well under the cap, so this is the exception now — do not delete it for being
+  quiet.
+- **Effort is per caller, and it is the latency dial.** The briefing runs `high`
+  and a reply runs `medium`; nothing here runs `low`, because a careless read of
+  the journal is worse than a slow one.
 - **Her Telegram half must answer before it works, never after.** Telegram gives
   a webhook about a minute and then redelivers — which would run a whole
   briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is

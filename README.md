@@ -47,6 +47,7 @@ supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_telegram.sql               Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's memory and her schedule
+supabase/functions/_shared/edge.ts      env, secretMatches, json — one each
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-telegram/       Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
@@ -544,12 +545,31 @@ and the exchange since; not so much that every question resends last Tuesday's
 calendar. The table has RLS enabled and no policy at all, which denies the
 publishable key outright — the app has no business there.
 
-**A briefing does not fit in one Telegram message.** The cap is 4,096
-characters and seven sections is several times that, so `chunk()` splits on a
-blank line, then any newline, and only hard-cuts a single paragraph that is
-itself over the limit. Parts are sent sequentially, because Telegram does not
-promise ordering and a briefing whose section 5 arrives before section 2 is
-unreadable.
+**A briefing is written to be read on a phone.** The prompt asks for 2,500
+characters and forbids more than 4,000: one line per event, the mechanism as an
+arrow chain (`hot CPI → Fed holds longer → real yields up → gold down`), jargon
+glossed once in brackets and never again. Running long is cut by dropping
+words, never by dropping items — a briefing that omits an event is wrong, one
+that omits an adjective is not.
+
+**A long one still does not fit in one Telegram message.** The cap is 4,096
+characters, so `chunk()` splits on a blank line, then any newline, and only
+hard-cuts a single paragraph that is itself over the limit. Parts are sent
+sequentially, because Telegram does not promise ordering and a briefing whose
+section 5 arrives before section 2 is unreadable.
+
+**A question is not a briefing, and used to cost the same.** `effort` sets how
+deeply the model thinks before it writes. The briefing earns the depth — a dozen
+searches, seven sections, one shot a day — and runs at `high`. A reply runs at
+`medium`, because at `high` "how many trades did I take this week" bought a
+minute of reasoning to produce one sentence. Not `low`: the journal is the half
+that punishes carelessness, and a fast wrong reading of his discipline is worse
+than a slow right one.
+
+The typing indicator repeats while she works, because Telegram's lasts five
+seconds and cannot be extended — one call at the start left a thirty-second
+answer looking like a dead bot for twenty-five of them. It makes nothing faster;
+it makes the wait legible.
 
 **What she costs.** Roughly $0.20 a briefing — about $6 a month for six a week —
 of which a third is web search at $10 per 1,000 searches rather than tokens.
@@ -708,24 +728,47 @@ the same rule.** `.github/workflows/deploy-functions.yml` runs
 `supabase/functions/**` or `supabase/config.toml`. It needs one repository
 secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
 
-Every function goes on each run rather than only the changed one, so the two
-cannot drift apart from each other. `verify_jwt` lives in `supabase/config.toml`
-rather than in a dashboard toggle, which is what makes the committed file the
-whole description of how a function is deployed.
+All three functions go on each run rather than only the changed one, so none of
+them can drift apart from the others. `verify_jwt` lives in
+`supabase/config.toml` rather than in a dashboard toggle, which is what makes
+the committed file the whole description of how a function is deployed.
 
-**This is worth the machinery for one reason.** Both functions were pasted into
-the dashboard by hand, and nothing tied the running code to the committed code —
-so the repository could describe a system while the system ran something else,
-and every later change would be reasoned about from a file that was not the
-truth. That failure is silent, which is what makes it expensive.
+**`supabase/functions/_shared/edge.ts` holds `env`, `secretMatches` and
+`json`** — one definition each, bundled into every function that imports it.
+They were three byte-identical copies, and a copy of `secretMatches` is the one
+that could not be checked: the function exists to be *constant-time*, so a copy
+quietly rewritten to `presented === expected` returns the same answer to every
+assertion anyone would write while leaking the secret through timing. A
+behavioural test cannot see that; one definition has nothing to drift.
+
+`sbHeaders` and `tg` deliberately stay in the functions that own them. `tg`
+binds a different bot token per bot, and the poller's `sbHeaders` is genuinely a
+different function from the bots' — no argument, a hardcoded `Prefer`. Sharing
+either would mean threading config through every call site or a flag to switch
+behaviours, both of which cost more than the copy saves.
+
+**`npm test` runs first, in the same job, and a red suite stops the deploy.**
+`test.yml` also runs on every push, but it is a *separate* workflow — it would
+have gone red beside the deploy while the deploy shipped anyway, leaving two
+green ticks, one red, and the broken code already live. A failing step inside
+the deploy job is the only ordering that actually holds anything back. It is
+also what makes `_shared/` safe to depend on: the suite imports it by the same
+relative path the functions use, so an extraction that does not resolve fails
+the job instead of shipping three broken functions at once.
+
+**This is worth the machinery for one reason.** The poller and Gladys were
+pasted into the dashboard by hand, and nothing tied the running code to the
+committed code — so the repository could describe a system while the system ran
+something else, and every later change would be reasoned about from a file that
+was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` and `002_telegram.sql` are not
-under `supabase/migrations/`, so nothing applies them automatically, and a
-schema change that lands because a file was committed is exactly the accident
-the Operating section argues against for restores. The Apps Script is deployed
-from the Apps Script editor; it holds no secrets in the file and nothing reads
-it from here.
+SQL editor, never by a robot: `001_trades.sql`, `002_telegram.sql` and
+`003_eugenia.sql` are not under `supabase/migrations/`, so nothing applies them
+automatically, and a schema change that lands because a file was committed is
+exactly the accident the Operating section argues against for restores. The
+Apps Script is deployed from the Apps Script editor; it holds no secrets in the
+file and nothing reads it from here.
 
 ---
 
@@ -734,16 +777,21 @@ it from here.
 1. Run `supabase/001_trades.sql` in the SQL editor.
 2. Confirm `trades` is in the `supabase_realtime` publication and has RLS enabled.
 3. Put the project URL and publishable key in `SUPABASE` in `index.html`.
-4. Deploy the Edge Function; set `CTRADER_MCP_TOKEN` and `DOJI_USER_ID` in secrets.
-5. Schedule it with pg_cron every 2 minutes.
-6. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
+4. Deploy the functions — they deploy from `main`, see **Deployment** — and set
+   `CTRADER_MCP_TOKEN` and `DOJI_USER_ID` in Edge Function secrets.
+5. **Generate one cron secret and store it twice**, because two systems read it
+   under two spellings: `DOJI_CRON_SECRET` in Edge Function secrets, which is
+   what all three functions check, and `doji_cron_secret` in Vault, which is
+   what the cron jobs and the Telegram trigger present. Same value, and the
+   lower-case one is the database's. Nothing works without both.
+6. Schedule the poller with pg_cron every 2 minutes.
+7. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
    Properties, never in the file. Trigger `syncPepperstone` every minute.
-7. For the Telegram journal: create the bot with BotFather and send it `/start`
-   once, so it may message you unprompted. Set `TELEGRAM_BOT_TOKEN`,
-   `TELEGRAM_CHAT_ID` and `TELEGRAM_WEBHOOK_SECRET` in Edge Function secrets —
-   values never in the repo, the same discipline as the Apps Script's. The
-   function itself deploys from `main`; see **Deployment**.
-8. Point Telegram at the same function, passing the secret it will check:
+8. For Gladys: create the bot with BotFather and send it `/start` once, so it
+   may message you unprompted. Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+   `TELEGRAM_WEBHOOK_SECRET` in Edge Function secrets — values never in the
+   repo, the same discipline as the Apps Script's.
+9. Point Telegram at her function, passing the secret it will check:
 
    ```
    POST https://api.telegram.org/bot<token>/setWebhook
@@ -751,18 +799,18 @@ it from here.
         secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```
 
-9. For Eugenia: a second BotFather bot, `/start` it, and set `EUGENIA_BOT_TOKEN`,
-   `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in Edge Function secrets.
-   Point Telegram at `/functions/v1/doji-eugenia` with that secret token. The
-   API key comes from platform.claude.com — the same Anthropic account, billed
-   as prepaid credits rather than a subscription.
-10. Run `supabase/003_eugenia.sql`.
-11. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
-   the same secret and the same read the poller's cron job uses, so the trigger
-   holds no database power either. **Check the name against
-   `select command from cron.job` rather than trusting this line:** Postgres
-   compares it case-sensitively, and the wrong spelling makes the trigger give
-   up silently, which reads exactly like a bot that was never installed.
+10. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
+    the same secret and the same read the poller's cron job uses, so the trigger
+    holds no database power either. **Check the name against
+    `select command from cron.job` rather than trusting this line:** Postgres
+    compares it case-sensitively, and the wrong spelling makes the trigger give
+    up silently, which reads exactly like a bot that was never installed.
+11. For Eugenia: a second BotFather bot, `/start` it, and set
+    `EUGENIA_BOT_TOKEN`, `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in
+    Edge Function secrets. Point Telegram at `/functions/v1/doji-eugenia` with
+    that secret token. The API key comes from platform.claude.com — the same
+    Anthropic account, billed as prepaid credits rather than a subscription.
+12. Run `supabase/003_eugenia.sql`.
 
 ---
 
@@ -788,7 +836,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `greeting` and `chunk` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `greeting`, `chunk` and `tradesQuery` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 
