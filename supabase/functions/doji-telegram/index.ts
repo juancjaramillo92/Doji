@@ -27,9 +27,9 @@
 // the chat and message ids that editMessageText needs. A tap is
 // self-describing, so a redeploy in the middle of answering costs nothing.
 //
-// The exception is whether a redraw should settle. That cannot be read off the
-// keyboard — an open form and a form reopened with [Edit] both draw four rows —
-// so it comes from the row as it stood BEFORE the tap. See staysOpen.
+// The exception is whether a redraw should settle, which comes from the row as
+// it stood BEFORE the tap rather than from anything on the message. See
+// staysOpen.
 //
 // SECURITY CONTRACT
 //   1. Deployed with verify_jwt = false — Telegram calls it unauthenticated and
@@ -102,9 +102,13 @@ export interface Row {
 
 export interface Tap {
   id: string;
-  // null is the [Edit] action: reopen the keyboard, write nothing.
+  // null on [Edit] and [Done], which write nothing. Otherwise the column this
+  // tap sets.
   column: string | null;
   value: string | boolean | null;
+  // The two write-nothing taps move the form in opposite directions and are
+  // otherwise identical, so the action has to be carried rather than inferred.
+  action: 'answer' | 'edit' | 'done';
 }
 
 /* ─── callback_data ────────────────────────────────────────────────────────
@@ -123,17 +127,21 @@ export function parseCallback(data: string): Tap | null {
   const id = parts[0];
   if (!/^PID\d+$/.test(id)) return null;
 
-  if (parts.length === 2) return parts[1] === 'edit' ? { id, column: null, value: null } : null;
+  if (parts.length === 2) {
+    if (parts[1] === 'edit') return { id, column: null, value: null, action: 'edit' };
+    if (parts[1] === 'done') return { id, column: null, value: null, action: 'done' };
+    return null;
+  }
   if (parts.length !== 3) return null;
 
   const column = COLUMNS[parts[1]];
   if (!column) return null;
 
   if (parts[1] === 'setup') {
-    return SETUPS.includes(parts[2]) ? { id, column, value: parts[2] } : null;
+    return SETUPS.includes(parts[2]) ? { id, column, value: parts[2], action: 'answer' } : null;
   }
   if (parts[2] !== '0' && parts[2] !== '1') return null;
-  return { id, column, value: parts[2] === '1' };
+  return { id, column, value: parts[2] === '1', action: 'answer' };
 }
 
 /* ─── Rendering ────────────────────────────────────────────────────────────
@@ -160,19 +168,22 @@ const answered = (row: Row) =>
   row.setup !== null && row.followed_rules !== null &&
   row.followed_sl !== null && row.followed_tp !== null;
 
-/* Whether the redraw keeps the full keyboard, decided from the row as it stood
-   BEFORE the tap.
+/* Whether the redraw keeps the full keyboard.
 
-   An earlier version read the row count off the incoming message and got this
-   wrong in the only way that matters: an open form always has four rows, so the
-   test was true on every tap and the message never settled at all. The settled
+   [Edit] opens it and [Done] closes it, both explicitly. An answer is the case
+   that has to be decided, and it is decided from the row as it stood BEFORE the
+   tap: already complete means the trader is correcting a reopened message and
+   it stays open, incomplete means this tap may be the fourth answer, and the
+   fourth answer settles it.
+
+   Before-state rather than the keyboard, because that is what the question is
+   actually about — did this tap complete the journal, or amend a journal that
+   was already complete. An earlier version inferred it from the incoming row
+   count and was true on every tap, so the message never settled at all and the
    summary, the [Edit] button and readRow were unreachable in production.
-
-   Before-state is the signal that works. Already complete means the trader
-   reopened a settled message and is correcting it, so it stays open; incomplete
-   means this tap may be the fourth answer, and the fourth answer settles it.
    Exported because it is the decision that was wrong once. */
-export const staysOpen = (tap: Tap, before: Row) => tap.column === null || answered(before);
+export const staysOpen = (tap: Tap, before: Row) =>
+  tap.action === 'edit' || (tap.action === 'answer' && answered(before));
 
 const yesNo = (id: string, field: string, label: string) => [
   { text: `${label} ✓`, callback_data: `${id}|${field}|1` },
@@ -185,28 +196,37 @@ export function renderMessage(row: Row, expanded: boolean) {
   const price = Number(row.entry_price).toFixed(2);
 
   if (answered(row) && !expanded) {
+    // Two lines: the trade, then the verdict. SL and TP abbreviated here only —
+    // the form spells them out, the summary is scanned.
     return {
-      text: `${row.direction} ${price} · ${row.setup} · rules ${mark(row.followed_rules)}` +
-            ` stop ${mark(row.followed_sl)} target ${mark(row.followed_tp)}`,
+      text: `Logged · ${row.direction} ${price} · ${row.setup}\n` +
+            `rules ${mark(row.followed_rules)} · SL ${mark(row.followed_sl)}` +
+            ` · TP ${mark(row.followed_tp)}`,
       reply_markup: { inline_keyboard: [[{ text: 'Edit', callback_data: `${row.id}|edit` }]] },
     };
   }
 
   return {
     text: [
+      'New fill, boss.',
+      '',
       `${row.direction} ${price} · ${nyTime(row.entry_time)} NY`,
       '',
       `Setup: ${row.setup ?? '—'}`,
       `Rules: ${mark(row.followed_rules)}`,
-      `Stop: ${mark(row.followed_sl)}`,
-      `Target: ${mark(row.followed_tp)}`,
+      `Stop Loss: ${mark(row.followed_sl)}`,
+      `Take Profit: ${mark(row.followed_tp)}`,
     ].join('\n'),
     reply_markup: {
       inline_keyboard: [
         SETUPS.map(s => ({ text: s, callback_data: `${row.id}|setup|${s}` })),
         yesNo(row.id, 'rules', 'Rules'),
-        yesNo(row.id, 'sl', 'Stop'),
-        yesNo(row.id, 'tp', 'Target'),
+        yesNo(row.id, 'sl', 'Stop Loss'),
+        yesNo(row.id, 'tp', 'Take Profit'),
+        // Only once every answer is in. Before that the fourth answer settles
+        // the form on its own, and a [Done] that collapsed an unfinished
+        // journal would be a button for abandoning it.
+        ...(answered(row) ? [[{ text: 'Done', callback_data: `${row.id}|done` }]] : []),
       ],
     },
   };

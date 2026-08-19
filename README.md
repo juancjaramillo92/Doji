@@ -404,11 +404,17 @@ everything that matters — the keyboard, the message, the `callback_data`
 grammar — so splitting them meant deploying that code twice and keeping the
 copies in step.
 
-**One message, edited in place.** Four rows of buttons, answerable in any order.
-Each tap writes one column and redraws the message, and the fourth answer
-settles it to a one-line summary with an `[Edit]` button that opens the keyboard
-again. One thread entry per trade, not five. There is no text-reply path — a tap
-is the whole vocabulary.
+**One message, edited in place.** Four rows of buttons — the two setups, then
+Rules, Stop Loss and Take Profit — answerable in any order. Each tap writes one
+column and redraws the message, and the fourth answer settles it to a two-line
+summary with an `[Edit]` button. One thread entry per trade, not five. There is
+no text-reply path: a tap is the whole vocabulary.
+
+`[Edit]` reopens the form and adds a fifth row, `[Done]`, which collapses it
+again. That button exists because nothing else could: once every answer is in,
+no tap can be the fourth, so without it a reopened message stayed open forever
+even if you re-picked the same values. It appears only on a complete journal —
+on an unfinished one it would be a button for abandoning it.
 
 **It fires at open, not at close.** The poller mints the row from the entry deal
 alone, so all four answers are null at that point and the message asks for all
@@ -422,15 +428,13 @@ session table, no `tg_message_id` column and no schema change: the callback also
 carries the chat and message ids that `editMessageText` needs. A tap is
 self-describing, and a redeploy in the middle of answering costs nothing.
 
-The one thing `callback_data` cannot say is whether a redraw should settle, and
-the keyboard cannot say it either — an open form and a form reopened with
-`[Edit]` both draw four rows. It comes instead from the row **as it stood before
-the tap**, which costs one extra read per tap and is the only signal that works:
-already complete means the trader reopened a settled message and is correcting
-it, so it stays open; incomplete means this tap may be the fourth answer, and
-the fourth answer settles it. A message reopened with `[Edit]` therefore stays
-open, which is what lets a two-field correction happen without pressing `[Edit]`
-twice.
+`[Edit]` and `[Done]` say plainly which way the form should move. An **answer**
+is the case that has to be decided, and it is decided from the row **as it stood
+before the tap** — which costs one extra read per tap and is what the question
+is really about: already complete means a correction inside a reopened form, so
+it stays open; incomplete means this tap may be the fourth answer, and the
+fourth answer settles it. That is what lets a two-field correction happen
+without pressing `[Edit]` twice.
 
 That decision shipped wrong once — read off the keyboard's row count, which is
 true on every tap, so the message never settled and the summary, the `[Edit]`
