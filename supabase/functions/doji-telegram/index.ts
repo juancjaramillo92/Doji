@@ -236,7 +236,8 @@ export function renderMessage(row: Row, expanded: boolean) {
 /* ─── Inbound authorisation ────────────────────────────────────────────────
    Length-independent comparison, the same one doji-mcp-sync makes on its own
    header. A plain !== leaks the expected secret's length through timing, which
-   is free to avoid.
+   is free to avoid. A null header is a closed door rather than an open one,
+   which is why neither caller below checks for one first.
 
    Its own copy rather than an import: doji-mcp-sync calls Deno.serve at module
    scope, so importing that file from here would start a second poller inside
@@ -408,10 +409,10 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   }
 
   try {
-    if (fromTelegram !== null && secretMatches(fromTelegram, WEBHOOK_SECRET)) {
+    if (secretMatches(fromTelegram, WEBHOOK_SECRET)) {
       return await handleTap(req);
     }
-    if (fromTrigger !== null && secretMatches(fromTrigger, CRON_SECRET)) {
+    if (secretMatches(fromTrigger, CRON_SECRET)) {
       return await postOpen(req);
     }
     return json({ ok: false, error: "unauthorized" }, 401);

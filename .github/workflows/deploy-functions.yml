@@ -35,19 +35,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # THE SUITE GATES THE DEPLOY, in this job rather than in a separate one.
+      # test.yml runs on every push and would have gone red beside this
+      # workflow while it shipped anyway — two green ticks and one red, with
+      # the broken code already live. A failing step here stops the deploy,
+      # which is the only ordering that actually protects anything. It is the
+      # same suite; running it twice on a push to main costs seconds.
+      - run: npm install
+      - run: npm test
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
       # No function name: every function under supabase/functions goes, so one
-      # of them cannot silently fall behind the other.
+      # of them cannot silently fall behind the others.
       #
       # --no-verify-jwt duplicates what supabase/config.toml already says, and
-      # deliberately. Both functions authorise their own callers in code, and if
-      # either mechanism stops being honoured on its own, a deploy that quietly
-      # turned JWT verification back on would break the live Telegram webhook
-      # and the cron poller at once. Two statements of one setting is the
-      # cheaper mistake.
+      # deliberately. All three functions authorise their own callers in code,
+      # and if either mechanism stops being honoured on its own, a deploy that
+      # quietly turned JWT verification back on would break the live Telegram
+      # webhooks and the cron poller at once. Two statements of one setting is
+      # the cheaper mistake.
       - run: supabase functions deploy --project-ref gujhyogvkzjgnrodyuse --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

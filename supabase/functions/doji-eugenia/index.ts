@@ -73,14 +73,15 @@ export const greeting = (brief: Brief) =>
     : 'Buenos dias jefesito, todays news below';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
-   A full briefing is seven sections long and will not fit. Splitting is not
-   optional, and splitting badly is worse than not splitting: a break mid-
-   sentence reads as a bug.
+   The prompt aims at 2,500 characters, so most briefings now arrive as one
+   message and this does nothing. It stays for the ones that do not — a heavy
+   calendar week, or a Sunday — because splitting badly is worse than not
+   splitting: a break mid-sentence reads as a bug.
 
    So the split prefers a blank line, then any newline, then — only if a single
-   paragraph is itself over the limit — a hard cut. Paragraph boundaries are
-   what the prompt asks Eugenia to write toward, which is why the first choice
-   is nearly always the one taken.
+   paragraph is itself over the limit — a hard cut. The prompt puts a blank line
+   between sections and nowhere else, which is why the first choice is nearly
+   always the one taken.
    ───────────────────────────────────────────────────────────────────────── */
 export const TG_LIMIT = 4096;
 
@@ -269,7 +270,12 @@ const sbHeaders = (prefer?: string) => {
    question for no gain — what a follow-up needs is the briefing it follows and
    the exchange since, not last Tuesday's calendar. Twelve covers a morning's
    conversation and keeps the cost of a one-line question near the cost of a
-   one-line question. */
+   one-line question.
+
+   IT HAS TO BE EVEN. remember() writes a question and its answer together, so
+   the table is always a whole number of pairs; an odd window would start on an
+   assistant turn, and the Messages API requires the first message to be a user
+   one. Nothing enforces that but this sentence. */
 const HISTORY = 12;
 
 async function recent(): Promise<Turn[]> {
@@ -287,6 +293,23 @@ async function remember(turns: Turn[]) {
   if (!res.ok) throw new Error(`History write failed (HTTP ${res.status})`);
 }
 
+/* ─── Inbound authorisation ────────────────────────────────────────────────
+   Length-independent comparison, and a null header is a closed door rather
+   than an open one — which is why neither caller below checks for one first.
+
+   Its own copy rather than an import from doji-telegram, for the reason that
+   file gives about doji-mcp-sync: importing a module that calls Deno.serve at
+   its top level would start that function's server inside this one.
+   ───────────────────────────────────────────────────────────────────────── */
+export function secretMatches(presented: string | null, expected: string): boolean {
+  if (!expected || !presented) return false;
+  const a = new TextEncoder().encode(presented);
+  const b = new TextEncoder().encode(expected);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return diff === 0;
+}
+
 /* ─── The cron half: today's briefing ───────────────────────────────────── */
 
 // pg_net is fire-and-forget and never retries, so this half may take as long as
@@ -298,9 +321,8 @@ async function postBriefing(url: URL): Promise<Response> {
   // failure, and a way to exercise the whole path without waiting for 08:00.
   // It changes nothing else, and the answer comes back in the response rather
   // than only in Telegram, which is what makes a failure readable.
-  const due = url.searchParams.get("force") === "1"
-    ? briefDue(new Date()) ?? 'weekday'
-    : briefDue(new Date());
+  const forced = url.searchParams.get("force") === "1";
+  const due = briefDue(new Date()) ?? (forced ? 'weekday' : null);
   // The job runs hourly; twenty-three of those hours are not a briefing hour.
   if (!due) return json({ ok: true, skipped: "not a briefing hour" });
 
@@ -350,14 +372,19 @@ async function handleMessage(update: any): Promise<void> {
     typing();
     const keepTyping = setInterval(typing, 4_500);
 
+    let answer: string;
     try {
       const history = await recent();
-      const answer = await ask([...history, { role: 'user', content: msg.text }], 'medium');
-      await say(answer);
-      await remember([{ role: 'user', content: msg.text }, { role: 'assistant', content: answer }]);
+      answer = await ask([...history, { role: 'user', content: msg.text }], 'medium');
     } finally {
+      // Stopped the moment there is something to send, not after sending it —
+      // otherwise a ping fires between the message landing and the write, and
+      // she reads as about to say more.
       clearInterval(keepTyping);
     }
+
+    await say(answer);
+    await remember([{ role: 'user', content: msg.text }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
     await tg("sendMessage",
@@ -397,12 +424,12 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   }
 
   try {
-    if (fromTelegram !== null && secretMatches(fromTelegram, WEBHOOK_SECRET)) {
+    if (secretMatches(fromTelegram, WEBHOOK_SECRET)) {
       // Answer first, work after. See handleMessage.
       background(handleMessage(await req.json()));
       return json({ ok: true });
     }
-    if (fromCron !== null && secretMatches(fromCron, CRON_SECRET)) {
+    if (secretMatches(fromCron, CRON_SECRET)) {
       return await postBriefing(new URL(req.url));
     }
     return json({ ok: false, error: "unauthorized" }, 401);
@@ -413,18 +440,6 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });
-
-// Its own copy rather than an import from doji-telegram, for the reason that
-// file gives about doji-mcp-sync: importing a module that calls Deno.serve at
-// its top level would start that function's server inside this one.
-export function secretMatches(presented: string | null, expected: string): boolean {
-  if (!expected || !presented) return false;
-  const a = new TextEncoder().encode(presented);
-  const b = new TextEncoder().encode(expected);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-  return diff === 0;
-}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

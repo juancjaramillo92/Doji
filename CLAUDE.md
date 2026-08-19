@@ -11,8 +11,8 @@ flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, the cTrader poller (Edge Function), the email parser (Apps
 Script), and Gladys, the Telegram journal bot (one more Edge Function). Journal
 columns and broker columns never meet; that single idea is what the whole design
-rests on. Eugenia, the market bot, is a fifth Edge Function and writes to none
-of it — she owns only her own conversation history.
+rests on. Eugenia, the market bot, would be the fifth writer and is not: she
+owns only her own conversation history.
 
 ---
 

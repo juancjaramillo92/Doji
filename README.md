@@ -727,24 +727,30 @@ the same rule.** `.github/workflows/deploy-functions.yml` runs
 `supabase/functions/**` or `supabase/config.toml`. It needs one repository
 secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
 
-Every function goes on each run rather than only the changed one, so the two
-cannot drift apart from each other. `verify_jwt` lives in `supabase/config.toml`
-rather than in a dashboard toggle, which is what makes the committed file the
-whole description of how a function is deployed.
+All three functions go on each run rather than only the changed one, so none of
+them can drift apart from the others. `verify_jwt` lives in
+`supabase/config.toml` rather than in a dashboard toggle, which is what makes
+the committed file the whole description of how a function is deployed.
 
-**This is worth the machinery for one reason.** Both functions were pasted into
-the dashboard by hand, and nothing tied the running code to the committed code —
-so the repository could describe a system while the system ran something else,
-and every later change would be reasoned about from a file that was not the
-truth. That failure is silent, which is what makes it expensive.
+**`npm test` runs first, in the same job, and a red suite stops the deploy.**
+`test.yml` also runs on every push, but it is a *separate* workflow — it would
+have gone red beside the deploy while the deploy shipped anyway, leaving two
+green ticks, one red, and the broken code already live. A failing step inside
+the deploy job is the only ordering that actually holds anything back.
+
+**This is worth the machinery for one reason.** The poller and Gladys were
+pasted into the dashboard by hand, and nothing tied the running code to the
+committed code — so the repository could describe a system while the system ran
+something else, and every later change would be reasoned about from a file that
+was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` and `002_telegram.sql` are not
-under `supabase/migrations/`, so nothing applies them automatically, and a
-schema change that lands because a file was committed is exactly the accident
-the Operating section argues against for restores. The Apps Script is deployed
-from the Apps Script editor; it holds no secrets in the file and nothing reads
-it from here.
+SQL editor, never by a robot: `001_trades.sql`, `002_telegram.sql` and
+`003_eugenia.sql` are not under `supabase/migrations/`, so nothing applies them
+automatically, and a schema change that lands because a file was committed is
+exactly the accident the Operating section argues against for restores. The
+Apps Script is deployed from the Apps Script editor; it holds no secrets in the
+file and nothing reads it from here.
 
 ---
 
@@ -753,16 +759,21 @@ it from here.
 1. Run `supabase/001_trades.sql` in the SQL editor.
 2. Confirm `trades` is in the `supabase_realtime` publication and has RLS enabled.
 3. Put the project URL and publishable key in `SUPABASE` in `index.html`.
-4. Deploy the Edge Function; set `CTRADER_MCP_TOKEN` and `DOJI_USER_ID` in secrets.
-5. Schedule it with pg_cron every 2 minutes.
-6. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
+4. Deploy the functions — they deploy from `main`, see **Deployment** — and set
+   `CTRADER_MCP_TOKEN` and `DOJI_USER_ID` in Edge Function secrets.
+5. **Generate one cron secret and store it twice**, because two systems read it
+   under two spellings: `DOJI_CRON_SECRET` in Edge Function secrets, which is
+   what all three functions check, and `doji_cron_secret` in Vault, which is
+   what the cron jobs and the Telegram trigger present. Same value, and the
+   lower-case one is the database's. Nothing works without both.
+6. Schedule the poller with pg_cron every 2 minutes.
+7. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
    Properties, never in the file. Trigger `syncPepperstone` every minute.
-7. For the Telegram journal: create the bot with BotFather and send it `/start`
-   once, so it may message you unprompted. Set `TELEGRAM_BOT_TOKEN`,
-   `TELEGRAM_CHAT_ID` and `TELEGRAM_WEBHOOK_SECRET` in Edge Function secrets —
-   values never in the repo, the same discipline as the Apps Script's. The
-   function itself deploys from `main`; see **Deployment**.
-8. Point Telegram at the same function, passing the secret it will check:
+8. For Gladys: create the bot with BotFather and send it `/start` once, so it
+   may message you unprompted. Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+   `TELEGRAM_WEBHOOK_SECRET` in Edge Function secrets — values never in the
+   repo, the same discipline as the Apps Script's.
+9. Point Telegram at her function, passing the secret it will check:
 
    ```
    POST https://api.telegram.org/bot<token>/setWebhook
@@ -770,18 +781,18 @@ it from here.
         secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```
 
-9. For Eugenia: a second BotFather bot, `/start` it, and set `EUGENIA_BOT_TOKEN`,
-   `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in Edge Function secrets.
-   Point Telegram at `/functions/v1/doji-eugenia` with that secret token. The
-   API key comes from platform.claude.com — the same Anthropic account, billed
-   as prepaid credits rather than a subscription.
-10. Run `supabase/003_eugenia.sql`.
-11. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
-   the same secret and the same read the poller's cron job uses, so the trigger
-   holds no database power either. **Check the name against
-   `select command from cron.job` rather than trusting this line:** Postgres
-   compares it case-sensitively, and the wrong spelling makes the trigger give
-   up silently, which reads exactly like a bot that was never installed.
+10. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
+    the same secret and the same read the poller's cron job uses, so the trigger
+    holds no database power either. **Check the name against
+    `select command from cron.job` rather than trusting this line:** Postgres
+    compares it case-sensitively, and the wrong spelling makes the trigger give
+    up silently, which reads exactly like a bot that was never installed.
+11. For Eugenia: a second BotFather bot, `/start` it, and set
+    `EUGENIA_BOT_TOKEN`, `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in
+    Edge Function secrets. Point Telegram at `/functions/v1/doji-eugenia` with
+    that secret token. The API key comes from platform.claude.com — the same
+    Anthropic account, billed as prepaid credits rather than a subscription.
+12. Run `supabase/003_eugenia.sql`.
 
 ---
 

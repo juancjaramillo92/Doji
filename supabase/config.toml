@@ -1,11 +1,10 @@
 # Deploy settings for the Edge Functions, kept here rather than in dashboard
 # toggles nobody re-opens.
 #
-# verify_jwt = false on both: the platform gateway checks nothing, and each
+# verify_jwt = false on all three: the platform gateway checks nothing, and each
 # function authorises its own caller in code before doing any work — the poller
-# on x-doji-key, the Telegram function on whichever of its two secrets the
-# caller presents. That check is visible in the file being read, which a
-# dashboard switch is not.
+# on x-doji-key, each bot on whichever of its two secrets the caller presents.
+# That check is visible in the file being read, which a dashboard switch is not.
 project_id = "gujhyogvkzjgnrodyuse"
 
 [functions.doji-mcp-sync]
