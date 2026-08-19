@@ -306,18 +306,22 @@ test('midweek is open around the clock', () => {
 
 test('a tap names one journal column and its value', () => {
   assert.deepEqual(parseCallback('PID562780708|setup|Break & Retest'),
-    { id: 'PID562780708', column: 'setup', value: 'Break & Retest' });
+    { id: 'PID562780708', column: 'setup', value: 'Break & Retest', action: 'answer' });
   assert.deepEqual(parseCallback('PID562780708|rules|1'),
-    { id: 'PID562780708', column: 'followed_rules', value: true });
+    { id: 'PID562780708', column: 'followed_rules', value: true, action: 'answer' });
   assert.deepEqual(parseCallback('PID562780708|sl|0'),
-    { id: 'PID562780708', column: 'followed_sl', value: false });
+    { id: 'PID562780708', column: 'followed_sl', value: false, action: 'answer' });
   assert.deepEqual(parseCallback('PID562780708|tp|1'),
-    { id: 'PID562780708', column: 'followed_tp', value: true });
+    { id: 'PID562780708', column: 'followed_tp', value: true, action: 'answer' });
 });
 
-test('[Edit] carries no column, so it writes nothing', () => {
+test('[Edit] and [Done] carry no column, so they write nothing', () => {
+  // They differ only in which way they move the form, which is why the action
+  // is carried rather than inferred from a null column.
   assert.deepEqual(parseCallback('PID562780708|edit'),
-    { id: 'PID562780708', column: null, value: null });
+    { id: 'PID562780708', column: null, value: null, action: 'edit' });
+  assert.deepEqual(parseCallback('PID562780708|done'),
+    { id: 'PID562780708', column: null, value: null, action: 'done' });
 });
 
 test('only the four journal columns are reachable from a button', () => {
@@ -380,7 +384,11 @@ test('an unanswered trade opens on the full keyboard, one row per question', () 
   const rows = renderMessage(open, false).reply_markup.inline_keyboard;
   assert.equal(rows.length, 4);
   assert.deepEqual(rows[0].map(b => b.text), [...SETUPS]);
-  assert.deepEqual(rows.slice(1).map(r => r.length), [2, 2, 2]);
+  // The labels, not just the shape. They are what the trader reads on the
+  // button, and the column they write is not recoverable from them.
+  assert.deepEqual(rows[1].map(b => b.text), ['Rules ✓', 'Rules ✗']);
+  assert.deepEqual(rows[2].map(b => b.text), ['Stop Loss ✓', 'Stop Loss ✗']);
+  assert.deepEqual(rows[3].map(b => b.text), ['Take Profit ✓', 'Take Profit ✗']);
 });
 
 test('the fourth answer settles the message to one [Edit] row', () => {
@@ -390,12 +398,24 @@ test('the fourth answer settles the message to one [Edit] row', () => {
   assert.equal(rows[0][0].callback_data, 'PID562780708|edit');
 });
 
-test('the row count is what tells the webhook whether the form is open', () => {
-  // The message IS the state — there is nowhere else it could be read from.
-  // Settled-and-expanded must be indistinguishable from open, or a correction
-  // to two fields needs [Edit] pressed twice.
-  assert.equal(renderMessage(settled, true).reply_markup.inline_keyboard.length, 4);
-  assert.equal(renderMessage(open, true).reply_markup.inline_keyboard.length, 4);
+test('a reopened form offers [Done], an unfinished one does not', () => {
+  // Without it there is no way back to the summary: every answer is already in,
+  // so no tap can be the fourth. A [Done] on an unfinished journal would be a
+  // button for abandoning it, so it appears only once all four are answered.
+  const reopened = renderMessage(settled, true).reply_markup.inline_keyboard;
+  assert.equal(reopened.length, 5);
+  assert.deepEqual(reopened[4], [{ text: 'Done', callback_data: 'PID562780708|done' }]);
+
+  const unfinished = renderMessage(open, true).reply_markup.inline_keyboard;
+  assert.equal(unfinished.length, 4);
+  assert.equal(unfinished.flat().some(b => b.text === 'Done'), false);
+});
+
+test('[Done] collapses a reopened form, [Edit] opens it again', () => {
+  const done = parseCallback('PID562780708|done');
+  assert.equal(staysOpen(done, settled), false);
+  assert.equal(renderMessage(settled, staysOpen(done, settled))
+    .reply_markup.inline_keyboard.length, 1);
 });
 
 /* ─── Telegram: the message ──────────────────────────────────────────────── */
@@ -406,7 +426,8 @@ test('an unanswered discipline column draws as unanswered, never as no', () => {
   // the column means.
   const text = renderMessage({ ...open, followed_sl: false }, false).text;
   assert.match(text, /Rules: —/);
-  assert.match(text, /Stop: ✗/);
+  assert.match(text, /Stop Loss: ✗/);
+  assert.match(text, /Take Profit: —/);
   assert.match(text, /Setup: —/);
 });
 
@@ -417,10 +438,15 @@ test('the message heads with the New York clock, not the UTC one', () => {
   assert.match(renderMessage(evening, false).text, /^SELL 3400\.00 · 30 Jul, 21:05 NY$/m);
 });
 
-test('the settled summary is one line and carries all four answers', () => {
-  const text = renderMessage(settled, false).text;
-  assert.equal(text.includes('\n'), false);
-  assert.equal(text, 'SELL 3400.00 · Break & Retest · rules ✓ stop ✓ target ✗');
+test('the settled summary is two lines and carries all four answers', () => {
+  assert.equal(renderMessage(settled, false).text,
+    'Logged · SELL 3400.00 · Break & Retest\nrules ✓ · SL ✓ · TP ✗');
+});
+
+test('the open form greets, then states the fill', () => {
+  const lines = renderMessage(open, false).text.split('\n');
+  assert.equal(lines[0], 'New fill, boss.');
+  assert.equal(lines[2], 'SELL 3400.00 · 30 Jul, 10:00 NY');
 });
 
 /* ─── Telegram: when the form settles ────────────────────────────────────────
@@ -457,8 +483,9 @@ test('a correction inside a reopened form does not re-settle it', () => {
   // would make a two-field correction need [Edit] pressed twice.
   const tap = parseCallback('PID562780708|sl|0');
   assert.equal(staysOpen(tap, settled), true);
+  // Five rows: the four questions plus the [Done] that closes it again.
   assert.equal(renderMessage({ ...settled, followed_sl: false },
-    staysOpen(tap, settled)).reply_markup.inline_keyboard.length, 4);
+    staysOpen(tap, settled)).reply_markup.inline_keyboard.length, 5);
 });
 
 test('[Edit] reopens whatever it is pressed on', () => {
