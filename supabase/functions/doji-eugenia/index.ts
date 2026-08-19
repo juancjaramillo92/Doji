@@ -277,7 +277,10 @@ async function remember(turns: Turn[]) {
 
 /* ─── The cron half: today's briefing ───────────────────────────────────── */
 
-async function postBriefing(req: Request): Promise<Response> {
+// pg_net is fire-and-forget and never retries, so this half may take as long as
+// it takes — the timeout in the cron job only has to outlast the work. That is
+// the whole difference between this caller and Telegram's.
+async function postBriefing(): Promise<Response> {
   const due = briefDue(new Date());
   // The job runs hourly; twenty-three of those hours are not a briefing hour.
   if (!due) return json({ ok: true, skipped: "not a briefing hour" });
@@ -295,17 +298,27 @@ async function postBriefing(req: Request): Promise<Response> {
 
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
 
-// Every path answers 200, for the reason doji-telegram spells out: Telegram
-// redelivers anything else, and a redelivery loop against a failing model call
-// spends money without ever succeeding.
-async function handleMessage(req: Request): Promise<Response> {
+/* THE ANSWER IS NOT WRITTEN INSIDE THE RESPONSE, AND IT CANNOT BE.
+
+   Telegram waits about a minute for a webhook to reply and then gives up with
+   "Read timeout expired" and redelivers the update. A briefing is a dozen web
+   searches and a long generation; it does not fit in that window, and the first
+   attempt proved it. Answering late is worse than slow: the redelivery runs the
+   whole thing again, so the trader gets two briefings and pays for two.
+
+   So the entry point answers 200 immediately and hands the work here.
+   EdgeRuntime.waitUntil is what keeps the worker alive past the response —
+   without it the runtime may reclaim it the moment the 200 is sent, killing the
+   generation halfway. Nothing awaits this, so it carries its own error handling
+   and its own apology; there is no response left to put a failure in. */
+async function handleMessage(update: any): Promise<void> {
   try {
-    const msg = (await req.json()).message;
-    // Edits, joins, and anything without text. Acknowledged and dropped.
-    if (!msg?.text) return json({ ok: true, ignored: "no text" });
+    const msg = update?.message;
+    // Edits, joins, and anything without text. Dropped.
+    if (!msg?.text) return;
     if (String(msg.chat?.id) !== CHAT_ID) {
       console.error("doji-eugenia: message from unexpected chat");
-      return json({ ok: true, ignored: "wrong chat" });
+      return;
     }
 
     // Typing shows immediately; a briefing-grade answer takes a while and a
@@ -316,14 +329,21 @@ async function handleMessage(req: Request): Promise<Response> {
     const answer = await ask([...history, { role: 'user', content: msg.text }]);
     await say(answer);
     await remember([{ role: 'user', content: msg.text }, { role: 'assistant', content: answer }]);
-    return json({ ok: true });
   } catch (err) {
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
     await tg("sendMessage",
       { chat_id: CHAT_ID, text: "Something broke on my side, jefe. Try again in a moment." })
       .catch(() => {});
-    return json({ ok: false, error: "reply failed" });
   }
+}
+
+// Keeps a promise alive past the response. The catch is not optional: nothing
+// awaits this, so an unhandled rejection is the only trace a failure would
+// otherwise leave.
+function background(work: Promise<unknown>) {
+  const guarded = work.catch(err =>
+    console.error("doji-eugenia:", err instanceof Error ? err.message : err));
+  (globalThis as any).EdgeRuntime?.waitUntil?.(guarded);
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
@@ -338,10 +358,12 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
   try {
     if (fromTelegram !== null && secretMatches(fromTelegram, WEBHOOK_SECRET)) {
-      return await handleMessage(req);
+      // Answer first, work after. See handleMessage.
+      background(handleMessage(await req.json()));
+      return json({ ok: true });
     }
     if (fromCron !== null && secretMatches(fromCron, CRON_SECRET)) {
-      return await postBriefing(req);
+      return await postBriefing();
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {

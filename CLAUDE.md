@@ -184,6 +184,11 @@ code you write near it:
   year.
 - **A briefing exceeds Telegram's 4,096 characters.** `chunk` splits it and the
   parts go sequentially; Telegram does not promise ordering.
+- **Her Telegram half must answer before it works, never after.** Telegram gives
+  a webhook about a minute and then redelivers — which would run a whole
+  briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is
+  what makes the 200 immediate. The cron half has no such limit: pg_net never
+  retries.
 
 ---
 
