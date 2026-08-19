@@ -3,9 +3,10 @@
 This file is the context a Claude Code session starts from. It is **subordinate
 to `README.md`**: where anything here disagrees with the README, the README wins
 and you say so. The README is the contract for how the app behaves; this file is
-how to work on it.
+how to work on it, and it holds only what the README does not — every
+description of behaviour lives there, once.
 
-Doji is a personal XAUUSD trading journal: one `index.html` of ~4,000 lines, one
+Doji is a personal XAUUSD trading journal: one `index.html` of ~3,800 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, the cTrader poller (Edge Function), the email parser (Apps
 Script), and the Telegram bot (one more Edge Function). Journal columns and
@@ -28,7 +29,8 @@ Every change is:
 - **Free of wrappers and indirection.** No function that only forwards to
   another. No options object for a one-caller call. No abstraction for a second
   case that does not exist yet. A helper used once that adds no clarity gets
-  inlined.
+  inlined — unless exporting it is what makes a decision testable, which is why
+  `balanceTarget`, `foldHours` and `staysOpen` exist.
 - **Free of dead code.** No commented-out blocks, no `TODO`, no stubs, no
   placeholder branches, no rule whose effect is already the default. When
   something is retired, delete it *and* its CONFIG entry, its CSS, its README
@@ -46,7 +48,8 @@ Every change is:
 - **Single-sourced.** One decision, one place. `CONFIG.BE` (±$3, one fill),
   `CONFIG.BE_AGG` (±$10, a day/week/month cell), `CONFIG.PERIODS`, `Data.OWNED`,
   `resultOf`, `money()`, `byKey` and the shared primitives each exist so a rule
-  changes once. Never compute the same thing a second way in a second spot.
+  changes once. Never compute the same thing a second way in a second spot — and
+  that includes prose: a fact stated in the README does not get restated here.
 - **Load-order safe.** Nothing references anything defined below it at load time.
   New code goes in the section it belongs to, under the right banner — not at the
   bottom because that is easier.
@@ -57,13 +60,11 @@ Every change is:
 - **Commented for *why*, never for *what*.** Match the existing comments, which
   carry reasoning that cannot be recovered from the code. Delete any comment that
   only restates the line beneath it.
-- **Deployed from `main`, not from a dashboard.** `.github/workflows/deploy-functions.yml`
-  pushes every Edge Function on a push that touches `supabase/functions/**`, and
-  `supabase/config.toml` holds `verify_jwt`. Never tell anyone to paste a
+- **Deployed from `main`, not from a dashboard.** Never tell anyone to paste a
   function into the dashboard editor: a hand-deployed function can differ from
   the committed one with nothing to reveal it, and every later change is then
   reasoned about from a file that is not what runs. The SQL stays manual on
-  purpose.
+  purpose. Mechanics in the README's Deployment section.
 - **Dependency-free.** No new libraries in the app. Three CDN scripts only
   (Chart.js and Supabase client are blocking tags; SheetJS is fetched on first
   export by `loadXLSX()`). `jsdom` is a dev dependency and never ships. A fourth
@@ -79,10 +80,18 @@ time is to run the check against a known defect and confirm it finds it *before*
 trusting any zero. Do the same for every new test: break the thing on purpose,
 watch it go red, put it back.
 
-The same applies to reasoning. A conclusion drawn from a value you have just
-proved is corrupt is worth nothing. **State mechanisms you can trace, not stories
-that fit.** If a claim rests on a number, say which number and check it is one you
-trust.
+**And the same applies to reasoning, which is the harder half.** A conclusion
+drawn from a value you have just proved is corrupt is worth nothing. State
+mechanisms you can trace, not stories that fit. If a claim rests on a number, say
+which number and check it is one you trust.
+
+The Telegram bot shipped with a mechanism that was asserted in the code, the
+README and a PR description without once being executed — an open form and a
+reopened one both draw four rows, so the redraw could never settle. Eighty-two
+tests were green throughout, because they called the renderer with a hand-picked
+flag instead of replaying the sequence. **A test that supplies the answer cannot
+discover that the answer is never produced.** Prefer a test that drives the real
+sequence end to end over one that asserts on a function in isolation.
 
 ---
 
@@ -94,11 +103,11 @@ npm test
 ```
 
 Node 22.6+. `test/fold.test.mjs` covers the pure logic of the poller and of
-`functions/doji-telegram/index.ts`;
-`test/app.test.mjs` boots `index.html` in jsdom with a recording Supabase
-stand-in. They do **not** cover pixels, realtime, auth, the xlsx export, or the
-Apps Script — so a good deal of what a change can break is only caught by
-reading. You cannot see pixels; say so on any visual change.
+`functions/doji-telegram/index.ts`; `test/app.test.mjs` boots `index.html` in
+jsdom with a recording Supabase stand-in. They do **not** cover pixels, realtime,
+auth, the xlsx export, or the Apps Script — so a good deal of what a change can
+break is only caught by reading. You cannot see pixels; say so on any visual
+change.
 
 ---
 
@@ -110,73 +119,48 @@ reading. You cannot see pixels; say so on any visual change.
   `sessionBars` (`.sess-wr-*`), `disciplineBar`, `rollRow`, `--bar-h`,
   `DONUT_CUTOUT` / `RESULT_FILL` / `RESULT_BORDER` / `SEG_BD`. Chart.js cannot
   read a CSS variable, so anything it needs is resolved through `cssToken()` into
-  a module constant. Never hand-roll a new component.
+  a module constant. Never hand-roll a new component, and never write a literal
+  colour — the palette is tokenised, and the README lists every token.
 - **No renderer mutates state.**
 - **The snapshot is a read cache and can never be anything else.** Painted on
   open, before the token check and the fetch answer; never written back.
 - **Broker sync must never overwrite journal fields.** `Data.OWNED` is the
   definitive list — a save sends those columns and nothing else, enforced in one
   place. Deletes are a soft `deleted: true` flag.
-
-### The data model, in one breath
-
-Journal-owned (app writes these, poller never sends them): `setup`,
-`followed_rules`, `followed_sl`, `followed_tp`. The three booleans have a third
-state — `null` is unanswered, **not** `no`. Polarity: the journal asks whether
-the stop and target were *respected*, not whether they were moved.
-
-Broker-owned (the app never writes these): `direction`, `entry_time`,
-`fill_time`, `entry_price`, `exit_price`, `open_day`, `commission`, `balance`,
-`net_pnl`, `computed_pnl`, and generated `pnl`. **A wrong direction, P&L or date
-cannot be fixed in `index.html`** — the fault is upstream in the poller or the
-parser. Say so rather than looking for it in the app.
-
-### The poller has two windows, and they are not the same question
-
-Write window (`LOOKBACK_HOURS`, 6h): which positions get upserted. Fold window
-(`write + MAX_POSITION_HOURS`, 78h): which deals get read. The fold reads wide
-because `foldPosition` takes direction from the earliest deal it is given; a
-narrow read hands it a closing deal with no entry, direction inverts, and
-`entry_time`/`entry_price`/`open_day` are overwritten with the exit's values. A
-manual DB correction older than the write window sticks; a forced backfill
-overwrites it. Repairs are `?force=1&hours=N`; the signature of a sliced row is
-`exit_price is null` on a closed trade.
+- **A wrong direction, P&L or date cannot be fixed in `index.html`.** The app
+  does not own those columns; the fault is upstream in the poller or the parser.
+  Say so rather than looking for it in the app.
+- **`null` is not `no`,** and the journal asks whether the stop and target were
+  *respected*, not whether they were moved. Both halves of that trip people up.
+  Column lists and the full account are in the README's Data model.
+- **The poller's two windows are not the same question** — which positions get
+  written, and which deals get read. The README explains why the fold window is
+  wider. What it does not carry, and you will need for a repair: the signature of
+  a row folded without its entry deal is **`exit_price is null` on a closed
+  trade**. Repairs are `?force=1&hours=N`, and a forced backfill overwrites a
+  manual DB correction.
 
 ---
 
-## The Telegram journal — shipped
+## The Telegram journal
 
-`README.md` carries the full account; this is what constrains code you write
-near it.
+The README carries the account of how it behaves. These are the constraints on
+code you write near it:
 
-- **It is the fourth writer and it stays in the journal half.** The webhook maps
-  a button's field to a column through the same four names as `Data.OWNED`. No
-  broker column is nameable from a tap, so there is nothing to arbitrate.
-- **`callback_data` is the entire state store.** `PID562780708|setup|Break &
-  Retest`, `PID562780708|edit` — trade, field, value, 39 bytes at worst against
-  Telegram's 64. No session table, no `tg_message_id`, no schema change.
-- **Whether a redraw settles comes from the row BEFORE the tap, never from the
-  keyboard.** An open form and a reopened one both draw four rows, so the row
-  count cannot tell them apart — reading it there was a bug that made the
-  message never settle at all, and it survived review because the reasoning
-  sounded right and was never executed. `staysOpen` is exported so a test can
-  replay the four taps.
-- **The trigger guard is load-bearing.** `when (new.entry_time > now() -
-  interval '1 hour')` on `after insert`. Verified against the real column types
-  and the restore SQL: an `on conflict do update` is not an insert, restored rows
-  carry historical `entry_time`, and an email-first row has none at all, so
-  `null > anything` keeps it silent.
-- **Answering `followed_sl`/`followed_tp` at open records intent, not outcome**,
-  and biases those two bars upward when a needed edit is never made. The mirror
-  of the `null`-is-not-`no` rule.
-- **One function, two callers**, told apart by which secret is on the request:
-  `x-doji-key` from the trigger, `x-telegram-bot-api-secret-token` from
-  Telegram. The two halves share the keyboard, the message and the grammar, so
-  two functions meant deploying that code twice. The pure parts are exported so
-  a test can reach them, and `Deno.serve` is guarded so the import runs nothing.
-  `secretMatches` is a second copy rather than an import from the poller: that
-  file calls `Deno.serve` at module scope, so importing it would start a second
-  poller inside this function.
+- **Never read whether a message should settle off its keyboard.** An open form
+  and one reopened with `[Edit]` both draw four rows. Only the row as it stood
+  *before* the tap can tell them apart — that is `staysOpen`, and getting it
+  wrong shipped a bot whose message could never settle.
+- **`secretMatches` is a second copy rather than an import from the poller.**
+  That file calls `Deno.serve` at module scope, so importing it would start a
+  second poller inside this function. `Deno.serve` here is guarded for the
+  mirror-image reason: so the test can import the module without serving.
+- **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
+  `Data.OWNED`, so no broker column is nameable from a tap. A test asserts
+  exactly that; do not widen it without widening the test.
+- **`callback_data` must stay under 64 bytes.** It is the entire state store —
+  no session table, no `tg_message_id`, no schema change — and a longer setup
+  name is the way it would silently overrun.
 
 ---
 

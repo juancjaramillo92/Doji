@@ -494,6 +494,54 @@ references anything defined below it at load time.
 `render()` is the orchestrator and holds no drawing of its own. Each step runs in
 isolation, so one widget can degrade without blanking the panel.
 
+### Palette
+
+Every colour is a CSS custom property on `:root` in `index.html`. Nothing in the
+app writes a literal — Chart.js is the one thing that cannot read a variable, so
+what it needs is resolved once through `cssToken()` into a module constant.
+
+| Token | Value | Used for |
+|---|---|---|
+| `--p` | `#8b35b8` | the accent. Selected states, focus, the sync dot |
+| `--bg` | `#070611` | page background — near-black with a faint purple hue |
+| `--s2` | `#141022` | the layer above the page |
+| `--glass` | `#0a0813` | card surfaces. Solid, not translucent |
+| `--cell-bg` | `rgba(8,8,10,.55)` | a calendar day with no result, so it recedes |
+| `--bd` / `--bd2` | `#251d39` / `#342948` | borders, dim and dimmer |
+| `--tx` | `#e8e6f0` | body text |
+| `--mt` / `--mt2` | `#6f6788` / `#9a92b0` | muted, and muted-but-readable |
+| `--tx-hi` / `--tx-max` | `#f0eeff` / `#fff` | on an accent fill, and on solid `--p` |
+| `--win` | `#3ba585` | a winning trade |
+| `--loss` | `#d63d5a` | a losing trade |
+| `--warn` | `#d9a441` | "notice this", one step short of `--loss`. Only the offline sync dot |
+| `--be-tx` | `#9aa4c0` | break-even text — cool, because a break-even is a result |
+| `--seg-be-bg` / `--seg-be-bd` | `#0e1020` / `#333f63` | break-even fill and border |
+
+**The result colours have a house treatment**, and it is worth knowing before
+adding anything that shows a win or a loss: a flat 12% fill against a
+full-strength border. `--seg-win-bg` and `--seg-loss-bg` are `--win` and `--loss`
+at `.12`; the hover pair `--seg-win-hv` / `--seg-loss-hv` are the same at `.22`.
+Break-even is the exception and is a solid colour rather than an alpha, because
+it has to stay legible on a 58px calendar cell where a translucent fill hazes.
+
+Break-even is also deliberately the darkest of the three: nothing happened, so it
+recedes furthest. Its green runs at or above its red so a small tile goes cool
+rather than mauve — the rest of the palette has red above green, which reads warm
+on a large card and muddy on a cell.
+
+**Neutral surfaces come from five alphas of white**, so a change lands in one
+place: `--fill-0` (`.02`, inset panels) through `--fill-3` (`.08`, hover on a
+`--fill-2` surface), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
+(`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
+`.42`, and `--p-hair` at `.04` for the table row rule.
+
+**Type** is `--ui` (Hanken Grotesk) and `--mono` (JetBrains Mono). **Radii** are
+`--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px —
+the last an exception for calendar tiles, which at the card radius each read as
+their own card and stop scanning as rows.
+
+---
+
 ### The shared primitives
 
 Every wheel and every bar is built from one of these. That is what keeps the
@@ -639,7 +687,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`, and the Telegram `parseCallback` and `renderMessage` |
+| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`, and the Telegram `parseCallback`, `renderMessage` and `staysOpen` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 
@@ -674,7 +722,10 @@ the earliest close instead of the latest, and a secret comparison that ignores
 length; the Telegram tests against a setup whitelist removed, a discipline
 answer that accepts anything, `direction` added to the reachable columns, `sl`
 and `tp` swapped, a loosened trade id, `null` drawn as `no`, the clock reverted
-to UTC, a keyboard row dropped, and a message that never settles; the client tests
+to UTC, a keyboard row dropped, a summary spilling onto two lines, a setup name
+long enough to overrun the 64-byte cap, `staysOpen` forced true — which is the
+bug that shipped, restored on purpose — one that stops `[Edit]` reopening, and
+one that lets a reopened form re-settle; the client tests
 against a widened break-even band, break-evens dropped from the win-rate
 denominator, a stray column in `Data.OWNED`, a session derived from the close,
 an inverted filing anchor and a throwing renderer. Every one of those was
