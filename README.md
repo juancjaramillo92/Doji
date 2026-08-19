@@ -531,6 +531,14 @@ the model, so it is a boundary.
 She is still not a fifth writer to `trades`. The only thing she writes is
 `eugenia_turns`.
 
+**A reply is answered after the response, not inside it.** Telegram waits about
+a minute for a webhook and then gives up with `Read timeout expired` and
+redelivers the update — and a briefing does not fit in a minute. Answering late
+is worse than slow: the redelivery runs the whole thing again, so you get two
+briefings and pay for two. The function returns 200 immediately and hands the
+work to `EdgeRuntime.waitUntil`, which keeps the worker alive past the response.
+Her half of the cron job has no such limit, because pg_net never retries.
+
 **Twelve turns of memory.** Enough that a follow-up has the briefing it follows
 and the exchange since; not so much that every question resends last Tuesday's
 calendar. The table has RLS enabled and no policy at all, which denies the
