@@ -22,6 +22,14 @@ on:
   # a dashboard edit has been made by mistake.
   workflow_dispatch:
 
+# Two pushes in quick succession must not race. Without this the older run can
+# finish last and leave its functions live while both runs report green — the
+# exact silent drift this workflow exists to prevent. Queued rather than
+# cancelled: the last push to land is the one that must win.
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

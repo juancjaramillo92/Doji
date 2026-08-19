@@ -154,9 +154,13 @@ near it.
   broker column is nameable from a tap, so there is nothing to arbitrate.
 - **`callback_data` is the entire state store.** `PID562780708|setup|Break &
   Retest`, `PID562780708|edit` — trade, field, value, 39 bytes at worst against
-  Telegram's 64. No session table, no `tg_message_id`, no schema change. Whether
-  a settled message has been reopened is read off the keyboard already on it:
-  four rows open, one row settled.
+  Telegram's 64. No session table, no `tg_message_id`, no schema change.
+- **Whether a redraw settles comes from the row BEFORE the tap, never from the
+  keyboard.** An open form and a reopened one both draw four rows, so the row
+  count cannot tell them apart — reading it there was a bug that made the
+  message never settle at all, and it survived review because the reasoning
+  sounded right and was never executed. `staysOpen` is exported so a test can
+  replay the four taps.
 - **The trigger guard is load-bearing.** `when (new.entry_time > now() -
   interval '1 hour')` on `after insert`. Verified against the real column types
   and the restore SQL: an `on conflict do update` is not an insert, restored rows

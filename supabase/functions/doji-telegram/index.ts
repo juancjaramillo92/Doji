@@ -21,11 +21,15 @@
 // write moves updated_at, and the realtime subscription the app already holds
 // re-renders any open tab for free.
 //
-// THE MESSAGE IS THE STATE. There is no session table and no stored message id,
-// because there is nothing to store: callback_data carries the trade, the field
-// and the value, and Telegram's callback carries the chat and message ids that
-// editMessageText needs. A tap is self-describing, so a redeploy in the middle
-// of answering costs nothing.
+// THE MESSAGE IS THE STATE, WITH ONE EXCEPTION. There is no session table and
+// no stored message id, because there is nothing to store: callback_data
+// carries the trade, the field and the value, and Telegram's callback carries
+// the chat and message ids that editMessageText needs. A tap is
+// self-describing, so a redeploy in the middle of answering costs nothing.
+//
+// The exception is whether a redraw should settle. That cannot be read off the
+// keyboard — an open form and a form reopened with [Edit] both draw four rows —
+// so it comes from the row as it stood BEFORE the tap. See staysOpen.
 //
 // SECURITY CONTRACT
 //   1. Deployed with verify_jwt = false — Telegram calls it unauthenticated and
@@ -54,6 +58,9 @@
 const env = (k: string): string => (globalThis as any).Deno?.env?.get(k) ?? "";
 
 const BOT_TOKEN      = env("TELEGRAM_BOT_TOKEN");
+// Numeric, not an @name. This value is both a sendMessage target and the
+// identity a tap's chat id is compared against, and only the numeric form
+// satisfies both — an @name posts messages fine and then drops every tap.
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
@@ -152,6 +159,20 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
 const answered = (row: Row) =>
   row.setup !== null && row.followed_rules !== null &&
   row.followed_sl !== null && row.followed_tp !== null;
+
+/* Whether the redraw keeps the full keyboard, decided from the row as it stood
+   BEFORE the tap.
+
+   An earlier version read the row count off the incoming message and got this
+   wrong in the only way that matters: an open form always has four rows, so the
+   test was true on every tap and the message never settled at all. The settled
+   summary, the [Edit] button and readRow were unreachable in production.
+
+   Before-state is the signal that works. Already complete means the trader
+   reopened a settled message and is correcting it, so it stays open; incomplete
+   means this tap may be the fourth answer, and the fourth answer settles it.
+   Exported because it is the decision that was wrong once. */
+export const staysOpen = (tap: Tap, before: Row) => tap.column === null || answered(before);
 
 const yesNo = (id: string, field: string, label: string) => [
   { text: `${label} ✓`, callback_data: `${id}|${field}|1` },
@@ -293,7 +314,8 @@ async function postOpen(req: Request): Promise<Response> {
 
 /* ─── The Telegram half: a button was tapped ─────────────────────────────── */
 
-// EVERY PATH HERE ANSWERS 200, INCLUDING THE FAILURES.
+// EVERY PATH HERE ANSWERS 200, INCLUDING THE FAILURES — which is why the whole
+// body is inside one try.
 //
 // Telegram redelivers an update it did not get a 2xx for, so a non-200 buys the
 // same tap again — and again. That is worth having when a retry could succeed,
@@ -302,49 +324,52 @@ async function postOpen(req: Request): Promise<Response> {
 // redelivery loop against a misconfigured deploy fixes nothing and empties the
 // rate limit. The console is where a failure is reported.
 async function handleTap(req: Request): Promise<Response> {
-  const cq = (await req.json()).callback_query;
-  // Anything else is a /start or a stray message. Acknowledged and dropped.
-  if (!cq) return json({ ok: true, ignored: "not a callback_query" });
-
-  // The secret proves the caller is Telegram. This proves the tap came from the
-  // trader's own thread — anyone can find a bot and press its buttons if a
-  // message ever reaches them.
-  if (String(cq.message?.chat?.id) !== CHAT_ID) {
-    console.error("doji-telegram: callback from unexpected chat");
-    return json({ ok: true, ignored: "wrong chat" });
-  }
-
-  const tap = parseCallback(cq.data ?? "");
-  if (!tap) {
-    await tg("answerCallbackQuery", { callback_query_id: cq.id });
-    return json({ ok: true, ignored: "unrecognised callback_data" });
-  }
-
-  // The write comes BEFORE the callback is answered, so the answer can carry
-  // the failure. It is one PostgREST call — nowhere near the ~15s Telegram
-  // gives before it gives up on the spinner itself — and the alternative is
-  // answering "done" to a tap that was not recorded.
-  let row: Row;
+  let cq: any;
   try {
-    row = tap.column
+    cq = (await req.json()).callback_query;
+    // Anything else is a /start or a stray message. Acknowledged and dropped.
+    if (!cq) return json({ ok: true, ignored: "not a callback_query" });
+
+    // The secret proves the caller is Telegram. This proves the tap came from
+    // the trader's own thread — anyone can find a bot and press its buttons if
+    // a message ever reaches them.
+    if (String(cq.message?.chat?.id) !== CHAT_ID) {
+      console.error("doji-telegram: callback from unexpected chat");
+      await tg("answerCallbackQuery", { callback_query_id: cq.id });
+      return json({ ok: true, ignored: "wrong chat" });
+    }
+
+    const tap = parseCallback(cq.data ?? "");
+    if (!tap) {
+      await tg("answerCallbackQuery", { callback_query_id: cq.id });
+      return json({ ok: true, ignored: "unrecognised callback_data" });
+    }
+
+    // Read before write, because staysOpen needs the row as it was. Two
+    // PostgREST calls rather than one, and the reason is worth the round trip:
+    // without the before-state the message can never settle.
+    const before = await readRow(tap.id);
+    const row = tap.column
       ? await writeAnswer(tap.id, tap.column, tap.value as string | boolean)
-      : await readRow(tap.id);
+      : before;
+
+    // Answered after the write, so a failure reaches the trader as an alert
+    // instead of a tap that looked accepted. Two PostgREST calls are nowhere
+    // near the ~15s Telegram gives before it abandons the spinner itself.
+    await tg("answerCallbackQuery", { callback_query_id: cq.id });
+    await redraw(row, cq.message.chat.id, cq.message.message_id, staysOpen(tap, before));
+    return json({ ok: true, id: tap.id, column: tap.column });
   } catch (err) {
     console.error("doji-telegram:", err instanceof Error ? err.message : err);
-    await tg("answerCallbackQuery",
-      { callback_query_id: cq.id, text: "Not saved — try again.", show_alert: true });
-    return json({ ok: false, error: "write failed" });
+    // Best effort, and guarded: telling the trader the tap failed must not
+    // itself turn a 200 into a redelivery loop.
+    if (cq?.id) {
+      await tg("answerCallbackQuery",
+        { callback_query_id: cq.id, text: "Not saved — try again.", show_alert: true })
+        .catch(() => {});
+    }
+    return json({ ok: false, error: "tap failed" });
   }
-  await tg("answerCallbackQuery", { callback_query_id: cq.id });
-
-  // [Edit] forces the full keyboard back. Otherwise the form stays as it was
-  // drawn: four rows while it is open, one row once it has settled — so a
-  // correction to two fields does not need [Edit] pressed twice.
-  const expanded = tap.column === null ||
-    (cq.message.reply_markup?.inline_keyboard?.length ?? 0) > 1;
-
-  await redraw(row, cq.message.chat.id, cq.message.message_id, expanded);
-  return json({ ok: true, id: tap.id, column: tap.column });
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
