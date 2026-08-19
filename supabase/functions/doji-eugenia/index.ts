@@ -280,8 +280,15 @@ async function remember(turns: Turn[]) {
 // pg_net is fire-and-forget and never retries, so this half may take as long as
 // it takes — the timeout in the cron job only has to outlast the work. That is
 // the whole difference between this caller and Telegram's.
-async function postBriefing(): Promise<Response> {
-  const due = briefDue(new Date());
+async function postBriefing(url: URL): Promise<Response> {
+  // ?force=1 runs a briefing now, whatever the clock says — the same flag
+  // doji-mcp-sync carries, for the same two jobs: a manual re-run after a
+  // failure, and a way to exercise the whole path without waiting for 08:00.
+  // It changes nothing else, and the answer comes back in the response rather
+  // than only in Telegram, which is what makes a failure readable.
+  const due = url.searchParams.get("force") === "1"
+    ? briefDue(new Date()) ?? 'weekday'
+    : briefDue(new Date());
   // The job runs hourly; twenty-three of those hours are not a briefing hour.
   if (!due) return json({ ok: true, skipped: "not a briefing hour" });
 
@@ -343,7 +350,18 @@ async function handleMessage(update: any): Promise<void> {
 function background(work: Promise<unknown>) {
   const guarded = work.catch(err =>
     console.error("doji-eugenia:", err instanceof Error ? err.message : err));
-  (globalThis as any).EdgeRuntime?.waitUntil?.(guarded);
+
+  const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
+  // SAID OUT LOUD, because its absence is otherwise invisible: without it the
+  // worker can be reclaimed the moment the 200 is sent, and the answer dies
+  // mid-generation with no error anywhere. That reads exactly like a model call
+  // that hung, which is the wrong thing to go looking for.
+  if (!waitUntil) {
+    console.error("doji-eugenia: EdgeRuntime.waitUntil unavailable — " +
+                  "the reply may be killed when this response returns");
+    return;
+  }
+  waitUntil.call((globalThis as any).EdgeRuntime, guarded);
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
@@ -363,7 +381,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true });
     }
     if (fromCron !== null && secretMatches(fromCron, CRON_SECRET)) {
-      return await postBriefing();
+      return await postBriefing(new URL(req.url));
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
