@@ -47,6 +47,7 @@ supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_telegram.sql               Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's memory and her schedule
+supabase/functions/_shared/edge.ts      env, secretMatches, json — one each
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-telegram/       Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
@@ -732,11 +733,28 @@ them can drift apart from the others. `verify_jwt` lives in
 `supabase/config.toml` rather than in a dashboard toggle, which is what makes
 the committed file the whole description of how a function is deployed.
 
+**`supabase/functions/_shared/edge.ts` holds `env`, `secretMatches` and
+`json`** — one definition each, bundled into every function that imports it.
+They were three byte-identical copies, and a copy of `secretMatches` is the one
+that could not be checked: the function exists to be *constant-time*, so a copy
+quietly rewritten to `presented === expected` returns the same answer to every
+assertion anyone would write while leaking the secret through timing. A
+behavioural test cannot see that; one definition has nothing to drift.
+
+`sbHeaders` and `tg` deliberately stay in the functions that own them. `tg`
+binds a different bot token per bot, and the poller's `sbHeaders` is genuinely a
+different function from the bots' — no argument, a hardcoded `Prefer`. Sharing
+either would mean threading config through every call site or a flag to switch
+behaviours, both of which cost more than the copy saves.
+
 **`npm test` runs first, in the same job, and a red suite stops the deploy.**
 `test.yml` also runs on every push, but it is a *separate* workflow — it would
 have gone red beside the deploy while the deploy shipped anyway, leaving two
 green ticks, one red, and the broken code already live. A failing step inside
-the deploy job is the only ordering that actually holds anything back.
+the deploy job is the only ordering that actually holds anything back. It is
+also what makes `_shared/` safe to depend on: the suite imports it by the same
+relative path the functions use, so an extraction that does not resolve fails
+the job instead of shipping three broken functions at once.
 
 **This is worth the machinery for one reason.** The poller and Gladys were
 pasted into the dashboard by hand, and nothing tied the running code to the
@@ -818,7 +836,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `greeting` and `chunk` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `greeting`, `chunk` and `tradesQuery` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 

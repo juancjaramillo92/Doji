@@ -52,10 +52,11 @@
 //           DOJI_CRON_SECRET, SUPABASE_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Every Deno touch goes through here, so the module imports under plain Node
-// and test/fold.test.mjs can reach the pure exports below. The Deno.serve at
-// the bottom is guarded for the same reason.
-const env = (k: string): string => (globalThis as any).Deno?.env?.get(k) ?? "";
+// env, secretMatches and json live in _shared/edge.ts — one definition each,
+// for the reason that file gives. Every Deno touch goes through env(), so this
+// module imports under plain Node and test/fold.test.mjs can reach the pure
+// exports below. The Deno.serve at the bottom is guarded for the same reason.
+import { env, secretMatches, json } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("TELEGRAM_BOT_TOKEN");
 // Numeric, not an @name. This value is both a sendMessage target and the
@@ -233,25 +234,6 @@ export function renderMessage(row: Row, expanded: boolean) {
   };
 }
 
-/* ─── Inbound authorisation ────────────────────────────────────────────────
-   Length-independent comparison, the same one doji-mcp-sync makes on its own
-   header. A plain !== leaks the expected secret's length through timing, which
-   is free to avoid. A null header is a closed door rather than an open one,
-   which is why neither caller below checks for one first.
-
-   Its own copy rather than an import: doji-mcp-sync calls Deno.serve at module
-   scope, so importing that file from here would start a second poller inside
-   this function.
-   ───────────────────────────────────────────────────────────────────────── */
-export function secretMatches(presented: string | null, expected: string): boolean {
-  if (!expected || !presented) return false;
-  const a = new TextEncoder().encode(presented);
-  const b = new TextEncoder().encode(expected);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-  return diff === 0;
-}
-
 /* ─── Telegram and PostgREST ───────────────────────────────────────────── */
 
 const tg = (method: string, body: unknown) =>
@@ -425,6 +407,3 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

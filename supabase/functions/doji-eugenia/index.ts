@@ -26,8 +26,9 @@
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SUPABASE_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM } from "./prompt.ts";
-
-const env = (k: string): string => (globalThis as any).Deno?.env?.get(k) ?? "";
+// env, secretMatches and json live in _shared/edge.ts — one definition each,
+// for the reason that file gives.
+import { env, secretMatches, json } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
 const WEBHOOK_SECRET = env("EUGENIA_WEBHOOK_SECRET");
@@ -293,23 +294,6 @@ async function remember(turns: Turn[]) {
   if (!res.ok) throw new Error(`History write failed (HTTP ${res.status})`);
 }
 
-/* ─── Inbound authorisation ────────────────────────────────────────────────
-   Length-independent comparison, and a null header is a closed door rather
-   than an open one — which is why neither caller below checks for one first.
-
-   Its own copy rather than an import from doji-telegram, for the reason that
-   file gives about doji-mcp-sync: importing a module that calls Deno.serve at
-   its top level would start that function's server inside this one.
-   ───────────────────────────────────────────────────────────────────────── */
-export function secretMatches(presented: string | null, expected: string): boolean {
-  if (!expected || !presented) return false;
-  const a = new TextEncoder().encode(presented);
-  const b = new TextEncoder().encode(expected);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-  return diff === 0;
-}
-
 /* ─── The cron half: today's briefing ───────────────────────────────────── */
 
 // pg_net is fire-and-forget and never retries, so this half may take as long as
@@ -440,6 +424,3 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

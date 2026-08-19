@@ -153,10 +153,10 @@ code you write near it:
   and one reopened with `[Edit]` both draw four rows. Only the row as it stood
   *before* the tap can tell them apart — that is `staysOpen`, and getting it
   wrong shipped a bot whose message could never settle.
-- **`secretMatches` is a second copy rather than an import from the poller.**
-  That file calls `Deno.serve` at module scope, so importing it would start a
-  second poller inside this function. `Deno.serve` here is guarded for the
-  mirror-image reason: so the test can import the module without serving.
+- **`Deno.serve` is guarded so the test can import the module without serving.**
+  That guard is also why the three shared primitives live in `_shared/edge.ts`
+  and not in one of the functions: importing a module that serves at its top
+  level would start that function inside the caller.
 - **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
   `Data.OWNED`, so no broker column is nameable from a tap. A test asserts
   exactly that; do not widen it without widening the test.

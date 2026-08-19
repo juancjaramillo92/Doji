@@ -31,11 +31,11 @@
 // Secrets: CTRADER_MCP_TOKEN, DOJI_USER_ID, DOJI_CRON_SECRET, SUPABASE_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Read through a guard rather than touching Deno at module scope, so this file
-// can be imported under plain Node without throwing before a single assertion
-// runs. Untestable code rots quietly; this is the one line that prevents it.
-// test/fold.test.mjs is what finally used it.
-const env = (k: string): string => (globalThis as any).Deno?.env?.get(k) ?? "";
+// env, secretMatches and json live in _shared/edge.ts — one definition each,
+// for the reason that file gives. Reading Deno through a guard rather than at
+// module scope is what lets this file be imported under plain Node without
+// throwing before a single assertion runs; test/fold.test.mjs is what uses it.
+import { env, secretMatches, json } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
 const MCP_TOKEN = env("CTRADER_MCP_TOKEN");
@@ -184,20 +184,6 @@ const MAX_ROWS = 500;
 // Nothing that amends, closes or creates is reachable from this function.
 const ALLOWED_TOOLS = ["get_deals", "get_balance"] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
-
-/* ─── Inbound authorisation ────────────────────────────────────────────────
-   Length-independent comparison. A plain !== leaks the expected secret's length
-   through timing. That is a small thing on an endpoint called every two minutes
-   by one caller, and free to avoid.
-   ───────────────────────────────────────────────────────────────────────── */
-export function secretMatches(presented: string | null, expected: string): boolean {
-  if (!expected || !presented) return false;
-  const a = new TextEncoder().encode(presented);
-  const b = new TextEncoder().encode(expected);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-  return diff === 0;
-}
 
 /* ─── MCP transport ────────────────────────────────────────────────────────
    Streamable HTTP. Three things make it fiddlier than a REST call: a session
@@ -577,6 +563,3 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

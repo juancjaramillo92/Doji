@@ -21,9 +21,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+// secretMatches comes from _shared, not from a function module, because there
+// is now one of it. That this import resolves is also what proves every
+// function's `../_shared/edge.ts` resolves — the same file, the same path
+// shape — which is the check standing between a bad extraction and a deploy.
+import { secretMatches } from '../supabase/functions/_shared/edge.ts';
+
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
-  lookbackFor, foldHours, balanceTarget, secretMatches, parseSse, marketOpen
+  lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
