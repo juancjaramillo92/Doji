@@ -160,7 +160,19 @@ async function readTrades(days: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 interface Turn { role: 'user' | 'assistant'; content: string }
 
-async function call(messages: any[]) {
+/* THE BRIEFING AND A QUESTION ARE NOT THE SAME AMOUNT OF WORK, AND WERE PRICED
+   AS IF THEY WERE. Effort sets how deeply the model thinks before it writes,
+   and at "high" — the API default — "how many trades did I take this week"
+   bought a minute of reasoning to produce one sentence. The briefing earns that
+   depth: a dozen searches, seven sections, one shot a day. A reply does not.
+
+   Medium rather than low for the reply, because the journal is the half that
+   punishes carelessness — `null` is not `no`, break-even is a price band and
+   not a number, and a fast wrong reading of his discipline is worse than a slow
+   right one. Low is for work with no way to be subtly wrong. */
+type Effort = 'medium' | 'high';
+
+async function call(messages: any[], effort: Effort) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -181,7 +193,7 @@ async function call(messages: any[]) {
         TRADES_TOOL,
       ],
       thinking: { type: "adaptive" },
-      output_config: { effort: "high" },
+      output_config: { effort },
     }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -193,11 +205,11 @@ async function call(messages: any[]) {
 // for the case where that assumption is wrong rather than as a working limit.
 const MAX_ROUNDS = 4;
 
-async function ask(messages: Turn[]): Promise<string> {
+async function ask(messages: Turn[], effort: Effort): Promise<string> {
   const convo: any[] = [...messages];
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const body = await call(convo);
+    const body = await call(convo, effort);
     // A refusal stops the turn with no usable content, so it is checked before
     // the blocks are read rather than surfacing as an empty message.
     if (body.stop_reason === "refusal") {
@@ -296,7 +308,7 @@ async function postBriefing(url: URL): Promise<Response> {
     ? "Today's briefing, please — the full structure. It is Sunday evening, the gold week is about to open."
     : "Today's briefing, please — the full structure.";
 
-  const brief = await ask([{ role: 'user', content: asked }]);
+  const brief = await ask([{ role: 'user', content: asked }], 'high');
   await say(`${greeting(due)}\n\n${brief}`);
   // Stored so a follow-up question has the briefing it follows.
   await remember([{ role: 'user', content: asked }, { role: 'assistant', content: brief }]);
@@ -328,14 +340,24 @@ async function handleMessage(update: any): Promise<void> {
       return;
     }
 
-    // Typing shows immediately; a briefing-grade answer takes a while and a
-    // silent bot reads as a broken one. Best effort — it is a courtesy.
-    await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+    // TELEGRAM'S TYPING INDICATOR LASTS FIVE SECONDS AND CANNOT BE EXTENDED, so
+    // one call at the start leaves a thirty-second answer looking like a dead
+    // bot for twenty-five of them — which is exactly how it was read the first
+    // time it ran long. Re-sent until there is something to send. It makes
+    // nothing faster; it makes the wait legible. Best effort, so a failed ping
+    // is swallowed rather than taking the answer down with it.
+    const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+    typing();
+    const keepTyping = setInterval(typing, 4_500);
 
-    const history = await recent();
-    const answer = await ask([...history, { role: 'user', content: msg.text }]);
-    await say(answer);
-    await remember([{ role: 'user', content: msg.text }, { role: 'assistant', content: answer }]);
+    try {
+      const history = await recent();
+      const answer = await ask([...history, { role: 'user', content: msg.text }], 'medium');
+      await say(answer);
+      await remember([{ role: 'user', content: msg.text }, { role: 'assistant', content: answer }]);
+    } finally {
+      clearInterval(keepTyping);
+    }
   } catch (err) {
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
     await tg("sendMessage",

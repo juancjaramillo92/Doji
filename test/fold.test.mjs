@@ -534,8 +534,9 @@ test('the salutation matches the time of day the briefing lands', () => {
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
 
 test('a briefing longer than one message is split, and never mid-sentence', () => {
-  // Seven sections of realistic length. The prompt asks her to write toward
-  // paragraph breaks, so the split should always find one.
+  // Deliberately over the length the prompt asks for — most briefings now fit
+  // in one message, and this exercises the ones that do not. Written in
+  // paragraphs, as she writes, so the split should always find a break.
   const section = (n) => `SECTION ${n}\n` + `Real yields drive gold. `.repeat(60);
   const brief = [...Array(7)].map((_, i) => section(i + 1)).join('\n\n');
   assert.ok(brief.length > TG_LIMIT, 'the fixture must actually exceed the limit');

@@ -544,12 +544,31 @@ and the exchange since; not so much that every question resends last Tuesday's
 calendar. The table has RLS enabled and no policy at all, which denies the
 publishable key outright — the app has no business there.
 
-**A briefing does not fit in one Telegram message.** The cap is 4,096
-characters and seven sections is several times that, so `chunk()` splits on a
-blank line, then any newline, and only hard-cuts a single paragraph that is
-itself over the limit. Parts are sent sequentially, because Telegram does not
-promise ordering and a briefing whose section 5 arrives before section 2 is
-unreadable.
+**A briefing is written to be read on a phone.** The prompt asks for 2,500
+characters and forbids more than 4,000: one line per event, the mechanism as an
+arrow chain (`hot CPI → Fed holds longer → real yields up → gold down`), jargon
+glossed once in brackets and never again. Running long is cut by dropping
+words, never by dropping items — a briefing that omits an event is wrong, one
+that omits an adjective is not.
+
+**A long one still does not fit in one Telegram message.** The cap is 4,096
+characters, so `chunk()` splits on a blank line, then any newline, and only
+hard-cuts a single paragraph that is itself over the limit. Parts are sent
+sequentially, because Telegram does not promise ordering and a briefing whose
+section 5 arrives before section 2 is unreadable.
+
+**A question is not a briefing, and used to cost the same.** `effort` sets how
+deeply the model thinks before it writes. The briefing earns the depth — a dozen
+searches, seven sections, one shot a day — and runs at `high`. A reply runs at
+`medium`, because at `high` "how many trades did I take this week" bought a
+minute of reasoning to produce one sentence. Not `low`: the journal is the half
+that punishes carelessness, and a fast wrong reading of his discipline is worse
+than a slow right one.
+
+The typing indicator repeats while she works, because Telegram's lasts five
+seconds and cannot be extended — one call at the start left a thirty-second
+answer looking like a dead bot for twenty-five of them. It makes nothing faster;
+it makes the wait legible.
 
 **What she costs.** Roughly $0.20 a briefing — about $6 a month for six a week —
 of which a third is web search at $10 per 1,000 searches rather than tokens.

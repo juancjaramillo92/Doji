@@ -182,8 +182,13 @@ code you write near it:
 - **Her schedule is `briefDue`, not a cron expression.** Hourly job, New York
   clock, because pg_cron is UTC and a fixed expression is wrong for half the
   year.
-- **A briefing exceeds Telegram's 4,096 characters.** `chunk` splits it and the
-  parts go sequentially; Telegram does not promise ordering.
+- **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
+  the parts go sequentially; Telegram does not promise ordering. The prompt aims
+  well under the cap, so this is the exception now — do not delete it for being
+  quiet.
+- **Effort is per caller, and it is the latency dial.** The briefing runs `high`
+  and a reply runs `medium`; nothing here runs `low`, because a careless read of
+  the journal is worse than a slow one.
 - **Her Telegram half must answer before it works, never after.** Telegram gives
   a webhook about a minute and then redelivers — which would run a whole
   briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is
