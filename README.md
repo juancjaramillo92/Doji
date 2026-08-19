@@ -639,7 +639,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`, and the Telegram `parseCallback` and `renderMessage` |
+| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`, and the Telegram `parseCallback`, `renderMessage` and `staysOpen` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 
@@ -674,7 +674,10 @@ the earliest close instead of the latest, and a secret comparison that ignores
 length; the Telegram tests against a setup whitelist removed, a discipline
 answer that accepts anything, `direction` added to the reachable columns, `sl`
 and `tp` swapped, a loosened trade id, `null` drawn as `no`, the clock reverted
-to UTC, a keyboard row dropped, and a message that never settles; the client tests
+to UTC, a keyboard row dropped, a summary spilling onto two lines, a setup name
+long enough to overrun the 64-byte cap, `staysOpen` forced true — which is the
+bug that shipped, restored on purpose — one that stops `[Edit]` reopening, and
+one that lets a reopened form re-settle; the client tests
 against a widened break-even band, break-evens dropped from the win-rate
 denominator, a stray column in `Data.OWNED`, a session derived from the close,
 an inverted filing anchor and a throwing renderer. Every one of those was
