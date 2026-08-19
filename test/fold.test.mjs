@@ -25,6 +25,7 @@ import {
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
+import { briefDue, greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -435,7 +436,7 @@ test('the message heads with the New York clock, not the UTC one', () => {
   // 21:05 New York on 30 July is 01:05 UTC on the 31st, the same fill nyDay is
   // tested against. The header has to agree with the day the trade is filed on.
   const evening = { ...open, entry_time: new Date(Date.UTC(2026, 6, 31, 1, 5)).toISOString() };
-  assert.match(renderMessage(evening, false).text, /^SELL 3400\.00 · 30 Jul, 21:05 NY$/m);
+  assert.match(renderMessage(evening, false).text, /^SELL 3400\.00 · 30 Jul, 21:05 ET$/m);
 });
 
 test('the settled summary is two lines and carries all four answers', () => {
@@ -445,8 +446,8 @@ test('the settled summary is two lines and carries all four answers', () => {
 
 test('the open form greets, then states the fill', () => {
   const lines = renderMessage(open, false).text.split('\n');
-  assert.equal(lines[0], 'New fill, boss.');
-  assert.equal(lines[2], 'SELL 3400.00 · 30 Jul, 10:00 NY');
+  assert.equal(lines[0], 'Hola Jefe, new fill below');
+  assert.equal(lines[2], 'SELL 3400.00 · 30 Jul, 10:00 ET');
 });
 
 /* ─── Telegram: when the form settles ────────────────────────────────────────
@@ -491,4 +492,106 @@ test('a correction inside a reopened form does not re-settle it', () => {
 test('[Edit] reopens whatever it is pressed on', () => {
   assert.equal(staysOpen(parseCallback('PID562780708|edit'), settled), true);
   assert.equal(staysOpen(parseCallback('PID562780708|edit'), open), true);
+});
+
+/* ─── Eugenia: when the briefing is due ──────────────────────────────────────
+   Weekdays 08:00 and Sunday 17:00 New York. The cron job fires hourly and this
+   is the whole decision, so an off-by-one here is a briefing that never arrives
+   or one that arrives every hour. August 2026 is EDT (UTC-4), January is EST
+   (UTC-5) — both are tested, because a fixed UTC schedule is exactly what this
+   exists to avoid.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('the weekday briefing is 08:00 New York, in both halves of the year', () => {
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 19, 12, 0))), 'weekday');  // Wed 08:00 EDT
+  assert.equal(briefDue(new Date(Date.UTC(2026, 0, 14, 13, 0))), 'weekday');  // Wed 08:00 EST
+  // The same UTC instant is the wrong hour in the other season, which is the
+  // entire reason this is not a cron expression.
+  assert.equal(briefDue(new Date(Date.UTC(2026, 0, 14, 12, 0))), null);       // Wed 07:00 EST
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 19, 13, 0))), null);       // Wed 09:00 EDT
+});
+
+test('the Sunday briefing is 17:00 New York, when the gold week opens', () => {
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 23, 21, 0))), 'sunday');   // Sun 17:00 EDT
+  assert.equal(briefDue(new Date(Date.UTC(2026, 0, 11, 22, 0))), 'sunday');   // Sun 17:00 EST
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 23, 12, 0))), null);       // Sun 08:00 — not a weekday
+});
+
+test('Saturday never gets a briefing, and no other hour does either', () => {
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 22, 12, 0))), null);       // Sat 08:00
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 22, 21, 0))), null);       // Sat 17:00
+  assert.equal(briefDue(new Date(Date.UTC(2026, 7, 19, 21, 0))), null);       // Wed 17:00
+  // Every hour of one weekday: exactly one of the twenty-four is the hour.
+  const due = [...Array(24)].filter((_, h) => briefDue(new Date(Date.UTC(2026, 7, 19, h, 0))));
+  assert.equal(due.length, 1);
+});
+
+test('the salutation matches the time of day the briefing lands', () => {
+  assert.equal(greeting('weekday'), 'Buenos dias jefesito, todays news below');
+  assert.equal(greeting('sunday'),  'Buenas tardes jefesito, todays news below');
+});
+
+/* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
+
+test('a briefing longer than one message is split, and never mid-sentence', () => {
+  // Seven sections of realistic length. The prompt asks her to write toward
+  // paragraph breaks, so the split should always find one.
+  const section = (n) => `SECTION ${n}\n` + `Real yields drive gold. `.repeat(60);
+  const brief = [...Array(7)].map((_, i) => section(i + 1)).join('\n\n');
+  assert.ok(brief.length > TG_LIMIT, 'the fixture must actually exceed the limit');
+
+  const parts = chunk(brief);
+  assert.ok(parts.length > 1);
+  for (const p of parts) assert.ok(p.length <= TG_LIMIT, `${p.length} > ${TG_LIMIT}`);
+  // Nothing dropped and nothing duplicated. Compared without whitespace, since
+  // the split trims at its seams and that is not a loss.
+  const bare = (t) => t.replace(/\s/g, '');
+  assert.equal(bare(parts.join('')), bare(brief));
+  // No part was re-flowed: each appears verbatim in the original, which is only
+  // true if every break landed on whitespace the text already had.
+  for (const p of parts) assert.ok(brief.includes(p), 'a part was rewritten, not cut');
+});
+
+test('a message that fits is sent whole, as one', () => {
+  assert.deepEqual(chunk('Buenos dias jefesito, todays news below'),
+    ['Buenos dias jefesito, todays news below']);
+});
+
+test('a single paragraph over the limit is cut rather than dropped', () => {
+  // No newline to break on. It must still fit, and must not lose characters.
+  const wall = 'x'.repeat(TG_LIMIT + 500);
+  const parts = chunk(wall);
+  assert.equal(parts.length, 2);
+  for (const p of parts) assert.ok(p.length <= TG_LIMIT);
+  assert.equal(parts.join('').length, wall.length);
+});
+
+/* ─── Eugenia: the journal, read-only ────────────────────────────────────────
+   `days` arrives from the model, so tradesQuery is the boundary and clamping is
+   its job. The view it names is the read-only one; that this function reads a
+   view rather than the table is the guarantee she cannot write a trade.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const NOW = Date.UTC(2026, 7, 19, 12, 0);   // 19 Aug 2026
+
+test('the journal read names the read-only view, never the table', () => {
+  // The path segment itself, not a substring of it — `eugenia_trades` contains
+  // `trades`, which is exactly the trap a looser assertion falls into.
+  const q = tradesQuery(30, NOW);
+  assert.equal(q.split('?')[0], 'eugenia_trades');
+});
+
+test('a window from the model is clamped, never trusted', () => {
+  const since = (d) => tradesQuery(d, NOW).match(/gte\.(\d{4}-\d\d-\d\d)/)[1];
+  assert.equal(since(7), '2026-08-12');
+  assert.equal(since(1), '2026-08-18');
+  assert.equal(since(99999), since(365));      // a year, and no further back
+  assert.equal(since(-5), since(1));           // never forward in time
+  assert.equal(since(0), since(30));           // absent or zero is a month
+  assert.equal(since('abc'), since(30));       // junk is a month, not NaN
+  assert.equal(since(undefined), since(30));
+});
+
+test('the journal read is bounded, so a wide window cannot fill the context', () => {
+  assert.match(tradesQuery(365, NOW), /limit=400/);
 });

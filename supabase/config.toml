@@ -13,3 +13,6 @@ verify_jwt = false
 
 [functions.doji-telegram]
 verify_jwt = false
+
+[functions.doji-eugenia]
+verify_jwt = false

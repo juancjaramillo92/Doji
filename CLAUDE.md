@@ -9,8 +9,10 @@ description of behaviour lives there, once.
 Doji is a personal XAUUSD trading journal: one `index.html` of ~3,800 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, the cTrader poller (Edge Function), the email parser (Apps
-Script), and the Telegram bot (one more Edge Function). Journal columns and
-broker columns never meet; that single idea is what the whole design rests on.
+Script), and Gladys, the Telegram journal bot (one more Edge Function). Journal
+columns and broker columns never meet; that single idea is what the whole design
+rests on. Eugenia, the market bot, is a fifth Edge Function and writes to none
+of it — she owns only her own conversation history.
 
 ---
 
@@ -161,6 +163,27 @@ code you write near it:
 - **`callback_data` must stay under 64 bytes.** It is the entire state store —
   no session table, no `tg_message_id`, no schema change — and a longer setup
   name is the way it would silently overrun.
+
+---
+
+## Eugenia
+
+- **She is not a writer to `trades` and must not become one.** She reads the web,
+  reads the journal through the `eugenia_trades` view, and writes only
+  `eugenia_turns`. The view is granted `select` alone and hides `user_id`,
+  `balance`, `commission` and deleted rows — but the grant secures the view, not
+  the key, so the guarantee that matters is structural: one database read of the
+  journal, no write path to it in the file. Do not add one.
+- **`tradesQuery` is a boundary.** Its `days` comes from the model, so it is
+  clamped and row-limited there rather than trusted.
+- **The prohibitions live in `prompt.ts`, and they are the product.** No forward
+  price-action opinions, no signals, no verdict on a trade, one question at a
+  time. Mechanism analysis stops at the mechanism.
+- **Her schedule is `briefDue`, not a cron expression.** Hourly job, New York
+  clock, because pg_cron is UTC and a fixed expression is wrong for half the
+  year.
+- **A briefing exceeds Telegram's 4,096 characters.** `chunk` splits it and the
+  parts go sequentially; Telegram does not promise ordering.
 
 ---
 
