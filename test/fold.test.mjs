@@ -24,7 +24,7 @@ import {
   lookbackFor, foldHours, balanceTarget, secretMatches, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, parseCallback, renderMessage } from '../supabase/functions/doji-telegram/index.ts';
+import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -360,15 +360,14 @@ function T0_ISO() { return new Date(Date.UTC(2026, 6, 30, 14, 0, 0)).toISOString
 const settled = { ...open, setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: false };
 
 test('every button fits inside Telegram\'s 64-byte callback_data cap', () => {
-  // Measured in BYTES, not characters, and over the longest setup name there
-  // is — the value travels inside the payload, so the vocabulary sets the
-  // budget. Worst case today is 39.
+  // Measured in BYTES, not characters, and over every button both forms draw —
+  // a setup value travels inside the payload, so the vocabulary sets the
+  // budget. Worst case today is 39. Asserting the cap rather than the current
+  // longest name, so a longer legal setup fails this only if it truly overruns.
   const rows = [
     ...renderMessage(open, false).reply_markup.inline_keyboard,
     ...renderMessage(settled, false).reply_markup.inline_keyboard
   ];
-  const longest = Math.max(...SETUPS.map(s => s.length));
-  assert.equal(longest, 'Support & Resistance'.length);   // the budget this was measured against
   for (const row of rows) {
     for (const btn of row) {
       const bytes = new TextEncoder().encode(btn.callback_data).length;
@@ -422,4 +421,47 @@ test('the settled summary is one line and carries all four answers', () => {
   const text = renderMessage(settled, false).text;
   assert.equal(text.includes('\n'), false);
   assert.equal(text, 'SELL 3400.00 · Break & Retest · rules ✓ stop ✓ target ✗');
+});
+
+/* ─── Telegram: when the form settles ────────────────────────────────────────
+   The decision that was wrong. An earlier version read the keyboard's row count
+   off the incoming message, which is true on every tap — an open form always
+   has four rows — so the message never settled and the summary, the [Edit]
+   button and the readRow path were all unreachable. These replay the taps.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('the fourth answer settles the form, and the three before it do not', () => {
+  // The whole sequence, exactly as the webhook drives it: read before, write,
+  // then redraw with staysOpen. This is the regression test for a message that
+  // could never settle at all.
+  const complete = r => r.setup !== null && r.followed_rules !== null &&
+                        r.followed_sl !== null && r.followed_tp !== null;
+  let row = { ...open };
+  let didSettle = false;
+
+  for (const data of ['PID562780708|setup|Break & Retest', 'PID562780708|rules|1',
+                      'PID562780708|sl|1', 'PID562780708|tp|1']) {
+    const tap = parseCallback(data);
+    const before = row;                                  // the row as it stood
+    row = { ...row, [tap.column]: tap.value };            // the write
+    // Settling needs both: the row complete, and the tap not a reopen.
+    didSettle = complete(row) && !staysOpen(tap, before);
+    const rows = renderMessage(row, staysOpen(tap, before)).reply_markup.inline_keyboard.length;
+    assert.equal(rows, didSettle ? 1 : 4, data);
+  }
+  assert.equal(didSettle, true, 'the fourth answer must settle it');
+});
+
+test('a correction inside a reopened form does not re-settle it', () => {
+  // Reopened means every answer was already in before this tap. Collapsing here
+  // would make a two-field correction need [Edit] pressed twice.
+  const tap = parseCallback('PID562780708|sl|0');
+  assert.equal(staysOpen(tap, settled), true);
+  assert.equal(renderMessage({ ...settled, followed_sl: false },
+    staysOpen(tap, settled)).reply_markup.inline_keyboard.length, 4);
+});
+
+test('[Edit] reopens whatever it is pressed on', () => {
+  assert.equal(staysOpen(parseCallback('PID562780708|edit'), settled), true);
+  assert.equal(staysOpen(parseCallback('PID562780708|edit'), open), true);
 });

@@ -422,12 +422,20 @@ session table, no `tg_message_id` column and no schema change: the callback also
 carries the chat and message ids that `editMessageText` needs. A tap is
 self-describing, and a redeploy in the middle of answering costs nothing.
 
-The one thing the row cannot say is whether a settled message has been reopened.
-That is read off the keyboard already on it — four rows means open, one row
-means settled — so correcting two fields does not need `[Edit]` pressed twice.
-The consequence, stated rather than discovered: a message reopened with `[Edit]`
-stays open. Only the fourth answer settles it, and a reopened message has no
-fourth answer left to give.
+The one thing `callback_data` cannot say is whether a redraw should settle, and
+the keyboard cannot say it either — an open form and a form reopened with
+`[Edit]` both draw four rows. It comes instead from the row **as it stood before
+the tap**, which costs one extra read per tap and is the only signal that works:
+already complete means the trader reopened a settled message and is correcting
+it, so it stays open; incomplete means this tap may be the fourth answer, and
+the fourth answer settles it. A message reopened with `[Edit]` therefore stays
+open, which is what lets a two-field correction happen without pressing `[Edit]`
+twice.
+
+That decision shipped wrong once — read off the keyboard's row count, which is
+true on every tap, so the message never settled and the summary, the `[Edit]`
+button and the read path were all unreachable. It is `staysOpen`, it is
+exported, and a test replays all four taps against it.
 
 **The write is the fourth writer and it stays in the journal half.** The webhook
 maps a button's field to a column through the same four names as `Data.OWNED`,
