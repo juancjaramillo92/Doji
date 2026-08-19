@@ -659,9 +659,12 @@ it from here.
         secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```
 
-9. Run `supabase/002_telegram.sql`. It reads `DOJI_CRON_SECRET` from Vault under
-   that name — the same secret and the same read the poller's cron job uses — so
-   the trigger holds no database power either.
+9. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
+   the same secret and the same read the poller's cron job uses, so the trigger
+   holds no database power either. **Check the name against
+   `select command from cron.job` rather than trusting this line:** Postgres
+   compares it case-sensitively, and the wrong spelling makes the trigger give
+   up silently, which reads exactly like a bot that was never installed.
 
 ---
 
@@ -770,9 +773,16 @@ account. The planned floor is **not recoverable from the data** — the broker
 reports only the *final* stop, so a stop moved to break-even has overwritten the
 original risk. Never infer what the planned R:R was; ask.
 
-**The pg_cron job holds no database power.** It presents `DOJI_CRON_SECRET`,
-read from Vault at call time, and that secret's entire authority is to start a
-poll that was going to run anyway. The service-role key lives in the Edge
+**The pg_cron job holds no database power.** It presents the cron secret, read
+from Vault at call time, and that secret's entire authority is to start a poll
+that was going to run anyway.
+
+One value, two stores, two spellings, and it is worth knowing before you touch
+either: the Edge Functions read it from their own secrets as
+**`DOJI_CRON_SECRET`**, while the database reads it from Vault as
+**`doji_cron_secret`**. Both the cron job and the Telegram trigger use the
+lower-case Vault name. The Telegram trigger shipped reading the upper-case one,
+found nothing, and went quiet without failing anything. The service-role key lives in the Edge
 Function's own secrets and never appears in the job. This replaced an earlier
 arrangement where the job text carried a legacy service_role JWT — full
 RLS-bypassing access, in a job definition, unrotatable.

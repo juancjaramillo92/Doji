@@ -3,8 +3,8 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- Fires when the poller mints a row from an entry deal, and asks the trader the
 -- four journal questions in Telegram. Separate from 001_trades.sql because it
--- depends on two things that file does not: doji-telegram deployed, and
--- DOJI_CRON_SECRET in Vault.
+-- depends on two things that file does not: doji-telegram deployed, and the
+-- cron job's secret in Vault.
 --
 -- Run once, in the SQL editor, after both exist.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -35,15 +35,19 @@ as $$
 declare
   secret text;
 begin
+  -- Lower case, and read from the poller's own cron job rather than guessed:
+  -- `select command from cron.job` shows it reads exactly this name. Postgres
+  -- compares strings case-sensitively, so the upper-case spelling this file
+  -- shipped with matched nothing and every trade went unannounced.
   select decrypted_secret into secret
     from vault.decrypted_secrets
-    where name = 'DOJI_CRON_SECRET';   -- the name the pg_cron poller job reads
+    where name = 'doji_cron_secret';
 
   -- An AFTER trigger that raises takes the INSERT down with it, and a missing
   -- secret must never cost the trade its row. The prompt is the expendable half
   -- of this feature; the fill is not.
   if secret is null then
-    raise warning 'trades_telegram_open: DOJI_CRON_SECRET not in Vault — no message sent';
+    raise warning 'trades_telegram_open: doji_cron_secret not in Vault — no message sent';
     return null;
   end if;
 
@@ -58,7 +62,11 @@ begin
       'setup',          new.setup,
       'followed_rules', new.followed_rules,
       'followed_sl',    new.followed_sl,
-      'followed_tp',    new.followed_tp)
+      'followed_tp',    new.followed_tp),
+    -- The poller's job sets the same bound. A cold start plus a read, a write
+    -- and a Telegram call can outrun pg_net's default, and a request cut off
+    -- mid-flight is a message that never arrives.
+    timeout_milliseconds := 20000
   );
   return null;
 end $$;
