@@ -12,7 +12,7 @@ table — the app, the cTrader poller (Edge Function), the email parser (Apps
 Script), and Gladys, the Telegram journal bot (one more Edge Function). Journal
 columns and broker columns never meet; that single idea is what the whole design
 rests on. Eugenia, the market bot, would be the fifth writer and is not: she
-owns only her own conversation history.
+owns only her own conversation and her own notes.
 
 ---
 
@@ -170,25 +170,44 @@ code you write near it:
 
 - **She is not a writer to `trades` and must not become one.** She reads the web,
   reads the journal through the `eugenia_trades` view, and writes only
-  `eugenia_turns`. The view is granted `select` alone and hides `user_id`,
-  `balance`, `commission` and deleted rows — but the grant secures the view, not
-  the key, so the guarantee that matters is structural: one database read of the
-  journal, no write path to it in the file. Do not add one.
+  `eugenia_turns` and `eugenia_notes`. The view is granted `select` alone and
+  hides `user_id`, `balance`, `commission` and deleted rows — but the grant
+  secures the view, not the key, so the guarantee that matters is structural:
+  one database read of the journal, no write path to it in the file. Do not add
+  one.
 - **`tradesQuery` is a boundary.** Its `days` comes from the model, so it is
-  clamped and row-limited there rather than trusted.
-- **The prohibitions live in `prompt.ts`, and they are the product.** No forward
-  price-action opinions, no signals, no verdict on a trade, one question at a
-  time. Mechanism analysis stops at the mechanism.
-- **Her schedule is `briefDue`, not a cron expression.** Hourly job, New York
-  clock, because pg_cron is UTC and a fixed expression is wrong for half the
-  year.
+  clamped and row-limited there rather than trusted. `writeNote` is the other
+  one: it truncates rather than refusing, because a tool that errors mid-turn
+  costs the whole answer.
+- **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
+  no verdict on a trade, one question at a time. The line she may now cross is
+  narrow and deliberate: *what the market is pricing* and *what would surprise
+  it* are facts about today and are hers to say; what price will do never is.
+  Widening that further is a product decision, not a prompt tweak.
+- **The briefing is prose and must stay prose.** Numbered sections with headings
+  are a report however plain the words inside them; that is what the rewrite
+  removed. Do not reintroduce scaffolding to "organise" it.
+- **Two schedules, one hourly job.** `briefDue` and `pulseDue` both read
+  `nyClock`, because pg_cron is UTC and a fixed expression is wrong for half the
+  year. A test walks every hour of a week asserting they never both fire — one
+  call cannot owe two answers.
+- **The pulse's default is silence, and `isSilent` is how it is said.** It
+  matches the bare word only, so a sentence merely opening with it is sent. Err
+  toward sending: a swallowed message is invisible, an extra one is extra.
+  Nothing is stored on a quiet pulse — twelve turns is the whole window and
+  empty pairs would push the briefing out of it.
+- **What is stored is the raw turn, never the augmented one.** Notes and the
+  week's trades are rebuilt every turn; storing them would resend a stale copy
+  as history for the next six briefings.
+- **`HISTORY` has to stay even.** Turns are written in pairs, so an odd window
+  starts on an assistant turn and the Messages API refuses it.
 - **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
   the parts go sequentially; Telegram does not promise ordering. The prompt aims
   well under the cap, so this is the exception now — do not delete it for being
   quiet.
-- **Effort is per caller, and it is the latency dial.** The briefing runs `high`
-  and a reply runs `medium`; nothing here runs `low`, because a careless read of
-  the journal is worse than a slow one.
+- **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
+  a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
+  read of the journal is worse than a slow one.
 - **Her Telegram half must answer before it works, never after.** Telegram gives
   a webhook about a minute and then redelivers — which would run a whole
   briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is
