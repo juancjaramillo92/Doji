@@ -25,7 +25,7 @@ import {
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
-import { briefDue, greeting, chunk, TG_LIMIT } from '../supabase/functions/doji-eugenia/index.ts';
+import { briefDue, greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -436,7 +436,7 @@ test('the message heads with the New York clock, not the UTC one', () => {
   // 21:05 New York on 30 July is 01:05 UTC on the 31st, the same fill nyDay is
   // tested against. The header has to agree with the day the trade is filed on.
   const evening = { ...open, entry_time: new Date(Date.UTC(2026, 6, 31, 1, 5)).toISOString() };
-  assert.match(renderMessage(evening, false).text, /^SELL 3400\.00 · 30 Jul, 21:05 NY$/m);
+  assert.match(renderMessage(evening, false).text, /^SELL 3400\.00 · 30 Jul, 21:05 ET$/m);
 });
 
 test('the settled summary is two lines and carries all four answers', () => {
@@ -447,7 +447,7 @@ test('the settled summary is two lines and carries all four answers', () => {
 test('the open form greets, then states the fill', () => {
   const lines = renderMessage(open, false).text.split('\n');
   assert.equal(lines[0], 'Hola Jefe, new fill below');
-  assert.equal(lines[2], 'SELL 3400.00 · 30 Jul, 10:00 NY');
+  assert.equal(lines[2], 'SELL 3400.00 · 30 Jul, 10:00 ET');
 });
 
 /* ─── Telegram: when the form settles ────────────────────────────────────────
@@ -564,4 +564,34 @@ test('a single paragraph over the limit is cut rather than dropped', () => {
   assert.equal(parts.length, 2);
   for (const p of parts) assert.ok(p.length <= TG_LIMIT);
   assert.equal(parts.join('').length, wall.length);
+});
+
+/* ─── Eugenia: the journal, read-only ────────────────────────────────────────
+   `days` arrives from the model, so tradesQuery is the boundary and clamping is
+   its job. The view it names is the read-only one; that this function reads a
+   view rather than the table is the guarantee she cannot write a trade.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const NOW = Date.UTC(2026, 7, 19, 12, 0);   // 19 Aug 2026
+
+test('the journal read names the read-only view, never the table', () => {
+  // The path segment itself, not a substring of it — `eugenia_trades` contains
+  // `trades`, which is exactly the trap a looser assertion falls into.
+  const q = tradesQuery(30, NOW);
+  assert.equal(q.split('?')[0], 'eugenia_trades');
+});
+
+test('a window from the model is clamped, never trusted', () => {
+  const since = (d) => tradesQuery(d, NOW).match(/gte\.(\d{4}-\d\d-\d\d)/)[1];
+  assert.equal(since(7), '2026-08-12');
+  assert.equal(since(1), '2026-08-18');
+  assert.equal(since(99999), since(365));      // a year, and no further back
+  assert.equal(since(-5), since(1));           // never forward in time
+  assert.equal(since(0), since(30));           // absent or zero is a month
+  assert.equal(since('abc'), since(30));       // junk is a month, not NaN
+  assert.equal(since(undefined), since(30));
+});
+
+test('the journal read is bounded, so a wide window cannot fill the context', () => {
+  assert.match(tradesQuery(365, NOW), /limit=400/);
 });

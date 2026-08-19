@@ -33,6 +33,31 @@ create index eugenia_turns_id_desc on public.eugenia_turns (id desc);
 
 alter table public.eugenia_turns enable row level security;
 
+-- ─── What she may see of the journal ───────────────────────────────────────
+-- Read-only, and enforced by the grant below rather than by her good intentions.
+--
+-- A VIEW rather than the table, for two reasons. It fixes the column list — no
+-- user_id, no balance, no commission, none of which she needs to discuss a
+-- trade — and it filters `deleted`, so a trade the trader removed stays removed
+-- in conversation too. A single-table view is auto-updatable in Postgres, which
+-- is exactly why the revoke below is not decoration.
+create view public.eugenia_trades as
+  select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
+         open_day, setup, followed_rules, followed_sl, followed_tp
+  from public.trades
+  where deleted = false;
+
+-- SELECT and nothing else, for the one role that reaches it.
+revoke all on public.eugenia_trades from anon, authenticated, service_role;
+grant select on public.eugenia_trades to service_role;
+
+-- SAY THE LIMIT PLAINLY: this makes the VIEW read-only, not the key. Eugenia
+-- holds the service key because she writes eugenia_turns, and that key can
+-- still reach `trades` directly. What stops her is structural — her function
+-- has exactly one database read of the journal and no write path to it at all,
+-- and a test asserts the query it builds. The grant is the second lock, not the
+-- only one.
+
 -- ─── Her clock ─────────────────────────────────────────────────────────────
 -- HOURLY, AND THE HOUR IS DECIDED IN THE FUNCTION. Weekdays at 08:00 and Sunday
 -- at 17:00 New York; pg_cron schedules in UTC, so any fixed expression is an

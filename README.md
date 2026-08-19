@@ -496,8 +496,8 @@ better retried by the trader's own second tap than by a redelivery loop.
 
 ## Eugenia — the market bot
 
-A daily XAU/USD briefing, and a conversation about it. **Weekdays at 08:00 New
-York, Sunday at 17:00** — the second is the gold open, so the week's first
+A daily XAU/USD briefing, and a conversation about it. **Weekdays at 08:00 ET,
+Sunday at 17:00 ET** — the second is the gold open, so the week's first
 briefing lands exactly as the market does. She greets with `Buenos dias
 jefesito` in the morning and `Buenas tardes jefesito` on Sunday evening.
 
@@ -512,10 +512,24 @@ America/New_York for its own clock — twenty-three of those calls return "not a
 briefing hour" and spend nothing. It is the same trade `marketOpen()` makes for
 the poller, for the same reason.
 
-**She reads no trade and owns no column of `trades`.** She is not a fifth writer:
-the only thing she writes is her own conversation history, in `eugenia_turns`.
-Trade review stays in the Claude app, where the data is — a character told to
-review trades without access to them would invent them.
+**She reads the journal and can never write it.** `get_trades` is a tool she
+calls when the conversation is about his trading, and three separate things make
+it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no
+`balance`, no `commission`) and hides deleted rows; the grant on that view is
+`select` and nothing else; and her function has exactly one database read of the
+journal and no write path to it anywhere. Said plainly, because it is the honest
+limit: the grant makes the *view* read-only, not the key — she holds the service
+key to write her own history, so the structural guarantee is what matters and
+the grant is the second lock.
+
+A tool rather than trades pasted into every request: most messages are about the
+Fed, not last Tuesday, and a journal stapled to every turn would be paid for on
+every turn and would break the prompt cache each time a fill landed. The window
+she asks for is clamped to 1–365 days and 400 rows — that argument comes from
+the model, so it is a boundary.
+
+She is still not a fifth writer to `trades`. The only thing she writes is
+`eugenia_turns`.
 
 **Twelve turns of memory.** Enough that a follow-up has the briefing it follows
 and the exchange since; not so much that every question resends last Tuesday's

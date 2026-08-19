@@ -168,9 +168,14 @@ code you write near it:
 
 ## Eugenia
 
-- **She is not a writer to `trades` and must not become one.** She reads the web
-  and writes `eugenia_turns`. A character with the trade table in reach would
-  start giving verdicts, which her prompt forbids and the project forbids.
+- **She is not a writer to `trades` and must not become one.** She reads the web,
+  reads the journal through the `eugenia_trades` view, and writes only
+  `eugenia_turns`. The view is granted `select` alone and hides `user_id`,
+  `balance`, `commission` and deleted rows — but the grant secures the view, not
+  the key, so the guarantee that matters is structural: one database read of the
+  journal, no write path to it in the file. Do not add one.
+- **`tradesQuery` is a boundary.** Its `days` comes from the model, so it is
+  clamped and row-limited there rather than trusted.
 - **The prohibitions live in `prompt.ts`, and they are the product.** No forward
   price-action opinions, no signals, no verdict on a trade, one question at a
   time. Mechanism analysis stops at the mechanism.

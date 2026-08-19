@@ -100,6 +100,55 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
   return out;
 }
 
+/* ─── The journal, read-only ───────────────────────────────────────────────
+   She can look at trades when the conversation is about trades, and cannot
+   touch them. Three things make that true and none of them is her restraint:
+   the view fixes the columns and hides deleted rows, the grant on it is SELECT
+   only, and this function is the single database read of the journal she has —
+   there is no write path to `trades` anywhere in the file.
+
+   A TOOL rather than trades pasted into every request. Most messages are about
+   the Fed, not about last Tuesday, and a journal stapled to every turn would be
+   paid for on every turn and would break the prompt cache each time a fill
+   landed. She pulls it when she needs it.
+   ───────────────────────────────────────────────────────────────────────── */
+const TRADES_TOOL = {
+  name: "get_trades",
+  description:
+    "The trader's own journal for the last N days, newest first. Use it whenever " +
+    "he asks about his trades, his discipline, or a pattern in how he has been " +
+    "trading. Returns one object per trade: id, direction, entry and exit price, " +
+    "entry and fill time (UTC), pnl, open_day, setup, and the three discipline " +
+    "answers. A discipline answer of null means unanswered, which is NOT 'no'.",
+  input_schema: {
+    type: "object",
+    properties: {
+      days: { type: "integer", description: "How many days back to read, 1 to 365." },
+    },
+    required: ["days"],
+    additionalProperties: false,
+  },
+  strict: true,
+} as const;
+
+// The whole query, built in one place so a test can read it. `days` arrives
+// from the model, so it is clamped rather than trusted: this is the boundary.
+// 400 rows is far more than a year of this account and stops a wide window
+// returning a context-filling answer.
+export function tradesQuery(days: unknown, now = Date.now()): string {
+  const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
+  const since = new Date(now - n * 86_400_000).toISOString().slice(0, 10);
+  return `eugenia_trades?open_day=gte.${since}` +
+         `&order=open_day.desc,entry_time.desc&limit=400`;
+}
+
+async function readTrades(days: unknown): Promise<string> {
+  const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Trades read failed (HTTP ${res.status})`);
+  const rows = await res.json();
+  return rows.length ? JSON.stringify(rows) : "No trades in that window.";
+}
+
 /* ─── Claude ───────────────────────────────────────────────────────────────
    Raw fetch rather than the SDK, to match every other outbound call in this
    repo — the poller speaks JSON-RPC to cTrader and REST to PostgREST the same
@@ -111,7 +160,7 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
    ───────────────────────────────────────────────────────────────────────── */
 interface Turn { role: 'user' | 'assistant'; content: string }
 
-async function ask(messages: Turn[]): Promise<string> {
+async function call(messages: any[]) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -125,23 +174,57 @@ async function ask(messages: Turn[]): Promise<string> {
       // Cached: the system prompt is long, fixed, and sent on every turn.
       system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 12 }],
+      // web_search runs on Anthropic's side and needs no loop here; get_trades
+      // is ours and is executed below.
+      tools: [
+        { type: "web_search_20260209", name: "web_search", max_uses: 12 },
+        TRADES_TOOL,
+      ],
       thinking: { type: "adaptive" },
       output_config: { effort: "high" },
     }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return res.json();
+}
 
-  const body = await res.json();
-  // A refusal stops the turn with no usable content, so it is checked before
-  // the blocks are read rather than surfacing as an empty message.
-  if (body.stop_reason === "refusal") {
-    throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
+// Four rounds, because a loop that cannot end is a loop that bills forever. Two
+// is the realistic maximum — ask for trades, then answer — and the cap exists
+// for the case where that assumption is wrong rather than as a working limit.
+const MAX_ROUNDS = 4;
+
+async function ask(messages: Turn[]): Promise<string> {
+  const convo: any[] = [...messages];
+
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const body = await call(convo);
+    // A refusal stops the turn with no usable content, so it is checked before
+    // the blocks are read rather than surfacing as an empty message.
+    if (body.stop_reason === "refusal") {
+      throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
+    }
+
+    if (body.stop_reason === "tool_use") {
+      convo.push({ role: "assistant", content: body.content });
+      // All results in ONE user message. Splitting them teaches the model to
+      // stop asking for tools in parallel.
+      const results = [];
+      for (const b of body.content ?? []) {
+        if (b.type === "tool_use" && b.name === TRADES_TOOL.name) {
+          results.push({ type: "tool_result", tool_use_id: b.id, content: await readTrades(b.input?.days) });
+        }
+      }
+      if (!results.length) throw new Error("tool_use with no tool this function serves");
+      convo.push({ role: "user", content: results });
+      continue;
+    }
+
+    const text = (body.content ?? [])
+      .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+    if (!text) throw new Error("Claude returned no text");
+    return text;
   }
-  const text = (body.content ?? [])
-    .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
-  if (!text) throw new Error("Claude returned no text");
-  return text;
+  throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
 }
 
 /* ─── Telegram and history ─────────────────────────────────────────────── */

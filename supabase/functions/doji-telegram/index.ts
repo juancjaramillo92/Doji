@@ -156,9 +156,10 @@ export function parseCallback(data: string): Tap | null {
 // means.
 const mark = (v: boolean | null) => v === null ? '—' : v ? '✓' : '✗';
 
-// The New York clock, because that is the day the trade is filed under. The
-// same 21:05 fill that nyDay keeps on its own day would read as tomorrow here
-// if this used the UTC stamp.
+// The New York clock, because that is the day the trade is filed under — shown
+// as ET, since "NY" is the name of a session in this app and would read as one.
+// The same 21:05 fill that nyDay keeps on its own day would read as tomorrow
+// here if this used the UTC stamp.
 const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York',
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -210,7 +211,7 @@ export function renderMessage(row: Row, expanded: boolean) {
     text: [
       'Hola Jefe, new fill below',
       '',
-      `${row.direction} ${price} · ${nyTime(row.entry_time)} NY`,
+      `${row.direction} ${price} · ${nyTime(row.entry_time)} ET`,
       '',
       `Setup: ${row.setup ?? '—'}`,
       `Rules: ${mark(row.followed_rules)}`,
