@@ -45,9 +45,11 @@ icon-512.png                            home-screen icon
 vercel.json                             no-cache header for index.html
 supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
-supabase/002_telegram.sql               the trade-open trigger
+supabase/002_telegram.sql               Gladys's trade-open trigger
+supabase/003_eugenia.sql                Eugenia's memory and her schedule
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
-supabase/functions/doji-telegram/       Edge Function: the Telegram journal
+supabase/functions/doji-telegram/       Edge Function: Gladys, the journal bot
+supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs both suites on every push
@@ -390,7 +392,21 @@ the notifications on regardless of whether you read them.
 
 ---
 
-## The Telegram journal
+## The two bots
+
+**Gladys** collects the journal. **Eugenia** does macro. They are separate bots
+with separate tokens and separate threads, and they share nothing but a chat id
+and the cron secret — Gladys writes four journal columns and reads no market;
+Eugenia reads the web and writes no trade.
+
+That split is deliberate. Gladys is deterministic, answers in milliseconds and
+must never change; Eugenia calls a model, takes seconds, costs money per message
+and will be tuned constantly. Putting them in one function would mean
+redeploying the thing that writes to `trades` every time a prompt is reworded.
+
+---
+
+## Gladys — the Telegram journal
 
 When a position opens, the trader gets one Telegram message and answers the
 whole journal from it — setup and all three discipline booleans — without
@@ -403,6 +419,8 @@ is Telegram reporting a tap. They were briefly two functions and share
 everything that matters — the keyboard, the message, the `callback_data`
 grammar — so splitting them meant deploying that code twice and keeping the
 copies in step.
+
+She opens with `Hola Jefe, new fill below`.
 
 **One message, edited in place.** Four rows of buttons — the two setups, then
 Rules, Stop Loss and Take Profit — answerable in any order. Each tap writes one
@@ -473,6 +491,54 @@ success. Any *other* edit failure falls back to a fresh message, which is also
 the answer if Telegram caps how long a bot may edit its own message. And every
 path answers 200: Telegram redelivers anything else, and a write that failed is
 better retried by the trader's own second tap than by a redelivery loop.
+
+---
+
+## Eugenia — the market bot
+
+A daily XAU/USD briefing, and a conversation about it. **Weekdays at 08:00 New
+York, Sunday at 17:00** — the second is the gold open, so the week's first
+briefing lands exactly as the market does. She greets with `Buenos dias
+jefesito` in the morning and `Buenas tardes jefesito` on Sunday evening.
+
+Reply to her and she answers. `supabase/003_eugenia.sql` holds her memory and
+her clock; `doji-eugenia/prompt.ts` holds who she is; `doji-eugenia/index.ts` is
+the wiring.
+
+**The schedule is decided in the function, not in cron.** pg_cron schedules in
+UTC, so any fixed expression is an hour wrong for half the year and needs
+editing twice a year forever. The job runs hourly and `briefDue()` asks
+America/New_York for its own clock — twenty-three of those calls return "not a
+briefing hour" and spend nothing. It is the same trade `marketOpen()` makes for
+the poller, for the same reason.
+
+**She reads no trade and owns no column of `trades`.** She is not a fifth writer:
+the only thing she writes is her own conversation history, in `eugenia_turns`.
+Trade review stays in the Claude app, where the data is — a character told to
+review trades without access to them would invent them.
+
+**Twelve turns of memory.** Enough that a follow-up has the briefing it follows
+and the exchange since; not so much that every question resends last Tuesday's
+calendar. The table has RLS enabled and no policy at all, which denies the
+publishable key outright — the app has no business there.
+
+**A briefing does not fit in one Telegram message.** The cap is 4,096
+characters and seven sections is several times that, so `chunk()` splits on a
+blank line, then any newline, and only hard-cuts a single paragraph that is
+itself over the limit. Parts are sent sequentially, because Telegram does not
+promise ordering and a briefing whose section 5 arrives before section 2 is
+unreadable.
+
+**What she costs.** Roughly $0.20 a briefing — about $6 a month for six a week —
+of which a third is web search at $10 per 1,000 searches rather than tokens.
+Questions are a few cents each. The model is the strongest one; at this volume
+the searches dominate, so a weaker model would save little.
+
+**What she will not do**, and it is in the prompt rather than left to taste: no
+forward price-action opinions, no signals or entries, no verdict on a trade, and
+never more than one question at a time. Mechanism analysis is the whole point —
+*hawkish Fed → real yields up → bearish pressure on gold* — and it stops at the
+mechanism.
 
 ---
 
@@ -663,7 +729,13 @@ it from here.
         secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```
 
-9. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
+9. For Eugenia: a second BotFather bot, `/start` it, and set `EUGENIA_BOT_TOKEN`,
+   `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in Edge Function secrets.
+   Point Telegram at `/functions/v1/doji-eugenia` with that secret token. The
+   API key comes from platform.claude.com — the same Anthropic account, billed
+   as prepaid credits rather than a subscription.
+10. Run `supabase/003_eugenia.sql`.
+11. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
    the same secret and the same read the poller's cron job uses, so the trigger
    holds no database power either. **Check the name against
    `select command from cron.job` rather than trusting this line:** Postgres
@@ -694,7 +766,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`, and the Telegram `parseCallback`, `renderMessage` and `staysOpen` |
+| `test/fold.test.mjs` | `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `secretMatches`, `parseSse`, `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `greeting` and `chunk` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 
@@ -732,7 +804,10 @@ and `tp` swapped, a loosened trade id, `null` drawn as `no`, the clock reverted
 to UTC, a keyboard row dropped, a summary spilling onto two lines, a setup name
 long enough to overrun the 64-byte cap, `staysOpen` forced true — which is the
 bug that shipped, restored on purpose — one that stops `[Edit]` reopening, and
-one that lets a reopened form re-settle; the client tests
+one that lets a reopened form re-settle, Eugenia's schedule reverted to UTC
+hours, a Saturday briefing, the Sunday briefing moved to the weekday hour,
+swapped salutations, a splitter that stops splitting and one that drops its last
+piece; the client tests
 against a widened break-even band, break-evens dropped from the win-rate
 denominator, a stray column in `Data.OWNED`, a session derived from the close,
 an inverted filing anchor and a throwing renderer. Every one of those was

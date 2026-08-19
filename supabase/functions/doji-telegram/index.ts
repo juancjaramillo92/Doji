@@ -208,7 +208,7 @@ export function renderMessage(row: Row, expanded: boolean) {
 
   return {
     text: [
-      'New fill, boss.',
+      'Hola Jefe, new fill below',
       '',
       `${row.direction} ${price} · ${nyTime(row.entry_time)} NY`,
       '',
