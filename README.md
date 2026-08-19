@@ -494,6 +494,54 @@ references anything defined below it at load time.
 `render()` is the orchestrator and holds no drawing of its own. Each step runs in
 isolation, so one widget can degrade without blanking the panel.
 
+### Palette
+
+Every colour is a CSS custom property on `:root` in `index.html`. Nothing in the
+app writes a literal — Chart.js is the one thing that cannot read a variable, so
+what it needs is resolved once through `cssToken()` into a module constant.
+
+| Token | Value | Used for |
+|---|---|---|
+| `--p` | `#8b35b8` | the accent. Selected states, focus, the sync dot |
+| `--bg` | `#070611` | page background — near-black with a faint purple hue |
+| `--s2` | `#141022` | the layer above the page |
+| `--glass` | `#0a0813` | card surfaces. Solid, not translucent |
+| `--cell-bg` | `rgba(8,8,10,.55)` | a calendar day with no result, so it recedes |
+| `--bd` / `--bd2` | `#251d39` / `#342948` | borders, dim and dimmer |
+| `--tx` | `#e8e6f0` | body text |
+| `--mt` / `--mt2` | `#6f6788` / `#9a92b0` | muted, and muted-but-readable |
+| `--tx-hi` / `--tx-max` | `#f0eeff` / `#fff` | on an accent fill, and on solid `--p` |
+| `--win` | `#3ba585` | a winning trade |
+| `--loss` | `#d63d5a` | a losing trade |
+| `--warn` | `#d9a441` | "notice this", one step short of `--loss`. Only the offline sync dot |
+| `--be-tx` | `#9aa4c0` | break-even text — cool, because a break-even is a result |
+| `--seg-be-bg` / `--seg-be-bd` | `#0e1020` / `#333f63` | break-even fill and border |
+
+**The result colours have a house treatment**, and it is worth knowing before
+adding anything that shows a win or a loss: a flat 12% fill against a
+full-strength border. `--seg-win-bg` and `--seg-loss-bg` are `--win` and `--loss`
+at `.12`; the hover pair `--seg-win-hv` / `--seg-loss-hv` are the same at `.22`.
+Break-even is the exception and is a solid colour rather than an alpha, because
+it has to stay legible on a 58px calendar cell where a translucent fill hazes.
+
+Break-even is also deliberately the darkest of the three: nothing happened, so it
+recedes furthest. Its green runs at or above its red so a small tile goes cool
+rather than mauve — the rest of the palette has red above green, which reads warm
+on a large card and muddy on a cell.
+
+**Neutral surfaces come from five alphas of white**, so a change lands in one
+place: `--fill-0` (`.02`, inset panels) through `--fill-3` (`.08`, hover on a
+`--fill-2` surface), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
+(`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
+`.42`, and `--p-hair` at `.04` for the table row rule.
+
+**Type** is `--ui` (Hanken Grotesk) and `--mono` (JetBrains Mono). **Radii** are
+`--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px —
+the last an exception for calendar tiles, which at the card radius each read as
+their own card and stop scanning as rows.
+
+---
+
 ### The shared primitives
 
 Every wheel and every bar is built from one of these. That is what keeps the
