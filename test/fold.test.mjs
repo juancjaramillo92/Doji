@@ -33,7 +33,7 @@ import {
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
-import { briefDue, greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
+import { briefDue, pulseDue, isSilent, greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -537,6 +537,51 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
 test('the salutation matches the time of day the briefing lands', () => {
   assert.equal(greeting('weekday'), 'Buenos dias jefesito, todays news below');
   assert.equal(greeting('sunday'),  'Buenas tardes jefesito, todays news below');
+});
+
+/* ─── Eugenia: the pulse ─────────────────────────────────────────────────────
+   The second scheduled look. It has to sit on a weekday hour that is NOT a
+   briefing hour, and it has to be able to stay quiet — a pulse that could never
+   go silent would message him every weekday whether or not anything happened.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the pulse is 10:00 New York on weekdays, in both halves of the year', () => {
+  // 14:00 UTC is 10:00 New York in August (EDT, UTC-4).
+  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 19, 14, 0))), true);
+  // 15:00 UTC is 10:00 New York in January (EST, UTC-5) — the same wall hour.
+  assert.equal(pulseDue(new Date(Date.UTC(2026, 0, 14, 15, 0))), true);
+  // An hour either side of it is not the pulse.
+  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 19, 13, 0))), false);
+  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 19, 15, 0))), false);
+});
+
+test('the weekend gets no pulse at all', () => {
+  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 22, 14, 0))), false);   // Saturday
+  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 23, 14, 0))), false);   // Sunday
+});
+
+test('a briefing hour and a pulse hour never collide', () => {
+  // Every hour of a full week: the two schedules must never both fire, or one
+  // call would owe two answers and only one caller would get its own.
+  for (let h = 0; h < 24 * 7; h++) {
+    const at = new Date(Date.UTC(2026, 7, 16, h));           // Sun 16 Aug onwards
+    assert.equal(briefDue(at) !== null && pulseDue(at), false,
+      `both due at ${at.toISOString()}`);
+  }
+});
+
+test('the pulse stays silent on the word it was told to use', () => {
+  assert.equal(isSilent('NOTHING'), true);
+  assert.equal(isSilent('NOTHING.'), true);
+  assert.equal(isSilent('  Nothing  '), true);
+});
+
+test('a sentence that merely opens with the word is news, and is sent', () => {
+  // The failure direction matters: a swallowed message is invisible, an extra
+  // one is merely extra. So only the bare word is silence.
+  assert.equal(isSilent('Nothing much has changed, except gold is up forty.'), false);
+  assert.equal(isSilent('Core CPI came in at 0.2%, under the 0.3% expected.'), false);
+  assert.equal(isSilent(''), false);
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */

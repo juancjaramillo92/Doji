@@ -46,7 +46,8 @@ vercel.json                             no-cache header for index.html
 supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_telegram.sql               Gladys's trade-open trigger
-supabase/003_eugenia.sql                Eugenia's memory and her schedule
+supabase/003_eugenia.sql                Eugenia's conversation and her clock
+supabase/004_eugenia_notes.sql          Eugenia's long-term memory
 supabase/functions/_shared/edge.ts      env, secretMatches, json — one each
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-telegram/       Edge Function: Gladys, the journal bot
@@ -497,21 +498,96 @@ better retried by the trader's own second tap than by a redelivery loop.
 
 ## Eugenia — the market bot
 
-A daily XAU/USD briefing, and a conversation about it. **Weekdays at 08:00 ET,
-Sunday at 17:00 ET** — the second is the gold open, so the week's first
-briefing lands exactly as the market does. She greets with `Buenos dias
-jefesito` in the morning and `Buenas tardes jefesito` on Sunday evening.
+A daily XAU/USD briefing, a quieter look later in the morning, and a
+conversation about either. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
+second is the gold open, so the week's first briefing lands exactly as the
+market does. She greets with `Buenos dias jefesito` in the morning and `Buenas
+tardes jefesito` on Sunday evening.
 
-Reply to her and she answers. `supabase/003_eugenia.sql` holds her memory and
-her clock; `doji-eugenia/prompt.ts` holds who she is; `doji-eugenia/index.ts` is
-the wiring.
+Reply to her and she answers. `supabase/003_eugenia.sql` holds her conversation
+and her clock, `004_eugenia_notes.sql` what she remembers; `prompt.ts` holds who
+she is; `index.ts` is the wiring.
 
 **The schedule is decided in the function, not in cron.** pg_cron schedules in
 UTC, so any fixed expression is an hour wrong for half the year and needs
-editing twice a year forever. The job runs hourly and `briefDue()` asks
-America/New_York for its own clock — twenty-three of those calls return "not a
-briefing hour" and spend nothing. It is the same trade `marketOpen()` makes for
-the poller, for the same reason.
+editing twice a year forever. The job runs hourly and the function asks
+America/New_York for its own clock — `briefDue()` for the briefing, `pulseDue()`
+for the pulse — and most of those calls find nothing due and spend nothing. It
+is the same trade `marketOpen()` makes for the poller. A test walks every hour
+of a week and asserts the two never both fire, because one call cannot owe two
+answers.
+
+### The briefing is prose, not a report
+
+Four or five short paragraphs of someone talking: where gold is, the one thing
+that matters today and the chain of why, everything else in a sentence, one
+genuinely odd fact, and a single question or nothing.
+
+It used to be seven numbered sections with impact emoji, and plain-Englishing
+the words inside them did not help — **seven numbered sections with headings
+*are* a report**, whatever the vocabulary. The scaffolding was doing the
+talking. Nine hundred to fourteen hundred characters, and running long is cut by
+dropping words, never events.
+
+The vocabulary rule is now "plain words first": *the gap between rates and
+inflation* before *real yields*, and the short name only once the long one has
+been said. The ideas stay exactly as sophisticated; only the words come down.
+
+**She remembers what she told you yesterday.** The briefing reads the last
+twelve turns, so it opens with how yesterday's print landed rather than from
+nothing. It did not until now — it wrote to `eugenia_turns` and never read back,
+so every morning started blank and she could not know she had explained the same
+term three times that week. A briefing that could have been written on any
+morning is a failure.
+
+The stored turn is a marker (`[weekday briefing]`), not the text that was sent:
+the memory and the week's trades are rebuilt fresh each morning, and storing
+them would resend a stale copy as history for the next six briefings.
+
+**She sees your week without being asked.** The last seven days of trades go in
+with the briefing, so *"you have not traded since Tuesday"* costs no tool round.
+Mentioned only when there is something real to say, in a clause, never as a
+verdict — most mornings the right amount to say about your trading is nothing.
+
+### The pulse
+
+Weekdays at 10:00 ET, past the 08:30 data window and into the session. **Its
+default answer is silence:** she replies with the single word `NOTHING` and the
+function sends nothing at all, storing nothing either — twelve turns is the
+whole window and a week of empty pairs would push the morning's briefing out of
+it, which is the one thing a follow-up needs.
+
+One extra call a day rather than a check every hour. An hourly watch is
+twenty-three model calls with web search behind them, which is not worth a
+feature whose right answer is usually "nothing happened" — so this is **not
+event-driven**, and calling it that would be a lie. It is a second scheduled
+look that usually says nothing. A second hour is one line if the first proves
+useful.
+
+`isSilent()` matches the bare word and nothing else, so *"Nothing much has
+changed, except gold is up forty"* is news wearing the word and gets sent. The
+failure direction is deliberate: a swallowed message is invisible, an extra one
+is merely extra.
+
+### What she remembers
+
+Two kinds of memory, and they answer different questions.
+
+| | Holds | Window | Written by |
+|---|---|---|---|
+| `eugenia_turns` | the conversation | last 12 turns | every exchange |
+| `eugenia_notes` | facts about the trader | last 20 notes | her `remember` tool |
+
+Turns roll over in a morning, so without notes she could never know in September
+that he has been working on holding his stop since August. Notes are one
+sentence each, in her own words, about *him* rather than about the market — a
+note about today's price is stale tomorrow and the prompt forbids it. They are
+handed back at the start of every turn, briefing and reply alike.
+
+Append-only: superseding a note means writing a newer one, which is how a
+person's memory works — the recent account wins. There is no update path and no
+delete path in the function, so the only thing she can do to that table is add a
+sentence to it.
 
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
@@ -520,17 +596,20 @@ it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no
 `select` and nothing else; and her function has exactly one database read of the
 journal and no write path to it anywhere. Said plainly, because it is the honest
 limit: the grant makes the *view* read-only, not the key — she holds the service
-key to write her own history, so the structural guarantee is what matters and
-the grant is the second lock.
+key to write her own tables, so the structural guarantee is what matters and the
+grant is the second lock.
 
-A tool rather than trades pasted into every request: most messages are about the
-Fed, not last Tuesday, and a journal stapled to every turn would be paid for on
-every turn and would break the prompt cache each time a fill landed. The window
-she asks for is clamped to 1–365 days and 400 rows — that argument comes from
-the model, so it is a boundary.
+She is still not a fifth writer to `trades`. The only things she writes are
+`eugenia_turns` and `eugenia_notes`.
 
-She is still not a fifth writer to `trades`. The only thing she writes is
-`eugenia_turns`.
+**Context goes in the user turn, not in a system message.** Mid-conversation
+system messages are the channel built for exactly this and would keep the cached
+prefix intact — but that request shape could not be exercised from the machine
+this was written on, and a 400 there kills every reply she gives. Nothing here
+is untrusted anyway: the notes are her own sentences and the trades are his own
+journal, so the injection safety a system turn buys is not what this needs.
+
+### The rest of the wiring
 
 **A reply is answered after the response, not inside it.** Telegram waits about
 a minute for a webhook and then gives up with `Read timeout expired` and
@@ -538,49 +617,50 @@ redelivers the update — and a briefing does not fit in a minute. Answering lat
 is worse than slow: the redelivery runs the whole thing again, so you get two
 briefings and pay for two. The function returns 200 immediately and hands the
 work to `EdgeRuntime.waitUntil`, which keeps the worker alive past the response.
-Her half of the cron job has no such limit, because pg_net never retries.
+Her cron half has no such limit, because pg_net never retries.
 
 **Twelve turns of memory.** Enough that a follow-up has the briefing it follows
 and the exchange since; not so much that every question resends last Tuesday's
-calendar. The table has RLS enabled and no policy at all, which denies the
-publishable key outright — the app has no business there.
+calendar. It must stay **even** — turns are written in pairs, and an odd window
+would start on an assistant turn, which the Messages API refuses. Both tables
+have RLS enabled and no policy at all, which denies the publishable key
+outright.
 
-**A briefing is written to be read on a phone.** The prompt asks for 2,500
-characters and forbids more than 4,000: one line per event, the mechanism as an
-arrow chain (`hot CPI → Fed holds longer → real yields up → gold down`), jargon
-glossed once in brackets and never again. Running long is cut by dropping
-words, never by dropping items — a briefing that omits an event is wrong, one
-that omits an adjective is not.
-
-**A long one still does not fit in one Telegram message.** The cap is 4,096
+**A long briefing still does not fit in one Telegram message.** The cap is 4,096
 characters, so `chunk()` splits on a blank line, then any newline, and only
-hard-cuts a single paragraph that is itself over the limit. Parts are sent
-sequentially, because Telegram does not promise ordering and a briefing whose
-section 5 arrives before section 2 is unreadable.
+hard-cuts a single paragraph that is itself over the limit. Parts go
+sequentially, because Telegram does not promise ordering.
 
 **A question is not a briefing, and used to cost the same.** `effort` sets how
-deeply the model thinks before it writes. The briefing earns the depth — a dozen
-searches, seven sections, one shot a day — and runs at `high`. A reply runs at
-`medium`, because at `high` "how many trades did I take this week" bought a
-minute of reasoning to produce one sentence. Not `low`: the journal is the half
-that punishes carelessness, and a fast wrong reading of his discipline is worse
-than a slow right one.
+deeply the model thinks before it writes. The briefing earns the depth and runs
+at `high`; a reply and the pulse run at `medium`, because at `high` "how many
+trades did I take this week" bought a minute of reasoning to produce one
+sentence. Not `low`: the journal is the half that punishes carelessness, and a
+fast wrong reading of his discipline is worse than a slow right one.
 
 The typing indicator repeats while she works, because Telegram's lasts five
 seconds and cannot be extended — one call at the start left a thirty-second
 answer looking like a dead bot for twenty-five of them. It makes nothing faster;
 it makes the wait legible.
 
-**What she costs.** Roughly $0.20 a briefing — about $6 a month for six a week —
-of which a third is web search at $10 per 1,000 searches rather than tokens.
-Questions are a few cents each. The model is the strongest one; at this volume
-the searches dominate, so a weaker model would save little.
+**What she costs.** Roughly $0.20 a briefing and rather less for a pulse that
+finds nothing — call it $10 a month for six briefings and five pulses a week —
+of which a large share is web search at $10 per 1,000 searches rather than
+tokens. Questions are a few cents each. The model is the strongest one; at this
+volume the searches dominate, so a weaker model would save little.
 
-**What she will not do**, and it is in the prompt rather than left to taste: no
-forward price-action opinions, no signals or entries, no verdict on a trade, and
-never more than one question at a time. Mechanism analysis is the whole point —
-*hawkish Fed → real yields up → bearish pressure on gold* — and it stops at the
-mechanism.
+### What she will not do
+
+In the prompt rather than left to taste: no forward price-action opinions, no
+signals or entries, no verdict on a trade, and never more than one question at
+a time.
+
+**The line is between describing the world and predicting it**, and she is
+allowed the first half of that deliberately. *"A December cut is about 70%
+priced"* is a fact about today. *"A 0.4% core print is not in the price"* is a
+statement about expectations. Both are hers to say, and saying them is most of
+what stops the briefing reading like a wire feed. *"That would send gold lower"*
+is not, and never becomes so.
 
 ---
 
@@ -763,8 +843,8 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql`, `002_telegram.sql` and
-`003_eugenia.sql` are not under `supabase/migrations/`, so nothing applies them
+SQL editor, never by a robot: `001_trades.sql` through `004_eugenia_notes.sql`
+are not under `supabase/migrations/`, so nothing applies them
 automatically, and a schema change that lands because a file was committed is
 exactly the accident the Operating section argues against for restores. The
 Apps Script is deployed from the Apps Script editor; it holds no secrets in the
@@ -810,7 +890,9 @@ file and nothing reads it from here.
     Edge Function secrets. Point Telegram at `/functions/v1/doji-eugenia` with
     that secret token. The API key comes from platform.claude.com — the same
     Anthropic account, billed as prepaid credits rather than a subscription.
-12. Run `supabase/003_eugenia.sql`.
+12. Run `supabase/003_eugenia.sql`, then `supabase/004_eugenia_notes.sql`.
+    The hourly cron job in 003 drives both the briefing and the pulse; 004 adds
+    no schedule of its own.
 
 ---
 
@@ -836,7 +918,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `greeting`, `chunk` and `tradesQuery` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `isSilent`, `greeting`, `chunk` and `tradesQuery` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 
