@@ -7,11 +7,11 @@
 //
 // THE WRITE IS HERE BECAUSE OF WHERE THE ALTERNATIVE PUT A PASSWORD. Supabase's
 // sb_secret_ keys refuse any client whose user agent looks like a browser, and
-// Apps Script's does with no way to change it — so the script used to sign in
-// as the trader instead, with DOJI_EMAIL and DOJI_PASSWORD in Script
-// Properties. That constraint is about who may write, not about where the write
-// happens. Moving it here leaves the parser holding one secret whose entire
-// authority is the five columns below, instead of holding the account.
+// Apps Script's does with no way to change it. The obvious alternative is for
+// the script to sign in as the trader, which puts the account password in
+// Script Properties — but that constraint is about who may write, not about
+// where the write happens. Doing it here leaves the parser holding one secret
+// whose entire authority is the five columns below, instead of the account.
 //
 // It also means every write to `trades` that is not the app's now happens in a
 // runtime deployed from main, and the "only these columns" guarantee is a

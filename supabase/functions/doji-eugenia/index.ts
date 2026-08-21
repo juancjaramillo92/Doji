@@ -201,7 +201,7 @@ async function readNotes(): Promise<string[]> {
    character over its budget is still worth keeping, and a throw here would
    propagate out of the tool loop and cost the whole reply — so a failed write
    comes back as a sentence she can read and carry on from. It is also what
-   makes her survive being deployed before 004_eugenia_notes.sql has been run:
+   makes her survive being deployed before 003_eugenia.sql has been run:
    no table, no memory, but every answer still lands. */
 async function writeNote(note: unknown): Promise<string> {
   const text = String(note ?? "").trim().slice(0, 200);
