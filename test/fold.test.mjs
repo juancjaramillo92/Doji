@@ -33,7 +33,8 @@ import {
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
-import { briefDue, pulseDue, isSilent, greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
+import { briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
+         greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -582,6 +583,43 @@ test('a sentence that merely opens with the word is news, and is sent', () => {
   assert.equal(isSilent('Nothing much has changed, except gold is up forty.'), false);
   assert.equal(isSilent('Core CPI came in at 0.2%, under the 0.3% expected.'), false);
   assert.equal(isSilent(''), false);
+});
+
+/* ─── Eugenia: the retry ─────────────────────────────────────────────────────
+   A briefing that failed at 08:00 used to wait a full day. These are the hours
+   it may try again, and the marker that stops it trying once one has landed.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the retry window is the three weekday hours after the briefing', () => {
+  // August: New York is EDT (UTC-4), so 13:00–15:00 UTC is 09:00–11:00 ET.
+  for (const h of [13, 14, 15]) {
+    assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, h))), true, `${h}:00 UTC`);
+  }
+  // 08:00 is the briefing's own hour, and noon is too late to be a morning.
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, 12))), false);
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, 16))), false);
+});
+
+test('the retry window holds its New York hours in winter too', () => {
+  // January: EST (UTC-5), so 09:00 ET is 14:00 UTC and 08:00 ET is 13:00.
+  assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 14))), true);
+  assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 13))), false);
+});
+
+test('the weekend never retries', () => {
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 22, 14))), false);   // Saturday
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 23, 14))), false);   // Sunday
+});
+
+test('the retry recognises exactly what a briefing stores, and nothing else', () => {
+  // If it could not spot yesterday's shape it would send a second briefing
+  // every morning; if it matched too loosely, a question mentioning the word
+  // would suppress a real one.
+  assert.equal(isBriefingMarker(briefingMarker('weekday')), true);
+  assert.equal(isBriefingMarker(briefingMarker('sunday')), true);
+  assert.equal(isBriefingMarker('[pulse]'), false);
+  assert.equal(isBriefingMarker('what did the briefing say about CPI?'), false);
+  assert.equal(isBriefingMarker(''), false);
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */

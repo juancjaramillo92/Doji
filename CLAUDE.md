@@ -208,6 +208,17 @@ code you write near it:
 - **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
   a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
   read of the journal is worse than a slow one.
+- **The container is not optional once web search is in play.** `web_search_20260209`
+  runs code execution for its dynamic filtering, so the model can call
+  `get_trades` from inside that container; the continuation must carry
+  `container` (a bare string on the request, `container.id` on the response) or
+  the API rejects it. Neither tool may set `strict: true`, and the message
+  answering those calls must hold only `tool_result` blocks. Getting this wrong
+  is a 400 that kills the whole briefing, and it did.
+- **A failure must reach him, not the console.** pg_net discards the response,
+  `net._http_response` is pruned within hours, and nobody reads Edge logs — so
+  the cron half messages Telegram on failure and retries at 09:00–11:00 ET until
+  `briefedToday()` sees the marker. Do not quietly remove either half.
 - **Her Telegram half must answer before it works, never after.** Telegram gives
   a webhook about a minute and then redelivers — which would run a whole
   briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is
