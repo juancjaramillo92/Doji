@@ -2,7 +2,8 @@
  * DOJI ↔ PEPPERSTONE (cTrader) EMAIL SYNC
  * ─────────────────────────────────────────────────────────────────────────
  * Runs in your own Google account. Every minute it finds unprocessed cTrader
- * alerts, parses the fill, and merges TWO VALUES into `trades`:
+ * alerts, parses the fill, and posts it to the doji-email-sync Edge Function,
+ * which merges TWO VALUES into `trades`:
  *
  *   net_pnl  — includes swap, which get_deals does not report
  *   balance  — account balance after the fill
@@ -12,9 +13,14 @@
  *
  * That is the whole job. Everything else about a trade — entry time, entry and
  * exit price, commission, the New York filing day, the computed P&L — belongs
- * to the poller, and this script does not name those columns, so it cannot
- * overwrite them. It equally never names setup, session, the discipline
- * answers or `deleted`, so it cannot touch the journal.
+ * to the poller, and the Edge Function will not accept those columns from here.
+ *
+ * THIS SCRIPT HOLDS NO ACCOUNT CREDENTIALS. It used to sign in as you, with
+ * your Supabase email and password in Script Properties, because Supabase's
+ * secret keys reject any client whose user agent looks like a browser and Apps
+ * Script's does. The write moved behind an Edge Function instead: what lives
+ * here now is one secret whose entire authority is those five columns. If this
+ * script is ever compromised, that is the whole of what is lost.
  *
  * These alerts are also the early warning if the cTrader MCP token is ever
  * misused, so leave the notifications switched on regardless.
@@ -22,32 +28,25 @@
  * SETUP
  *   1. script.google.com → New project → paste this file.
  *   2. Project Settings → Script Properties:
- *        DOJI_EMAIL     your Supabase login email
- *        DOJI_PASSWORD  your Supabase login password
- *      Never put the password in this file. It ends up in version history, in
+ *        DOJI_EMAIL_SECRET   the same value set as DOJI_EMAIL_SECRET in the
+ *                            Supabase Edge Function secrets
+ *      Never put it in this file. It ends up in version history, in
  *      screenshots, and in anything the file is ever pasted into.
- *   3. Run `testLogin`  → confirm sign-in works.
- *   4. Run `testParse`  → check the logged fields. Writes nothing.
+ *   3. Run `testParse`  → check the logged fields. Writes nothing.
+ *   4. Run `testSecret` → confirms the function accepts the secret. Writes
+ *      nothing: it deliberately sends a fill that cannot be valid.
  *   5. Run `syncPepperstone` once by hand → confirm a row moved in Supabase.
  *   6. Triggers → syncPepperstone · Time-driven · Minutes · Every minute.
  */
 
-// No secret key: Supabase's sb_secret_ keys reject any client whose User-Agent
-// looks like a browser, and Apps Script's does with no way to change it. So the
-// script signs in as YOU and writes as an authenticated user, which the RLS
-// policy allows — and which also fills user_id from its auth.uid() default on
-// any row this script creates first.
-var SUPABASE_URL    = 'https://gujhyogvkzjgnrodyuse.supabase.co';
-var PUBLISHABLE_KEY = 'sb_publishable_qDYX9YI-F8zrTYs0Vw5nhA_gNuYWsyL';
+var SYNC_URL = 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-email-sync';
 
-function creds_() {
-  var p = PropertiesService.getScriptProperties();
-  var email = p.getProperty('DOJI_EMAIL');
-  var pass  = p.getProperty('DOJI_PASSWORD');
-  if (!email || !pass) {
-    throw new Error('Set DOJI_EMAIL and DOJI_PASSWORD in Project Settings → Script Properties.');
+function secret_() {
+  var s = PropertiesService.getScriptProperties().getProperty('DOJI_EMAIL_SECRET');
+  if (!s) {
+    throw new Error('Set DOJI_EMAIL_SECRET in Project Settings → Script Properties.');
   }
-  return { email: email, password: pass };
+  return s;
 }
 
 var ALERT_FROM = 'trade@alerts.ctrader.com';
@@ -61,11 +60,6 @@ var FAIL_LABEL = 'doji-parse-failed';
 var GMAIL_QUERY = 'from:' + ALERT_FROM + ' -label:' + DONE_LABEL +
                   ' -label:' + FAIL_LABEL + ' newer_than:90d';
 
-// The only columns this script may write. Enforced in upsertFill_ rather than
-// trusted to the parser: a stray key here would overwrite the poller's data
-// with whatever the closing email happened to know.
-var EMAIL_OWNED = ['id', 'direction', 'fill_time', 'net_pnl', 'balance'];
-
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN — attach the every-minute trigger to this
 // ═══════════════════════════════════════════════════════════════════════════
@@ -75,13 +69,13 @@ function syncPepperstone() {
   var threads = GmailApp.search(GMAIL_QUERY, 0, 20);
 
   threads.forEach(function (thread) {
-    // Three outcomes, not two. A PARSE failure is permanent and earns the fail
-    // label so the thread leaves the queue. An UPSERT failure is transient —
-    // a Supabase blip, an expired session, no network — and must leave the
-    // thread UNLABELLED so the next run retries it. Labelling those the same
-    // way is how a momentary outage used to discard a fill's net_pnl and
-    // balance forever.
-    var parseFailed = false, writeFailed = false;
+    // Three outcomes, not two. A PERMANENT failure — this body will never parse,
+    // or the function refused the fill it produced — earns the fail label so the
+    // thread leaves the queue. A TRANSIENT one — a Supabase blip, no network, a
+    // cold start — must leave the thread UNLABELLED so the next run retries it.
+    // Labelling those the same way is how a momentary outage used to discard a
+    // fill's net_pnl and balance forever.
+    var permanent = false, transient = false;
 
     thread.getMessages().forEach(function (msg) {
       var subject = msg.getSubject() || '';
@@ -91,15 +85,18 @@ function syncPepperstone() {
 
       var fill = parseAlert_(subject, msg.getBody());
       if (!fill) {
-        parseFailed = true;
+        permanent = true;
         Logger.log('PARSE FAILED: ' + subject + ' (' + msg.getDate() + ')');
         return;
       }
-      if (!upsertFill_(fill)) writeFailed = true;
+
+      var outcome = sendFill_(fill);
+      if (outcome === 'rejected') permanent = true;
+      else if (outcome === 'retry') transient = true;
     });
 
-    if (writeFailed) return;                        // no label — retried next run
-    thread.addLabel(parseFailed ? fail : done);
+    if (transient) return;                          // no label — retried next run
+    thread.addLabel(permanent ? fail : done);
   });
 }
 
@@ -117,7 +114,22 @@ function testParse() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PARSER — HTML body → a trades row
+// TEST — confirms the secret is right without writing anything.
+// ───────────────────────────────────────────────────────────────────────────
+// It sends a body the function cannot accept, so the two answers separate
+// cleanly: 401 means the secret is wrong, 400 means the secret was accepted and
+// the fill was refused — which is the whole of what is being checked here.
+// ═══════════════════════════════════════════════════════════════════════════
+function testSecret() {
+  var res = post_({});
+  var code = res.getResponseCode();
+  if (code === 400) Logger.log('✓ Secret accepted. (' + res.getContentText() + ')');
+  else if (code === 401) Logger.log('✗ Secret rejected — check DOJI_EMAIL_SECRET on both sides.');
+  else Logger.log('? Unexpected ' + code + ': ' + res.getContentText());
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARSER — HTML body → a fill
 // ═══════════════════════════════════════════════════════════════════════════
 function parseAlert_(subject, htmlBody) {
   var text = htmlBody
@@ -183,105 +195,44 @@ function parseAlert_(subject, htmlBody) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SUPABASE UPSERT
+// SEND — hand the fill to doji-email-sync, which owns the write
 // ───────────────────────────────────────────────────────────────────────────
-// merge-duplicates, not ignore-duplicates. With two writers, ignoring meant
-// that whenever the poller created the row first — entirely possible, it runs
-// every two minutes — PostgREST silently DISCARDED this row and still returned
-// 2xx. net_pnl and balance were lost, this function reported success, and the
-// thread was labelled synced: a failure that looks exactly like a success.
-//
-// Two guards make the merge safe:
-//   · only EMAIL_OWNED keys are sent, so no other column is ever targeted;
-//   · null and empty values are stripped, because PostgREST writes exactly the
-//     keys present — sending direction:null would erase a correct direction.
+// Three outcomes rather than a boolean, because the caller has three things to
+// do with them. The column whitelist, the shape checks and the merge live in
+// the function now, where they are covered by test/fold.test.mjs — this end
+// parses and forwards, and nothing here can name a column at all.
 // ═══════════════════════════════════════════════════════════════════════════
-function upsertFill_(fill) {
-  var payload = {};
-  EMAIL_OWNED.forEach(function (k) {
-    if (fill[k] !== null && fill[k] !== undefined && fill[k] !== '') payload[k] = fill[k];
-  });
-  if (!payload.id) { Logger.log('UPSERT SKIPPED: no id'); return false; }
-
-  var res = postFill_(payload);
-  if (res && res.getResponseCode() === 401) {
-    clearSession_();                       // stale cached session — retry once
-    res = postFill_(payload);
+function sendFill_(fill) {
+  var res;
+  try {
+    res = post_(fill);
+  } catch (e) {
+    Logger.log('SEND FAILED (network): ' + e);   // no response at all
+    return 'retry';
   }
-  if (!res) return false;
 
   var code = res.getResponseCode();
-  var ok = code >= 200 && code < 300;
-  if (!ok) Logger.log('UPSERT FAILED ' + code + ': ' + res.getContentText());
-  return ok;
-}
+  if (code >= 200 && code < 300) return 'ok';
 
-function postFill_(payload) {
-  var token = getAccessToken_();
-  if (!token) { Logger.log('UPSERT SKIPPED: could not sign in.'); return null; }
-  return UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/trades?on_conflict=id', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: {
-      apikey: PUBLISHABLE_KEY,
-      Authorization: 'Bearer ' + token,
-      Prefer: 'resolution=merge-duplicates,return=minimal'
-    },
-    payload: JSON.stringify([payload]),
-    muteHttpExceptions: true
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// AUTH — sign in once, cache the session, refresh near expiry. Runs every
-// minute without minting a new session each time.
-// ═══════════════════════════════════════════════════════════════════════════
-function getAccessToken_() {
-  var props = PropertiesService.getScriptProperties();
-  var token = props.getProperty('sb_access_token');
-  var exp   = Number(props.getProperty('sb_expires_at') || 0);
-  if (token && Math.floor(Date.now() / 1000) < exp - 60) return token;
-
-  var refresh = props.getProperty('sb_refresh_token');
-  if (refresh) {
-    var r = authRequest_('grant_type=refresh_token', { refresh_token: refresh });
-    if (r) return r;
+  // 400 is the function saying this fill is not acceptable and never will be —
+  // retrying it every minute for ninety days would be the only alternative.
+  if (code === 400) {
+    Logger.log('FILL REFUSED ' + fill.id + ': ' + res.getContentText());
+    return 'rejected';
   }
-  var c = creds_();
-  return authRequest_('grant_type=password', { email: c.email, password: c.password });
+
+  Logger.log('SEND FAILED ' + code + ': ' + res.getContentText());
+  return 'retry';
 }
 
-function authRequest_(grant, payload) {
-  var res = UrlFetchApp.fetch(SUPABASE_URL + '/auth/v1/token?' + grant, {
+function post_(payload) {
+  return UrlFetchApp.fetch(SYNC_URL, {
     method: 'post',
     contentType: 'application/json',
-    headers: { apikey: PUBLISHABLE_KEY },
+    headers: { 'x-doji-key': secret_() },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });
-  if (res.getResponseCode() !== 200) {
-    // Does not log the response body — it can echo credentials.
-    Logger.log('AUTH ' + grant + ' failed ' + res.getResponseCode());
-    return null;
-  }
-  var data  = JSON.parse(res.getContentText());
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty('sb_access_token',  data.access_token);
-  props.setProperty('sb_refresh_token', data.refresh_token || '');
-  props.setProperty('sb_expires_at',    String(Math.floor(Date.now() / 1000) + (data.expires_in || 3600)));
-  return data.access_token;
-}
-
-function clearSession_() {
-  var props = PropertiesService.getScriptProperties();
-  props.deleteProperty('sb_access_token');
-  props.deleteProperty('sb_refresh_token');
-  props.deleteProperty('sb_expires_at');
-}
-
-function testLogin() {
-  clearSession_();
-  Logger.log(getAccessToken_() ? '✓ Signed in.' : '✗ Sign-in failed — check Script Properties.');
 }
 
 function getOrCreateLabel_(name) {

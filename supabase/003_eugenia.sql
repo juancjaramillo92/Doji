@@ -1,9 +1,18 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- DOJI — Eugenia: conversation history and her schedule
+-- DOJI — Eugenia: what she can see and what she remembers
 -- ───────────────────────────────────────────────────────────────────────────
--- Eugenia is the market bot. She reads no trade and owns no column of `trades`,
--- so nothing here touches the journal — this is her own memory and her own
--- clock, and that is the whole file.
+-- Eugenia is the market bot. She reads no trade she can write and owns no
+-- column of `trades`, so nothing here touches the journal — this is her own
+-- memory and her own read of his, and that is the whole file. Her schedule is
+-- in 005_cron.sql with the poller's, because "what runs on a timer" should be
+-- one place to look rather than one file per feature.
+--
+-- Two tables and a view, and they are three because they answer three
+-- questions. eugenia_turns is a conversation window that rolls over in a
+-- morning; eugenia_notes is a handful of facts about the trader that stay true
+-- for weeks; eugenia_trades is a read of the journal that stores nothing at
+-- all. Nothing ever reads two of them together, which is the test that says
+-- they are not one table wearing a `kind` column.
 --
 -- Run once, in the SQL editor, after doji-eugenia is deployed and
 -- ANTHROPIC_API_KEY is in the Edge Function secrets.
@@ -58,32 +67,34 @@ grant select on public.eugenia_trades to service_role;
 -- and a test asserts the query it builds. The grant is the second lock, not the
 -- only one.
 
--- ─── Her clock ─────────────────────────────────────────────────────────────
--- HOURLY, AND THE HOUR IS DECIDED IN THE FUNCTION. Weekdays at 08:00 and Sunday
--- at 17:00 New York; pg_cron schedules in UTC, so any fixed expression is an
--- hour wrong for half the year and would need editing twice a year forever.
--- briefDue() asks America/New_York for its own clock instead, and twenty-three
--- of these twenty-four calls return "not a briefing hour" without spending a
--- token. That is the same trade the poller makes with marketOpen().
+-- ─── What she remembers ────────────────────────────────────────────────────
+-- eugenia_turns above is a conversation window — twelve turns, and they roll
+-- over in a morning. This is the other kind of memory: a handful of short
+-- facts about the trader that stay true for weeks. Without it she can never
+-- know in September that he has been working on holding his stop since August.
 --
--- Same secret and same Vault read as the poller's job — lower case, as it is
--- actually stored. Check it against `select command from cron.job` rather than
--- trusting this line: the Telegram trigger shipped with the upper-case spelling
--- and went silently quiet for it.
-select cron.schedule(
-  'doji-eugenia',
-  '0 * * * *',
-  $$
-    select net.http_post(
-      url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia',
-      headers := jsonb_build_object(
-                   'Content-Type', 'application/json',
-                   'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
-                                    where name = 'doji_cron_secret')),
-      -- A briefing is a dozen web searches and a long generation. The poller's
-      -- 20s would cut it off mid-thought; pg_net is fire-and-forget, so this
-      -- bound only has to outlast the work.
-      timeout_milliseconds := 300000
-    );
-  $$
+-- APPEND-ONLY, and read newest-first. Superseding a note means writing a newer
+-- one, which is also how a person's memory works — the recent account wins.
+-- There is no update path and no delete path in the function, so the only thing
+-- she can do to this table is add a sentence to it.
+--
+-- Same shape and the same reasoning as eugenia_turns: no user_id, because
+-- nothing but the Edge Function ever reads this and it holds the service key.
+-- RLS enabled with no policy at all denies the publishable key outright — the
+-- app has no business here, and an unprotected table reachable by a public key
+-- would be an open notebook.
+create table public.eugenia_notes (
+  id         bigserial primary key,
+  note       text not null,
+  created_at timestamptz not null default now(),
+
+  -- The function truncates at 200 before writing; this is the same limit stated
+  -- where it cannot be bypassed. A note is one sentence — anything longer is a
+  -- transcript, and a transcript is what eugenia_turns is already for.
+  constraint eugenia_notes_note_length check (char_length(note) between 1 and 200)
 );
+
+-- The only read there is: the newest twenty.
+create index eugenia_notes_id_desc on public.eugenia_notes (id desc);
+
+alter table public.eugenia_notes enable row level security;

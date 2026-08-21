@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// DOJI — Telegram journal  ·  Supabase Edge Function (Deno)
+// GLADYS — the journal bot  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
 // One function, two callers, told apart by which secret they present:
 //
 //   x-doji-key                        the after-insert trigger in
-//                                     supabase/002_telegram.sql — a position
+//                                     supabase/002_gladys.sql — a position
 //                                     opened, post the message.
 //   x-telegram-bot-api-secret-token   Telegram — a button was tapped, write the
 //                                     column and redraw the message.
@@ -36,9 +36,11 @@
 //      cannot be taught to present a JWT, so authorisation happens here, in
 //      code, before any work begins. Same arrangement as doji-mcp-sync.
 //   2. Each half checks its own secret, and an unset secret refuses rather than
-//      admits. The trigger presents DOJI_CRON_SECRET — the secret the pg_cron
-//      poller job already reads from Vault, whose authority is still only
-//      "start work that was going to happen anyway".
+//      admits. The trigger presents DOJI_CRON_SECRET, read from Vault — the
+//      same secret the poller's cron job carries. Its authority HERE is not
+//      nothing: postOpen renders the message from the request body, so a holder
+//      of that secret can put arbitrary text into the trader's own thread. It
+//      still cannot reach a column, because it never names one.
 //   3. The chat is checked as well as the secret. The header proves the caller
 //      is Telegram; the chat id proves the tap came from the trader's own
 //      thread.
@@ -46,44 +48,51 @@
 //      whitelists the field and the value, so a write can only ever name one of
 //      four columns.
 //
-// Deploy:   supabase functions deploy doji-telegram --no-verify-jwt
-// Register: setWebhook with secret_token = TELEGRAM_WEBHOOK_SECRET
-// Secrets:  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET,
+// Deploy:   supabase functions deploy doji-gladys --no-verify-jwt
+// Register: setWebhook with secret_token = GLADYS_WEBHOOK_SECRET and
+//           allowed_updates = ["callback_query"] — a tap is her whole
+//           vocabulary, so every other update type is a wake-up for nothing.
+// Secrets:  GLADYS_BOT_TOKEN, TELEGRAM_CHAT_ID, GLADYS_WEBHOOK_SECRET,
 //           DOJI_CRON_SECRET, SUPABASE_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 
-// env, secretMatches and json live in _shared/edge.ts — one definition each,
-// for the reason that file gives. Every Deno touch goes through env(), so this
-// module imports under plain Node and test/fold.test.mjs can reach the pure
-// exports below. The Deno.serve at the bottom is guarded for the same reason.
-import { env, secretMatches, json } from "../_shared/edge.ts";
+// Everything shared lives in _shared/edge.ts — one definition each, for the
+// reason that file gives. Every Deno touch goes through env(), so this module
+// imports under plain Node and test/fold.test.mjs can reach the pure exports
+// below. The Deno.serve at the bottom is guarded for the same reason.
+import {
+  env, secretMatches, json, telegram, sbHeaders, SB_URL, SB_KEY,
+} from "../_shared/edge.ts";
 
-const BOT_TOKEN      = env("TELEGRAM_BOT_TOKEN");
+const BOT_TOKEN      = env("GLADYS_BOT_TOKEN");
 // Numeric, not an @name. This value is both a sendMessage target and the
 // identity a tap's chat id is compared against, and only the numeric form
 // satisfies both — an @name posts messages fine and then drops every tap.
+//
+// Named for the wire rather than for her, because it is the one secret the two
+// bots genuinely share: one trader, one chat, a thread each.
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
-const WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET");
+const WEBHOOK_SECRET = env("GLADYS_WEBHOOK_SECRET");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
-
-const SB_URL = env("SUPABASE_URL");
-const SB_KEY = env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
-// Legacy keys are JWTs and PostgREST accepts them on Authorization: Bearer. The
-// new sb_secret_ keys are opaque and belong on apikey only. Same detection as
-// doji-mcp-sync, so one code path works before and after legacy keys go.
-const IS_JWT = SB_KEY.startsWith("eyJ");
 
 /* ─── The journal vocabulary ───────────────────────────────────────────────
    Identical to CONFIG.SETUPS in index.html and to the trades_setup_check
-   constraint. Three copies of one list, and the constraint is the one that
-   cannot be bypassed — a value that gets past the check below still has to
-   satisfy Postgres.
+   constraint. Three copies of one list across three runtimes with no build step
+   between them, and the constraint is the one that cannot be bypassed — a value
+   that gets past the check below still has to satisfy Postgres.
+
+   Three copies is what it costs; three copies that can DISAGREE is not, and was
+   the actual risk. test/agree.test.mjs reads all three — this export, the app's
+   CONFIG.SETUPS out of index.html, and the constraint text out of
+   001_trades.sql — and fails when they stop saying the same thing.
    ───────────────────────────────────────────────────────────────────────── */
 export const SETUPS: readonly string[] = ['Break & Retest', 'Support & Resistance'];
 
 // callback_data field → column. This map is the entire reason a tap cannot
-// disturb broker data.
-const COLUMNS: Record<string, string> = {
+// disturb broker data: it holds the same four names as Data.OWNED and nothing
+// else, and agree.test.mjs is what holds those two lists together rather than
+// each being checked against a literal typed into its own test.
+export const COLUMNS: Record<string, string> = {
   setup: 'setup',
   rules: 'followed_rules',
   sl:    'followed_sl',
@@ -236,17 +245,8 @@ export function renderMessage(row: Row, expanded: boolean) {
 
 /* ─── Telegram and PostgREST ───────────────────────────────────────────── */
 
-const tg = (method: string, body: unknown) =>
-  fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  }).then(r => r.json());
-
-const sbHeaders = (prefer?: string) => {
-  const headers: Record<string, string> = { apikey: SB_KEY, "Content-Type": "application/json" };
-  if (IS_JWT) headers.Authorization = `Bearer ${SB_KEY}`;
-  if (prefer) headers.Prefer = prefer;
-  return headers;
-};
+// Her token, bound once. Every call below is unchanged by the binding.
+const tg = (method: string, body: unknown) => telegram(BOT_TOKEN, method, body);
 
 // The columns renderMessage reads, and no more. The id is `PID\d+` — enforced
 // by parseCallback before either of these is reached — so it needs no escaping.
@@ -294,7 +294,7 @@ async function redraw(row: Row, chatId: number, messageId: number, expanded: boo
   if (edited.ok) return;
   if (String(edited.description ?? "").includes("message is not modified")) return;
 
-  console.error("doji-telegram: edit refused —", edited.description);
+  console.error("doji-gladys: edit refused —", edited.description);
   await tg("sendMessage", { chat_id: chatId, text, reply_markup });
 }
 
@@ -338,7 +338,7 @@ async function handleTap(req: Request): Promise<Response> {
     // the trader's own thread — anyone can find a bot and press its buttons if
     // a message ever reaches them.
     if (String(cq.message?.chat?.id) !== CHAT_ID) {
-      console.error("doji-telegram: callback from unexpected chat");
+      console.error("doji-gladys: callback from unexpected chat");
       await tg("answerCallbackQuery", { callback_query_id: cq.id });
       return json({ ok: true, ignored: "wrong chat" });
     }
@@ -364,7 +364,7 @@ async function handleTap(req: Request): Promise<Response> {
     await redraw(row, cq.message.chat.id, cq.message.message_id, staysOpen(tap, before));
     return json({ ok: true, id: tap.id, column: tap.column });
   } catch (err) {
-    console.error("doji-telegram:", err instanceof Error ? err.message : err);
+    console.error("doji-gladys:", err instanceof Error ? err.message : err);
     // Best effort, and guarded: telling the trader the tap failed must not
     // itself turn a 200 into a redelivery loop.
     if (cq?.id) {
@@ -386,7 +386,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   const fromTrigger  = req.headers.get("x-doji-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !SB_KEY) {
-    console.error("doji-telegram: a required secret is not set — refusing all requests");
+    console.error("doji-gladys: a required secret is not set — refusing all requests");
     return json({ ok: false, error: "not configured" }, 503);
   }
 
@@ -403,7 +403,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     // this line is the only place a trigger-side failure is ever reported. The
     // trade is journalled from the app in the meantime; nothing is lost but the
     // prompt.
-    console.error("doji-telegram:", err instanceof Error ? err.message : err);
+    console.error("doji-gladys:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });

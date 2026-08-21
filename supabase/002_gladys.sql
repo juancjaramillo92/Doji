@@ -1,10 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- DOJI — Telegram journal trigger
+-- DOJI — Gladys's trade-open trigger
 -- ───────────────────────────────────────────────────────────────────────────
 -- Fires when the poller mints a row from an entry deal, and asks the trader the
 -- four journal questions in Telegram. Separate from 001_trades.sql because it
--- depends on two things that file does not: doji-telegram deployed, and the
--- cron job's secret in Vault.
+-- depends on two things that file does not: doji-gladys deployed, and the cron
+-- job's secret in Vault.
 --
 -- Run once, in the SQL editor, after both exist.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -36,9 +36,9 @@ declare
   secret text;
 begin
   -- Lower case, and read from the poller's own cron job rather than guessed:
-  -- `select command from cron.job` shows it reads exactly this name. Postgres
-  -- compares strings case-sensitively, so the upper-case spelling this file
-  -- shipped with matched nothing and every trade went unannounced.
+  -- 005_cron.sql reads exactly this name. Postgres compares strings
+  -- case-sensitively, so the upper-case spelling this file shipped with matched
+  -- nothing and every trade went unannounced.
   select decrypted_secret into secret
     from vault.decrypted_secrets
     where name = 'doji_cron_secret';
@@ -52,7 +52,7 @@ begin
   end if;
 
   perform net.http_post(
-    url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-telegram',
+    url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-gladys',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-doji-key', secret),
     body    := jsonb_build_object(
       'id',             new.id,

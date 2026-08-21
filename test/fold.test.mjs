@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — Edge Function tests
    ───────────────────────────────────────────────────────────────────────────
-   Covers the pure exports of all three Edge Functions — doji-mcp-sync,
-   doji-telegram and doji-eugenia. Each guards every Deno touch behind env() and
+   Covers the pure exports of all four Edge Functions — doji-mcp-sync,
+   doji-email-sync, doji-gladys and doji-eugenia — and the primitives in
+   _shared they are built from. Each guards every Deno touch behind env() and
    Deno?.serve, so importing them under plain Node runs nothing — that guard
    exists for this file and nothing else, which is why it is exercised by the
    mere fact that these imports work.
@@ -32,7 +33,7 @@ import {
   lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
+import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { briefDue, pulseDue, isSilent, greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';

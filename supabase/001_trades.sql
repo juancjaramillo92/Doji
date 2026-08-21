@@ -1,10 +1,12 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — schema
 -- ───────────────────────────────────────────────────────────────────────────
--- One table. Two writers reach it — the Edge Function poller and the Apps
--- Script email parser — and one reader, index.html, which also writes the
--- journal columns. Nothing else exists: `records`, `broker_fills` and
--- `app_state` were dropped when the sync replaced them.
+-- One table. Four writers reach it: two Edge Functions on the broker side
+-- (doji-mcp-sync, doji-email-sync), and on the journal side index.html and
+-- doji-gladys. Journal columns and broker columns never meet, which is why
+-- there is nothing here to arbitrate between them. Nothing else exists:
+-- `records`, `broker_fills` and `app_state` were dropped when the sync
+-- replaced them.
 --
 -- Run once, in the SQL editor, on a fresh project.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -24,13 +26,13 @@ create table public.trades (
   -- it the same way, which is what lands two sources on one row instead of two.
   id            text primary key,
 
-  -- NOT NULL with an auth.uid() default: the Apps Script writes as the signed-in
-  -- user and gets it for free, while the poller runs under the service role
-  -- where auth.uid() is null and must supply it explicitly.
+  -- NOT NULL with an auth.uid() default: index.html writes as the signed-in
+  -- user and gets it for free, while the Edge Functions run under the service
+  -- key, where auth.uid() is null and the owner must be supplied explicitly.
   user_id       uuid not null default auth.uid()
                 references auth.users(id) on delete cascade,
 
-  -- ── Broker-owned. The poller and the email parser write these; the client
+  -- ── Broker-owned. doji-mcp-sync and doji-email-sync write these; the client
   --    displays them and never computes them.
   direction     text,
   entry_time    timestamptz,
@@ -55,7 +57,8 @@ create table public.trades (
   -- schema, rather than reimplemented in every client that reads a P&L.
   pnl           numeric generated always as (coalesce(net_pnl, computed_pnl)) stored,
 
-  -- ── Journal-owned. Written by index.html alone; neither sync sends these.
+  -- ── Journal-owned. Written by index.html and doji-gladys, through the same
+  --    four names; neither broker writer ever sends them.
   setup         text,
   -- Booleans with three states. null is unanswered, which is NOT the same as
   -- no: every broker fill arrives with all three null, so a blank must never
