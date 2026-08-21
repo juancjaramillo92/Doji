@@ -36,7 +36,7 @@
 //   3. user_id is supplied from secrets, never from the body.
 //
 // Deploy:  supabase functions deploy doji-email-sync --no-verify-jwt
-// Secrets: DOJI_EMAIL_SECRET, DOJI_USER_ID, SUPABASE_SECRET_KEY
+// Secrets: DOJI_EMAIL_SECRET, DOJI_USER_ID, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 import { env, secretMatches, json, sbHeaders, SB_URL, SB_KEY } from "../_shared/edge.ts";
 

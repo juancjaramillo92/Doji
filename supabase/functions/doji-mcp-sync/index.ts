@@ -28,7 +28,7 @@
 //      written to the database.
 //
 // Deploy:  supabase functions deploy doji-mcp-sync --no-verify-jwt
-// Secrets: CTRADER_MCP_TOKEN, DOJI_USER_ID, DOJI_CRON_SECRET, SUPABASE_SECRET_KEY
+// Secrets: CTRADER_MCP_TOKEN, DOJI_USER_ID, DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Everything shared lives in _shared/edge.ts — one definition each, for the
@@ -53,7 +53,7 @@ const MCP_TOKEN = env("CTRADER_MCP_TOKEN");
    README — which is why the claim is made about this endpoint rather than about
    the secret.
 
-   SUPABASE_SECRET_KEY — "may this function write to the table?". It bypasses
+   SB_SECRET_KEY — "may this function write to the table?". It bypasses
    RLS and never leaves this runtime. It is the reason the split exists: the
    thing scheduled every two minutes must not be the thing that can write.
 

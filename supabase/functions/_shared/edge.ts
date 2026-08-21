@@ -64,7 +64,20 @@ export const json = (body: unknown, status = 200) =>
    `resolution=merge-duplicates` baked in.
    ───────────────────────────────────────────────────────────────────────── */
 export const SB_URL = env("SUPABASE_URL");
-export const SB_KEY = env("SUPABASE_SECRET_KEY");
+
+// SB_SECRET_KEY, NOT SUPABASE_SECRET_KEY, and the difference is not cosmetic.
+// Supabase injects SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY itself and treats
+// the SUPABASE_ prefix as its own, so a secret cannot be created under that
+// name — which means a function reading one gets "" no matter what is in the
+// dashboard. That is how this shipped reading a name nothing could ever set and
+// silently falling back to the legacy service_role JWT instead: two spellings of
+// one value, the same shape of mistake as doji_cron_secret's case sensitivity,
+// and equally quiet.
+//
+// Unset now, every function answers 503 at its first line rather than reaching
+// for something else. A key that is not there should stop the work, not change
+// which key does it.
+export const SB_KEY = env("SB_SECRET_KEY");
 
 export const sbHeaders = (prefer?: string): Record<string, string> => {
   const headers: Record<string, string> = {

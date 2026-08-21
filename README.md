@@ -998,11 +998,13 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 2. Confirm `trades` is in the `supabase_realtime` publication and has RLS enabled.
 3. Put the project URL and publishable key in `SUPABASE` in `index.html`.
 4. Deploy the functions — they deploy from `main`, see **Deployment** — and set
-   `CTRADER_MCP_TOKEN`, `DOJI_USER_ID` and `SUPABASE_SECRET_KEY` in Edge
-   Function secrets. `SUPABASE_SECRET_KEY` is an `sb_secret_` key from the API
-   settings page and it is **not** one of the values Supabase injects for you:
-   unset, every function refuses every request at boot rather than falling back
-   to anything.
+   `CTRADER_MCP_TOKEN`, `DOJI_USER_ID` and **`SB_SECRET_KEY`** in Edge Function
+   secrets. `SB_SECRET_KEY` holds an `sb_secret_` key from the API settings page,
+   and the name is short for a reason: Supabase owns the `SUPABASE_` prefix, so a
+   secret cannot be created under it. A function reading `SUPABASE_SECRET_KEY`
+   therefore reads `""` however carefully the dashboard is filled in. Unset,
+   every function answers 503 at its first line rather than reaching for
+   something else.
 5. **Generate one cron secret and store it twice**, because two systems read it
    under two spellings: `DOJI_CRON_SECRET` in Edge Function secrets, which is
    what the poller and the two bots check, and `doji_cron_secret` in Vault,

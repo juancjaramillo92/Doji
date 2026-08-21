@@ -29,7 +29,7 @@
 // Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET and
 //           allowed_updates = ["message"] — she answers text and nothing else.
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
-//           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SUPABASE_SECRET_KEY
+//           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM } from "./prompt.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the

@@ -281,3 +281,23 @@ and what could not be verified.
 - **`005_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file.
+
+---
+
+## Two names that are one value
+
+Both have already caused a silent failure, and both fail the same way — the
+wrong spelling reads as empty and something else happens quietly:
+
+- **`doji_cron_secret`** in Vault, **`DOJI_CRON_SECRET`** in Edge secrets.
+  Postgres compares the Vault name case-sensitively. Gladys's trigger shipped
+  reading the upper-case one and went quiet without failing anything.
+- **`SB_SECRET_KEY`**, never `SUPABASE_SECRET_KEY`. Supabase owns the
+  `SUPABASE_` prefix, so no secret can be created under it and a function
+  reading that name gets `""` whatever the dashboard shows. The code read it
+  for months while the legacy service_role JWT quietly served every request
+  through a fallback.
+
+Before adding a third: `verify.sql` catches a database-side mismatch, and a 503
+at boot catches a secrets-side one. Neither catches a name that is merely
+*wrong*, so check a new one against the surface that stores it.

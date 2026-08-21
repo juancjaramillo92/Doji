@@ -53,7 +53,7 @@
 //           allowed_updates = ["callback_query"] — a tap is her whole
 //           vocabulary, so every other update type is a wake-up for nothing.
 // Secrets:  GLADYS_BOT_TOKEN, TELEGRAM_CHAT_ID, GLADYS_WEBHOOK_SECRET,
-//           DOJI_CRON_SECRET, SUPABASE_SECRET_KEY
+//           DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Everything shared lives in _shared/edge.ts — one definition each, for the
