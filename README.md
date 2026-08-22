@@ -650,8 +650,10 @@ The stored turn is a marker (`[weekday briefing]`), not the text that was sent:
 the memory and the week's trades are rebuilt fresh each morning, and storing
 them would resend a stale copy as history for the next six briefings.
 
-**She sees your week without being asked.** The last seven days of trades go in
-with the briefing, so *"you have not traded since Tuesday"* costs no tool round.
+**She sees your week without being asked**, bounded by a New York day rather
+than a UTC one — `open_day` is a New York civil day, and building the bound with
+`toISOString()` started the window a day late every evening, quietly dropping
+the oldest day. The last seven days of trades go in with the briefing, so *"you have not traded since Tuesday"* costs no tool round.
 Mentioned only when there is something real to say, in a clause, never as a
 verdict — most mornings the right amount to say about your trading is nothing.
 
@@ -1167,7 +1169,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`, and the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; and Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

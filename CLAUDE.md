@@ -203,8 +203,10 @@ code you write near it:
   secures the view, not the key, so the guarantee that matters is structural:
   one database read of the journal, no write path to it in the file. Do not add
   one.
-- **`tradesQuery` is a boundary.** Its `days` comes from the model, so it is
-  clamped and row-limited there rather than trusted. `writeNote` is the other
+- **`tradesQuery` is a boundary, and its window is a New York day.** `days`
+  comes from the model, so it is clamped and row-limited there rather than
+  trusted; the lower bound is built with `nyDate` because `open_day` is a New
+  York civil day, and `toISOString()` made the two disagree every evening. `writeNote` is the other
   one: it truncates rather than refusing, because a tool that errors mid-turn
   costs the whole answer.
 - **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
