@@ -1141,16 +1141,17 @@ are exercised but realtime and the auth paths are not. `mcpInit`, `mcpCall` and
 `upsert` reach the network on their first line and are not exported. The xlsx
 export needs SheetJS from a CDN and is not exercised.
 
-**The Apps Script is now half covered, and the half that is not is named.**
+**The Apps Script is covered where it decides something, and the rest is
+named.**
 `parseAlert_` is a pure function of a subject and a body and `syncPepperstone`
 is a loop over threads, so both are reachable once `GmailApp`,
 `PropertiesService`, `Logger` and `UrlFetchApp` exist — `test/gs.mjs` evaluates
 the file in a `vm` context with those four stubbed to record, which runs nothing,
-because the file has no top-level calls. What that cannot prove is that the
-parser matches what cTrader actually sends: the bodies in `parse.test.mjs` are
-built to the alert's shape, not saved from a real message, so they hold the
-parser to its *rules* and not to its input. `ALERT` is one string, and replacing
-it with a saved body is the whole of that upgrade.
+because the file has no top-level calls. The anchor is a real alert body under
+`test/fixtures/`, so what the parser claims is held against what cTrader
+actually sent. What that still cannot reach is Gmail itself — the search, the
+labels and the trigger are exercised through stubs, so what is tested is which
+label a thread ends up with, not that GmailApp behaves as assumed.
 
 **`agree.test.mjs` cannot see the live database either.** `trades_setup_check`
 is asserted as `001_trades.sql` declares it, not as Postgres holds it, so a
@@ -1212,14 +1213,21 @@ fail has more than once been mistaken here for clean code.
 
 ## Known rough edges
 
-**The email parser's fixtures are written to the alert's shape, not saved from
-a real one.** Its rules are covered — the explicit `Z`, the position side,
-thousands separators, a margin notice declined, and which label a thread ends up
-with in each of the three outcomes. What is not covered is whether those rules
-match what cTrader actually sends, because that needs a real message. Save one
-into `ALERT` the next time a fill lands. Until then this is still one of the two
-pieces that can lose data quietly — the poller is the other — and the weekly
-backup is the floor underneath both.
+**The email parser is checked against a real message, and the variants are
+not.** `test/fixtures/ctrader-stop-loss-filled.html` is an actual Pepperstone
+alert, decoded exactly as GmailApp hands it over, for a fill that is in the
+database — so every field the parser claims is checked against what the broker
+sent rather than against a guess at it. Replacing the invented fixture caught
+two things immediately: money arrives as `USD -108.40`, with a currency prefix,
+and the fill time as `19/08/2026 20:22:55 (UTC)`, with the zone in brackets.
+Both parsed correctly; nothing had been proving it.
+
+The variants — a buy, a thousands separator, a missing figure, an unreadable
+time — are still built, because no saved message contains them. They are built
+in the real message's shape, and one test holds the builder against the real
+body so a variant cannot quietly stop resembling what cTrader sends. This is
+still one of the two pieces that can lose data quietly — the poller is the
+other — and the weekly backup is the floor underneath both.
 
 **The Supabase client carries no SRI hash**, unlike Chart.js and SheetJS. The
 floating `@2` tag is gone — it is pinned to `@2.111.0`, which closes the drift
