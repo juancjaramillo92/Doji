@@ -8,42 +8,63 @@
    labelled failed, it leaves the queue, and the trade keeps the computed figure
    forever with nothing anywhere reporting it. That is the case these cover.
 
-   SAY THE LIMIT PLAINLY, BECAUSE IT IS THE WHOLE WEAKNESS OF THIS FILE. The
-   bodies below are built to cTrader's shape, not saved from a real alert, so
-   they prove the parser holds its RULES — the explicit Z, the position side,
-   the label escaping, thousands separators, a margin notice declined — and they
-   cannot prove it matches what cTrader actually sends. Only a real message can
-   do that. ALERT is one string and replacing it with a saved body is the whole
-   of that upgrade; do it the next time a fill lands.
+   THE ANCHOR IS A REAL MESSAGE. `fixtures/ctrader-stop-loss-filled.html` is the
+   body of an actual Pepperstone alert, decoded from quoted-printable exactly as
+   GmailApp hands it over, for a fill that is in the database — PID577885869,
+   SELL, -108.40, balance 385.73. Every field the parser claims is checked
+   against what the broker actually sent, not against a shape anyone guessed at.
 
-   The rest of the script is genuinely out of reach: GmailApp needs a mailbox.
-   What is reachable is the labelling, and the labelling is where a transient
-   failure used to be recorded as permanent.
+   That mattered. The fixture this replaced was written to the alert's shape and
+   got two things wrong that no assertion could have caught: money arrives as
+   `USD -108.40`, with a currency prefix, and the fill time as
+   `19/08/2026 20:22:55 (UTC)`, with the zone in brackets. Both parse correctly —
+   but nothing was testing that they did.
+
+   WHAT IS STILL SYNTHETIC, and it is unavoidable: the variants. A buy, a
+   thousands separator, a missing P&L, an unreadable time — none of those exist
+   as saved messages, so `alert()` builds them in the real message's shape. The
+   last test in the first section holds that builder against the real body, so a
+   variant cannot quietly stop resembling what cTrader sends.
+
+   The rest of the script is out of reach: GmailApp needs a mailbox. What is
+   reachable is the labelling, and the labelling is where a transient failure
+   used to be recorded as permanent.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { boot, thread, message } from './gs.mjs';
 
-const SUBJECT = 'Your order has been filled for XAUUSD';
+// The real subject line, which is also what syncPepperstone matches on: a stop
+// loss says "Stop loss filled for", not "order has been filled".
+const SUBJECT = '[cTrader live account] Stop loss filled for XAUUSD';
 
-// cTrader's alerts are an HTML table, which is what the tag-stripping in
-// parseAlert_ is for — the labels and their values sit in separate cells, so a
-// fixture that ran them together as plain text would not exercise it.
+const ALERT = readFileSync(new URL('./fixtures/ctrader-stop-loss-filled.html', import.meta.url), 'utf8');
+
+/* A variant, in the real message's shape. Label and value sit in SEPARATE <p>
+   elements, which is what the tag-stripping in parseAlert_ exists for — a
+   fixture that ran them together on one line would not exercise it. The USD
+   prefix and the bracketed zone are cTrader's, not decoration. */
+const field = (label, value) =>
+  `<p style="font-size: 13px;">\n                ${label}            </p>\n` +
+  `            <p style="font-size: 16px; font-weight: 600;">\n                ${value}\n            </p>\n` +
+  `            <hr style="border-top: 1px solid #eaeaea;">`;
+
 const alert = (f = {}) => `
 <html><head><style>.x{color:#fff}</style></head><body>
-  <table>
-    <tr><td>Position ID</td><td>${f.id ?? 'PID562780708'}</td></tr>
-    <tr><td>Symbol</td><td>XAUUSD</td></tr>
-    <tr><td>Direction</td><td>${f.direction ?? 'Sell'}</td></tr>
-    <tr><td>Volume</td><td>2.00</td></tr>
-    <tr><td>Fill time</td><td>${f.fillTime ?? '30/07/2026 14:29:00'} UTC</td></tr>
-    <tr><td>Gross P&amp;L</td><td>${f.gross ?? '57.24'}</td></tr>
-    <tr><td>Net P&amp;L</td><td>${f.net ?? '57.10'}</td></tr>
-    <tr><td>Current balance</td><td>${f.balance ?? '10,057.10'}</td></tr>
-  </table>
+  <table><tr><td>
+    ${field('Account', '1351729 (Live)')}
+    ${field('Symbol', 'XAUUSD')}
+    ${field('Direction', f.direction ?? 'SELL')}
+    ${field('Fill time', f.fillTime ?? '19/08/2026 20:22:55 (UTC)')}
+    ${field('Fill price', '4512.80')}
+    ${field('Volume', 'Oz 4.00')}
+    ${field('Position ID', f.id ?? 'PID577885869')}
+    ${field('Gross P&amp;L', f.gross ?? 'USD -108.12')}
+    ${field('Net P&amp;L', f.net ?? 'USD -108.40')}
+    ${field('Current balance', f.balance ?? 'USD 385.73')}
+  </td></tr></table>
 </body></html>`;
-
-const ALERT = alert();
 
 // Spread on the way out: the fill is built inside the vm context, so it carries
 // that realm's Object.prototype and a strict deep-equal compares prototypes as
@@ -56,14 +77,39 @@ const parse = (body = ALERT, subject = SUBJECT) => {
 
 /* ─── The fill ───────────────────────────────────────────────────────────── */
 
-test('a closing alert parses to the five columns the email owns, and no others', () => {
+test('the real alert parses to the five columns the email owns, and no others', () => {
+  // These five values are the row in the database: PID577885869. If this
+  // assertion and that row ever disagree, one of them is wrong about a fill
+  // that actually happened.
   assert.deepEqual(parse(), {
-    id: 'PID562780708',
+    id: 'PID577885869',
     direction: 'SELL',
-    fill_time: '2026-07-30T14:29:00Z',
-    net_pnl: 57.10,
-    balance: 10057.10,
+    fill_time: '2026-08-19T20:22:55Z',
+    net_pnl: -108.40,
+    balance: 385.73,
   });
+});
+
+test('the money figures survive their currency prefix', () => {
+  // `USD -108.40`, not `-108.40`. The old fixture omitted the prefix, so
+  // nothing proved the parser could see past it.
+  const { net_pnl, balance } = parse();
+  assert.equal(net_pnl, -108.40);
+  assert.equal(balance, 385.73);
+});
+
+test('the built variants still look like the real message', () => {
+  // The one guard on the synthetic half: parse the real body and a variant
+  // built to match it, and require the same five keys with the same types. A
+  // builder that drifts from what cTrader sends makes every variant below a
+  // test of nothing.
+  const real = parse();
+  const built = parse(alert());
+  assert.deepEqual(Object.keys(built).sort(), Object.keys(real).sort());
+  for (const k of Object.keys(real)) {
+    assert.equal(typeof built[k], typeof real[k], k);
+  }
+  assert.deepEqual(built, real, 'the builder no longer reproduces the real fill');
 });
 
 test('the fill time carries an explicit Z, because the email states UTC', () => {
@@ -73,34 +119,41 @@ test('the fill time carries an explicit Z, because the email states UTC', () => 
   // check is about what it MEANS rather than how it is spelled.
   const { fill_time } = parse();
   assert.equal(fill_time.endsWith('Z'), true);
-  assert.equal(Date.parse(fill_time), Date.UTC(2026, 6, 30, 14, 29, 0));
+  assert.equal(Date.parse(fill_time), Date.UTC(2026, 7, 19, 20, 22, 55));
 });
 
 test('an ISO fill time is accepted as well as the slashed one', () => {
-  assert.equal(parse(alert({ fillTime: '2026-07-30 14:29:00' })).fill_time,
+  assert.equal(parse(alert({ fillTime: '2026-07-30 14:29:00 (UTC)' })).fill_time,
     '2026-07-30T14:29:00Z');
 });
 
 test('direction is the position side, in either spelling', () => {
+  // The real message sends it upper case; the others are cheap insurance
+  // against cTrader changing its mind about capitalisation.
+  assert.equal(parse(alert({ direction: 'SELL' })).direction, 'SELL');
   assert.equal(parse(alert({ direction: 'Sell' })).direction, 'SELL');
-  assert.equal(parse(alert({ direction: 'Buy'  })).direction, 'BUY');
   assert.equal(parse(alert({ direction: 'BUY'  })).direction, 'BUY');
+  assert.equal(parse(alert({ direction: 'Buy'  })).direction, 'BUY');
 });
 
 test('a thousands separator does not truncate the balance', () => {
-  // 10,057.10 read without stripping the comma gives 10 — a plausible number,
-  // wrong by three orders of magnitude, and silent.
-  assert.equal(parse(alert({ balance: '1,234,567.89' })).balance, 1234567.89);
+  // This account has not crossed 1,000 yet, so the real message carries no
+  // comma and cannot cover it. Read without stripping, `USD 1,234,567.89`
+  // gives 1 — a plausible number, wrong by six orders of magnitude, silent.
+  assert.equal(parse(alert({ balance: 'USD 1,234,567.89' })).balance, 1234567.89);
 });
 
-test('a loss keeps its sign', () => {
-  assert.equal(parse(alert({ net: '-38.42' })).net_pnl, -38.42);
+test('a win keeps its sign too', () => {
+  // The real message is a loss, so the positive case is the one that needs
+  // building.
+  assert.equal(parse(alert({ net: 'USD 57.10' })).net_pnl, 57.10);
 });
 
 test('Net P&L is read, not Gross', () => {
-  // They differ by commission, and the column stores the settled figure. The
-  // ampersand in both labels is also the reason the parser escapes them.
-  assert.equal(parse(alert({ gross: '99.99', net: '57.10' })).net_pnl, 57.10);
+  // In the real message they are -108.12 and -108.40, and only the second is
+  // settled. The ampersand in both labels is why the parser escapes them.
+  assert.equal(parse().net_pnl, -108.40);
+  assert.equal(parse(alert({ gross: 'USD 99.99', net: 'USD 57.10' })).net_pnl, 57.10);
 });
 
 /* ─── What it refuses ────────────────────────────────────────────────────── */
@@ -118,10 +171,10 @@ test('a fill with an unreadable time is refused rather than filed under today', 
 });
 
 test('a missing P&L is absent, not zero', () => {
-  // A body carrying no Net P&L line at all. null travels to the Edge Function,
-  // which drops the key rather than writing it — zero would be a real figure
-  // and would read as a scratch.
-  const body = ALERT.replace(/<tr><td>Net P&amp;L<\/td>.*?<\/tr>/, '');
+  // The real body with its Net P&L value blanked. null travels to the Edge
+  // Function, which drops the key rather than writing it — zero would be a real
+  // figure and would read as a scratch.
+  const body = ALERT.replace('USD -108.40', '');
   assert.equal(parse(body).net_pnl, null);
 });
 
@@ -171,6 +224,8 @@ test('an unparseable body is permanent and the thread leaves the queue', () => {
 });
 
 test('a message that is not a fill is skipped without failing the thread', () => {
+  // syncPepperstone matches /filled for/i on the SUBJECT, which the real one
+  // satisfies as "Stop loss filled for XAUUSD".
   const t = thread([message('Margin call warning', ALERT)]);
   const gs = boot({ threads: [t] });
   gs.syncPepperstone();

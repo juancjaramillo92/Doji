@@ -277,10 +277,11 @@ and what could not be verified.
   function are permanent and label the thread; anything else, including no
   response at all, leaves it unlabelled so the next run retries. Collapsing the
   last two is how a fill's P&L was once discarded forever.
-- **`parseAlert_` is testable and is tested; the Gmail half is not.** The
-  fixtures are built to the alert's shape rather than saved from a real message,
-  so they hold the parser to its rules and not to its input. Replacing `ALERT`
-  with a real body is the whole of that upgrade.
+- **`parseAlert_` is anchored to a real message; the Gmail half is not.**
+  `test/fixtures/` holds an actual alert body for a fill that is in the
+  database, so the parser is held to its input and not only to its rules. The
+  variants around it are built, and one test keeps the builder matching the real
+  body. Save a new fixture whenever cTrader changes the alert.
 
 ---
 
