@@ -8,11 +8,18 @@ description of behaviour lives there, once.
 
 Doji is a personal XAUUSD trading journal: one `index.html` of ~3,800 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
-table — the app, the cTrader poller (Edge Function), the email parser (Apps
-Script), and Gladys, the Telegram journal bot (one more Edge Function). Journal
-columns and broker columns never meet; that single idea is what the whole design
-rests on. Eugenia, the market bot, would be the fifth writer and is not: she
-owns only her own conversation and her own notes.
+table — the app, and three Edge Functions: `doji-mcp-sync` (the cTrader poller),
+`doji-email-sync` (which writes what the Apps Script parses out of Gmail) and
+`doji-gladys` (the Telegram journal bot). Journal columns and broker columns
+never meet; that single idea is what the whole design rests on. Eugenia, the
+market bot, would be the fifth writer and is not: she owns only her own
+conversation and her own notes.
+
+**A function is named after who it is** — `doji-gladys`, `doji-eugenia` — and so
+are its secrets: `GLADYS_BOT_TOKEN`, `EUGENIA_BOT_TOKEN`. `TELEGRAM_CHAT_ID` is
+the one exception and earns it, being the only value the two bots share. The two
+ingestion functions are named for the channel they read, which is the only thing
+that distinguishes them.
 
 ---
 
@@ -48,10 +55,16 @@ Every change is:
   `NOT NULL DEFAULT` column cannot arrive null. Never wrap something in
   `try/catch` to make a symptom go away.
 - **Single-sourced.** One decision, one place. `CONFIG.BE` (±$3, one fill),
-  `CONFIG.BE_AGG` (±$10, a day/week/month cell), `CONFIG.PERIODS`, `Data.OWNED`,
-  `resultOf`, `money()`, `byKey` and the shared primitives each exist so a rule
-  changes once. Never compute the same thing a second way in a second spot — and
-  that includes prose: a fact stated in the README does not get restated here.
+  `CONFIG.PERIODS`, `Data.OWNED`, `resultOf`, `money()`, `byKey` and the shared
+  primitives each exist so a rule changes once. Never compute the same thing a
+  second way in a second spot — and that includes prose: a fact stated in the
+  README does not get restated here.
+- **Where a copy is unavoidable, a test holds the copies together.** Four
+  runtimes and no build step mean the setups vocabulary and the four journal
+  column names genuinely live in more than one file. `test/agree.test.mjs` reads
+  every copy of each and fails when they disagree. Adding a third copy of
+  anything means adding it there too — a copy nothing can compare is the actual
+  defect, not the copy itself.
 - **Load-order safe.** Nothing references anything defined below it at load time.
   New code goes in the section it belongs to, under the right banner — not at the
   bottom because that is easier.
@@ -104,12 +117,19 @@ npm install   # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6+. `test/fold.test.mjs` covers the pure logic of the poller and of
-`functions/doji-telegram/index.ts`; `test/app.test.mjs` boots `index.html` in
-jsdom with a recording Supabase stand-in. They do **not** cover pixels, realtime,
-auth, the xlsx export, or the Apps Script — so a good deal of what a change can
-break is only caught by reading. You cannot see pixels; say so on any visual
-change.
+Node 22.6+. Four suites, and the script globs `test/*.test.mjs` one level, so a
+test in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
+of all four Edge Functions and of `_shared`; `app.test.mjs` boots `index.html` in
+jsdom with a recording Supabase stand-in; `agree.test.mjs` holds the duplicated
+vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
+Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
+suites.
+
+They do **not** cover pixels, realtime, auth, the xlsx export, or whether the
+email parser matches a real cTrader message — its fixtures are built to the
+alert's shape. Nor can anything here see the live database: `verify.sql` is that
+check and a person runs it. So a good deal of what a change can break is only
+caught by reading. You cannot see pixels; say so on any visual change.
 
 ---
 
@@ -130,8 +150,12 @@ change.
   definitive list — a save sends those columns and nothing else, enforced in one
   place. Deletes are a soft `deleted: true` flag.
 - **A wrong direction, P&L or date cannot be fixed in `index.html`.** The app
-  does not own those columns; the fault is upstream in the poller or the parser.
-  Say so rather than looking for it in the app.
+  does not own those columns; the fault is upstream in the poller or the email
+  path. Say so rather than looking for it in the app.
+- **Two columns have two claimants, and their arbitration differs.** `balance`
+  is settled by a filter inside the UPDATE (`where balance is null`); `direction`
+  is last-write-wins, and is only safe because both sources read the side off the
+  opening deal. Anything else in `trades` has exactly one writer.
 - **`null` is not `no`,** and the journal asks whether the stop and target were
   *respected*, not whether they were moved. Both halves of that trip people up.
   Column lists and the full account are in the README's Data model.
@@ -154,12 +178,16 @@ code you write near it:
   *before* the tap can tell them apart — that is `staysOpen`, and getting it
   wrong shipped a bot whose message could never settle.
 - **`Deno.serve` is guarded so the test can import the module without serving.**
-  That guard is also why the three shared primitives live in `_shared/edge.ts`
-  and not in one of the functions: importing a module that serves at its top
-  level would start that function inside the caller.
+  That guard is also why the shared primitives live in `_shared/edge.ts` and not
+  in one of the functions: importing a module that serves at its top level would
+  start that function inside the caller.
+- **Do not extract the entry point.** All four functions authorise their callers
+  with the same four lines, and that is the one shape that must stay readable in
+  the file being edited rather than behind a helper.
 - **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
-  `Data.OWNED`, so no broker column is nameable from a tap. A test asserts
-  exactly that; do not widen it without widening the test.
+  `Data.OWNED`, so no broker column is nameable from a tap. `agree.test.mjs`
+  asserts the two lists against each other rather than each against a literal;
+  do not widen either without widening it.
 - **`callback_data` must stay under 64 bytes.** It is the entire state store —
   no session table, no `tg_message_id`, no schema change — and a longer setup
   name is the way it would silently overrun.
@@ -231,3 +259,56 @@ code you write near it:
 
 State plainly what was changed, what was verified by running, what by reading,
 and what could not be verified.
+
+---
+
+## The email path
+
+- **The Apps Script parses and forwards; it does not write.** `doji-email-sync`
+  owns the write, and `emailRow` is the boundary — five names built into a
+  payload rather than filtered out of one, each type-checked. An absent key and
+  a null key mean opposite things under `merge-duplicates`, which is why a
+  missing figure is dropped rather than sent as null.
+- **It holds no account credential, and must never hold one again.** The write
+  moved behind a function precisely so that the secret living in Google's
+  infrastructure opens five columns rather than the whole account. A test asserts
+  the sign-in helpers are gone.
+- **Three outcomes, not two.** A body that will never parse and a `400` from the
+  function are permanent and label the thread; anything else, including no
+  response at all, leaves it unlabelled so the next run retries. Collapsing the
+  last two is how a fill's P&L was once discarded forever.
+- **`parseAlert_` is testable and is tested; the Gmail half is not.** The
+  fixtures are built to the alert's shape rather than saved from a real message,
+  so they hold the parser to its rules and not to its input. Replacing `ALERT`
+  with a real body is the whole of that upgrade.
+
+---
+
+## The database
+
+- **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
+  is deliberate, so nothing keeps the live schema honest on its own. Run
+  `verify.sql` after any manual change and before believing the numbered files.
+- **`005_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
+  upserts on the job name, so applying the file makes the database match it. Add
+  a new scheduled job there, never in a feature's own file.
+
+---
+
+## Two names that are one value
+
+Both have already caused a silent failure, and both fail the same way — the
+wrong spelling reads as empty and something else happens quietly:
+
+- **`doji_cron_secret`** in Vault, **`DOJI_CRON_SECRET`** in Edge secrets.
+  Postgres compares the Vault name case-sensitively. Gladys's trigger shipped
+  reading the upper-case one and went quiet without failing anything.
+- **`SB_SECRET_KEY`**, never `SUPABASE_SECRET_KEY`. Supabase owns the
+  `SUPABASE_` prefix, so no secret can be created under it and a function
+  reading that name gets `""` whatever the dashboard shows. The code read it
+  for months while the legacy service_role JWT quietly served every request
+  through a fallback.
+
+Before adding a third: `verify.sql` catches a database-side mismatch, and a 503
+at boot catches a secrets-side one. Neither catches a name that is merely
+*wrong*, so check a new one against the surface that stores it.

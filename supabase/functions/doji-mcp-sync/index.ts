@@ -28,61 +28,46 @@
 //      written to the database.
 //
 // Deploy:  supabase functions deploy doji-mcp-sync --no-verify-jwt
-// Secrets: CTRADER_MCP_TOKEN, DOJI_USER_ID, DOJI_CRON_SECRET, SUPABASE_SECRET_KEY
+// Secrets: CTRADER_MCP_TOKEN, DOJI_USER_ID, DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 
-// env, secretMatches and json live in _shared/edge.ts — one definition each,
-// for the reason that file gives. Reading Deno through a guard rather than at
-// module scope is what lets this file be imported under plain Node without
-// throwing before a single assertion runs; test/fold.test.mjs is what uses it.
-import { env, secretMatches, json } from "../_shared/edge.ts";
+// Everything shared lives in _shared/edge.ts — one definition each, for the
+// reason that file gives. Reading Deno through a guard rather than at module
+// scope is what lets this file be imported under plain Node without throwing
+// before a single assertion runs; test/fold.test.mjs is what uses it.
+import {
+  env, secretMatches, json, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
+} from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
 const MCP_TOKEN = env("CTRADER_MCP_TOKEN");
-const SB_URL    = env("SUPABASE_URL");
 
 /* ─── Credentials ──────────────────────────────────────────────────────────
    Two DIFFERENT secrets, deliberately, because they answer different questions
    and leak with different consequences.
 
-   DOJI_CRON_SECRET — "may this caller trigger a poll?". It has no database
-   power whatsoever. Its entire authority is to make this function do the one
-   read-only thing it does. The cron job carries this and nothing else, and it
-   is read out of Vault at call time rather than written into the job text —
-   but even if that changed, the worst a reader learns is a token that can do
-   nothing except start a poll that was going to run anyway.
+   DOJI_CRON_SECRET — "may this caller start a poll?". It has no database power
+   whatsoever, and against this function that is the whole of it: the worst a
+   holder can do is start a read-only poll that was going to run anyway. Two
+   other functions check the same secret and it is NOT harmless there — see the
+   README — which is why the claim is made about this endpoint rather than about
+   the secret.
 
-   SUPABASE_SECRET_KEY — "may this function write to the table?". It bypasses
+   SB_SECRET_KEY — "may this function write to the table?". It bypasses
    RLS and never leaves this runtime. It is the reason the split exists: the
    thing scheduled every two minutes must not be the thing that can write.
 
    The cron job used to carry a legacy service_role JWT, which meant the job
-   held full RLS-bypassing access to the entire database.
-   Worse, legacy JWT keys cannot be rotated at all — Supabase disabled it,
-   because they are tied to the project's JWT secret — so any exposure was
-   permanent short of migrating off them. This file is that migration.
-
-   The fallback to SUPABASE_SERVICE_ROLE_KEY keeps the function working during
-   the changeover, before legacy keys are disabled. Once they are, it is dead
-   weight and the || collapses to its first term.
+   held full RLS-bypassing access to the entire database. Worse, legacy JWT
+   keys cannot be rotated at all — they are tied to the project's JWT secret —
+   so any exposure was permanent short of migrating off them. That migration is
+   done; sbHeaders in _shared has the header shape and the rest of the account.
    ───────────────────────────────────────────────────────────────────────── */
 const CRON_SECRET = env("DOJI_CRON_SECRET");
-const SB_KEY      = env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
-
-// Legacy keys are JWTs and PostgREST accepts them on Authorization: Bearer. The
-// new sb_secret_ keys are opaque tokens and are REJECTED there — they belong on
-// the apikey header only. Detecting the shape rather than configuring it means
-// one code path works before and after legacy keys are disabled.
-const IS_JWT = SB_KEY.startsWith("eyJ");
 
 // `trades.user_id` is NOT NULL and defaults to auth.uid(), which is null under
-// the service role — so the owner has to be supplied explicitly here.
-//
-// (That default did not exist until August 2026. The Apps Script's comment
-// claimed it did and relied on it, so every email arriving before the poller
-// had created the row failed NOT NULL and retried every minute until it did.
-// The three-outcome label design is the only reason that was a delay rather
-// than lost P&L.)
+// the service role — so the owner has to be supplied explicitly here, and in
+// doji-email-sync for the same reason.
 //
 // A missing secret is fatal rather than silently inserting nothing, because a
 // poller that reports success and writes no rows is the worst failure shape
@@ -273,11 +258,9 @@ export const usdFromCents = (c: number) => c / 100;
 // The New York civil day an instant falls on. This is the day a trade is filed
 // under, and it is why an entry at 21:05 New York on 30 July stays on 30 July
 // instead of drifting to the 31st with the UTC date.
-export function nyDay(ms: number): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date(ms));
-}
+// Takes an epoch, because every caller here has one — the deals carry
+// executionTimestamp and nothing else.
+export const nyDay = (ms: number): string => nyDate(new Date(ms));
 
 /* ─── Deal folding ─────────────────────────────────────────────────────────
    A position is deals sharing a positionId. Sorted by execution time the first
@@ -360,25 +343,14 @@ export function foldPosition(deals: Deal[], userId: string) {
   };
 }
 
-/* ─── Writing ──────────────────────────────────────────────────────────────
-   apikey always; Authorization only when the key is a legacy JWT. The new
-   sb_secret_ keys are opaque tokens and PostgREST rejects them on Authorization.
-   ───────────────────────────────────────────────────────────────────────── */
-const sbHeaders = () => {
-  const headers: Record<string, string> = {
-    apikey: SB_KEY,
-    "Content-Type": "application/json",
-    Prefer: "resolution=merge-duplicates,return=minimal",
-  };
-  if (IS_JWT) headers.Authorization = `Bearer ${SB_KEY}`;
-  return headers;
-};
-
+/* ─── Writing ──────────────────────────────────────────────────────────── */
 async function upsert(rows: Record<string, unknown>[]) {
   if (!rows.length) return 0;
 
   const res = await fetch(`${SB_URL}/rest/v1/trades?on_conflict=id`, {
-    method: "POST", headers: sbHeaders(), body: JSON.stringify(rows),
+    method: "POST",
+    headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify(rows),
   });
   if (!res.ok) throw new Error(`Upsert failed (HTTP ${res.status}): ${await res.text()}`);
   return rows.length;
@@ -394,7 +366,9 @@ async function upsert(rows: Record<string, unknown>[]) {
    A PATCH rather than another column on the upsert: merge-duplicates sets every
    key in the payload unconditionally, so naming `balance` there would overwrite
    the email's figure on each of the re-upserts a position gets for the rest of
-   the write window. */
+   the write window — which is also why no merge-duplicates Prefer is named
+   here. It would mean nothing on an update, and reading it here suggests it
+   does. */
 async function writeBalance(id: string, balance: number) {
   const res = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${id}&balance=is.null`, {
     method: "PATCH", headers: sbHeaders(), body: JSON.stringify({ balance }),
@@ -410,18 +384,12 @@ async function writeBalance(id: string, balance: number) {
    Decided here rather than in the cron expression on purpose: "continuous from
    Sunday evening to Friday evening" takes three cron jobs, pg_cron schedules in
    UTC, and every one of them would be an hour wrong whenever New York is on
-   standard time. Asking America/New_York for its own clock is correct all year
-   and is one function.
+   standard time. nyClock asks America/New_York for its own clock instead, which
+   is correct all year — the same reading Eugenia's two schedules take, from the
+   same definition.
    ───────────────────────────────────────────────────────────────────────── */
 export function marketOpen(now = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", weekday: "short", hour: "2-digit", hour12: false,
-  }).formatToParts(now);
-  const wd = ({ Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 } as Record<string, number>)[
-    parts.find(p => p.type === "weekday")?.value ?? "Mon"] ?? 1;
-  let hour = +(parts.find(p => p.type === "hour")?.value ?? 12);
-  if (hour === 24) hour = 0;
-
+  const { wd, hour } = nyClock(now);
   if (wd === 6) return false;                 // Saturday
   if (wd === 5 && hour >= 17) return false;   // after the Friday close
   if (wd === 0 && hour < 17) return false;    // before the Sunday open

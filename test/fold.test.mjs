@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — Edge Function tests
    ───────────────────────────────────────────────────────────────────────────
-   Covers the pure exports of all three Edge Functions — doji-mcp-sync,
-   doji-telegram and doji-eugenia. Each guards every Deno touch behind env() and
+   Covers the pure exports of all four Edge Functions — doji-mcp-sync,
+   doji-email-sync, doji-gladys and doji-eugenia — and the primitives in
+   _shared they are built from. Each guards every Deno touch behind env() and
    Deno?.serve, so importing them under plain Node runs nothing — that guard
    exists for this file and nothing else, which is why it is exercised by the
    mere fact that these imports work.
@@ -25,16 +26,19 @@ import assert from 'node:assert/strict';
 // is now one of it. That this import resolves is also what proves every
 // function's `../_shared/edge.ts` resolves — the same file, the same path
 // shape — which is the check standing between a bad extraction and a deploy.
-import { secretMatches } from '../supabase/functions/_shared/edge.ts';
+import { secretMatches, nyClock } from '../supabase/functions/_shared/edge.ts';
 
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-telegram/index.ts';
-import { briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
-         greeting, chunk, TG_LIMIT, tradesQuery } from '../supabase/functions/doji-eugenia/index.ts';
+import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
+import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
+import {
+  briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
+  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser,
+} from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -686,4 +690,172 @@ test('a window from the model is clamped, never trusted', () => {
 
 test('the journal read is bounded, so a wide window cannot fill the context', () => {
   assert.match(tradesQuery(365, NOW), /limit=400/);
+});
+
+/* ─── The New York clock ─────────────────────────────────────────────────────
+   One definition, read by the poller's market hours and by both of Eugenia's
+   schedules. It was two near-identical copies whose only difference was what
+   they returned when Intl failed to emit a part — Monday noon on one side, -1
+   on the other, and neither reachable.
+
+   These assert the clock DIRECTLY rather than through its three callers,
+   because those callers already have their own tests and a bug here would move
+   all of them together in a way that reads as correct.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the clock reads New York, not UTC, in both halves of the year', () => {
+  // Daylight time: UTC-4. Standard time: UTC-5.
+  assert.deepEqual(nyClock(new Date('2026-07-30T14:00:00Z')), { wd: 4, hour: 10 });
+  assert.deepEqual(nyClock(new Date('2026-01-15T14:00:00Z')), { wd: 4, hour: 9 });
+});
+
+test('every weekday maps to the number the schedules switch on', () => {
+  // Sunday is 0, because that is what briefDue and marketOpen both test for and
+  // Sunday 17:00 is the gold open — the one boundary that is not a weekday.
+  const sunday = Date.UTC(2026, 7, 23, 18, 0, 0);          // 23 Aug 2026, 14:00 ET
+  for (let i = 0; i < 7; i++) {
+    assert.equal(nyClock(new Date(sunday + i * 86_400_000)).wd, i);
+  }
+});
+
+test('midnight in New York reads as hour 0, never as 24', () => {
+  // Some engines emit '24' at midnight, which would make every hour comparison
+  // in every schedule miss the first hour of the day.
+  assert.equal(nyClock(new Date('2026-07-30T04:00:00Z')).hour, 0);
+  assert.equal(nyClock(new Date('2026-01-15T05:00:00Z')).hour, 0);
+});
+
+test('the market check and the briefing check read the same hour', () => {
+  // The reason they share a definition: a disagreement about what hour it is in
+  // New York is the sort of bug nobody finds until March.
+  const at8 = new Date('2026-08-24T12:00:00Z');            // Monday 08:00 ET
+  assert.equal(nyClock(at8).hour, 8);
+  assert.equal(briefDue(at8), 'weekday');
+  assert.equal(marketOpen(at8), true);
+});
+
+/* ─── Eugenia's history window ───────────────────────────────────────────────
+   The Messages API merges consecutive same-role turns and refuses a leading
+   assistant one, and the refusal is total: every reply 400s until the offending
+   row rolls out of the window.
+
+   The window used to rely on turns being written in pairs, which they are —
+   but two rows in one INSERT draw two sequence values and a concurrent INSERT
+   can take one in between, so the pairs can interleave and the window can open
+   mid-pair. That was an invariant held up by a comment; this is the same
+   invariant held up by a function.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const u = (content) => ({ role: 'user', content });
+const a = (content) => ({ role: 'assistant', content });
+
+test('a window that already opens on a user turn is left exactly as it is', () => {
+  const window = [u('one'), a('two'), u('three'), a('four')];
+  assert.deepEqual(openOnUser(window), window);
+});
+
+test('a window opening on an assistant turn is trimmed until it does not', () => {
+  // What the API refuses, and the only shape that has to be repaired.
+  assert.deepEqual(openOnUser([a('two'), u('three'), a('four')]),
+    [u('three'), a('four')]);
+});
+
+test('interleaved pairs are repaired rather than sent', () => {
+  // Two messages seconds apart: both handlers read the same history and both
+  // write a pair, and the sequence values interleave as u1 u2 a1 a2. Reading
+  // any even number of those can open on an assistant turn.
+  const scrambled = [a('a1'), a('a2'), u('u3'), a('a3')];
+  const repaired = openOnUser(scrambled);
+  assert.equal(repaired[0].role, 'user');
+  assert.deepEqual(repaired, [u('u3'), a('a3')]);
+});
+
+test('a window with no user turn at all becomes empty, not invalid', () => {
+  // Empty is a first message the caller then supplies. A leading assistant turn
+  // is a 400 and no answer at all.
+  assert.deepEqual(openOnUser([a('one'), a('two')]), []);
+  assert.deepEqual(openOnUser([]), []);
+});
+
+/* ─── The email boundary ─────────────────────────────────────────────────────
+   doji-email-sync is the only function here that reads a request body, so it is
+   the only one with a shape to check. What it must guarantee is what the Apps
+   Script's EMAIL_OWNED loop used to: five columns reach the table and nothing
+   else can, whatever arrives.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const fill = (o = {}) => ({
+  id: 'PID562780708', direction: 'SELL', fill_time: '2026-07-30T14:29:00Z',
+  net_pnl: 57.10, balance: 10057.10, ...o,
+});
+const rowOf = (o) => { const r = emailRow(o, USER); assert.ok('row' in r, JSON.stringify(r)); return r.row; };
+const why = (o) => { const r = emailRow(o, USER); assert.ok('error' in r, 'accepted a fill it should refuse'); return r.error; };
+
+test('a well-formed fill becomes the five email-owned columns plus the owner', () => {
+  assert.deepEqual(rowOf(fill()), {
+    id: 'PID562780708', user_id: USER, direction: 'SELL',
+    fill_time: '2026-07-30T14:29:00Z', net_pnl: 57.10, balance: 10057.10,
+  });
+});
+
+test('no broker or journal column is reachable through the body', () => {
+  // THE WHOLE GUARANTEE. merge-duplicates writes exactly the keys present, so a
+  // key that survives this projection overwrites whatever the poller folded.
+  const row = rowOf(fill({
+    entry_time: '2020-01-01T00:00:00Z', entry_price: 1, exit_price: 2,
+    commission: 99, open_day: '2020-01-01', computed_pnl: 1234, pnl: 1234,
+    setup: 'Break & Retest', followed_rules: false, followed_sl: false,
+    followed_tp: false, deleted: true, created_at: 'x', updated_at: 'x',
+  }));
+  assert.deepEqual(Object.keys(row).sort(),
+    ['balance', 'direction', 'fill_time', 'id', 'net_pnl', 'user_id']);
+});
+
+test('the owner comes from secrets, never from the body', () => {
+  assert.equal(rowOf(fill({ user_id: 'somebody-else' })).user_id, USER);
+});
+
+test('an id that is not a position id is refused', () => {
+  // Unprefixed, the same position mints a second row; anything else is not a
+  // trade at all.
+  for (const id of ['562780708', 'PID', 'pid562780708', 'PID562780708; drop', '', null]) {
+    assert.match(why(fill({ id })), /id/);
+  }
+});
+
+test('direction is BUY or SELL and nothing else', () => {
+  for (const direction of ['Buy', 'sell', 'LONG', '', null, undefined]) {
+    assert.match(why(fill({ direction })), /direction/);
+  }
+});
+
+test('a fill time that does not parse is refused rather than filed under today', () => {
+  for (const fill_time of ['just now', '30/07/2026', '', null, 20260730]) {
+    assert.match(why(fill({ fill_time })), /fill_time/);
+  }
+});
+
+test('a missing figure is dropped, because null would erase a good one', () => {
+  // An absent key and a null key mean opposite things under merge-duplicates:
+  // absent leaves the column alone, null overwrites it.
+  assert.deepEqual(Object.keys(rowOf(fill({ net_pnl: null, balance: undefined }))).sort(),
+    ['direction', 'fill_time', 'id', 'user_id']);
+});
+
+test('a figure that is not a finite number is refused, never coerced', () => {
+  for (const net_pnl of ['57.10', NaN, Infinity, {}, []]) {
+    assert.match(why(fill({ net_pnl })), /net_pnl/);
+  }
+});
+
+test('a body that is not an object at all is refused without throwing', () => {
+  for (const body of [null, undefined, 'PID1', 42, []]) {
+    assert.ok('error' in emailRow(body, USER));
+  }
+});
+
+test('zero is a real P&L and must survive', () => {
+  // The one falsy value that is a figure. Dropped, the trade would keep a
+  // computed P&L that includes no swap.
+  assert.equal(rowOf(fill({ net_pnl: 0 })).net_pnl, 0);
 });

@@ -2,7 +2,7 @@
 // EUGENIA — market briefing and conversation  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
 // The second bot. Gladys collects the journal; Eugenia does macro. Same two-
-// caller shape as doji-telegram, told apart by which secret arrives:
+// caller shape as doji-gladys, told apart by which secret arrives:
 //
 //   x-doji-key                        the hourly pg_cron job in
 //                                     supabase/003_eugenia.sql — post the
@@ -20,27 +20,31 @@
 // whether this is the hour, exactly as marketOpen() does for the poller. Asking
 // America/New_York for its own clock is correct all year and is one function.
 //
+// HOLDING HER CRON SECRET IS NOT NOTHING. Against the poller it starts a poll
+// that was going to run anyway; here `?force=1` spends money, a briefing at a
+// time, with no bound in the code. The bound is a spend cap on the Anthropic
+// key, which is the only place one can actually be enforced.
+//
 // Deploy:   supabase functions deploy doji-eugenia --no-verify-jwt
-// Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET
+// Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET and
+//           allowed_updates = ["message"] — she answers text and nothing else.
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
-//           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SUPABASE_SECRET_KEY
+//           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM } from "./prompt.ts";
-// env, secretMatches and json live in _shared/edge.ts — one definition each,
-// for the reason that file gives.
-import { env, secretMatches, json } from "../_shared/edge.ts";
+// Everything shared lives in _shared/edge.ts — one definition each, for the
+// reason that file gives.
+import {
+  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
+} from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
 const WEBHOOK_SECRET = env("EUGENIA_WEBHOOK_SECRET");
 // The same chat as Gladys — one trader, one thread each. Numeric, for the same
-// reason as doji-telegram: it is both a send target and an identity.
+// reason as doji-gladys: it is both a send target and an identity.
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
 const ANTHROPIC_KEY  = env("ANTHROPIC_API_KEY");
-
-const SB_URL = env("SUPABASE_URL");
-const SB_KEY = env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
-const IS_JWT = SB_KEY.startsWith("eyJ");
 
 /* ─── When the briefing is due ─────────────────────────────────────────────
    Monday to Friday at 08:00, Sunday at 17:00 — New York, which is the clock
@@ -52,20 +56,9 @@ const IS_JWT = SB_KEY.startsWith("eyJ");
    ───────────────────────────────────────────────────────────────────────── */
 export type Brief = 'weekday' | 'sunday';
 
-// Weekday and hour in New York. Two schedules ask the same question now, so it
-// is read once here rather than once each — and a disagreement between them
-// about what hour it is would be the sort of bug nobody finds until March.
-function nyClock(now: Date): { wd: number; hour: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", weekday: "short", hour: "2-digit", hour12: false,
-  }).formatToParts(now);
-  const wd = ({ Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 } as Record<string, number>)[
-    parts.find(p => p.type === "weekday")?.value ?? ""] ?? -1;
-  let hour = +(parts.find(p => p.type === "hour")?.value ?? -1);
-  if (hour === 24) hour = 0;                  // some engines emit '24' at midnight
-  return { wd, hour };
-}
-
+// nyClock is shared with the poller's market hours, so the two cannot disagree
+// about what hour it is in New York — the sort of difference nobody finds until
+// March. Both schedules below read it, which is why it is read once here.
 export function briefDue(now: Date): Brief | null {
   const { wd, hour } = nyClock(now);
   if (wd >= 1 && wd <= 5 && hour === 8) return 'weekday';
@@ -206,7 +199,7 @@ async function readNotes(): Promise<string[]> {
    character over its budget is still worth keeping, and a throw here would
    propagate out of the tool loop and cost the whole reply — so a failed write
    comes back as a sentence she can read and carry on from. It is also what
-   makes her survive being deployed before 004_eugenia_notes.sql has been run:
+   makes her survive being deployed before 003_eugenia.sql has been run:
    no table, no memory, but every answer still lands. */
 async function writeNote(note: unknown): Promise<string> {
   const text = String(note ?? "").trim().slice(0, 200);
@@ -315,6 +308,15 @@ async function call(messages: any[], effort: Effort, container?: string) {
       ],
       thinking: { type: "adaptive" },
       output_config: { effort },
+      // A DECLINE COSTS THE WHOLE BRIEFING OTHERWISE. The cron half now retries
+      // at 09:00, 10:00 and 11:00, so a refusal is no longer silent — but a
+      // retry is another dozen searches paid for again, and the next hour may
+      // decline for the same reason. `fallbacks: "default"` re-runs the request
+      // on another model inside this same call and routes by refusal category,
+      // so there is no model list here to go stale, and a decline before any
+      // output is not billed.
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
     }),
@@ -339,8 +341,10 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const body = await call(convo, effort, container);
     container = body.container?.id ?? container;
-    // A refusal stops the turn with no usable content, so it is checked before
-    // the blocks are read rather than surfacing as an empty message.
+    // Still checked, and it still happens: `fallbacks` rescues a model that
+    // declines, and this is the case where the whole chain did. No usable
+    // content, so it is caught before the blocks are read rather than surfacing
+    // as an empty message.
     if (body.stop_reason === "refusal") {
       throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
     }
@@ -375,10 +379,8 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
 
 /* ─── Telegram and history ─────────────────────────────────────────────── */
 
-const tg = (method: string, body: unknown) =>
-  fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  }).then(r => r.json());
+// Her token, bound once. Every call below is unchanged by the binding.
+const tg = (method: string, body: unknown) => telegram(BOT_TOKEN, method, body);
 
 // One message per chunk, in order. Sequential rather than parallel: Telegram
 // does not promise ordering, and a briefing whose section 5 arrives before
@@ -390,13 +392,6 @@ async function say(text: string) {
   }
 }
 
-const sbHeaders = (prefer?: string) => {
-  const headers: Record<string, string> = { apikey: SB_KEY, "Content-Type": "application/json" };
-  if (IS_JWT) headers.Authorization = `Bearer ${SB_KEY}`;
-  if (prefer) headers.Prefer = prefer;
-  return headers;
-};
-
 /* Twelve turns, oldest first.
 
    A briefing is long, so a wider window would resend several of them on every
@@ -405,18 +400,37 @@ const sbHeaders = (prefer?: string) => {
    conversation and keeps the cost of a one-line question near the cost of a
    one-line question.
 
-   IT HAS TO BE EVEN. remember() writes a question and its answer together, so
-   the table is always a whole number of pairs; an odd window would start on an
-   assistant turn, and the Messages API requires the first message to be a user
-   one. Nothing enforces that but this sentence. */
+   IT MUST START ON A USER TURN, which is the Messages API's one hard rule about
+   the shape of a conversation. Consecutive same-role turns it merges; a leading
+   assistant turn it refuses, and the refusal is total — every reply 400s until
+   the offending row rolls out of the window.
+
+   Pairs are written in a single INSERT, so the obvious argument is that an even
+   window can only ever open on a user turn. That argument is wrong, and it held
+   this together for one release. Two rows in one statement draw two sequence
+   values, and a concurrent INSERT can take one in between: two messages sent
+   seconds apart — ordinary, since the webhook answers 200 immediately and both
+   handlers then run at once — can interleave as u₁ u₂ a₁ a₂. The window then
+   opens mid-pair.
+
+   So the shape is repaired rather than assumed, which also means HISTORY no
+   longer has to be even and nothing depends on a sentence being remembered.
+   Exported because it is the decision, and a decision asserted in a comment is
+   what this replaced.
+   ───────────────────────────────────────────────────────────────────────── */
 const HISTORY = 12;
+
+export function openOnUser(turns: Turn[]): Turn[] {
+  const first = turns.findIndex(t => t.role === 'user');
+  return first === -1 ? [] : turns.slice(first);
+}
 
 async function recent(): Promise<Turn[]> {
   const res = await fetch(
     `${SB_URL}/rest/v1/eugenia_turns?select=role,content&order=id.desc&limit=${HISTORY}`,
     { headers: sbHeaders() });
   if (!res.ok) throw new Error(`History read failed (HTTP ${res.status})`);
-  return (await res.json()).reverse();
+  return openOnUser((await res.json()).reverse());
 }
 
 async function remember(turns: Turn[]) {
@@ -534,9 +548,6 @@ export function retryDue(now: Date): boolean {
    A read failure counts as "yes, already briefed": if the database is unwell
    the retry cannot check, and sending a second briefing on a guess is worse
    than skipping one. */
-const nyDate = (d: Date) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
-
 async function briefedToday(): Promise<boolean> {
   try {
     const res = await fetch(
@@ -634,6 +645,14 @@ async function handleMessage(update: any): Promise<void> {
     if (!msg?.text) return;
     if (String(msg.chat?.id) !== CHAT_ID) {
       console.error("doji-eugenia: message from unexpected chat");
+      return;
+    }
+    // A slash command is addressed to Telegram, not to her, and /start arrives
+    // once per install. Answering one costs a full model call with the notes
+    // attached, so it is answered from here instead — Gladys ignores everything
+    // that is not a tap for the same reason.
+    if (msg.text.startsWith('/')) {
+      await tg("sendMessage", { chat_id: CHAT_ID, text: "Aqui estoy, jefe. Just talk to me." });
       return;
     }
 

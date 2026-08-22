@@ -45,12 +45,14 @@ icon-512.png                            home-screen icon
 vercel.json                             no-cache header for index.html
 supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
-supabase/002_telegram.sql               Gladys's trade-open trigger
-supabase/003_eugenia.sql                Eugenia's conversation and her clock
-supabase/004_eugenia_notes.sql          Eugenia's long-term memory
-supabase/functions/_shared/edge.ts      env, secretMatches, json — one each
+supabase/002_gladys.sql                 Gladys's trade-open trigger
+supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
+supabase/005_cron.sql                   both scheduled jobs
+supabase/verify.sql                     read-only: does the database match these?
+supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
-supabase/functions/doji-telegram/       Edge Function: Gladys, the journal bot
+supabase/functions/doji-email-sync/     Edge Function: the email fill's write
+supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
@@ -92,15 +94,33 @@ test/                                   node:test suites — see Tests
 
 Four writers, one table. Journal columns and broker columns never meet, so
 between the journal half and the broker half there is nothing to arbitrate at
-all — that is the single idea the whole design rests on. The Telegram bot is a
-writer on the journal side, the app's side, and reaches the same four columns
-through the same list.
+all — that is the single idea the whole design rests on. Gladys is a writer on
+the journal side, the app's side, and reaches the same four columns through the
+same list.
 
-`balance` is the one column two writers share, and the arbitration for it is a
-filter rather than a rule anybody has to remember: the poller writes it only
-`where balance is null`. The email's figure is the balance the broker itself
-printed on the fill, so it is the better number and it always wins; the poller
-fills only the gap the email leaves, which is every manually closed trade.
+Every writer but the app is an Edge Function deployed from `main`. The email
+parser used to be the exception — it signed in as the trader from Apps Script,
+with the account password in Script Properties — and now posts its fill to
+`doji-email-sync` instead. See **The email parser**.
+
+**Two columns have two claimants, and they are arbitrated differently.**
+
+`balance` is settled by a filter rather than by a rule anybody has to remember:
+the poller writes it only `where balance is null`, and Postgres evaluates that
+inside the UPDATE, so an email landing mid-run cannot lose a race — there is no
+read to race with. The email's figure is the balance the broker itself printed
+on the fill, so it is the better number and it always wins; the poller fills
+only the gap the email leaves, which is every manually closed trade.
+
+`direction` has no filter at all: last write wins. The poller re-upserts every
+position inside its six-hour write window, so the poller's reading wins for
+anything it can see, and the email's survives only on a position the poller
+never reached. That is safe for one reason and it is worth stating rather than
+trusting — **both sources read the side off the OPENING deal**, so they agree by
+construction. If either ever started reading it off a close, this column would
+disagree with itself depending on how old the trade was.
+
+Nothing else is shared. `id` is the join, not a value.
 
 ---
 
@@ -211,6 +231,28 @@ fill the poller backfills later corrects itself. There is no override.
 
 **Completeness** — setup and all three discipline answers. P&L is deliberately
 not required.
+
+---
+
+## Facts that live in more than one file
+
+Four runtimes and no build step, so two things genuinely cannot be single-sourced
+at run time: the **setups vocabulary** (`CONFIG.SETUPS`, Gladys's `SETUPS`,
+`trades_setup_check`) and the **four journal column names** (`Data.OWNED`,
+Gladys's `COLUMNS`, and the columns themselves).
+
+Copies are the cost. Copies that can *disagree* were the risk, and that is what
+`test/agree.test.mjs` closes: it reads all three of each — the app out of
+`index.html` through the same jsdom harness the render tests use, the function
+exports directly, and the constraint out of the SQL as text — and fails when
+they stop saying the same thing. Every one of those values was already tested
+before, and every one of those tests asserted against a literal typed into the
+file beside it, so changing a list and its own test in one pass left the other
+copies untouched and the suite green.
+
+It also asserts the guarantee rather than only the lists: no broker column may
+appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
+rests on, tested rather than repeated.
 
 ---
 
@@ -362,11 +404,27 @@ defaults to `auth.uid()`, which is null under the service role.
 
 ### The email parser
 
-An Apps Script reads cTrader's TP/SL alerts and merges four values: `net_pnl`
-(which includes swap), `balance`, `fill_time`, and `direction` for a position
-the poller never reached.
+An Apps Script reads cTrader's TP/SL alerts, parses the fill, and posts it to
+`doji-email-sync`, which merges four values: `net_pnl` (which includes swap),
+`balance`, `fill_time`, and `direction` for a position the poller never reached.
 
-It writes only those columns, so it cannot disturb anything else.
+**The write is in an Edge Function because of where the alternative put a
+password.** Supabase's `sb_secret_` keys refuse any client whose user agent
+looks like a browser and Apps Script's does, so the obvious alternative is for
+the script to sign in *as the trader*, with the account password sitting in
+Script Properties. That constraint is about who may write, not about
+where the write happens. Moving it leaves the script holding one secret whose
+entire authority is five columns of one table, instead of holding the account,
+and takes about fifty lines of session machinery out of the file with it.
+
+It also puts the column whitelist somewhere it can be tested. `emailRow` is the
+boundary: it builds the payload from five names rather than filtering one, so a
+key that is not one of them cannot survive, and it type-checks each — an id that
+is not `PID\d+`, a direction that is not `BUY`/`SELL`, a `fill_time` that does
+not parse, or a figure that is not a finite number is refused rather than
+coerced. A **missing** figure is dropped rather than sent as null, because
+`merge-duplicates` writes exactly the keys present and `direction: null` would
+erase a correct direction rather than leave it alone.
 
 **`net_pnl` is the one nothing else can supply, and it is why this script
 stays.** `computed_pnl` is arithmetic over the deals — entry, exit, volume,
@@ -380,14 +438,18 @@ system.
 
 The other three the poller could now reach — `balance` from `get_balance`,
 `fill_time` and `direction` from the deals themselves. They stay here because a
-second independent path into the table costs nothing and the Edge Function is
-otherwise a single point of failure for everything.
+second independent path into the table costs nothing and the poller is otherwise
+a single point of failure for everything.
 
-**Parse failures and write failures are different.** A parse failure is
-permanent and labels the thread so it leaves the queue. A write failure is
-transient — a Supabase blip, an expired session — and leaves the thread
-*unlabelled* so the next run retries it. Treating them the same is how a
-momentary outage used to discard a fill's P&L forever.
+**Permanent failures and transient failures are different, and there are now
+three answers rather than two.** A body that does not parse is permanent and
+labels the thread so it leaves the queue. A `400` from the function is also
+permanent — it means this fill will never be accepted, and retrying it every
+minute for ninety days is the only alternative. Anything else, including no
+response at all, is transient and leaves the thread *unlabelled* so the next run
+retries it. Treating a transient failure as permanent is how a momentary outage
+used to discard a fill's P&L forever, and it is the case
+`test/parse.test.mjs` was broken against on purpose to confirm the check fires.
 
 The alerts are also the early warning if the MCP token is ever misused, so leave
 the notifications on regardless of whether you read them.
@@ -406,14 +468,27 @@ must never change; Eugenia calls a model, takes seconds, costs money per message
 and will be tuned constantly. Putting them in one function would mean
 redeploying the thing that writes to `trades` every time a prompt is reworded.
 
+What they do share is a definition rather than a copy. `_shared/edge.ts` holds
+`env`, `secretMatches`, `json`, `sbHeaders`, `telegram` and `nyClock`, and each
+bot binds its own token in one line: `const tg = (m, b) => telegram(BOT_TOKEN, m, b)`.
+The test is not "could this be shared" but "are there two copies nothing can
+compare" — `sbHeaders` and the Telegram call were byte-identical in both bots,
+and the two New York clocks differed only in fallbacks neither could reach.
+
 ---
 
 ## Gladys — the Telegram journal
 
 When a position opens, the trader gets one Telegram message and answers the
 whole journal from it — setup and all three discipline booleans — without
-opening the app. `supabase/002_telegram.sql` holds the trigger and
-`doji-telegram` is the Edge Function behind it.
+opening the app. `supabase/002_gladys.sql` holds the trigger and `doji-gladys`
+is the Edge Function behind it.
+
+**A function is named after who it is, and so are its secrets** — `doji-gladys`,
+`GLADYS_BOT_TOKEN`, `GLADYS_WEBHOOK_SECRET`. Naming a bot after the wire it
+speaks over leaves no rule anybody could apply to the next one. `TELEGRAM_CHAT_ID`
+is the exception and earns it: it is the one value the two bots genuinely share,
+because there is one trader and one chat, with a thread each.
 
 **One function, two callers**, told apart by which secret they present:
 `x-doji-key` is the trigger saying a position opened, `x-telegram-bot-api-secret-token`
@@ -504,9 +579,18 @@ second is the gold open, so the week's first briefing lands exactly as the
 market does. She greets with `Buenos dias jefesito` in the morning and `Buenas
 tardes jefesito` on Sunday evening.
 
-Reply to her and she answers. `supabase/003_eugenia.sql` holds her conversation
-and her clock, `004_eugenia_notes.sql` what she remembers; `prompt.ts` holds who
-she is; `index.ts` is the wiring.
+Reply to her and she answers. `supabase/003_eugenia.sql` holds both her tables
+and her read of the journal, `005_cron.sql` her clock; `prompt.ts` holds who she
+is; `index.ts` is the wiring.
+
+**Three objects in the database, and only two of them store anything.**
+`eugenia_turns` is the conversation window, `eugenia_notes` is what she
+remembers, and `eugenia_trades` is a view — a saved `select`, no rows of its
+own. The two tables stay two because nothing ever reads them together: notes go
+in at the top of a turn, turns at the end, with different windows, different
+shapes and different constraints. Merged, they would need a `kind` column, a
+nullable `role`, two constraints that each say "unless this is the other kind"
+and two partial indexes — more parts to hold one idea, not fewer.
 
 **The schedule is decided in the function, not in cron.** pg_cron schedules in
 UTC, so any fixed expression is an hour wrong for half the year and needs
@@ -665,15 +749,38 @@ Her cron half has no such limit, because pg_net never retries.
 
 **Twelve turns of memory.** Enough that a follow-up has the briefing it follows
 and the exchange since; not so much that every question resends last Tuesday's
-calendar. It must stay **even** — turns are written in pairs, and an odd window
-would start on an assistant turn, which the Messages API refuses. Both tables
-have RLS enabled and no policy at all, which denies the publishable key
-outright.
+calendar. Both tables have RLS enabled and no policy at all, which denies the
+publishable key outright.
+
+**The window is repaired on the way out, not assumed on the way in.** The
+Messages API merges consecutive same-role turns and refuses a leading assistant
+one, and that refusal is total: every reply 400s until the offending row rolls
+out of the window. The old argument was that turns are written in pairs, so an
+even window can only open on a user turn — and it is wrong. Two rows in one
+`INSERT` draw two sequence values and a concurrent `INSERT` can take one in
+between, so two messages sent seconds apart — ordinary, since the webhook answers
+200 immediately and both handlers then run at once — can interleave as
+`u₁ u₂ a₁ a₂` and the window opens mid-pair. `openOnUser` drops leading assistant
+turns, which retires the even-window rule entirely: nothing now depends on a
+sentence being remembered, and `HISTORY` is free to be any number.
 
 **A long briefing still does not fit in one Telegram message.** The cap is 4,096
 characters, so `chunk()` splits on a blank line, then any newline, and only
 hard-cuts a single paragraph that is itself over the limit. Parts go
 sequentially, because Telegram does not promise ordering.
+
+**A refusal no longer costs the whole briefing.** Nothing retries the cron half
+— `pg_net` is fire-and-forget — so a model declining the request was simply a
+morning with no briefing and a line in a log nobody reads. The request now
+carries `fallbacks: "default"`, which re-runs it on another model inside the same
+call and routes by refusal category, so there is no model list here to go stale.
+A decline before any output is not billed. The `stop_reason === "refusal"` check
+stays and still fires: it is now the case where the whole chain declined.
+
+**A slash command is answered without a model call.** `/start` arrives once per
+install and is addressed to Telegram rather than to her; answering it the normal
+way costs a full turn with the notes attached. Gladys ignores everything that is
+not a tap for the same reason.
 
 **A question is not a briefing, and used to cost the same.** `effort` sets how
 deeply the model thinks before it writes. The briefing earns the depth and runs
@@ -852,24 +959,47 @@ the same rule.** `.github/workflows/deploy-functions.yml` runs
 `supabase/functions/**` or `supabase/config.toml`. It needs one repository
 secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
 
-All three functions go on each run rather than only the changed one, so none of
+All four functions go on each run rather than only the changed one, so none of
 them can drift apart from the others. `verify_jwt` lives in
 `supabase/config.toml` rather than in a dashboard toggle, which is what makes
 the committed file the whole description of how a function is deployed.
 
-**`supabase/functions/_shared/edge.ts` holds `env`, `secretMatches` and
-`json`** — one definition each, bundled into every function that imports it.
-They were three byte-identical copies, and a copy of `secretMatches` is the one
-that could not be checked: the function exists to be *constant-time*, so a copy
-quietly rewritten to `presented === expected` returns the same answer to every
-assertion anyone would write while leaking the secret through timing. A
-behavioural test cannot see that; one definition has nothing to drift.
+**`supabase/functions/_shared/edge.ts` holds one definition of each primitive**
+— `env`, `secretMatches`, `json`, `sbHeaders`, `telegram`, `nyDate` and `nyClock` —
+bundled into every function that imports it. The test is not "could this be
+shared" but **"are there two copies nothing can compare"**, and `secretMatches`
+is why: the function exists to be *constant-time*, so a copy quietly rewritten
+to `presented === expected` returns the same answer to every assertion anyone
+would write while leaking the secret through timing. A behavioural test cannot
+see that; one definition has nothing to drift.
 
-`sbHeaders` and `tg` deliberately stay in the functions that own them. `tg`
-binds a different bot token per bot, and the poller's `sbHeaders` is genuinely a
-different function from the bots' — no argument, a hardcoded `Prefer`. Sharing
-either would mean threading config through every call site or a flag to switch
-behaviours, both of which cost more than the copy saves.
+The rest met the same test and were extracted late. `sbHeaders` and the Telegram
+call were **byte-identical** in both bots. The two New York clocks differed only
+in what they returned when `Intl` failed to emit a part — Monday noon in the
+poller, `-1` in Eugenia — and neither branch can fire, because `formatToParts`
+with `weekday` and `hour` requested always emits both. That is defensive padding
+at a boundary where nothing untrusted enters, so it is gone and an impossible
+response now throws rather than quietly deciding the market is open.
+
+`nyDate` and `nyClock` are separate because they answer separate questions —
+which civil day an instant falls on, and what weekday and hour it is. The poller
+asks the first to file a trade and Eugenia asks it to decide whether today's
+briefing already went; the poller asks the second for market hours and Eugenia
+for both her schedules. Gladys's `nyTime` stays hers: it is a display format with
+one caller, not a third reading of the clock.
+
+Configuration is an argument rather than a capture, which is what makes sharing
+free: each bot binds its own token in one line, and every call site below it is
+unchanged. `sbHeaders(prefer?)` names the `Prefer` at the call site, which also
+keeps an upsert directive off a `PATCH` — the poller's private copy had
+`resolution=merge-duplicates` baked in and sent it on the balance write, where
+it means nothing.
+
+What is deliberately **not** shared is the entry point. All four authorise their
+own callers with the same shape — refuse if a secret is unset, match one, match
+the other, 401 — and extracting that into a router would put the one check
+worth reading behind a helper. Authorisation stays visible in the file being
+read.
 
 **`npm test` runs first, in the same job, and a red suite stops the deploy.**
 `test.yml` also runs on every push, but it is a *separate* workflow — it would
@@ -878,7 +1008,7 @@ green ticks, one red, and the broken code already live. A failing step inside
 the deploy job is the only ordering that actually holds anything back. It is
 also what makes `_shared/` safe to depend on: the suite imports it by the same
 relative path the functions use, so an extraction that does not resolve fails
-the job instead of shipping three broken functions at once.
+the job instead of shipping four broken functions at once.
 
 **This is worth the machinery for one reason.** The poller and Gladys were
 pasted into the dashboard by hand, and nothing tied the running code to the
@@ -887,12 +1017,29 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `004_eugenia_notes.sql`
-are not under `supabase/migrations/`, so nothing applies them
-automatically, and a schema change that lands because a file was committed is
-exactly the accident the Operating section argues against for restores. The
-Apps Script is deployed from the Apps Script editor; it holds no secrets in the
-file and nothing reads it from here.
+SQL editor, never by a robot: `001_trades.sql` through `005_cron.sql` are not
+under `supabase/migrations/`, so nothing applies them automatically, and a
+schema change that lands because a file was committed is exactly the accident
+the Operating section argues against for restores. The Apps Script is deployed
+from the Apps Script editor; it holds no secrets in the file and nothing reads
+it from here.
+
+**Applying by hand means the files are a claim, so `supabase/verify.sql` is how
+the claim gets tested.** It writes nothing: it reads back the columns, the
+constraints, the indexes, the policies, the grants on Eugenia's view, the
+triggers, the realtime publication, both cron jobs and the last ten function
+responses, to be compared against 001–005 by eye. Run it after any manual change
+and before believing anything here about the database. A CI job cannot stand in
+for it — 002, 003 and 005 need `pg_net`, `vault` and `pg_cron`, none of which a
+plain Postgres container has, so a green pipeline would prove only that 001
+parses.
+
+**`005_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
+upserts on the job name, so applying the file makes the database match it rather
+than describing what the database might hold. The poller's job was not in this
+repository at all until then — its schedule, its timeout and the secret it
+presents were readable only by querying the live database, which is the same
+silent drift `deploy-functions.yml` exists to prevent for the functions.
 
 ---
 
@@ -902,28 +1049,42 @@ file and nothing reads it from here.
 2. Confirm `trades` is in the `supabase_realtime` publication and has RLS enabled.
 3. Put the project URL and publishable key in `SUPABASE` in `index.html`.
 4. Deploy the functions — they deploy from `main`, see **Deployment** — and set
-   `CTRADER_MCP_TOKEN` and `DOJI_USER_ID` in Edge Function secrets.
+   `CTRADER_MCP_TOKEN`, `DOJI_USER_ID` and **`SB_SECRET_KEY`** in Edge Function
+   secrets. `SB_SECRET_KEY` holds an `sb_secret_` key from the API settings page,
+   and the name is short for a reason: Supabase owns the `SUPABASE_` prefix, so a
+   secret cannot be created under it. A function reading `SUPABASE_SECRET_KEY`
+   therefore reads `""` however carefully the dashboard is filled in. Unset,
+   every function answers 503 at its first line rather than reaching for
+   something else.
 5. **Generate one cron secret and store it twice**, because two systems read it
    under two spellings: `DOJI_CRON_SECRET` in Edge Function secrets, which is
-   what all three functions check, and `doji_cron_secret` in Vault, which is
-   what the cron jobs and the Telegram trigger present. Same value, and the
+   what the poller and the two bots check, and `doji_cron_secret` in Vault,
+   which is what the cron jobs and Gladys's trigger present. Same value, and the
    lower-case one is the database's. Nothing works without both.
-6. Schedule the poller with pg_cron every 2 minutes.
-7. Deploy the Apps Script; put `DOJI_EMAIL` and `DOJI_PASSWORD` in Script
-   Properties, never in the file. Trigger `syncPepperstone` every minute.
+   `doji-email-sync` is the exception and checks its own — see step 7.
+6. Run `supabase/005_cron.sql` to schedule the poller and Eugenia. It is safe to
+   re-run: `cron.schedule` upserts on the job name, so the file is what the
+   database holds rather than a description of what it might.
+7. Deploy the Apps Script. Generate a second secret, and store it twice:
+   `DOJI_EMAIL_SECRET` in Edge Function secrets, and the same value in the
+   script's own Script Properties, never in the file. It is separate from the
+   cron secret on purpose — this is the only secret that lives outside your own
+   infrastructure, so it opens the narrowest door there is. Run `testParse`, then
+   `testSecret`, then trigger `syncPepperstone` every minute.
 8. For Gladys: create the bot with BotFather and send it `/start` once, so it
-   may message you unprompted. Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
-   `TELEGRAM_WEBHOOK_SECRET` in Edge Function secrets — values never in the
+   may message you unprompted. Set `GLADYS_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+   `GLADYS_WEBHOOK_SECRET` in Edge Function secrets — values never in the
    repo, the same discipline as the Apps Script's.
 9. Point Telegram at her function, passing the secret it will check:
 
    ```
    POST https://api.telegram.org/bot<token>/setWebhook
-        url=https://<project>.supabase.co/functions/v1/doji-telegram
-        secret_token=<TELEGRAM_WEBHOOK_SECRET>
+        url=https://<project>.supabase.co/functions/v1/doji-gladys
+        secret_token=<GLADYS_WEBHOOK_SECRET>
+        allowed_updates=["callback_query"]
    ```
 
-10. Run `supabase/002_telegram.sql`. It reads `doji_cron_secret` from Vault —
+10. Run `supabase/002_gladys.sql`. It reads `doji_cron_secret` from Vault —
     the same secret and the same read the poller's cron job uses, so the trigger
     holds no database power either. **Check the name against
     `select command from cron.job` rather than trusting this line:** Postgres
@@ -932,11 +1093,15 @@ file and nothing reads it from here.
 11. For Eugenia: a second BotFather bot, `/start` it, and set
     `EUGENIA_BOT_TOKEN`, `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in
     Edge Function secrets. Point Telegram at `/functions/v1/doji-eugenia` with
-    that secret token. The API key comes from platform.claude.com — the same
-    Anthropic account, billed as prepaid credits rather than a subscription.
-12. Run `supabase/003_eugenia.sql`, then `supabase/004_eugenia_notes.sql`.
-    The hourly cron job in 003 drives both the briefing and the pulse; 004 adds
-    no schedule of its own.
+    that secret token and `allowed_updates=["message"]`. The API key comes from
+    platform.claude.com — the same Anthropic account, billed as prepaid credits
+    rather than a subscription. **Set a spend cap on that key**: it is the only
+    place a bound on what she can cost is actually enforceable.
+12. Run `supabase/003_eugenia.sql`, then `supabase/005_cron.sql`. The hourly
+    job drives both the briefing and the pulse; the function decides which, or
+    neither.
+13. Run `supabase/verify.sql` and read it against 001–005. Nothing is set up
+    until that agrees.
 
 ---
 
@@ -962,19 +1127,37 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk` and `tradesQuery` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery` and `openOnUser` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`, and the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema |
+| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
+| `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
 
 **What is not covered, plainly.** The suite asserts on values and on emitted
 markup, so it cannot see pixels — a renderer that emits correct HTML with broken
 CSS passes. The Supabase client is a recording stand-in, so `load` and `save`
 are exercised but realtime and the auth paths are not. `mcpInit`, `mcpCall` and
 `upsert` reach the network on their first line and are not exported. The xlsx
-export needs SheetJS from a CDN and is not exercised. And the Apps Script has no
-coverage at all.
+export needs SheetJS from a CDN and is not exercised.
 
-The Telegram function is covered only where it decides something.
+**The Apps Script is now half covered, and the half that is not is named.**
+`parseAlert_` is a pure function of a subject and a body and `syncPepperstone`
+is a loop over threads, so both are reachable once `GmailApp`,
+`PropertiesService`, `Logger` and `UrlFetchApp` exist — `test/gs.mjs` evaluates
+the file in a `vm` context with those four stubbed to record, which runs nothing,
+because the file has no top-level calls. What that cannot prove is that the
+parser matches what cTrader actually sends: the bodies in `parse.test.mjs` are
+built to the alert's shape, not saved from a real message, so they hold the
+parser to its *rules* and not to its input. `ALERT` is one string, and replacing
+it with a saved body is the whole of that upgrade.
+
+**`agree.test.mjs` cannot see the live database either.** `trades_setup_check`
+is asserted as `001_trades.sql` declares it, not as Postgres holds it, so a
+constraint edited by hand in the SQL editor passes there. `supabase/verify.sql`
+is where that is caught, and it is a query a person runs.
+
+Gladys is covered only where she decides something.
 `parseCallback` and `renderMessage` are pure and are tested hard; `sendMessage`,
 `editMessageText` and the PATCH reach the network on their first line, so the
 double tap, the fresh-message fallback, the chat check and the secret that
@@ -1007,18 +1190,36 @@ piece; the client tests
 against a widened break-even band, break-evens dropped from the win-rate
 denominator, a stray column in `Data.OWNED`, a session derived from the close,
 an inverted filing anchor and a throwing renderer. Every one of those was
-caught. Do the same to any check added later — a green run from a scanner that
-cannot fail has more than once been mistaken here for clean code.
+caught.
+
+The checks added since were broken the same way before being trusted. The
+**agreement** tests against a setup added to `index.html` alone, a setup added
+to Gladys alone, a setup changed in the constraint alone, a journal column
+renamed in `Data.OWNED` alone, and `direction` added to Gladys's `COLUMNS` — five
+edits, each on one side of a pair, each caught. The **email parser** against a
+fill time with its `Z` dropped, an inverted position side, thousands separators
+left unstripped, and — the one that matters most — a transient send failure
+recorded as permanent, which is the shape that discards a fill's P&L forever.
+The **shared clock** against a timezone reverted to UTC, which took nine tests
+with it. **`openOnUser`** against a repair turned back into a no-op, which is
+precisely the state that shipped. And the **email boundary** against a whitelist
+widened to let `entry_price` and `setup` through.
+
+Do the same to any check added later — a green run from a scanner that cannot
+fail has more than once been mistaken here for clean code.
 
 ---
 
 ## Known rough edges
 
-**The Apps Script has no coverage and is the hardest of the three to ever get
-any.** It needs Gmail and a live session, so it stays read-the-code-carefully
-whatever else changes. It is also one of the two pieces that can lose data
-quietly — the poller is the other — and the weekly backup is the floor
-underneath both.
+**The email parser's fixtures are written to the alert's shape, not saved from
+a real one.** Its rules are covered — the explicit `Z`, the position side,
+thousands separators, a margin notice declined, and which label a thread ends up
+with in each of the three outcomes. What is not covered is whether those rules
+match what cTrader actually sends, because that needs a real message. Save one
+into `ALERT` the next time a fill lands. Until then this is still one of the two
+pieces that can lose data quietly — the poller is the other — and the weekly
+backup is the floor underneath both.
 
 **The Supabase client carries no SRI hash**, unlike Chart.js and SheetJS. The
 floating `@2` tag is gone — it is pinned to `@2.111.0`, which closes the drift
@@ -1048,20 +1249,43 @@ account. The planned floor is **not recoverable from the data** — the broker
 reports only the *final* stop, so a stop moved to break-even has overwritten the
 original risk. Never infer what the planned R:R was; ask.
 
-**The pg_cron job holds no database power.** It presents the cron secret, read
-from Vault at call time, and that secret's entire authority is to start a poll
-that was going to run anyway.
+**The pg_cron jobs hold no database power**, and that is a claim about the
+database rather than about the secret. Neither job can read or write a table:
+each presents the cron secret, read from Vault at call time, and the
+service-role key lives in the functions' own secrets and never appears in a job.
+This replaced an arrangement where the job text carried a legacy service_role
+JWT — full RLS-bypassing access, in a job definition, and unrotatable, because
+legacy keys are tied to the project's JWT secret.
+
+**What `DOJI_CRON_SECRET` can actually cause is not the same at all three doors,
+and it used to be described as though it were.** Say it per endpoint:
+
+| Function | What a holder of the secret can do |
+|---|---|
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway |
+| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code |
+| `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
+
+Neither of the last two can reach a column: Gladys's trigger half never names
+one, and Eugenia has no write path to `trades` at all. But "the worst case is
+nothing" was the sentence that stopped anyone checking the worst case, and it
+was wrong for two of the three. There is no exposure path today — the value sits
+in Vault and in function secrets and crosses no untrusted channel — so the fix
+is the description, plus the one bound that is actually enforceable: a spend cap
+on the Anthropic key.
+
+`DOJI_EMAIL_SECRET` is deliberately not this secret. It is the only one that
+lives outside the trader's own infrastructure, in Google's, so it opens the
+narrowest door there is — five columns of one table — and it is stored in two
+places rather than three, with no Vault spelling to get wrong.
 
 One value, two stores, two spellings, and it is worth knowing before you touch
-either: the Edge Functions read it from their own secrets as
+either: the Edge Functions read the cron secret from their own secrets as
 **`DOJI_CRON_SECRET`**, while the database reads it from Vault as
-**`doji_cron_secret`**. Both the cron job and the Telegram trigger use the
-lower-case Vault name. The Telegram trigger shipped reading the upper-case one,
-found nothing, and went quiet without failing anything. The service-role key lives in the Edge
-Function's own secrets and never appears in the job. This replaced an earlier
-arrangement where the job text carried a legacy service_role JWT — full
-RLS-bypassing access, in a job definition, unrotatable.
+**`doji_cron_secret`**. Both cron jobs and Gladys's trigger use the lower-case
+Vault name. That trigger shipped reading the upper-case one, found nothing, and
+went quiet without failing anything.
 
 **Resolved — the old tables are gone.** `records`, `broker_fills` and
-`app_state` were dropped; introspection now returns `trades` alone. That was the
-last step of the migration.
+`app_state` were dropped; introspection now returns `trades`, Eugenia's two
+tables and her view. That was the last step of the migration.
