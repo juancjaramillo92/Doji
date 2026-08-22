@@ -501,16 +501,20 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        net.http_post discards — so the one signal that trades were being dropped
        was reported to nobody, forever.
 
-       TWO signals, because one of them is a vendor field name we do not
-       control. If cTrader renames hasMore, returns has_more, or omits it when
-       truncating, the row-count check still fires. The window named is the FOLD
-       window, because that is the one that was read. */
+       THE TEST IS OUR OWN CAP, NOT THE VENDOR'S FLAG. A response holding
+       maxRows deals is one this function asked to be cut, and a cut page is how
+       a position loses its entry deal. `hasMore` means something else — that
+       more deals exist beyond the window asked for — which is true of almost
+       every run and says nothing about whether this page was truncated. Reading
+       it as truncation would hand cTrader the ability to halt the journal by
+       changing what a field means, and the halt would be silent, because
+       net.http_post discards this response. It is reported instead. */
     const rawDeals = (data.deals ?? []).length;
-    if (data.hasMore === true || rawDeals >= MAX_ROWS) {
+    if (rawDeals >= MAX_ROWS) {
       throw new Error(
-        `get_deals truncated at maxRows over a ${foldHours(hours)}h fold window ` +
-        `(${rawDeals} deals, hasMore=${data.hasMore}) — some positions may be ` +
-        `folded without their entry deal. Narrow the window.`);
+        `get_deals returned ${rawDeals} deals, at the ${MAX_ROWS} cap, over a ` +
+        `${foldHours(hours)}h fold window — the page was cut and some positions ` +
+        `may be folded without their entry deal. Nothing was written.`);
     }
 
     const deals: Deal[] = (data.deals ?? [])
@@ -565,6 +569,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
       deals: deals.length, positions: n, balance_for: target,
+      // Reported rather than acted on: it says more deals exist beyond the
+      // window, which is true of almost every run.
+      has_more: data.hasMore ?? null,
     });
   } catch (err) {
     console.error("doji-mcp-sync:", err instanceof Error ? err.message : err);

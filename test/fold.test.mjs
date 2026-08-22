@@ -410,19 +410,25 @@ test('no setup name contains the delimiter its callback_data is split on', () =>
   }
 });
 
-test('a fill just after midnight ET stays on the New York hour', () => {
-  /* 04:05 UTC is 00:05 the same evening in New York — the boundary where a UTC
-     stamp is not merely offset but a different day and a different hour. Driven
-     through renderMessage rather than the private formatter, because the
-     message is what the trader reads.
+test('the message heads with the New York hour and the New York day', () => {
+  /* Two instants either side of the boundary, because they fail differently.
 
-     WHAT THIS DOES NOT PROVE: the `24:05` half. nyTime states hourCycle: h23
-     rather than hour12: false, which on some engines resolves to h24 — but V8
-     resolves en-GB to h23 either way, so reverting the option leaves this green.
-     Reverting the TIMEZONE does fail it, which is what it actually guards. */
-  const midnight = { ...open, entry_time: '2026-08-22T04:05:00Z' };
-  const { text } = renderMessage(midnight, false);
-  assert.match(text, /00:05 ET/);
+     04:05 UTC is 00:05 the same day in New York: only the HOUR moves, and it
+     moves to the one an h24 cycle would render as 24.
+
+     02:00 UTC is 22:00 the PREVIOUS day in New York: the DAY moves, which is
+     the failure that files a trade under tomorrow. The first fixture alone does
+     not cover this — its date reads 22 August in both zones, which an earlier
+     version of this comment claimed otherwise.
+
+     Driven through renderMessage rather than the private formatter, because the
+     message is what the trader reads. WHAT IT DOES NOT PROVE is the h24 half:
+     nyTime states hourCycle h23, and V8 resolves en-GB to h23 either way, so
+     reverting that option leaves this green. Reverting the timezone fails it. */
+  assert.match(renderMessage({ ...open, entry_time: '2026-08-22T04:05:00Z' }, false).text,
+    /22 Aug, 00:05 ET/);
+  assert.match(renderMessage({ ...open, entry_time: '2026-08-22T02:00:00Z' }, false).text,
+    /21 Aug, 22:00 ET/);
 });
 
 test('an unanswered trade opens on the full keyboard, one row per question', () => {
