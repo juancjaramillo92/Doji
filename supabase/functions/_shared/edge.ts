@@ -123,14 +123,15 @@ export const nyDate = (d: Date): string =>
 const WEEKDAY: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 export function nyClock(now: Date): { wd: number; hour: number } {
+  // hourCycle rather than hour12, which leaves the cycle to the locale and can
+  // resolve to h24 — midnight arriving as 24 and every `hour === 8` test in the
+  // schedules missing the first hour of the day. This carried a `=== 24 ? 0`
+  // correction for that; stating h23 removes the case rather than repairing it,
+  // which is what Eugenia's nyStamp does too.
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", weekday: "short", hour: "2-digit", hour12: false,
+    timeZone: "America/New_York", weekday: "short", hour: "2-digit", hourCycle: "h23",
   }).formatToParts(now);
   const at = (type: string) => parts.find(p => p.type === type)!.value;
 
-  const hour = +at("hour");
-  return {
-    wd: WEEKDAY[at("weekday")],
-    hour: hour === 24 ? 0 : hour,   // some engines emit '24' at midnight
-  };
+  return { wd: WEEKDAY[at("weekday")], hour: +at("hour") };
 }
