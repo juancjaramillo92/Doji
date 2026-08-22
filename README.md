@@ -777,6 +777,22 @@ call and routes by refusal category, so there is no model list here to go stale.
 A decline before any output is not billed. The `stop_reason === "refusal"` check
 stays and still fires: it is now the case where the whole chain declined.
 
+**She is told what time it is, and told when each past exchange happened.** Asked a
+question at 23:42 she opened with "morning" — not a model error, but the only
+inference available from what she was given: a system prompt about morning
+briefings, and a history whose most recent long turn was that morning's
+briefing. `ask()` attaches the New York date and time to the turn being asked —
+in one place, because three callers each remembering was three chances to
+forget, and removing it from the pulse alone left every test green. The prompt
+tells her to trust it over the conversation, because the conversation genuinely
+does argue for morning.
+
+History is dated too. "Yesterday you said the print was the thing to watch" is a
+guess across a weekend otherwise, and the prompt now forbids her inferring the
+date from the turns themselves — so each user turn carries the New York day it
+happened on, from a `created_at` the table already had. Her own words go back
+unprefixed: a date in front of them reads as though she said it.
+
 **A slash command is answered without a model call.** `/start` arrives once per
 install and is addressed to Telegram rather than to her; answering it the normal
 way costs a full turn with the notes attached. Gladys ignores everything that is
@@ -1127,7 +1143,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery` and `openOnUser` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`, and the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
