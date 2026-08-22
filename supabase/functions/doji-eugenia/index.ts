@@ -338,7 +338,7 @@ async function call(messages: any[], effort: Effort, container?: string) {
 const MAX_ROUNDS = 6;
 
 async function ask(messages: Turn[], effort: Effort): Promise<string> {
-  const convo: any[] = [...messages];
+  const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
   // the missing one did.
@@ -433,10 +433,10 @@ export function openOnUser(turns: Turn[]): Turn[] {
 
 async function recent(): Promise<Turn[]> {
   const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_turns?select=role,content&order=id.desc&limit=${HISTORY}`,
+    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`,
     { headers: sbHeaders() });
   if (!res.ok) throw new Error(`History read failed (HTTP ${res.status})`);
-  return openOnUser((await res.json()).reverse());
+  return openOnUser(dateTurns((await res.json()).reverse()));
 }
 
 async function remember(turns: Turn[]) {
@@ -475,14 +475,51 @@ async function remember(turns: Turn[]) {
    the same way Gladys's nyTime does. The trust clause is load-bearing: the
    turns above genuinely are from this morning, and without it the freshest
    thing in her context still argues for the wrong answer. */
+// hourCycle rather than hour12: false, which leaves the cycle to the locale and
+// can resolve to h24 — midnight renders "24:05". nyClock in _shared carries a
+// `=== 24` correction for exactly that; stating h23 removes the case instead of
+// repairing it.
 const nyStamp = (now: Date) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', weekday: 'long', day: 'numeric', month: 'long',
-  year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(now);
 
 export const nowBlock = (now = new Date()) =>
   `\n\n[Right now it is ${nyStamp(now)} in New York. Trust this over anything ` +
   `the conversation above implies about the time or the date.]`;
+
+/* THE CLOCK GOES ON IN ONE PLACE, and it has to. Three callers each appending
+   it is three chances to forget: removing it from the pulse alone left every
+   test green, because the tests called nowBlock directly and nothing proved it
+   reached a message. A caller cannot omit what it does not attach.
+
+   The last user turn, because that is the one being asked. History is dated
+   separately — see dateTurns — and the stored turn is still the raw text, since
+   this runs on a copy the caller never sees. */
+export function withClock(messages: Turn[], now = new Date()): Turn[] {
+  const last = messages.length - 1;
+  if (last < 0 || messages[last].role !== 'user') return messages;
+  return messages.map((m, i) =>
+    i === last ? { ...m, content: m.content + nowBlock(now) } : m);
+}
+
+/* HISTORY IS DATED TOO, or "yesterday you said" is a guess across a weekend.
+   The prompt asks her for continuity and now forbids inferring the date from
+   the conversation, which together leave her nothing to reason from unless the
+   turns carry their own. created_at is already on the table and already read by
+   briefedToday.
+
+   The user turn of each pair only: it anchors the exchange, and prefixing her
+   own words back to her reads as though she said them. */
+const shortDay = (d: Date) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/New_York', weekday: 'short', day: 'numeric', month: 'short',
+}).format(d);
+
+export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
+  return rows.map(({ role, content, created_at }) => role === 'user'
+    ? { role, content: `[${shortDay(new Date(created_at))}] ${content}` }
+    : { role, content });
+}
 
 // Optional by design: a database blip must cost her the memory, not the
 // briefing. Logged, because a bot that has quietly stopped remembering reads
@@ -623,7 +660,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    + nowBlock() + await notesBlock() + await tradesBlock();
+    + await notesBlock() + await tradesBlock();
 
   const brief = await ask([...await recent(), { role: 'user', content: asked }], 'high');
 
@@ -660,7 +697,7 @@ export const isSilent = (text: string) => /^nothing[.!\s]*$/i.test(text.trim());
    a week of "NOTHING" pairs would push the morning's briefing out of it — the
    one thing a follow-up question actually needs. */
 async function postPulse(): Promise<Response> {
-  const asked = "Pulse, please — anything since the briefing?" + nowBlock() + await notesBlock();
+  const asked = "Pulse, please — anything since the briefing?" + await notesBlock();
   const said = await ask([...await recent(), { role: 'user', content: asked }], 'medium');
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
@@ -718,8 +755,7 @@ async function handleMessage(update: any): Promise<void> {
     try {
       const history = await recent();
       answer = await ask(
-        [...history, { role: 'user', content: msg.text + nowBlock() + await notesBlock() }],
-        'medium');
+        [...history, { role: 'user', content: msg.text + await notesBlock() }], 'medium');
     } finally {
       // Stopped the moment there is something to send, not after sending it —
       // otherwise a ping fires between the message landing and the write, and

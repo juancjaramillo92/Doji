@@ -21,6 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 // secretMatches comes from _shared, not from a function module, because there
 // is now one of it. That this import resolves is also what proves every
@@ -37,7 +38,7 @@ import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/fun
 import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
 import {
   briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
-  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock,
+  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
 } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
@@ -884,4 +885,83 @@ test('the stamp tells her to trust it over the conversation', () => {
   // Without this the freshest thing in her context is still this morning's
   // briefing, and it argues for the wrong answer.
   assert.match(nowBlock(new Date()), /Trust this over anything the conversation/);
+});
+
+test('midnight reads as 00, never as 24', () => {
+  // hour12: false leaves the cycle to the locale and can resolve to h24.
+  assert.match(nowBlock(new Date('2026-08-22T04:05:00Z')), /at 00:05/);
+});
+
+/* withClock is where the stamp is actually attached, and it exists because the
+   three callers appending it themselves was three chances to forget — removing
+   it from the pulse alone left every test green.
+
+   Moving it to one place makes it harder to forget and no easier to SEE: ask()
+   reaches the network on its first line, so no assertion here can watch it
+   build a request. Deleting the call from ask() left all 162 green, which is
+   the same hole one level up. So this reads the file. It is weaker than driving
+   the sequence and it is the strongest thing available, which is worth saying
+   rather than leaving someone to assume the wiring is covered. */
+const EUGENIA = readFileSync(
+  new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+test('ask attaches the clock, so no caller can omit it', () => {
+  const from = EUGENIA.indexOf('async function ask(');
+  assert.notEqual(from, -1, 'ask() has been renamed — this check is now asserting nothing');
+  const body = EUGENIA.slice(from, EUGENIA.indexOf('\n}\n', from));
+  assert.match(body, /withClock\(messages\)/,
+    'ask() no longer attaches the clock — every caller can lose it silently again');
+});
+
+test('the turn being asked carries the clock', () => {
+  const out = withClock([u('one'), a('two'), u('three')], new Date('2026-08-22T03:42:00Z'));
+  assert.match(out[2].content, /^three\n\n\[Right now it is Friday, 21 August 2026 at 23:42/);
+});
+
+test('nothing else in the window is touched', () => {
+  const window = [u('one'), a('two'), u('three')];
+  const out = withClock(window, new Date());
+  assert.equal(out[0].content, 'one');
+  assert.equal(out[1].content, 'two');
+  // And the caller's array is not mutated, because remember() stores it.
+  assert.equal(window[2].content, 'three');
+});
+
+test('a window that does not end on a user turn is left alone', () => {
+  // Cannot happen through ask(), and returning a doctored assistant turn would
+  // be worse than returning nothing.
+  assert.deepEqual(withClock([u('one'), a('two')], new Date()), [u('one'), a('two')]);
+  assert.deepEqual(withClock([], new Date()), []);
+});
+
+/* dateTurns answers "yesterday you said", which across a weekend is otherwise a
+   guess — the prompt asks for continuity and forbids inferring the date from
+   the conversation, which leaves the turns themselves as the only source. */
+
+const stored = (role, content, created_at) => ({ role, content, created_at });
+
+test('each exchange is anchored to the day it happened', () => {
+  const out = dateTurns([
+    stored('user', '[weekday briefing]', '2026-08-21T12:00:00Z'),
+    stored('assistant', 'Gold is at 4512.', '2026-08-21T12:00:05Z'),
+  ]);
+  assert.equal(out[0].content, '[Fri 21 Aug] [weekday briefing]');
+});
+
+test('her own words are handed back unchanged', () => {
+  // Prefixing an assistant turn reads as though she said the date herself.
+  const out = dateTurns([stored('assistant', 'Gold is at 4512.', '2026-08-21T12:00:00Z')]);
+  assert.deepEqual(out, [{ role: 'assistant', content: 'Gold is at 4512.' }]);
+});
+
+test('the day is New York\'s, so a late turn is not filed under tomorrow', () => {
+  // 03:42 UTC is still Friday evening in New York — the same boundary the
+  // filing day and the briefing hour are kept in.
+  const out = dateTurns([stored('user', 'hola', '2026-08-22T03:42:00Z')]);
+  assert.equal(out[0].content, '[Fri 21 Aug] hola');
+});
+
+test('created_at never leaks into the turn the API is sent', () => {
+  const out = dateTurns([stored('user', 'hola', '2026-08-21T12:00:00Z')]);
+  assert.deepEqual(Object.keys(out[0]).sort(), ['content', 'role']);
 });
