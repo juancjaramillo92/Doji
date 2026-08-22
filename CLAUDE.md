@@ -301,9 +301,15 @@ and what could not be verified.
 - **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
-- **`005_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
+- **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file.
+- **A caller's URL is checked in the repository and in the database, and they
+  are different checks.** `agree.test.mjs` reads every `/functions/v1/<name>` in
+  the SQL and the Apps Script and fails if one names a function that is not
+  there, or if the five project refs disagree; `verify.sql` asks the live
+  trigger the same question. Renaming a function means editing a trigger body
+  and a cron job by hand, and a missed one is a 404 pg_net throws away.
 
 ---
 

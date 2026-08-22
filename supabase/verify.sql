@@ -15,7 +15,7 @@
 -- seconds, and it is worth doing after any manual change and before believing
 -- anything in this repository about the database.
 --
--- A CI job cannot do this instead. 002, 003 and 005 need pg_net, vault and
+-- A CI job cannot do this instead. 002, 003 and 004 need pg_net, vault and
 -- pg_cron, none of which a plain Postgres container has — so a green pipeline
 -- would prove only that 001 parses, which is the least of what can drift.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -27,7 +27,7 @@
 -- (select it and press Run), read the `ok` column, and go looking below only
 -- where it says false.
 --
--- Each row is a fact 001-005 asserts, read back out of the catalogs. `expected`
+-- Each row is a fact 001-004 asserts, read back out of the catalogs. `expected`
 -- is what the files say; `actual` is what the database holds.
 -- coalesce, because a check whose subquery finds nothing yields NULL and NULL
 -- is not false — a missing table would print a blank `ok` and read as fine.
@@ -68,6 +68,13 @@ from (values
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_notes')),
    '0'),
 
+  -- Without this the view reads `trades` with its owner's rights, and what RLS
+  -- does then depends on who ran 003 rather than on who is asking.
+  ('eugenia_trades runs with the caller''s rights',
+   (select (reloptions @> array['security_invoker=true'])::text
+      from pg_class where oid = to_regclass('public.eugenia_trades')),
+   'true'),
+
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
   -- her read of the journal a write path.
   ('eugenia_trades is select-only, service_role only',
@@ -96,6 +103,16 @@ from (values
   ('three cron jobs, all active',
    (select count(*)::text from cron.job where active),
    '3'),
+
+  -- THE SECRET NAME, WHICH USED TO BE READ BY EYE AND IS THE FAILURE THIS
+  -- SYSTEM HAS HAD TWICE. Postgres compares the Vault name case-sensitively, so
+  -- the upper-case spelling matches nothing, yields null and makes the caller
+  -- give up without raising anything. Both calling jobs must name the lower-case
+  -- one; the third is a DELETE and presents no secret.
+  ('both calling jobs read the lower-case Vault secret',
+   (select count(*)::text from cron.job
+     where command like '%''doji_cron_secret''%'),
+   '2'),
 
   -- One of the three places the setups vocabulary lives. test/agree.test.mjs
   -- holds the other two together and cannot see this one.
@@ -166,8 +183,9 @@ order by c.relname;
 -- ─── Grants on Eugenia's view ──────────────────────────────────────────────
 -- Expect ONE row: service_role, SELECT. A single-table view is auto-updatable
 -- in Postgres, so an INSERT/UPDATE/DELETE grant appearing here would make her
--- read of the journal a write path — and anon or authenticated appearing at all
--- would expose every user's trades to the publishable key.
+-- read of the journal a write path. anon or authenticated appearing at all
+-- would hand the publishable key a read of the journal — scoped by RLS, since
+-- the view is security_invoker, but a read it has no business having.
 select grantee, privilege_type
 from information_schema.role_table_grants
 where table_schema = 'public' and table_name = 'eugenia_trades'
@@ -196,10 +214,10 @@ where pubname = 'supabase_realtime'
 order by tablename;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
--- Against 005_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
--- purge-cron-history nightly — three, all active. CHECK THE SECRET NAME IN THE COMMAND TEXT — it must be the
--- lower-case doji_cron_secret. Postgres compares it case-sensitively, and the
--- upper-case spelling matches nothing in Vault and fails silently.
+-- Against 004_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
+-- purge-cron-history nightly — three, all active. The summary block checks the
+-- Vault secret name in the two calling jobs; this is where the schedules and
+-- the timeouts are read.
 select jobid, jobname, schedule, active, command
 from cron.job
 order by jobname;

@@ -36,9 +36,9 @@ declare
   secret text;
 begin
   -- Lower case, and read from the poller's own cron job rather than guessed:
-  -- 005_cron.sql reads exactly this name. Postgres compares strings
-  -- case-sensitively, so the upper-case spelling this file shipped with matched
-  -- nothing and every trade went unannounced.
+  -- 004_cron.sql reads exactly this name. Postgres compares it case-sensitively
+  -- and a name that matches nothing yields null, so the upper-case spelling
+  -- costs every trade its message and raises nothing.
   select decrypted_secret into secret
     from vault.decrypted_secrets
     where name = 'doji_cron_secret';

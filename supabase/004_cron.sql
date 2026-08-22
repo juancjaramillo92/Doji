@@ -29,9 +29,9 @@
 -- either: the Edge Functions read it from their own secrets as
 -- DOJI_CRON_SECRET, while the database reads it from Vault as
 -- doji_cron_secret. Both jobs and Gladys's trigger use the lower-case Vault
--- name. Postgres compares it case-sensitively, and the wrong spelling makes a
--- caller give up silently — which is exactly how Gladys's trigger shipped, and
--- it reads like a bot that was never installed.
+-- name. Postgres compares it case-sensitively and a name matching nothing
+-- yields null, so the wrong spelling makes a caller give up without raising
+-- anything — it reads like a bot that was never installed.
 --
 -- Run in the SQL editor, after the functions are deployed and the secret is in
 -- Vault. Confirm with the query at the bottom of supabase/verify.sql.
@@ -64,12 +64,15 @@ select cron.schedule(
 );
 
 -- ─── Eugenia ───────────────────────────────────────────────────────────────
--- HOURLY, AND THE HOUR IS DECIDED IN THE FUNCTION. Weekdays at 08:00 and Sunday
--- at 17:00 New York for the briefing, weekdays at 10:00 for the pulse. Same
--- reasoning as the poller's: a fixed UTC expression is an hour wrong for half
--- the year and would need editing twice a year forever. briefDue() and
--- pulseDue() read the same nyClock the poller's market check does, and
--- twenty-two of these twenty-four calls find nothing due and spend nothing.
+-- HOURLY, AND WHICH HOUR OWES WHAT IS DECIDED IN THE FUNCTION. Weekdays at
+-- 08:00 and Sunday at 17:00 New York for the briefing, weekdays at 10:00 for
+-- the pulse, and 09:00 to 11:00 to retry a briefing that failed. Same reasoning
+-- as the poller's: a fixed UTC expression is an hour wrong for half the year
+-- and would need editing twice a year forever, and three overlapping schedules
+-- cannot be expressed as three jobs without two of them firing at once.
+-- dueNow() reads the same nyClock the poller's market check does, and most of
+-- these twenty-four calls find nothing due: a clock read, one small query and
+-- no model call at all.
 select cron.schedule(
   'doji-eugenia',
   '0 * * * *',

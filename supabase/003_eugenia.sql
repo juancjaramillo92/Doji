@@ -4,7 +4,7 @@
 -- Eugenia is the market bot. She reads no trade she can write and owns no
 -- column of `trades`, so nothing here touches the journal — this is her own
 -- memory and her own read of his, and that is the whole file. Her schedule is
--- in 005_cron.sql with the poller's, because "what runs on a timer" should be
+-- in 004_cron.sql with the poller's, because "what runs on a timer" should be
 -- one place to look rather than one file per feature.
 --
 -- Two tables and a view, and they are three because they answer three
@@ -20,7 +20,7 @@
 
 -- ─── Her memory ────────────────────────────────────────────────────────────
 -- Without this every question starts from nothing and "what did you mean about
--- the Fed?" cannot be answered. The function reads the last twelve rows.
+-- the Fed?" cannot be answered.
 --
 -- No user_id and no RLS policy: nothing but the Edge Function ever reads this,
 -- and it holds the service key. RLS is still enabled with no policy at all,
@@ -37,7 +37,7 @@ create table public.eugenia_turns (
   constraint eugenia_turns_role_check check (role in ('user', 'assistant'))
 );
 
--- The only read there is: the newest twelve, in id order.
+-- The only read there is: the newest few, in id order.
 create index eugenia_turns_id_desc on public.eugenia_turns (id desc);
 
 alter table public.eugenia_turns enable row level security;
@@ -50,7 +50,20 @@ alter table public.eugenia_turns enable row level security;
 -- trade — and it filters `deleted`, so a trade the trader removed stays removed
 -- in conversation too. A single-table view is auto-updatable in Postgres, which
 -- is exactly why the revoke below is not decoration.
-create view public.eugenia_trades as
+--
+-- security_invoker, because a view's default is the OPPOSITE and the difference
+-- is invisible until it matters. Without it the view reads `trades` with its
+-- OWNER's rights, so what RLS does depends on an attribute of whoever happened
+-- to run this file — and the grant below is then the only thing standing
+-- between the publishable key and every user's trades. With it the reader's own
+-- rights apply: service_role bypasses RLS by definition, so Eugenia sees exactly
+-- what she sees today, and a grant widened by mistake leaks nothing.
+--
+-- OR REPLACE, so this file can be applied to a database that already has the
+-- view. Adding a column is fine; removing or reordering one is not, and needs a
+-- drop — which is why the column list is written out rather than `select *`.
+create or replace view public.eugenia_trades
+  with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
          open_day, setup, followed_rules, followed_sl, followed_tp
   from public.trades
@@ -68,8 +81,8 @@ grant select on public.eugenia_trades to service_role;
 -- only one.
 
 -- ─── What she remembers ────────────────────────────────────────────────────
--- eugenia_turns above is a conversation window — twelve turns, and they roll
--- over in a morning. This is the other kind of memory: a handful of short
+-- eugenia_turns above is a conversation window, and it rolls over in a
+-- morning. This is the other kind of memory: a handful of short
 -- facts about the trader that stay true for weeks. Without it she can never
 -- know in September that he has been working on holding his stop since August.
 --
@@ -94,7 +107,7 @@ create table public.eugenia_notes (
   constraint eugenia_notes_note_length check (char_length(note) between 1 and 200)
 );
 
--- The only read there is: the newest twenty.
+-- The only read there is: the newest handful.
 create index eugenia_notes_id_desc on public.eugenia_notes (id desc);
 
 alter table public.eugenia_notes enable row level security;

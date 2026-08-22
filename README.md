@@ -47,7 +47,7 @@ supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_gladys.sql                 Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
-supabase/005_cron.sql                   both scheduled jobs
+supabase/004_cron.sql                   both scheduled jobs
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -602,7 +602,7 @@ market does. She greets with `Buenos dias jefesito` in the morning and `Buenas
 tardes jefesito` on Sunday evening.
 
 Reply to her and she answers. `supabase/003_eugenia.sql` holds both her tables
-and her read of the journal, `005_cron.sql` her clock; `prompt.ts` holds who she
+and her read of the journal, `004_cron.sql` her clock; `prompt.ts` holds who she
 is; `index.ts` is the wiring.
 
 **Three objects in the database, and only two of them store anything.**
@@ -705,6 +705,14 @@ journal and no write path to it anywhere. Said plainly, because it is the honest
 limit: the grant makes the *view* read-only, not the key — she holds the service
 key to write her own tables, so the structural guarantee is what matters and the
 grant is the second lock.
+
+The view is `security_invoker`, which a view is **not** by default. Without it
+the view reads `trades` with the rights of whoever ran `003_eugenia.sql`, so
+what row level security does depends on an attribute of that role rather than on
+who is asking — and the grant is then the only thing between the publishable key
+and every user's trades. With it the reader's own rights apply. Nothing changes
+for Eugenia, who holds the service key and bypasses RLS either way; what changes
+is that a grant widened by mistake leaks nothing.
 
 She is still not a fifth writer to `trades`. The only things she writes are
 `eugenia_turns` and `eugenia_notes`.
@@ -1061,7 +1069,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `005_cron.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `004_cron.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -1072,13 +1080,13 @@ it from here.
 the claim gets tested.** It writes nothing: it reads back the columns, the
 constraints, the indexes, the policies, the grants on Eugenia's view, the
 triggers, the realtime publication, both cron jobs and the last ten function
-responses, to be compared against 001–005 by eye. Run it after any manual change
+responses, to be compared against 001–004 by eye. Run it after any manual change
 and before believing anything here about the database. A CI job cannot stand in
-for it — 002, 003 and 005 need `pg_net`, `vault` and `pg_cron`, none of which a
+for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
 plain Postgres container has, so a green pipeline would prove only that 001
 parses.
 
-**`005_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
+**`004_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
 upserts on the job name, so applying the file makes the database match it rather
 than describing what the database might hold. The poller's job was not in this
 repository at all until then — its schedule, its timeout and the secret it
@@ -1106,7 +1114,7 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
    which is what the cron jobs and Gladys's trigger present. Same value, and the
    lower-case one is the database's. Nothing works without both.
    `doji-email-sync` is the exception and checks its own — see step 7.
-6. Run `supabase/005_cron.sql` to schedule the poller and Eugenia. It is safe to
+6. Run `supabase/004_cron.sql` to schedule the poller and Eugenia. It is safe to
    re-run: `cron.schedule` upserts on the job name, so the file is what the
    database holds rather than a description of what it might.
 7. Deploy the Apps Script. Generate a second secret, and store it twice:
@@ -1141,10 +1149,10 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
     platform.claude.com — the same Anthropic account, billed as prepaid credits
     rather than a subscription. **Set a spend cap on that key**: it is the only
     place a bound on what she can cost is actually enforceable.
-12. Run `supabase/003_eugenia.sql`, then `supabase/005_cron.sql`. The hourly
+12. Run `supabase/003_eugenia.sql`, then `supabase/004_cron.sql`. The hourly
     job drives both the briefing and the pulse; the function decides which, or
     neither.
-13. Run `supabase/verify.sql` and read it against 001–005. Nothing is set up
+13. Run `supabase/verify.sql` and read it against 001–004. Nothing is set up
     until that agrees.
 
 ---
@@ -1173,7 +1181,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; and Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; and every function name and project ref a caller uses, across `002_gladys.sql`, `004_cron.sql` and the Apps Script |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — the copies that have to agree
    ───────────────────────────────────────────────────────────────────────────
-   Four runtimes, no build step, and two facts that consequently live in more
-   than one file: the setups vocabulary, and the four journal column names.
+   Four runtimes, no build step, and facts that consequently live in more than
+   one file: the setups vocabulary, the four journal column names, Eugenia's
+   note limit, and the names of the functions themselves.
 
    Copies are not the problem. Copies NOTHING CAN COMPARE are, and that is what
    this closes. Every one of these values was already tested — and every one of
@@ -22,7 +23,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
@@ -156,4 +157,53 @@ test('the note length is one number in all three places', () => {
     'Postgres would refuse notes writeNote considers fine — every remember() fails quietly');
   assert.equal(promised, truncated,
     'the tool description promises the model a budget the code does not keep');
+});
+
+
+/* ─── Who the database and Gmail think they are calling ─────────────────────
+   A function's name is in its directory, in the Deno.serve URL Supabase derives
+   from that directory, and in every caller's URL — and the callers are a SQL
+   file and an Apps Script, which no compiler, deploy or type check ever reads.
+   Renaming doji-telegram to doji-gladys meant editing a trigger body and a cron
+   job by hand, and a missed one is a 404 into a void: pg_net discards the
+   response, so the trade simply goes unannounced.
+
+   So this asserts the other direction from verify.sql. verify.sql reads the
+   live database and checks the trigger names doji-gladys; this reads every
+   caller in the repository and checks each one names a function that exists.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const CALLERS = ['supabase/002_gladys.sql', 'supabase/004_cron.sql', 'doji_gmail_sync.gs']
+  .map(path => ({ path, text: readFileSync(new URL(`../${path}`, import.meta.url), 'utf8') }));
+
+const called = (text) =>
+  [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
+    .map(([, project, fn]) => ({ project, fn }));
+
+test('every function a caller names is a function that exists', () => {
+  const deployed = readdirSync(new URL('../supabase/functions', import.meta.url),
+    { withFileTypes: true })
+    .filter(e => e.isDirectory() && !e.name.startsWith('_')).map(e => e.name);
+
+  assert.deepEqual(deployed.sort(),
+    ['doji-email-sync', 'doji-eugenia', 'doji-gladys', 'doji-mcp-sync'],
+    'a function was added or removed — say so here, and check every caller');
+
+  for (const { path, text } of CALLERS) {
+    const urls = called(text);
+    // A caller that matched nothing would pass every assertion below it.
+    assert.ok(urls.length, `${path} calls no Edge Function at all — has the URL shape changed?`);
+    for (const { fn } of urls) {
+      assert.ok(deployed.includes(fn), `${path} calls /functions/v1/${fn}, which is not deployed`);
+    }
+  }
+});
+
+test('every caller points at the same Supabase project', () => {
+  // Five copies of the project ref, in three languages, none of them a secret
+  // and none of them checked by anything else. A restore into a new project
+  // means editing all five, and the one that is missed keeps writing to the old
+  // one for as long as it exists.
+  const projects = new Set(CALLERS.flatMap(({ text }) => called(text).map(u => u.project)));
+  assert.equal(projects.size, 1, `callers are split across projects: ${[...projects].join(', ')}`);
 });
