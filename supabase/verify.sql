@@ -70,10 +70,21 @@ from (values
 
   -- Without this the view reads `trades` with its owner's rights, and what RLS
   -- does then depends on who ran 003 rather than on who is asking.
+  -- Read through pg_options_to_table and cast, so `security_invoker = on` — the
+  -- same thing said differently — is not reported as a drift.
   ('eugenia_trades runs with the caller''s rights',
-   (select (reloptions @> array['security_invoker=true'])::text
-      from pg_class where oid = to_regclass('public.eugenia_trades')),
+   (select coalesce((select option_value from pg_options_to_table(c.reloptions)
+                      where option_name = 'security_invoker'), 'false')::boolean::text
+      from pg_class c where c.oid = to_regclass('public.eugenia_trades')),
    'true'),
+
+  -- Which security_invoker makes load-bearing: an invoker's-rights view does
+  -- not borrow its owner's access to the table underneath.
+  ('service_role can select trades directly',
+   (select count(*)::text from information_schema.role_table_grants
+     where table_schema = 'public' and table_name = 'trades'
+       and grantee = 'service_role' and privilege_type = 'SELECT'),
+   '1'),
 
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
   -- her read of the journal a write path.
@@ -113,6 +124,12 @@ from (values
    (select count(*)::text from cron.job
      where command like '%''doji_cron_secret''%'),
    '2'),
+  -- The third caller, and the one that actually shipped with the upper-case
+  -- spelling. It is a function body rather than a job, so it needs its own row.
+  ('the trade-open trigger reads the lower-case Vault secret',
+   (select (prosrc like '%''doji_cron_secret''%')::text
+      from pg_proc where proname = 'trades_telegram_open'),
+   'true'),
 
   -- One of the three places the setups vocabulary lives. test/agree.test.mjs
   -- holds the other two together and cannot see this one.

@@ -1086,6 +1086,28 @@ for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which 
 plain Postgres container has, so a green pipeline would prove only that 001
 parses.
 
+**001, 002 and 003 are not re-runnable in full, and the reason differs.** 002 is
+a function and a trigger and is entirely `create or replace`, so it re-applies
+cleanly. 001 and 003 create tables, which stops them at the first statement — so
+a change to something further down is applied by running *that statement* on its
+own. In 003 those are the `eugenia_trades` view and the three grants under it,
+which is what an existing database needs to pick up `security_invoker`:
+
+```sql
+create or replace view public.eugenia_trades
+  with (security_invoker = true) as
+  select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
+         open_day, setup, followed_rules, followed_sl, followed_tp
+  from public.trades
+  where deleted = false;
+
+revoke all on public.eugenia_trades from anon, authenticated, service_role;
+grant select on public.eugenia_trades to service_role;
+grant select on public.trades to service_role;
+```
+
+`verify.sql` answers whether it took.
+
 **`004_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
 upserts on the job name, so applying the file makes the database match it rather
 than describing what the database might hold. The poller's job was not in this

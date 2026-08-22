@@ -307,8 +307,10 @@ and what could not be verified.
 - **A caller's URL is checked in the repository and in the database, and they
   are different checks.** `agree.test.mjs` reads every `/functions/v1/<name>` in
   the SQL and the Apps Script and fails if one names a function that is not
-  there, or if the five project refs disagree; `verify.sql` asks the live
-  trigger the same question. Renaming a function means editing a trigger body
+  there, and reads the project ref out of all eight files that carry it —
+  including `index.html`, `config.toml` and the deploy workflow, which name a
+  project without naming a function; `verify.sql` asks the live trigger the same
+  question. Renaming a function means editing a trigger body
   and a cron job by hand, and a missed one is a 404 pg_net throws away.
 
 ---

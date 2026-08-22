@@ -173,8 +173,17 @@ test('the note length is one number in all three places', () => {
    caller in the repository and checks each one names a function that exists.
    ─────────────────────────────────────────────────────────────────────────── */
 
+const read = (path) =>
+  ({ path, text: readFileSync(new URL(`../${path}`, import.meta.url), 'utf8') });
+
+// The three that name a FUNCTION.
 const CALLERS = ['supabase/002_gladys.sql', 'supabase/004_cron.sql', 'doji_gmail_sync.gs']
-  .map(path => ({ path, text: readFileSync(new URL(`../${path}`, import.meta.url), 'utf8') }));
+  .map(read);
+
+// Every file that names the PROJECT, which is a longer list: the app connects
+// to it, config.toml links the CLI to it and the deploy workflow pushes to it.
+const PROJECT_FILES = [...CALLERS.map(c => c.path),
+  'index.html', 'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
@@ -199,11 +208,27 @@ test('every function a caller names is a function that exists', () => {
   }
 });
 
-test('every caller points at the same Supabase project', () => {
-  // Five copies of the project ref, in three languages, none of them a secret
-  // and none of them checked by anything else. A restore into a new project
-  // means editing all five, and the one that is missed keeps writing to the old
-  // one for as long as it exists.
-  const projects = new Set(CALLERS.flatMap(({ text }) => called(text).map(u => u.project)));
-  assert.equal(projects.size, 1, `callers are split across projects: ${[...projects].join(', ')}`);
+/* The project ref is not a secret, and it is not a URL everywhere it appears:
+   config.toml carries it as project_id and the deploy workflow as
+   --project-ref. So all three shapes are matched, and each is anchored to the
+   text around it — hunting for a bare twenty-letter word would find one in
+   index.html sooner or later and fail for a reason that is not this.
+
+   Eight copies across five languages, none of them checked by anything else. A
+   restore into a new project means editing all eight, and the one that is
+   missed keeps talking to the old project for as long as it exists. */
+const REF = /https:\/\/([a-z]+)\.supabase\.co|project_id\s*=\s*"([a-z]+)"|--project-ref\s+([a-z]+)/g;
+
+const refs = (text) => [...text.matchAll(REF)].map(m => m[1] ?? m[2] ?? m[3]);
+
+test('every file that names the Supabase project names the same one', () => {
+  const found = PROJECT_FILES.map(({ path, text }) => {
+    const seen = new Set(refs(text));
+    // A file that matched nothing would agree with everyone by saying nothing.
+    assert.equal(seen.size, 1,
+      `${path} names ${seen.size} project refs, expected exactly 1: ${[...seen].join(', ')}`);
+    return [...seen][0];
+  });
+  assert.equal(new Set(found).size, 1,
+    `the project is split across refs: ${[...new Set(found)].join(', ')}`);
 });

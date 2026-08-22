@@ -15,7 +15,9 @@
 -- they are not one table wearing a `kind` column.
 --
 -- Run once, in the SQL editor, after doji-eugenia is deployed and
--- ANTHROPIC_API_KEY is in the Edge Function secrets.
+-- ANTHROPIC_API_KEY is in the Edge Function secrets. The CREATE TABLEs make the
+-- file run-once; on a database that already has them, run the view statement
+-- and the three grants below on their own.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ─── Her memory ────────────────────────────────────────────────────────────
@@ -59,9 +61,10 @@ alter table public.eugenia_turns enable row level security;
 -- rights apply: service_role bypasses RLS by definition, so Eugenia sees exactly
 -- what she sees today, and a grant widened by mistake leaks nothing.
 --
--- OR REPLACE, so this file can be applied to a database that already has the
--- view. Adding a column is fine; removing or reordering one is not, and needs a
--- drop — which is why the column list is written out rather than `select *`.
+-- OR REPLACE so the view statement can be re-applied on its own — which is what
+-- an existing database needs, since the CREATE TABLE above stops the file
+-- running twice. Adding a column is fine; removing or reordering one needs a
+-- drop, which is why the column list is written out rather than `select *`.
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
@@ -72,6 +75,14 @@ create or replace view public.eugenia_trades
 -- SELECT and nothing else, for the one role that reaches it.
 revoke all on public.eugenia_trades from anon, authenticated, service_role;
 grant select on public.eugenia_trades to service_role;
+
+-- AND THE SAME GRANT ON THE TABLE UNDERNEATH, which security_invoker is exactly
+-- what makes necessary: a definer's-rights view borrows its owner's access to
+-- `trades`, an invoker's-rights view does not. Supabase's default privileges
+-- already grant this, so it is stated rather than added — a database restored
+-- without those defaults would otherwise answer "permission denied for table
+-- trades" and Eugenia would lose the journal with no other sign.
+grant select on public.trades to service_role;
 
 -- SAY THE LIMIT PLAINLY: this makes the VIEW read-only, not the key. Eugenia
 -- holds the service key because she writes eugenia_turns, and that key can
