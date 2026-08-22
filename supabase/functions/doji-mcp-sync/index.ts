@@ -36,7 +36,7 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, nyClock, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -258,11 +258,9 @@ export const usdFromCents = (c: number) => c / 100;
 // The New York civil day an instant falls on. This is the day a trade is filed
 // under, and it is why an entry at 21:05 New York on 30 July stays on 30 July
 // instead of drifting to the 31st with the UTC date.
-export function nyDay(ms: number): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date(ms));
-}
+// Takes an epoch, because every caller here has one — the deals carry
+// executionTimestamp and nothing else.
+export const nyDay = (ms: number): string => nyDate(new Date(ms));
 
 /* ─── Deal folding ─────────────────────────────────────────────────────────
    A position is deals sharing a positionId. Sorted by execution time the first

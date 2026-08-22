@@ -111,6 +111,15 @@ export const telegram = (token: string, method: string, body: unknown) =>
    it is gone, and a genuinely impossible response now throws rather than
    quietly deciding the market is open.
    ───────────────────────────────────────────────────────────────────────── */
+// The New York CIVIL DAY an instant falls on — a different question from the
+// clock below, and asked by both the poller (which day a trade is filed under)
+// and Eugenia (whether today's briefing already went). en-CA is YYYY-MM-DD,
+// which is also the shape `open_day` is compared against.
+export const nyDate = (d: Date): string =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(d);
+
 const WEEKDAY: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 export function nyClock(now: Date): { wd: number; hour: number } {
