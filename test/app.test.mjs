@@ -82,7 +82,7 @@ test('load fills both row sets, hides deleted rows, and reports Synced', async (
   db.error = null;
   db.rows = [
     journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
-    { ...journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10 }), deleted: true }
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10, deleted: true })
   ];
   await app.Data.load();
 
