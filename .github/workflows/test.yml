@@ -9,5 +9,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      # ci, not install: it installs the lockfile exactly and fails if that
+      # disagrees with package.json. A green run has to mean the tree someone
+      # else gets, or "the suite passes" is a claim about one machine.
+      - run: npm ci
       - run: npm test

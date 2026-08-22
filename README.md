@@ -1204,15 +1204,24 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 ## Tests
 
 ```sh
-npm install          # once — jsdom, and nothing else
+npm ci               # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6 or newer; `--experimental-strip-types` is what lets the suite import
-the Edge Function's `.ts` directly, which is why the script exists rather than a
-bare `node --test`. `jsdom` is the only dependency in the repository and it is a
-dev dependency — the application itself still installs nothing and still has no
-build step.
+Node 22.6 or newer — stated in `package.json`'s `engines` as well as here;
+`--experimental-strip-types` is what lets the suite import the Edge Function's
+`.ts` directly, which is why the script exists rather than a bare `node --test`.
+It is a no-op from Node 22.18, where type stripping is on by default, and stays
+for the versions below that. `jsdom` is the only dependency in the repository
+and it is a dev dependency — the application itself still installs nothing and
+still has no build step.
+
+**`package-lock.json` is committed and CI runs `npm ci`.** `npm install` against
+a floating `^30.0.1` means the tree that goes green in CI is not necessarily the
+tree anyone else gets, and the same suite gates the Edge Function deploy — so
+"the tests pass" would be a claim about one machine on one afternoon. `npm ci`
+installs the lockfile exactly and fails outright if it disagrees with
+`package.json`, which is the only version of that claim worth making.
 
 The suites run on every push through `.github/workflows/test.yml`, so a red run
 is attached to the commit that caused it rather than found later. A second

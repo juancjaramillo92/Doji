@@ -45,7 +45,7 @@ jobs:
       # the broken code already live. A failing step here stops the deploy,
       # which is the only ordering that actually protects anything. It is the
       # same suite; running it twice on a push to main costs seconds.
-      - run: npm install
+      - run: npm ci
       - run: npm test
 
       - uses: supabase/setup-cli@v1
@@ -56,7 +56,7 @@ jobs:
       # of them cannot silently fall behind the others.
       #
       # --no-verify-jwt duplicates what supabase/config.toml already says, and
-      # deliberately. All three functions authorise their own callers in code,
+      # deliberately. All four functions authorise their own callers in code,
       # and if either mechanism stops being honoured on its own, a deploy that
       # quietly turned JWT verification back on would break the live Telegram
       # webhooks and the cron poller at once. Two statements of one setting is

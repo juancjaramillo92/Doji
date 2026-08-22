@@ -302,3 +302,36 @@ test('a function refuses to run without every secret it reads', () => {
     }
   }
 });
+
+
+/* ─── Every function says the same thing about its own gateway ──────────────
+   verify_jwt = false is stated twice on purpose — once per function in
+   config.toml, once as --no-verify-jwt on the deploy command — because each
+   function authorises its own caller in code and a gateway that quietly
+   started checking a JWT would take down both Telegram webhooks and the cron
+   poller at once.
+
+   Two statements is the cheap mistake; ONE MISSING statement is not. A function
+   added without a stanza here deploys correctly only for as long as the
+   workflow's flag is what deploys it — a hand-run `supabase functions deploy
+   <name>` would put it behind the gateway, and every caller would get a 401
+   with nothing in the function's own logs to say why.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('config.toml turns the gateway off for every function that exists', () => {
+  const toml = readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8');
+
+  for (const name of DEPLOYED) {
+    const stanza = toml.match(
+      new RegExp(`\\[functions\\.${name}\\]([^\\[]*)`));
+    assert.ok(stanza, `config.toml has no [functions.${name}] stanza`);
+    assert.match(stanza[1], /verify_jwt\s*=\s*false/,
+      `${name} is deployed but its gateway is not turned off in config.toml`);
+  }
+
+  // And nothing configured that is not there: a stanza left behind after a
+  // rename configures a function nobody deploys, and reads as coverage.
+  const configured = [...toml.matchAll(/\[functions\.([a-z0-9-]+)\]/g)].map(m => m[1]).sort();
+  assert.deepEqual(configured, DEPLOYED,
+    'config.toml and supabase/functions name different sets of functions');
+});

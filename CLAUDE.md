@@ -113,7 +113,7 @@ sequence end to end over one that asserts on a function in isolation.
 ## Tests — run both, always
 
 ```sh
-npm install   # once — jsdom, and nothing else
+npm ci        # once — jsdom, and nothing else
 npm test
 ```
 
