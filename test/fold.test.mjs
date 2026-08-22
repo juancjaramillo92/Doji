@@ -37,7 +37,7 @@ import {
 import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
 import {
-  briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
+  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, isBriefingMarker,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
 } from '../supabase/functions/doji-eugenia/index.ts';
 
@@ -610,6 +610,66 @@ test('a briefing hour and a pulse hour never collide', () => {
     assert.equal(briefDue(at) !== null && pulseDue(at), false,
       `both due at ${at.toISOString()}`);
   }
+});
+
+/* ─── Eugenia: which of the three schedules this hour owes ──────────────────
+   Each predicate is right on its own and that is not the question — the three
+   overlap, and what an hour actually owes is the composition of them. So this
+   drives every hour of a full week, on both answers to "has a briefing landed",
+   and states the whole timetable rather than sampling it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('an ordinary weekday owes exactly one briefing and one pulse', () => {
+  // Wed 19 Aug 2026, EDT: 08:00 ET is 12:00 UTC.
+  const owed = [];
+  for (let h = 0; h < 24; h++) {
+    const at = new Date(Date.UTC(2026, 7, 19, h));
+    // briefed: the 08:00 briefing landed, which is the ordinary day.
+    const due = dueNow(at, true);
+    if (due) owed.push([h - 4, due]);              // h - 4 is the New York hour
+  }
+  assert.deepEqual(owed, [[8, 'weekday'], [10, 'pulse']]);
+});
+
+test('a morning whose briefing failed owes the retry, and the pulse gives way', () => {
+  const owed = [];
+  for (let h = 0; h < 24; h++) {
+    const at = new Date(Date.UTC(2026, 7, 19, h));
+    const due = dueNow(at, false);
+    if (due) owed.push([h - 4, due]);
+  }
+  // 10:00 is the one hour both apply to, and it goes to the retry: a second
+  // look at a morning he was never told about is not what is missing.
+  assert.deepEqual(owed, [[8, 'weekday'], [9, 'weekday'], [10, 'weekday'], [11, 'weekday']]);
+});
+
+test('Sunday owes the open briefing and nothing else', () => {
+  const owed = [];
+  for (let h = 0; h < 24; h++) {
+    const at = new Date(Date.UTC(2026, 7, 23, h));   // Sun 23 Aug, EDT
+    const due = dueNow(at, true);
+    if (due) owed.push([h - 4, due]);
+  }
+  assert.deepEqual(owed, [[17, 'sunday']]);
+});
+
+test('Saturday owes nothing, briefed or not', () => {
+  for (let h = 0; h < 24; h++) {
+    const at = new Date(Date.UTC(2026, 7, 22, h));
+    assert.equal(dueNow(at, true), null, at.toISOString());
+    assert.equal(dueNow(at, false), null, at.toISOString());
+  }
+});
+
+test('the timetable holds its New York hours in winter too', () => {
+  // January: EST (UTC-5). Wed 14 Jan 2026.
+  const owed = [];
+  for (let h = 0; h < 24; h++) {
+    const at = new Date(Date.UTC(2026, 0, 14, h));
+    const due = dueNow(at, true);
+    if (due) owed.push([h - 5, due]);
+  }
+  assert.deepEqual(owed, [[8, 'weekday'], [10, 'pulse']]);
 });
 
 test('the pulse stays silent on the word it was told to use', () => {

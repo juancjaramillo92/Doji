@@ -230,8 +230,11 @@ code you write near it:
 - **What is stored is the raw turn, never the augmented one.** Notes and the
   week's trades are rebuilt every turn; storing them would resend a stale copy
   as history for the next six briefings.
-- **`HISTORY` has to stay even.** Turns are written in pairs, so an odd window
-  starts on an assistant turn and the Messages API refuses it.
+- **The history window is repaired, not assumed.** Pairs are written in one
+  INSERT, but a concurrent one can take a sequence value between them, so an
+  even window can still open on an assistant turn — which the Messages API
+  refuses outright. `openOnUser` trims to the first user turn; nothing may go
+  back to depending on `HISTORY` being even.
 - **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
   the parts go sequentially; Telegram does not promise ordering. The prompt aims
   well under the cap, so this is the exception now — do not delete it for being

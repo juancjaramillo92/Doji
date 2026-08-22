@@ -9,10 +9,10 @@
 //                                     briefing if this is one of its hours.
 //   x-telegram-bot-api-secret-token   Telegram — the trader replied, answer him.
 //
-// SHE OWNS NO TABLE COLUMN AND READS NO TRADE. The only thing she writes is her
-// own conversation history, which is why she is not a fifth writer to `trades`
-// and has nothing to arbitrate with anybody. Trade review stays in the Claude
-// app, where the data is.
+// SHE OWNS NO COLUMN OF `trades` AND HAS NO WRITE PATH TO IT. She reads the
+// journal through the eugenia_trades view, which is granted SELECT and nothing
+// else, and writes only her own conversation and her own notes — which is why
+// she is not a fifth writer and has nothing to arbitrate with anybody.
 //
 // THE SCHEDULE IS DECIDED HERE, NOT IN CRON. Weekdays at 08:00 and Sunday at
 // 17:00 New York — and pg_cron schedules in UTC, so a fixed expression would be
@@ -80,6 +80,32 @@ export function briefDue(now: Date): Brief | null {
 export function pulseDue(now: Date): boolean {
   const { wd, hour } = nyClock(now);
   return wd >= 1 && wd <= 5 && hour === 10;
+}
+
+/* Weekday 09:00, 10:00 and 11:00 New York — the hours where a briefing is still
+   a briefing rather than a bulletin about a morning that has gone. Nothing
+   fires unless the 08:00 one failed, which briefedToday() decides. */
+export function retryDue(now: Date): boolean {
+  const { wd, hour } = nyClock(now);
+  return wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11;
+}
+
+/* WHAT THIS HOUR OWES — one answer, because one call cannot owe two.
+
+   The three schedules above overlap, so the decision between them is a fourth
+   one and belongs here rather than spread through the caller: each predicate
+   answering correctly on its own says nothing about which of them wins.
+
+   At 10:00 the retry window and the pulse both apply, and the retry takes it:
+   on a day the briefing failed, the briefing is the thing worth having and a
+   second look at a morning he was never told about is not. `briefed` is the
+   fact the caller reads from the database, and only the retry hours turn on
+   it. */
+export function dueNow(now: Date, briefed: boolean): Brief | 'pulse' | null {
+  const brief = briefDue(now);
+  if (brief) return brief;
+  if (retryDue(now) && !briefed) return 'weekday';
+  return pulseDue(now) ? 'pulse' : null;
 }
 
 // Buenos días before the week, buenas tardes for the Sunday open — which is
@@ -345,7 +371,7 @@ async function call(messages: any[], effort: Effort, container?: string) {
 // Six rounds, because a loop that cannot end is a loop that bills forever.
 // Three is the realistic maximum now — read the journal, write a note, answer —
 // and the cap exists for the case where that assumption is wrong rather than as
-// a working limit. It was four when there was one tool to call.
+// a working limit.
 const MAX_ROUNDS = 6;
 
 async function ask(messages: Turn[], effort: Effort): Promise<string> {
@@ -487,9 +513,8 @@ async function remember(turns: Turn[]) {
    turns above genuinely are from this morning, and without it the freshest
    thing in her context still argues for the wrong answer. */
 // hourCycle rather than hour12: false, which leaves the cycle to the locale and
-// can resolve to h24 — midnight renders "24:05". nyClock in _shared carries a
-// `=== 24` correction for exactly that; stating h23 removes the case instead of
-// repairing it.
+// can resolve to h24 — midnight rendering "24:05". _shared's nyClock states it
+// for the same reason.
 const nyStamp = (now: Date) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', weekday: 'long', day: 'numeric', month: 'long',
   year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -576,21 +601,15 @@ async function postScheduled(url: URL): Promise<Response> {
     if (url.searchParams.get("pulse") === "1") return await postPulse();
 
     const now = new Date();
-    const due = briefDue(now) ?? (url.searchParams.get("force") === "1" ? 'weekday' : null);
-    if (due) return await postBriefing(due);
-
-    /* A briefing that failed at 08:00 gets another go while the morning is
-       still worth having one. Bounded to three hours and skipped the moment one
-       has landed, so the cost of a good day is three small reads.
-
-       THE RETRY WINDOW OVERLAPS THE PULSE HOUR, deliberately and only at 10:00.
-       On a day the briefing failed, the briefing is the thing worth having and
-       the pulse — a second look at a morning he was never told about — is not.
-       So the retry wins and the pulse is skipped, which is why this is one
-       branch and not two: a call still owes exactly one answer. */
-    if (pulseDue(now) || retryDue(now)) {
-      return (await briefedToday()) ? await postPulse() : await postBriefing('weekday');
+    if (url.searchParams.get("force") === "1") {
+      return await postBriefing(briefDue(now) ?? 'weekday');
     }
+
+    // briefedToday() is a database read, so it is only made in the hours whose
+    // answer can turn on it — which retryDue names.
+    const due = dueNow(now, retryDue(now) ? await briefedToday() : true);
+    if (due === 'pulse') return await postPulse();
+    if (due) return await postBriefing(due);
 
     return json({ ok: true, skipped: "nothing due this hour" });
   } catch (err) {
@@ -609,14 +628,6 @@ async function postScheduled(url: URL): Promise<Response> {
     }).catch(() => {});
     return json({ ok: false, error: why }, 500);
   }
-}
-
-/* Weekday 09:00, 10:00 and 11:00 New York — the hours where a briefing is still
-   a briefing rather than a bulletin about a morning that has gone. Nothing
-   fires unless the 08:00 one failed, which briefedToday() decides. */
-export function retryDue(now: Date): boolean {
-  const { wd, hour } = nyClock(now);
-  return wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11;
 }
 
 /* Whether a briefing has already landed today, read off the marker

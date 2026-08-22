@@ -728,10 +728,15 @@ separate ways of doing it.
 
 **A failed briefing tries again**, at 09:00, 10:00 and 11:00 ET, and stops the
 moment one has landed. `briefedToday()` reads the marker `postBriefing` stores
-— written immediately after `say()` returns, so it exists exactly when the
-message reached Telegram. A read failure counts as *already briefed*: if the
-database is unwell the retry cannot check, and a second briefing sent on a guess
-is worse than a skipped one.
+— written *before* the send, so it exists whenever a briefing was generated. The
+generation is the expensive half, and a marker written after it would let a
+failed insert produce four briefings and four bills. A read failure counts as
+*already briefed* for the same reason: if the database is unwell the retry
+cannot check, and a second briefing sent on a guess is worse than a skipped one.
+
+At 10:00 the retry window and the pulse overlap, and `dueNow()` gives that hour
+to the retry — on a day the briefing failed, a second look at a morning he was
+never told about is not what is wanted.
 
 ### Programmatic tool calls need their container
 
@@ -1166,7 +1171,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; and Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
