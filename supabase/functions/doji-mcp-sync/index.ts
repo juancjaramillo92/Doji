@@ -189,13 +189,18 @@ export function balanceTarget(closes: { id: string; at: number }[], now: number)
    zero deals on every run and report success, which is the failure shape
    hardest to notice.
 
-   A value that parses to nothing throws rather than emptying the list, because
-   an empty list is read below as "no filter" and would quietly file every
-   symbol on the account into an XAUUSD journal. Refusing the poll is the
-   smaller wrong: no trades appear, which is visible within minutes. */
+   POSITIVE INTEGERS, and a value that yields none throws. Filtering on
+   Number.isFinite alone let a blank token through: `Number("")` and
+   `Number(" ")` are both 0, so `SYMBOL_IDS=","` parsed to [0] — a non-empty
+   list that matches no deal, which is precisely the silent zero-trade success
+   this constant exists to prevent. Refusing the poll is the smaller wrong: no
+   trades appear, and that is visible within minutes.
+   ───────────────────────────────────────────────────────────────────────── */
 const SYMBOL_IDS: number[] = (() => {
   const raw = env("SYMBOL_IDS") || "41";
-  const ids = raw.split(",").map(s => Number(s.trim())).filter(Number.isFinite);
+  const ids = raw.split(",")
+    .map(s => Number(s.trim()))
+    .filter(n => Number.isInteger(n) && n > 0);
   if (!ids.length) throw new Error(`SYMBOL_IDS holds no usable symbol id: ${raw}`);
   return ids;
 })();

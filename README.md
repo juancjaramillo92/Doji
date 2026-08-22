@@ -376,8 +376,22 @@ the integer. Unprefixed, the same position mints two rows.
 Both are plausible integers that are wrong by 100× if misread. The Edge Function
 converts before writing, so `commission` in the database is already dollars.
 
-**Truncation is an error, not a field.** If `get_deals` hits `maxRows` the
-function throws. It used to return `truncated: true` in a 200 body, which
+**Truncation is an error, not a field, and it is checked before anything is
+written.** If `get_deals` hits `maxRows` the function throws — ahead of the
+upsert, because a truncated window can return a position's closing deals without
+its entry and those are exactly the rows that would land. It used to throw after
+the write, on the reasoning that the write had already happened; that is
+backwards.
+
+**What that costs, said plainly: a truncated run writes nothing, and the only
+place it says so is a 500 that `net.http_post` discards.** So a fold window that
+stayed at or over 500 deals would halt the journal quietly. It takes about
+fifteen times this account's volume to reach that in 78 hours, and the realistic
+way to get there is a `?hours=` backfill — which is a manual run whose response
+you are reading. The poller has no Telegram path of its own, unlike Eugenia's
+cron half; giving it one is the fix if this ever bites, and the reason it has
+not been done is that a failure repeating every two minutes needs a rate limit
+before it needs a notification. It used to return `truncated: true` in a 200 body, which
 `net.http_post` discards — so the one signal that trades were being dropped went
 to nobody. It is also worse than losing rows: a truncated window can return a
 position's closing deals without its entry, and direction then gets read off a
