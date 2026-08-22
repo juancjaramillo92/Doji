@@ -34,8 +34,8 @@ import {
   lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
-import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
+import { SETUPS, COLUMNS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
+import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import {
   briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, isBriefingMarker,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
@@ -529,6 +529,43 @@ test('the fourth answer settles the form, and the three before it do not', () =>
   assert.equal(didSettle, true, 'the fourth answer must settle it');
 });
 
+test('the taps are taken off the buttons the form actually drew', () => {
+  /* THE SAME SEQUENCE AS ABOVE, WITH NOTHING TYPED INTO IT. The test before
+     this one writes its own callback_data, so it proves the loop settles on
+     four answers and says nothing about whether the keyboard emits payloads
+     that reach it. Those are different questions, and only this one covers the
+     join: a ✓ button drawn with any value but `1` parses to null, the tap is
+     acknowledged and dropped by design, and the bot goes silent while every
+     test that supplies its own payload stays green.
+
+     So each round renders the form, finds the button that writes the field,
+     and taps THAT — the payload, the parse and the redraw all off the real
+     thing. */
+  let row = { ...open };
+
+  for (const field of ['setup', 'rules', 'sl', 'tp']) {
+    const before = row;
+    const drawn = renderMessage(row, false).reply_markup.inline_keyboard.flat()
+      .find(b => b.callback_data.split('|')[1] === field);
+    assert.ok(drawn, `the open form draws no button that writes ${field}`);
+
+    const tap = parseCallback(drawn.callback_data);
+    assert.ok(tap, `the ${field} button draws ${drawn.callback_data}, which the parser refuses`);
+    assert.equal(tap.column, COLUMNS[field]);
+
+    row = { ...row, [tap.column]: tap.value };
+    const rows = renderMessage(row, staysOpen(tap, before)).reply_markup.inline_keyboard.length;
+    assert.equal(rows, field === 'tp' ? 1 : 4, drawn.callback_data);
+  }
+
+  // And the values landed as the three-state booleans the column holds, not as
+  // the strings they travelled as.
+  assert.equal(row.setup, SETUPS[0]);
+  for (const c of ['followed_rules', 'followed_sl', 'followed_tp']) {
+    assert.equal(typeof row[c], 'boolean', c);
+  }
+});
+
 test('a correction inside a reopened form does not re-settle it', () => {
   // Reopened means every answer was already in before this tap. Collapsing here
   // would make a two-field correction need [Edit] pressed twice.
@@ -967,6 +1004,37 @@ test('a figure that is not a finite number is refused, never coerced', () => {
 test('a body that is not an object at all is refused without throwing', () => {
   for (const body of [null, undefined, 'PID1', 42, []]) {
     assert.ok('error' in emailRow(body, USER));
+  }
+});
+
+/* ─── The email path: what the caller is told ────────────────────────────────
+   The other half of the three-outcome contract. test/parse.test.mjs proves the
+   Apps Script labels a 400 permanently and retries everything else; these prove
+   this end emits a 400 for the same cases and only those. Two halves each
+   tested against a literal is how the first version of this shipped treating
+   every 4xx as permanent.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('only a status about the row itself is permanent', () => {
+  // Postgres looked at this row and will never take it: malformed, a constraint
+  // it violates, a value it cannot process. Retrying is the only alternative,
+  // every minute for ninety days.
+  for (const status of [400, 409, 422]) {
+    assert.equal(answerFor(status), 400, `${status} should be permanent`);
+  }
+});
+
+test('a status about the caller is transient, so the fill keeps its place', () => {
+  /* THE ONE THAT LOST DATA. A rotated SB_SECRET_KEY answers 401 — which says
+     nothing whatever about the fill. Treated as permanent, the thread is
+     labelled failed, drops out of the Gmail query, and every queued net_pnl is
+     gone by the time anyone notices the key.
+
+     404 is a renamed function, 403 a revoked grant, 429 a rate limit, and every
+     5xx is Supabase. A person fixing any of those wants the fill still waiting
+     for them. */
+  for (const status of [401, 403, 404, 408, 429, 500, 502, 503, 504]) {
+    assert.equal(answerFor(status), 500, `${status} should be retryable`);
   }
 });
 

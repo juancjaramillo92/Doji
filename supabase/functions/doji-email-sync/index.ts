@@ -121,6 +121,23 @@ const upsert = (row: Record<string, unknown>) =>
     body: JSON.stringify([row]),
   });
 
+/* WHAT POSTGRES SAID, TRANSLATED INTO WHAT THE APPS SCRIPT DOES ABOUT IT.
+
+   Exported because it is the joint between the two halves, and both had been
+   written against literals: parse.test.mjs proves the script labels a 400
+   permanently and retries everything else, and nothing proved this end emits a
+   400 for the same set of cases. Two correct halves and an untested join is how
+   the first version of this shipped treating every 4xx as permanent — a rotated
+   SB_SECRET_KEY answers 401, the thread would have been labelled failed, and
+   every queued fill's net_pnl gone.
+
+   400 out means the row will never be accepted; 500 out means try again. Only
+   the three statuses that mean Postgres examined THIS ROW are permanent. */
+const PERMANENT = [400, 409, 422];
+
+export const answerFor = (status: number): 400 | 500 =>
+  PERMANENT.includes(status) ? 400 : 500;
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing — the file loads under plain
 // Node, where Deno.serve does not exist.
@@ -184,11 +201,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
      costs a thread sitting in the queue, which is visible and harmless.
      Discarding something transient costs the only settled P&L this system
      ever gets. */
-  const PERMANENT = [400, 409, 422];
-  if (PERMANENT.includes(res.status)) {
-    console.error(`doji-email-sync: refused by PostgREST (${res.status}) — ${detail}`);
-    return json({ ok: false, error: detail }, 400);
-  }
-  console.error(`doji-email-sync: write failed (${res.status}) — ${detail}`);
-  return json({ ok: false, error: detail }, 500);
+  const answer = answerFor(res.status);
+  console.error(`doji-email-sync: ${answer === 400 ? "refused by PostgREST" : "write failed"}` +
+                ` (${res.status}) — ${detail}`);
+  return json({ ok: false, error: detail }, answer);
 });

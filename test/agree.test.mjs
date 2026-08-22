@@ -33,6 +33,10 @@ const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.m
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
+const FUNCTIONS = ['doji-mcp-sync', 'doji-gladys', 'doji-email-sync', 'doji-eugenia']
+  .map(name => ({ name, text: readFileSync(
+    new URL(`../supabase/functions/${name}/index.ts`, import.meta.url), 'utf8') }));
+
 /* The vocabulary as Postgres will enforce it, read out of the constraint rather
    than out of a comment near it. Deliberately anchored on the constraint NAME:
    a check written against some other column would not be this rule, and a
@@ -231,4 +235,56 @@ test('every file that names the Supabase project names the same one', () => {
   });
   assert.equal(new Set(found).size, 1,
     `the project is split across refs: ${[...new Set(found)].join(', ')}`);
+});
+
+
+/* ─── Every secret a function needs is one it refuses to run without ────────
+   Each function opens by answering 503 if a required secret is unset, because
+   the alternative is a function that starts, authorises nobody and reports
+   nothing — the shape SB_SECRET_KEY's misspelling had for months.
+
+   That guard is a hand-written list, and the failure is adding a secret and not
+   adding it to the list. Nothing else could catch it: an unset secret makes the
+   function behave differently, not crash, and no test here can set one. So this
+   reads both lists out of the file and requires them to be the same list.
+
+   The guard must also be a chain of ORs. `!A || !B && !C` parses as
+   `!A || (!B && !C)`, which reads exactly like the correct thing and lets two
+   of the three go missing unnoticed — one `&&` in a line of five clauses.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// The consts a function binds from its own environment. SB_KEY and SB_URL come
+// from _shared and are named in the guards without being bound here, which is
+// why the comparison runs from the file's own reads to the guard.
+const bound = (text) =>
+  [...text.matchAll(/^const\s+([A-Z_]+)\s*=\s*env\((.*)$/gm)]
+    .map(m => ({ name: m[1], line: m[2] }));
+
+// The condition on the line above the refusal, which is the guard by
+// construction: an `if` whose body logs "refusing all requests".
+const guardClause = (text) => {
+  const lines = text.split('\n');
+  const at = lines.findIndex(l => l.includes('refusing all requests'));
+  if (at < 1) return null;
+  return lines[at - 1].match(/^\s*if \((.+)\) \{\s*$/)?.[1] ?? null;
+};
+
+test('a function refuses to run without every secret it reads', () => {
+  for (const { name, text } of FUNCTIONS) {
+    const clause = guardClause(text);
+    assert.ok(clause, `${name} has no boot guard refusing to run without its secrets`);
+
+    assert.ok(!clause.includes('&&'),
+      `${name}'s boot guard joins clauses with && — && binds tighter than ||, ` +
+      `so a missing secret in that pair would not refuse the request`);
+
+    const guarded = [...clause.matchAll(/!([A-Z_]+)/g)].map(m => m[1]);
+    for (const { name: secret, line } of bound(text)) {
+      // A read with a `||` default can never be unset, so it is not required.
+      if (line.includes('||')) continue;
+      assert.ok(guarded.includes(secret),
+        `${name} reads ${secret} but will start without it — an unset one then ` +
+        `surfaces as a downstream failure rather than as "not configured"`);
+    }
+  }
 });

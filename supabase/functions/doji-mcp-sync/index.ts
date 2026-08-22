@@ -449,9 +449,14 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   // re-opens.
   //
   // A missing secret is a hard failure, never an open door: an unset
-  // DOJI_CRON_SECRET must not mean "let everyone in".
-  if (!CRON_SECRET) {
-    console.error("doji-mcp-sync: DOJI_CRON_SECRET not set — refusing all requests");
+  // DOJI_CRON_SECRET must not mean "let everyone in". The other three are here
+  // for a different reason — none of them is an authorisation and each would
+  // otherwise surface a page or two downstream, as a 401 from cTrader or a
+  // Postgres complaint about a user_id that is not a uuid. Naming the problem
+  // at the door is the whole point of a 503, and pg_cron discards every answer
+  // but this one.
+  if (!CRON_SECRET || !MCP_TOKEN || !USER_ID || !SB_KEY) {
+    console.error("doji-mcp-sync: a required secret is not set — refusing all requests");
     return json({ ok: false, error: "not configured" }, 503);
   }
   if (!secretMatches(req.headers.get("x-doji-key"), CRON_SECRET)) {
@@ -460,10 +465,6 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   }
 
   try {
-    if (!MCP_TOKEN) throw new Error("CTRADER_MCP_TOKEN not set");
-    if (!USER_ID)   throw new Error("DOJI_USER_ID not set");
-    if (!SB_KEY)    throw new Error("no Supabase key available");
-
     // ?force=1 bypasses the schedule for manual runs and backfills.
     // ?hours=N  widens the window for one call, clamped to cTrader's 720h cap.
     // Neither selects a tool or reaches an MCP call with request-supplied data,
