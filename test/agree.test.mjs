@@ -141,11 +141,19 @@ const noteLimit = {
 };
 
 test('the note length is one number in all three places', () => {
-  const truncated = noteLimit.truncatedAt();
+  // Each number is read back out of its own file, so a pattern that stops
+  // matching yields NaN — and NaN against NaN would report a drift that is
+  // really this test having gone blind. All three are checked before they are
+  // compared, which is the same reason the setups lists are counted first.
+  const truncated  = noteLimit.truncatedAt();
+  const constraint = noteLimit.constrainedTo();
+  const promised   = noteLimit.toldToTheModel();
   assert.ok(Number.isInteger(truncated), 'writeNote no longer truncates at a literal length');
+  assert.ok(Number.isInteger(constraint), 'the note constraint no longer reads as a char_length range');
+  assert.ok(Number.isInteger(promised), 'the tool description no longer states a character budget');
 
-  assert.equal(noteLimit.constrainedTo(), truncated,
+  assert.equal(constraint, truncated,
     'Postgres would refuse notes writeNote considers fine — every remember() fails quietly');
-  assert.equal(noteLimit.toldToTheModel(), truncated,
+  assert.equal(promised, truncated,
     'the tool description promises the model a budget the code does not keep');
 });

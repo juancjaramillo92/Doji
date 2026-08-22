@@ -614,62 +614,62 @@ test('a briefing hour and a pulse hour never collide', () => {
 
 /* ─── Eugenia: which of the three schedules this hour owes ──────────────────
    Each predicate is right on its own and that is not the question — the three
-   overlap, and what an hour actually owes is the composition of them. So this
-   drives every hour of a full week, on both answers to "has a briefing landed",
-   and states the whole timetable rather than sampling it.
+   overlap, and what an hour owes is the composition of them.
+
+   So this walks 168 CONSECUTIVE HOURS and states the whole timetable, rather
+   than sampling four separate UTC days: a run that restarts at 00:00 UTC each
+   day never reaches Sunday 20:00–23:59 in New York, which is 00:00–03:59 UTC on
+   the Monday, and a spurious briefing hour hiding there would ship green.
+
+   Sun 16 Aug 2026 00:00 UTC is Sat 15 Aug 20:00 in New York, so the range
+   covers every New York hour of Sunday 16th through Friday 21st, and both
+   weekend edges.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('an ordinary weekday owes exactly one briefing and one pulse', () => {
-  // Wed 19 Aug 2026, EDT: 08:00 ET is 12:00 UTC.
+const timetable = (briefed) => {
   const owed = [];
-  for (let h = 0; h < 24; h++) {
-    const at = new Date(Date.UTC(2026, 7, 19, h));
-    // briefed: the 08:00 briefing landed, which is the ordinary day.
-    const due = dueNow(at, true);
-    if (due) owed.push([h - 4, due]);              // h - 4 is the New York hour
+  for (let h = 0; h < 24 * 7; h++) {
+    const at  = new Date(Date.UTC(2026, 7, 16, h));
+    const due = dueNow(at, briefed);
+    if (due) owed.push(`${at.toISOString().slice(0, 16)} ${due}`);
   }
-  assert.deepEqual(owed, [[8, 'weekday'], [10, 'pulse']]);
+  return owed;
+};
+
+test('an ordinary week owes one briefing and one pulse a day, and nothing else', () => {
+  // August, so New York is EDT: 08:00 ET is 12:00 UTC, 10:00 ET is 14:00, and
+  // the Sunday open at 17:00 ET is 21:00.
+  assert.deepEqual(timetable(true), [
+    '2026-08-16T21:00 sunday',
+    '2026-08-17T12:00 weekday', '2026-08-17T14:00 pulse',
+    '2026-08-18T12:00 weekday', '2026-08-18T14:00 pulse',
+    '2026-08-19T12:00 weekday', '2026-08-19T14:00 pulse',
+    '2026-08-20T12:00 weekday', '2026-08-20T14:00 pulse',
+    '2026-08-21T12:00 weekday', '2026-08-21T14:00 pulse',
+  ]);
 });
 
-test('a morning whose briefing failed owes the retry, and the pulse gives way', () => {
-  const owed = [];
-  for (let h = 0; h < 24; h++) {
-    const at = new Date(Date.UTC(2026, 7, 19, h));
-    const due = dueNow(at, false);
-    if (due) owed.push([h - 4, due]);
-  }
-  // 10:00 is the one hour both apply to, and it goes to the retry: a second
-  // look at a morning he was never told about is not what is missing.
-  assert.deepEqual(owed, [[8, 'weekday'], [9, 'weekday'], [10, 'weekday'], [11, 'weekday']]);
-});
-
-test('Sunday owes the open briefing and nothing else', () => {
-  const owed = [];
-  for (let h = 0; h < 24; h++) {
-    const at = new Date(Date.UTC(2026, 7, 23, h));   // Sun 23 Aug, EDT
-    const due = dueNow(at, true);
-    if (due) owed.push([h - 4, due]);
-  }
-  assert.deepEqual(owed, [[17, 'sunday']]);
-});
-
-test('Saturday owes nothing, briefed or not', () => {
-  for (let h = 0; h < 24; h++) {
-    const at = new Date(Date.UTC(2026, 7, 22, h));
-    assert.equal(dueNow(at, true), null, at.toISOString());
-    assert.equal(dueNow(at, false), null, at.toISOString());
-  }
+test('a week of failed briefings owes the retry hours, and the pulse gives way', () => {
+  // 09:00, 10:00 and 11:00 ET are 13:00, 14:00 and 15:00 UTC. 14:00 is the one
+  // hour the pulse also wants, and the retry takes it: a second look at a
+  // morning he was never told about is not what is missing.
+  const day = (d) => [`2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
+                      `2026-08-${d}T14:00 weekday`, `2026-08-${d}T15:00 weekday`];
+  assert.deepEqual(timetable(false), [
+    '2026-08-16T21:00 sunday',
+    ...day('17'), ...day('18'), ...day('19'), ...day('20'), ...day('21'),
+  ]);
 });
 
 test('the timetable holds its New York hours in winter too', () => {
-  // January: EST (UTC-5). Wed 14 Jan 2026.
+  // January: EST (UTC-5), so every hour above moves one later in UTC.
   const owed = [];
   for (let h = 0; h < 24; h++) {
-    const at = new Date(Date.UTC(2026, 0, 14, h));
+    const at  = new Date(Date.UTC(2026, 0, 14, h));   // Wed 14 Jan
     const due = dueNow(at, true);
-    if (due) owed.push([h - 5, due]);
+    if (due) owed.push(`${at.toISOString().slice(11, 16)} ${due}`);
   }
-  assert.deepEqual(owed, [[8, 'weekday'], [10, 'pulse']]);
+  assert.deepEqual(owed, ['13:00 weekday', '15:00 pulse']);
 });
 
 test('the pulse stays silent on the word it was told to use', () => {

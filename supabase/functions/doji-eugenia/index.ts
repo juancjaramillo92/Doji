@@ -605,9 +605,10 @@ async function postScheduled(url: URL): Promise<Response> {
       return await postBriefing(briefDue(now) ?? 'weekday');
     }
 
-    // briefedToday() is a database read, so it is only made in the hours whose
-    // answer can turn on it — which retryDue names.
-    const due = dueNow(now, retryDue(now) ? await briefedToday() : true);
+    // Which hours turn on this is dueNow's rule and is stated there once; a
+    // caller deciding when to bother asking would be the same rule again, and
+    // the read is thirty rows.
+    const due = dueNow(now, await briefedToday());
     if (due === 'pulse') return await postPulse();
     if (due) return await postBriefing(due);
 

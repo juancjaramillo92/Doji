@@ -62,8 +62,7 @@ Every change is:
 - **Where a copy is unavoidable, a test holds the copies together.** Four
   runtimes and no build step mean the setups vocabulary, the four journal column
   names and Eugenia's note limit genuinely live in more than one file.
-  `test/agree.test.mjs` reads
-  every copy of each and fails when they disagree. Adding a third copy of
+  `test/agree.test.mjs` reads every copy of each and fails when they disagree. Adding a third copy of
   anything means adding it there too — a copy nothing can compare is the actual
   defect, not the copy itself.
 - **Load-order safe.** Nothing references anything defined below it at load time.
@@ -218,9 +217,11 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
-- **Two schedules, one hourly job.** `briefDue` and `pulseDue` both read
-  `nyClock`, because pg_cron is UTC and a fixed expression is wrong for half the
-  year. A test walks every hour of a week asserting they never both fire — one
+- **Three schedules, one hourly job, and `dueNow` picks between them.**
+  `briefDue`, `pulseDue` and `retryDue` all read `nyClock`, because pg_cron is
+  UTC and a fixed expression is wrong for half the year. They overlap, so each
+  answering correctly on its own settles nothing: the composition is the
+  decision, and a test walks every hour of a week through `dueNow` because one
   call cannot owe two answers.
 - **The pulse's default is silence, and `isSilent` is how it is said.** It
   matches the bare word only, so a sentence merely opening with it is sent. Err
