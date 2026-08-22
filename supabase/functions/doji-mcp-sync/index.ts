@@ -74,6 +74,34 @@ const CRON_SECRET = env("DOJI_CRON_SECRET");
 // available.
 const USER_ID = env("DOJI_USER_ID");
 
+/* ─── Reading a window out of configuration ────────────────────────────────
+   Hours, clamped to cTrader's 720h cap, or null when the value is not a
+   positive number.
+
+   NaN IS THE FAILURE THAT MATTERS. `Number("6h")` is NaN, `Math.min(NaN, 720)`
+   is NaN, and a NaN window reaches get_deals as the string "NaN" — a poll that
+   asks for nothing and then reports whatever the broker makes of it. The query
+   flag was already guarded against exactly this; the two env vars were not, and
+   they are the ones a person edits in a dashboard months later.
+   ───────────────────────────────────────────────────────────────────────── */
+const clampHours = (raw: unknown): number | null => {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 720) : null;
+};
+
+/* An env var is different from a query flag: nobody is watching when it is
+   read, so a value that does not parse must stop the function rather than
+   quietly becoming the default. Absent is fine and means the default; PRESENT
+   AND WRONG is a configuration error, and a poller running a window nobody
+   chose is the shape this file exists to avoid. */
+function envHours(name: string, fallback: number): number {
+  const raw = env(name);
+  if (!raw) return fallback;
+  const hours = clampHours(raw);
+  if (hours === null) throw new Error(`${name} is not a positive number of hours: ${raw}`);
+  return hours;
+}
+
 /* ─── Write window ─────────────────────────────────────────────────────────
    Which positions get UPSERT. Wider than the cron interval so a missed run, a
    redeploy or a cold start self-heals on the next pass instead of leaving a
@@ -88,13 +116,14 @@ const USER_ID = env("DOJI_USER_ID");
    Six still tolerates 180 consecutive missed runs, far beyond any outage this
    is meant to survive.
    ───────────────────────────────────────────────────────────────────────── */
-const DEFAULT_LOOKBACK = Math.min(Number(env("LOOKBACK_HOURS") || 6), 720);
+const DEFAULT_LOOKBACK = envHours("LOOKBACK_HOURS", 6);
 
 // Backfills need the wide window without editing a secret and putting it back.
-// Read-only and clamped, same as the default. cTrader caps a range at 720h.
+// Read-only and clamped, same as the default. cTrader caps a range at 720h, and
+// a `?hours=` that is not a positive number falls back rather than refusing —
+// it arrives on a URL, where a typo is the caller's to notice immediately.
 export function lookbackFor(url: URL): number {
-  const raw = Number(url.searchParams.get("hours"));
-  return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 720) : DEFAULT_LOOKBACK;
+  return clampHours(url.searchParams.get("hours")) ?? DEFAULT_LOOKBACK;
 }
 
 /* ─── Fold window ──────────────────────────────────────────────────────────
@@ -118,7 +147,7 @@ export function lookbackFor(url: URL): number {
    slices, so this is a bound on how long a position may live, not a guess at a
    window. Raise it if that ever stops being true.
    ───────────────────────────────────────────────────────────────────────── */
-const MAX_POSITION_HOURS = Math.min(Number(env("MAX_POSITION_HOURS") || 72), 720);
+const MAX_POSITION_HOURS = envHours("MAX_POSITION_HOURS", 72);
 
 export const foldHours = (writeHours: number) =>
   Math.min(writeHours + MAX_POSITION_HOURS, 720);
@@ -155,12 +184,21 @@ export function balanceTarget(closes: { id: string; at: number }[], now: number)
   return best && now - best.at <= BALANCE_MAX_AGE_MS ? best.id : null;
 }
 
-// XAUUSD on this account. An account-specific magic number, so it is
-// overridable — a broker or account change would otherwise make this return
-// zero deals on every run and report success, which is the failure shape
-// hardest to notice.
-const SYMBOL_IDS: number[] = (env("SYMBOL_IDS") || "41")
-  .split(",").map(s => Number(s.trim())).filter(Number.isFinite);
+/* XAUUSD on this account. An account-specific magic number, so it is
+   overridable — a broker or account change would otherwise make this return
+   zero deals on every run and report success, which is the failure shape
+   hardest to notice.
+
+   A value that parses to nothing throws rather than emptying the list, because
+   an empty list is read below as "no filter" and would quietly file every
+   symbol on the account into an XAUUSD journal. Refusing the poll is the
+   smaller wrong: no trades appear, which is visible within minutes. */
+const SYMBOL_IDS: number[] = (() => {
+  const raw = env("SYMBOL_IDS") || "41";
+  const ids = raw.split(",").map(s => Number(s.trim())).filter(Number.isFinite);
+  if (!ids.length) throw new Error(`SYMBOL_IDS holds no usable symbol id: ${raw}`);
+  return ids;
+})();
 
 // Explicit: the server defaults to 50 and truncates silently.
 const MAX_ROWS = 500;
@@ -255,10 +293,7 @@ async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unkn
 export const ozFromVolume = (v: number) => v / 100;
 export const usdFromCents = (c: number) => c / 100;
 
-// The New York civil day an instant falls on. This is the day a trade is filed
-// under, and it is why an entry at 21:05 New York on 30 July stays on 30 July
-// instead of drifting to the 31st with the UTC date.
-// Takes an epoch, because every caller here has one — the deals carry
+// nyDate takes a Date; every caller here has an epoch, because the deals carry
 // executionTimestamp and nothing else.
 export const nyDay = (ms: number): string => nyDate(new Date(ms));
 
@@ -446,9 +481,36 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       maxRows: MAX_ROWS,
     });
 
+    /* TRUNCATION IS DATA LOSS, SO IT IS AN ERROR — AND IT IS CHECKED BEFORE
+       ANYTHING IS WRITTEN.
+
+       A truncated window can return a position's closing deals without its
+       entry, and foldPosition then reads direction off a close and inverts it,
+       along with entry_time, entry_price and open_day. This check used to sit
+       after the upsert, on the reasoning that the write had already happened
+       and nothing was lost by throwing — but that is backwards: the rows it
+       would have stopped are exactly the wrong ones, and they are now in the
+       table. Refusing to write is what "failing loudly" has to mean here.
+
+       It also used to return `truncated: true` in a 200 body, which
+       net.http_post discards — so the one signal that trades were being dropped
+       was reported to nobody, forever.
+
+       TWO signals, because one of them is a vendor field name we do not
+       control. If cTrader renames hasMore, returns has_more, or omits it when
+       truncating, the row-count check still fires. The window named is the FOLD
+       window, because that is the one that was read. */
+    const rawDeals = (data.deals ?? []).length;
+    if (data.hasMore === true || rawDeals >= MAX_ROWS) {
+      throw new Error(
+        `get_deals truncated at maxRows over a ${foldHours(hours)}h fold window ` +
+        `(${rawDeals} deals, hasMore=${data.hasMore}) — some positions may be ` +
+        `folded without their entry deal. Narrow the window.`);
+    }
+
     const deals: Deal[] = (data.deals ?? [])
       .filter((d: Deal) => d.dealStatus === "FILLED")
-      .filter((d: Deal) => !SYMBOL_IDS.length || SYMBOL_IDS.includes(d.symbolId));
+      .filter((d: Deal) => SYMBOL_IDS.includes(d.symbolId));
 
     const byPosition = new Map<number, Deal[]>();
     for (const d of deals) {
@@ -471,33 +533,6 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         closedAt: Math.max(...ds.map(d => d.executionTimestamp)),
       }));
     const n = await upsert(folded.map(f => f.row));
-
-    // TRUNCATION IS DATA LOSS, SO IT IS AN ERROR, NOT A FIELD.
-    //
-    // This used to return `truncated: true` in a 200 body. pg_cron invokes the
-    // function through net.http_post, which discards the response — so the one
-    // signal that trades were being dropped was reported to nobody, forever.
-    //
-    // It is also worse than losing rows: a truncated window can return a
-    // position's closing deals without its entry, and foldPosition then reads
-    // direction off a close and inverts it. Failing loudly is the only honest
-    // answer. The write above has already happened, so nothing is lost by
-    // throwing here — the next run repeats it.
-    //
-    // TWO signals, because one of them is a vendor field name we do not
-    // control. If cTrader renames hasMore, returns has_more, or omits it when
-    // truncating, the row-count check still fires. The window named here is the
-    // FOLD window, because that is the one that was read.
-    //
-    // Ahead of the balance write deliberately: a run that may have folded a
-    // position without its entry must not then stamp an account balance on it.
-    const rawDeals = (data.deals ?? []).length;
-    if (data.hasMore === true || rawDeals >= MAX_ROWS) {
-      throw new Error(
-        `get_deals truncated at maxRows over a ${foldHours(hours)}h fold window ` +
-        `(${rawDeals} deals, hasMore=${data.hasMore}) — some positions may be ` +
-        `folded without their entry deal. Narrow the window.`);
-    }
 
     // BALANCE REACHES THE TABLE NO OTHER WAY FROM HERE.
     //
