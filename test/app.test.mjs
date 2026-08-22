@@ -126,6 +126,23 @@ test('a save sends the journal columns and nothing else', async () => {
     ['followed_rules', 'followed_sl', 'followed_tp', 'setup']);
 });
 
+test('a save replaces the row it names, in both row sets', async () => {
+  /* replace() finds its row by id in `rows` AND in `all`, and `all` is what a
+     backup exports. Match the wrong one and a save writes over someone else's
+     trade; match nothing and it appends a duplicate. Neither shows on screen —
+     the panel just quietly holds two of something. */
+  db.error = null;
+  db.rows = [journalled({ id: 'PID1', pnl: 10 }), journalled({ id: 'PID2', pnl: 20 })];
+  await app.Data.load();
+
+  app.Data.replace({ ...journalled({ id: 'PID2', pnl: 20 }), setup: 'Support & Resistance' });
+
+  assert.equal(app.Data.rows.length, 2, 'the replacement was appended instead of replacing');
+  assert.equal(app.Data.all.length, 2, 'the backup copy now holds two of one trade');
+  assert.equal(app.Data.byId.get('PID2').setup, 'Support & Resistance');
+  assert.equal(app.Data.byId.get('PID1').setup, 'Break & Retest', 'the wrong row was overwritten');
+});
+
 /* ─── The scratch rule ───────────────────────────────────────────────────────
    A break-even is a distance in PRICE, and the reason is scale: $3 of P&L is $3
    of gold at 0.01 lots and three cents of gold at 1.00, so a dollar band would
@@ -167,6 +184,17 @@ test('a row with no prices falls back to the same $3 read against P&L', () => {
   // An open position is the same case from the other end: an entry price and no
   // exit yet, so there is no distance to measure.
   assert.equal(app.resultOf(trade({ exit_price: null, pnl: -40 })), 'loss');
+
+  /* AND THE HALF-PRICED ROW INSIDE THE BAND, which is the case that separates
+     "both prices" from "either price". A closed trade with an entry price and
+     no exit is a real state — it is the signature the README gives for a
+     position the poller folded without its entry deal — and with a P&L inside
+     the band the two readings disagree: measuring the distance gives NaN, which
+     is not ≤ 3, so the trade reads as a win it did not earn.
+
+     The -40 above cannot see that. Its P&L is outside the band either way. */
+  assert.equal(app.resultOf(trade({ exit_price: null, pnl: 1 })), 'be');
+  assert.equal(app.resultOf(trade({ entry_price: null, pnl: 1 })), 'be');
 });
 
 test('no P&L is not a break-even', () => {
@@ -226,6 +254,42 @@ test('the money split is on the sign, so a scratch still moves the dollars', () 
   assert.equal(app.money([scratch]).net, 2.5);
 });
 
+test('an average is bucketed on the result label, never on the sign', () => {
+  /* THE ONE PLACE money() AND averages() MUST DIFFER. money() splits on the
+     sign, so every dollar lands somewhere and profit minus loss equals net.
+     averages() splits on the LABEL, because a scratch is a dollar but not a
+     win — bucketed with the winners it adds nothing to the numerator and a
+     whole trade to the denominator, halving an average win that should read
+     $57.
+
+     Two wins and a scratch, all positive, all inside money()'s gross. */
+  const px = (entry, exit, pnl) => trade({ entry_price: entry, exit_price: exit, pnl });
+  const { avgWin, avgLoss } = app.rangeStats(
+    [px(4500, 4560, 57), px(4500, 4557, 57), px(4500, 4502, 2), px(4500, 4440, -30)],
+    '2000-01-01', '2100-01-01');
+
+  assert.equal(avgWin, 57, 'the scratch was averaged in with the winners');
+  assert.equal(avgLoss, 30);
+});
+
+test('a range opens where the range before it closed', () => {
+  /* The half-open bound is what makes that true: [start, end), so a trade
+     filed ON the start day is inside the range rather than in its opening
+     balance. Off by one in either direction and last month's closing figure
+     stops equalling this month's opening one, which is the whole point of the
+     panel. */
+  const on = (day, pnl) => trade({ open_day: day, entry_price: 4500, exit_price: 4600, pnl });
+  const rows = [on('2026-07-31', 10), on('2026-08-01', 100), on('2026-08-31', 5), on('2026-09-01', 999)];
+
+  const aug = app.rangeStats(rows, '2026-08-01', '2026-09-01');
+  assert.equal(aug.opening, 10, 'the range swallowed a day that belongs before it');
+  assert.equal(aug.n, 2, 'the bound included the first day of the next range');
+  assert.equal(aug.closing, 115);
+
+  const sep = app.rangeStats(rows, '2026-09-01', '2026-10-01');
+  assert.equal(sep.opening, aug.closing, 'September does not open where August closed');
+});
+
 test('a split always totals 100 percent, and nothing to split is null', () => {
   // The largest-remainder pass is there so three thirds read 34/33/33 rather
   // than 33/33/33 — a rate that does not add up is the kind of thing the trader
@@ -235,6 +299,52 @@ test('a split always totals 100 percent, and nothing to split is null', () => {
     assert.equal(p.reduce((a, b) => a + b, 0), 100, `${parts} split to ${p}`);
   }
   assert.equal(app.pctSplit([0, 0, 0]), null);   // no trades — not 0%, nothing
+});
+
+/* ─── The week and the backup key ────────────────────────────────────────────
+   The one rule that decides what "This Week" means, and the one that decides
+   when the weekly backup fires. Both hinge on 17:00 New York, both take their
+   date as an argument, and neither was covered — flipping either comparison
+   left the suite green.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the week opens at the Sunday 17:00 New York gold open', () => {
+  const wk = iso => app.Dates.weekStart(new Date(iso));
+
+  // Sunday 16 Aug 2026, EDT. 20:00 UTC is 16:00 ET — before the open, so the
+  // week that is running is still the one that began on the 9th.
+  assert.equal(wk('2026-08-16T20:00:00Z'), '2026-08-09');
+  // 21:00 UTC is 17:00 ET exactly: the new week starts on the minute.
+  assert.equal(wk('2026-08-16T21:00:00Z'), '2026-08-16');
+  // And every day after it belongs to that Sunday.
+  assert.equal(wk('2026-08-19T16:00:00Z'), '2026-08-16');
+  assert.equal(wk('2026-08-22T23:00:00Z'), '2026-08-16');
+});
+
+test('the weekend keeps reading the week that just ended, not a blank one', () => {
+  // THE REASON THE RULE IS NOT A CALENDAR SUNDAY. The gap between the Friday
+  // close and the Sunday open is when the week gets reviewed, and a calendar
+  // anchor would blank every figure at exactly that moment.
+  assert.equal(app.Dates.weekStart(new Date('2026-08-16T15:00:00Z')), '2026-08-09');
+});
+
+test('the week boundary holds its New York hour in winter too', () => {
+  // January: EST, so 17:00 ET is 22:00 UTC rather than 21:00. An hour built in
+  // UTC would open the week an hour early for half the year.
+  assert.equal(app.Dates.weekStart(new Date('2026-01-11T21:30:00Z')), '2026-01-04');
+  assert.equal(app.Dates.weekStart(new Date('2026-01-11T22:00:00Z')), '2026-01-11');
+});
+
+test('the backup key is the Friday whose 17:00 New York close last passed', () => {
+  const key = iso => app.Dates.lastClose(new Date(iso));
+
+  // Fri 21 Aug 2026, EDT. Before 17:00 ET the week has not closed, so the key
+  // is still the previous Friday and the backup does not fire twice.
+  assert.equal(key('2026-08-21T20:00:00Z'), '2026-08-14');
+  assert.equal(key('2026-08-21T21:00:00Z'), '2026-08-21');
+  // It then holds all weekend and into the next week.
+  assert.equal(key('2026-08-23T12:00:00Z'), '2026-08-21');
+  assert.equal(key('2026-08-27T12:00:00Z'), '2026-08-21');
 });
 
 /* ─── Filing and sessions ────────────────────────────────────────────────── */
