@@ -439,6 +439,18 @@ coerced. A **missing** figure is dropped rather than sent as null, because
 `merge-duplicates` writes exactly the keys present and `direction: null` would
 erase a correct direction rather than leave it alone.
 
+**The parser is anchored to a saved message, not to a guess at one.**
+`test/fixtures/` holds the decoded body of a real alert for a fill that is in
+the database, and every field is checked against what the broker actually sent.
+One thing that body cannot settle on its own: cTrader writes the fill time day
+first, `19/08/2026`, and 19 is not a month — so the real message parses correctly
+under either reading. A separate test pins the ambiguous case, because a
+month-first reading would file every fill between the 1st and the 12th in the
+wrong month with the P&L and the balance all correct and nothing reporting it.
+Each field is read from one label; if cTrader renames one the fill is refused,
+the thread is labelled `doji-parse-failed` and the subject is logged, which is a
+louder failure than an alias nobody has seen matching some other line.
+
 **`net_pnl` is the one nothing else can supply, and it is why this script
 stays.** `computed_pnl` is arithmetic over the deals — entry, exit, volume,
 commission — and swap appears in none of them, so a position carried through the

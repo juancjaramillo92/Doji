@@ -51,7 +51,7 @@ const USER_ID = env("DOJI_USER_ID");
 /* ─── The boundary ─────────────────────────────────────────────────────────
    Everything below arrived over the wire, so nothing above it is trusted.
 
-   The four columns and their shapes, stated once:
+   The five columns and their shapes, stated once:
 
      id          `PID` + digits, exactly as foldPosition mints it. Unprefixed,
                  the same position would land on a second row.

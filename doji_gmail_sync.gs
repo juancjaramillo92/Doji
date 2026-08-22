@@ -3,13 +3,12 @@
  * ─────────────────────────────────────────────────────────────────────────
  * Runs in your own Google account. Every minute it finds unprocessed cTrader
  * alerts, parses the fill, and posts it to the doji-email-sync Edge Function,
- * which merges TWO VALUES into `trades`:
+ * which merges FOUR VALUES into `trades`:
  *
- *   net_pnl  — includes swap, which get_deals does not report
- *   balance  — account balance after the fill
- *
- * plus fill_time, which is the filing-day fallback for a position the MCP
- * poller never reached, and direction, which is the only source for one.
+ *   net_pnl    includes swap, which get_deals does not report
+ *   balance    the account after the fill
+ *   fill_time  the filing-day fallback for a position the poller never reached
+ *   direction  the only source for one the poller never reached
  *
  * That is the whole job. Everything else about a trade — entry time, entry and
  * exit price, commission, the New York filing day, the computed P&L — belongs
@@ -55,8 +54,9 @@ var FAIL_LABEL = 'doji-parse-failed';
 
 // 90 days rather than 30. The label is what stops a message being re-read, so
 // the window only has to be wider than the longest plausible outage — and it is
-// what bounds resetDojiLabels(), the repair path, which at 30 days could not
-// reach anything worth repairing.
+// also the reach of the repair path: resetDojiLabels() strips the labels, and
+// this is what decides how far back the next run then re-reads. At 30 days that
+// could not reach anything worth repairing.
 var GMAIL_QUERY = 'from:' + ALERT_FROM + ' -label:' + DONE_LABEL +
                   ' -label:' + FAIL_LABEL + ' newer_than:90d';
 
@@ -80,7 +80,9 @@ function syncPepperstone() {
     thread.getMessages().forEach(function (msg) {
       var subject = msg.getSubject() || '';
       // Only closed-trade alerts carry a position id and a P&L. Anything else
-      // from this sender — a margin notice — is skipped without failing.
+      // from this sender — a margin notice — is skipped, and the thread ends up
+      // labelled synced: nothing was written, but nothing ever will be, and the
+      // label is what stops it being read again every minute for ninety days.
       if (!/filled for/i.test(subject)) return;
 
       var fill = parseAlert_(subject, msg.getBody());
@@ -169,11 +171,23 @@ function parseAlert_(subject, htmlBody) {
     return null;
   })();
 
+  // DAY FIRST. cTrader sends `19/08/2026 20:22:55 (UTC)`, which is the 19th of
+  // August — and the saved fixture is the only thing that says so, because a
+  // day above twelve is the only way the two readings differ visibly. Read as
+  // month-first, every fill on the 1st to the 12th would be filed in the wrong
+  // month and nothing anywhere would report it. A test pins the ambiguous case.
+  //
   // The email states UTC explicitly, and the Z is what makes that stick.
   // Dropping it lets the runtime read the string in its own timezone, which is
   // how evening trades used to land on the wrong day.
+  //
+  // ONE LABEL, not a list of guesses at one. If cTrader renames the field the
+  // fill is refused, the thread is labelled doji-parse-failed and the subject is
+  // logged — a loud failure with a repair path. An alias nobody has ever seen
+  // trades that for the chance of reading some other line as the fill time,
+  // which would file the trade on the wrong day silently.
   var fillTime = (function () {
-    var raw = grab('Fill time') || grab('Filled time') || grab('Time') || '';
+    var raw = grab('Fill time') || '';
     var a = raw.match(/(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})/);
     if (a) return a[3] + '-' + a[2] + '-' + a[1] + 'T' + a[4] + ':' + a[5] + ':' + a[6] + 'Z';
     var b = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
@@ -190,7 +204,7 @@ function parseAlert_(subject, htmlBody) {
     // uses it as the filing-day fallback for a row the poller never folded.
     fill_time: fillTime,
     net_pnl:   num(grab('Net P&L')),
-    balance:   num(grab('Current balance') || grab('Balance'))
+    balance:   num(grab('Current balance'))
   };
 }
 

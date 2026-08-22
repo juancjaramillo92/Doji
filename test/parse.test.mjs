@@ -122,6 +122,20 @@ test('the fill time carries an explicit Z, because the email states UTC', () => 
   assert.equal(Date.parse(fill_time), Date.UTC(2026, 7, 19, 20, 22, 55));
 });
 
+test('the slashed date is day first, which is the only reading the fixture proves', () => {
+  /* THE ONE THING THE REAL MESSAGE CANNOT SETTLE. Its fill time is 19/08/2026,
+     and 19 is not a month — so it parses correctly under either reading and
+     says nothing about which one the parser uses. Every fill on the 1st to the
+     12th is where the two disagree, and there the wrong reading gives a real
+     date in the wrong month: filed silently, with the P&L and the balance all
+     correct, and nothing anywhere reporting it.
+
+     05/08/2026 is the 5th of August in cTrader's format. Under month-first it
+     would be the 8th of May. */
+  assert.equal(parse(alert({ fillTime: '05/08/2026 10:00:00 (UTC)' })).fill_time,
+    '2026-08-05T10:00:00Z');
+});
+
 test('an ISO fill time is accepted as well as the slashed one', () => {
   assert.equal(parse(alert({ fillTime: '2026-07-30 14:29:00 (UTC)' })).fill_time,
     '2026-07-30T14:29:00Z');
