@@ -164,11 +164,31 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
   if (res.ok) return json({ ok: true, id: fill.row.id });
 
-  const detail = (await res.text()).slice(0, 300);
-  if (res.status >= 400 && res.status < 500) {
+  // A body is not guaranteed, and "" tells the Apps Script log nothing.
+  const detail = (await res.text()).slice(0, 300) || `HTTP ${res.status}`;
+
+  /* PERMANENT IS A STATEMENT ABOUT THE ROW, NOT ABOUT THE CALLER, and getting
+     that backwards loses data. The first version of this treated every 4xx as
+     permanent — so a rotated SB_SECRET_KEY would answer 401, the Apps Script
+     would label the thread failed, it would drop out of the Gmail query, and
+     every queued fill's net_pnl would be gone. The key being wrong says nothing
+     about the fill.
+
+     So the list is the other way round: only a status that means Postgres
+     examined this row and will never accept it is permanent. 400 malformed, 409
+     a constraint, 422 unprocessable. Everything else — 401, 403, 404, 408, 429,
+     every 5xx, no response at all — is the caller, the connection or the
+     deployment, and a person fixing one of those wants the fill still waiting.
+
+     The two failure modes are not symmetrical. Retrying something permanent
+     costs a thread sitting in the queue, which is visible and harmless.
+     Discarding something transient costs the only settled P&L this system
+     ever gets. */
+  const PERMANENT = [400, 409, 422];
+  if (PERMANENT.includes(res.status)) {
     console.error(`doji-email-sync: refused by PostgREST (${res.status}) — ${detail}`);
     return json({ ok: false, error: detail }, 400);
   }
   console.error(`doji-email-sync: write failed (${res.status}) — ${detail}`);
-  return json({ ok: false, error: "write failed" }, 500);
+  return json({ ok: false, error: detail }, 500);
 });

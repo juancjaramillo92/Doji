@@ -395,6 +395,42 @@ test('every button fits inside Telegram\'s 64-byte callback_data cap', () => {
   }
 });
 
+test('no setup name contains the delimiter its callback_data is split on', () => {
+  /* callback_data is `id|field|value`, and parseCallback refuses anything that
+     is not exactly two or three parts. A setup named "Break | Retest" would
+     therefore arrive as four and every tap on it would be dropped — silently,
+     because an unrecognised payload is acknowledged and ignored by design.
+
+     The vocabulary is the one string in this system a person edits, and nothing
+     else checks this. It is the same class as the 64-byte cap above: a legal
+     name that the grammar cannot carry. */
+  for (const setup of SETUPS) {
+    assert.equal(setup.includes('|'), false,
+      `"${setup}" contains the callback_data delimiter and can never be tapped`);
+  }
+});
+
+test('the message heads with the New York hour and the New York day', () => {
+  /* Two instants either side of the boundary, because they fail differently.
+
+     04:05 UTC is 00:05 the same day in New York: only the HOUR moves, and it
+     moves to the one an h24 cycle would render as 24.
+
+     02:00 UTC is 22:00 the PREVIOUS day in New York: the DAY moves, which is
+     the failure that files a trade under tomorrow. The first fixture alone does
+     not cover this — its date reads 22 August in both zones, which an earlier
+     version of this comment claimed otherwise.
+
+     Driven through renderMessage rather than the private formatter, because the
+     message is what the trader reads. WHAT IT DOES NOT PROVE is the h24 half:
+     nyTime states hourCycle h23, and V8 resolves en-GB to h23 either way, so
+     reverting that option leaves this green. Reverting the timezone fails it. */
+  assert.match(renderMessage({ ...open, entry_time: '2026-08-22T04:05:00Z' }, false).text,
+    /22 Aug, 00:05 ET/);
+  assert.match(renderMessage({ ...open, entry_time: '2026-08-22T02:00:00Z' }, false).text,
+    /21 Aug, 22:00 ET/);
+});
+
 test('an unanswered trade opens on the full keyboard, one row per question', () => {
   const rows = renderMessage(open, false).reply_markup.inline_keyboard;
   assert.equal(rows.length, 4);
