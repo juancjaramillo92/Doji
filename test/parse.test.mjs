@@ -122,13 +122,15 @@ test('the fill time carries an explicit Z, because the email states UTC', () => 
   assert.equal(Date.parse(fill_time), Date.UTC(2026, 7, 19, 20, 22, 55));
 });
 
-test('the slashed date is day first, which is the only reading the fixture proves', () => {
-  /* THE ONE THING THE REAL MESSAGE CANNOT SETTLE. Its fill time is 19/08/2026,
-     and 19 is not a month — so it parses correctly under either reading and
-     says nothing about which one the parser uses. Every fill on the 1st to the
-     12th is where the two disagree, and there the wrong reading gives a real
-     date in the wrong month: filed silently, with the P&L and the balance all
-     correct, and nothing anywhere reporting it.
+test('the slashed date is day first, on the dates where that is a real choice', () => {
+  /* WHAT THE REAL MESSAGE CANNOT SETTLE. Its fill time is 19/08/2026, and 19 is
+     not a month — so a parser that simply swapped the two would produce
+     2026-19-08, which is not a date, and the tests above already catch it.
+
+     What they cannot catch is a reading that is only wrong when both numbers
+     are plausible months. There the wrong one gives a REAL date in the wrong
+     month: filed silently, with the P&L and the balance all correct, and
+     nothing anywhere reporting it. Every fill from the 1st to the 12th.
 
      05/08/2026 is the 5th of August in cTrader's format. Under month-first it
      would be the 8th of May. */
@@ -184,12 +186,26 @@ test('a fill with an unreadable time is refused rather than filed under today', 
   assert.equal(parse(alert({ fillTime: 'just now' })), null);
 });
 
-test('a missing P&L is absent, not zero', () => {
-  // The real body with its Net P&L value blanked. null travels to the Edge
-  // Function, which drops the key rather than writing it — zero would be a real
-  // figure and would read as a scratch.
+test('a fill with no readable P&L is refused, not written without one', () => {
+  /* THE FIGURE NOTHING ELSE CAN SUPPLY. computed_pnl is arithmetic over the
+     deals and swap appears in none of them, so a row written from this email
+     without a net_pnl keeps the computed figure forever and looks complete
+     while doing it. Refusing labels the thread and logs the subject; writing
+     what parsed loses the number with nothing reporting it.
+
+     The real body with its Net P&L value blanked — which is also what a renamed
+     label would look like to the parser. */
   const body = ALERT.replace('USD -108.40', '');
-  assert.equal(parse(body).net_pnl, null);
+  assert.equal(parse(body), null);
+});
+
+test('a missing balance is absent rather than zero, and does not refuse the fill', () => {
+  // Unlike the P&L, this column has a second writer: the poller's get_balance
+  // fills it `where balance is null`. So it is dropped and repaired on the next
+  // poll. Zero would be a real figure and would read as a wiped-out account.
+  const fill = parse(ALERT.replace('USD 385.73', ''));
+  assert.equal(fill.balance, null);
+  assert.equal(fill.net_pnl, -108.40);
 });
 
 /* ─── The three outcomes ─────────────────────────────────────────────────────

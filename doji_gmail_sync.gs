@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  * Runs in your own Google account. Every minute it finds unprocessed cTrader
  * alerts, parses the fill, and posts it to the doji-email-sync Edge Function,
- * which merges FOUR VALUES into `trades`:
+ * which merges four values onto the position's row:
  *
  *   net_pnl    includes swap, which get_deals does not report
  *   balance    the account after the fill
@@ -195,7 +195,17 @@ function parseAlert_(subject, htmlBody) {
     return null;
   })();
 
-  if (!direction || !fillTime) return null;
+  var netPnl = num(grab('Net P&L'));
+
+  // NET P&L IS REQUIRED, and it is the only optional-looking field that is not.
+  // It is the one figure nothing else in this system can supply — computed_pnl
+  // is arithmetic over the deals and swap appears in none of them — so a fill
+  // written without it is a row that looks complete and carries the wrong P&L
+  // forever. Refusing labels the thread, logs the subject and leaves a repair
+  // path; writing what parsed leaves nothing at all. direction and fill_time
+  // are required for the same reason in reverse: nothing downstream can supply
+  // a direction, and a fill_time that did not parse would move a trade's day.
+  if (!direction || !fillTime || netPnl === null) return null;
 
   return {
     id:        positionId,
@@ -203,7 +213,11 @@ function parseAlert_(subject, htmlBody) {
     // The CLOSING instant — the email carries no entry data at all. The app
     // uses it as the filing-day fallback for a row the poller never folded.
     fill_time: fillTime,
-    net_pnl:   num(grab('Net P&L')),
+    net_pnl:   netPnl,
+    // The one field here that may go missing quietly, and it is the one that
+    // can afford to: the poller's get_balance writes this column too, under a
+    // `where balance is null` filter, so a dropped balance is repaired on the
+    // next poll rather than lost.
     balance:   num(grab('Current balance'))
   };
 }

@@ -439,17 +439,27 @@ coerced. A **missing** figure is dropped rather than sent as null, because
 `merge-duplicates` writes exactly the keys present and `direction: null` would
 erase a correct direction rather than leave it alone.
 
-**The parser is anchored to a saved message, not to a guess at one.**
-`test/fixtures/` holds the decoded body of a real alert for a fill that is in
-the database, and every field is checked against what the broker actually sent.
-One thing that body cannot settle on its own: cTrader writes the fill time day
-first, `19/08/2026`, and 19 is not a month — so the real message parses correctly
-under either reading. A separate test pins the ambiguous case, because a
-month-first reading would file every fill between the 1st and the 12th in the
-wrong month with the P&L and the balance all correct and nothing reporting it.
-Each field is read from one label; if cTrader renames one the fill is refused,
-the thread is labelled `doji-parse-failed` and the subject is logged, which is a
-louder failure than an alias nobody has seen matching some other line.
+**The script refuses a fill it cannot read in full.** Four of the five values
+are required — `id`, `direction`, `fill_time` and `net_pnl` — and if any of them
+does not parse, nothing is sent: the thread is labelled `doji-parse-failed`, the
+subject is logged, and the repair is to fix the parser and run
+`resetDojiLabels()`. `net_pnl` is required for the reason given below, and a row
+written without it would look complete while carrying the computed figure
+forever. `balance` is the one value allowed to go missing, and the one that can
+afford to: the poller writes that column too, `where balance is null`, so a
+dropped balance is repaired on the next poll.
+
+That is also why each value is read from **one** label rather than a list of
+candidates. A rename then fails loudly instead of half-writing, where an alias
+nobody has ever seen might match some other line and file the trade wrongly.
+
+**The fill time is day first.** cTrader writes `19/08/2026`, which is August the
+19th, and the saved alert cannot prove that on its own: a parser that swapped the
+two would produce `2026-19-08`, which is not a date at all and which the fixture
+tests already reject. What they cannot see is a reading that is wrong only when
+both numbers are plausible months — every fill from the 1st to the 12th, filed in
+the wrong month with every other figure correct. A separate test pins `05/08/2026`
+to the 5th of August for exactly that.
 
 **`net_pnl` is the one nothing else can supply, and it is why this script
 stays.** `computed_pnl` is arithmetic over the deals — entry, exit, volume,
@@ -1306,7 +1316,9 @@ database — so every field the parser claims is checked against what the broker
 sent rather than against a guess at it. Replacing the invented fixture caught
 two things immediately: money arrives as `USD -108.40`, with a currency prefix,
 and the fill time as `19/08/2026 20:22:55 (UTC)`, with the zone in brackets.
-Both parsed correctly; nothing had been proving it.
+Both parsed correctly; nothing had been proving it. A saved message settles the
+shape of a field and not always its meaning, which is why the day-first reading
+above needs a test the fixture cannot supply.
 
 The variants — a buy, a thousands separator, a missing figure, an unreadable
 time — are still built, because no saved message contains them. They are built
