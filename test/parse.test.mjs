@@ -276,6 +276,23 @@ test('one bad message in a thread does not discard the good one', () => {
   assert.deepEqual(t.labels, ['doji-parse-failed']);
 });
 
+test('the first run creates the two labels rather than failing on their absence', () => {
+  // A fresh Google account has neither, and getOrCreateLabel_ is what stands
+  // between that and a script that throws on its first minute. Nothing could
+  // reach that branch while the harness answered every lookup with a label.
+  const t = thread([message(SUBJECT, ALERT)]);
+  const gs = boot({ threads: [t], responses: [{ code: 200 }], existingLabels: [] });
+  gs.syncPepperstone();
+  assert.deepEqual(gs.created, ['doji-synced', 'doji-parse-failed']);
+  assert.deepEqual(t.labels, ['doji-synced']);
+});
+
+test('resetDojiLabels passes over a label that was never created', () => {
+  const gs = boot({ existingLabels: [] });
+  gs.resetDojiLabels();
+  assert.deepEqual(gs.created, [], 'the repair path created a label instead of skipping it');
+});
+
 /* ─── What leaves this machine ───────────────────────────────────────────── */
 
 test('the request carries the secret on the header the function checks', () => {

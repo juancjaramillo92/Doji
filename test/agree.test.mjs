@@ -33,9 +33,15 @@ const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.m
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-const FUNCTIONS = ['doji-mcp-sync', 'doji-gladys', 'doji-email-sync', 'doji-eugenia']
-  .map(name => ({ name, text: readFileSync(
-    new URL(`../supabase/functions/${name}/index.ts`, import.meta.url), 'utf8') }));
+// The functions as the DIRECTORY holds them, not as a list typed here: the two
+// tests below both need it, and a fifth function added to one copy and not the
+// other is the same defect this file exists to catch.
+const DEPLOYED = readdirSync(new URL('../supabase/functions', import.meta.url),
+  { withFileTypes: true })
+  .filter(e => e.isDirectory() && !e.name.startsWith('_')).map(e => e.name).sort();
+
+const FUNCTIONS = DEPLOYED.map(name => ({ name, text: readFileSync(
+  new URL(`../supabase/functions/${name}/index.ts`, import.meta.url), 'utf8') }));
 
 /* The vocabulary as Postgres will enforce it, read out of the constraint rather
    than out of a comment near it. Deliberately anchored on the constraint NAME:
@@ -194,11 +200,7 @@ const called = (text) =>
     .map(([, project, fn]) => ({ project, fn }));
 
 test('every function a caller names is a function that exists', () => {
-  const deployed = readdirSync(new URL('../supabase/functions', import.meta.url),
-    { withFileTypes: true })
-    .filter(e => e.isDirectory() && !e.name.startsWith('_')).map(e => e.name);
-
-  assert.deepEqual(deployed.sort(),
+  assert.deepEqual(DEPLOYED,
     ['doji-email-sync', 'doji-eugenia', 'doji-gladys', 'doji-mcp-sync'],
     'a function was added or removed — say so here, and check every caller');
 
@@ -207,7 +209,7 @@ test('every function a caller names is a function that exists', () => {
     // A caller that matched nothing would pass every assertion below it.
     assert.ok(urls.length, `${path} calls no Edge Function at all — has the URL shape changed?`);
     for (const { fn } of urls) {
-      assert.ok(deployed.includes(fn), `${path} calls /functions/v1/${fn}, which is not deployed`);
+      assert.ok(DEPLOYED.includes(fn), `${path} calls /functions/v1/${fn}, which is not deployed`);
     }
   }
 });
@@ -279,9 +281,21 @@ test('a function refuses to run without every secret it reads', () => {
       `so a missing secret in that pair would not refuse the request`);
 
     const guarded = [...clause.matchAll(/!([A-Z_]+)/g)].map(m => m[1]);
-    for (const { name: secret, line } of bound(text)) {
-      // A read with a `||` default can never be unset, so it is not required.
-      if (line.includes('||')) continue;
+
+    // A read with a `||` default can never be unset, so it is not required.
+    const required = bound(text).filter(b => !b.line.includes('||')).map(b => b.name);
+    // SB_KEY is not bound here — it comes from _shared — so it has to be added
+    // by hand, and it is the secret whose silent absence this whole guard is
+    // named after.
+    if (/\bSB_KEY\b/.test(text)) required.push('SB_KEY');
+
+    // WITHOUT THIS THE LOOP BELOW IS VACUOUS. bound() reads `const X = env(` and
+    // a file that stopped binding its secrets that way would satisfy every
+    // guard, including `if (false)`.
+    assert.ok(required.length >= 2,
+      `${name}: only ${required.length} required secrets found — the reader has gone blind`);
+
+    for (const secret of required) {
       assert.ok(guarded.includes(secret),
         `${name} reads ${secret} but will start without it — an unset one then ` +
         `surfaces as a downstream failure rather than as "not configured"`);

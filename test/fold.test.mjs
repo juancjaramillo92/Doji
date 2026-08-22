@@ -566,6 +566,33 @@ test('the taps are taken off the buttons the form actually drew', () => {
   }
 });
 
+test('every button either form draws is a tap the parser accepts', () => {
+  /* The sequence above walks one path through the keyboard — the ✓ half of each
+     pair, and the first setup. Everything it does not press is untested by it,
+     and a ✗ drawn as `|no` instead of `|0` is refused by parseCallback exactly
+     as silently as a ✓ would be: acknowledged, dropped, no change on screen.
+
+     So this presses nothing and checks everything. Both forms, every row, every
+     button, including the [Edit] and [Done] that write no column at all. */
+  const forms = [
+    ['the open form', renderMessage(open, false)],
+    ['the settled summary', renderMessage(settled, false)],
+    ['a reopened form', renderMessage(settled, true)],
+  ];
+
+  for (const [what, msg] of forms) {
+    const buttons = msg.reply_markup.inline_keyboard.flat();
+    assert.ok(buttons.length, `${what} draws no buttons at all`);
+
+    for (const btn of buttons) {
+      const tap = parseCallback(btn.callback_data);
+      assert.ok(tap, `${what} draws "${btn.callback_data}", which parseCallback refuses`);
+      // A tap that names a column must name one of the four, and only those.
+      if (tap.column) assert.ok(Object.values(COLUMNS).includes(tap.column), tap.column);
+    }
+  }
+});
+
 test('a correction inside a reopened form does not re-settle it', () => {
   // Reopened means every answer was already in before this tap. Collapsing here
   // would make a two-field correction need [Edit] pressed twice.
