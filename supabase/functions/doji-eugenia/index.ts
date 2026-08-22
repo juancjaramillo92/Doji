@@ -459,6 +459,31 @@ async function remember(turns: Turn[]) {
    never resent forever as history.
    ───────────────────────────────────────────────────────────────────────── */
 
+/* ─── What time it is ─────────────────────────────────────────────────────
+   SHE HAS NO CLOCK OTHERWISE, and the absence does not read as one. Her whole
+   context is a system prompt about morning briefings and a history whose most
+   recent long turn IS this morning's briefing — so asked a question at 23:42
+   she opened with "morning", which is not a model error but the only inference
+   available from what she was given.
+
+   It also silently undermines everything she says about dates. The prompt asks
+   her to be specific with dates and to say he has not traded since one, and
+   get_trades computes its window from Date.now() on this side — so the DATA is
+   right while her narration of it is a guess.
+
+   A display format with one caller, so it stays here rather than in _shared,
+   the same way Gladys's nyTime does. The trust clause is load-bearing: the
+   turns above genuinely are from this morning, and without it the freshest
+   thing in her context still argues for the wrong answer. */
+const nyStamp = (now: Date) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/New_York', weekday: 'long', day: 'numeric', month: 'long',
+  year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(now);
+
+export const nowBlock = (now = new Date()) =>
+  `\n\n[Right now it is ${nyStamp(now)} in New York. Trust this over anything ` +
+  `the conversation above implies about the time or the date.]`;
+
 // Optional by design: a database blip must cost her the memory, not the
 // briefing. Logged, because a bot that has quietly stopped remembering reads
 // exactly like a bot with nothing to remember.
@@ -598,7 +623,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    + await notesBlock() + await tradesBlock();
+    + nowBlock() + await notesBlock() + await tradesBlock();
 
   const brief = await ask([...await recent(), { role: 'user', content: asked }], 'high');
 
@@ -635,7 +660,7 @@ export const isSilent = (text: string) => /^nothing[.!\s]*$/i.test(text.trim());
    a week of "NOTHING" pairs would push the morning's briefing out of it — the
    one thing a follow-up question actually needs. */
 async function postPulse(): Promise<Response> {
-  const asked = "Pulse, please — anything since the briefing?" + await notesBlock();
+  const asked = "Pulse, please — anything since the briefing?" + nowBlock() + await notesBlock();
   const said = await ask([...await recent(), { role: 'user', content: asked }], 'medium');
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
@@ -692,7 +717,9 @@ async function handleMessage(update: any): Promise<void> {
     let answer: string;
     try {
       const history = await recent();
-      answer = await ask([...history, { role: 'user', content: msg.text + await notesBlock() }], 'medium');
+      answer = await ask(
+        [...history, { role: 'user', content: msg.text + nowBlock() + await notesBlock() }],
+        'medium');
     } finally {
       // Stopped the moment there is something to send, not after sending it —
       // otherwise a ping fires between the message landing and the write, and

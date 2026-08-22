@@ -37,7 +37,7 @@ import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/fun
 import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
 import {
   briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
-  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser,
+  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
@@ -858,4 +858,30 @@ test('zero is a real P&L and must survive', () => {
   // The one falsy value that is a figure. Dropped, the trade would keep a
   // computed P&L that includes no swap.
   assert.equal(rowOf(fill({ net_pnl: 0 })).net_pnl, 0);
+});
+
+/* ─── The clock she is given ─────────────────────────────────────────────────
+   She has no other one. Asked a question at 23:42 she answered "morning",
+   because her whole context is a system prompt about morning briefings and a
+   history whose most recent long turn IS that morning's briefing — the only
+   inference available from what she was handed.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the stamp is the New York wall clock, not UTC', () => {
+  // 03:42 UTC is the night before in New York, which is the case that produced
+  // "morning" at twenty to midnight.
+  const at = nowBlock(new Date('2026-08-22T03:42:00Z'));
+  assert.match(at, /Friday, 21 August 2026 at 23:42/);
+  assert.equal(at.includes('22 August'), false, 'the UTC date leaked through');
+});
+
+test('the stamp follows New York through the daylight-saving change', () => {
+  assert.match(nowBlock(new Date('2026-01-15T14:00:00Z')), /at 09:00/);   // EST, UTC-5
+  assert.match(nowBlock(new Date('2026-07-15T14:00:00Z')), /at 10:00/);   // EDT, UTC-4
+});
+
+test('the stamp tells her to trust it over the conversation', () => {
+  // Without this the freshest thing in her context is still this morning's
+  // briefing, and it argues for the wrong answer.
+  assert.match(nowBlock(new Date()), /Trust this over anything the conversation/);
 });

@@ -777,6 +777,15 @@ call and routes by refusal category, so there is no model list here to go stale.
 A decline before any output is not billed. The `stop_reason === "refusal"` check
 stays and still fires: it is now the case where the whole chain declined.
 
+**She is told what time it is, because she has no other clock.** Asked a
+question at 23:42 she opened with "morning" — not a model error, but the only
+inference available from what she was given: a system prompt about morning
+briefings, and a history whose most recent long turn was that morning's
+briefing. Every turn now carries the New York date and time, and the prompt
+tells her to trust it over the conversation, because the conversation genuinely
+does argue for morning. It also stops her guessing today's date in a sentence
+about when he last traded.
+
 **A slash command is answered without a model call.** `/start` arrives once per
 install and is addressed to Telegram rather than to her; answering it the normal
 way costs a full turn with the notes attached. Gladys ignores everything that is
