@@ -1,9 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — everything that runs on a timer
 -- ───────────────────────────────────────────────────────────────────────────
--- Two jobs: the poller every two minutes, Eugenia every hour. One file, because
--- "what fires on its own in this system" should be one place to look rather
--- than one file per feature.
+-- Three jobs: the poller every two minutes, Eugenia every hour, and a nightly
+-- sweep of pg_cron's own history. One file, because "what fires on its own in
+-- this system" should be one place to look rather than one file per feature.
 --
 -- THE POLLER'S JOB WAS NOT IN THIS REPOSITORY UNTIL NOW, and it is the most
 -- load-bearing scheduled thing here — every trade arrives through it. Its
@@ -13,15 +13,17 @@
 -- repository that describes a system while the system runs something else.
 --
 -- SAFE TO RE-RUN. cron.schedule upserts on the job name, so applying this file
--- replaces whatever is scheduled under these two names with what it says. That
+-- replaces whatever is scheduled under these three names with what it says. That
 -- is what makes the file the source of truth rather than a description of one —
 -- run it and the database matches, rather than reading the database to find out
 -- whether it does.
 --
--- NEITHER JOB HOLDS DATABASE POWER. Each presents the cron secret, read from
--- Vault at call time rather than written into the job text. An earlier version
--- of the poller's job carried a legacy service_role JWT — full RLS-bypassing
--- access, in a job definition, unrotatable.
+-- NEITHER OF THE TWO CALLING JOBS HOLDS DATABASE POWER. Each presents the cron
+-- secret, read from Vault at call time rather than written into the job text.
+-- An earlier version of the poller's job carried a legacy service_role JWT —
+-- full RLS-bypassing access, in a job definition, unrotatable. The third job is
+-- the exception and is the reason for the distinction: it is a DELETE, and it
+-- reaches nothing outside pg_cron's own history.
 --
 -- ONE VALUE, TWO STORES, TWO SPELLINGS, and it is worth knowing before touching
 -- either: the Edge Functions read it from their own secrets as
@@ -84,4 +86,16 @@ select cron.schedule(
       timeout_milliseconds := 300000
     );
   $$
+);
+
+-- ─── Housekeeping ──────────────────────────────────────────────────────────
+-- cron.job_run_details grows by 750 rows a day from the poller alone and
+-- nothing prunes it on its own. Seven days is longer than any question anyone
+-- asks of it — and it is not where a failure is diagnosed anyway, because it
+-- records that the SQL ran, not what the function answered. net._http_response
+-- is the one that carries the answer, and Supabase prunes that itself.
+select cron.schedule(
+  'purge-cron-history',
+  '0 3 * * *',
+  $$ delete from cron.job_run_details where end_time < now() - interval '7 days' $$
 );
