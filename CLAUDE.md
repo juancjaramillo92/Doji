@@ -62,9 +62,9 @@ Every change is:
 - **Where a copy is unavoidable, a test holds the copies together.** Four
   runtimes and no build step mean the setups vocabulary, the four journal column
   names and Eugenia's note limit genuinely live in more than one file.
-  `test/agree.test.mjs` reads every copy of each and fails when they disagree. Adding a third copy of
-  anything means adding it there too — a copy nothing can compare is the actual
-  defect, not the copy itself.
+  `test/agree.test.mjs` reads every copy of each and fails when they disagree.
+  Adding a third copy of anything means adding it there too — a copy nothing can
+  compare is the actual defect, not the copy itself.
 - **Load-order safe.** Nothing references anything defined below it at load time.
   New code goes in the section it belongs to, under the right banner — not at the
   bottom because that is easier.
@@ -110,26 +110,28 @@ sequence end to end over one that asserts on a function in isolation.
 
 ---
 
-## Tests — run both, always
+## Tests — one command, and run it
 
 ```sh
 npm ci        # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types` needs. Four suites, and the script globs `test/*.test.mjs` one level, so a
-test in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
+Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
+needs. Four suites, and the script globs `test/*.test.mjs` one level, so a test
+in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
 of all four Edge Functions and of `_shared`; `app.test.mjs` boots `index.html` in
 jsdom with a recording Supabase stand-in; `agree.test.mjs` holds the duplicated
 vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
 Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
 suites.
 
-They do **not** cover pixels, realtime, auth, the xlsx export, or whether the
-email parser matches a real cTrader message — its fixtures are built to the
-alert's shape. Nor can anything here see the live database: `verify.sql` is that
-check and a person runs it. So a good deal of what a change can break is only
-caught by reading. You cannot see pixels; say so on any visual change.
+They do **not** cover pixels, realtime, auth or the xlsx export. The email
+parser IS held to a real cTrader message — `test/fixtures/` holds a saved one —
+but only that one; the variants around it are built. Nor can anything here see
+the live database: `verify.sql` is that check and a person runs it. So a good
+deal of what a change can break is only caught by reading. You cannot see
+pixels; say so on any visual change.
 
 ---
 

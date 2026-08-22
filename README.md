@@ -47,7 +47,7 @@ supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_gladys.sql                 Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
-supabase/004_cron.sql                   both scheduled jobs
+supabase/004_cron.sql                   every scheduled job
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -56,8 +56,10 @@ supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
-.github/workflows/test.yml              runs both suites on every push
+.github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
+package.json                            one dev dependency and the test script
+package-lock.json                       committed — see Tests
 ```
 
 ---
@@ -236,19 +238,30 @@ not required.
 
 ## Facts that live in more than one file
 
-Four runtimes and no build step, so two things genuinely cannot be single-sourced
-at run time: the **setups vocabulary** (`CONFIG.SETUPS`, Gladys's `SETUPS`,
-`trades_setup_check`) and the **four journal column names** (`Data.OWNED`,
-Gladys's `COLUMNS`, and the columns themselves).
+Four runtimes, five languages and no build step, so some things genuinely cannot
+be single-sourced at run time:
+
+| The fact | Where its copies live |
+|---|---|
+| the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves |
+| Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
+| the **project ref** | eight files, in five languages, three of them not URLs |
+| each function's **required secrets** | its `env()` calls and its own boot guard |
 
 Copies are the cost. Copies that can *disagree* were the risk, and that is what
-`test/agree.test.mjs` closes: it reads all three of each — the app out of
+`test/agree.test.mjs` closes: it reads every copy of each — the app out of
 `index.html` through the same jsdom harness the render tests use, the function
-exports directly, and the constraint out of the SQL as text — and fails when
-they stop saying the same thing. Every one of those values was already tested
-before, and every one of those tests asserted against a literal typed into the
-file beside it, so changing a list and its own test in one pass left the other
-copies untouched and the suite green.
+exports directly, the constraint and the cron jobs out of the SQL as text, the
+project ref out of the workflow and `config.toml` — and fails when they stop
+saying the same thing. Adding a third copy of anything means adding it there
+too: a copy nothing can compare is the defect, not the copy.
+
+Every one of those values was already tested before, and every one of those
+tests asserted against a literal typed into the file beside it — so changing a
+list and its own test in one pass left the other copies untouched and the suite
+green.
 
 It also asserts the guarantee rather than only the lists: no broker column may
 appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
@@ -1241,9 +1254,9 @@ not run.
 | File | Covers |
 |---|---|
 | `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
-| `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; and every function name and project ref a caller uses, across `002_gladys.sql`, `004_cron.sql` and the Apps Script |
-| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
+| `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; every function's `verify_jwt` stanza against the directory that holds it; and every secret a function reads against the guard that refuses to start without it |
+| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
 
@@ -1286,38 +1299,30 @@ plain JSON and testable, and is not tested. And `boot()` returns the recorded
 Chart configs so a test can read what a wheel was asked to draw; nothing does,
 so the wheels are checked for not throwing and nothing more.
 
-**A check you have not proved can fail is not a check.** Both suites were run
-against deliberately broken copies before being trusted: the fold tests against
-an inverted entry deal, a double-counted commission, a fold window collapsed to
-the write window, a `balanceTarget` with its age bound removed, one that returns
-the earliest close instead of the latest, and a secret comparison that ignores
-length; the Telegram tests against a setup whitelist removed, a discipline
-answer that accepts anything, `direction` added to the reachable columns, `sl`
-and `tp` swapped, a loosened trade id, `null` drawn as `no`, the clock reverted
-to UTC, a keyboard row dropped, a summary spilling onto two lines, a setup name
-long enough to overrun the 64-byte cap, `staysOpen` forced true — which is the
-bug that shipped, restored on purpose — one that stops `[Edit]` reopening, and
-one that lets a reopened form re-settle, Eugenia's schedule reverted to UTC
-hours, a Saturday briefing, the Sunday briefing moved to the weekday hour,
-swapped salutations, a splitter that stops splitting and one that drops its last
-piece; the client tests
-against a widened break-even band, break-evens dropped from the win-rate
-denominator, a stray column in `Data.OWNED`, a session derived from the close,
-an inverted filing anchor and a throwing renderer. Every one of those was
-caught.
+**A check you have not proved can fail is not a check.** Every test here was run
+against a deliberately broken copy of the thing it covers before it was
+believed, and the rule is the point rather than the inventory — a list of the
+individual breaks would be a changelog, and would be stale the day it was
+written. Three that are worth keeping because they name a shape rather than a
+line:
 
-The checks added since were broken the same way before being trusted. The
-**agreement** tests against a setup added to `index.html` alone, a setup added
-to Gladys alone, a setup changed in the constraint alone, a journal column
-renamed in `Data.OWNED` alone, and `direction` added to Gladys's `COLUMNS` — five
-edits, each on one side of a pair, each caught. The **email parser** against a
-fill time with its `Z` dropped, an inverted position side, thousands separators
-left unstripped, and — the one that matters most — a transient send failure
-recorded as permanent, which is the shape that discards a fill's P&L forever.
-The **shared clock** against a timezone reverted to UTC, which took nine tests
-with it. **`openOnUser`** against a repair turned back into a no-op, which is
-precisely the state that shipped. And the **email boundary** against a whitelist
-widened to let `entry_price` and `setup` through.
+- **`staysOpen` forced true** — the bug that actually shipped, and the reason
+  CLAUDE.md opens on it. A whole suite stayed green because it handed the
+  renderer the flag it should have derived.
+- **A transient send failure recorded as permanent**, which is the shape that
+  discards a fill's P&L forever — and it appears twice, once in the Apps Script
+  and once in the Edge Function that answers it.
+- **A timezone reverted to UTC**, which takes nine tests with it, in a system
+  where every market boundary is New York wall time.
+
+The other direction is worth naming too, because it is subtler: several checks
+turned out to be unable to fail *before* the thing they cover was broken. A
+clock test whose call site could be deleted with the suite still green; a
+credential check that asked a stub rather than reading the file; a boot-guard
+check that passed a guard gutted to `if (false)`; a keyboard test that typed the
+payloads it should have taken off the buttons. Each was found the same way —
+break it on purpose, watch it stay green — and each was rewritten until it
+could fail.
 
 Do the same to any check added later — a green run from a scanner that cannot
 fail has more than once been mistaken here for clean code.
