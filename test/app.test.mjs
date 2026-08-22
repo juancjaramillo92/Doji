@@ -138,9 +138,15 @@ test('a save replaces the row it names, in both row sets', async () => {
   app.Data.replace({ ...journalled({ id: 'PID2', pnl: 20 }), setup: 'Support & Resistance' });
 
   assert.equal(app.Data.rows.length, 2, 'the replacement was appended instead of replacing');
-  assert.equal(app.Data.all.length, 2, 'the backup copy now holds two of one trade');
   assert.equal(app.Data.byId.get('PID2').setup, 'Support & Resistance');
   assert.equal(app.Data.byId.get('PID1').setup, 'Break & Retest', 'the wrong row was overwritten');
+
+  // `all` is the set a backup exports, and it is the half that goes wrong
+  // quietly: nothing on screen reads it, so a stale copy there shows up only in
+  // a restore, which is the one thing a restore point cannot get wrong.
+  assert.equal(app.Data.all.length, 2, 'the backup copy now holds two of one trade');
+  assert.equal(app.Data.all.find(t => t.id === 'PID2').setup, 'Support & Resistance',
+    'the backup copy still holds the pre-edit row');
 });
 
 /* ─── The scratch rule ───────────────────────────────────────────────────────
@@ -189,8 +195,9 @@ test('a row with no prices falls back to the same $3 read against P&L', () => {
      "both prices" from "either price". A closed trade with an entry price and
      no exit is a real state — it is the signature the README gives for a
      position the poller folded without its entry deal — and with a P&L inside
-     the band the two readings disagree: measuring the distance gives NaN, which
-     is not ≤ 3, so the trade reads as a win it did not earn.
+     the band the two readings disagree: the missing price is null, so measuring
+     the distance gives the other price itself, which is nowhere near ≤ 3, and
+     the trade reads as a win it did not earn.
 
      The -40 above cannot see that. Its P&L is outside the band either way. */
   assert.equal(app.resultOf(trade({ exit_price: null, pnl: 1 })), 'be');
@@ -312,20 +319,16 @@ test('the week opens at the Sunday 17:00 New York gold open', () => {
   const wk = iso => app.Dates.weekStart(new Date(iso));
 
   // Sunday 16 Aug 2026, EDT. 20:00 UTC is 16:00 ET — before the open, so the
-  // week that is running is still the one that began on the 9th.
+  // week that is running is still the one that began on the 9th. That is the
+  // reason the rule is not a calendar Sunday: the gap between the Friday close
+  // and the Sunday open is when the week gets reviewed, and a calendar anchor
+  // would blank every figure at exactly that moment.
   assert.equal(wk('2026-08-16T20:00:00Z'), '2026-08-09');
   // 21:00 UTC is 17:00 ET exactly: the new week starts on the minute.
   assert.equal(wk('2026-08-16T21:00:00Z'), '2026-08-16');
   // And every day after it belongs to that Sunday.
   assert.equal(wk('2026-08-19T16:00:00Z'), '2026-08-16');
   assert.equal(wk('2026-08-22T23:00:00Z'), '2026-08-16');
-});
-
-test('the weekend keeps reading the week that just ended, not a blank one', () => {
-  // THE REASON THE RULE IS NOT A CALENDAR SUNDAY. The gap between the Friday
-  // close and the Sunday open is when the week gets reviewed, and a calendar
-  // anchor would blank every figure at exactly that moment.
-  assert.equal(app.Dates.weekStart(new Date('2026-08-16T15:00:00Z')), '2026-08-09');
 });
 
 test('the week boundary holds its New York hour in winter too', () => {

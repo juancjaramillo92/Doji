@@ -1785,9 +1785,16 @@ const Dates = {
   },
 
   // hourCycle rather than hour12, which leaves the cycle to the locale and can
-  // resolve to h24 — midnight arriving as 24, and every boundary below reading
-  // it as after the close. Stating h23 removes the case instead of correcting
-  // for it afterwards, which is what _shared/edge.ts and Eugenia's clock do.
+  // resolve to h24 — midnight arriving as 24. It never bit here: 24 fails
+  // `h < close` exactly as 0 fails `h >= open`. It bit through nyParts, whose
+  // hour IS compared against 17. Stating h23 removes the case in both rather
+  // than correcting for it in each, which is what _shared/edge.ts and Eugenia's
+  // clock do — one answer across all four runtimes.
+  //
+  // It is also the file's browser floor: hourCycle is Safari 14 / iOS 14, above
+  // the ?. and ?? everywhere else here. An engine below it IGNORES the option
+  // and en-US falls back to h12, so hours arrive 1–12 and every session label
+  // and every 17:00 boundary is wrong without saying so.
   hourIn(tz, date) {
     const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' })
       .formatToParts(date);
@@ -3482,7 +3489,7 @@ const IO = {
       }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12}];
+    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:16},{wch:20},{wch:22}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Journal');
     const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
