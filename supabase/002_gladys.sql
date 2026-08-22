@@ -93,7 +93,12 @@ end $$;
 --   · The poller's own re-upserts. Only the first write of a position is an
 --     INSERT; every one after it inside the 6h write window is an UPDATE. One
 --     message per trade, and the mechanism is Postgres's, not a de-dupe check.
-create trigger trades_telegram_on_open
+-- REPLACE rather than CREATE, so this file can be applied to a database that
+-- already has it. The URL above changes when the function is renamed, and a
+-- file that errors on its last statement leaves the reader guessing whether the
+-- statements before it took. `create or replace trigger` is atomic — unlike a
+-- drop and recreate, there is no window in which an insert goes unannounced.
+create or replace trigger trades_telegram_on_open
   after insert on public.trades
   for each row
   when (new.entry_time > now() - interval '1 hour')
