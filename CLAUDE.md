@@ -60,8 +60,9 @@ Every change is:
   second way in a second spot — and that includes prose: a fact stated in the
   README does not get restated here.
 - **Where a copy is unavoidable, a test holds the copies together.** Four
-  runtimes and no build step mean the setups vocabulary and the four journal
-  column names genuinely live in more than one file. `test/agree.test.mjs` reads
+  runtimes and no build step mean the setups vocabulary, the four journal column
+  names and Eugenia's note limit genuinely live in more than one file.
+  `test/agree.test.mjs` reads
   every copy of each and fails when they disagree. Adding a third copy of
   anything means adding it there too — a copy nothing can compare is the actual
   defect, not the copy itself.
@@ -203,12 +204,12 @@ code you write near it:
   secures the view, not the key, so the guarantee that matters is structural:
   one database read of the journal, no write path to it in the file. Do not add
   one.
-- **`tradesQuery` is a boundary, and its window is a New York day.** `days`
-  comes from the model, so it is clamped and row-limited there rather than
-  trusted; the lower bound is built with `nyDate` because `open_day` is a New
-  York civil day, and `toISOString()` made the two disagree every evening. `writeNote` is the other
-  one: it truncates rather than refusing, because a tool that errors mid-turn
-  costs the whole answer.
+- **`tradesQuery` is a boundary, and its window is counted in civil days.**
+  `days` comes from the model, so it is clamped and row-limited there rather
+  than trusted; the bound is stepped off today's New York date, because
+  `open_day` is a civil day and a fixed number of milliseconds is not one.
+  `writeNote` is the other boundary: it truncates rather than refusing, because
+  a tool that errors mid-turn costs the whole answer.
 - **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
   no verdict on a trade, one question at a time. The line she may now cross is
   narrow and deliberate: *what the market is pricing* and *what would surprise

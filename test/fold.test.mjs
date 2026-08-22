@@ -725,12 +725,23 @@ test('a window from the model is clamped, never trusted', () => {
   assert.equal(since(undefined), since(30));
 });
 
-test('the window starts on a New York day, because open_day is one', () => {
-  // 02:00 UTC is 22:00 the previous evening in New York. Built with
-  // toISOString() the bound read 2026-08-15 here and the oldest day of "this
-  // past week" was silently missing — every evening, which is when he asks.
-  const evening = new Date('2026-08-22T02:00:00Z').getTime();
-  assert.match(tradesQuery(7, evening), /open_day=gte\.2026-08-14/);
+test('the window is n civil days back from today in New York', () => {
+  /* open_day is a civil day, so the bound has to be one. Two instants where an
+     instant-arithmetic bound gets it wrong:
+
+     02:00 UTC is 22:00 the previous evening in New York, so a UTC-derived date
+     is already tomorrow and the window starts a day late — every evening.
+
+     The evening after the clocks go back, a day is 25 hours long, so
+     subtracting seven fixed days lands six civil days ago and the oldest day of
+     "this past week" is gone. Spring-forward stretches it to eight. */
+  const evening   = new Date('2026-08-22T02:00:00Z').getTime();   // Fri 21 Aug, 22:00 ET
+  const fallBack  = new Date('2026-11-03T04:30:00Z').getTime();   // Mon 2 Nov, 23:30 ET
+  const springFwd = new Date('2026-03-09T03:30:00Z').getTime();   // Sun 8 Mar, 23:30 ET
+
+  assert.match(tradesQuery(7, evening),   /open_day=gte\.2026-08-14/);
+  assert.match(tradesQuery(7, fallBack),  /open_day=gte\.2026-10-26/);
+  assert.match(tradesQuery(7, springFwd), /open_day=gte\.2026-03-01/);
 });
 
 test('the journal read is bounded, so a wide window cannot fill the context', () => {

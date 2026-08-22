@@ -650,12 +650,11 @@ The stored turn is a marker (`[weekday briefing]`), not the text that was sent:
 the memory and the week's trades are rebuilt fresh each morning, and storing
 them would resend a stale copy as history for the next six briefings.
 
-**She sees your week without being asked**, bounded by a New York day rather
-than a UTC one — `open_day` is a New York civil day, and building the bound with
-`toISOString()` started the window a day late every evening, quietly dropping
-the oldest day. The last seven days of trades go in with the briefing, so *"you have not traded since Tuesday"* costs no tool round.
-Mentioned only when there is something real to say, in a clause, never as a
-verdict — most mornings the right amount to say about your trading is nothing.
+**She sees your week without being asked.** The last seven New York days of
+trades go in with the briefing, so *"you have not traded since Tuesday"* costs
+no tool round. Mentioned only when there is something real to say, in a clause,
+never as a verdict — most mornings the right amount to say about your trading is
+nothing.
 
 ### The pulse
 

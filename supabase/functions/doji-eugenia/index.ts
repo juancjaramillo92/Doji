@@ -222,16 +222,20 @@ async function writeNote(note: unknown): Promise<string> {
    400 rows is far more than a year of this account and stops a wide window
    returning a context-filling answer.
 
-   THE BOUND IS A NEW YORK DAY, BECAUSE open_day IS ONE. It was built with
-   toISOString(), which is UTC — so between 20:00 and midnight in New York the
-   two disagree and the window started a day late, quietly dropping the oldest
-   day from "his trades this past week". That is the evening, which is when he
-   is actually talking to her. The same UTC-against-New-York mismatch the filing
-   day, the briefing hour and the market check all exist to avoid. */
+   THE WINDOW IS COUNTED IN CIVIL DAYS, NOT IN MILLISECONDS, because `open_day`
+   is a civil day. Subtracting n × 86,400,000 and formatting the result is
+   instant arithmetic wearing a civil-day label: it is right until a clock
+   change, when a day is 23 or 25 hours long and "seven days ago" lands on the
+   wrong date. So today's New York date is taken first and the days are stepped
+   off it — the same way index.html walks to a week or a month boundary. */
 export function tradesQuery(days: unknown, now = Date.now()): string {
   const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
-  const since = nyDate(new Date(now - n * 86_400_000));
-  return `eugenia_trades?open_day=gte.${since}` +
+
+  const [y, m, d] = nyDate(new Date(now)).split('-').map(Number);
+  const from = new Date(Date.UTC(y, m - 1, d));
+  from.setUTCDate(from.getUTCDate() - n);
+
+  return `eugenia_trades?open_day=gte.${from.toISOString().slice(0, 10)}` +
          `&order=open_day.desc,entry_time.desc&limit=400`;
 }
 
