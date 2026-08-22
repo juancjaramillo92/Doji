@@ -29,7 +29,9 @@
 --
 -- Each row is a fact 001-005 asserts, read back out of the catalogs. `expected`
 -- is what the files say; `actual` is what the database holds.
-select check_name, actual, expected, (actual = expected) as ok
+-- coalesce, because a check whose subquery finds nothing yields NULL and NULL
+-- is not false — a missing table would print a blank `ok` and read as fine.
+select check_name, actual, expected, coalesce(actual = expected, false) as ok
 from (values
   ('tables and the view exist',
    (select count(*)::text from information_schema.tables
@@ -45,25 +47,25 @@ from (values
    'ALWAYS'),
 
   ('RLS on trades',
-   (select relrowsecurity::text from pg_class where oid = 'public.trades'::regclass),
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.trades')),
    'true'),
   ('one policy on trades',
-   (select count(*)::text from pg_policy where polrelid = 'public.trades'::regclass),
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.trades')),
    '1'),
 
   -- RLS enabled with NO policy is what denies the publishable key outright. A
   -- policy appearing here would turn either table into an open log.
   ('RLS on eugenia_turns',
-   (select relrowsecurity::text from pg_class where oid = 'public.eugenia_turns'::regclass),
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_turns')),
    'true'),
   ('no policy on eugenia_turns',
-   (select count(*)::text from pg_policy where polrelid = 'public.eugenia_turns'::regclass),
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_turns')),
    '0'),
   ('RLS on eugenia_notes',
-   (select relrowsecurity::text from pg_class where oid = 'public.eugenia_notes'::regclass),
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_notes')),
    'true'),
   ('no policy on eugenia_notes',
-   (select count(*)::text from pg_policy where polrelid = 'public.eugenia_notes'::regclass),
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_notes')),
    '0'),
 
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
@@ -80,7 +82,7 @@ from (values
    'true'),
   ('two triggers on trades',
    (select count(*)::text from pg_trigger
-     where tgrelid = 'public.trades'::regclass and not tgisinternal),
+     where tgrelid = to_regclass('public.trades') and not tgisinternal),
    '2'),
 
   -- Without this a fill never reaches an open tab on its own. The five-minute
@@ -195,7 +197,7 @@ order by tablename;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
 -- Against 005_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
--- both active. CHECK THE SECRET NAME IN THE COMMAND TEXT — it must be the
+-- purge-cron-history nightly — three, all active. CHECK THE SECRET NAME IN THE COMMAND TEXT — it must be the
 -- lower-case doji_cron_secret. Postgres compares it case-sensitively, and the
 -- upper-case spelling matches nothing in Vault and fails silently.
 select jobid, jobname, schedule, active, command

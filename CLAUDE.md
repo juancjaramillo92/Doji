@@ -236,6 +236,10 @@ code you write near it:
 - **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
   a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
   read of the journal is worse than a slow one.
+- **A beta flag is a header on a raw fetch, never a `betas` body field.** The
+  `betas: [...]` array is the SDKs' parameter and they turn it into
+  `anthropic-beta`. This file uses `fetch`, so the header is the only form that
+  works — and an unknown top-level parameter is a 400, which is every call.
 - **The container is not optional once web search is in play.** `web_search_20260209`
   runs code execution for its dynamic filtering, so the model can call
   `get_trades` from inside that container; the continuation must carry

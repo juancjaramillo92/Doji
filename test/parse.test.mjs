@@ -33,7 +33,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { boot, thread, message } from './gs.mjs';
+import { boot, thread, message, SOURCE } from './gs.mjs';
 
 // The real subject line, which is also what syncPepperstone matches on: a stop
 // loss says "Stop loss filled for", not "order has been filled".
@@ -255,14 +255,29 @@ test('the request carries the secret on the header the function checks', () => {
 });
 
 test('no account credential is anywhere in the script', () => {
-  // The password is the finding this file exists to keep closed. A sign-in path
-  // reappearing here would put the whole account back into Google's
-  // infrastructure to save one hop.
-  const gs = boot();
-  for (const gone of ['DOJI_PASSWORD', 'DOJI_EMAIL', 'sb_access_token', 'signInWithPassword']) {
-    assert.equal(gs.PropertiesService.getScriptProperties().getProperty(gone), null);
+  /* THE PASSWORD IS THE FINDING THIS KEEPS CLOSED, and the first version of
+     this test could not have caught it coming back: it asked the stub for
+     DOJI_PASSWORD, and the stub returns null for every key it does not know
+     regardless of what the script reads. It asserted the harness, not the file.
+
+     So this reads the source. A sign-in path reappearing here would put the
+     whole account back into Google's infrastructure to save one network hop. */
+  // Word-bounded, because DOJI_EMAIL is a prefix of DOJI_EMAIL_SECRET and a
+  // plain substring test fails on the one credential the script is allowed.
+  for (const gone of ['DOJI_PASSWORD', 'DOJI_EMAIL', 'signInWithPassword',
+                      'auth', 'grant_type', 'refresh_token',
+                      'sb_access_token', 'PUBLISHABLE_KEY']) {
+    assert.match(SOURCE, new RegExp(`^(?!.*\\b${gone}\\b)`, 's'),
+      `${gone} is back in doji_gmail_sync.gs`);
   }
-  for (const gone of ['getAccessToken_', 'authRequest_', 'clearSession_']) {
+
+  // And that the helpers are gone from the evaluated file, not just its text.
+  const gs = boot();
+  for (const gone of ['getAccessToken_', 'authRequest_', 'clearSession_', 'creds_']) {
     assert.equal(gs[gone], undefined, `${gone} is back`);
   }
+
+  // The one secret it may hold, so the test fails if the script stops needing
+  // any credential at all — which would mean the write moved back inline.
+  assert.equal(SOURCE.includes('DOJI_EMAIL_SECRET'), true);
 });
