@@ -42,7 +42,7 @@ default or duplicated something already in the head. Left alone deliberately.
 ```
 index.html                              the entire application
 icon-512.png                            home-screen icon
-vercel.json                             no-cache header for index.html
+vercel.json                             no-cache header for the app shell
 supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_gladys.sql                 Gladys's trade-open trigger
@@ -1208,13 +1208,21 @@ npm ci               # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6 or newer — stated in `package.json`'s `engines` as well as here;
+Node 22.22.2 or newer — stated in `package.json`'s `engines` as well as here.
+It is jsdom that sets that floor, not the app: `--experimental-strip-types` has
+worked since 22.6, and jsdom 30 declares `^22.22.2`. The number worth writing
+down is the one at which everything in the repository actually runs;
 `--experimental-strip-types` is what lets the suite import the Edge Function's
 `.ts` directly, which is why the script exists rather than a bare `node --test`.
 It is a no-op from Node 22.18, where type stripping is on by default, and stays
 for the versions below that. `jsdom` is the only dependency in the repository
 and it is a dev dependency — the application itself still installs nothing and
 still has no build step.
+
+**The `no-cache` header names both paths.** `/` and `/index.html` are the same
+document, and only the second is ever typed — the home-screen shortcut and every
+bookmark open `/`. A rule matching the request path rather than the file left the
+app shell cacheable at the one address it is actually opened at.
 
 **`package-lock.json` is committed and CI runs `npm ci`.** `npm install` against
 a floating `^30.0.1` means the tree that goes green in CI is not necessarily the

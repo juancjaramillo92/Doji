@@ -117,7 +117,7 @@ npm ci        # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6+. Four suites, and the script globs `test/*.test.mjs` one level, so a
+Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types` needs. Four suites, and the script globs `test/*.test.mjs` one level, so a
 test in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
 of all four Edge Functions and of `_shared`; `app.test.mjs` boots `index.html` in
 jsdom with a recording Supabase stand-in; `agree.test.mjs` holds the duplicated

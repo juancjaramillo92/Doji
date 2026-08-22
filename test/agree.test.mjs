@@ -319,7 +319,11 @@ test('a function refuses to run without every secret it reads', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('config.toml turns the gateway off for every function that exists', () => {
-  const toml = readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8');
+  // Comments stripped first. The file is half explanation, and a `verify_jwt`
+  // named in prose — or a live `= true` above a note about `= false` — would
+  // otherwise satisfy every assertion below while the gateway was on.
+  const toml = readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8')
+    .split('\n').map(l => l.replace(/#.*$/, '')).join('\n');
 
   for (const name of DEPLOYED) {
     const stanza = toml.match(

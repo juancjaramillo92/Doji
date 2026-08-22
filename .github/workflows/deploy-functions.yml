@@ -30,11 +30,22 @@ concurrency:
   group: deploy-functions
   cancel-in-progress: false
 
+# This job needs to read the repository and nothing else. The default token is
+# write-scoped, and the account-scoped SUPABASE_ACCESS_TOKEN below already makes
+# this the most privileged workflow here — there is no reason for a second
+# credential in the same environment to be able to write anything.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      # persist-credentials: false, so the checkout token is not left in
+      # .git/config for the third-party steps that run after it.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -48,6 +59,11 @@ jobs:
       - run: npm ci
       - run: npm test
 
+      # `latest`, not a pin, and it is the one thing here deliberately not
+      # pinned: the CLI talks to a platform that moves under it, so a pinned
+      # version drifting out of step with the API is the likelier failure — and
+      # it is Supabase's own tool authenticating to Supabase with a token that
+      # is already theirs.
       - uses: supabase/setup-cli@v1
         with:
           version: latest
