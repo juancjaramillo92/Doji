@@ -291,6 +291,13 @@ async function call(messages: any[], effort: Effort, container?: string) {
     headers: {
       "x-api-key": ANTHROPIC_KEY,
       "anthropic-version": "2023-06-01",
+      // A HEADER, NOT A BODY FIELD, and the difference is total. `betas: [...]`
+      // is what the SDKs accept and what they turn into this header; a raw
+      // fetch sending it in the JSON sends an unknown parameter, which the API
+      // rejects — and `fallbacks` without the header is rejected as well. So
+      // the shape below 400s every call, briefing and reply alike, which is
+      // the whole function. It shipped that way for one commit.
+      "anthropic-beta": "server-side-fallback-2026-07-01",
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -315,7 +322,6 @@ async function call(messages: any[], effort: Effort, container?: string) {
       // on another model inside this same call and routes by refusal category,
       // so there is no model list here to go stale, and a decline before any
       // output is not billed.
-      betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
@@ -500,11 +506,18 @@ async function postScheduled(url: URL): Promise<Response> {
     const due = briefDue(now) ?? (url.searchParams.get("force") === "1" ? 'weekday' : null);
     if (due) return await postBriefing(due);
 
-    // A briefing that failed at 08:00 gets another go while the morning is
-    // still worth having one. Bounded to three hours and skipped the moment one
-    // has landed, so the cost of a good day is three small reads.
-    if (retryDue(now) && !(await briefedToday())) return await postBriefing('weekday');
-    if (pulseDue(now)) return await postPulse();
+    /* A briefing that failed at 08:00 gets another go while the morning is
+       still worth having one. Bounded to three hours and skipped the moment one
+       has landed, so the cost of a good day is three small reads.
+
+       THE RETRY WINDOW OVERLAPS THE PULSE HOUR, deliberately and only at 10:00.
+       On a day the briefing failed, the briefing is the thing worth having and
+       the pulse — a second look at a morning he was never told about — is not.
+       So the retry wins and the pulse is skipped, which is why this is one
+       branch and not two: a call still owes exactly one answer. */
+    if (pulseDue(now) || retryDue(now)) {
+      return (await briefedToday()) ? await postPulse() : await postBriefing('weekday');
+    }
 
     return json({ ok: true, skipped: "nothing due this hour" });
   } catch (err) {
@@ -534,10 +547,10 @@ export function retryDue(now: Date): boolean {
 }
 
 /* Whether a briefing has already landed today, read off the marker
-   postBriefing stores in place of the sent text. The marker is written
-   immediately after say() returns, so it exists exactly when the message
-   reached Telegram — which is the question being asked, rather than whether the
-   model produced any text.
+   postBriefing stores in place of the sent text. It is written just BEFORE the
+   send, so it exists whenever a briefing was generated — which is the question
+   worth asking here, because the expensive half is the generation and a retry
+   that duplicates it is the failure this guards.
 
    The day comparison is done HERE, in New York, rather than as a timestamp
    filter in the query. A `created_at=gte.<date>T00:00:00-05:00` would be an
@@ -588,9 +601,19 @@ async function postBriefing(due: Brief): Promise<Response> {
     + await notesBlock() + await tradesBlock();
 
   const brief = await ask([...await recent(), { role: 'user', content: asked }], 'high');
-  await say(`${greeting(due)}\n\n${brief}`);
+
+  /* THE MARKER GOES DOWN BEFORE THE SEND, and the order is the whole point.
+     Written after, a remember() that fails leaves a briefing delivered, an
+     apology saying none arrived, and no marker — so 09:00, 10:00 and 11:00 each
+     generate and send another one. Four briefings and four times the bill, from
+     one failed insert.
+
+     Written first, the failure mode inverts: a send that fails after the marker
+     lands costs the retry rather than duplicating it, and he is told. Losing a
+     briefing is cheaper than sending four. */
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
+  await say(`${greeting(due)}\n\n${brief}`);
   return json({ ok: true, brief: due });
 }
 
@@ -728,8 +751,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
-    // pg_net discards this, so the console is where a missed briefing is
-    // reported. Nothing retries: tomorrow's briefing is the next attempt.
+    // pg_net discards this, so the console and the Telegram message above are
+    // where a failure is reported. postScheduled retries a failed briefing at
+    // 09:00, 10:00 and 11:00; anything reaching here is outside that.
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }

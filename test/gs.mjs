@@ -19,7 +19,10 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const SOURCE = readFileSync(new URL('../doji_gmail_sync.gs', import.meta.url), 'utf8');
+// Exported so a test can assert on what the file SAYS, not only on what the
+// stubs answer. The credential check needs this: a stub that returns null for
+// every unknown property answers "no password here" whatever the script does.
+export const SOURCE = readFileSync(new URL('../doji_gmail_sync.gs', import.meta.url), 'utf8');
 
 // A Gmail thread as the script uses one: messages in, a label out. `labels` is
 // what every assertion about the three outcomes actually reads.

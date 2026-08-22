@@ -107,14 +107,19 @@ export function emailRow(input: unknown, userId: string): Fill {
   return { row };
 }
 
-async function upsert(row: Record<string, unknown>) {
-  const res = await fetch(`${SB_URL}/rest/v1/trades?on_conflict=id`, {
+/* Returns the response rather than throwing, because the STATUS is the answer
+   the caller needs. Postgres refuses a row for reasons that will never change —
+   a user_id that is not a real user, a direction the check constraint rejects —
+   and PostgREST reports those as 4xx. Collapsing them into a 500 tells the Apps
+   Script to try again, which it then does every minute until the thread ages
+   out of the 90-day window and the fill's net_pnl is gone. That is the exact
+   failure the three-outcome design exists to prevent, rebuilt one layer down. */
+const upsert = (row: Record<string, unknown>) =>
+  fetch(`${SB_URL}/rest/v1/trades?on_conflict=id`, {
     method: "POST",
     headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
     body: JSON.stringify([row]),
   });
-  if (!res.ok) throw new Error(`Upsert failed (HTTP ${res.status}): ${await res.text()}`);
-}
 
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing — the file loads under plain
@@ -148,11 +153,22 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: fill.error }, 400);
   }
 
+  let res: Response;
   try {
-    await upsert(fill.row);
-    return json({ ok: true, id: fill.row.id });
+    res = await upsert(fill.row);
   } catch (err) {
+    // No response at all — DNS, a dropped connection. Always worth retrying.
     console.error("doji-email-sync:", err instanceof Error ? err.message : err);
-    return json({ ok: false, error: "write failed" }, 500);
+    return json({ ok: false, error: "write unreachable" }, 500);
   }
+
+  if (res.ok) return json({ ok: true, id: fill.row.id });
+
+  const detail = (await res.text()).slice(0, 300);
+  if (res.status >= 400 && res.status < 500) {
+    console.error(`doji-email-sync: refused by PostgREST (${res.status}) — ${detail}`);
+    return json({ ok: false, error: detail }, 400);
+  }
+  console.error(`doji-email-sync: write failed (${res.status}) — ${detail}`);
+  return json({ ok: false, error: "write failed" }, 500);
 });
