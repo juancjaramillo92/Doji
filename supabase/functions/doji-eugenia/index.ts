@@ -217,13 +217,20 @@ async function writeNote(note: unknown): Promise<string> {
   }
 }
 
-// The whole query, built in one place so a test can read it. `days` arrives
-// from the model, so it is clamped rather than trusted: this is the boundary.
-// 400 rows is far more than a year of this account and stops a wide window
-// returning a context-filling answer.
+/* The whole query, built in one place so a test can read it. `days` arrives
+   from the model, so it is clamped rather than trusted: this is the boundary.
+   400 rows is far more than a year of this account and stops a wide window
+   returning a context-filling answer.
+
+   THE BOUND IS A NEW YORK DAY, BECAUSE open_day IS ONE. It was built with
+   toISOString(), which is UTC — so between 20:00 and midnight in New York the
+   two disagree and the window started a day late, quietly dropping the oldest
+   day from "his trades this past week". That is the evening, which is when he
+   is actually talking to her. The same UTC-against-New-York mismatch the filing
+   day, the briefing hour and the market check all exist to avoid. */
 export function tradesQuery(days: unknown, now = Date.now()): string {
   const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
-  const since = new Date(now - n * 86_400_000).toISOString().slice(0, 10);
+  const since = nyDate(new Date(now - n * 86_400_000));
   return `eugenia_trades?open_day=gte.${since}` +
          `&order=open_day.desc,entry_time.desc&limit=400`;
 }

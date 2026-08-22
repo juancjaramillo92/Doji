@@ -725,6 +725,14 @@ test('a window from the model is clamped, never trusted', () => {
   assert.equal(since(undefined), since(30));
 });
 
+test('the window starts on a New York day, because open_day is one', () => {
+  // 02:00 UTC is 22:00 the previous evening in New York. Built with
+  // toISOString() the bound read 2026-08-15 here and the oldest day of "this
+  // past week" was silently missing — every evening, which is when he asks.
+  const evening = new Date('2026-08-22T02:00:00Z').getTime();
+  assert.match(tradesQuery(7, evening), /open_day=gte\.2026-08-14/);
+});
+
 test('the journal read is bounded, so a wide window cannot fill the context', () => {
   assert.match(tradesQuery(365, NOW), /limit=400/);
 });

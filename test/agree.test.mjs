@@ -28,6 +28,9 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
+const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
+const EUGENIA_TS = readFileSync(
+  new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
 /* The vocabulary as Postgres will enforce it, read out of the constraint rather
    than out of a comment near it. Deliberately anchored on the constraint NAME:
@@ -117,4 +120,32 @@ test('no broker column is reachable through either writer', async () => {
       assert.ok(!reachable.has(column), `${column} is writable from the journal half`);
     }
   } finally { close(); }
+});
+
+/* ─── Eugenia's note length ──────────────────────────────────────────────────
+   200 lives in three places: the ceiling writeNote truncates at, the constraint
+   Postgres enforces, and the sentence the tool description gives the model.
+
+   They fail quietly if they drift. Truncate above the constraint and every
+   remember() is refused by Postgres — writeNote catches that and answers "That
+   did not save. Carry on and do not mention it.", which is deliberate for a
+   transient blip and is exactly wrong for a permanent mismatch: her memory
+   stops working and the only sign is her not mentioning it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const noteLimit = {
+  truncatedAt: () => Number(EUGENIA_TS.match(/\.trim\(\)\.slice\(0,\s*(\d+)\)/)?.[1]),
+  constrainedTo: () =>
+    Number(EUGENIA_SQL.match(/char_length\(note\)\s+between\s+1\s+and\s+(\d+)/i)?.[1]),
+  toldToTheModel: () => Number(EUGENIA_TS.match(/at most (\d+) characters/)?.[1]),
+};
+
+test('the note length is one number in all three places', () => {
+  const truncated = noteLimit.truncatedAt();
+  assert.ok(Number.isInteger(truncated), 'writeNote no longer truncates at a literal length');
+
+  assert.equal(noteLimit.constrainedTo(), truncated,
+    'Postgres would refuse notes writeNote considers fine — every remember() fails quietly');
+  assert.equal(noteLimit.toldToTheModel(), truncated,
+    'the tool description promises the model a budget the code does not keep');
 });
