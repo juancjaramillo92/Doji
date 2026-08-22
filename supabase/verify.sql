@@ -10,14 +10,99 @@
 -- would show up anywhere.
 --
 -- So this is the other half of that trade: nothing here writes, and running it
--- is the check. Read each result against 001–005. Ten seconds, and it is worth
--- doing after any manual change and before believing anything in this
--- repository about the database.
+-- is the check. Start with the summary block below — it answers every question
+-- in one result set, which is what a SQL editor can actually show you. Ten
+-- seconds, and it is worth doing after any manual change and before believing
+-- anything in this repository about the database.
 --
 -- A CI job cannot do this instead. 002, 003 and 005 need pg_net, vault and
 -- pg_cron, none of which a plain Postgres container has — so a green pipeline
 -- would prove only that 001 parses, which is the least of what can drift.
 -- ═══════════════════════════════════════════════════════════════════════════
+
+-- ─── One query, and it is the one to run ───────────────────────────────────
+-- THE REST OF THIS FILE IS TEN SEPARATE STATEMENTS, and a SQL editor shows the
+-- result of the LAST one only — so running the file top to bottom displays the
+-- HTTP responses and hides every check above them. Run this block on its own
+-- (select it and press Run), read the `ok` column, and go looking below only
+-- where it says false.
+--
+-- Each row is a fact 001-005 asserts, read back out of the catalogs. `expected`
+-- is what the files say; `actual` is what the database holds.
+select check_name, actual, expected, (actual = expected) as ok
+from (values
+  ('tables and the view exist',
+   (select count(*)::text from information_schema.tables
+     where table_schema = 'public'
+       and table_name in ('trades','eugenia_turns','eugenia_notes','eugenia_trades')),
+   '4'),
+
+  -- If pnl is a plain column, the email-beats-computed rule is no longer stated
+  -- in the schema and every client is reading a stored value nobody maintains.
+  ('pnl is a generated column',
+   (select is_generated from information_schema.columns
+     where table_schema = 'public' and table_name = 'trades' and column_name = 'pnl'),
+   'ALWAYS'),
+
+  ('RLS on trades',
+   (select relrowsecurity::text from pg_class where oid = 'public.trades'::regclass),
+   'true'),
+  ('one policy on trades',
+   (select count(*)::text from pg_policy where polrelid = 'public.trades'::regclass),
+   '1'),
+
+  -- RLS enabled with NO policy is what denies the publishable key outright. A
+  -- policy appearing here would turn either table into an open log.
+  ('RLS on eugenia_turns',
+   (select relrowsecurity::text from pg_class where oid = 'public.eugenia_turns'::regclass),
+   'true'),
+  ('no policy on eugenia_turns',
+   (select count(*)::text from pg_policy where polrelid = 'public.eugenia_turns'::regclass),
+   '0'),
+  ('RLS on eugenia_notes',
+   (select relrowsecurity::text from pg_class where oid = 'public.eugenia_notes'::regclass),
+   'true'),
+  ('no policy on eugenia_notes',
+   (select count(*)::text from pg_policy where polrelid = 'public.eugenia_notes'::regclass),
+   '0'),
+
+  -- A single-table view is auto-updatable, so anything beyond SELECT here makes
+  -- her read of the journal a write path.
+  ('eugenia_trades is select-only, service_role only',
+   (select coalesce(string_agg(distinct grantee || ':' || privilege_type, ',' order by grantee || ':' || privilege_type), 'none')
+      from information_schema.role_table_grants
+     where table_schema = 'public' and table_name = 'eugenia_trades'
+       and grantee in ('anon','authenticated','service_role')),
+   'service_role:SELECT'),
+
+  ('the trade-open trigger calls doji-gladys',
+   (select (prosrc like '%doji-gladys%')::text from pg_proc where proname = 'trades_telegram_open'),
+   'true'),
+  ('two triggers on trades',
+   (select count(*)::text from pg_trigger
+     where tgrelid = 'public.trades'::regclass and not tgisinternal),
+   '2'),
+
+  -- Without this a fill never reaches an open tab on its own. The five-minute
+  -- refresh still finds it, so the failure is a slow app rather than a broken
+  -- one — which is why it goes unnoticed.
+  ('trades is published to realtime',
+   (select count(*)::text from pg_publication_tables
+     where pubname = 'supabase_realtime' and tablename = 'trades'),
+   '1'),
+
+  ('three cron jobs, all active',
+   (select count(*)::text from cron.job where active),
+   '3'),
+
+  -- One of the three places the setups vocabulary lives. test/agree.test.mjs
+  -- holds the other two together and cannot see this one.
+  ('both setups are accepted by the constraint',
+   (select (pg_get_constraintdef(oid) like '%Break & Retest%'
+        and pg_get_constraintdef(oid) like '%Support & Resistance%')::text
+      from pg_constraint where conname = 'trades_setup_check'),
+   'true')
+) as t(check_name, actual, expected);
 
 -- ─── Tables and views ──────────────────────────────────────────────────────
 -- Expect exactly: trades, eugenia_turns, eugenia_notes, and the eugenia_trades
