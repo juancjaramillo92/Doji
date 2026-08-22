@@ -395,6 +395,36 @@ test('every button fits inside Telegram\'s 64-byte callback_data cap', () => {
   }
 });
 
+test('no setup name contains the delimiter its callback_data is split on', () => {
+  /* callback_data is `id|field|value`, and parseCallback refuses anything that
+     is not exactly two or three parts. A setup named "Break | Retest" would
+     therefore arrive as four and every tap on it would be dropped — silently,
+     because an unrecognised payload is acknowledged and ignored by design.
+
+     The vocabulary is the one string in this system a person edits, and nothing
+     else checks this. It is the same class as the 64-byte cap above: a legal
+     name that the grammar cannot carry. */
+  for (const setup of SETUPS) {
+    assert.equal(setup.includes('|'), false,
+      `"${setup}" contains the callback_data delimiter and can never be tapped`);
+  }
+});
+
+test('a fill just after midnight ET stays on the New York hour', () => {
+  /* 04:05 UTC is 00:05 the same evening in New York — the boundary where a UTC
+     stamp is not merely offset but a different day and a different hour. Driven
+     through renderMessage rather than the private formatter, because the
+     message is what the trader reads.
+
+     WHAT THIS DOES NOT PROVE: the `24:05` half. nyTime states hourCycle: h23
+     rather than hour12: false, which on some engines resolves to h24 — but V8
+     resolves en-GB to h23 either way, so reverting the option leaves this green.
+     Reverting the TIMEZONE does fail it, which is what it actually guards. */
+  const midnight = { ...open, entry_time: '2026-08-22T04:05:00Z' };
+  const { text } = renderMessage(midnight, false);
+  assert.match(text, /00:05 ET/);
+});
+
 test('an unanswered trade opens on the full keyboard, one row per question', () => {
   const rows = renderMessage(open, false).reply_markup.inline_keyboard;
   assert.equal(rows.length, 4);

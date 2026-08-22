@@ -383,19 +383,12 @@ its entry and those are exactly the rows that would land. It used to throw after
 the write, on the reasoning that the write had already happened; that is
 backwards.
 
-**What that costs, said plainly: a truncated run writes nothing, and the only
-place it says so is a 500 that `net.http_post` discards.** So a fold window that
-stayed at or over 500 deals would halt the journal quietly. It takes about
-fifteen times this account's volume to reach that in 78 hours, and the realistic
-way to get there is a `?hours=` backfill — which is a manual run whose response
-you are reading. The poller has no Telegram path of its own, unlike Eugenia's
-cron half; giving it one is the fix if this ever bites, and the reason it has
-not been done is that a failure repeating every two minutes needs a rate limit
-before it needs a notification. It used to return `truncated: true` in a 200 body, which
-`net.http_post` discards — so the one signal that trades were being dropped went
-to nobody. It is also worse than losing rows: a truncated window can return a
-position's closing deals without its entry, and direction then gets read off a
-close and inverted.
+**A truncated run therefore writes nothing**, and that is the right answer
+rather than a cost. Five hundred *deals* is roughly two hundred trades inside a
+78-hour window — an order of magnitude beyond this account and not reachable on
+the two-minute schedule. Hitting it means something is wrong with the window or
+the account rather than that the trader had a busy week, and the last thing to
+do then is write rows folded from a partial history.
 
 **Balance is read from a second tool, and only for a close just seen.**
 `get_deals` carries no balance — eleven fields, none of them the account — and

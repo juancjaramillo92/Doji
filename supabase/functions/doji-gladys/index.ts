@@ -170,9 +170,12 @@ const mark = (v: boolean | null) => v === null ? '—' : v ? '✓' : '✗';
 // as ET, since "NY" is the name of a session in this app and would read as one.
 // The same 21:05 fill that nyDay keeps on its own day would read as tomorrow
 // here if this used the UTC stamp.
+// hourCycle, not hour12: the latter leaves the cycle to the locale and can
+// resolve to h24, so a fill just after midnight ET would read "24:05". Same
+// reason nyClock and Eugenia's nyStamp state it.
 const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York',
-  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(new Date(iso));
 
 const answered = (row: Row) =>

@@ -164,7 +164,17 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
   if (res.ok) return json({ ok: true, id: fill.row.id });
 
-  const detail = (await res.text()).slice(0, 300);
+  // A body is not guaranteed, and "" tells the Apps Script log nothing.
+  const detail = (await res.text()).slice(0, 300) || `HTTP ${res.status}`;
+
+  /* NOT EVERY 4xx IS PERMANENT, which is the whole point of branching on the
+     status at all. 429 is rate limiting and 408 is a timeout — both mean try
+     again shortly, and calling them permanent labels the thread and discards
+     the fill, which is the failure this branch was added to prevent. */
+  if (res.status === 408 || res.status === 429) {
+    console.error(`doji-email-sync: retryable (${res.status}) — ${detail}`);
+    return json({ ok: false, error: detail }, 500);
+  }
   if (res.status >= 400 && res.status < 500) {
     console.error(`doji-email-sync: refused by PostgREST (${res.status}) — ${detail}`);
     return json({ ok: false, error: detail }, 400);
