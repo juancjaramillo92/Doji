@@ -536,6 +536,20 @@ test('a wheel plots wins, losses and break-evens, in that order', () => {
   const set = chartFor('chart-total');
   assert.ok(set, 'the all-time wheel was never built');
   assert.deepEqual([...set.data], [2, 1, 1]);
+
+  // The counts alone do not hold the order: reversed fills would draw the wins
+  // red and every assertion above would still pass. Chart.js cannot read a CSS
+  // variable, so the palette is resolved into a module constant — and this is
+  // the only thing checking that copy still lines up with the stylesheet.
+  const token = (name) =>
+    win.getComputedStyle(win.document.documentElement).getPropertyValue(name).trim();
+
+  assert.deepEqual([...set.backgroundColor],
+    [token('--seg-win-bg'), token('--seg-loss-bg'), token('--seg-be-bg')],
+    'the arc fills no longer run win, loss, break-even');
+  assert.deepEqual([...set.borderColor],
+    [token('--win'), token('--loss'), token('--seg-be-bd')],
+    'the arc borders no longer run win, loss, break-even');
 });
 
 test('a wheel with nothing decided draws the placeholder ring, not an empty one', () => {

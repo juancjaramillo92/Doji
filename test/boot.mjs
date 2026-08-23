@@ -48,8 +48,9 @@ export async function boot() {
       // Real Chart.js exposes the canvas it was mounted on, and mountDonut
       // reads it: `existing.canvas === canvas` is how a wheel decides between
       // updating in place and being rebuilt. Without it that check was always
-      // false, so every render tore down and rebuilt nine charts — the exact
-      // path the app has a comment explaining it avoids, exercised by nothing.
+      // false, so every render tore down and rebuilt all five wheels — the
+      // exact path the app has a comment explaining it avoids, exercised by
+      // nothing.
       this.canvas = ctx?.canvas;
       this.config = cfg;
       this.data = cfg.data;

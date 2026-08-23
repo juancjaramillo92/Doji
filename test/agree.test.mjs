@@ -355,25 +355,45 @@ test('config.toml turns the gateway off for every function that exists', () => {
    says. That half is caught by reading, or not at all.
    ─────────────────────────────────────────────────────────────────────────── */
 
-// Everything the repository is, as one string. Cheap, and it means a symbol
-// counts as real if it exists ANYWHERE — a test file, a SQL constraint, a CSS
-// token — rather than only where a reader might expect it.
-const CODE = execSync('git ls-files', { encoding: 'utf8' }).split('\n')
-  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f))
+const TRACKED = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filter(Boolean);
+
+/* Everything the repository is, as one string, so a symbol counts as real if it
+   exists ANYWHERE — a test file, a SQL constraint, a CSS token — rather than
+   only where a reader might expect it.
+
+   THIS FILE IS EXCLUDED, and that is not tidiness. The exception list below
+   holds the names the documents mention BECAUSE they are absent, and with this
+   file in the corpus every one of them would validate against its own
+   exception — the list would pass by existing rather than by being right. */
+const CODE = TRACKED
+  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f) && f !== 'test/agree.test.mjs')
   .map(f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
 
 /* Prose in backticks is mostly prose. What is wanted is the subset that looks
-   like something a compiler would recognise, so this keeps names that are
-   camelCase, snake_case, dotted or SCREAMING — and drops short lower-case words
-   like `null`, `both` and `no`, which are English wearing a code font. */
-const SYMBOLS = /`([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)`/g;
+   like something a compiler or a filesystem would recognise, so this keeps
+   names that are camelCase, snake_case, hyphenated, dotted or SCREAMING — and
+   drops short lower-case words like `null`, `both` and `no`, which are English
+   wearing a code font.
+
+   THE HYPHEN AND THE LEADING DIGIT MATTER: `doji-telegram` and `005_cron.sql`
+   are two of the three renames that actually survived in prose here, and a
+   pattern anchored on an identifier start would miss both. */
+const SYMBOLS = /`([A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_]+)*)`/g;
 
 const looksLikeCode = (name) =>
-  /[A-Z_.]/.test(name) && name.length >= 4;
+  /[A-Z_.\-]/.test(name) && name.length >= 4 && /[A-Za-z]/.test(name);
 
-// Named in prose precisely because they are NOT in the code: prohibitions, and
-// one column the design is defined by not having.
-const DELIBERATELY_ABSENT = new Set(['TODO', 'tg_message_id', 'background_color']);
+/* Named in prose PRECISELY BECAUSE they are not in the code, so each entry needs
+   its reason beside it or this becomes the place failures are sent to be
+   forgotten:
+
+     TODO                        a prohibition — CLAUDE.md forbids the marker
+     tg_message_id               the column Gladys works without, by design
+     background_color            }  manifest fields tried against the iOS
+     apple-touch-startup-image   }  launch frame, none of which reached it */
+const DELIBERATELY_ABSENT = new Set([
+  'TODO', 'tg_message_id', 'background_color', 'apple-touch-startup-image',
+]);
 
 test('the documents name only symbols the repository has', () => {
   const missing = [];
@@ -393,6 +413,15 @@ test('the documents name only symbols the repository has', () => {
       `${doc}: only ${named.size} symbols found — the reader has gone blind`);
 
     for (const name of named) {
+      // A name with a file extension is a FILE and is checked as one, against
+      // what git tracks. `verify.sql` and `005_cron.sql` are not symbols, and
+      // reading them as one made their last segment the only thing checked.
+      if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md)$/.test(name)) {
+        if (!TRACKED.some(f => f === name || f.endsWith('/' + name))) {
+          missing.push(`${doc}: ${name} (no such file)`);
+        }
+        continue;
+      }
       // A dotted name is checked by its last part: `Data.OWNED` is declared as
       // `OWNED:` inside an object literal, and `CONFIG.PERIODS` likewise.
       const leaf = name.split('.').pop();

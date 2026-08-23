@@ -63,10 +63,11 @@ const deal = (o) => ({
 
    What CAN be held is the builder against the interface in the same repository:
    the poller declares the fields it reads, and a deal missing one of them is a
-   deal the tests could pass while the live fold threw. It catches a field
-   added, renamed or dropped in the source. It cannot catch the interface itself
-   being wrong about cTrader — only a saved response would, and that is named in
-   the README as still missing. */
+   deal the tests could pass while the live fold threw. It catches a field added
+   to the interface or renamed in it. It does NOT catch one dropped — fewer
+   declared fields is fewer things to check — and it cannot catch the interface
+   itself being wrong about cTrader. Only a saved response would, and that is
+   named in the README as still missing. */
 const POLLER_SRC = readFileSync(
   new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 

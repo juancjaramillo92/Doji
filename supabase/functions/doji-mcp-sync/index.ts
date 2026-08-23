@@ -16,14 +16,16 @@
 //
 // SECURITY CONTRACT
 //   1. ALLOWED_TOOLS is a hardcoded whitelist holding two read tools.
-//      mcpCall() throws on anything else.
+//      mcpPost() throws on anything else, and it is the only place a tool name
+//      becomes a request.
 //   2. Every request must present DOJI_CRON_SECRET on the x-doji-key header.
 //      This function runs with verify_jwt = false, so the platform gateway no
 //      longer checks anything — authorisation happens here, in code, before any
 //      work begins. See the note at the entry point.
 //   3. No value from the HTTP request reaches an MCP call. The body is never
-//      read. The only request input consulted is two query flags, both
-//      numeric/boolean and both clamped. No code path constructs an order.
+//      read. The only request input consulted is three query flags — force,
+//      raw and hours — the first two boolean and the third clamped. No code
+//      path constructs an order.
 //   4. Tokens live only in Deno.env — never logged, never returned, never
 //      written to the database.
 //
@@ -47,11 +49,11 @@ const MCP_TOKEN = env("CTRADER_MCP_TOKEN");
    and leak with different consequences.
 
    DOJI_CRON_SECRET — "may this caller start a poll?". It has no database power
-   whatsoever, and against this function that is the whole of it: the worst a
-   holder can do is start a read-only poll that was going to run anyway. Two
-   other functions check the same secret and it is NOT harmless there — see the
-   README — which is why the claim is made about this endpoint rather than about
-   the secret.
+   whatsoever, and against this function that is nearly the whole of it: a
+   holder can start a read-only poll that was going to run anyway, or read the
+   deal history back with ?raw=1. Neither writes. Two other functions check the
+   same secret and it is NOT harmless there — see the README — which is why the
+   claim is made about this endpoint rather than about the secret.
 
    SB_SECRET_KEY — "may this function write to the table?". It bypasses
    RLS and never leaves this runtime. It is the reason the split exists: the
@@ -282,6 +284,10 @@ async function mcpPost(sid: string, tool: AllowedTool, args: Record<string, unkn
     headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
   });
+  // Checked here, so ?raw=1 cannot hand back a 401 body under a 200 and have it
+  // read as what the broker sent. mcpInit refuses the same way for the same
+  // reason.
+  if (!res.ok) throw new Error(`MCP ${tool}: HTTP ${res.status}`);
   return res.text();
 }
 
@@ -477,12 +483,17 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
   try {
     // ?force=1 bypasses the schedule for manual runs and backfills.
-    // ?hours=N  widens the window for one call, clamped to cTrader's 720h cap.
-    // Neither selects a tool or reaches an MCP call with request-supplied data,
-    // so the read-only guarantee is untouched.
+    // ?raw=1   returns the get_deals body unparsed — see below.
+    // ?hours=N widens the window for one call, clamped to cTrader's 720h cap.
+    // None of the three selects a tool or reaches an MCP call with
+    // request-supplied data, so the read-only guarantee is untouched.
     const url   = new URL(req.url);
     const force = url.searchParams.get("force") === "1";
-    if (!force && !marketOpen()) {
+    const raw   = url.searchParams.get("raw") === "1";
+    // ?raw=1 answers over the weekend too, which is when a suspicious row
+    // actually gets looked at. It writes nothing, so the market check has
+    // nothing to protect here.
+    if (!force && !raw && !marketOpen()) {
       return json({ ok: true, skipped: "market closed" });
     }
 
@@ -510,9 +521,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        than JSON because the SSE framing and the double-encoded payload are
        half of what is being looked at — parsing it away would hide the layer
        the question is usually about. */
-    if (url.searchParams.get("raw") === "1") {
-      return new Response(await mcpPost(sid, "get_deals", dealArgs),
-        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    if (raw) {
+      const body = await mcpPost(sid, "get_deals", dealArgs);
+      return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 
     const data = await mcpCall(sid, "get_deals", dealArgs);

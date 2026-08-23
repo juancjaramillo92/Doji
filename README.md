@@ -1316,10 +1316,11 @@ is plain JSON and testable, and is not tested.
 runs on deals this repository invents, so the section rests on the builder
 producing what cTrader produces — which is the belief the email fixture was
 added to stop trusting. One test holds the builder against the `Deal` interface
-the poller declares, so a field added, renamed or dropped in the source is
-caught; nothing catches the interface being wrong about the broker. A saved
-`get_deals` response would, and there is not one — `?raw=1` below is how one
-gets captured.
+the poller declares, so a field added to it or renamed in it is caught. A field
+*dropped* is not — fewer declared fields is fewer things to check — and nothing
+catches the interface being wrong about the broker in the first place. A saved
+`get_deals` response would, and there is not one; `?raw=1`, under **The MCP
+poller** above, is how one gets captured.
 
 **A check you have not proved can fail is not a check.** Every test here was run
 against a deliberately broken copy of the thing it covers before it was
