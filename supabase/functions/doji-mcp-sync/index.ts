@@ -266,8 +266,15 @@ async function mcpInit(): Promise<string> {
   return sid;
 }
 
-async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unknown>) {
-  // Enforced at the call site, not by the caller's good intentions.
+/* The request and nothing else, so the body cTrader sent can be had whole as
+   well as unwrapped. mcpCall wants the deals inside it; ?raw=1 wants the frame,
+   the envelope and the double-encoded payload exactly as they arrived. Two
+   consumers, one statement of what the request is — writing the fetch twice is
+   how the two would drift.
+
+   The allow-list check lives here rather than in mcpCall, because here is the
+   only place a tool name becomes a request. */
+async function mcpPost(sid: string, tool: AllowedTool, args: Record<string, unknown>): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
 
   const res = await fetch(MCP_URL, {
@@ -275,7 +282,11 @@ async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unkn
     headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
   });
-  const envelope = parseSse(await res.text());
+  return res.text();
+}
+
+async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unknown>) {
+  const envelope = parseSse(await mcpPost(sid, tool, args));
   if (envelope.error) throw new Error(`MCP ${tool}: ${envelope.error.message}`);
 
   // Tool results arrive as a text block whose body is itself a JSON document,
@@ -480,12 +491,31 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const from     = to - hours * 3600_000;               // what gets written
     const foldFrom = to - foldHours(hours) * 3600_000;    // what gets read
 
-    const sid  = await mcpInit();
-    const data = await mcpCall(sid, "get_deals", {
+    const sid = await mcpInit();
+    const dealArgs = {
       fromTimestamp: String(foldFrom),
       toTimestamp:   String(to),
       maxRows: MAX_ROWS,
-    });
+    };
+
+    /* ?raw=1 — WHAT THE BROKER ACTUALLY SENT, which is the question a wrong row
+       raises and the one thing nothing else here can answer. A trade with an
+       inverted direction or a missing entry price is either a fold this
+       function got wrong or a response cTrader shaped differently, and the two
+       repairs are opposite: ?force=1&hours=N for the first, a code change for
+       the second. Guessing which has already cost a day.
+
+       It writes nothing and reads nothing but the same get_deals the poll was
+       about to make, so it is safe to run at any time. Returned as text rather
+       than JSON because the SSE framing and the double-encoded payload are
+       half of what is being looked at — parsing it away would hide the layer
+       the question is usually about. */
+    if (url.searchParams.get("raw") === "1") {
+      return new Response(await mcpPost(sid, "get_deals", dealArgs),
+        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+
+    const data = await mcpCall(sid, "get_deals", dealArgs);
 
     /* TRUNCATION IS DATA LOSS, SO IT IS AN ERROR — AND IT IS CHECKED BEFORE
        ANYTHING IS WRITTEN.
