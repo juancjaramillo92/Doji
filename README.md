@@ -247,16 +247,16 @@ be single-sourced at run time:
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
-| the **project ref** | eight files, in five languages, three of them not URLs |
+| the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
+| each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 
 Copies are the cost. Copies that can *disagree* were the risk, and that is what
 `test/agree.test.mjs` closes: it reads every copy of each — the app out of
 `index.html` through the same jsdom harness the render tests use, the function
 exports directly, the constraint and the cron jobs out of the SQL as text, the
 project ref out of the workflow and `config.toml` — and fails when they stop
-saying the same thing. Adding a third copy of anything means adding it there
-too: a copy nothing can compare is the defect, not the copy.
+saying the same thing.
 
 Every one of those values was already tested before, and every one of those
 tests asserted against a literal typed into the file beside it — so changing a
@@ -959,7 +959,7 @@ recedes furthest. Its green runs at or above its red so a small tile goes cool
 rather than mauve — the rest of the palette has red above green, which reads warm
 on a large card and muddy on a cell.
 
-**Neutral surfaces come from five alphas of white**, so a change lands in one
+**Neutral surfaces come from seven alphas of white**, so a change lands in one
 place: `--fill-0` (`.02`, inset panels) through `--fill-3` (`.08`, hover on a
 `--fill-2` surface), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
 (`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
@@ -1114,7 +1114,7 @@ it from here.
 **Applying by hand means the files are a claim, so `supabase/verify.sql` is how
 the claim gets tested.** It writes nothing: it reads back the columns, the
 constraints, the indexes, the policies, the grants on Eugenia's view, the
-triggers, the realtime publication, both cron jobs and the last ten function
+triggers, the realtime publication, all three cron jobs and the last ten function
 responses, to be compared against 001–004 by eye. Run it after any manual change
 and before believing anything here about the database. A CI job cannot stand in
 for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
@@ -1171,7 +1171,8 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
    which is what the cron jobs and Gladys's trigger present. Same value, and the
    lower-case one is the database's. Nothing works without both.
    `doji-email-sync` is the exception and checks its own — see step 7.
-6. Run `supabase/004_cron.sql` to schedule the poller and Eugenia. It is safe to
+6. Run `supabase/004_cron.sql` to schedule the poller, Eugenia and the nightly
+   sweep of pg_cron's own history. It is safe to
    re-run: `cron.schedule` upserts on the job name, so the file is what the
    database holds rather than a description of what it might.
 7. Deploy the Apps Script. Generate a second secret, and store it twice:
@@ -1253,7 +1254,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; every function's `verify_jwt` stanza against the directory that holds it; and every secret a function reads against the guard that refuses to start without it |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
@@ -1377,10 +1378,12 @@ account. The planned floor is **not recoverable from the data** — the broker
 reports only the *final* stop, so a stop moved to break-even has overwritten the
 original risk. Never infer what the planned R:R was; ask.
 
-**The pg_cron jobs hold no database power**, and that is a claim about the
-database rather than about the secret. Neither job can read or write a table:
-each presents the cron secret, read from Vault at call time, and the
+**The two calling pg_cron jobs hold no database power**, and that is a claim
+about the database rather than about the secret. Neither can read or write a
+table: each presents the cron secret, read from Vault at call time, and the
 service-role key lives in the functions' own secrets and never appears in a job.
+The third job is the exception and is why the distinction is worth making — it
+is a DELETE, and it reaches nothing outside pg_cron's own history.
 This replaced an arrangement where the job text carried a legacy service_role
 JWT — full RLS-bypassing access, in a job definition, and unrotatable, because
 legacy keys are tied to the project's JWT secret.
@@ -1410,8 +1413,8 @@ places rather than three, with no Vault spelling to get wrong.
 One value, two stores, two spellings, and it is worth knowing before you touch
 either: the Edge Functions read the cron secret from their own secrets as
 **`DOJI_CRON_SECRET`**, while the database reads it from Vault as
-**`doji_cron_secret`**. Both cron jobs and Gladys's trigger use the lower-case
-Vault name. That trigger shipped reading the upper-case one, found nothing, and
+**`doji_cron_secret`**. The two calling jobs and Gladys's trigger all read the
+lower-case Vault name, and `verify.sql` asserts all three. That trigger shipped reading the upper-case one, found nothing, and
 went quiet without failing anything.
 
 **Resolved — the old tables are gone.** `records`, `broker_fills` and

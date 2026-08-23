@@ -60,11 +60,11 @@ Every change is:
   second way in a second spot — and that includes prose: a fact stated in the
   README does not get restated here.
 - **Where a copy is unavoidable, a test holds the copies together.** Four
-  runtimes and no build step mean the setups vocabulary, the four journal column
-  names and Eugenia's note limit genuinely live in more than one file.
+  runtimes and no build step mean seven facts genuinely live in more than one
+  file — the README's *Facts that live in more than one file* names them, and
   `test/agree.test.mjs` reads every copy of each and fails when they disagree.
-  Adding a third copy of anything means adding it there too — a copy nothing can
-  compare is the actual defect, not the copy itself.
+  Adding a copy of anything means adding it there too, and to that table: a copy
+  nothing can compare is the actual defect, not the copy itself.
 - **Load-order safe.** Nothing references anything defined below it at load time.
   New code goes in the section it belongs to, under the right banner — not at the
   bottom because that is easier.
@@ -126,11 +126,9 @@ vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
 Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
 suites.
 
-They do **not** cover pixels, realtime, auth or the xlsx export. The email
-parser IS held to a real cTrader message — `test/fixtures/` holds a saved one —
-but only that one; the variants around it are built. Nor can anything here see
-the live database: `verify.sql` is that check and a person runs it. So a good
-deal of what a change can break is only caught by reading. You cannot see
+They do **not** cover pixels, realtime, auth or the xlsx export, and nothing
+here sees the live database: `verify.sql` is that check and a person runs it. So
+a good deal of what a change can break is only caught by reading. You cannot see
 pixels; say so on any visual change.
 
 ---
@@ -309,7 +307,7 @@ and what could not be verified.
 - **A caller's URL is checked in the repository and in the database, and they
   are different checks.** `agree.test.mjs` reads every `/functions/v1/<name>` in
   the SQL and the Apps Script and fails if one names a function that is not
-  there, and reads the project ref out of all eight files that carry it —
+  there, and reads the project ref out of every file that carries one —
   including `index.html`, `config.toml` and the deploy workflow, which name a
   project without naming a function; `verify.sql` asks the live trigger the same
   question. Renaming a function means editing a trigger body
