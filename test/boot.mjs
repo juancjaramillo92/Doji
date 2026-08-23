@@ -43,7 +43,19 @@ export async function boot() {
   // rather than omitting it keeps the wheel paths under test.
   const charts = [];
   class ChartStub {
-    constructor(ctx, cfg) { this.ctx = ctx; this.config = cfg; this.data = cfg.data; charts.push(this); }
+    constructor(ctx, cfg) {
+      this.ctx = ctx;
+      // Real Chart.js exposes the canvas it was mounted on, and mountDonut
+      // reads it: `existing.canvas === canvas` is how a wheel decides between
+      // updating in place and being rebuilt. Without it that check was always
+      // false, so every render tore down and rebuilt all five wheels — the
+      // exact path the app has a comment explaining it avoids, exercised by
+      // nothing.
+      this.canvas = ctx?.canvas;
+      this.config = cfg;
+      this.data = cfg.data;
+      charts.push(this);
+    }
     update() { this.updated = (this.updated || 0) + 1; }
     destroy() { this.destroyed = true; }
   }
@@ -98,9 +110,14 @@ export async function boot() {
   });
   // Chart.js is stubbed, but the app calls clearRect itself on the placeholder
   // ring, so the context needs to be a no-op surface rather than a bare object.
-  win.HTMLCanvasElement.prototype.getContext = () => new Proxy({}, {
-    get: (t, k) => k === 'canvas' ? undefined : (t[k] ??= () => {})
-  });
+  // `canvas` is the one real property on it: a 2d context carries the element
+  // it came from, and both Chart.js and the wheel-reuse check read it back.
+  win.HTMLCanvasElement.prototype.getContext = function () {
+    const canvas = this;
+    return new Proxy({}, {
+      get: (t, k) => k === 'canvas' ? canvas : (t[k] ??= () => {})
+    });
+  };
   win.URL.createObjectURL = () => 'blob:doji-test';
   win.URL.revokeObjectURL = () => {};
 

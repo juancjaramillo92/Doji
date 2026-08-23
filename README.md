@@ -409,6 +409,20 @@ schedule. Hitting the cap means something is wrong with the window rather than
 that the trader had a busy week, and the last thing to do then is write rows
 folded from a partial history.
 
+**`?raw=1` returns what the broker actually sent.** A trade with an inverted
+direction or a missing entry price is either a fold this function got wrong or a
+response cTrader shaped differently, and the two repairs are opposite — a
+`?force=1&hours=N` backfill for the first, a code change for the second. Nothing
+else in the system can tell them apart. The flag writes nothing, makes the same
+`get_deals` call the poll was about to make, and returns the body as text: the
+SSE framing and the double-encoded payload are half of what is being looked at,
+so parsing them away would hide the layer the question is usually about.
+
+```sh
+curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
+     -H "x-doji-key: $DOJI_CRON_SECRET"
+```
+
 **Balance is read from a second tool, and only for a close just seen.**
 `get_deals` carries no balance — eleven fields, none of them the account — and
 `get_position_details` reports `balance`, `commission` and `swap` as zero on a
@@ -1292,13 +1306,21 @@ double tap, the fresh-message fallback, the chat check and the secret that
 picks which half runs are verified by reading. So is the trigger — nothing here runs Postgres, so its guard is argued
 against the real column types and the restore SQL rather than executed.
 
-Four gaps are worth naming rather than leaving to be rediscovered. Soft delete
+Three gaps are worth naming rather than leaving to be rediscovered. Soft delete
 has no test of its own — `Data.mark` and the `deleted` path are touched only
 incidentally, by the load test asserting that a flagged row is kept and not
-rendered. `London+NY` is the one session bucket never asserted. `IO.backup` is
-plain JSON and testable, and is not tested. And `boot()` returns the recorded
-Chart configs so a test can read what a wheel was asked to draw; nothing does,
-so the wheels are checked for not throwing and nothing more.
+rendered. `London+NY` is the one session bucket never asserted. And `IO.backup`
+is plain JSON and testable, and is not tested.
+
+**The poller has no saved response, and the email parser does.** Every fold test
+runs on deals this repository invents, so the section rests on the builder
+producing what cTrader produces — which is the belief the email fixture was
+added to stop trusting. One test holds the builder against the `Deal` interface
+the poller declares, so a field added to it or renamed in it is caught. A field
+*dropped* is not — fewer declared fields is fewer things to check — and nothing
+catches the interface being wrong about the broker in the first place. A saved
+`get_deals` response would, and there is not one; `?raw=1`, under **The MCP
+poller** above, is how one gets captured.
 
 **A check you have not proved can fail is not a check.** Every test here was run
 against a deliberately broken copy of the thing it covers before it was
@@ -1393,7 +1415,7 @@ and it used to be described as though it were.** Say it per endpoint:
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read the deals back with `?raw=1` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 

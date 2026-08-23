@@ -16,14 +16,16 @@
 //
 // SECURITY CONTRACT
 //   1. ALLOWED_TOOLS is a hardcoded whitelist holding two read tools.
-//      mcpCall() throws on anything else.
+//      mcpPost() throws on anything else, and it is the only place a tool name
+//      becomes a request.
 //   2. Every request must present DOJI_CRON_SECRET on the x-doji-key header.
 //      This function runs with verify_jwt = false, so the platform gateway no
 //      longer checks anything — authorisation happens here, in code, before any
 //      work begins. See the note at the entry point.
 //   3. No value from the HTTP request reaches an MCP call. The body is never
-//      read. The only request input consulted is two query flags, both
-//      numeric/boolean and both clamped. No code path constructs an order.
+//      read. The only request input consulted is three query flags — force,
+//      raw and hours — the first two boolean and the third clamped. No code
+//      path constructs an order.
 //   4. Tokens live only in Deno.env — never logged, never returned, never
 //      written to the database.
 //
@@ -47,11 +49,11 @@ const MCP_TOKEN = env("CTRADER_MCP_TOKEN");
    and leak with different consequences.
 
    DOJI_CRON_SECRET — "may this caller start a poll?". It has no database power
-   whatsoever, and against this function that is the whole of it: the worst a
-   holder can do is start a read-only poll that was going to run anyway. Two
-   other functions check the same secret and it is NOT harmless there — see the
-   README — which is why the claim is made about this endpoint rather than about
-   the secret.
+   whatsoever, and against this function that is nearly the whole of it: a
+   holder can start a read-only poll that was going to run anyway, or read the
+   deal history back with ?raw=1. Neither writes. Two other functions check the
+   same secret and it is NOT harmless there — see the README — which is why the
+   claim is made about this endpoint rather than about the secret.
 
    SB_SECRET_KEY — "may this function write to the table?". It bypasses
    RLS and never leaves this runtime. It is the reason the split exists: the
@@ -266,8 +268,15 @@ async function mcpInit(): Promise<string> {
   return sid;
 }
 
-async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unknown>) {
-  // Enforced at the call site, not by the caller's good intentions.
+/* The request and nothing else, so the body cTrader sent can be had whole as
+   well as unwrapped. mcpCall wants the deals inside it; ?raw=1 wants the frame,
+   the envelope and the double-encoded payload exactly as they arrived. Two
+   consumers, one statement of what the request is — writing the fetch twice is
+   how the two would drift.
+
+   The allow-list check lives here rather than in mcpCall, because here is the
+   only place a tool name becomes a request. */
+async function mcpPost(sid: string, tool: AllowedTool, args: Record<string, unknown>): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
 
   const res = await fetch(MCP_URL, {
@@ -275,7 +284,15 @@ async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unkn
     headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
   });
-  const envelope = parseSse(await res.text());
+  // Checked here, so ?raw=1 cannot hand back a 401 body under a 200 and have it
+  // read as what the broker sent. mcpInit refuses the same way for the same
+  // reason.
+  if (!res.ok) throw new Error(`MCP ${tool}: HTTP ${res.status}`);
+  return res.text();
+}
+
+async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unknown>) {
+  const envelope = parseSse(await mcpPost(sid, tool, args));
   if (envelope.error) throw new Error(`MCP ${tool}: ${envelope.error.message}`);
 
   // Tool results arrive as a text block whose body is itself a JSON document,
@@ -466,12 +483,17 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
   try {
     // ?force=1 bypasses the schedule for manual runs and backfills.
-    // ?hours=N  widens the window for one call, clamped to cTrader's 720h cap.
-    // Neither selects a tool or reaches an MCP call with request-supplied data,
-    // so the read-only guarantee is untouched.
+    // ?raw=1   returns the get_deals body unparsed — see below.
+    // ?hours=N widens the window for one call, clamped to cTrader's 720h cap.
+    // None of the three selects a tool or reaches an MCP call with
+    // request-supplied data, so the read-only guarantee is untouched.
     const url   = new URL(req.url);
     const force = url.searchParams.get("force") === "1";
-    if (!force && !marketOpen()) {
+    const raw   = url.searchParams.get("raw") === "1";
+    // ?raw=1 answers over the weekend too, which is when a suspicious row
+    // actually gets looked at. It writes nothing, so the market check has
+    // nothing to protect here.
+    if (!force && !raw && !marketOpen()) {
       return json({ ok: true, skipped: "market closed" });
     }
 
@@ -480,12 +502,31 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const from     = to - hours * 3600_000;               // what gets written
     const foldFrom = to - foldHours(hours) * 3600_000;    // what gets read
 
-    const sid  = await mcpInit();
-    const data = await mcpCall(sid, "get_deals", {
+    const sid = await mcpInit();
+    const dealArgs = {
       fromTimestamp: String(foldFrom),
       toTimestamp:   String(to),
       maxRows: MAX_ROWS,
-    });
+    };
+
+    /* ?raw=1 — WHAT THE BROKER ACTUALLY SENT, which is the question a wrong row
+       raises and the one thing nothing else here can answer. A trade with an
+       inverted direction or a missing entry price is either a fold this
+       function got wrong or a response cTrader shaped differently, and the two
+       repairs are opposite: ?force=1&hours=N for the first, a code change for
+       the second. Guessing which has already cost a day.
+
+       It writes nothing and reads nothing but the same get_deals the poll was
+       about to make, so it is safe to run at any time. Returned as text rather
+       than JSON because the SSE framing and the double-encoded payload are
+       half of what is being looked at — parsing it away would hide the layer
+       the question is usually about. */
+    if (raw) {
+      const body = await mcpPost(sid, "get_deals", dealArgs);
+      return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+
+    const data = await mcpCall(sid, "get_deals", dealArgs);
 
     /* TRUNCATION IS DATA LOSS, SO IT IS AN ERROR — AND IT IS CHECKED BEFORE
        ANYTHING IS WRITTEN.
