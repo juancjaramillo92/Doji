@@ -43,11 +43,19 @@ export const message = (subject, body, date = new Date('2026-07-30T14:29:00Z')) 
 
 /* Boots the script. `responses` is what UrlFetchApp hands back, one per call —
    an object of { code, text }, or an Error to throw, which is how a network
-   failure with no response at all is expressed. */
-export function boot({ threads = [], responses = [], secret = 'test-secret' } = {}) {
+   failure with no response at all is expressed.
+
+   `existingLabels` is which Gmail labels already exist. It matters because
+   getOrCreateLabel_ and resetDojiLabels both branch on a label being absent,
+   and a stub that always answered with one made neither branch reachable. */
+export function boot({ threads = [], responses = [], secret = 'test-secret',
+                       existingLabels = ['doji-synced', 'doji-parse-failed'] } = {}) {
   const log = [];
   const posted = [];
+  const created = [];
   let next = 0;
+
+  const label = (name) => ({ name, getThreads: () => threads });
 
   const context = {
     // The three-outcome logic reads the code and nothing else, so a response is
@@ -55,6 +63,13 @@ export function boot({ threads = [], responses = [], secret = 'test-secret' } = 
     UrlFetchApp: {
       fetch(url, options) {
         posted.push({ url, options, body: JSON.parse(options.payload) });
+        // A call the test did not describe is a call the test cannot be
+        // asserting about. Answering it 200 makes "sent one fill" and "sent
+        // four" look identical from the labels, which is the whole subject.
+        if (next >= responses.length && responses.length) {
+          throw new Error(`gs.mjs: call ${next + 1} was not described — ` +
+                          `${responses.length} response(s) supplied`);
+        }
         const answer = responses[next++] ?? { code: 200, text: '{"ok":true}' };
         if (answer instanceof Error) throw answer;
         return {
@@ -70,8 +85,11 @@ export function boot({ threads = [], responses = [], secret = 'test-secret' } = 
     },
     GmailApp: {
       search: () => threads,
-      getUserLabelByName: (name) => ({ name, getThreads: () => threads }),
-      createLabel: (name) => ({ name, getThreads: () => threads }),
+      // null when the label does not exist yet, which is what the script's two
+      // absent-label branches are written for.
+      getUserLabelByName: (name) =>
+        existingLabels.includes(name) ? label(name) : null,
+      createLabel(name) { created.push(name); existingLabels.push(name); return label(name); },
     },
     Logger: { log: (m) => log.push(String(m)) },
   };
@@ -79,5 +97,5 @@ export function boot({ threads = [], responses = [], secret = 'test-secret' } = 
   vm.createContext(context);
   vm.runInContext(SOURCE, context);
 
-  return { ...context, log, posted, threads };
+  return { ...context, log, posted, created, threads };
 }

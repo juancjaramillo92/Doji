@@ -159,7 +159,7 @@ export function trade(o = {}) {
     followed_rules: 'followed_rules' in o ? o.followed_rules : null,
     followed_sl: 'followed_sl' in o ? o.followed_sl : null,
     followed_tp: 'followed_tp' in o ? o.followed_tp : null,
-    deleted: false,
+    deleted: 'deleted' in o ? o.deleted : false,
     created_at: '2026-07-30T14:30:00.000Z',
     updated_at: '2026-07-30T14:30:00.000Z'
   };

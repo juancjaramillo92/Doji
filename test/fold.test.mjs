@@ -34,10 +34,10 @@ import {
   lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
-import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
+import { SETUPS, COLUMNS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
+import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import {
-  briefDue, pulseDue, retryDue, isSilent, briefingMarker, isBriefingMarker,
+  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, isBriefingMarker,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
 } from '../supabase/functions/doji-eugenia/index.ts';
 
@@ -529,6 +529,70 @@ test('the fourth answer settles the form, and the three before it do not', () =>
   assert.equal(didSettle, true, 'the fourth answer must settle it');
 });
 
+test('the taps are taken off the buttons the form actually drew', () => {
+  /* THE SAME SEQUENCE AS ABOVE, WITH NOTHING TYPED INTO IT. The test before
+     this one writes its own callback_data, so it proves the loop settles on
+     four answers and says nothing about whether the keyboard emits payloads
+     that reach it. Those are different questions, and only this one covers the
+     join: a ✓ button drawn with any value but `1` parses to null, the tap is
+     acknowledged and dropped by design, and the bot goes silent while every
+     test that supplies its own payload stays green.
+
+     So each round renders the form, finds the button that writes the field,
+     and taps THAT — the payload, the parse and the redraw all off the real
+     thing. */
+  let row = { ...open };
+
+  for (const field of ['setup', 'rules', 'sl', 'tp']) {
+    const before = row;
+    const drawn = renderMessage(row, false).reply_markup.inline_keyboard.flat()
+      .find(b => b.callback_data.split('|')[1] === field);
+    assert.ok(drawn, `the open form draws no button that writes ${field}`);
+
+    const tap = parseCallback(drawn.callback_data);
+    assert.ok(tap, `the ${field} button draws ${drawn.callback_data}, which the parser refuses`);
+    assert.equal(tap.column, COLUMNS[field]);
+
+    row = { ...row, [tap.column]: tap.value };
+    const rows = renderMessage(row, staysOpen(tap, before)).reply_markup.inline_keyboard.length;
+    assert.equal(rows, field === 'tp' ? 1 : 4, drawn.callback_data);
+  }
+
+  // And the values landed as the three-state booleans the column holds, not as
+  // the strings they travelled as.
+  assert.equal(row.setup, SETUPS[0]);
+  for (const c of ['followed_rules', 'followed_sl', 'followed_tp']) {
+    assert.equal(typeof row[c], 'boolean', c);
+  }
+});
+
+test('every button either form draws is a tap the parser accepts', () => {
+  /* The sequence above walks one path through the keyboard — the ✓ half of each
+     pair, and the first setup. Everything it does not press is untested by it,
+     and a ✗ drawn as `|no` instead of `|0` is refused by parseCallback exactly
+     as silently as a ✓ would be: acknowledged, dropped, no change on screen.
+
+     So this presses nothing and checks everything. Both forms, every row, every
+     button, including the [Edit] and [Done] that write no column at all. */
+  const forms = [
+    ['the open form', renderMessage(open, false)],
+    ['the settled summary', renderMessage(settled, false)],
+    ['a reopened form', renderMessage(settled, true)],
+  ];
+
+  for (const [what, msg] of forms) {
+    const buttons = msg.reply_markup.inline_keyboard.flat();
+    assert.ok(buttons.length, `${what} draws no buttons at all`);
+
+    for (const btn of buttons) {
+      const tap = parseCallback(btn.callback_data);
+      assert.ok(tap, `${what} draws "${btn.callback_data}", which parseCallback refuses`);
+      // A tap that names a column must name one of the four, and only those.
+      if (tap.column) assert.ok(Object.values(COLUMNS).includes(tap.column), tap.column);
+    }
+  }
+});
+
 test('a correction inside a reopened form does not re-settle it', () => {
   // Reopened means every answer was already in before this tap. Collapsing here
   // would make a two-field correction need [Edit] pressed twice.
@@ -610,6 +674,66 @@ test('a briefing hour and a pulse hour never collide', () => {
     assert.equal(briefDue(at) !== null && pulseDue(at), false,
       `both due at ${at.toISOString()}`);
   }
+});
+
+/* ─── Eugenia: which of the three schedules this hour owes ──────────────────
+   Each predicate is right on its own and that is not the question — the three
+   overlap, and what an hour owes is the composition of them.
+
+   So this walks 168 CONSECUTIVE HOURS and states the whole timetable, rather
+   than sampling four separate UTC days: a run that restarts at 00:00 UTC each
+   day never reaches Sunday 20:00–23:59 in New York, which is 00:00–03:59 UTC on
+   the Monday, and a spurious briefing hour hiding there would ship green.
+
+   Sun 16 Aug 2026 00:00 UTC is Sat 15 Aug 20:00 in New York, so the range
+   covers every New York hour of Sunday 16th through Friday 21st, and both
+   weekend edges.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const timetable = (briefed) => {
+  const owed = [];
+  for (let h = 0; h < 24 * 7; h++) {
+    const at  = new Date(Date.UTC(2026, 7, 16, h));
+    const due = dueNow(at, briefed);
+    if (due) owed.push(`${at.toISOString().slice(0, 16)} ${due}`);
+  }
+  return owed;
+};
+
+test('an ordinary week owes one briefing and one pulse a day, and nothing else', () => {
+  // August, so New York is EDT: 08:00 ET is 12:00 UTC, 10:00 ET is 14:00, and
+  // the Sunday open at 17:00 ET is 21:00.
+  assert.deepEqual(timetable(true), [
+    '2026-08-16T21:00 sunday',
+    '2026-08-17T12:00 weekday', '2026-08-17T14:00 pulse',
+    '2026-08-18T12:00 weekday', '2026-08-18T14:00 pulse',
+    '2026-08-19T12:00 weekday', '2026-08-19T14:00 pulse',
+    '2026-08-20T12:00 weekday', '2026-08-20T14:00 pulse',
+    '2026-08-21T12:00 weekday', '2026-08-21T14:00 pulse',
+  ]);
+});
+
+test('a week of failed briefings owes the retry hours, and the pulse gives way', () => {
+  // 09:00, 10:00 and 11:00 ET are 13:00, 14:00 and 15:00 UTC. 14:00 is the one
+  // hour the pulse also wants, and the retry takes it: a second look at a
+  // morning he was never told about is not what is missing.
+  const day = (d) => [`2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
+                      `2026-08-${d}T14:00 weekday`, `2026-08-${d}T15:00 weekday`];
+  assert.deepEqual(timetable(false), [
+    '2026-08-16T21:00 sunday',
+    ...day('17'), ...day('18'), ...day('19'), ...day('20'), ...day('21'),
+  ]);
+});
+
+test('the timetable holds its New York hours in winter too', () => {
+  // January: EST (UTC-5), so every hour above moves one later in UTC.
+  const owed = [];
+  for (let h = 0; h < 24; h++) {
+    const at  = new Date(Date.UTC(2026, 0, 14, h));   // Wed 14 Jan
+    const due = dueNow(at, true);
+    if (due) owed.push(`${at.toISOString().slice(11, 16)} ${due}`);
+  }
+  assert.deepEqual(owed, ['13:00 weekday', '15:00 pulse']);
 });
 
 test('the pulse stays silent on the word it was told to use', () => {
@@ -723,6 +847,25 @@ test('a window from the model is clamped, never trusted', () => {
   assert.equal(since(0), since(30));           // absent or zero is a month
   assert.equal(since('abc'), since(30));       // junk is a month, not NaN
   assert.equal(since(undefined), since(30));
+});
+
+test('the window is n civil days back from today in New York', () => {
+  /* open_day is a civil day, so the bound has to be one. Two instants where an
+     instant-arithmetic bound gets it wrong:
+
+     02:00 UTC is 22:00 the previous evening in New York, so a UTC-derived date
+     is already tomorrow and the window starts a day late — every evening.
+
+     The evening after the clocks go back, a day is 25 hours long, so
+     subtracting seven fixed days lands six civil days ago and the oldest day of
+     "this past week" is gone. Spring-forward stretches it to eight. */
+  const evening   = new Date('2026-08-22T02:00:00Z').getTime();   // Fri 21 Aug, 22:00 ET
+  const fallBack  = new Date('2026-11-03T04:30:00Z').getTime();   // Mon 2 Nov, 23:30 ET
+  const springFwd = new Date('2026-03-09T03:30:00Z').getTime();   // Sun 8 Mar, 23:30 ET
+
+  assert.match(tradesQuery(7, evening),   /open_day=gte\.2026-08-14/);
+  assert.match(tradesQuery(7, fallBack),  /open_day=gte\.2026-10-26/);
+  assert.match(tradesQuery(7, springFwd), /open_day=gte\.2026-03-01/);
 });
 
 test('the journal read is bounded, so a wide window cannot fill the context', () => {
@@ -888,6 +1031,37 @@ test('a figure that is not a finite number is refused, never coerced', () => {
 test('a body that is not an object at all is refused without throwing', () => {
   for (const body of [null, undefined, 'PID1', 42, []]) {
     assert.ok('error' in emailRow(body, USER));
+  }
+});
+
+/* ─── The email path: what the caller is told ────────────────────────────────
+   The other half of the three-outcome contract. test/parse.test.mjs proves the
+   Apps Script labels a 400 permanently and retries everything else; these prove
+   this end emits a 400 for the same cases and only those. Two halves each
+   tested against a literal is how the first version of this shipped treating
+   every 4xx as permanent.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('only a status about the row itself is permanent', () => {
+  // Postgres looked at this row and will never take it: malformed, a constraint
+  // it violates, a value it cannot process. Retrying is the only alternative,
+  // every minute for ninety days.
+  for (const status of [400, 409, 422]) {
+    assert.equal(answerFor(status), 400, `${status} should be permanent`);
+  }
+});
+
+test('a status about the caller is transient, so the fill keeps its place', () => {
+  /* THE ONE THAT LOST DATA. A rotated SB_SECRET_KEY answers 401 — which says
+     nothing whatever about the fill. Treated as permanent, the thread is
+     labelled failed, drops out of the Gmail query, and every queued net_pnl is
+     gone by the time anyone notices the key.
+
+     404 is a renamed function, 403 a revoked grant, 429 a rate limit, and every
+     5xx is Supabase. A person fixing any of those wants the fill still waiting
+     for them. */
+  for (const status of [401, 403, 404, 408, 429, 500, 502, 503, 504]) {
+    assert.equal(answerFor(status), 500, `${status} should be retryable`);
   }
 });
 

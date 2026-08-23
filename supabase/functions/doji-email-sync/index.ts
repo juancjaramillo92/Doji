@@ -51,7 +51,7 @@ const USER_ID = env("DOJI_USER_ID");
 /* ─── The boundary ─────────────────────────────────────────────────────────
    Everything below arrived over the wire, so nothing above it is trusted.
 
-   The four columns and their shapes, stated once:
+   The five columns and their shapes, stated once:
 
      id          `PID` + digits, exactly as foldPosition mints it. Unprefixed,
                  the same position would land on a second row.
@@ -121,6 +121,35 @@ const upsert = (row: Record<string, unknown>) =>
     body: JSON.stringify([row]),
   });
 
+/* WHAT POSTGRES SAID, TRANSLATED INTO WHAT THE APPS SCRIPT DOES ABOUT IT.
+   400 out means this row will never be accepted, so the thread is labelled and
+   leaves the queue; 500 out means try again, so it stays unlabelled.
+
+   PERMANENT IS A STATEMENT ABOUT THE ROW, NOT ABOUT THE CALLER, and getting
+   that backwards loses data. The first version of this treated every 4xx as
+   permanent — so a rotated SB_SECRET_KEY answers 401, the Apps Script labels
+   the thread failed, it drops out of the Gmail query, and every queued fill's
+   net_pnl is gone. The key being wrong says nothing about the fill.
+
+   So the list is the other way round: only a status meaning Postgres examined
+   THIS ROW and will never accept it. 400 malformed, 409 a constraint, 422
+   unprocessable. Everything else — 401, 403, 404, 408, 429, every 5xx, no
+   response at all — is the caller, the connection or the deployment, and a
+   person fixing one of those wants the fill still waiting.
+
+   The two failure modes are not symmetrical. Retrying something permanent
+   costs a thread sitting in the queue, which is visible and harmless.
+   Discarding something transient costs the only settled P&L this system gets.
+
+   Exported because it is the joint between the two halves and both were
+   written against literals: parse.test.mjs proves the script labels a 400
+   permanently and retries everything else, and nothing proved this end emits a
+   400 for the same cases. */
+const PERMANENT = [400, 409, 422];
+
+export const answerFor = (status: number): 400 | 500 =>
+  PERMANENT.includes(status) ? 400 : 500;
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing — the file loads under plain
 // Node, where Deno.serve does not exist.
@@ -167,28 +196,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   // A body is not guaranteed, and "" tells the Apps Script log nothing.
   const detail = (await res.text()).slice(0, 300) || `HTTP ${res.status}`;
 
-  /* PERMANENT IS A STATEMENT ABOUT THE ROW, NOT ABOUT THE CALLER, and getting
-     that backwards loses data. The first version of this treated every 4xx as
-     permanent — so a rotated SB_SECRET_KEY would answer 401, the Apps Script
-     would label the thread failed, it would drop out of the Gmail query, and
-     every queued fill's net_pnl would be gone. The key being wrong says nothing
-     about the fill.
-
-     So the list is the other way round: only a status that means Postgres
-     examined this row and will never accept it is permanent. 400 malformed, 409
-     a constraint, 422 unprocessable. Everything else — 401, 403, 404, 408, 429,
-     every 5xx, no response at all — is the caller, the connection or the
-     deployment, and a person fixing one of those wants the fill still waiting.
-
-     The two failure modes are not symmetrical. Retrying something permanent
-     costs a thread sitting in the queue, which is visible and harmless.
-     Discarding something transient costs the only settled P&L this system
-     ever gets. */
-  const PERMANENT = [400, 409, 422];
-  if (PERMANENT.includes(res.status)) {
-    console.error(`doji-email-sync: refused by PostgREST (${res.status}) — ${detail}`);
-    return json({ ok: false, error: detail }, 400);
-  }
-  console.error(`doji-email-sync: write failed (${res.status}) — ${detail}`);
-  return json({ ok: false, error: detail }, 500);
+  const answer = answerFor(res.status);
+  console.error(`doji-email-sync: ${answer === 400 ? "refused by PostgREST" : "write failed"}` +
+                ` (${res.status}) — ${detail}`);
+  return json({ ok: false, error: detail }, answer);
 });

@@ -1389,7 +1389,7 @@ tr.broker-pending td:first-child {
   .heatmap-week { padding-top:14px; }
 
   /* Trade log: phone shows the identity columns only — Date, Dir, Session,
-     Setup, P&L. Rules/SLS/TPS and delete live in the entry itself (tap the
+     Setup, P&L. Rules/SL/TP and delete live in the entry itself (tap the
      row); no sideways scrolling. Setup flips to its initials form (B&R / S&R)
      and cell padding tightens so all 5 columns land inside the screen. */
   .tlog-wrap th:nth-child(n+6), .tlog-wrap td:nth-child(n+6) { display:none; }
@@ -1570,7 +1570,7 @@ tr.broker-pending td:first-child {
       <div id="io-section-journal" class="io-section">
         <div class="io-section-label">Export Journal to Excel</div>
         <div class="io-section-desc">
-          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, and discipline (rules / SLS / TPS).
+          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, and discipline (rules / SL / TP).
         </div>
         <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
       </div>
@@ -1784,11 +1784,21 @@ const Dates = {
     ny:     { tz: 'America/New_York',  open: 8, close: 17 }
   },
 
+  // hourCycle rather than hour12, which leaves the cycle to the locale and can
+  // resolve to h24 — midnight arriving as 24. It never bit here: 24 fails
+  // `h < close` exactly as 0 fails `h >= open`. It bit through nyParts, whose
+  // hour IS compared against 17. Stating h23 removes the case in both rather
+  // than correcting for it in each, which is what _shared/edge.ts and Eugenia's
+  // clock do — one answer across all four runtimes.
+  //
+  // It is also the file's browser floor: hourCycle is Safari 14 / iOS 14, above
+  // the ?. and ?? everywhere else here. An engine below it IGNORES the option
+  // and en-US falls back to h12, so hours arrive 1–12 and every session label
+  // and every 17:00 boundary is wrong without saying so.
   hourIn(tz, date) {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false })
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' })
       .formatToParts(date);
-    const h = +(parts.find(p => p.type === 'hour')?.value ?? 0);
-    return h === 24 ? 0 : h;   // some engines emit '24' at midnight
+    return +parts.find(p => p.type === 'hour').value;
   },
 
   isOpen(mkt, date) {
@@ -1817,13 +1827,12 @@ const Dates = {
     const fmt = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/New_York', weekday: 'short',
       year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: false
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
     });
     const p = {};
     for (const part of fmt.formatToParts(date)) p[part.type] = part.value;
-    const hour = +p.hour === 24 ? 0 : +p.hour;
     return {
-      y: +p.year, m: +p.month, d: +p.day, hour, minute: +p.minute,
+      y: +p.year, m: +p.month, d: +p.day, hour: +p.hour, minute: +p.minute,
       weekday: { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 }[p.weekday]
     };
   },
@@ -3183,7 +3192,7 @@ function renderTable(rows) {
 
   host.innerHTML = `<table><thead><tr>
       <th>Date</th><th>Dir</th><th>Session</th><th>Setup</th>
-      <th>P&amp;L</th><th class="c">Rules</th><th class="c">SLS</th><th class="c">TPS</th><th></th>
+      <th>P&amp;L</th><th class="c">Rules</th><th class="c">SL</th><th class="c">TP</th><th></th>
     </tr></thead><tbody>${body}</tbody></table>`;
 
   if (pages > 1) {
@@ -3258,9 +3267,9 @@ function journalForm(t) {
   }).join('');
 
   const yn = [
-    ['followed_rules', 'Followed rules?', t.followed_rules],
-    ['followed_sl',    'Followed SLS?',   t.followed_sl],
-    ['followed_tp',    'Followed TPS?',   t.followed_tp]
+    ['followed_rules', 'Followed rules?',       t.followed_rules],
+    ['followed_sl',    'Followed stop loss?',   t.followed_sl],
+    ['followed_tp',    'Followed take profit?', t.followed_tp]
   ].map(([name, label, val]) => {
     const opts = [['yes', true, 'Yes'], ['no', false, 'No']].map(([v, bool, text]) => `
       <input type="radio" class="jf-pill-radio" name="${name}" id="${name}-${v}" value="${v}"${val === bool ? ' checked' : ''}>
@@ -3475,12 +3484,12 @@ const IO = {
         'P&L ($)':        t.pnl ?? '',
         'Result':         res(t),
         'Followed Rules': yn(t.followed_rules),
-        'Followed SLS':   yn(t.followed_sl),
-        'Followed TPS':   yn(t.followed_tp)
+        'Followed Stop Loss': yn(t.followed_sl),
+        'Followed Take Profit': yn(t.followed_tp)
       }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12}];
+    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:16},{wch:20},{wch:22}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Journal');
     const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });

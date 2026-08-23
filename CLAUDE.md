@@ -60,11 +60,11 @@ Every change is:
   second way in a second spot — and that includes prose: a fact stated in the
   README does not get restated here.
 - **Where a copy is unavoidable, a test holds the copies together.** Four
-  runtimes and no build step mean the setups vocabulary and the four journal
-  column names genuinely live in more than one file. `test/agree.test.mjs` reads
-  every copy of each and fails when they disagree. Adding a third copy of
-  anything means adding it there too — a copy nothing can compare is the actual
-  defect, not the copy itself.
+  runtimes and no build step mean seven facts genuinely live in more than one
+  file — the README's *Facts that live in more than one file* names them, and
+  `test/agree.test.mjs` reads every copy of each and fails when they disagree.
+  Adding a copy of anything means adding it there too, and to that table: a copy
+  nothing can compare is the actual defect, not the copy itself.
 - **Load-order safe.** Nothing references anything defined below it at load time.
   New code goes in the section it belongs to, under the right banner — not at the
   bottom because that is easier.
@@ -110,26 +110,26 @@ sequence end to end over one that asserts on a function in isolation.
 
 ---
 
-## Tests — run both, always
+## Tests — one command, and run it
 
 ```sh
-npm install   # once — jsdom, and nothing else
+npm ci        # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6+. Four suites, and the script globs `test/*.test.mjs` one level, so a
-test in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
+Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
+needs. Four suites, and the script globs `test/*.test.mjs` one level, so a test
+in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
 of all four Edge Functions and of `_shared`; `app.test.mjs` boots `index.html` in
 jsdom with a recording Supabase stand-in; `agree.test.mjs` holds the duplicated
 vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
 Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
 suites.
 
-They do **not** cover pixels, realtime, auth, the xlsx export, or whether the
-email parser matches a real cTrader message — its fixtures are built to the
-alert's shape. Nor can anything here see the live database: `verify.sql` is that
-check and a person runs it. So a good deal of what a change can break is only
-caught by reading. You cannot see pixels; say so on any visual change.
+They do **not** cover pixels, realtime, auth or the xlsx export, and nothing
+here sees the live database: `verify.sql` is that check and a person runs it. So
+a good deal of what a change can break is only caught by reading. You cannot see
+pixels; say so on any visual change.
 
 ---
 
@@ -203,10 +203,12 @@ code you write near it:
   secures the view, not the key, so the guarantee that matters is structural:
   one database read of the journal, no write path to it in the file. Do not add
   one.
-- **`tradesQuery` is a boundary.** Its `days` comes from the model, so it is
-  clamped and row-limited there rather than trusted. `writeNote` is the other
-  one: it truncates rather than refusing, because a tool that errors mid-turn
-  costs the whole answer.
+- **`tradesQuery` is a boundary, and its window is counted in civil days.**
+  `days` comes from the model, so it is clamped and row-limited there rather
+  than trusted; the bound is stepped off today's New York date, because
+  `open_day` is a civil day and a fixed number of milliseconds is not one.
+  `writeNote` is the other boundary: it truncates rather than refusing, because
+  a tool that errors mid-turn costs the whole answer.
 - **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
   no verdict on a trade, one question at a time. The line she may now cross is
   narrow and deliberate: *what the market is pricing* and *what would surprise
@@ -215,9 +217,11 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
-- **Two schedules, one hourly job.** `briefDue` and `pulseDue` both read
-  `nyClock`, because pg_cron is UTC and a fixed expression is wrong for half the
-  year. A test walks every hour of a week asserting they never both fire — one
+- **Three schedules, one hourly job, and `dueNow` picks between them.**
+  `briefDue`, `pulseDue` and `retryDue` all read `nyClock`, because pg_cron is
+  UTC and a fixed expression is wrong for half the year. They overlap, so each
+  answering correctly on its own settles nothing: the composition is the
+  decision, and a test walks every hour of a week through `dueNow` because one
   call cannot owe two answers.
 - **The pulse's default is silence, and `isSilent` is how it is said.** It
   matches the bare word only, so a sentence merely opening with it is sent. Err
@@ -227,8 +231,11 @@ code you write near it:
 - **What is stored is the raw turn, never the augmented one.** Notes and the
   week's trades are rebuilt every turn; storing them would resend a stale copy
   as history for the next six briefings.
-- **`HISTORY` has to stay even.** Turns are written in pairs, so an odd window
-  starts on an assistant turn and the Messages API refuses it.
+- **The history window is repaired, not assumed.** Pairs are written in one
+  INSERT, but a concurrent one can take a sequence value between them, so an
+  even window can still open on an assistant turn — which the Messages API
+  refuses outright. `openOnUser` trims to the first user turn; nothing may go
+  back to depending on `HISTORY` being even.
 - **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
   the parts go sequentially; Telegram does not promise ordering. The prompt aims
   well under the cap, so this is the exception now — do not delete it for being
@@ -294,9 +301,17 @@ and what could not be verified.
 - **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
-- **`005_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
+- **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file.
+- **A caller's URL is checked in the repository and in the database, and they
+  are different checks.** `agree.test.mjs` reads every `/functions/v1/<name>` in
+  the SQL and the Apps Script and fails if one names a function that is not
+  there, and reads the project ref out of every file that carries one —
+  including `index.html`, `config.toml` and the deploy workflow, which name a
+  project without naming a function; `verify.sql` asks the live trigger the same
+  question. Renaming a function means editing a trigger body
+  and a cron job by hand, and a missed one is a 404 pg_net throws away.
 
 ---
 

@@ -42,12 +42,12 @@ default or duplicated something already in the head. Left alone deliberately.
 ```
 index.html                              the entire application
 icon-512.png                            home-screen icon
-vercel.json                             no-cache header for index.html
+vercel.json                             no-cache header for the app shell
 supabase/config.toml                    Edge Function deploy settings
 supabase/001_trades.sql                 the schema
 supabase/002_gladys.sql                 Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
-supabase/005_cron.sql                   both scheduled jobs
+supabase/004_cron.sql                   every scheduled job
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -56,8 +56,10 @@ supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
-.github/workflows/test.yml              runs both suites on every push
+.github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
+package.json                            one dev dependency and the test script
+package-lock.json                       committed — see Tests
 ```
 
 ---
@@ -236,19 +238,30 @@ not required.
 
 ## Facts that live in more than one file
 
-Four runtimes and no build step, so two things genuinely cannot be single-sourced
-at run time: the **setups vocabulary** (`CONFIG.SETUPS`, Gladys's `SETUPS`,
-`trades_setup_check`) and the **four journal column names** (`Data.OWNED`,
-Gladys's `COLUMNS`, and the columns themselves).
+Four runtimes, five languages and no build step, so some things genuinely cannot
+be single-sourced at run time:
+
+| The fact | Where its copies live |
+|---|---|
+| the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves |
+| Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
+| the **project ref** | eight copies across six files, two of them not URLs at all |
+| each function's **required secrets** | its `env()` calls and its own boot guard |
+| each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 
 Copies are the cost. Copies that can *disagree* were the risk, and that is what
-`test/agree.test.mjs` closes: it reads all three of each — the app out of
+`test/agree.test.mjs` closes: it reads every copy of each — the app out of
 `index.html` through the same jsdom harness the render tests use, the function
-exports directly, and the constraint out of the SQL as text — and fails when
-they stop saying the same thing. Every one of those values was already tested
-before, and every one of those tests asserted against a literal typed into the
-file beside it, so changing a list and its own test in one pass left the other
-copies untouched and the suite green.
+exports directly, the constraint and the cron jobs out of the SQL as text, the
+project ref out of the workflow and `config.toml` — and fails when they stop
+saying the same thing.
+
+Every one of those values was already tested before, and every one of those
+tests asserted against a literal typed into the file beside it — so changing a
+list and its own test in one pass left the other copies untouched and the suite
+green.
 
 It also asserts the guarantee rather than only the lists: no broker column may
 appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
@@ -439,6 +452,28 @@ coerced. A **missing** figure is dropped rather than sent as null, because
 `merge-duplicates` writes exactly the keys present and `direction: null` would
 erase a correct direction rather than leave it alone.
 
+**The script refuses a fill it cannot read in full.** Four of the five values
+are required — `id`, `direction`, `fill_time` and `net_pnl` — and if any of them
+does not parse, nothing is sent: the thread is labelled `doji-parse-failed`, the
+subject is logged, and the repair is to fix the parser and run
+`resetDojiLabels()`. `net_pnl` is required for the reason given below, and a row
+written without it would look complete while carrying the computed figure
+forever. `balance` is the one value allowed to go missing, and the one that can
+afford to: the poller writes that column too, `where balance is null`, so a
+dropped balance is repaired on the next poll.
+
+That is also why each value is read from **one** label rather than a list of
+candidates. A rename then fails loudly instead of half-writing, where an alias
+nobody has ever seen might match some other line and file the trade wrongly.
+
+**The fill time is day first.** cTrader writes `19/08/2026`, which is August the
+19th, and the saved alert cannot prove that on its own: a parser that swapped the
+two would produce `2026-19-08`, which is not a date at all and which the fixture
+tests already reject. What they cannot see is a reading that is wrong only when
+both numbers are plausible months — every fill from the 1st to the 12th, filed in
+the wrong month with every other figure correct. A separate test pins `05/08/2026`
+to the 5th of August for exactly that.
+
 **`net_pnl` is the one nothing else can supply, and it is why this script
 stays.** `computed_pnl` is arithmetic over the deals — entry, exit, volume,
 commission — and swap appears in none of them, so a position carried through the
@@ -602,7 +637,7 @@ market does. She greets with `Buenos dias jefesito` in the morning and `Buenas
 tardes jefesito` on Sunday evening.
 
 Reply to her and she answers. `supabase/003_eugenia.sql` holds both her tables
-and her read of the journal, `005_cron.sql` her clock; `prompt.ts` holds who she
+and her read of the journal, `004_cron.sql` her clock; `prompt.ts` holds who she
 is; `index.ts` is the wiring.
 
 **Three objects in the database, and only two of them store anything.**
@@ -650,10 +685,11 @@ The stored turn is a marker (`[weekday briefing]`), not the text that was sent:
 the memory and the week's trades are rebuilt fresh each morning, and storing
 them would resend a stale copy as history for the next six briefings.
 
-**She sees your week without being asked.** The last seven days of trades go in
-with the briefing, so *"you have not traded since Tuesday"* costs no tool round.
-Mentioned only when there is something real to say, in a clause, never as a
-verdict — most mornings the right amount to say about your trading is nothing.
+**She sees your week without being asked.** The last seven New York days of
+trades go in with the briefing, so *"you have not traded since Tuesday"* costs
+no tool round. Mentioned only when there is something real to say, in a clause,
+never as a verdict — most mornings the right amount to say about your trading is
+nothing.
 
 ### The pulse
 
@@ -705,6 +741,14 @@ limit: the grant makes the *view* read-only, not the key — she holds the servi
 key to write her own tables, so the structural guarantee is what matters and the
 grant is the second lock.
 
+The view is `security_invoker`, which a view is **not** by default. Without it
+the view reads `trades` with the rights of whoever ran `003_eugenia.sql`, so
+what row level security does depends on an attribute of that role rather than on
+who is asking — and the grant is then the only thing between the publishable key
+and every user's trades. With it the reader's own rights apply. Nothing changes
+for Eugenia, who holds the service key and bypasses RLS either way; what changes
+is that a grant widened by mistake leaks nothing.
+
 She is still not a fifth writer to `trades`. The only things she writes are
 `eugenia_turns` and `eugenia_notes`.
 
@@ -727,10 +771,15 @@ separate ways of doing it.
 
 **A failed briefing tries again**, at 09:00, 10:00 and 11:00 ET, and stops the
 moment one has landed. `briefedToday()` reads the marker `postBriefing` stores
-— written immediately after `say()` returns, so it exists exactly when the
-message reached Telegram. A read failure counts as *already briefed*: if the
-database is unwell the retry cannot check, and a second briefing sent on a guess
-is worse than a skipped one.
+— written *before* the send, so it exists whenever a briefing was generated. The
+generation is the expensive half, and a marker written after it would let a
+failed insert produce four briefings and four bills. A read failure counts as
+*already briefed* for the same reason: if the database is unwell the retry
+cannot check, and a second briefing sent on a guess is worse than a skipped one.
+
+At 10:00 the retry window and the pulse overlap, and `dueNow()` gives that hour
+to the retry — on a day the briefing failed, a second look at a morning he was
+never told about is not what is wanted.
 
 ### Programmatic tool calls need their container
 
@@ -910,7 +959,7 @@ recedes furthest. Its green runs at or above its red so a small tile goes cool
 rather than mauve — the rest of the palette has red above green, which reads warm
 on a large card and muddy on a cell.
 
-**Neutral surfaces come from five alphas of white**, so a change lands in one
+**Neutral surfaces come from seven alphas of white**, so a change lands in one
 place: `--fill-0` (`.02`, inset panels) through `--fill-3` (`.08`, hover on a
 `--fill-2` surface), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
 (`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
@@ -1055,7 +1104,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `005_cron.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `004_cron.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -1065,14 +1114,36 @@ it from here.
 **Applying by hand means the files are a claim, so `supabase/verify.sql` is how
 the claim gets tested.** It writes nothing: it reads back the columns, the
 constraints, the indexes, the policies, the grants on Eugenia's view, the
-triggers, the realtime publication, both cron jobs and the last ten function
-responses, to be compared against 001–005 by eye. Run it after any manual change
+triggers, the realtime publication, all three cron jobs and the last ten function
+responses, to be compared against 001–004 by eye. Run it after any manual change
 and before believing anything here about the database. A CI job cannot stand in
-for it — 002, 003 and 005 need `pg_net`, `vault` and `pg_cron`, none of which a
+for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
 plain Postgres container has, so a green pipeline would prove only that 001
 parses.
 
-**`005_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
+**001, 002 and 003 are not re-runnable in full, and the reason differs.** 002 is
+a function and a trigger and is entirely `create or replace`, so it re-applies
+cleanly. 001 and 003 create tables, which stops them at the first statement — so
+a change to something further down is applied by running *that statement* on its
+own. In 003 those are the `eugenia_trades` view and the three grants under it,
+which is what an existing database needs to pick up `security_invoker`:
+
+```sql
+create or replace view public.eugenia_trades
+  with (security_invoker = true) as
+  select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
+         open_day, setup, followed_rules, followed_sl, followed_tp
+  from public.trades
+  where deleted = false;
+
+revoke all on public.eugenia_trades from anon, authenticated, service_role;
+grant select on public.eugenia_trades to service_role;
+grant select on public.trades to service_role;
+```
+
+`verify.sql` answers whether it took.
+
+**`004_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
 upserts on the job name, so applying the file makes the database match it rather
 than describing what the database might hold. The poller's job was not in this
 repository at all until then — its schedule, its timeout and the secret it
@@ -1100,7 +1171,8 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
    which is what the cron jobs and Gladys's trigger present. Same value, and the
    lower-case one is the database's. Nothing works without both.
    `doji-email-sync` is the exception and checks its own — see step 7.
-6. Run `supabase/005_cron.sql` to schedule the poller and Eugenia. It is safe to
+6. Run `supabase/004_cron.sql` to schedule the poller, Eugenia and the nightly
+   sweep of pg_cron's own history. It is safe to
    re-run: `cron.schedule` upserts on the job name, so the file is what the
    database holds rather than a description of what it might.
 7. Deploy the Apps Script. Generate a second secret, and store it twice:
@@ -1135,10 +1207,10 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
     platform.claude.com — the same Anthropic account, billed as prepaid credits
     rather than a subscription. **Set a spend cap on that key**: it is the only
     place a bound on what she can cost is actually enforceable.
-12. Run `supabase/003_eugenia.sql`, then `supabase/005_cron.sql`. The hourly
+12. Run `supabase/003_eugenia.sql`, then `supabase/004_cron.sql`. The hourly
     job drives both the briefing and the pulse; the function decides which, or
     neither.
-13. Run `supabase/verify.sql` and read it against 001–005. Nothing is set up
+13. Run `supabase/verify.sql` and read it against 001–004. Nothing is set up
     until that agrees.
 
 ---
@@ -1146,15 +1218,32 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 ## Tests
 
 ```sh
-npm install          # once — jsdom, and nothing else
+npm ci               # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.6 or newer; `--experimental-strip-types` is what lets the suite import
-the Edge Function's `.ts` directly, which is why the script exists rather than a
-bare `node --test`. `jsdom` is the only dependency in the repository and it is a
-dev dependency — the application itself still installs nothing and still has no
-build step.
+Node 22.22.2 or newer — stated in `package.json`'s `engines` as well as here.
+It is jsdom that sets that floor, not the app: `--experimental-strip-types` has
+worked since 22.6, and jsdom 30 declares `^22.22.2`. The number worth writing
+down is the one at which everything in the repository actually runs;
+`--experimental-strip-types` is what lets the suite import the Edge Function's
+`.ts` directly, which is why the script exists rather than a bare `node --test`.
+It is a no-op from Node 22.18, where type stripping is on by default, and stays
+for the versions below that. `jsdom` is the only dependency in the repository
+and it is a dev dependency — the application itself still installs nothing and
+still has no build step.
+
+**The `no-cache` header names both paths.** `/` and `/index.html` are the same
+document, and only the second is ever typed — the home-screen shortcut and every
+bookmark open `/`. A rule matching the request path rather than the file left the
+app shell cacheable at the one address it is actually opened at.
+
+**`package-lock.json` is committed and CI runs `npm ci`.** `npm install` against
+a floating `^30.0.1` means the tree that goes green in CI is not necessarily the
+tree anyone else gets, and the same suite gates the Edge Function deploy — so
+"the tests pass" would be a claim about one machine on one afternoon. `npm ci`
+installs the lockfile exactly and fails outright if it disagrees with
+`package.json`, which is the only version of that claim worth making.
 
 The suites run on every push through `.github/workflows/test.yml`, so a red run
 is attached to the commit that caused it rather than found later. A second
@@ -1165,10 +1254,10 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `isSilent`, `briefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
-| `test/app.test.mjs` | completeness, `Data.load` and `Data.save`, the price-based scratch rule and aggregate inheritance, win rate, the money split, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`, and the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema |
-| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against built alert bodies, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
+| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; every function's `verify_jwt` stanza against the directory that holds it; and every secret a function reads against the guard that refuses to start without it |
+| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
 
@@ -1211,38 +1300,30 @@ plain JSON and testable, and is not tested. And `boot()` returns the recorded
 Chart configs so a test can read what a wheel was asked to draw; nothing does,
 so the wheels are checked for not throwing and nothing more.
 
-**A check you have not proved can fail is not a check.** Both suites were run
-against deliberately broken copies before being trusted: the fold tests against
-an inverted entry deal, a double-counted commission, a fold window collapsed to
-the write window, a `balanceTarget` with its age bound removed, one that returns
-the earliest close instead of the latest, and a secret comparison that ignores
-length; the Telegram tests against a setup whitelist removed, a discipline
-answer that accepts anything, `direction` added to the reachable columns, `sl`
-and `tp` swapped, a loosened trade id, `null` drawn as `no`, the clock reverted
-to UTC, a keyboard row dropped, a summary spilling onto two lines, a setup name
-long enough to overrun the 64-byte cap, `staysOpen` forced true — which is the
-bug that shipped, restored on purpose — one that stops `[Edit]` reopening, and
-one that lets a reopened form re-settle, Eugenia's schedule reverted to UTC
-hours, a Saturday briefing, the Sunday briefing moved to the weekday hour,
-swapped salutations, a splitter that stops splitting and one that drops its last
-piece; the client tests
-against a widened break-even band, break-evens dropped from the win-rate
-denominator, a stray column in `Data.OWNED`, a session derived from the close,
-an inverted filing anchor and a throwing renderer. Every one of those was
-caught.
+**A check you have not proved can fail is not a check.** Every test here was run
+against a deliberately broken copy of the thing it covers before it was
+believed, and the rule is the point rather than the inventory — a list of the
+individual breaks would be a changelog, and would be stale the day it was
+written. Three that are worth keeping because they name a shape rather than a
+line:
 
-The checks added since were broken the same way before being trusted. The
-**agreement** tests against a setup added to `index.html` alone, a setup added
-to Gladys alone, a setup changed in the constraint alone, a journal column
-renamed in `Data.OWNED` alone, and `direction` added to Gladys's `COLUMNS` — five
-edits, each on one side of a pair, each caught. The **email parser** against a
-fill time with its `Z` dropped, an inverted position side, thousands separators
-left unstripped, and — the one that matters most — a transient send failure
-recorded as permanent, which is the shape that discards a fill's P&L forever.
-The **shared clock** against a timezone reverted to UTC, which took nine tests
-with it. **`openOnUser`** against a repair turned back into a no-op, which is
-precisely the state that shipped. And the **email boundary** against a whitelist
-widened to let `entry_price` and `setup` through.
+- **`staysOpen` forced true** — the bug that actually shipped, and the reason
+  CLAUDE.md opens on it. A whole suite stayed green because it handed the
+  renderer the flag it should have derived.
+- **A transient send failure recorded as permanent**, which is the shape that
+  discards a fill's P&L forever — and it appears twice, once in the Apps Script
+  and once in the Edge Function that answers it.
+- **A timezone reverted to UTC**, which takes nine tests with it, in a system
+  where every market boundary is New York wall time.
+
+The other direction is worth naming too, because it is subtler: several checks
+turned out to be unable to fail *before* the thing they cover was broken. A
+clock test whose call site could be deleted with the suite still green; a
+credential check that asked a stub rather than reading the file; a boot-guard
+check that passed a guard gutted to `if (false)`; a keyboard test that typed the
+payloads it should have taken off the buttons. Each was found the same way —
+break it on purpose, watch it stay green — and each was rewritten until it
+could fail.
 
 Do the same to any check added later — a green run from a scanner that cannot
 fail has more than once been mistaken here for clean code.
@@ -1258,7 +1339,9 @@ database — so every field the parser claims is checked against what the broker
 sent rather than against a guess at it. Replacing the invented fixture caught
 two things immediately: money arrives as `USD -108.40`, with a currency prefix,
 and the fill time as `19/08/2026 20:22:55 (UTC)`, with the zone in brackets.
-Both parsed correctly; nothing had been proving it.
+Both parsed correctly; nothing had been proving it. A saved message settles the
+shape of a field and not always its meaning, which is why the day-first reading
+above needs a test the fixture cannot supply.
 
 The variants — a buy, a thousands separator, a missing figure, an unreadable
 time — are still built, because no saved message contains them. They are built
@@ -1295,10 +1378,12 @@ account. The planned floor is **not recoverable from the data** — the broker
 reports only the *final* stop, so a stop moved to break-even has overwritten the
 original risk. Never infer what the planned R:R was; ask.
 
-**The pg_cron jobs hold no database power**, and that is a claim about the
-database rather than about the secret. Neither job can read or write a table:
-each presents the cron secret, read from Vault at call time, and the
+**The two calling pg_cron jobs hold no database power**, and that is a claim
+about the database rather than about the secret. Neither can read or write a
+table: each presents the cron secret, read from Vault at call time, and the
 service-role key lives in the functions' own secrets and never appears in a job.
+The third job is the exception and is why the distinction is worth making — it
+is a DELETE, and it reaches nothing outside pg_cron's own history.
 This replaced an arrangement where the job text carried a legacy service_role
 JWT — full RLS-bypassing access, in a job definition, and unrotatable, because
 legacy keys are tied to the project's JWT secret.
@@ -1328,8 +1413,8 @@ places rather than three, with no Vault spelling to get wrong.
 One value, two stores, two spellings, and it is worth knowing before you touch
 either: the Edge Functions read the cron secret from their own secrets as
 **`DOJI_CRON_SECRET`**, while the database reads it from Vault as
-**`doji_cron_secret`**. Both cron jobs and Gladys's trigger use the lower-case
-Vault name. That trigger shipped reading the upper-case one, found nothing, and
+**`doji_cron_secret`**. The two calling jobs and Gladys's trigger all read the
+lower-case Vault name, and `verify.sql` asserts all three. That trigger shipped reading the upper-case one, found nothing, and
 went quiet without failing anything.
 
 **Resolved — the old tables are gone.** `records`, `broker_fills` and
