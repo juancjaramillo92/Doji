@@ -53,6 +53,38 @@ const deal = (o) => ({
   dealStatus: 'FILLED', commission: o.comm ?? 0
 });
 
+/* THE BUILDER AGAINST THE SHAPE THE POLLER DECLARES.
+
+   Every fold test below runs on deals this file invents, so the whole section
+   rests on `deal()` producing what cTrader produces. The email parser has a
+   saved message to be held against; the poller has none, and nothing here can
+   make one — a fixture built to a believed shape proves the belief, not the
+   broker.
+
+   What CAN be held is the builder against the interface in the same repository:
+   the poller declares the fields it reads, and a deal missing one of them is a
+   deal the tests could pass while the live fold threw. It catches a field
+   added, renamed or dropped in the source. It cannot catch the interface itself
+   being wrong about cTrader — only a saved response would, and that is named in
+   the README as still missing. */
+const POLLER_SRC = readFileSync(
+  new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+test('a built deal carries every field the poller declares it reads', () => {
+  const block = POLLER_SRC.match(/interface Deal \{([^}]*)\}/);
+  assert.ok(block, 'the poller no longer declares a Deal interface');
+
+  const declared = [...block[1].matchAll(/([a-zA-Z]+)\??\s*:/g)].map(m => m[1]);
+  assert.ok(declared.length >= 8,
+    `only ${declared.length} fields read out of the interface — the reader has gone blind`);
+
+  const built = deal({ side: 'SELL', price: 3400 });
+  for (const field of declared) {
+    assert.ok(field in built,
+      `the poller reads deal.${field}; the test builder does not produce it`);
+  }
+});
+
 /* ─── Units ──────────────────────────────────────────────────────────────── */
 
 test('units match the fill they were derived from', () => {

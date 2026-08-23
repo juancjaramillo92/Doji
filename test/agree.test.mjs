@@ -24,6 +24,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
@@ -338,4 +339,67 @@ test('config.toml turns the gateway off for every function that exists', () => {
   const configured = [...toml.matchAll(/\[functions\.([a-z0-9-]+)\]/g)].map(m => m[1]).sort();
   assert.deepEqual(configured, DEPLOYED,
     'config.toml and supabase/functions name different sets of functions');
+});
+
+
+/* ─── The documents may only name things that exist ─────────────────────────
+   README.md is the contract and CLAUDE.md is how to work on the repo, and both
+   are dense with `identifiers` in backticks. Nothing checked them. A rename
+   leaves every mention behind, and a document naming a function that is gone
+   reads exactly like a document that is right — which is how `005_cron.sql`,
+   `doji-telegram` and a `nyClock` correction that no longer existed all
+   survived in prose after the code moved on.
+
+   This catches the mechanical half: a name that is nowhere in the repository.
+   It cannot catch a name that still exists but no longer does what the sentence
+   says. That half is caught by reading, or not at all.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Everything the repository is, as one string. Cheap, and it means a symbol
+// counts as real if it exists ANYWHERE — a test file, a SQL constraint, a CSS
+// token — rather than only where a reader might expect it.
+const CODE = execSync('git ls-files', { encoding: 'utf8' }).split('\n')
+  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f))
+  .map(f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
+
+/* Prose in backticks is mostly prose. What is wanted is the subset that looks
+   like something a compiler would recognise, so this keeps names that are
+   camelCase, snake_case, dotted or SCREAMING — and drops short lower-case words
+   like `null`, `both` and `no`, which are English wearing a code font. */
+const SYMBOLS = /`([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)`/g;
+
+const looksLikeCode = (name) =>
+  /[A-Z_.]/.test(name) && name.length >= 4;
+
+// Named in prose precisely because they are NOT in the code: prohibitions, and
+// one column the design is defined by not having.
+const DELIBERATELY_ABSENT = new Set(['TODO', 'tg_message_id', 'background_color']);
+
+test('the documents name only symbols the repository has', () => {
+  const missing = [];
+
+  for (const doc of ['README.md', 'CLAUDE.md']) {
+    const text = readFileSync(new URL(`../${doc}`, import.meta.url), 'utf8');
+    const named = new Set();
+
+    for (const [, name] of text.matchAll(SYMBOLS)) {
+      if (!looksLikeCode(name) || DELIBERATELY_ABSENT.has(name)) continue;
+      named.add(name);
+    }
+
+    // WITHOUT THIS THE LOOP BELOW PROVES NOTHING. A pattern that stopped
+    // matching would report every document clean.
+    assert.ok(named.size > 40,
+      `${doc}: only ${named.size} symbols found — the reader has gone blind`);
+
+    for (const name of named) {
+      // A dotted name is checked by its last part: `Data.OWNED` is declared as
+      // `OWNED:` inside an object literal, and `CONFIG.PERIODS` likewise.
+      const leaf = name.split('.').pop();
+      if (!CODE.includes(leaf)) missing.push(`${doc}: ${name}`);
+    }
+  }
+
+  assert.deepEqual(missing, [],
+    'the documents name things the repository does not have');
 });

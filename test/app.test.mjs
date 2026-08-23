@@ -23,10 +23,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, trade, journalled } from './boot.mjs';
 
-let app, seed, $, win, close, db;
+let app, seed, $, win, close, db, charts;
 
 before(async () => {
-  ({ app, seed, $, win, close, db } = await boot());
+  ({ app, seed, $, win, close, db, charts } = await boot());
 });
 after(() => close());
 
@@ -500,6 +500,83 @@ test('the wheel row runs narrowest window to widest, left to right', () => {
   renderClean([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })]);
   assert.deepEqual([...$('period-row').children].map(el => el.dataset.period),
     ['month', 'week', 'total']);
+});
+
+/* ─── What the charts were actually asked to draw ────────────────────────────
+   The harness records every Chart the app builds — the constructor arguments,
+   and the live `data` object every later update mutates in place. Nothing read
+   it, so until now a wheel was tested for NOT THROWING and nothing else: a
+   donut plotting its counts in the wrong order, or a curve that stopped
+   accumulating, passed every assertion in this file.
+
+   These read that recording. They are the only tests here that look at what a
+   chart says rather than at whether it appeared.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Charts are built once and updated in place, so the recording is searched by
+// canvas id rather than by position, and the dataset is read live.
+const chartFor = (id) => {
+  // Last, not first: a wheel whose host replaced its canvas is legitimately
+  // rebuilt, so the newest one on that id is the live one.
+  const live = [...charts].reverse().find(c => c.canvas?.id === id && !c.destroyed);
+  return live && live.data.datasets[0];
+};
+
+test('a wheel plots wins, losses and break-evens, in that order', () => {
+  /* [w, l, be] is the order RESULT_FILL and RESULT_BORDER are frozen in, and
+     the order the legend beside the wheel is written in markup. Three lists,
+     one order — and the arcs are the copy nothing could see. */
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-28', pnl: 40,  entry_price: 4500, exit_price: 4560 }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: 30,  entry_price: 4500, exit_price: 4550 }),
+    journalled({ id: 'PID3', open_day: '2026-07-29', pnl: -22, entry_price: 4500, exit_price: 4470 }),
+    journalled({ id: 'PID4', open_day: '2026-07-30', pnl: 1.5, entry_price: 4500, exit_price: 4501 }),
+  ]);
+
+  const set = chartFor('chart-total');
+  assert.ok(set, 'the all-time wheel was never built');
+  assert.deepEqual([...set.data], [2, 1, 1]);
+});
+
+test('a wheel with nothing decided draws the placeholder ring, not an empty one', () => {
+  // A single full arc in the empty colour. Drawing [0,0,0] gives Chart.js
+  // nothing to lay out and the panel loses its shape where a wheel should be.
+  renderClean([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: null })]);
+
+  const set = chartFor('chart-total');
+  assert.deepEqual([...set.data], [1]);
+  assert.equal(set.backgroundColor.length, 1, 'the placeholder took the result palette');
+});
+
+test('the curve is cumulative, and takes its colour from where it ended', () => {
+  /* Each point is the running total, not the trade — a curve of individual
+     P&Ls is a bar chart with the bars joined up, and says nothing about the
+     account. The line is green or red on the FINAL value, which is the only
+     thing the colour is claiming. */
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-28', pnl: 100, entry_price: 4500, exit_price: 4600 }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -30, entry_price: 4500, exit_price: 4470 }),
+    journalled({ id: 'PID3', open_day: '2026-07-30', pnl: -50, entry_price: 4500, exit_price: 4450 }),
+  ]);
+
+  const set = chartFor('chart-pnl');
+  assert.ok(set, 'the curve was never built');
+  assert.deepEqual([...set.data], [100, 70, 20]);
+});
+
+test('a curve that ends underwater is drawn in the loss colour', () => {
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-28', pnl: 10,  entry_price: 4500, exit_price: 4510 }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -60, entry_price: 4500, exit_price: 4440 }),
+  ]);
+
+  const set = chartFor('chart-pnl');
+  assert.deepEqual([...set.data], [10, -50]);
+  // The two colours must differ, or the rule is decoration.
+  const down = set.borderColor;
+  renderClean([journalled({ id: 'PID1', open_day: '2026-07-28', pnl: 10, entry_price: 4500, exit_price: 4510 })]);
+  assert.notEqual(chartFor('chart-pnl').borderColor, down,
+    'a winning curve and a losing one are drawn the same colour');
 });
 
 test('an empty journal renders with no step failing', () => {

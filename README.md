@@ -1292,13 +1292,19 @@ double tap, the fresh-message fallback, the chat check and the secret that
 picks which half runs are verified by reading. So is the trigger — nothing here runs Postgres, so its guard is argued
 against the real column types and the restore SQL rather than executed.
 
-Four gaps are worth naming rather than leaving to be rediscovered. Soft delete
+Three gaps are worth naming rather than leaving to be rediscovered. Soft delete
 has no test of its own — `Data.mark` and the `deleted` path are touched only
 incidentally, by the load test asserting that a flagged row is kept and not
-rendered. `London+NY` is the one session bucket never asserted. `IO.backup` is
-plain JSON and testable, and is not tested. And `boot()` returns the recorded
-Chart configs so a test can read what a wheel was asked to draw; nothing does,
-so the wheels are checked for not throwing and nothing more.
+rendered. `London+NY` is the one session bucket never asserted. And `IO.backup`
+is plain JSON and testable, and is not tested.
+
+**The poller has no saved response, and the email parser does.** Every fold test
+runs on deals this repository invents, so the section rests on the builder
+producing what cTrader produces — which is the belief the email fixture was
+added to stop trusting. One test holds the builder against the `Deal` interface
+the poller declares, so a field added, renamed or dropped in the source is
+caught; nothing catches the interface being wrong about the broker. A saved
+`get_deals` response would, and there is not one.
 
 **A check you have not proved can fail is not a check.** Every test here was run
 against a deliberately broken copy of the thing it covers before it was
