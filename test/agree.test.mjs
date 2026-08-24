@@ -432,3 +432,36 @@ test('the documents name only symbols the repository has', () => {
   assert.deepEqual(missing, [],
     'the documents name things the repository does not have');
 });
+
+
+/* ─── Every way she speaks to him reads what he has told her ────────────────
+   His notes are the only channel he has for correcting her — there is no
+   settings page, no feedback button, and nothing else that survives the twelve
+   turns of conversation window. "Stop mentioning the ten-year" becomes a note,
+   and every later message is supposed to obey it.
+
+   That makes notesBlock() load-bearing in a way it was not before, and its
+   absence is silent: drop it from one path and she simply carries on ignoring
+   an instruction he thinks she took. He would have no way to tell whether she
+   disagreed, forgot, or never read it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the briefing, the pulse and a reply all read his notes', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // The function bodies, so a call anywhere else in the file cannot satisfy this.
+  const body = (name) => {
+    const at = src.indexOf(`async function ${name}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
+    const end = src.indexOf('\n}', at);
+    assert.ok(end > at, `could not read the body of ${name}()`);
+    return src.slice(at, end);
+  };
+
+  for (const fn of ['postBriefing', 'postPulse', 'handleMessage']) {
+    assert.match(body(fn), /notesBlock\(\)/,
+      `${fn} does not read his notes — an instruction he gave would be ignored ` +
+      `with nothing anywhere reporting it`);
+  }
+});

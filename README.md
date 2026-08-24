@@ -732,16 +732,32 @@ Two kinds of memory, and they answer different questions.
 | | Holds | Window | Written by |
 |---|---|---|---|
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
-| `eugenia_notes` | facts about the trader | last 20 notes | her `remember` tool |
+| `eugenia_notes` | facts about him, and what he has told her to do | last 20 notes | her `remember` tool |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
-sentence each, in her own words, about *him* rather than about the market — a
-note about today's price is stale tomorrow and the prompt forbids it. They are
-handed back at the start of every turn, briefing and reply alike.
+sentence each about *him* rather than about the market — a note about today's
+price is stale tomorrow and the prompt forbids it. They are handed back at the
+start of every turn, briefing and reply alike.
+
+**And they are how he corrects her, which is the only way he can.** There is no
+settings page and no feedback button, and the conversation window rolls over in
+a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
+is odd"* would all be forgotten by tomorrow if they stayed in the conversation.
+Recorded as notes they are standing instructions: written the moment he gives
+one, in his words, obeyed from the next message on, and overriding the shape the
+prompt otherwise asks for. She acknowledges an instruction in four words or
+fewer — a fact about him she records silently — because otherwise he cannot tell
+it stuck and will say it again.
+
+`notesBlock()` is therefore load-bearing on all three paths, and its absence
+would be silent: drop it from one and she carries on ignoring an instruction he
+believes she took. A test asserts the briefing, the pulse and a reply each read
+them.
 
 Append-only: superseding a note means writing a newer one, which is how a
-person's memory works — the recent account wins. There is no update path and no
+person's memory works — the recent account wins, and it is also what lets him
+change his mind about an instruction without anything having to be deleted. There is no update path and no
 delete path in the function, so the only thing she can do to that table is add a
 sentence to it.
 
