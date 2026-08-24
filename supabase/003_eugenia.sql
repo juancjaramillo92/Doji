@@ -9,15 +9,20 @@
 --
 -- Two tables and a view, and they are three because they answer three
 -- questions. eugenia_turns is a conversation window that rolls over in a
--- morning; eugenia_notes is a handful of facts about the trader that stay true
--- for weeks; eugenia_trades is a read of the journal that stores nothing at
--- all. Nothing ever reads two of them together, which is the test that says
--- they are not one table wearing a `kind` column.
+-- morning; eugenia_notes is what stays true for weeks; eugenia_trades is a read
+-- of the journal that stores nothing at all. Nothing ever reads two of them in
+-- one query, which is the test that says they are three objects rather than one
+-- wearing a discriminator.
+--
+-- eugenia_notes DOES carry a kind, and that is the same test passing rather
+-- than failing: its two kinds share a shape, a lifecycle and a writer, and only
+-- their read window differs. Turns and notes share none of those.
 --
 -- Run once, in the SQL editor, after doji-eugenia is deployed and
 -- ANTHROPIC_API_KEY is in the Edge Function secrets. The CREATE TABLEs make the
--- file run-once; on a database that already has them, run the view statement
--- and the three grants below on their own.
+-- file run-once; on a database that already has them, the README's Deployment
+-- section carries the statements to apply on their own — the view and its
+-- grants, and eugenia_notes.kind.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ─── Her memory ────────────────────────────────────────────────────────────
@@ -97,10 +102,20 @@ grant select on public.trades to service_role;
 -- facts about the trader that stay true for weeks. Without it she can never
 -- know in September that he has been working on holding his stop since August.
 --
--- APPEND-ONLY, and read newest-first. Superseding a note means writing a newer
--- one, which is also how a person's memory works — the recent account wins.
--- There is no update path and no delete path in the function, so the only thing
--- she can do to this table is add a sentence to it.
+-- TWO KINDS IN ONE TABLE, AND THEY ARE READ SEPARATELY. A `fact` is something
+-- she noticed about him; an `instruction` is something he told her — "stop
+-- mentioning the ten-year" — and it is the only way he can correct her.
+--
+-- Same shape and same lifecycle, so one table; different SIZE, so two reads.
+-- Notes arrive at a few a week and instructions at a few ever, and a single
+-- newest-20 window over both would evict a standing instruction after a month
+-- of ordinary observations. Silently, and after she had told him it stuck.
+--
+-- APPEND-ONLY, and read newest-first. Superseding either means writing a newer
+-- one, which is also how a person's memory works — the recent account wins, and
+-- it is what lets him change his mind with nothing to delete. There is no
+-- update path and no delete path in the function, so the only thing she can do
+-- to this table is add a sentence to it.
 --
 -- Same shape and the same reasoning as eugenia_turns: no user_id, because
 -- nothing but the Edge Function ever reads this and it holds the service key.
@@ -110,15 +125,20 @@ grant select on public.trades to service_role;
 create table public.eugenia_notes (
   id         bigserial primary key,
   note       text not null,
+  -- Defaulted, so a row written before the caller knew about kinds is an
+  -- observation rather than a standing rule — the harmless way round.
+  kind       text not null default 'fact',
   created_at timestamptz not null default now(),
 
   -- The function truncates at 200 before writing; this is the same limit stated
   -- where it cannot be bypassed. A note is one sentence — anything longer is a
   -- transcript, and a transcript is what eugenia_turns is already for.
-  constraint eugenia_notes_note_length check (char_length(note) between 1 and 200)
+  constraint eugenia_notes_note_length check (char_length(note) between 1 and 200),
+  -- The vocabulary, enforced here rather than trusted to the tool schema.
+  constraint eugenia_notes_kind_check check (kind in ('fact', 'instruction'))
 );
 
--- The only read there is: the newest handful.
-create index eugenia_notes_id_desc on public.eugenia_notes (id desc);
+-- Both reads are one kind, newest first, so the kind leads the index.
+create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc);
 
 alter table public.eugenia_notes enable row level security;

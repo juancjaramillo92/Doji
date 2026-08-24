@@ -732,16 +732,32 @@ Two kinds of memory, and they answer different questions.
 | | Holds | Window | Written by |
 |---|---|---|---|
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
-| `eugenia_notes` | facts about the trader | last 20 notes | her `remember` tool |
+| `eugenia_notes` | facts about him, and what he has told her to do | last 20 notes | her `remember` tool |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
-sentence each, in her own words, about *him* rather than about the market — a
-note about today's price is stale tomorrow and the prompt forbids it. They are
-handed back at the start of every turn, briefing and reply alike.
+sentence each about *him* rather than about the market — a note about today's
+price is stale tomorrow and the prompt forbids it. They are handed back at the
+start of every turn, briefing and reply alike.
+
+**And they are how he corrects her, which is the only way he can.** There is no
+settings page and no feedback button, and the conversation window rolls over in
+a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
+is odd"* would all be forgotten by tomorrow if they stayed in the conversation.
+Recorded as notes they are standing instructions: written the moment he gives
+one, in his words, obeyed from the next message on, and overriding the shape the
+prompt otherwise asks for. She acknowledges an instruction in four words or
+fewer — a fact about him she records silently — because otherwise he cannot tell
+it stuck and will say it again.
+
+`notesBlock()` is therefore load-bearing on all three paths, and its absence
+would be silent: drop it from one and she carries on ignoring an instruction he
+believes she took. A test asserts the briefing, the pulse and a reply each read
+them.
 
 Append-only: superseding a note means writing a newer one, which is how a
-person's memory works — the recent account wins. There is no update path and no
+person's memory works — the recent account wins, and it is also what lets him
+change his mind about an instruction without anything having to be deleted. There is no update path and no
 delete path in the function, so the only thing she can do to that table is add a
 sentence to it.
 
@@ -770,8 +786,9 @@ She is still not a fifth writer to `trades`. The only things she writes are
 system messages are the channel built for exactly this and would keep the cached
 prefix intact — but that request shape could not be exercised from the machine
 this was written on, and a 400 there kills every reply she gives. Nothing here
-is untrusted anyway: the notes are her own sentences and the trades are his own
-journal, so the injection safety a system turn buys is not what this needs.
+is untrusted anyway: the trades are his own journal, and the notes are her
+sentences or his, in his own thread — so the injection safety a system turn buys
+is not what this needs.
 
 ### When it breaks, she says so
 
@@ -1155,6 +1172,21 @@ grant select on public.eugenia_trades to service_role;
 grant select on public.trades to service_role;
 ```
 
+And an existing `eugenia_notes` needs its `kind` column, which is what lets a
+standing instruction outlive twenty observations:
+
+```sql
+alter table public.eugenia_notes
+  add column if not exists kind text not null default 'fact';
+alter table public.eugenia_notes
+  drop constraint if exists eugenia_notes_kind_check,
+  add constraint eugenia_notes_kind_check check (kind in ('fact', 'instruction'));
+
+create index if not exists eugenia_notes_kind_id_desc
+  on public.eugenia_notes (kind, id desc);
+drop index if exists eugenia_notes_id_desc;
+```
+
 `verify.sql` answers whether it took.
 
 **`004_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
@@ -1270,7 +1302,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; every function's `verify_jwt` stanza against the directory that holds it; and every secret a function reads against the guard that refuses to start without it |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the three paths that must call it |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

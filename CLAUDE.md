@@ -209,6 +209,13 @@ code you write near it:
   `open_day` is a civil day and a fixed number of milliseconds is not one.
   `writeNote` is the other boundary: it truncates rather than refusing, because
   a tool that errors mid-turn costs the whole answer.
+- **Her notes are the only channel he has for correcting her, so `notesBlock()`
+  is load-bearing on all three paths.** An instruction — *"stop mentioning the
+  ten-year"* — is a note, and every later message obeys it; the conversation
+  window would forget it by morning. Dropping the call from the briefing, the
+  pulse or a reply fails silently: she carries on ignoring something he believes
+  she took, and nothing anywhere reports it. `agree.test.mjs` reads the three
+  function bodies for it.
 - **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
   no verdict on a trade, one question at a time. The line she may now cross is
   narrow and deliberate: *what the market is pricing* and *what would surprise
