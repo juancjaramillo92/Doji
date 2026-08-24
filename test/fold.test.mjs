@@ -53,34 +53,180 @@ const deal = (o) => ({
   dealStatus: 'FILLED', commission: o.comm ?? 0
 });
 
-/* THE BUILDER AGAINST THE SHAPE THE POLLER DECLARES.
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE ANCHOR — a real get_deals response, and a real email about one of its
+   trades
+   ───────────────────────────────────────────────────────────────────────────
+   `fixtures/ctrader-get-deals.txt` is the body cTrader actually returned for a
+   week of this account, captured through the poller's own ?raw=1 — SSE framing,
+   JSON-RPC envelope, double-encoded payload and all. Everything else in this
+   section runs on deals invented below, which is the belief the email fixture
+   exists to stop trusting; this is the other half of that.
 
-   Every fold test below runs on deals this file invents, so the whole section
-   rests on `deal()` producing what cTrader produces. The email parser has a
-   saved message to be held against; the poller has none, and nothing here can
-   make one — a fixture built to a believed shape proves the belief, not the
-   broker.
+   AND THE TWO FIXTURES OVERLAP. Position 577885869 is in both: the poller saw
+   its deals, and `ctrader-stop-loss-filled.html` is the email Pepperstone sent
+   about the same fill. Two independent records of one trade, from two
+   different systems, neither built by anyone here — so the fold can be checked
+   against something other than its own arithmetic. That is as close to an
+   end-to-end test as a repository with no live broker can get.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-   What CAN be held is the builder against the interface in the same repository:
-   the poller declares the fields it reads, and a deal missing one of them is a
-   deal the tests could pass while the live fold threw. It catches a field added
-   to the interface or renamed in it. It does NOT catch one dropped — fewer
-   declared fields is fewer things to check — and it cannot catch the interface
-   itself being wrong about cTrader. Only a saved response would, and that is
-   named in the README as still missing. */
+const RAW_DEALS = readFileSync(
+  new URL('./fixtures/ctrader-get-deals.txt', import.meta.url), 'utf8');
+
+const REAL_DEALS = JSON.parse(parseSse(RAW_DEALS).result.content[0].text).deals;
+
+/* The poller's own source, read once: the Deal interface is the only statement
+   in this repository of what a deal IS, and both the real capture and the
+   builder below are checked against it. */
 const POLLER_SRC = readFileSync(
   new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-test('a built deal carries every field the poller declares it reads', () => {
+const declaredDealFields = () => {
   const block = POLLER_SRC.match(/interface Deal \{([^}]*)\}/);
   assert.ok(block, 'the poller no longer declares a Deal interface');
+  const fields = [...block[1].matchAll(/([a-zA-Z]+)\??\s*:/g)].map(m => m[1]);
+  // WITHOUT THIS EVERY LOOP BELOW IS VACUOUS: an emptied interface declares
+  // nothing, so nothing is checked and both tests pass saying so.
+  assert.ok(fields.length >= 8,
+    `only ${fields.length} fields read out of the interface — the reader has gone blind`);
+  return fields;
+};
 
-  const declared = [...block[1].matchAll(/([a-zA-Z]+)\??\s*:/g)].map(m => m[1]);
-  assert.ok(declared.length >= 8,
-    `only ${declared.length} fields read out of the interface — the reader has gone blind`);
+test('the real response is read through its framing, its envelope and its double encoding', () => {
+  /* Three layers, and the synthetic parseSse tests further down build only the
+     first. `data:` lines carrying a JSON-RPC envelope whose one content block
+     is a STRING that is itself a JSON document — parseSse handles the outside
+     and mcpCall parses the inside twice, which is a shape nobody would
+     invent. */
+  assert.match(RAW_DEALS, /^event: message\ndata: \{/);
+  assert.equal(REAL_DEALS.length, 41);
+  assert.equal(JSON.parse(parseSse(RAW_DEALS).result.content[0].text).hasMore, false);
+});
 
+test('every field the poller declares is on every deal cTrader actually sent', () => {
+  // The interface is a SUBSET on purpose — the real deals also carry orderId,
+  // which nothing here reads. What matters is the other direction: a field the
+  // fold depends on that the broker does not send.
+  for (const d of REAL_DEALS) {
+    for (const field of declaredDealFields()) {
+      assert.ok(field in d, `deal ${d.dealId} has no ${field}`);
+    }
+  }
+});
+
+test('commission really does arrive negative, which is why the column stores a magnitude', () => {
+  // The schema's check constraint refuses a negative commission, so foldPosition
+  // takes the absolute value. That was a claim about cTrader until now.
+  assert.ok(REAL_DEALS.every(d => d.commission < 0),
+    'cTrader has started reporting commission positive — foldPosition would now flip a sign');
+});
+
+test('a real trade folds to the numbers the broker emailed about the same trade', () => {
+  /* THE ONE TEST HELD AGAINST SOMETHING NOBODY IN THIS REPOSITORY WROTE — and
+     the JOIN ITSELF comes out of the email too. The position id is the email's
+     own, not a number typed here, so replacing either capture moves the whole
+     comparison rather than leaving it pointed at a trade that is no longer in
+     both. */
+  const email = readFileSync(
+    new URL('./fixtures/ctrader-stop-loss-filled.html', import.meta.url), 'utf8')
+    .replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+
+  // Each field stated as the shape the broker writes it in, so a pattern that
+  // stops matching fails loudly rather than comparing undefined to undefined.
+  const said = (re, what) => {
+    const m = email.match(re);
+    assert.ok(m, `the saved email no longer states its ${what}`);
+    return m[1];
+  };
+
+  const id = said(/\b(PID\d+)\b/, 'position id');
+  const mine = REAL_DEALS.filter(d => `PID${d.positionId}` === id);
+  assert.equal(mine.length, 2, `${id} is not a two-deal position in the saved response`);
+
+  const folded = foldPosition(mine, USER);
+  assert.equal(folded.id, id, 'the two fixtures no longer describe the same position');
+
+  // Direction: the email states the POSITION side, and foldPosition reads it
+  // off the earliest deal. Two different derivations, one answer.
+  assert.equal(folded.direction, said(/Direction\s+(BUY|SELL)\b/, 'direction'));
+
+  // The closing price, which the email calls the fill price.
+  assert.equal(folded.exit_price, Number(said(/Fill price\s+([\d.]+)/, 'fill price')));
+
+  /* And the settled figure. gross is (entry − exit) × oz for a short:
+     (4485.77 − 4512.80) × 4 = −108.12, which is the email's Gross P&L; less the
+     commission it is −108.40, which is the email's Net P&L. They agree to the
+     cent only because swap was zero on this trade — it opened and closed inside
+     one New York session — and a position held through 17:00 would not. */
+  assert.equal(folded.computed_pnl,
+    Number(said(/Net P&L\s+USD\s+(-?[\d.]+)/, 'net P&L')));
+  // Read off the deals, not typed: the magnitude of what both of them charged.
+  assert.equal(folded.commission,
+    Math.abs(mine.reduce((sum, d) => sum + d.commission, 0)) / 100);
+
+  /* THE FILL TIME, AGAINST A TIMESTAMP. The email writes it in local words and
+     the deals in milliseconds, so this is the one place the parser's reading of
+     that string is checked against a machine-readable instant for the same
+     event. It confirms the instant, NOT the day-first rule — 19 cannot be a
+     month, so this trade would parse the same either way. That rule is pinned
+     by an ambiguous date in test/parse.test.mjs and only there. */
+  const fill = email.match(/Fill time\s+(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
+  assert.ok(fill, 'the saved email no longer states its fill time');
+  const [, dd, mo, yyyy, hh, mm, ss] = fill;
+
+  const closedAt = Math.max(...mine.map(d => d.executionTimestamp));
+  assert.equal(`${yyyy}-${mo}-${dd}T${hh}:${mm}:${ss}Z`,
+    new Date(closedAt).toISOString().replace(/\.\d+Z$/, 'Z'));
+
+  // And the filing day is the ENTRY's New York day, which is a different deal
+  // from the one the email is about.
+  const openedAt = Math.min(...mine.map(d => d.executionTimestamp));
+  assert.equal(folded.open_day, nyDay(openedAt));
+});
+
+test('a real position held overnight is filed under the day it OPENED', () => {
+  /* THE FILING ANCHOR, ON TRADES THAT ACTUALLY CROSSED A NEW YORK MIDNIGHT.
+     The cross-check above cannot see this rule: its trade opened and closed in
+     one session, so entry and close give the same day and reading the wrong
+     deal is invisible. The capture holds two positions that did span the
+     boundary, and they are the only place in the suite where a real fill
+     settles it.
+
+     Found rather than named: a position id typed here would go stale the day
+     the fixture is replaced, and the point is that the CAPTURE contains such a
+     trade, not that one particular trade does. */
+  const byPosition = new Map();
+  for (const d of REAL_DEALS) {
+    if (!byPosition.has(d.positionId)) byPosition.set(d.positionId, []);
+    byPosition.get(d.positionId).push(d);
+  }
+
+  const overnight = [...byPosition.values()].filter(ds => {
+    const at = ds.map(d => d.executionTimestamp);
+    return nyDay(Math.min(...at)) !== nyDay(Math.max(...at));
+  });
+  assert.ok(overnight.length,
+    'no position in the saved response crosses a New York day — replace it with a capture that does');
+
+  for (const ds of overnight) {
+    const at = ds.map(d => d.executionTimestamp);
+    assert.equal(foldPosition(ds, USER).open_day, nyDay(Math.min(...at)),
+      'a position was filed under the day it closed rather than the day it opened');
+  }
+});
+
+/* THE BUILDER AGAINST THE SAME INTERFACE.
+
+   Every fold test below runs on deals this file invents. The capture above is
+   what holds the interface to cTrader; this holds the builder to the interface,
+   so a field added or renamed in the source cannot leave the synthetic deals
+   behind. A field DROPPED is still not caught — fewer declared fields is fewer
+   things to check. */
+
+test('a built deal carries every field the poller declares it reads', () => {
   const built = deal({ side: 'SELL', price: 3400 });
-  for (const field of declared) {
+  for (const field of declaredDealFields()) {
     assert.ok(field in built,
       `the poller reads deal.${field}; the test builder does not produce it`);
   }

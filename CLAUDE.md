@@ -288,6 +288,12 @@ and what could not be verified.
   function are permanent and label the thread; anything else, including no
   response at all, leaves it unlabelled so the next run retries. Collapsing the
   last two is how a fill's P&L was once discarded forever.
+- **Both broker paths are anchored to real captures, and they overlap.**
+  `fixtures/ctrader-get-deals.txt` (a `?raw=1` capture) and
+  `ctrader-stop-loss-filled.html` (a real alert) both contain position
+  577885869, so the fold is checked against the broker's own email rather than
+  against its own arithmetic. Replace either capture and the comparison moves
+  with it — both sides are read out of the fixtures, never typed into the test.
 - **`parseAlert_` is anchored to a real message; the Gmail half is not.**
   `test/fixtures/` holds an actual alert body for a fill that is in the
   database, so the parser is held to its input and not only to its rules. The
