@@ -1268,7 +1268,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; every function's `verify_jwt` stanza against the directory that holds it; and every secret a function reads against the guard that refuses to start without it |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
@@ -1312,15 +1312,27 @@ incidentally, by the load test asserting that a flagged row is kept and not
 rendered. `London+NY` is the one session bucket never asserted. And `IO.backup`
 is plain JSON and testable, and is not tested.
 
-**The poller has no saved response, and the email parser does.** Every fold test
-runs on deals this repository invents, so the section rests on the builder
-producing what cTrader produces — which is the belief the email fixture was
-added to stop trusting. One test holds the builder against the `Deal` interface
-the poller declares, so a field added to it or renamed in it is caught. A field
-*dropped* is not — fewer declared fields is fewer things to check — and nothing
-catches the interface being wrong about the broker in the first place. A saved
-`get_deals` response would, and there is not one; `?raw=1`, under **The MCP
-poller** above, is how one gets captured.
+**Both broker paths are anchored to something the broker actually sent, and the
+two anchors overlap.** `fixtures/ctrader-get-deals.txt` is a real `get_deals`
+body captured through `?raw=1` — SSE framing, JSON-RPC envelope, double-encoded
+payload and all — and `fixtures/ctrader-stop-loss-filled.html` is a real
+Pepperstone alert. **Position 577885869 is in both.** The poller saw its deals;
+the email announced the same fill. Two independent records of one trade, from
+two systems, neither written by anyone here.
+
+So the fold can be checked against something other than its own arithmetic: the
+direction it reads off the earliest deal against the direction the email states,
+the exit price against the fill price, and `computed_pnl` against the email's
+`Net P&L` — which agree to the cent here only because swap was zero on this
+trade. It also checks the fill time the email writes in words against the millisecond
+timestamp the deals give for the same event — which confirms the *instant*, not
+the day-first rule: 19 cannot be a month, so this trade parses the same either
+way. That rule is pinned by an ambiguous date, in `test/parse.test.mjs` and only
+there.
+
+That is as close to end-to-end as a repository with no live broker gets. What it
+still cannot see is cTrader changing something *after* the capture; a fresh
+`?raw=1` is how the fixture gets replaced when they do.
 
 **A check you have not proved can fail is not a check.** Every test here was run
 against a deliberately broken copy of the thing it covers before it was
