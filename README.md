@@ -786,8 +786,9 @@ She is still not a fifth writer to `trades`. The only things she writes are
 system messages are the channel built for exactly this and would keep the cached
 prefix intact — but that request shape could not be exercised from the machine
 this was written on, and a 400 there kills every reply she gives. Nothing here
-is untrusted anyway: the notes are her own sentences and the trades are his own
-journal, so the injection safety a system turn buys is not what this needs.
+is untrusted anyway: the trades are his own journal, and the notes are her
+sentences or his, in his own thread — so the injection safety a system turn buys
+is not what this needs.
 
 ### When it breaks, she says so
 
@@ -1171,6 +1172,21 @@ grant select on public.eugenia_trades to service_role;
 grant select on public.trades to service_role;
 ```
 
+And an existing `eugenia_notes` needs its `kind` column, which is what lets a
+standing instruction outlive twenty observations:
+
+```sql
+alter table public.eugenia_notes
+  add column if not exists kind text not null default 'fact';
+alter table public.eugenia_notes
+  drop constraint if exists eugenia_notes_kind_check,
+  add constraint eugenia_notes_kind_check check (kind in ('fact', 'instruction'));
+
+create index if not exists eugenia_notes_kind_id_desc
+  on public.eugenia_notes (kind, id desc);
+drop index if exists eugenia_notes_id_desc;
+```
+
 `verify.sql` answers whether it took.
 
 **`004_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
@@ -1286,7 +1302,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; every function's `verify_jwt` stanza against the directory that holds it; and every secret a function reads against the guard that refuses to start without it |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the three paths that must call it |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

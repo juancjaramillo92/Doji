@@ -3,7 +3,13 @@
    ───────────────────────────────────────────────────────────────────────────
    Four runtimes, no build step, and facts that consequently live in more than
    one file: the setups vocabulary, the four journal column names, Eugenia's
-   note limit, and the names of the functions themselves.
+   note limit and note kinds, and the names of the functions themselves.
+
+   TWO CHECKS HERE ARE NOT ABOUT COPIES, and they are here because there is
+   nowhere better: each function's boot guard against the secrets it reads, and
+   `notesBlock()` against the three paths that must call it. Both are one file
+   read against itself rather than two files read against each other — what they
+   share with the rest is the shape of the failure, which is silence.
 
    Copies are not the problem. Copies NOTHING CAN COMPARE are, and that is what
    this closes. Every one of these values was already tested — and every one of
@@ -135,39 +141,60 @@ test('no broker column is reachable through either writer', async () => {
 });
 
 /* ─── Eugenia's note length ──────────────────────────────────────────────────
-   200 lives in three places: the ceiling writeNote truncates at, the constraint
-   Postgres enforces, and the sentence the tool description gives the model.
+   The ceiling used to live in three places — the truncation, the constraint,
+   and the sentence the tool description gives the model. Two of those are now
+   one: NOTE_MAX is the constant, and the description interpolates it, so the
+   model can no longer be promised a budget the code does not keep.
 
-   They fail quietly if they drift. Truncate above the constraint and every
-   remember() is refused by Postgres — writeNote catches that and answers "That
-   did not save. Carry on and do not mention it.", which is deliberate for a
-   transient blip and is exactly wrong for a permanent mismatch: her memory
-   stops working and the only sign is her not mentioning it.
+   The constraint is the copy that remains, and it is the one that cannot be
+   fixed from this side. Truncate above it and every remember() is refused by
+   Postgres — writeNote catches that and answers "That did not save", which is
+   deliberate for a transient blip and exactly wrong for a permanent mismatch:
+   her memory stops working and the only sign is her not mentioning it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const noteLimit = {
-  truncatedAt: () => Number(EUGENIA_TS.match(/\.trim\(\)\.slice\(0,\s*(\d+)\)/)?.[1]),
+  truncatedAt: () => Number(EUGENIA_TS.match(/NOTE_MAX\s*=\s*(\d+)/)?.[1]),
   constrainedTo: () =>
     Number(EUGENIA_SQL.match(/char_length\(note\)\s+between\s+1\s+and\s+(\d+)/i)?.[1]),
-  toldToTheModel: () => Number(EUGENIA_TS.match(/at most (\d+) characters/)?.[1]),
 };
 
-test('the note length is one number in all three places', () => {
-  // Each number is read back out of its own file, so a pattern that stops
-  // matching yields NaN — and NaN against NaN would report a drift that is
-  // really this test having gone blind. All three are checked before they are
-  // compared, which is the same reason the setups lists are counted first.
+test('the note length is one number on both sides of the wire', () => {
+  // Each read back out of its own file, so a pattern that stops matching yields
+  // NaN — and NaN against NaN would report a drift that is really this test
+  // having gone blind. Both are checked before they are compared.
   const truncated  = noteLimit.truncatedAt();
   const constraint = noteLimit.constrainedTo();
-  const promised   = noteLimit.toldToTheModel();
-  assert.ok(Number.isInteger(truncated), 'writeNote no longer truncates at a literal length');
+  assert.ok(Number.isInteger(truncated), 'NOTE_MAX is no longer a literal in doji-eugenia');
   assert.ok(Number.isInteger(constraint), 'the note constraint no longer reads as a char_length range');
-  assert.ok(Number.isInteger(promised), 'the tool description no longer states a character budget');
 
   assert.equal(constraint, truncated,
     'Postgres would refuse notes writeNote considers fine — every remember() fails quietly');
-  assert.equal(promised, truncated,
-    'the tool description promises the model a budget the code does not keep');
+
+  // And the third copy is gone rather than merely agreeing: the description
+  // must interpolate the constant, not restate it.
+  assert.doesNotMatch(EUGENIA_TS, /at most \d+ characters/,
+    'the tool description states the budget as a literal again instead of interpolating NOTE_MAX');
+});
+
+/* ─── And the two kinds of note ──────────────────────────────────────────────
+   'fact' and 'instruction' are a vocabulary the model chooses from and Postgres
+   enforces, which is the same shape as the setups list and fails the same way:
+   a kind the tool offers and the constraint refuses makes every remember() of
+   that kind vanish, reported to nobody. A kind the constraint allows and the
+   tool never offers is dead weight that reads as coverage.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the note kinds are the same two words in the tool and the constraint', () => {
+  const offered = [...EUGENIA_TS.matchAll(/NOTE_KINDS = \[([^\]]*)\]/g)]
+    .flatMap(m => [...m[1].matchAll(/'([a-z]+)'/g)].map(k => k[1])).sort();
+  const enforced = [...(EUGENIA_SQL.match(/kind in \(([^)]*)\)/i)?.[1] ?? '')
+    .matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort();
+
+  assert.deepEqual(offered, ['fact', 'instruction'],
+    'the kinds the tool offers have changed — say so here, and check the constraint');
+  assert.deepEqual(enforced, offered,
+    'the tool and the check constraint no longer offer the same kinds');
 });
 
 
@@ -460,8 +487,13 @@ test('the briefing, the pulse and a reply all read his notes', () => {
   };
 
   for (const fn of ['postBriefing', 'postPulse', 'handleMessage']) {
-    assert.match(body(fn), /notesBlock\(\)/,
-      `${fn} does not read his notes — an instruction he gave would be ignored ` +
-      `with nothing anywhere reporting it`);
+    // Comments stripped, because the identifier appearing in prose about the
+    // call is not the call. And `await` required: notesBlock is async, so an
+    // un-awaited one interpolates "[object Promise]" into the prompt — which
+    // reaches the model as text rather than as an error.
+    const code = body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    assert.match(code, /await\s+notesBlock\(\)/,
+      `${fn} does not await notesBlock() — an instruction he gave would be ` +
+      `ignored, or arrive as [object Promise], with nothing reporting either`);
   }
 });

@@ -177,42 +177,63 @@ const TRADES_TOOL = {
 /* ─── What she remembers ───────────────────────────────────────────────────
    Twelve turns of conversation roll over in a morning, so without this she can
    never know in September that he has been working on holding his stop since
-   August. These are facts about HIM, kept in her own words — not a transcript
-   and not a market log.
+   August.
 
-   APPEND-ONLY, and read newest-first. Superseding a note means writing a newer
-   one, which is also how a person's memory works: the recent account wins. No
-   update path and no delete path, so the only thing she can do to this table is
-   add a sentence to it.
+   TWO KINDS, AND THEY ARE NOT INTERCHANGEABLE. A `fact` is something about him
+   she noticed. An `instruction` is something he TOLD her — "stop mentioning the
+   ten-year", "too long" — and it is the only channel he has for correcting her:
+   no settings page, no feedback button, and the conversation window forgets by
+   morning.
+
+   They are one table because they are the same shape and the same lifecycle,
+   and they are read SEPARATELY because they are not the same size. Notes arrive
+   at a few a week; instructions at a few ever. One newest-20 window over both
+   would evict "stop mentioning the ten-year" after a month of ordinary
+   observations — silently, and after she had told him it stuck, which is the
+   one failure this feature cannot have.
+
+   APPEND-ONLY, and read newest-first. Superseding either means writing a newer
+   one, which is also how a person's memory works and is what lets him change
+   his mind about an instruction with nothing to delete.
 
    Still not a writer to `trades`. eugenia_turns and eugenia_notes are hers;
    the journal remains one read through a view with no write path in the file.
    ───────────────────────────────────────────────────────────────────────── */
+export const NOTE_KINDS = ['fact', 'instruction'] as const;
+export const NOTE_MAX = 200;
+
 const NOTES_TOOL = {
   name: "remember",
   description:
-    "Keep one short fact about the trader for later — how he trades, what he is " +
-    "working on, what he already understands, what explanation landed. Facts about " +
-    "him, not about the market: never today's price, today's data, or anything that " +
-    "will be stale tomorrow. One sentence, in your own words. He is not told.",
+    "Keep one short line for later. Use kind='fact' for something about the trader — " +
+    "how he trades, what he is working on, what he already understands, what " +
+    "explanation landed; never today's price or today's data, which are stale " +
+    "tomorrow. Use kind='instruction' for something he has told you to do or stop " +
+    "doing, in his own words: those are standing, and every later message obeys " +
+    "them. Record a fact silently; acknowledge an instruction in four words or fewer.",
   input_schema: {
     type: "object",
     properties: {
-      note: { type: "string", description: "One short sentence, at most 200 characters." },
+      note: { type: "string", description: `One short sentence, at most ${NOTE_MAX} characters.` },
+      kind: {
+        type: "string",
+        enum: NOTE_KINDS,
+        description: "'fact' for something you noticed about him; 'instruction' for something he told you.",
+      },
     },
-    required: ["note"],
+    required: ["note", "kind"],
     additionalProperties: false,
   },
 } as const;
 
-// Twenty is a season of them at the few-a-week the prompt asks for, and they are
-// one sentence each, so the whole memory costs less than one paragraph of a
-// briefing.
+// Twenty of each is a season of observations at the few-a-week the prompt asks
+// for, and more standing instructions than he is ever likely to give — they are
+// one sentence each, so the whole memory costs less than one paragraph.
 const NOTES = 20;
 
-async function readNotes(): Promise<string[]> {
+async function readNotes(kind: string): Promise<string[]> {
   const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_notes?select=note&order=id.desc&limit=${NOTES}`,
+    `${SB_URL}/rest/v1/eugenia_notes?select=note&kind=eq.${kind}&order=id.desc&limit=${NOTES}`,
     { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Notes read failed (HTTP ${res.status})`);
   return (await res.json()).map((r: { note: string }) => r.note);
@@ -226,20 +247,42 @@ async function readNotes(): Promise<string[]> {
    propagate out of the tool loop and cost the whole reply — so a failed write
    comes back as a sentence she can read and carry on from. It is also what
    makes her survive being deployed before 003_eugenia.sql has been run:
-   no table, no memory, but every answer still lands. */
-async function writeNote(note: unknown): Promise<string> {
-  const text = String(note ?? "").trim().slice(0, 200);
+   no table, no memory, but every answer still lands.
+
+   BOTH ANSWERS SAY WHICH KIND FAILED, because the two are not equally
+   forgivable. A lost observation costs a little continuity and she should not
+   mention it. A lost INSTRUCTION is worse than saying nothing: she is about to
+   acknowledge it, and an acknowledgement for something that was never stored
+   means he stops repeating himself about a thing she will keep doing. Same for
+   a truncation — an instruction cut mid-sentence becomes a standing rule
+   nobody wrote. */
+async function writeNote(note: unknown, kind: unknown): Promise<string> {
+  const text = String(note ?? "").trim();
   if (!text) return "Nothing to remember.";
+
+  // The kind decides how a failure is reported, so an unrecognised one takes
+  // the quieter branch rather than promising him something.
+  const k = (NOTE_KINDS as readonly string[]).includes(String(kind)) ? String(kind) : 'fact';
+  const kept = text.slice(0, NOTE_MAX);
+
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
       method: "POST", headers: sbHeaders("return=minimal"),
-      body: JSON.stringify([{ note: text }]),
+      body: JSON.stringify([{ note: kept, kind: k }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (kept.length < text.length) {
+      return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". ` +
+             (k === 'instruction'
+               ? 'Say it back to him shorter and check that is still what he meant.'
+               : 'Write it shorter next time.');
+    }
     return "Remembered.";
   } catch (err) {
     console.error("doji-eugenia: note not written —", err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    return k === 'instruction'
+      ? "That did NOT save. Tell him it did not stick and that he will have to say it again."
+      : "That did not save. Carry on and do not mention it.";
   }
 }
 
@@ -404,7 +447,8 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
         if (b.name === TRADES_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id, content: await readTrades(b.input?.days) });
         } else if (b.name === NOTES_TOOL.name) {
-          results.push({ type: "tool_result", tool_use_id: b.id, content: await writeNote(b.input?.note) });
+          results.push({ type: "tool_result", tool_use_id: b.id,
+            content: await writeNote(b.input?.note, b.input?.kind) });
         }
       }
       if (!results.length) throw new Error("tool_use with no tool this function serves");
@@ -488,9 +532,9 @@ async function remember(turns: Turn[]) {
    system message. That channel exists for exactly this and would keep the
    cached prefix intact — but its request shape could not be exercised from the
    machine this was written on, and a 400 there kills every reply she gives.
-   Nothing here is untrusted anyway: the notes are her own sentences and the
-   trades are his own journal, so the injection safety a system turn buys is not
-   what this needs.
+   Nothing here is untrusted anyway: the trades are his own journal, and the
+   notes are her sentences or his, in his own thread — so the injection safety a
+   system turn buys is not what this needs.
 
    remember() stores the RAW message, never the augmented one, so a preamble is
    never resent forever as history.
@@ -557,15 +601,26 @@ export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
     : { role, content });
 }
 
-// Optional by design: a database blip must cost her the memory, not the
-// briefing. Logged, because a bot that has quietly stopped remembering reads
-// exactly like a bot with nothing to remember.
+/* Optional by design: a database blip must cost her the memory, not the
+   briefing. Logged, because a bot that has quietly stopped remembering reads
+   exactly like a bot with nothing to remember.
+
+   The two kinds are labelled differently on purpose. What she noticed is
+   context; what he told her is not, and a list that ran them together would
+   invite her to weigh an instruction against her own observation. */
 async function notesBlock(): Promise<string> {
   try {
-    const notes = await readNotes();
-    return notes.length
-      ? `\n\nWhat you have remembered about him, newest first:\n· ${notes.join("\n· ")}`
-      : "";
+    const [told, noticed] = await Promise.all([
+      readNotes('instruction'), readNotes('fact'),
+    ]);
+    const list = (ns: string[]) => `\n· ${ns.join("\n· ")}`;
+    return (told.length
+             ? `\n\nWhat he has told you to do, newest first. These are not optional and a` +
+               ` later one replaces an earlier one:${list(told)}`
+             : "")
+         + (noticed.length
+             ? `\n\nWhat you have noticed about him, newest first:${list(noticed)}`
+             : "");
   } catch (err) {
     console.error("doji-eugenia: notes unavailable —", err instanceof Error ? err.message : err);
     return "";

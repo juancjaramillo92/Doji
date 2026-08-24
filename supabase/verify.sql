@@ -86,6 +86,14 @@ from (values
        and grantee = 'service_role' and privilege_type = 'SELECT'),
    '1'),
 
+  -- Without this every remember() lands as kind 'fact' by default and standing
+  -- instructions are evicted by ordinary observations — silently, and after she
+  -- has told him they stuck.
+  ('eugenia_notes has its kind column',
+   (select data_type from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_notes' and column_name = 'kind'),
+   'text'),
+
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
   -- her read of the journal a write path.
   ('eugenia_trades is select-only, service_role only',
