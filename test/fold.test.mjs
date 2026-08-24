@@ -185,6 +185,37 @@ test('a real trade folds to the numbers the broker emailed about the same trade'
   assert.equal(folded.open_day, nyDay(openedAt));
 });
 
+test('a real position held overnight is filed under the day it OPENED', () => {
+  /* THE FILING ANCHOR, ON TRADES THAT ACTUALLY CROSSED A NEW YORK MIDNIGHT.
+     The cross-check above cannot see this rule: its trade opened and closed in
+     one session, so entry and close give the same day and reading the wrong
+     deal is invisible. The capture holds two positions that did span the
+     boundary, and they are the only place in the suite where a real fill
+     settles it.
+
+     Found rather than named: a position id typed here would go stale the day
+     the fixture is replaced, and the point is that the CAPTURE contains such a
+     trade, not that one particular trade does. */
+  const byPosition = new Map();
+  for (const d of REAL_DEALS) {
+    if (!byPosition.has(d.positionId)) byPosition.set(d.positionId, []);
+    byPosition.get(d.positionId).push(d);
+  }
+
+  const overnight = [...byPosition.values()].filter(ds => {
+    const at = ds.map(d => d.executionTimestamp);
+    return nyDay(Math.min(...at)) !== nyDay(Math.max(...at));
+  });
+  assert.ok(overnight.length,
+    'no position in the saved response crosses a New York day — replace it with a capture that does');
+
+  for (const ds of overnight) {
+    const at = ds.map(d => d.executionTimestamp);
+    assert.equal(foldPosition(ds, USER).open_day, nyDay(Math.min(...at)),
+      'a position was filed under the day it closed rather than the day it opened');
+  }
+});
+
 /* THE BUILDER AGAINST THE SAME INTERFACE.
 
    Every fold test below runs on deals this file invents. The capture above is
