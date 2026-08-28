@@ -191,6 +191,12 @@ last changed" — the poller re-upserts every position in its window on every ru
 and Postgres does not skip no-op updates. Nothing reads the column today; the
 distinction matters the first time anything does.
 
+`tg_message_id` is the Telegram message Gladys posted for the trade, and it is
+hers alone — in neither `Data.OWNED` nor her `COLUMNS`, so nothing can name it
+from a save or from a tap. It exists so a journal answer written **anywhere**
+reaches the message she already sent; `null` simply means there is nothing to
+edit, which is every row the poller never opened.
+
 ---
 
 ## What is derived, not stored
@@ -244,7 +250,7 @@ be single-sourced at run time:
 | The fact | Where its copies live |
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
-| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
@@ -312,7 +318,8 @@ on conflict (id) do update set
   net_pnl = excluded.net_pnl, computed_pnl = excluded.computed_pnl,
   setup = excluded.setup,
   followed_rules = excluded.followed_rules, followed_sl = excluded.followed_sl,
-  followed_tp = excluded.followed_tp, deleted = excluded.deleted;
+  followed_tp = excluded.followed_tp, deleted = excluded.deleted,
+  tg_message_id = excluded.tg_message_id;
 ```
 
 The deleted rows matter: restoring without them lets the poller rebuild every
@@ -552,8 +559,9 @@ and the two New York clocks differed only in fallbacks neither could reach.
 
 When a position opens, the trader gets one Telegram message and answers the
 whole journal from it — setup and all three discipline booleans — without
-opening the app. `supabase/002_gladys.sql` holds the trigger and `doji-gladys`
-is the Edge Function behind it.
+opening the app. Journalling the same trade anywhere else redraws that message
+rather than leaving it behind. `supabase/002_gladys.sql` holds both triggers and
+`doji-gladys` is the Edge Function behind them.
 
 **A function is named after who it is, and so are its secrets** — `doji-gladys`,
 `GLADYS_BOT_TOKEN`, `GLADYS_WEBHOOK_SECRET`. Naming a bot after the wire it
@@ -562,11 +570,11 @@ is the exception and earns it: it is the one value the two bots genuinely share,
 because there is one trader and one chat, with a thread each.
 
 **One function, two callers**, told apart by which secret they present:
-`x-doji-key` is the trigger saying a position opened, `x-telegram-bot-api-secret-token`
-is Telegram reporting a tap. They were briefly two functions and share
-everything that matters — the keyboard, the message, the `callback_data`
-grammar — so splitting them meant deploying that code twice and keeping the
-copies in step.
+`x-doji-key` is the database — a position opened, or its journal answers moved —
+and `x-telegram-bot-api-secret-token` is Telegram reporting a tap. They were
+briefly two functions and share everything that matters — the keyboard, the
+message, the `callback_data` grammar — so splitting them meant deploying that
+code twice and keeping the copies in step.
 
 She opens with `Hola Jefe, new fill below`.
 
@@ -587,12 +595,31 @@ alone, so all four answers are null at that point and the message asks for all
 four. The app has always allowed journalling an open position; this is that,
 from the notification.
 
-**`callback_data` is the entire state store.** `PID562780708|setup|Break &
+**`callback_data` is the entire state a tap needs.** `PID562780708|setup|Break &
 Retest`, `PID562780708|sl|1`, `PID562780708|edit` — the trade, the field and the
 value, in 39 bytes at worst against Telegram's 64-byte cap. So there is no
-session table, no `tg_message_id` column and no schema change: the callback also
-carries the chat and message ids that `editMessageText` needs. A tap is
-self-describing, and a redeploy in the middle of answering costs nothing.
+session table and no schema change on the tap path: the callback also carries
+the chat and message ids that `editMessageText` needs. A tap is self-describing,
+and a redeploy in the middle of answering costs nothing.
+
+**A write from anywhere else has none of that, which is why the message id is
+kept.** Journalling a trade in the app used to reach Telegram not at all — the
+message sat on `Setup: —` for the life of the trade, because nothing knew which
+message to edit. So `postOpen` stores what `sendMessage` hands back in
+`trades.tg_message_id`, and a second trigger, `trades_telegram_on_answer`, fires
+whenever any of the four journal columns actually changes on a row that has one.
+The answers now travel in both directions: a tap reaches the app through the
+realtime subscription it already holds, and a save reaches Telegram through this.
+
+That trigger watches the four columns with `is distinct from` rather than `<>`,
+because they are three-state — `<>` is `NULL` against an unanswered one, a `WHEN`
+clause that is not true does not fire, and the *first* answer to every question
+would be the one redraw that never happened. It needs no time guard, unlike the
+open trigger: this edits a message rather than posting one, so a restore from
+backup asks Telegram to redraw each message to what it already says, which is
+refused as `message is not modified`. A row with no message id fails the clause
+outright, so an email-first trade stays silent for good — correctly, there was
+never a message.
 
 `[Edit]` and `[Done]` say plainly which way the form should move. An **answer**
 is the case that has to be decided, and it is decided from the row **as it stood
@@ -607,15 +634,29 @@ true on every tap, so the message never settled and the summary, the `[Edit]`
 button and the read path were all unreachable. It is `staysOpen`, it is
 exported, and a test replays all four taps against it.
 
+**Which is why the two redraws a tap sets off agree by construction.** A tap
+writes, so it fires the redraw trigger as well as redrawing the message itself —
+two redraws, and the trigger's is the one that lands. They cannot be allowed to
+differ, so neither decides from the writer: both decide from that same
+before-state, which the trigger sends as `before` and the webhook has already
+read. `answered(before)` and `staysOpen` are one expression, the two messages
+come out identical, and Telegram answers the second `message is not modified`.
+Decide it any other way and the trigger's answer wins — so a form reopened with
+`[Edit]` would shut under the very correction being made in it. `agree.test.mjs`
+reads `postAnswer`'s body for that call, because nothing in the suite can drive
+the function itself.
+
 **The write is the fourth writer and it stays in the journal half.** The webhook
 maps a button's field to a column through the same four names as `Data.OWNED`,
 so no broker column is nameable from a tap and there is nothing to arbitrate.
 `updated_at` moves, and the realtime subscription the app already holds
-re-renders any open tab for free.
+re-renders any open tab for free. `tg_message_id` is on neither list, which is
+what keeps the column Gladys's own: no tap and no save can point her at another
+message, or take a trade's own away.
 
-**The trigger guard is load-bearing.** `when (new.entry_time > now() - interval
-'1 hour')`. Without it, restoring from backup messages you once per row in the
-file. A live fill is seconds old; everything else fails the test — restored rows
+**The open trigger's guard is load-bearing.** `when (new.entry_time > now() -
+interval '1 hour')`. Without it, restoring from backup messages you once per row
+in the file. A live fill is seconds old; everything else fails the test — restored rows
 carry historical `entry_time`, an `on conflict do update` is not an insert at
 all, a `?force=1` backfill updates existing ids, and the poller's own re-upserts
 inside its six-hour write window are updates too. One message per trade, and the
@@ -1153,10 +1194,12 @@ plain Postgres container has, so a green pipeline would prove only that 001
 parses.
 
 **001, 002 and 003 are not re-runnable in full, and the reason differs.** 002 is
-a function and a trigger and is entirely `create or replace`, so it re-applies
-cleanly. 001 and 003 create tables, which stops them at the first statement — so
-a change to something further down is applied by running *that statement* on its
-own. In 003 those are the `eugenia_trades` view and the three grants under it,
+a function and two triggers and is entirely `create or replace`, so it re-applies
+cleanly — its closing `drop function if exists` is the old single-purpose name of
+that function, left behind rather than dropped by the triggers being repointed
+above it, and a no-op on a database that never had it. 001 and 003 create tables,
+which stops them at the first statement — so a change to something further down
+is applied by running *that statement* on its own. In 003 those are the `eugenia_trades` view and the three grants under it,
 which is what an existing database needs to pick up `security_invoker`:
 
 ```sql
@@ -1171,6 +1214,17 @@ revoke all on public.eugenia_trades from anon, authenticated, service_role;
 grant select on public.eugenia_trades to service_role;
 grant select on public.trades to service_role;
 ```
+
+An existing `trades` needs the column Gladys edits her own message through.
+Without it the redraw trigger's `WHEN` clause is never true, and journalling in
+the app goes on reaching Telegram not at all — silently, because the half that
+posts the message is unaffected:
+
+```sql
+alter table public.trades add column if not exists tg_message_id bigint;
+```
+
+Apply that **before** 002, which creates the trigger that reads it.
 
 And an existing `eugenia_notes` needs its `kind` column, which is what lets a
 standing instruction outlive twenty observations:
@@ -1300,9 +1354,9 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage` and `staysOpen`; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS` and the schema; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the three paths that must call it |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the three paths that must call it |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
@@ -1332,11 +1386,19 @@ constraint edited by hand in the SQL editor passes there. `supabase/verify.sql`
 is where that is caught, and it is a query a person runs.
 
 Gladys is covered only where she decides something.
-`parseCallback` and `renderMessage` are pure and are tested hard; `sendMessage`,
-`editMessageText` and the PATCH reach the network on their first line, so the
-double tap, the fresh-message fallback, the chat check and the secret that
-picks which half runs are verified by reading. So is the trigger — nothing here runs Postgres, so its guard is argued
-against the real column types and the restore SQL rather than executed.
+`parseCallback`, `renderMessage` and `answered` are pure and are tested hard;
+`sendMessage`, `editMessageText` and the PATCH reach the network on their first
+line, so the double tap, the fresh-message fallback, the chat check, the secret
+that picks which half runs, and the message id being recorded after each are
+verified by reading. `postAnswer` is unreachable for the same reason, and
+because its one decision is the one that has been wrong before, `agree.test.mjs`
+reads its body for `answered(before)` instead — one file against itself, the
+same shape as the `notesBlock()` check.
+
+So are the triggers. Nothing in the suite runs Postgres, so their `WHEN` clauses
+are argued against the real column types rather than executed; what the suite
+does hold is that both column lists inside the redraw trigger are the four
+`Data.OWNED` names, since those are text in a file no compiler reads.
 
 Three gaps are worth naming rather than leaving to be rediscovered. Soft delete
 has no test of its own — `Data.mark` and the `deleted` path are touched only

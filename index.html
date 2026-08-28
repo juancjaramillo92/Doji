@@ -462,9 +462,16 @@ nav {
   margin-left:8px; letter-spacing:.5px;
 }
 
-/* Label left, value right, so the values form one clean edge. */
+/* Label left, value right, so the values form one clean edge — and the edge is
+   held by an auto margin rather than by space-between, which stops holding the
+   moment a row overflows: the figures then start wherever their own label ends,
+   so Week and Month land on two different edges because "Week" and "Month" are
+   two different widths. Wrapping is the other half. A pair too wide to sit
+   beside its label drops to its own line, still against the right, instead of
+   running off the card — which is what four- and five-figure weeks do. */
 .pnl-stats-grid { display:flex; flex-direction:column; gap:11px; }
-.pnl-stat { display:flex; align-items:baseline; justify-content:space-between; gap:16px; }
+.pnl-stat { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 16px; }
+.pnl-stat > :last-child { margin-left:auto; }
 .pnl-stat-lbl {
   color:var(--mt); white-space:nowrap;
 }
@@ -478,11 +485,25 @@ nav {
 /* Two figures per row, each with its own colour — a losing last week beside a
    winning current one is the point of showing them together, and one class on
    the row could not say it. Tags are quieter than the numbers, and sized a step
-   down so the pair clears the label on one line. */
-.pnl-stat-pair { display:flex; align-items:baseline; gap:4px; white-space:nowrap; }
+   down so the pair clears the label on one line wherever there is room for one.
+
+   Inline text rather than a flex row, because this is the one thing in the card
+   that can be too wide for any column it is given: two figures that each grow
+   with the account. Inline flow breaks it at the spaces the markup already has
+   — after a figure, after the arrow — and NOT between a tag and the figure it
+   names, which sit adjacent with no whitespace between them. A flex row breaks
+   between any two items, so it would strand `CM` at the end of a line from the
+   number it belongs to; nowrap does not break at all, and a pair that cannot
+   break widens its own grid column until the card runs off the page.
+
+   line-height:1 because a block's strut is its OWN font size, which here is the
+   inherited 13px rather than the 10px of the figures inside it — left alone
+   these two rows stand taller than the two above them, and a wrapped line opens
+   a gap the single figures never do. */
+.pnl-stat-pair { text-align:right; line-height:1; }
 .ps-tag {
   font-size:7px; letter-spacing:.5px;
-  text-transform:uppercase; color:var(--mt);
+  text-transform:uppercase; color:var(--mt); margin-right:4px;
 }
 .ps-fig { font-size:10px; font-weight:600; color:var(--mt2); }
 .ps-fig.win  { color:var(--win); }
@@ -1293,6 +1314,20 @@ tr.broker-pending td:first-child {
 
   /* Companion boxes stack */
   .grid-2 { grid-template-columns:1fr; }
+  /* And so do the P&L card's own two halves. Side by side on a phone the
+     performance half is about 135px, which a four-figure week overruns before
+     wrapping can help — the pair on its own is wider than the column. Full
+     width each, and the divider turns with them. */
+  .pnl-card-inner { flex-direction:column; gap:16px; }
+  /* Stretched beside the stats, the balance block absorbs the spare pixels and
+     the figure's auto margins centre it in them. Stacked there are none, so
+     both the gap between the readings and the title rhythm above the first one
+     have to be stated rather than left to the space. */
+  .pnl-net {
+    gap:14px; padding-right:0; padding-bottom:16px;
+    border-right:none; border-bottom:1px solid var(--bd);
+  }
+  .pnl-net > div:first-child > .cbox-l { margin-bottom:var(--gap-title); }
   /* Side by side would leave the table roughly 140px wide. Source order is
      kept, so the roll-forward lands beneath the log. */
   .log-split { grid-template-columns:1fr; }

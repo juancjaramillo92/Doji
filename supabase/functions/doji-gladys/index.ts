@@ -3,9 +3,10 @@
 // ───────────────────────────────────────────────────────────────────────────
 // One function, two callers, told apart by which secret they present:
 //
-//   x-doji-key                        the after-insert trigger in
+//   x-doji-key                        the two triggers in
 //                                     supabase/002_gladys.sql — a position
-//                                     opened, post the message.
+//                                     opened, post the message; its journal
+//                                     answers moved, redraw it.
 //   x-telegram-bot-api-secret-token   Telegram — a button was tapped, write the
 //                                     column and redraw the message.
 //
@@ -21,15 +22,21 @@
 // write moves updated_at, and the realtime subscription the app already holds
 // re-renders any open tab for free.
 //
-// THE MESSAGE IS THE STATE, WITH ONE EXCEPTION. There is no session table and
-// no stored message id, because there is nothing to store: callback_data
+// A TAP IS SELF-DESCRIBING; A WRITE FROM ANYWHERE ELSE IS NOT. callback_data
 // carries the trade, the field and the value, and Telegram's callback carries
-// the chat and message ids that editMessageText needs. A tap is
-// self-describing, so a redeploy in the middle of answering costs nothing.
+// the chat and message ids editMessageText needs — so the tap path holds no
+// session state at all and a redeploy in the middle of answering costs nothing.
 //
-// The exception is whether a redraw should settle, which comes from the row as
-// it stood BEFORE the tap rather than from anything on the message. See
-// staysOpen.
+// The app writing the same four columns has none of that, and for as long as
+// there was nothing to edit from, journalling a trade in the app left this
+// message showing an empty one for good. So the message id is kept, on the row,
+// in trades.tg_message_id. It is Gladys's column alone: it is in neither
+// Data.OWNED nor COLUMNS below, so nothing can name it from a save or a tap.
+//
+// Whether a redraw settles the form is decided from neither. It comes from the
+// row as it stood BEFORE the write — see staysOpen — which is what lets the
+// update trigger and the tap path reach the same answer, so the two redraws a
+// tap sets off draw the identical message and the second is a no-op.
 //
 // SECURITY CONTRACT
 //   1. Deployed with verify_jwt = false — Telegram calls it unauthenticated and
@@ -99,15 +106,28 @@ export const COLUMNS: Record<string, string> = {
   tp:    'followed_tp',
 };
 
-export interface Row {
-  id: string;
-  direction: string;
-  entry_price: number;
-  entry_time: string;
+// The journal half of the row, split out because it is the whole input to the
+// one decision this file makes twice — whether a redraw settles the form.
+export interface Answers {
   setup: string | null;
   followed_rules: boolean | null;
   followed_sl: boolean | null;
   followed_tp: boolean | null;
+}
+
+export interface Row extends Answers {
+  id: string;
+  direction: string;
+  entry_price: number;
+  entry_time: string;
+}
+
+// What a trigger posts. Both extras belong to the update: the message to edit,
+// and the answers as they stood before it. An insert has neither, and that
+// absence is what tells the two apart.
+interface Fired extends Row {
+  tg_message_id?: number;
+  before?: Answers;
 }
 
 export interface Tap {
@@ -178,7 +198,10 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(new Date(iso));
 
-const answered = (row: Row) =>
+// Exported because two callers decide the redraw from it and they must not
+// drift: staysOpen, for a tap, and the update trigger's half, for an answer
+// written anywhere else.
+export const answered = (row: Answers) =>
   row.setup !== null && row.followed_rules !== null &&
   row.followed_sl !== null && row.followed_tp !== null;
 
@@ -251,8 +274,9 @@ export function renderMessage(row: Row, expanded: boolean) {
 // Her token, bound once. Every call below is unchanged by the binding.
 const tg = (method: string, body: unknown) => telegram(BOT_TOKEN, method, body);
 
-// The columns renderMessage reads, and no more. The id is `PID\d+` — enforced
-// by parseCallback before either of these is reached — so it needs no escaping.
+// The columns renderMessage reads, and no more. The id needs no escaping on
+// either path into these: a tap's is `PID\d+`, enforced by parseCallback before
+// it gets here, and a trigger's is the row's own primary key.
 const SELECT = "id,direction,entry_price,entry_time,setup,followed_rules,followed_sl,followed_tp";
 
 async function readRow(id: string): Promise<Row> {
@@ -265,11 +289,12 @@ async function readRow(id: string): Promise<Row> {
 }
 
 // return=representation, so the write and the read the redraw needs are one
-// round trip rather than two.
-async function writeAnswer(id: string, column: string, value: string | boolean): Promise<Row> {
+// round trip rather than two. Two writers reach it: a tap's answer, and the
+// message id Telegram has just handed back.
+async function patchRow(id: string, fields: Record<string, unknown>): Promise<Row> {
   const res = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${id}&select=${SELECT}`, {
     method: "PATCH", headers: sbHeaders("return=representation"),
-    body: JSON.stringify({ [column]: value }),
+    body: JSON.stringify(fields),
   });
   if (!res.ok) throw new Error(`Write failed (HTTP ${res.status}): ${await res.text()}`);
   const rows = await res.json();
@@ -288,24 +313,41 @@ async function writeAnswer(id: string, column: string, value: string | boolean):
    ANY OTHER EDIT FAILURE falls back to a fresh message. This is also the
    answer if Telegram caps how long a bot may edit its own message: whether or
    not there is such a cap, a stale [Edit] tap produces a new message rather
-   than silently doing nothing. */
-async function redraw(row: Row, chatId: number, messageId: number, expanded: boolean) {
+   than silently doing nothing.
+
+   Which is why this returns that replacement's id, and null when it drew
+   nothing new. The id on the row is now pointing at a message that cannot be
+   edited, so left alone every later answer would fail against the same dead
+   message and post another fresh one beneath it. */
+async function redraw(row: Row, chatId: number | string, messageId: number,
+                      expanded: boolean): Promise<number | null> {
   const { text, reply_markup } = renderMessage(row, expanded);
 
   const edited = await tg("editMessageText",
     { chat_id: chatId, message_id: messageId, text, reply_markup });
-  if (edited.ok) return;
-  if (String(edited.description ?? "").includes("message is not modified")) return;
+  if (edited.ok) return null;
+  if (String(edited.description ?? "").includes("message is not modified")) return null;
 
   console.error("doji-gladys: edit refused —", edited.description);
-  await tg("sendMessage", { chat_id: chatId, text, reply_markup });
+  const sent = await tg("sendMessage", { chat_id: chatId, text, reply_markup });
+  return sent.ok ? sent.result.message_id as number : null;
 }
 
-/* ─── The trigger half: a position opened ────────────────────────────────── */
+/* ─── The trigger half: a position opened, or its answers moved ──────────── */
 
-async function postOpen(req: Request): Promise<Response> {
-  const row = await req.json() as Row;
+// Both triggers present the same secret and post the same eight columns, so
+// the body is what says which fired: only the update names a message to edit
+// and the answers it is replacing.
+async function fromTrigger(req: Request): Promise<Response> {
+  const fired = await req.json() as Fired;
+  const { tg_message_id, before } = fired;
 
+  return before && tg_message_id
+    ? await postAnswer(fired, tg_message_id, before)
+    : await postOpen(fired);
+}
+
+async function postOpen(row: Row): Promise<Response> {
   // false: the message opens on the full keyboard. A freshly inserted row has
   // all four answers null anyway, so this is what it would resolve to — but
   // stating it keeps the settled form a thing only a tap can produce.
@@ -315,6 +357,27 @@ async function postOpen(req: Request): Promise<Response> {
   // the status alone proves nothing.
   const body = await tg("sendMessage", { chat_id: CHAT_ID, text, reply_markup });
   if (!body.ok) throw new Error(`sendMessage failed: ${body.description ?? "unknown"}`);
+
+  // Recorded before the trader can possibly have answered anything, because a
+  // message nothing can find again is one the app's own writes leave showing an
+  // empty trade for good — which is the whole reason the column exists.
+  await patchRow(row.id, { tg_message_id: body.result.message_id });
+
+  return json({ ok: true, id: row.id });
+}
+
+/* An answer written outside Telegram — the app, or a hand-edit in the SQL
+   editor. The message she posted is a snapshot of a row four writers can move,
+   and nothing about that write reaches the trader unless it is redrawn.
+
+   Same decision as a tap's, off the same input: the row as it stood before.
+   A tap fires this trigger as well as redrawing itself, so both draw the
+   identical message and Telegram answers the second `message is not modified`.
+   Decide it any other way and the two fight, and the one that loses is a form
+   that shuts under a correction. */
+async function postAnswer(row: Row, messageId: number, before: Answers): Promise<Response> {
+  const replaced = await redraw(row, CHAT_ID, messageId, answered(before));
+  if (replaced) await patchRow(row.id, { tg_message_id: replaced });
 
   return json({ ok: true, id: row.id });
 }
@@ -357,14 +420,16 @@ async function handleTap(req: Request): Promise<Response> {
     // without the before-state the message can never settle.
     const before = await readRow(tap.id);
     const row = tap.column
-      ? await writeAnswer(tap.id, tap.column, tap.value as string | boolean)
+      ? await patchRow(tap.id, { [tap.column]: tap.value })
       : before;
 
     // Answered after the write, so a failure reaches the trader as an alert
     // instead of a tap that looked accepted. Two PostgREST calls are nowhere
     // near the ~15s Telegram gives before it abandons the spinner itself.
     await tg("answerCallbackQuery", { callback_query_id: cq.id });
-    await redraw(row, cq.message.chat.id, cq.message.message_id, staysOpen(tap, before));
+    const replaced = await redraw(row, cq.message.chat.id, cq.message.message_id,
+                                  staysOpen(tap, before));
+    if (replaced) await patchRow(tap.id, { tg_message_id: replaced });
     return json({ ok: true, id: tap.id, column: tap.column });
   } catch (err) {
     console.error("doji-gladys:", err instanceof Error ? err.message : err);
@@ -386,7 +451,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   // AUTHORISATION FIRST, BEFORE ANYTHING ELSE, AND THE HEADER ALSO PICKS THE
   // HALF. A caller presenting neither secret is told nothing beyond "no".
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
-  const fromTrigger  = req.headers.get("x-doji-key");
+  const fromDatabase = req.headers.get("x-doji-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !SB_KEY) {
     console.error("doji-gladys: a required secret is not set — refusing all requests");
@@ -397,15 +462,16 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     if (secretMatches(fromTelegram, WEBHOOK_SECRET)) {
       return await handleTap(req);
     }
-    if (secretMatches(fromTrigger, CRON_SECRET)) {
-      return await postOpen(req);
+    if (secretMatches(fromDatabase, CRON_SECRET)) {
+      return await fromTrigger(req);
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
     // pg_net discards the response, exactly as pg_cron does for the poller, so
     // this line is the only place a trigger-side failure is ever reported. The
-    // trade is journalled from the app in the meantime; nothing is lost but the
-    // prompt.
+    // journal is unharmed either way — the row is written and committed before
+    // either trigger runs, and what is lost is a prompt, or a message left
+    // saying what it said before.
     console.error("doji-gladys:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }

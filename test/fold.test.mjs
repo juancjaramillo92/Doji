@@ -34,7 +34,7 @@ import {
   lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
-import { SETUPS, COLUMNS, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
+import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import {
   briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, isBriefingMarker,
@@ -706,6 +706,73 @@ test('the fourth answer settles the form, and the three before it do not', () =>
     assert.equal(rows, didSettle ? 1 : 4, data);
   }
   assert.equal(didSettle, true, 'the fourth answer must settle it');
+});
+
+/* ─── Telegram: an answer written somewhere else ─────────────────────────────
+   The app writes the same four columns, and for as long as nothing told Gladys
+   so, journalling a trade in the app left her message reading `Setup: —` for
+   the life of the trade. supabase/002_gladys.sql now fires on the update and
+   sends the row with the answers AS THEY STOOD, and doji-gladys decides the
+   redraw from that before-state with answered() — the same expression
+   staysOpen() applies to a tap.
+
+   THEY HAVE TO STAY THE SAME EXPRESSION, because a tap fires both: the webhook
+   redraws, and the write it just made fires the trigger, which redraws again.
+   Two answers that differed would leave the message wherever the SECOND one
+   landed — and the second one is the trigger, so a form reopened with [Edit]
+   would shut under the correction being made in it.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('a trade missing any one answer is not answered', () => {
+  /* All four, and the setup counts. answered() is the whole gate on settling —
+     a message that settled without a setup would read
+     `Logged · SELL 3400.00 · null`, and the app path would settle a trade the
+     app itself still shows as pending. */
+  for (const missing of ['setup', 'followed_rules', 'followed_sl', 'followed_tp']) {
+    assert.equal(answered({ ...settled, [missing]: null }), false, missing);
+  }
+  assert.equal(answered(settled), true);
+});
+
+test('the trigger and a tap decide the redraw identically, on every before-state', () => {
+  // Driven off a real payload rather than a hand-built Tap, so a change to the
+  // grammar that stopped producing an `answer` reaches this too.
+  const tap = parseCallback('PID562780708|rules|1');
+
+  for (const setup of [null, SETUPS[0]])
+    for (const rules of [null, true])
+      for (const sl of [null, false])
+        for (const tp of [null, true]) {
+          const before = { setup, followed_rules: rules, followed_sl: sl, followed_tp: tp };
+          assert.equal(answered(before), staysOpen(tap, before),
+            `the two halves disagree on ${JSON.stringify(before)}`);
+        }
+});
+
+test('journalling from the app settles the message, exactly as a fourth tap does', () => {
+  /* The app writes all four columns in ONE update, so the trigger sees a
+     before-state with every answer null against a row with every answer in —
+     a sequence no tap can produce, and the one the complaint was about. */
+  const before = { setup: null, followed_rules: null, followed_sl: null, followed_tp: null };
+  const drawn = renderMessage(settled, answered(before));
+
+  assert.equal(drawn.reply_markup.inline_keyboard.length, 1, 'the form did not settle');
+  assert.equal(drawn.text, renderMessage(settled, false).text,
+    'the app path and a fourth tap draw different summaries');
+});
+
+test('correcting a settled trade from the app reopens the form, as a tap does', () => {
+  // Complete before the write, so this is a correction rather than a last
+  // answer — and a correction leaves the form open whoever made it. Deciding
+  // that from the ROW rather than from the writer is what lets the trigger a
+  // tap fires agree with the tap's own redraw.
+  const corrected = { ...settled, followed_tp: true };
+  const viaApp = renderMessage(corrected, answered(settled)).reply_markup.inline_keyboard;
+  const viaTap = renderMessage(corrected, staysOpen(parseCallback('PID562780708|tp|1'), settled))
+    .reply_markup.inline_keyboard;
+
+  assert.equal(viaApp.length, 5, 'the reopened form is missing a row');
+  assert.deepEqual(viaApp, viaTap);
 });
 
 test('the taps are taken off the buttons the form actually drew', () => {
