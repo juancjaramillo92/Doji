@@ -77,6 +77,13 @@ create table public.trades (
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 
+  -- The Telegram message Gladys posted for this trade, so a journal answer
+  -- written anywhere else can redraw it instead of leaving it showing an empty
+  -- trade. Hers alone: it is in neither Data.OWNED nor her COLUMNS map, so
+  -- nothing can name it from a save or from a tap, and null simply means there
+  -- is no message to edit — an email-first row never had one.
+  tg_message_id bigint,
+
   -- Vocabularies enforced here rather than trusted to the client, so an invalid
   -- value cannot arrive from the app, from a hand-edit, or from anywhere else.
   constraint trades_direction_check check (direction in ('BUY', 'SELL')),

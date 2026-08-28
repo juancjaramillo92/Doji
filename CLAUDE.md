@@ -185,12 +185,26 @@ code you write near it:
   with the same four lines, and that is the one shape that must stay readable in
   the file being edited rather than behind a helper.
 - **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
-  `Data.OWNED`, so no broker column is nameable from a tap. `agree.test.mjs`
-  asserts the two lists against each other rather than each against a literal;
-  do not widen either without widening it.
-- **`callback_data` must stay under 64 bytes.** It is the entire state store —
-  no session table, no `tg_message_id`, no schema change — and a longer setup
+  `Data.OWNED`, so no broker column is nameable from a tap. `tg_message_id` is
+  on neither list and must stay off both. `agree.test.mjs` asserts the two lists
+  against each other, and both column lists inside `trades_telegram_on_answer`
+  against them, rather than each against a literal; do not widen any of them
+  without widening it.
+- **`callback_data` must stay under 64 bytes.** It is the entire state a *tap*
+  needs — no session table, no schema change on that path — and a longer setup
   name is the way it would silently overrun.
+- **The two redraws a tap sets off must decide the same thing.** A tap writes,
+  so it fires `trades_telegram_on_answer` as well as redrawing the message
+  itself, and the trigger's redraw is the one that lands. Neither may decide
+  from the writer: `answered(before)` in `postAnswer` and `staysOpen` on the tap
+  path are one expression against one before-state, which is why the second edit
+  comes back `message is not modified`. Change either and a form reopened with
+  `[Edit]` shuts under the correction being made in it — `agree.test.mjs` reads
+  `postAnswer`'s body for that call, because nothing in the suite can drive it.
+- **That trigger compares with `is distinct from`, never `<>`.** These columns
+  are three-state and `<>` is NULL against an unanswered one; a `WHEN` clause
+  that is not true does not fire, so the first answer to every question would be
+  the one redraw that never happened.
 
 ---
 

@@ -36,6 +36,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
+const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
 const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
@@ -121,6 +122,67 @@ test('every journal column both writers name exists in the schema', async () => 
   } finally { close(); }
 });
 
+/* ─── And the two copies inside the redraw trigger ───────────────────────────
+   002_gladys.sql names the four journal columns twice more, and both copies are
+   typed SQL in a file no compiler reads. The WHEN clause decides that an answer
+   moved; the `before` object carries the answers as they stood, which is the
+   whole input to whether the redraw settles the form.
+
+   Each fails silently and differently. A column missing from the WHEN clause is
+   an answer that never reaches the Telegram message — the exact defect the
+   trigger was added to fix, back for one question out of four. A column missing
+   from `before` reads as unanswered, so a correction to a settled trade reopens
+   the form instead of leaving it settled.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('the redraw trigger watches, and carries, exactly the journal columns', async () => {
+  const { app, close } = await boot();
+  try {
+    const owned = [...app.Data.OWNED].sort();
+
+    // Anchored on the trigger itself, so the columns in the payload above it
+    // cannot stand in for the ones in the WHEN clause.
+    const at = GLADYS_SQL.indexOf('create or replace trigger trades_telegram_on_answer');
+    assert.ok(at > -1, '002_gladys.sql no longer creates trades_telegram_on_answer');
+
+    const watched = [...GLADYS_SQL.slice(at).matchAll(/new\.(\w+)\s+is distinct from/g)]
+      .map(m => m[1]).sort();
+    assert.deepEqual(watched, owned,
+      'the trigger watches columns the journal half does not write, or misses one it ' +
+      'does — an answer to that question would never redraw the message');
+
+    const before = [...GLADYS_SQL.matchAll(/'before', jsonb_build_object\(([^)]*)\)/g)]
+      .flatMap(m => [...m[1].matchAll(/'(\w+)',\s*old\./g)].map(k => k[1])).sort();
+    assert.deepEqual(before, owned,
+      'the before-state the trigger sends is not the four columns answered() reads — ' +
+      'a missing one reads as unanswered and reopens a form that was settled');
+  } finally { close(); }
+});
+
+/* And the third read of that same before-state, which is a file against itself
+   rather than two files against each other — same shape as notesBlock() below,
+   and the same failure: silence. postAnswer() is the half of the redraw no test
+   can drive, because it talks to Telegram and PostgREST and nothing else calls
+   it. A constant in place of answered(before) there disagrees with the tap that
+   fired the trigger, and the second redraw is the one that lands. */
+
+test('the redraw decides from the before-state, not from a constant', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-gladys/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('async function postAnswer(');
+  assert.ok(at > -1, 'doji-gladys no longer has postAnswer()');
+  // Comments stripped: the expression named in the prose above the call is not
+  // the call.
+  const body = src.slice(at, src.indexOf('\n}', at))
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  assert.match(body, /redraw\([^)]*answered\(before\)\)/,
+    'postAnswer no longer redraws on answered(before) — it and the tap that fired ' +
+    'the trigger would then disagree, and a form reopened with [Edit] shuts under ' +
+    'the correction being made in it');
+});
+
 test('no broker column is reachable through either writer', async () => {
   const { app, close } = await boot();
   try {
@@ -132,6 +194,10 @@ test('no broker column is reachable through either writer', async () => {
       'id', 'user_id', 'direction', 'entry_time', 'fill_time', 'entry_price',
       'exit_price', 'commission', 'balance', 'open_day', 'net_pnl',
       'computed_pnl', 'pnl', 'deleted', 'created_at', 'updated_at',
+      // Gladys's own bookkeeping rather than a broker's, and it belongs on this
+      // list for the same reason: a tap or a save that could name it would be
+      // able to point her at somebody else's message, or lose the trade its own.
+      'tg_message_id',
     ];
     const reachable = new Set([...app.Data.OWNED, ...Object.values(COLUMNS)]);
     for (const column of broker) {
@@ -415,11 +481,10 @@ const looksLikeCode = (name) =>
    forgotten:
 
      TODO                        a prohibition — CLAUDE.md forbids the marker
-     tg_message_id               the column Gladys works without, by design
      background_color            }  manifest fields tried against the iOS
      apple-touch-startup-image   }  launch frame, none of which reached it */
 const DELIBERATELY_ABSENT = new Set([
-  'TODO', 'tg_message_id', 'background_color', 'apple-touch-startup-image',
+  'TODO', 'background_color', 'apple-touch-startup-image',
 ]);
 
 test('the documents name only symbols the repository has', () => {

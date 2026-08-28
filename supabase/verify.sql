@@ -103,13 +103,23 @@ from (values
        and grantee in ('anon','authenticated','service_role')),
    'service_role:SELECT'),
 
-  ('the trade-open trigger calls doji-gladys',
-   (select (prosrc like '%doji-gladys%')::text from pg_proc where proname = 'trades_telegram_open'),
+  ('the Telegram trigger function calls doji-gladys',
+   (select (prosrc like '%doji-gladys%')::text from pg_proc where proname = 'trades_telegram'),
    'true'),
-  ('two triggers on trades',
+  ('three triggers on trades',
    (select count(*)::text from pg_trigger
      where tgrelid = to_regclass('public.trades') and not tgisinternal),
-   '2'),
+   '3'),
+
+  -- Without it Gladys has no message to edit, and a trade journalled in the app
+  -- leaves her Telegram message showing an empty one for good. Nothing else
+  -- reports its absence: the redraw trigger's WHEN clause requires the column to
+  -- be non-null, so a database missing it is simply a database where the second
+  -- half of this feature never fires.
+  ('trades carries Gladys''s message id',
+   (select data_type from information_schema.columns
+     where table_schema = 'public' and table_name = 'trades' and column_name = 'tg_message_id'),
+   'bigint'),
 
   -- Without this a fill never reaches an open tab on its own. The five-minute
   -- refresh still finds it, so the failure is a slow app rather than a broken
@@ -134,9 +144,9 @@ from (values
    '2'),
   -- The third caller, and the one that actually shipped with the upper-case
   -- spelling. It is a function body rather than a job, so it needs its own row.
-  ('the trade-open trigger reads the lower-case Vault secret',
+  ('the Telegram trigger function reads the lower-case Vault secret',
    (select (prosrc like '%''doji_cron_secret''%')::text
-      from pg_proc where proname = 'trades_telegram_open'),
+      from pg_proc where proname = 'trades_telegram'),
    'true'),
 
   -- One of the three places the setups vocabulary lives. test/agree.test.mjs
@@ -217,10 +227,18 @@ where table_schema = 'public' and table_name = 'eugenia_trades'
 order by grantee, privilege_type;
 
 -- ─── Triggers ──────────────────────────────────────────────────────────────
--- Expect two on trades: trades_touch_updated_at (BEFORE UPDATE) and
--- trades_telegram_on_open (AFTER INSERT). Read the WHEN clause on the second
--- one: `new.entry_time > now() - interval '01:00:00'` is the guard that stops a
--- restore from backup messaging the trader once per row in the file.
+-- Expect three on trades: trades_touch_updated_at (BEFORE UPDATE),
+-- trades_telegram_on_open (AFTER INSERT) and trades_telegram_on_answer
+-- (AFTER UPDATE). Read the WHEN clauses on the last two. On the open,
+-- `new.entry_time > now() - interval '01:00:00'` is the guard that stops a
+-- restore from backup messaging the trader once per row in the file. On the
+-- answer, the four journal columns compared with `is distinct from` — `<>` is
+-- NULL against an unanswered one, so it would skip the first answer to every
+-- question — and `new.tg_message_id is not null`, which is what keeps a row
+-- that never had a message silent.
+--
+-- BOTH MUST NAME trades_telegram. A trigger left pointing at the function's old
+-- single-purpose name is a 404 into a void, and pg_net discards the response.
 select event_object_table as table_name, trigger_name, action_timing, event_manipulation,
        pg_get_triggerdef(t.oid) as definition
 from information_schema.triggers ist
