@@ -34,6 +34,7 @@ import { execSync } from 'node:child_process';
 
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
+import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -579,6 +580,69 @@ test('the documents name only symbols the repository has', () => {
    an instruction he thinks she took. He would have no way to tell whether she
    disagreed, forgot, or never read it.
    ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── The strategy, and the two ways it goes quiet ───────────────────────────
+   She cannot write this document, so nothing she does can report that it never
+   arrived. Both failures are silent and neither changes a single test elsewhere:
+   the always-loaded half dropped from the system prompt, and a rule citing a
+   section get_strategy cannot serve.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the strategy rides on the cached system prompt, not on a message', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // In the system block AND cached. Moved to a message it is paid on every turn
+  // and breaks the prefix each time the document is edited; dropped entirely she
+  // reasons about his trading from nothing and says so about nothing.
+  assert.match(src, /system:\s*\[\{[^}]*text:\s*SYSTEM \+ ALWAYS[^}]*cache_control/,
+    'the strategy is no longer part of the cached system prompt — either she has ' +
+    'stopped being given it at all, or it is being paid for on every message');
+});
+
+test('what is summarised into every turn can also be read in full', () => {
+  // Each rule cites the section holding its reasoning, and that citation is the
+  // only route from a one-line rule to why it exists.
+  const cited = [...ALWAYS.matchAll(/§(\d+)/g)].map(m => m[1]);
+  assert.ok(cited.length >= 3,
+    `only ${cited.length} section references read out of the rules table — the reader has gone blind`);
+
+  /* §0 and §7 are the two the document's retrieval contract names as always
+     loaded, and both are summarised to get there — the header down to its
+     summary paragraph, the rules down to their table. Losing either from
+     SECTIONS means she holds an abbreviation of something she can no longer
+     read whole, which is the shape of a confident wrong answer.
+
+     Sections 1-6 and 9-11 are cited and deliberately absent: they are drafted
+     separately, and readStrategy answering for them is asserted below rather
+     than pretended away here. */
+  for (const k of ['0', '7']) {
+    assert.ok(k in SECTIONS,
+      `§${k} is summarised into every turn and can no longer be read in full`);
+  }
+});
+
+test('an unknown section is answered, never silently empty', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('function readStrategy(');
+  assert.ok(at > -1, 'doji-eugenia no longer has readStrategy()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  // §7 cites sections that are not written. An empty tool result is a blank she
+  // fills in herself, which is the one outcome worse than saying it is missing.
+  assert.match(body, /has no section/,
+    'readStrategy returns nothing for a section that does not exist — she would ' +
+    'invent the reasoning rather than report it missing');
+});
+
+test('the version the document states is the version she is handed', () => {
+  assert.match(ALWAYS, new RegExp(`version ${VERSION}\\b`),
+    'ALWAYS announces a different version than VERSION exports');
+  assert.match(SECTIONS['0'], new RegExp(`\\*\\*Version\\*\\* ${VERSION}\\b`),
+    'the header section states a different version than VERSION exports — a rule ' +
+    'change would be invisible to anything reading the version');
+});
 
 /* ─── A schedule nothing dispatches ──────────────────────────────────────────
    dueNow can answer 'consolidate' correctly every night for a year and the pass
