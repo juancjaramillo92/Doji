@@ -2056,48 +2056,40 @@ function pctSplit(nums) {
   return out;
 }
 
-// The balance the broker last reported BEFORE a day — the day itself excluded,
+// WHEN A TRADE HAPPENED, and there is one answer. entry_time is the true
+// execution instant and unique per trade; fill_time covers a row the poller
+// never reached; the filing day is the last resort and collides across a day.
+//
+// It sits here rather than beside the trade log because latestBefore below is
+// its first caller, and a definition under its own use is a forward reference
+// waiting to become a load-order bug.
+const sortKey = t => t.entry_time || t.fill_time || (dayOf(t) || '') + 'T00:00:00Z';
+
+// The last value a broker column carried BEFORE a day — the day itself excluded,
 // matching the half-open [start, end) ranges rangeStats uses, so
-// balanceAt(rows, monthStart) is the opening balance and balanceAt(rows,
-// nextMonthStart) closes the month. A null day means "no bound", i.e. the
-// latest balance there is. One rule, so the P&L card and the roll-forward's two
-// balance rows cannot answer the same question differently. Ordered on the true
-// execution instant where there is one, since every trade on a day ties on the
-// filing date alone.
-/* THE ACCOUNT THE SIZING IMPLIES, which is not the same claim as the balance
-   above it. The ladder is 0.02 lots per 1,000 continuous, so a size is a
-   readout of the capital it was sized against — including whatever is not at
-   the broker, which is the whole reason this is worth deriving. Balance is the
-   portion deployed; this is the base the ladder was applied to.
-
-   THE LATEST SIZE, NEVER AN AVERAGE. Rungs are stepped, so a mean across a
-   month of sizes describes no account that ever existed.
-
-   Derived, never stored: size_oz is the fact, and lots and this are two
-   readings of it. Null wherever no row carries a size — every row predating the
-   column, and anything the poller never reached. */
-function sizingAt(list) {
-  let oz = null, at = '';
+// latestBefore(rows, 'balance', monthStart) is the opening balance and
+// latestBefore(rows, 'balance', nextMonthStart) closes the month. A null day
+// means "no bound", i.e. the latest there is. One rule, so the P&L card and the
+// roll-forward's two balance rows cannot answer the same question differently.
+//
+// Ordered on the true execution instant where there is one, since every trade on
+// a day ties on the filing date alone — which is the whole reason this is a
+// scan rather than a sort: the answer is one row, and finding it costs one pass.
+//
+// TWO COLUMNS ASK THIS, and they asked it in two identical loops until they
+// didn't: `balance` for the account the broker reported, `size_oz` for the size
+// he last traded. A second copy is how the two would come to disagree about
+// which row is latest.
+function latestBefore(list, field, day = null) {
+  let value = null, at = '';
   for (const t of list) {
-    if (t.size_oz == null) continue;
-    const d = dayOf(t);
-    if (!d) continue;
-    const stamp = String(t.entry_time || t.fill_time || d);
-    if (stamp > at) { oz = t.size_oz; at = stamp; }
-  }
-  return oz;
-}
-
-function balanceAt(list, day) {
-  let balance = null, at = '';
-  for (const t of list) {
-    if (t.balance == null) continue;
+    if (t[field] == null) continue;
     const d = dayOf(t);
     if (!d || (day && d >= day)) continue;
-    const stamp = String(t.entry_time || t.fill_time || d);
-    if (stamp > at) { balance = t.balance; at = stamp; }
+    const stamp = sortKey(t);
+    if (stamp > at) { value = t[field]; at = stamp; }
   }
-  return balance;
+  return value;
 }
 
 /* ─── DATA ───────────────────────────────────────────────────────────────────
@@ -2576,11 +2568,6 @@ const setupAbbr = s => String(s).trim().split(/\s+/)
 const setupCell = s => !s ? '—'
   : `<span class="setup-full">${esc(s)}</span><span class="setup-abbr">${esc(setupAbbr(s))}</span>`;
 
-// entry_time is the true execution instant and unique per trade; fill_time
-// covers a row the poller never reached; the filing day is the last resort and
-// collides across a day.
-const sortKey = t => t.entry_time || t.fill_time || (dayOf(t) || '') + 'T00:00:00Z';
-
 // Oldest first. Ties return 0 rather than falling through to "greater": two
 // pre-poller rows filed on the same day share a key, and a comparator that
 // never reports equality lets them swap places between renders.
@@ -2657,8 +2644,8 @@ function renderPnLCard(rows) {
     else if (d >= moPrev) monthWas += t.pnl;
   }
 
-  const balance = balanceAt(rows, null);
-  const oz      = sizingAt(rows);
+  const balance = latestBefore(rows, 'balance');
+  const oz      = latestBefore(rows, 'size_oz');
   $('pnl-balance-number').textContent = balance == null ? '—' : balance.toFixed(2);
   /* PRECEDENCE, AND IT IS NOT ARBITRARY. The awaiting notice explains the dash
      directly above it; the sizing line is an unrelated fact that would leave
@@ -3150,7 +3137,7 @@ function rangeStats(rows, start, end) {
     n: m.n, opening: round2(opening), gross: m.gross, loss: m.loss,
     closing: round2(opening + m.net), change: m.net,
     best, worst, avgWin, avgLoss,
-    openBal: balanceAt(rows, start), lastBal: balanceAt(rows, end)
+    openBal: latestBefore(rows, 'balance', start), lastBal: latestBefore(rows, 'balance', end)
   };
 }
 

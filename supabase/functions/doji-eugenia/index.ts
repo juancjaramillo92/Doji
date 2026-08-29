@@ -298,7 +298,7 @@ function readStrategy(section: unknown): string {
   const found = SECTIONS[key];
   if (found) return found;
   return `The strategy has no section ${key}. It holds ${Object.keys(SECTIONS).join(", ")} ` +
-         `at version ${VERSION}; the rest is drafted separately and is not written yet, ` +
+         `at version ${VERSION}. Sections 1, 2, 3, 9, 10 and 11 are not written, ` +
          `so say that rather than guessing what it would have said.`;
 }
 

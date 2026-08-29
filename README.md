@@ -885,7 +885,7 @@ prompt otherwise asks for. She acknowledges an instruction in four words or
 fewer — a fact about him she records silently — because otherwise he cannot tell
 it stuck and will say it again.
 
-`notesBlock()` is therefore load-bearing on all three paths, and its absence
+`notesBlock()` is therefore load-bearing on all four paths, and its absence
 would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts the briefing, the pulse and a reply each read
 them.
@@ -946,10 +946,21 @@ checked against a row today, `field` that a column would have to exist first,
 it is one whose compliance is invisible, so it never counts as kept merely
 because nothing contradicted it.
 
-Sections 1–6 and 9–11 are drafted separately and are not in the file yet. Rules
-cite them, and `get_strategy` says so plainly rather than returning nothing —
-a blank is something she would fill in herself, which is the one outcome worse
-than reporting it missing. A `[decide]` in the text is a value he has not
+Sections 1, 2, 3, 9, 10 and 11 are not written. Four of them are cited — §2 for
+the market model, §9 for the leg of a failure that leaves no signature, §10 for
+what would have to change before a judgment rule could become checkable, and §1
+only by the retrieval contract's own list — and `get_strategy` names them rather
+than returning nothing, because a blank is something she would fill in herself,
+which is the one outcome worse than reporting it missing.
+
+§4 is the one section that answers a question the rules could not. **The two
+setups differ by method, not by location**: Break & Retest is a continuation
+trade taken through a level that has already broken and flipped, and Support &
+Resistance is a mean-reversion trade taken off a level that is holding. Interior
+levels are where levels break, the extremes are where they turn price back — so
+R-05 and R-06 read as rules about location and are rules about method. It also
+settles what a per-setup statistic is: a win rate split by `setup` compares
+continuation against mean-reversion, not one part of the chart against another. A `[decide]` in the text is a value he has not
 settled, and she is told to say so rather than supply one.
 
 A TS module rather than a markdown file for the reason `prompt.ts` is one: a
@@ -1600,7 +1611,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the journal columns across `Data.OWNED`, Gladys's `COLUMNS` — a subset, not an equality — the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the three paths that must call it |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the journal columns across `Data.OWNED`, Gladys's `COLUMNS` — a subset, not an equality — the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the four paths that must call it — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

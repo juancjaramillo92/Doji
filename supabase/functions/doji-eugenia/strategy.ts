@@ -18,18 +18,21 @@
 // serves. Loading all of it instead would be roughly ten thousand characters
 // against every message, competing with the briefing for attention.
 //
-// SECTIONS 1-6 AND 9-11 DO NOT EXIST YET. §7 references them because they are
-// drafted separately, and get_strategy says so plainly rather than returning
-// nothing — a rule pointing at reasoning nobody can read is worth knowing about.
+// SECTIONS 1, 2, 3, 9, 10 AND 11 DO NOT EXIST. Four of them are cited — §2 for
+// the market model, §9 for the leg of a failure that leaves no signature, §10
+// for what would have to change before a judgment rule could be checked, and §1
+// only by the retrieval contract's own list. get_strategy says so plainly rather
+// than returning nothing: a blank is a thing she fills in herself, and a rule
+// pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.5";
+export const VERSION = "v1.6";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.5. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.6. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -67,7 +70,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.5 · **Effective from** [decide] · **Supersedes** v1.4
+**Version** v1.6 · **Effective from** [decide] · **Supersedes** v1.5
 
 ### Summary
 
@@ -133,6 +136,88 @@ front of you — \`eugenia_notes\` is her own memory, not a proposal queue — s
 conclusion reached on a Tuesday reaches §13 only if you remember it. Until a
 proposal path exists, §13 is written from conversation and nothing guarantees a
 finding survives to reach it.`,
+
+  "4": `## 4 · The setups
+
+Two, and **the difference between them is not where they are taken.** That is the
+consequence; the difference is which way each one trades relative to the level.
+
+**Break & Retest is a continuation trade.** A level has already broken, and the
+break is the premise. Price extends away, comes back, and the level it broke is
+now the other thing — resistance that has become support, or support that has
+become resistance. The entry is on that retest and it goes THROUGH the level, in
+the direction of the break.
+
+**Support & Resistance is a mean-reversion trade.** Nothing has broken. The level
+is intact, price arrives at it and refuses, and the entry goes AWAY from the
+level, back into the range it came from.
+
+So one trades a level that has failed, and the other trades a level that is
+holding. Interior levels and quarters are where levels break and flip as price
+works through a range, and the extremes are the boundaries that turn it back —
+which is why R-05 and R-06 read as rules about location. **They are rules about
+method, and location is how the method is recognised.**
+
+That distinction decides what a per-setup statistic means. A win rate split by
+\`setup\` is a comparison of continuation against mean-reversion, not of one part
+of the chart against another.
+
+### 4.1 · Break & Retest
+
+Journal value: \`Break & Retest\`. Taken at interior levels and quarters, never at
+an extreme (R-05).
+
+**The premise is the break, and the trade is the retest.** Entering on the
+breakout itself is a different trade and not this one: the retest is what
+separates a level that has genuinely flipped from a push that is about to fail
+back. It is also what makes the stop tight, since the level being retested is
+close by — and a tighter stop for the same target is where this setup's
+reward-to-risk comes from.
+
+**Confirmation is required at the retest, not at the break.** A signal is price
+reaching the flipped level and rejecting it; confirmation is a close in the
+intended direction, or the reaction resolving clearly enough to enter before one
+(§6, R-07).
+
+**Invalidation is price closing back on the original side of the level.** That is
+the break having been false, and it is a different event from the stop being hit:
+the idea is wrong at that close whether or not price has travelled far enough to
+take the stop out.
+
+The stop sits beyond the retest extreme, within the $20 cap. Everything else —
+target, break-even at +$20, one position — is §5 and §6 and is not restated here.
+
+**How it loses:** the break was liquidity rather than intent, so the retest keeps
+going and closes back through. Read as continuation, it is the only failure this
+setup has.
+
+### 4.2 · Support & Resistance
+
+Journal value: \`Support & Resistance\`. Taken at the outer extremes of the range
+only, never at an interior level (R-06). The extremes are few and thick, which is
+what makes them worth fading and what makes an entry there rarer than an interior
+one.
+
+**The premise is that the level holds.** Price arrives, refuses, and the trade is
+the refusal — a signal is that rejection, and confirmation is the close or the
+read (§6, R-07).
+
+**INVALIDATION IS A CLOSE BEYOND THE LEVEL, NEVER A WICK THROUGH IT**, and this
+is the single most important line in either subsection. A wick that pierces the
+extreme and closes back inside is a liquidity sweep: the stops resting beyond the
+level were taken and price refused anyway, which is the level holding rather than
+failing.
+
+That is why §6 allows re-entry after a sweep takes the stop and price comes
+rapidly back. It is not an exception to the rules and not a revenge trade — the
+idea was never invalidated, the stop was simply inside the sweep. The trade being
+stopped out and the idea being wrong are two different events at an extreme, and
+only the second one ends it.
+
+**How it loses:** the range is over. A level that had turned price back stops
+doing so, and a fade taken into a break is the failure this setup has — the
+mirror of §4.1's, and the reason R-09 restricts both to obvious trends and
+cycles.`,
 
   "5": `## 5 · Risk
 
@@ -637,6 +722,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.6 | [decide] | §4 written. The two setups differ by METHOD, not location — Break & Retest is continuation through a level that has flipped, Support & Resistance is mean-reversion off a level that is holding; location is how each is recognised. Invalidation stated per setup, and §6's re-entry rule is shown to follow from S&R's rather than being an exception to it. | Method research, anchored to his stated rules |
 | v1.5 | [decide] | §5 and §6 written. Risk per trade is 4% and is deliberate; the rung moves by hand; 4% is also the daily limit, and there is no weekly or monthly one. One position at a time, nothing else changes size. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep that snaps back to the level. R-08's sequence is recorded as existing but not written down. | His answers |
 | v1.4 | [decide] | \`planned_stop\` and \`planned_target\` are recorded at journalling time. R-03 moves from \`field\` to \`journal\` — it was the full-stop population that was missing, not the predicate — and is \`unknown\` rather than \`pass\` on rows with no plan. §8 and §12 restated: intent is on the row, and planned R:R is recoverable where a plan exists. | Schema change |
 | v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach or is showing reversal. R-01 gains its lower bound and becomes two-sided — the §7 [decide] on early exits is answered. The R:R floor is restated as 1:1.25, being the shortest allowed target over the widest allowed stop. | His decision |

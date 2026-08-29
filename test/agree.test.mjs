@@ -744,6 +744,28 @@ test('the search function is not reachable by a public key', () => {
     'eugenia_search is not granted to the one role that should call it');
 });
 
+/* ─── The strategy is markdown inside a template literal ─────────────────────
+   Every backtick in that document is escaped, and the file is written by editing
+   text that ALREADY contains escaped ones — so an editor that escapes a second
+   time produces `\\\`` , which parses fine, passes every other test, and reaches
+   her as a literal backslash in front of every column name.
+
+   It has happened three times. Nothing failed any of them, because a stray
+   backslash is valid TypeScript and valid prose.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no section reaches her carrying escape characters', () => {
+  for (const [k, body] of Object.entries(SECTIONS)) {
+    assert.ok(!body.includes('\\`'),
+      `§${k} contains a backslash before a backtick — the escaping was applied twice, ` +
+      `and she reads the document with literal backslashes through it`);
+    assert.ok(!body.includes('\\$\{'),
+      `§${k} contains an escaped interpolation, which is the same defect`);
+  }
+  assert.ok(!ALWAYS.includes('\\`'),
+    'the always-loaded half carries escape characters into every single turn');
+});
+
 /* ─── Every read is bounded ──────────────────────────────────────────────────
    Four reads in this function pull rows she is then charged for reasoning over,
    and three of them were capped from the day they were written. The fourth —
@@ -829,7 +851,11 @@ test('the briefing, the pulse and a reply all read his notes', () => {
     return src.slice(at, end);
   };
 
-  for (const fn of ['postBriefing', 'postPulse', 'handleMessage']) {
+  /* postConsolidation is the FOURTH and the worst one to lose. The other three
+     going without notes costs continuity in one message; consolidation going
+     without them means she cannot see what she already holds, so she never
+     supersedes and writes the same fact again every night. */
+  for (const fn of ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation']) {
     // Comments stripped, because the identifier appearing in prose about the
     // call is not the call. And `await` required: notesBlock is async, so an
     // un-awaited one interpolates "[object Promise]" into the prompt — which
