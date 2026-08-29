@@ -134,6 +134,30 @@ conclusion reached on a Tuesday reaches §13 only if you remember it. Until a
 proposal path exists, §13 is written from conversation and nothing guarantees a
 finding survives to reach it.`,
 
+  "5": `## 5 · Risk
+
+### Risk per trade is 4% of account, and that is deliberate
+
+The stop is never beyond $20 of price distance from entry, and size comes from
+the ladder — 0.02 lots per $1,000, continuous. Those two facts fix the third:
+
+    0.02 lots = 2 oz    account $1,000    $20 stop = $40    = 4.0%
+    0.10 lots = 10 oz   account $5,000    $20 stop = $200   = 4.0%
+
+The ladder is linear, so the share is the same at every rung. **He set it knowing
+that**, which is why it is written here as a number rather than left to fall out
+of two others — a figure nobody has stated is a figure nobody can be held to, and
+this one is the single most consequential quantity in the document.
+
+What 4% means in the shape of a month, so it is not abstract: **two and a half
+full stops erase a +10% month**, and **1.7 winners at $30 make one**. The target
+in §0 and the risk here are the same decision seen from two ends.
+
+Deriving it rather than storing it is deliberate too. \\\`size_oz\\\` is on the row, so
+the account tier and therefore the dollar risk of any past trade are recoverable
+from the trade itself, and a second column stating the percentage could disagree
+with the ladder that produced it.`,
+
   "7": `## 7 · The rules, enumerated
 
 Every rule the sections above impose, in one table a program can hold you to.
