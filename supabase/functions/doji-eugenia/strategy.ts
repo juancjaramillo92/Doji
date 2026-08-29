@@ -158,12 +158,18 @@ the account tier and therefore the dollar risk of any past trade are recoverable
 from the trade itself, and a second column stating the percentage could disagree
 with the ladder that produced it.
 
-### Moving up a rung is a deposit, not a threshold
+### Moving up a rung is discretionary, and it is a deposit rather than a threshold
 
-He changes size by hand, and the trigger is performance sustained rather than
-reached: **holding the 10% for a couple of months at the current size**, then
-depositing and moving to the next level. The rung follows the money in, and the
-money in follows the months.
+**He changes it by hand, when he feels like it.** That is the rule, and it is
+stated first because it is the part that decides what can be checked: there is no
+trigger a program could evaluate, so nothing here is ever a violation and no run
+of trades at one size means anything on its own.
+
+What he described alongside it is the pattern, not a condition: **holding the 10%
+for a couple of months at the current size**, then depositing and moving to the
+next level. The rung follows the money in, and the money in follows the months.
+It is what he does, which is different from what he must do, and reading it as a
+rule would produce findings about a decision he never bound himself to.
 
 So the ladder does not track the balance. It is not re-read per trade and it does
 not step the moment an account crosses a number — which is why §8 computes the
