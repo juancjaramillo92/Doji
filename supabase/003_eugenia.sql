@@ -73,7 +73,7 @@ alter table public.eugenia_turns enable row level security;
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp
+         size_oz, open_day, setup, followed_rules, followed_sl, followed_tp
   from public.trades
   where deleted = false;
 

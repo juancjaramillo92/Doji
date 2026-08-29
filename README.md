@@ -142,6 +142,7 @@ Written by the poller and the email parser. **The app never writes these.**
 | `entry_time` | true execution instant of the opening deal |
 | `fill_time` | closing instant, email only — the `open_day` fallback |
 | `entry_price`, `exit_price` | volume-weighted where the fill was scaled |
+| `size_oz` | position size in **ounces**, as opened — poller only |
 | `open_day` | the New York civil day the trade is filed under |
 | `commission` | dollars, positive magnitude, **never subtracted** |
 | `balance` | account balance after the fill — from the email, or from the poller on a close under ten minutes old |
@@ -151,6 +152,20 @@ Written by the poller and the email parser. **The app never writes these.**
 
 `pnl` is a generated column so the email-beats-computed rule is stated once, in
 the schema, rather than reimplemented in every client that reads a P&L.
+
+`size_oz` is in ounces because that is the unit **both** broker sources state:
+cTrader sends the poller a volume it divides by a hundred, and the alert email
+prints `Volume  Oz 4.00`. Lots are ounces over a hundred. It is the size the
+position was **opened** at, which is the quantity `computed_pnl` is calculated
+over — equal to the closed size on a full exit, and the honest number on a
+partial.
+
+**The poller writes it and the email does not.** The email boundary is five
+columns on purpose, and widening it would trade a stated property of that
+design — the secret in Google's infrastructure opens five columns, not the
+account — for coverage of trades the poller never reached. So a position it
+never saw carries no size, permanently, and anything reading sizes has to
+tolerate a null rather than assume one.
 
 `commission` is recorded and never displayed. The P&L this app stores is already
 net of it — `net_pnl` includes costs and swap, `computed_pnl` is derived from
@@ -252,6 +267,7 @@ be single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -1206,7 +1222,7 @@ which is what an existing database needs to pick up `security_invoker`:
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp
+         size_oz, open_day, setup, followed_rules, followed_sl, followed_tp
   from public.trades
   where deleted = false;
 
@@ -1240,6 +1256,22 @@ create index if not exists eugenia_notes_kind_id_desc
   on public.eugenia_notes (kind, id desc);
 drop index if exists eugenia_notes_id_desc;
 ```
+
+An existing `trades` needs its `size_oz` column, and Eugenia's view has to be
+replaced to expose it — the view statement in `003_eugenia.sql` is `or replace`
+precisely so it can be re-applied on its own:
+
+```sql
+alter table public.trades add column if not exists size_oz numeric;
+```
+
+Then re-run the `create or replace view public.eugenia_trades` statement from
+`003_eugenia.sql`. Adding a column to the end of a view's select list needs no
+drop; reordering or removing one would.
+
+The alter is the half that fails quietly. PostgREST drops a key the table does
+not have from a `merge-duplicates` payload instead of refusing the row, so a
+database that missed it keeps accepting fills and keeps storing no size.
 
 `verify.sql` answers whether it took.
 
