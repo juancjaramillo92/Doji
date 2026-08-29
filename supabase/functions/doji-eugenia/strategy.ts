@@ -23,13 +23,13 @@
 // nothing — a rule pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.4";
+export const VERSION = "v1.5";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.4. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.5. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -67,7 +67,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.4 · **Effective from** [decide] · **Supersedes** v1.3
+**Version** v1.5 · **Effective from** [decide] · **Supersedes** v1.4
 
 ### Summary
 
@@ -158,6 +158,35 @@ the account tier and therefore the dollar risk of any past trade are recoverable
 from the trade itself, and a second column stating the percentage could disagree
 with the ladder that produced it.
 
+### The day ends at 4%, which is one full stop
+
+The daily limit and the per-trade risk are the same number seen twice. 4% of
+account is what a full stop costs, so R-03 ending the day after a full stop and a
+4% daily cap are one rule, not two — which is why there is no second limit
+written beside it.
+
+It does mean losses that are not full stops still count toward it. Three exits
+cut by hand at a third of a stop each have spent the day exactly as one full stop
+would, and R-03's predicate does not see that, because the row it looks for is a
+loss closing at its planned stop. The limit is the 4%; the full stop is the usual
+shape of reaching it.
+
+### Nothing else caps a loss, and that is deliberate
+
+**No weekly maximum. No monthly maximum.** The day is the only window with a
+limit, and a run of bad days is not stopped by anything written here.
+
+### One position, always
+
+One trade at a time. He does not scale in, does not add, and does not hold two
+positions at once — so the $20 stop is the whole exposure rather than a per-leg
+figure, and 4% is the most that can be at risk at any moment.
+
+### Nothing changes size but the ladder
+
+No setup is sized up, no session is sized down. The rung is the only input, and
+it moves only as above.
+
 ### Moving up a rung is discretionary, and it is a deposit rather than a threshold
 
 **He changes it by hand, when he feels like it.** That is the rule, and it is
@@ -185,6 +214,61 @@ new rung is 4% of the new account, not a larger share of the old one.
 only, and nothing here says what happens to the rung after a bad stretch —
 whether it is reduced, and on what. That gap is the half of a sizing rule that
 matters when it matters most.`,
+
+  "6": `## 6 · Lifecycle
+
+### Before the trade
+
+R-08 requires a pre-trade sequence run in order, with a failed step ending it
+rather than being weighed against the others. **The steps themselves are not
+recorded here.** They exist — he runs them — but they have never been written
+into this document, so nothing can state them and nothing can check them.
+
+R-09 restricts him to obvious trends and cycles, and what makes a trend obvious
+is read from **price action**. That is a judgment rather than a condition, which
+is why R-09 is marked \`judgment\` and asks him rather than checking anything.
+
+### Entry
+
+A signal is price reaching a level and rejecting, and it is not an entry.
+Confirmation is required and is either a candle closing in the intended
+direction, or the reaction around the level resolving clearly enough to enter
+before a close. Entering on the signal with neither is the violation R-07 names.
+
+**Entry is at market.** There is no resting limit back into the level, so the
+fill is where price was when he decided rather than a price he chose in advance —
+which is part of why slippage is treated as his in §0 rather than allowed for.
+
+### While it is on
+
+The stop moves to break-even once price has travelled $20 toward the target. The
+target may be shortened from $30 to $25 where the level looks hard to reach or is
+showing reversal. Beyond those two, nothing is done to a position: no partial
+exits, no adding, no widening.
+
+**Re-entry after a stop-out is allowed, in one shape.** Where a liquidity sweep
+takes the stop and price comes rapidly back to the level he was trading, he may
+enter again. It is the same idea, not a new one, and it is the only case in which
+a level that has already stopped him out is tradeable again the same session.
+
+### Exit
+
+**Price-based, never time-based.** A trade ends at its target, at its stop, or at
+break-even once R-04 has moved the stop there. Nothing closes a position for
+having taken too long, and a trade going nowhere is left alone rather than cut —
+§0's *held for the move they were opened for* is what that phrase has always
+meant.
+
+### Recording
+
+**He journals at entry**, which is what makes \`planned_stop\` and \`planned_target\`
+worth anything: they are written before the stop moves, so they record the plan
+rather than a memory of it. A journal filled in at the end of the day would
+capture the same two prices as whatever the trade ended up doing, and every
+question they exist to answer would quietly become circular.
+
+The three discipline answers ask whether the stop and target were *respected*,
+not whether they were moved. \`null\` is unanswered and is not "no".`,
 
   "7": `## 7 · The rules, enumerated
 
@@ -553,6 +637,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.5 | [decide] | §5 and §6 written. Risk per trade is 4% and is deliberate; the rung moves by hand; 4% is also the daily limit, and there is no weekly or monthly one. One position at a time, nothing else changes size. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep that snaps back to the level. R-08's sequence is recorded as existing but not written down. | His answers |
 | v1.4 | [decide] | \`planned_stop\` and \`planned_target\` are recorded at journalling time. R-03 moves from \`field\` to \`journal\` — it was the full-stop population that was missing, not the predicate — and is \`unknown\` rather than \`pass\` on rows with no plan. §8 and §12 restated: intent is on the row, and planned R:R is recoverable where a plan exists. | Schema change |
 | v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach or is showing reversal. R-01 gains its lower bound and becomes two-sided — the §7 [decide] on early exits is answered. The R:R floor is restated as 1:1.25, being the shortest allowed target over the widest allowed stop. | His decision |
 | v1.2 | [decide] | Tolerance settled at none: the stop is at most $20, so a loss further out is a stop that moved, and R-01/R-02 compare flat. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror — a gap through the target enlarges the distance without anything having moved. | His decision |
