@@ -126,6 +126,30 @@ from (values
        and indexdef ilike '%where (superseded_by IS NULL)%'),
    '1'),
 
+  -- Without these she still answers, and answers as though the archive were
+  -- empty: searchMemory catches the 404 and reports that memory could not be
+  -- searched, which is indistinguishable from a database that is merely down.
+  ('eugenia_search exists',
+   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'eugenia_search'),
+   '1'),
+  ('eugenia_search is not executable by PUBLIC',
+   (select has_function_privilege('public', 'public.eugenia_search(text, int)', 'EXECUTE')::text),
+   'false'),
+  ('both search columns exist',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and column_name = 'search'
+       and table_name in ('eugenia_notes', 'eugenia_turns')),
+   '2'),
+
+  -- A tsvector match without a GIN index is a sequential scan over the whole
+  -- archive, which is correct and gets slower every week.
+  ('both search indexes exist',
+   (select count(*)::text from pg_indexes
+     where schemaname = 'public'
+       and indexname in ('eugenia_notes_search', 'eugenia_turns_search')),
+   '2'),
+
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
   -- her read of the journal a write path.
   ('eugenia_trades is select-only, service_role only',

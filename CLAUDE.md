@@ -238,17 +238,36 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
-- **Three schedules, one hourly job, and `dueNow` picks between them.**
-  `briefDue`, `pulseDue` and `retryDue` all read `nyClock`, because pg_cron is
-  UTC and a fixed expression is wrong for half the year. They overlap, so each
-  answering correctly on its own settles nothing: the composition is the
-  decision, and a test walks every hour of a week through `dueNow` because one
-  call cannot owe two answers.
+- **Four schedules, one hourly job, and `dueNow` picks between them.**
+  `briefDue`, `pulseDue`, `retryDue` and `consolidateDue` all read `nyClock`,
+  because pg_cron is UTC and a fixed expression is wrong for half the year. They
+  overlap, so each answering correctly on its own settles nothing: the
+  composition is the decision, and a test walks every hour of a week through
+  `dueNow` because one call cannot owe two answers. Adding an hour costs nothing
+  in cron — the job is `0 * * * *` and always was — which is exactly why a new
+  schedule can be answered correctly and dispatched by nobody. `agree.test.mjs`
+  reads `postScheduled` for a branch per answer.
 - **The pulse's default is silence, and `isSilent` is how it is said.** It
   matches the bare word only, so a sentence merely opening with it is sent. Err
   toward sending: a swallowed message is invisible, an extra one is extra.
   Nothing is stored on a quiet pulse — twelve turns is the whole window and
   empty pairs would push the briefing out of it.
+- **The nightly pass writes memory and sends nothing.** 22:00 New York, every
+  day. Notes written mid-conversation are decided at the worst possible moment —
+  while she is busy answering — and this is the only point at which she sees a
+  whole day at once. The window is a fixed twenty-four hours and there is no
+  watermark, because the window and the gap between runs are the same length; a
+  missed night loses that day's distillation and never the day, since the turns
+  stay in the table and stay searchable. That is what makes a lossy pass safe to
+  run unattended. It is `high` effort, and that is not a latency decision — a
+  careless note outlives a careless briefing by months.
+
+- **Superseding is what makes the pass safe, not a convenience.** A consolidator
+  that can only add is a noise generator: it cannot fix what it got wrong last
+  night, and five mediocre notes push five good ones out of a twenty-note
+  window. The prompt pulls toward writing almost nothing and toward retiring
+  rather than adding.
+
 - **What is stored is the raw turn, never the augmented one.** Notes and the
   week's trades are rebuilt every turn; storing them would resend a stale copy
   as history for the next six briefings.

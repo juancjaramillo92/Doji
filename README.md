@@ -744,11 +744,37 @@ shapes and different constraints. Merged, they would need a `kind` column, a
 nullable `role`, two constraints that each say "unless this is the other kind"
 and two partial indexes — more parts to hold one idea, not fewer.
 
+**She tidies her own memory at 22:00, every day.** Notes written mid-conversation
+are decided while she is busy answering, which is the worst moment to judge what
+will matter in November. The nightly pass is the only point at which she sees a
+whole day at once: it reads the last twenty-four hours of turns against the notes
+she is holding, writes what changed and will stay changed, and retires what is no
+longer true.
+
+**Its default is almost nothing.** Most days deserve no note — a conversation
+about today's data leaves nothing durable, and that is the normal outcome. The
+prompt pulls toward superseding rather than adding, because the visible window is
+twenty and five mediocre notes push five good ones out of it.
+
+Nothing is sent and no turn is stored: her reply is a line for the log, and
+storing it would spend two of tomorrow's twelve turns on bookkeeping she wrote to
+herself. `?consolidate=1` runs it on demand and is the only way to see what it
+does.
+
+**A fixed twenty-four hours and no watermark anywhere**, because the window and
+the gap between runs are the same length. A missed night loses that day's
+distillation and never the day — the turns stay in the table and stay searchable,
+which is what makes a lossy pass safe to run unattended.
+
 **The schedule is decided in the function, not in cron.** pg_cron schedules in
 UTC, so any fixed expression is an hour wrong for half the year and needs
 editing twice a year forever. The job runs hourly and the function asks
 America/New_York for its own clock — `briefDue()` for the briefing, `pulseDue()`
-for the pulse — and most of those calls find nothing due and spend nothing. It
+for the pulse, `consolidateDue()` for the nightly pass — and most of those calls
+find nothing due and spend nothing. Adding the fourth schedule needed no cron
+change at all, the job having always been `0 * * * *`, which is also how a
+schedule could be answered correctly and dispatched by nobody: `agree.test.mjs`
+reads `postScheduled` for a branch per answer `dueNow` can give. It
 is the same trade `marketOpen()` makes for the poller. A test walks every hour
 of a week and asserts the two never both fire, because one call cannot owe two
 answers.
@@ -872,6 +898,25 @@ The row itself never goes. It keeps what she used to believe and names what
 changed it, which is exactly what a search over this table will need later:
 findable, and marked as no longer true. There is still no delete path, so the
 only things she can do to that table are add a sentence and retire one.
+
+**She can search everything she has ever said.** The twelve turns and twenty
+notes she is handed are the newest slice of two append-only tables; everything
+older was still there and simply never selected. `search_memory` reaches it —
+one RPC, `eugenia_search`, ranking notes and turns together with Postgres full
+text so a question like *"what did we conclude about the December cut"* is
+answerable from March.
+
+**Searched, not loaded, and that is the design rather than a limitation.**
+Widening the windows would put the archive in her context, where every token is
+paid on every request and competes with the briefing for attention. The windows
+stay small and what is outside them is addressable on demand — the same trade
+`get_trades` makes for the journal.
+
+`websearch_to_tsquery` rather than `to_tsquery`, because the query is written by
+a model: the strict parser throws on an unbalanced quote, and a throw inside the
+tool loop costs the whole answer. **A retired note is returned and marked, never
+hidden** — that is the promise `superseded_by` makes, and *what did I used to
+think* is worth being able to answer.
 
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
@@ -1311,6 +1356,32 @@ create index if not exists eugenia_notes_kind_id_desc
   on public.eugenia_notes (kind, id desc);
 drop index if exists eugenia_notes_id_desc;
 ```
+
+Search is added to both of Eugenia's tables, and the whole block is idempotent —
+`add column if not exists`, `create index if not exists`, `create or replace
+function` — so it can be re-applied without a drop:
+
+```sql
+alter table public.eugenia_notes
+  add column if not exists search tsvector
+  generated always as (to_tsvector('english', note)) stored;
+
+alter table public.eugenia_turns
+  add column if not exists search tsvector
+  generated always as (to_tsvector('english', content)) stored;
+
+create index if not exists eugenia_notes_search on public.eugenia_notes using gin (search);
+create index if not exists eugenia_turns_search on public.eugenia_turns using gin (search);
+```
+
+…then the `create or replace function public.eugenia_search` statement from
+`003_eugenia.sql`, **including the `revoke` and `grant` under it** — EXECUTE is
+granted to PUBLIC by default and `anon` inherits it, so skipping those two lines
+leaves a public entry point to her memory with only RLS behind it.
+
+The generated columns backfill on the `alter`, so the whole archive is
+searchable the moment it runs — this is the one change today that works on
+history rather than only going forward.
 
 An existing `eugenia_notes` needs its `superseded_by` column, and the index has
 to be replaced with the partial one the read now matches:

@@ -580,6 +580,107 @@ test('the documents name only symbols the repository has', () => {
    disagreed, forgot, or never read it.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── A schedule nothing dispatches ──────────────────────────────────────────
+   dueNow can answer 'consolidate' correctly every night for a year and the pass
+   never runs, because the branch that would call it is not there. The week-walk
+   in fold.test.mjs proves the ANSWER; nothing there proves anyone acts on it,
+   and the failure is a nightly no-op that returns 200 and looks healthy in
+   net._http_response.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every answer dueNow can give is dispatched by postScheduled', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // The literals in dueNow's return type, which is the one statement of what it
+  // can answer. 'weekday' and 'sunday' arrive as Brief and are handled together.
+  const sig = src.match(/export function dueNow\([^)]*\):\s*([^{]+)\{/);
+  assert.ok(sig, 'doji-eugenia no longer declares what dueNow returns');
+  const answers = [...sig[1].matchAll(/'(\w+)'/g)].map(m => m[1]);
+  assert.ok(answers.length, 'dueNow now returns no named answers — the reader has gone blind');
+
+  const at = src.indexOf('async function postScheduled(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  for (const a of answers) {
+    assert.match(body, new RegExp(`due === '${a}'`),
+      `dueNow can answer '${a}' and postScheduled never asks — that hour would ` +
+      `return 200 having done nothing at all`);
+  }
+});
+
+/* ─── Every tool sent is a tool served ───────────────────────────────────────
+   The tools array in call() and the branches in ask() are two lists of the same
+   names, and they fail in opposite directions. A tool sent but not served makes
+   the loop throw `tool_use with no tool this function serves` — loud, but only
+   once the model happens to call it, which for a search tool may be days. A tool
+   served but not sent is dead code the model can never reach.
+
+   web_search is the deliberate exception and is excluded by shape rather than by
+   name: it carries a `type` and runs on Anthropic's side, so it never arrives in
+   the loop at all.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the tools she is offered are exactly the tools the loop can run', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // Read from the DEFINITIONS rather than from a tools array, because there are
+  // two arrays now and a tool belonging to either still has to be executable.
+  const defined = [...src.matchAll(/^const ([A-Z_]+_TOOL) = \{/gm)].map(m => m[1]).sort();
+  assert.ok(defined.length >= 3,
+    `only ${defined.length} tools read out of the file — the reader has gone blind`);
+
+  const served = [...src.matchAll(/b\.name === ([A-Z_]+_TOOL)\.name/g)].map(m => m[1]).sort();
+  assert.deepEqual(served, defined,
+    'a tool is defined that the loop cannot execute, or the reverse — the first ' +
+    'throws only once she happens to call it, the second is unreachable');
+
+  /* AND EVERY TOOL SET IS DRAWN FROM THAT SAME LIST. A name appearing in a set
+     but nowhere as a definition is a tool the model is offered and the loop has
+     never heard of. */
+  for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS']) {
+    const block = src.match(new RegExp(`const ${set} = \\[([\\s\\S]*?)\\];`));
+    assert.ok(block, `doji-eugenia no longer defines ${set}`);
+    const named = [...block[1].matchAll(/([A-Z_]+_TOOL)/g)].map(m => m[1]);
+    assert.ok(named.length, `${set} offers no tool this file defines`);
+    for (const t of named) {
+      assert.ok(defined.includes(t), `${set} offers ${t}, which is not defined anywhere`);
+    }
+  }
+});
+
+test('the search tool names the function the database actually defines', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // The RPC path is a string in one file and a function name in another, and a
+  // rename in either is a 404 that searchMemory catches and reports as "could
+  // not be searched" — indistinguishable from the database being down.
+  const rpc = src.match(/rest\/v1\/rpc\/(\w+)/);
+  assert.ok(rpc, 'doji-eugenia no longer calls an RPC at all');
+  assert.match(EUGENIA_SQL,
+    new RegExp(`create or replace function public\\.${rpc[1]}\\(`),
+    `doji-eugenia calls ${rpc[1]}() but 003_eugenia.sql does not define it`);
+
+  // Both search columns have to exist or the function body references nothing.
+  for (const table of ['eugenia_notes', 'eugenia_turns']) {
+    assert.match(EUGENIA_SQL,
+      new RegExp(`alter table public\\.${table}[\\s\\S]{0,120}add column if not exists search tsvector`),
+      `${table} has no generated search column, so eugenia_search cannot match against it`);
+  }
+});
+
+test('the search function is not reachable by a public key', () => {
+  // EXECUTE on a function is granted to PUBLIC by default, and anon inherits it.
+  // Left alone that is a public entry point to her whole memory.
+  assert.match(EUGENIA_SQL, /revoke execute on function public\.eugenia_search\(text, int\) from public/,
+    'eugenia_search is still executable by PUBLIC');
+  assert.match(EUGENIA_SQL, /grant execute on function public\.eugenia_search\(text, int\) to service_role/,
+    'eugenia_search is not granted to the one role that should call it');
+});
+
 /* ─── Retirement, and the filter that is the whole of it ─────────────────────
    A superseded note is still in the table by design — the trail is the point.
    What keeps it out of her context is one clause in one query, and losing that

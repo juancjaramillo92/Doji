@@ -31,7 +31,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE } from "./prompt.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the
 // reason that file gives.
 import {
@@ -90,6 +90,24 @@ export function retryDue(now: Date): boolean {
   return wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11;
 }
 
+/* SLEEP, ROUGHLY. Twenty-two hundred New York, every day including the weekend —
+   a Saturday conversation is worth keeping as much as a Tuesday one.
+
+   Clear of every other hour by construction: the briefing is 08:00 and Sunday
+   17:00, the retries are 09:00 to 11:00, the pulse is 10:00. The week-walk test
+   is what actually holds that, since an hour added to any of them could collide
+   here and nothing else would notice.
+
+   Late enough that the trading day and any evening conversation are done, which
+   is what makes a fixed 24-hour window the right read: nothing needs a watermark
+   because the window and the period between runs are the same length. A missed
+   night loses the DISTILLATION of that day, never the day — the turns stay in
+   the table and stay searchable, which is exactly why consolidation is allowed
+   to be lossy. */
+export function consolidateDue(now: Date): boolean {
+  return nyClock(now).hour === 22;
+}
+
 /* WHAT THIS HOUR OWES — one answer, because one call cannot owe two.
 
    The three schedules above overlap, so the decision between them is a fourth
@@ -101,11 +119,12 @@ export function retryDue(now: Date): boolean {
    second look at a morning he was never told about is not. `briefed` is the
    fact the caller reads from the database, and only the retry hours turn on
    it. */
-export function dueNow(now: Date, briefed: boolean): Brief | 'pulse' | null {
+export function dueNow(now: Date, briefed: boolean): Brief | 'pulse' | 'consolidate' | null {
   const brief = briefDue(now);
   if (brief) return brief;
   if (retryDue(now) && !briefed) return 'weekday';
-  return pulseDue(now) ? 'pulse' : null;
+  if (pulseDue(now)) return 'pulse';
+  return consolidateDue(now) ? 'consolidate' : null;
 }
 
 // Buenos días before the week, buenas tardes for the Sunday open — which is
@@ -235,6 +254,78 @@ const NOTES_TOOL = {
     additionalProperties: false,
   },
 } as const;
+
+/* ─── Reaching what the windows do not ─────────────────────────────────────
+   Twelve turns and twenty notes are what she is HANDED. Everything older is
+   still in the tables and simply never selected, so the archive is complete and
+   unreachable at the same time. This is the reach.
+
+   Deliberately not a wider window. Every token handed over is paid on every
+   request and competes with the briefing for attention; a search is paid only
+   when a question needs one, which is the same trade get_trades makes for the
+   journal.
+   ───────────────────────────────────────────────────────────────────────── */
+const SEARCH_TOOL = {
+  name: "search_memory",
+  description:
+    "Search everything you have ever said to him and every note you have kept — " +
+    "far past the recent turns and notes you are handed each message. Use it when " +
+    "he refers to something you discussed before that is not in front of you, when " +
+    "you need to know whether you have already explained something, or when he asks " +
+    "what you said or what he told you. Matches words, so search the terms that " +
+    "would appear in the text rather than a description of it. Results say whether " +
+    "each was a note or a turn, when it was, and whether a note has since been " +
+    "retired — a retired one is what you used to believe and is no longer true.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "The words to look for, as you would type them into a search box." },
+    },
+    required: ["query"],
+    additionalProperties: false,
+  },
+} as const;
+
+// Twelve hits and 300 characters each is roughly one briefing's worth of text —
+// enough to answer from, and bounded, because a turn can be a whole briefing and
+// an unbounded search result would push the conversation out of its own context.
+const SEARCH_HITS = 12;
+const SEARCH_CHARS = 300;
+
+type Hit = { source: string; id: number; at: string; retired: boolean; body: string };
+
+/* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
+   loop, and an exception here costs the answer she is in the middle of writing.
+   A search that fails comes back as a sentence she can carry on from. */
+async function searchMemory(query: unknown): Promise<string> {
+  const q = String(query ?? "").trim();
+  if (!q) return "Nothing to search for.";
+
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/eugenia_search`, {
+      method: "POST", headers: sbHeaders(),
+      body: JSON.stringify({ q, lim: SEARCH_HITS }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const hits: Hit[] = await res.json();
+
+    // An empty result is an ANSWER, and saying so plainly is what stops her
+    // reporting that she never discussed something when the search simply broke.
+    if (!hits.length) return `Nothing in your memory matches "${q}".`;
+
+    return hits.map(h => {
+      const when = shortDay(new Date(h.at));
+      const tag  = h.source === 'note'
+        ? `note ${h.id}${h.retired ? ', RETIRED — you no longer believe this' : ''}`
+        : `you said`;
+      const body = h.body.length > SEARCH_CHARS ? h.body.slice(0, SEARCH_CHARS) + '…' : h.body;
+      return `[${when}, ${tag}] ${body}`;
+    }).join("\n");
+  } catch (err) {
+    console.error("doji-eugenia: search failed —", err instanceof Error ? err.message : err);
+    return "Your memory could not be searched just now. Say you cannot check rather than answering as though you had.";
+  }
+}
 
 // Twenty of each is a season of observations at the few-a-week the prompt asks
 // for, and more standing instructions than he is ever likely to give — they are
@@ -410,7 +501,25 @@ type Effort = 'medium' | 'high';
    it. Nothing is lost: tradesQuery clamps `days` and writeNote coerces `note`,
    because both were already written as boundaries rather than trusting the
    model. */
-async function call(messages: any[], effort: Effort, container?: string) {
+/* TWO TOOL SETS, because the two jobs are not the same conversation.
+
+   Consolidation is handed the day and the notes and asked what is worth
+   keeping; it has no question to research and nothing to look up in the
+   journal. Sending it the full set would let a nightly bookkeeping pass run a
+   dozen web searches, which is money for nothing and a slower job that can fail
+   in more ways.
+
+   Both are served by the same loop below — a tool set is a list of what may be
+   offered, never of what can be executed. */
+const CHAT_TOOLS = [
+  { type: "web_search_20260209", name: "web_search", max_uses: 12 },
+  TRADES_TOOL,
+  NOTES_TOOL,
+  SEARCH_TOOL,
+];
+const CONSOLIDATE_TOOLS = [NOTES_TOOL];
+
+async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -431,13 +540,9 @@ async function call(messages: any[], effort: Effort, container?: string) {
       // Cached: the system prompt is long, fixed, and sent on every turn.
       system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages,
-      // web_search runs on Anthropic's side and needs no loop here; get_trades
-      // is ours and is executed below.
-      tools: [
-        { type: "web_search_20260209", name: "web_search", max_uses: 12 },
-        TRADES_TOOL,
-        NOTES_TOOL,
-      ],
+      // web_search runs on Anthropic's side and needs no loop here; the rest
+      // are ours and are executed below.
+      tools,
       thinking: { type: "adaptive" },
       output_config: { effort },
       // A DECLINE COSTS THE WHOLE BRIEFING OTHERWISE. The cron half now retries
@@ -462,7 +567,7 @@ async function call(messages: any[], effort: Effort, container?: string) {
 // a working limit.
 const MAX_ROUNDS = 6;
 
-async function ask(messages: Turn[], effort: Effort): Promise<string> {
+async function ask(messages: Turn[], effort: Effort, tools: unknown[] = CHAT_TOOLS): Promise<string> {
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -470,7 +575,7 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
   let container: string | undefined;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const body = await call(convo, effort, container);
+    const body = await call(convo, effort, tools, container);
     container = body.container?.id ?? container;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
@@ -487,13 +592,16 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
       const results = [];
       for (const b of body.content ?? []) {
         if (b.type !== "tool_use") continue;
-        // Only the two this function serves. web_search runs on Anthropic's
+        // Only the three this function serves. web_search runs on Anthropic's
         // side and never arrives here; anything else is a name we did not send.
         if (b.name === TRADES_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id, content: await readTrades(b.input?.days) });
         } else if (b.name === NOTES_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id,
             content: await writeNote(b.input?.note, b.input?.kind, b.input?.supersedes) });
+        } else if (b.name === SEARCH_TOOL.name) {
+          results.push({ type: "tool_result", tool_use_id: b.id,
+            content: await searchMemory(b.input?.query) });
         }
       }
       if (!results.length) throw new Error("tool_use with no tool this function serves");
@@ -694,14 +802,17 @@ async function tradesBlock(): Promise<string> {
 // the whole difference between this caller and Telegram's.
 //
 // One hourly job, three answers: a briefing hour, a pulse hour, or neither.
-// ?force=1 runs a briefing now and ?pulse=1 a pulse, whatever the clock says —
-// the same flag doji-mcp-sync carries, for the same two jobs: a manual re-run
-// after a failure, and a way to exercise the path without waiting for 08:00.
+// ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the nightly
+// pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
+// same two jobs: a manual re-run after a failure, and a way to exercise the path
+// without waiting for the hour. ?consolidate=1 is also the only way to SEE what
+// the nightly pass does, since it sends nothing and stores no turn.
 // The answer comes back in the response as well as in Telegram, which is what
 // makes a failure readable.
 async function postScheduled(url: URL): Promise<Response> {
   try {
     if (url.searchParams.get("pulse") === "1") return await postPulse();
+    if (url.searchParams.get("consolidate") === "1") return await postConsolidation();
 
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
@@ -713,6 +824,7 @@ async function postScheduled(url: URL): Promise<Response> {
     // the read is thirty rows.
     const due = dueNow(now, await briefedToday());
     if (due === 'pulse') return await postPulse();
+    if (due === 'consolidate') return await postConsolidation();
     if (due) return await postBriefing(due);
 
     return json({ ok: true, skipped: "nothing due this hour" });
@@ -822,6 +934,51 @@ export const isSilent = (text: string) => /^nothing[.!\s]*$/i.test(text.trim());
    Nothing is stored when she stays quiet. Twelve turns is the whole window, and
    a week of "NOTHING" pairs would push the morning's briefing out of it — the
    one thing a follow-up question actually needs. */
+/* ─── The nightly pass ─────────────────────────────────────────────────────
+   Twelve turns roll over in a morning. Without this, everything a conversation
+   established is reachable only by search and only if someone thinks to look —
+   so what she KNOWS never grows, however much she has been told.
+
+   A FIXED TWENTY-FOUR HOURS, and no watermark anywhere. The window and the gap
+   between runs are the same length, so a run reads exactly the day that has not
+   been read. A missed night loses that day's distillation and never the day
+   itself: the turns stay in the table and stay searchable, which is precisely
+   what makes a lossy pass safe to run unattended.
+
+   NOTHING IS SENT AND NOTHING IS STORED AS A TURN. Her reply here is a line for
+   the log, not a message — and storing it would spend two of the twelve turns
+   she opens tomorrow on bookkeeping she wrote to herself.
+   ───────────────────────────────────────────────────────────────────────── */
+const CONSOLIDATE_HOURS = 24;
+
+async function turnsSince(hours: number): Promise<Turn[]> {
+  const from = new Date(Date.now() - hours * 3600_000).toISOString();
+  const res = await fetch(
+    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at` +
+    `&created_at=gte.${from}&order=id.asc`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Day read failed (HTTP ${res.status})`);
+  return dateTurns(await res.json());
+}
+
+async function postConsolidation(): Promise<Response> {
+  const day = await turnsSince(CONSOLIDATE_HOURS);
+  // A day nobody spoke on has nothing to distil, and a call that says so costs
+  // a model round to be told what an empty array already said.
+  if (!day.length) return json({ ok: true, skipped: "nothing said" });
+
+  const asked = CONSOLIDATE + await notesBlock() +
+    `\n\nThe day, oldest first:\n\n` +
+    day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
+
+  // `high`, and it is the one place that is not a latency decision: this writes
+  // the memory every later briefing reasons from, and a careless note outlives
+  // a careless briefing by months.
+  const said = await ask([{ role: 'user', content: asked }], 'high', CONSOLIDATE_TOOLS);
+  console.log("doji-eugenia: consolidated —", said.slice(0, 200));
+  return json({ ok: true, consolidated: day.length });
+}
+
 async function postPulse(): Promise<Response> {
   const asked = "Pulse, please — anything since the briefing?" + await notesBlock();
   const said = await ask([...await recent(), { role: 'user', content: asked }], 'medium');
