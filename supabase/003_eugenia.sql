@@ -68,12 +68,23 @@ alter table public.eugenia_turns enable row level security;
 --
 -- OR REPLACE so the view statement can be re-applied on its own — which is what
 -- an existing database needs, since the CREATE TABLE above stops the file
--- running twice. Adding a column is fine; removing or reordering one needs a
--- drop, which is why the column list is written out rather than `select *`.
+-- running twice. That is why the column list is written out rather than
+-- `select *`.
+--
+-- A NEW COLUMN GOES ON THE END, AND NOTHING ELSE MOVES. `create or replace view`
+-- may only append: it matches the existing view position by position, so a name
+-- inserted mid-list reads as renaming the column that used to sit there and
+-- Postgres refuses with `cannot change name of view column`. `size_oz` is last
+-- for that reason and not because the order is meaningful — putting it beside
+-- the other broker columns, where it belongs by sense, is exactly the tidy that
+-- breaks re-application on every database that already has this view.
+--
+-- Removing or reordering needs a `drop view` first, which also drops the grants
+-- below it. Appending never does.
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         size_oz, open_day, setup, followed_rules, followed_sl, followed_tp
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz
   from public.trades
   where deleted = false;
 
