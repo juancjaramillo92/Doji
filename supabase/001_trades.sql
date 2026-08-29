@@ -39,6 +39,15 @@ create table public.trades (
   fill_time     timestamptz,
   entry_price   numeric,
   exit_price    numeric,
+  -- Position size in OUNCES, which is the unit both broker sources state it in:
+  -- cTrader sends a volume the poller divides by 100, and the alert email prints
+  -- it as `Volume  Oz 4.00`. Stored rather than folded away because it is the
+  -- only route to account size — lots are oz / 100 — and because it is what
+  -- makes a row reproduce its own P&L: gross is the price move times this.
+  --
+  -- Written by the poller alone. The email boundary stays at its five columns,
+  -- so a position the poller never reached carries no size and never will.
+  size_oz       numeric,
   -- Recorded and never displayed. The P&L stored here is already net of it, so
   -- subtracting it anywhere would double-count. Captured because the value
   -- exists only at sync time — a panel that wants it later gets history rather

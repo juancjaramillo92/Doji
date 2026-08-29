@@ -142,6 +142,7 @@ Written by the poller and the email parser. **The app never writes these.**
 | `entry_time` | true execution instant of the opening deal |
 | `fill_time` | closing instant, email only — the `open_day` fallback |
 | `entry_price`, `exit_price` | volume-weighted where the fill was scaled |
+| `size_oz` | position size in **ounces**, as opened — poller only |
 | `open_day` | the New York civil day the trade is filed under |
 | `commission` | dollars, positive magnitude, **never subtracted** |
 | `balance` | account balance after the fill — from the email, or from the poller on a close under ten minutes old |
@@ -151,6 +152,44 @@ Written by the poller and the email parser. **The app never writes these.**
 
 `pnl` is a generated column so the email-beats-computed rule is stated once, in
 the schema, rather than reimplemented in every client that reads a P&L.
+
+**`balance` and the account are different numbers, and the card shows both.**
+`balance` is the cash at the broker — the portion deployed. The account is the
+base the sizing ladder was applied to, which includes whatever is held off the
+broker ready to be moved across, and Doji never sees that directly.
+
+It is recoverable anyway, because the ladder is 0.02 lots per 1,000 continuous:
+
+    lots     = size_oz / 100
+    account  = size_oz * 500
+
+So a size is a readout of the capital it was sized against. The caption under
+Current Balance reads `0.04 lots — sizing for 2000`, and *sizing for* is doing
+real work in that sentence — it is what the ladder implies, not a figure anyone
+reported. It uses the **latest** size rather than an average, because rungs are
+stepped and a mean across a month describes no account that ever existed.
+
+Which makes the gap between the two worth reading: an implied account well above
+the balance is the reserve sitting off-broker. It is also the only thing that
+would show a size drifting off the ladder, since nothing else in the system
+knows what the ladder is.
+
+The notice wins the caption when there is no balance at all. It explains the
+dash directly above it, and a caption belongs to the figure it sits under.
+
+`size_oz` is in ounces because that is the unit **both** broker sources state:
+cTrader sends the poller a volume it divides by a hundred, and the alert email
+prints `Volume  Oz 4.00`. Lots are ounces over a hundred. It is the size the
+position was **opened** at, which is the quantity `computed_pnl` is calculated
+over — equal to the closed size on a full exit, and the honest number on a
+partial.
+
+**The poller writes it and the email does not.** The email boundary is five
+columns on purpose, and widening it would trade a stated property of that
+design — the secret in Google's infrastructure opens five columns, not the
+account — for coverage of trades the poller never reached. So a position it
+never saw carries no size, permanently, and anything reading sizes has to
+tolerate a null rather than assume one.
 
 `commission` is recorded and never displayed. The P&L this app stores is already
 net of it — `net_pnl` includes costs and swap, `computed_pnl` is derived from
@@ -252,6 +291,7 @@ be single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -729,6 +769,26 @@ The vocabulary rule is now "plain words first": *the gap between rates and
 inflation* before *real yields*, and the short name only once the long one has
 been said. The ideas stay exactly as sophisticated; only the words come down.
 
+**She teaches, and that is a rule about depth rather than length.** He is
+learning macro deliberately, so the paragraph on the day's one thing states its
+chain link by link — *hot inflation, so the Fed waits, so the gap between rates
+and inflation widens, so gold has stiffer competition* — because a cause named
+with no chain under it is something to memorise rather than understand. The
+character budget does not move to make room; the same words carry the why.
+
+Three rules keep that from turning into a lecture. A term explained this week is
+**used** the next time rather than redefined, since the second exposure is what
+turns vocabulary into something he thinks with. A simplification is signposted
+in a clause — *that is the clean version* — so he can tell a compressed story
+from a complete one. And what he has shown he understands is recorded as a note,
+because it is the only thing that says what **not** to explain; the five
+channels double as the map of which he reasons with unaided and which he has
+never once used himself.
+
+The single closing question is sometimes one he has to reason to answer rather
+than agree with. His answer is evidence about what he actually has, which no
+amount of explaining produces.
+
 **She remembers what she told you yesterday.** The briefing reads the last
 twelve turns, so it opens with how yesterday's print landed rather than from
 nothing. It did not until now — it wrote to `eugenia_turns` and never read back,
@@ -796,11 +856,22 @@ would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts the briefing, the pulse and a reply each read
 them.
 
-Append-only: superseding a note means writing a newer one, which is how a
-person's memory works — the recent account wins, and it is also what lets him
-change his mind about an instruction without anything having to be deleted. There is no update path and no
-delete path in the function, so the only thing she can do to that table is add a
-sentence to it.
+Append-only, and now with a way to retire a line rather than only bury it. Every
+note reaches her with a number in brackets, and `remember` takes an optional
+`supersedes` — so a new note that contradicts an old one names it, and the old
+one stops being read.
+
+**That filter is the whole feature and it fails silently.** Without
+`superseded_by is null` on the read she is handed the correction *and* the thing
+it corrected, every turn, with nothing marking which is current — no error, and
+a note count that looks perfectly healthy. `agree.test.mjs` reads the query for
+it, and checks the column, the filter and the tool parameter all exist together,
+since any one of the three missing leaves the other two doing nothing.
+
+The row itself never goes. It keeps what she used to believe and names what
+changed it, which is exactly what a search over this table will need later:
+findable, and marked as no longer true. There is still no delete path, so the
+only things she can do to that table are add a sentence and retire one.
 
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
@@ -1206,7 +1277,7 @@ which is what an existing database needs to pick up `security_invoker`:
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp
+         size_oz, open_day, setup, followed_rules, followed_sl, followed_tp
   from public.trades
   where deleted = false;
 
@@ -1240,6 +1311,37 @@ create index if not exists eugenia_notes_kind_id_desc
   on public.eugenia_notes (kind, id desc);
 drop index if exists eugenia_notes_id_desc;
 ```
+
+An existing `eugenia_notes` needs its `superseded_by` column, and the index has
+to be replaced with the partial one the read now matches:
+
+```sql
+alter table public.eugenia_notes
+  add column if not exists superseded_by bigint references public.eugenia_notes(id);
+
+drop index if exists eugenia_notes_kind_id_desc;
+create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc)
+  where superseded_by is null;
+```
+
+Without the column the read's `superseded_by=is.null` is a 400 on every turn,
+and `notesBlock()` swallows it — she loses her whole memory and says nothing.
+
+An existing `trades` needs its `size_oz` column, and Eugenia's view has to be
+replaced to expose it — the view statement in `003_eugenia.sql` is `or replace`
+precisely so it can be re-applied on its own:
+
+```sql
+alter table public.trades add column if not exists size_oz numeric;
+```
+
+Then re-run the `create or replace view public.eugenia_trades` statement from
+`003_eugenia.sql`. Adding a column to the end of a view's select list needs no
+drop; reordering or removing one would.
+
+The alter is the half that fails quietly. PostgREST drops a key the table does
+not have from a `merge-duplicates` payload instead of refusing the row, so a
+database that missed it keeps accepting fills and keeps storing no size.
 
 `verify.sql` answers whether it took.
 

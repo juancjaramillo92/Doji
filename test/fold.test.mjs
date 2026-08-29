@@ -154,6 +154,13 @@ test('a real trade folds to the numbers the broker emailed about the same trade'
   // The closing price, which the email calls the fill price.
   assert.equal(folded.exit_price, Number(said(/Fill price\s+([\d.]+)/, 'fill price')));
 
+  /* THE SIZE, AND IT IS THE REASON THE COLUMN IS IN OUNCES. cTrader sends the
+     poller a volume of 400 and it divides by 100; the email prints `Oz 4.00`
+     for the same position. Two systems, two units on the wire, one number — so
+     storing anything but ounces would mean converting away from what both of
+     them actually said. */
+  assert.equal(folded.size_oz, Number(said(/Volume\s+Oz\s+([\d.]+)/, 'volume')));
+
   /* And the settled figure. gross is (entry − exit) × oz for a short:
      (4485.77 − 4512.80) × 4 = −108.12, which is the email's Gross P&L; less the
      commission it is −108.40, which is the email's Net P&L. They agree to the
@@ -325,6 +332,12 @@ test('a partial close leaves the position open and its P&L unresolved', () => {
   ], USER);
   assert.equal(row.exit_price, null);
   assert.equal(row.computed_pnl, null);
+
+  /* AND THE SIZE IS WHAT WAS OPENED, NOT WHAT HAS CLOSED SO FAR. The two are
+     equal on every fully closed position, so the anchor above cannot tell them
+     apart — a fold reporting closeOz passes every other test in this file and
+     would report 1.00 oz for a 2.00 oz position that is half out. */
+  assert.equal(row.size_oz, 2);
 });
 
 test('scaled entries and exits are volume-weighted, not averaged', () => {

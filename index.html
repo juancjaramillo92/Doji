@@ -2064,6 +2064,30 @@ function pctSplit(nums) {
 // balance rows cannot answer the same question differently. Ordered on the true
 // execution instant where there is one, since every trade on a day ties on the
 // filing date alone.
+/* THE ACCOUNT THE SIZING IMPLIES, which is not the same claim as the balance
+   above it. The ladder is 0.02 lots per 1,000 continuous, so a size is a
+   readout of the capital it was sized against — including whatever is not at
+   the broker, which is the whole reason this is worth deriving. Balance is the
+   portion deployed; this is the base the ladder was applied to.
+
+   THE LATEST SIZE, NEVER AN AVERAGE. Rungs are stepped, so a mean across a
+   month of sizes describes no account that ever existed.
+
+   Derived, never stored: size_oz is the fact, and lots and this are two
+   readings of it. Null wherever no row carries a size — every row predating the
+   column, and anything the poller never reached. */
+function sizingAt(list) {
+  let oz = null, at = '';
+  for (const t of list) {
+    if (t.size_oz == null) continue;
+    const d = dayOf(t);
+    if (!d) continue;
+    const stamp = String(t.entry_time || t.fill_time || d);
+    if (stamp > at) { oz = t.size_oz; at = stamp; }
+  }
+  return oz;
+}
+
 function balanceAt(list, day) {
   let balance = null, at = '';
   for (const t of list) {
@@ -2631,8 +2655,17 @@ function renderPnLCard(rows) {
   }
 
   const balance = balanceAt(rows, null);
+  const oz      = sizingAt(rows);
   $('pnl-balance-number').textContent = balance == null ? '—' : balance.toFixed(2);
-  $('pnl-balance-at').textContent     = balance == null ? 'awaiting a synced fill' : '';
+  /* PRECEDENCE, AND IT IS NOT ARBITRARY. The awaiting notice explains the dash
+     directly above it; the sizing line is an unrelated fact that would leave
+     that dash unexplained. A caption belongs to the figure it sits under, so
+     the notice wins whenever there is one and the sizing fills the space it
+     leaves. Both absent is empty, which :empty already hides. */
+  $('pnl-balance-at').textContent =
+    balance == null ? 'awaiting a synced fill'
+    : oz == null    ? ''
+    : `${(oz / 100).toFixed(2)} lots — sizing for ${Math.round(oz * 500)}`;
   $('pnl-net-count').textContent      = m.n || '';
 
   setFigure('pnl-net-number',   m.n ? fmtMoney(m.net)   : '—', m.net);

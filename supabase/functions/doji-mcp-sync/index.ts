@@ -392,6 +392,11 @@ export function foldPosition(deals: Deal[], userId: string) {
     entry_time:   new Date(entry.executionTimestamp).toISOString(),
     entry_price:  Math.round(entryPrice * 100) / 100,
     exit_price:   exitPrice === null ? null : Math.round(exitPrice * 100) / 100,
+    // The size the position was OPENED at, which is the quantity computed_pnl
+    // above is calculated over — closeOz equals it on a closed position and is
+    // the wrong number on a partial. Two decimals because the broker states oz
+    // to two, and a scale-in weighted-averages to the same precision.
+    size_oz:      Math.round(openOz * 100) / 100,
     // Positive magnitude — the sign lives in the label, and this value is
     // recorded rather than ever subtracted: computed_pnl above already includes it.
     commission:   Math.abs(Math.round(commission * 100) / 100),

@@ -46,6 +46,22 @@ from (values
      where table_schema = 'public' and table_name = 'trades' and column_name = 'pnl'),
    'ALWAYS'),
 
+  -- The poller writes this and nothing else does, so a database that missed the
+  -- alter takes every size silently: PostgREST drops an unknown key from a
+  -- merge-duplicates payload rather than refusing the row, and the fills keep
+  -- landing without one.
+  ('trades has its size_oz column',
+   (select data_type from information_schema.columns
+     where table_schema = 'public' and table_name = 'trades' and column_name = 'size_oz'),
+   'numeric'),
+
+  -- And Eugenia reads the journal through the view, so the column existing on
+  -- the table is only half of it.
+  ('eugenia_trades exposes size_oz',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_trades' and column_name = 'size_oz'),
+   '1'),
+
   ('RLS on trades',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.trades')),
    'true'),
@@ -93,6 +109,22 @@ from (values
    (select data_type from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_notes' and column_name = 'kind'),
    'text'),
+
+  -- Without this the read's `superseded_by=is.null` filter is a 400 from
+  -- PostgREST on every turn, which notesBlock() swallows — so she loses her
+  -- whole memory and says nothing about it.
+  ('eugenia_notes has its superseded_by column',
+   (select data_type from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_notes'
+       and column_name = 'superseded_by'),
+   'bigint'),
+
+  -- And the index has to carry the same filter or the read stops using it.
+  ('the notes index is partial on live notes',
+   (select count(*)::text from pg_indexes
+     where schemaname = 'public' and indexname = 'eugenia_notes_kind_id_desc'
+       and indexdef ilike '%where (superseded_by IS NULL)%'),
+   '1'),
 
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
   -- her read of the journal a write path.

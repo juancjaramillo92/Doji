@@ -27,7 +27,7 @@ const EXPOSED = [
   'CONFIG', 'Data', 'Dates', 'IO', 'Journal', 'Login',
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'pctSplit', 'byKey', 'round2',
-  'render', 'renderTable', 'renderSetups', 'renderPeriods', 'rangeStats',
+  'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
   'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc'
 ];
 
@@ -167,6 +167,7 @@ export function trade(o = {}) {
     entry_price: 'entry_price' in o ? o.entry_price : 3400,
     exit_price: 'exit_price' in o ? o.exit_price : 3410,
     commission: 'commission' in o ? o.commission : 0.14,
+    size_oz: 'size_oz' in o ? o.size_oz : null,
     balance: 'balance' in o ? o.balance : 10000,
     open_day: 'open_day' in o ? o.open_day : '2026-07-30',
     net_pnl: 'net_pnl' in o ? o.net_pnl : null,

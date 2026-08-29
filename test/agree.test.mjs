@@ -67,6 +67,48 @@ function setupsInSchema() {
 const declaresColumn = (name) =>
   new RegExp(`^\\s*${name}\\s+(text|boolean)\\b`, 'mi').test(SCHEMA);
 
+/* ─── Eugenia's view, and the README's copy of it ────────────────────────────
+   The README quotes the whole `create or replace view` statement, because 003
+   starts with a CREATE TABLE and stops there on a database that already has the
+   tables — so re-applying the view means running that statement on its own, and
+   the README is where a person reads it from.
+
+   That makes the select list a fact in two files with nothing between them. A
+   column added to 003 and not to the README leaves the documented statement
+   building a view WITHOUT it, and running the documented one is the whole point
+   of quoting it: the reader would be handed a view missing the column they came
+   to add. Compared as a list rather than as text, so reformatting is free and
+   only the columns matter.
+   ───────────────────────────────────────────────────────────────────────── */
+const viewColumns = (text, where) => {
+  const stmt = text.match(
+    /create or replace view public\.eugenia_trades[\s\S]*?select([\s\S]*?)from public\.trades/i);
+  assert.ok(stmt, `${where} no longer states the eugenia_trades view`);
+  const cols = stmt[1].split(',').map(c => c.trim()).filter(Boolean);
+  // An emptied match would make the comparison below vacuous and green.
+  assert.ok(cols.length >= 8, `only ${cols.length} columns read out of ${where}`);
+  return cols;
+};
+
+test('the README builds the same eugenia_trades view that 003 does', () => {
+  const README = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.deepEqual(
+    viewColumns(README, 'README.md'),
+    viewColumns(EUGENIA_SQL, '003_eugenia.sql'),
+    'the README quotes a view with a different column list than 003_eugenia.sql creates — ' +
+    'following the README would build the wrong view');
+});
+
+test('the view exposes size_oz and still hides what it is meant to hide', () => {
+  const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
+  // Without this she can read every trade and never its size, so account tier
+  // and per-trade risk stay underivable however the prompt is written.
+  assert.ok(cols.includes('size_oz'), 'Eugenia cannot see position size');
+  for (const hidden of ['user_id', 'balance', 'commission']) {
+    assert.ok(!cols.includes(hidden), `${hidden} is exposed to Eugenia`);
+  }
+});
+
 /* ─── The setups vocabulary ──────────────────────────────────────────────── */
 
 test('the setups vocabulary is the same list in all three places', async () => {
@@ -537,6 +579,48 @@ test('the documents name only symbols the repository has', () => {
    an instruction he thinks she took. He would have no way to tell whether she
    disagreed, forgot, or never read it.
    ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── Retirement, and the filter that is the whole of it ─────────────────────
+   A superseded note is still in the table by design — the trail is the point.
+   What keeps it out of her context is one clause in one query, and losing that
+   clause fails in the worst available way: she is handed the correction AND the
+   thing it corrected, every turn, with nothing marking which is current. No
+   error, no log, and the note count merely looks healthy.
+
+   Three copies have to agree for the feature to exist at all: the column in the
+   schema, the filter in the read, and the parameter in the tool she calls. Any
+   one of them missing leaves the other two doing nothing.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the notes read asks for live notes only, and for the id that names one', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function readNotes(');
+  assert.ok(at > -1, 'doji-eugenia no longer has readNotes()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /superseded_by=is\.null/,
+    'readNotes no longer filters out retired notes — every correction she has ' +
+    'ever made comes back alongside the thing it corrected');
+  assert.match(body, /select=id,note/,
+    'readNotes no longer selects the id, so no note can be named in supersedes ' +
+    'and nothing can ever be retired');
+});
+
+test('the column, the filter and the tool parameter all exist together', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  assert.match(EUGENIA_SQL, /superseded_by\s+bigint\s+references\s+public\.eugenia_notes\(id\)/,
+    '003_eugenia.sql has no superseded_by column — the filter in the read would ' +
+    'match nothing and PostgREST would refuse it');
+  assert.match(src, /supersedes:\s*\{[\s\S]{0,80}type:\s*"integer"/,
+    'the remember tool no longer offers supersedes, so she cannot retire a note ' +
+    'however many she is shown');
+  // The index has to match the read or it stops being used for it.
+  assert.match(EUGENIA_SQL, /create index eugenia_notes_kind_id_desc[\s\S]*?where superseded_by is null/,
+    'the notes index no longer matches the read it exists for');
+});
 
 test('the briefing, the pulse and a reply all read his notes', () => {
   const src = readFileSync(
