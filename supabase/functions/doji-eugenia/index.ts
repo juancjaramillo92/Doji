@@ -424,11 +424,16 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   const k = (NOTE_KINDS as readonly string[]).includes(String(kind)) ? String(kind) : 'fact';
   const kept = text.slice(0, NOTE_MAX);
 
+  // Decided BEFORE the write, because it decides what the write asks for. Only a
+  // retirement needs the new row back, and asking for it every time left a body
+  // nobody read on the common path — an unconsumed response holds its connection
+  // open, and most notes supersede nothing.
+  const old = Math.trunc(Number(supersedes));
+  const retiring = Number.isFinite(old) && old > 0;
+
   try {
-    // return=representation, because retiring the old note means naming the new
-    // one and the id only exists once Postgres has minted it.
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
-      method: "POST", headers: sbHeaders("return=representation"),
+      method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
       body: JSON.stringify([{ note: kept, kind: k }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -437,8 +442,7 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
        point: a retirement that fails leaves two live notes, which is today's
        behaviour and is recoverable. Retiring first and failing to write would
        lose the correction and the thing it corrected in one go. */
-    const old = Math.trunc(Number(supersedes));
-    if (Number.isFinite(old) && old > 0) {
+    if (retiring) {
       const [row] = await res.json();
       const done = await fetch(
         `${SB_URL}/rest/v1/eugenia_notes?id=eq.${old}&superseded_by=is.null`, {
@@ -1003,11 +1007,18 @@ export const isSilent = (text: string) => /^nothing[.!\s]*$/i.test(text.trim());
    ───────────────────────────────────────────────────────────────────────── */
 const CONSOLIDATE_HOURS = 24;
 
+// Far more than a real day of conversation, and a bound rather than a working
+// limit — every other read in this file has one (400 trades, twelve turns,
+// twenty notes) and this was the only one that did not. A backfill, a loop, or
+// simply a very long day would otherwise put the whole window into a `high`
+// effort call with nothing to stop it.
+const CONSOLIDATE_TURNS = 200;
+
 async function turnsSince(hours: number): Promise<Turn[]> {
   const from = new Date(Date.now() - hours * 3600_000).toISOString();
   const res = await fetch(
     `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at` +
-    `&created_at=gte.${from}&order=id.asc`,
+    `&created_at=gte.${from}&order=id.asc&limit=${CONSOLIDATE_TURNS}`,
     { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Day read failed (HTTP ${res.status})`);
   return dateTurns(await res.json());
