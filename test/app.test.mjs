@@ -156,6 +156,48 @@ test('a save replaces the row it names, in both row sets', async () => {
    from the sign of the P&L — price distance is unsigned.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── The account the sizing implies ─────────────────────────────────────────
+   Balance is the portion at the broker. This is the base the ladder was applied
+   to, which includes what is held off it — so the two are different numbers and
+   the caption must not read as though it were restating the one above it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the latest size is read as lots and as the account the ladder implies', () => {
+  app.renderPnLCard(seed([
+    trade({ id: 'PID1', open_day: '2026-07-29', entry_time: '2026-07-29T14:00:00.000Z',
+            size_oz: 2, balance: 500 }),
+    trade({ id: 'PID2', open_day: '2026-07-30', entry_time: '2026-07-30T14:00:00.000Z',
+            size_oz: 4, balance: 500 })
+  ]));
+  // 4 oz is 0.04 lots, and 0.02 lots per 1,000 makes that a 2,000 account.
+  assert.equal($('pnl-balance-at').textContent, '0.04 lots — sizing for 2000');
+});
+
+test('the newest size wins outright — rungs are stepped, never averaged', () => {
+  app.renderPnLCard(seed([
+    trade({ id: 'PID1', open_day: '2026-07-29', entry_time: '2026-07-29T14:00:00.000Z',
+            size_oz: 10, balance: 500 }),
+    trade({ id: 'PID2', open_day: '2026-07-30', entry_time: '2026-07-30T14:00:00.000Z',
+            size_oz: 2, balance: 500 })
+  ]));
+  // A mean of 10 and 2 would read 0.06 lots and describe an account that has
+  // never existed.
+  assert.equal($('pnl-balance-at').textContent, '0.02 lots — sizing for 1000');
+});
+
+test('no row carries a size, so the caption says nothing rather than zero', () => {
+  app.renderPnLCard(seed([trade({ id: 'PID1', size_oz: null, balance: 500 })]));
+  // Every row predating the column is this case, and 0 lots would be a claim.
+  assert.equal($('pnl-balance-at').textContent, '');
+});
+
+test('the awaiting notice outranks the sizing line, because it owns the figure above', () => {
+  app.renderPnLCard(seed([trade({ id: 'PID1', size_oz: 4, balance: null })]));
+  // The poller writes size and the email writes balance, so this pair is a real
+  // state and not a contrived one. The dash above needs explaining first.
+  assert.equal($('pnl-balance-at').textContent, 'awaiting a synced fill');
+});
+
 test('a scratch is measured in price, and the band is ±$3 inclusive', () => {
   const px = (entry, exit, pnl) => app.resultOf(trade({ entry_price: entry, exit_price: exit, pnl }));
 

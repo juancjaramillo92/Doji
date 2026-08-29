@@ -153,6 +153,30 @@ Written by the poller and the email parser. **The app never writes these.**
 `pnl` is a generated column so the email-beats-computed rule is stated once, in
 the schema, rather than reimplemented in every client that reads a P&L.
 
+**`balance` and the account are different numbers, and the card shows both.**
+`balance` is the cash at the broker — the portion deployed. The account is the
+base the sizing ladder was applied to, which includes whatever is held off the
+broker ready to be moved across, and Doji never sees that directly.
+
+It is recoverable anyway, because the ladder is 0.02 lots per 1,000 continuous:
+
+    lots     = size_oz / 100
+    account  = size_oz * 500
+
+So a size is a readout of the capital it was sized against. The caption under
+Current Balance reads `0.04 lots — sizing for 2000`, and *sizing for* is doing
+real work in that sentence — it is what the ladder implies, not a figure anyone
+reported. It uses the **latest** size rather than an average, because rungs are
+stepped and a mean across a month describes no account that ever existed.
+
+Which makes the gap between the two worth reading: an implied account well above
+the balance is the reserve sitting off-broker. It is also the only thing that
+would show a size drifting off the ladder, since nothing else in the system
+knows what the ladder is.
+
+The notice wins the caption when there is no balance at all. It explains the
+dash directly above it, and a caption belongs to the figure it sits under.
+
 `size_oz` is in ounces because that is the unit **both** broker sources state:
 cTrader sends the poller a volume it divides by a hundred, and the alert email
 prints `Volume  Oz 4.00`. Lots are ounces over a hundred. It is the size the
