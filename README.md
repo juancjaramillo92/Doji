@@ -918,6 +918,38 @@ tool loop costs the whole answer. **A retired note is returned and marked, never
 hidden** — that is the promise `superseded_by` makes, and *what did I used to
 think* is worth being able to answer.
 
+**She holds his strategy and can never write it.** `strategy.ts` is the document
+he wrote — what he trades, the rules, how each one is checked. Its own retrieval
+contract decides what she carries: the summary and the rules table ride on the
+**cached** system prompt, so they are in front of her on every turn and paid for
+once; `get_strategy` fetches the reasoning behind any of it. Loading the whole
+document instead would be roughly ten thousand characters against every message,
+competing with the briefing for attention.
+
+**The asymmetry is the point.** A document that decides whether he followed his
+rules cannot be edited by the thing checking them — adherence to a moving target
+is not measurable, and her own analysis would start feeding the standard she
+measures against. She has no write path to it at all, in the same way she has
+none to `trades`.
+
+**The Evaluable column is what the table is for.** `journal` means a rule can be
+checked against a row today, `field` that a column would have to exist first,
+`judgment` that nothing stored can see it. A judgment rule is not a weaker rule —
+it is one whose compliance is invisible, so it never counts as kept merely
+because nothing contradicted it.
+
+Sections 1–6 and 9–11 are drafted separately and are not in the file yet. Rules
+cite them, and `get_strategy` says so plainly rather than returning nothing —
+a blank is something she would fill in herself, which is the one outcome worse
+than reporting it missing. A `[decide]` in the text is a value he has not
+settled, and she is told to say so rather than supply one.
+
+A TS module rather than a markdown file for the reason `prompt.ts` is one: a
+function deploys as its own directory, and an import is the one way to be certain
+a file travels with it. It is markdown inside a template literal, so **every
+backtick is escaped** — writing a new one plainly ends the string, which fails
+loudly at build rather than subtly at runtime.
+
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
 it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no

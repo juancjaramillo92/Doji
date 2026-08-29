@@ -210,6 +210,18 @@ code you write near it:
 
 ## Eugenia
 
+- **The strategy is a fourth memory and the only one she cannot write.**
+  `strategy.ts` holds it; its own retrieval contract splits it — the summary and
+  the rules table are appended to the CACHED system prompt, everything else is
+  `get_strategy`. Putting it in a message instead pays for it on every turn and
+  breaks the prefix each time the document is edited. It is markdown in a
+  template literal, so every backtick in it is escaped.
+
+  She has no write path to it, deliberately: a document that decides whether he
+  followed his rules cannot be edited by the thing checking them. Sections 1-6
+  and 9-11 are cited by rules and not written yet, and `readStrategy` answers for
+  them rather than returning nothing — a blank is a thing she fills in herself.
+
 - **She is not a writer to `trades` and must not become one.** She reads the web,
   reads the journal through the `eugenia_trades` view, and writes only
   `eugenia_turns` and `eugenia_notes`. The view is granted `select` alone and

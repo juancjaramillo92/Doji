@@ -32,6 +32,7 @@
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE } from "./prompt.ts";
+import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the
 // reason that file gives.
 import {
@@ -254,6 +255,48 @@ const NOTES_TOOL = {
     additionalProperties: false,
   },
 } as const;
+
+/* ─── What he has decided ──────────────────────────────────────────────────
+   The summary and the rules table ride on the cached system prompt and are in
+   front of her on every turn. This is the rest: the reasoning under a rule, how
+   a column is meant to be read, what a term means exactly.
+
+   SHE CANNOT WRITE IT, and that is the point rather than an omission. A document
+   that defines whether he followed his rules cannot also be edited by the thing
+   checking them — adherence to a moving target is not measurable, and her own
+   analysis would start feeding the standard she measures against.
+   ───────────────────────────────────────────────────────────────────────── */
+const STRATEGY_TOOL = {
+  name: "get_strategy",
+  description:
+    "The reasoning behind his trading rules. You already hold the summary and the " +
+    "rules table; this is the rest of the document — why a rule exists, how a " +
+    "journal column is meant to be read, what a term means precisely. Sections: " +
+    Object.keys(SECTIONS).map(k => `${k}`).join(", ") + ". " +
+    "Read the section a rule cites before explaining that rule, rather than " +
+    "reconstructing it from the one-line summary.",
+  input_schema: {
+    type: "object",
+    properties: {
+      section: { type: "string", description: "The section number, as the rules table cites it." },
+    },
+    required: ["section"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* Synchronous and cannot fail: it is a module constant, not a database read.
+   An unknown section is answered rather than refused — §7 cites sections that
+   are drafted and not yet written, and "that part does not exist yet" is a
+   better answer than silence, which she would fill in herself. */
+function readStrategy(section: unknown): string {
+  const key = String(section ?? "").trim().replace(/^§/, '');
+  const found = SECTIONS[key];
+  if (found) return found;
+  return `The strategy has no section ${key}. It holds ${Object.keys(SECTIONS).join(", ")} ` +
+         `at version ${VERSION}; the rest is drafted separately and is not written yet, ` +
+         `so say that rather than guessing what it would have said.`;
+}
 
 /* ─── Reaching what the windows do not ─────────────────────────────────────
    Twelve turns and twenty notes are what she is HANDED. Everything older is
@@ -516,6 +559,7 @@ const CHAT_TOOLS = [
   TRADES_TOOL,
   NOTES_TOOL,
   SEARCH_TOOL,
+  STRATEGY_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL];
 
@@ -537,8 +581,9 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
     body: JSON.stringify({
       model: "claude-opus-5",
       max_tokens: 16000,
-      // Cached: the system prompt is long, fixed, and sent on every turn.
-      system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+      // Cached: both are long, fixed, and sent on every turn — which is exactly
+      // why the strategy rides here rather than in the message.
+      system: [{ type: "text", text: SYSTEM + ALWAYS, cache_control: { type: "ephemeral" } }],
       messages,
       // web_search runs on Anthropic's side and needs no loop here; the rest
       // are ours and are executed below.
@@ -602,6 +647,9 @@ async function ask(messages: Turn[], effort: Effort, tools: unknown[] = CHAT_TOO
         } else if (b.name === SEARCH_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id,
             content: await searchMemory(b.input?.query) });
+        } else if (b.name === STRATEGY_TOOL.name) {
+          results.push({ type: "tool_result", tool_use_id: b.id,
+            content: readStrategy(b.input?.section) });
         }
       }
       if (!results.length) throw new Error("tool_use with no tool this function serves");
