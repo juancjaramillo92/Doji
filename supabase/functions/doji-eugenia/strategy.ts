@@ -23,13 +23,13 @@
 // nothing — a rule pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.1";
+export const VERSION = "v1.2";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.1. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.2. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -50,8 +50,8 @@ counts as kept just because nothing contradicted it.
 
 | ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
 |---|---|---|---|---|---|---|---|
-| R-01 | Take profit set $30 from entry price | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) > 30 + TOL\` | §5 | v1.0 |
-| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20 + TOL\` | §5 | v1.0 |
+| R-01 | Take profit set $30 from entry price | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) > 30\` | §5 | v1.0 |
+| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
 | R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs \`planned_stop\` at entry to identify the full-stop population — see the note | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
@@ -67,7 +67,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.1 · **Effective from** [decide] · **Supersedes** v1.0
+**Version** v1.2 · **Effective from** [decide] · **Supersedes** v1.1
 
 ### Summary
 
@@ -104,23 +104,22 @@ does.
 
 ### Tolerance
 
-One named value, used by every rule that compares a price distance: **\`TOL\` =
-$[decide]**.
+**There is none, and that is a decision rather than an omission.** The stop is at
+most $20 from entry. A loss that closed further away than that was not a $20 stop
+being filled badly — it was a stop that had been moved — so the predicates
+compare against 20 and 30 flat, with nothing added.
 
-It exists because "materially above 30" and "20 plus slippage" are not
-predicates — they read as checks and cannot be executed, and a rule that cannot
-be executed but is labelled as though it can is worse than one honestly marked
-\`judgment\`.
+Stated here rather than left implicit because the alternative was live for a
+version: a tolerance wide enough to absorb slippage is also wide enough to absorb
+a stop moved a couple of dollars, and every rule that compares a price distance
+would have inherited it.
 
-**Set it from the data rather than by guessing.** The distribution of
-\`|exit_price − entry_price|\` across closed losses on this account already
-contains the answer: real slippage clusters just past the intended stop, and a
-moved stop lands well beyond it. Pick the value that separates the two, and
-record here what the distribution looked like when it was picked so that a later
-reader can tell whether it still holds.
-
-Single-sourced deliberately, the way \`CONFIG.BE = 3\` is. Three rules depend on
-it and they must not drift apart.
+**A false positive costs a question, not a conclusion.** Reconciliation is
+one-way — she names the gap and stops, and never corrects a marker or decides
+what it meant — so a flagged trade is something he looks at, and erring tight is
+the right direction to err. What it must not become is frequent: a check that
+cries wolf teaches him to ignore it, which is the same failure §7 records for a
+stale zone map.
 
 ### Write access
 
@@ -160,8 +159,8 @@ underneath one is a discrepancy worth raising.
 
 | ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
 |---|---|---|---|---|---|---|---|
-| R-01 | Take profit set $30 from entry price | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) > 30 + TOL\` | §5 | v1.0 |
-| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20 + TOL\` | §5 | v1.0 |
+| R-01 | Take profit set $30 from entry price | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) > 30\` | §5 | v1.0 |
+| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
 | R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs \`planned_stop\` at entry to identify the full-stop population — see the note | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
@@ -186,12 +185,21 @@ needs a lower bound as well and the predicate above is half a rule.
 **[decide]** — and note the answer is not recoverable from history either way,
 so it has to be stated rather than measured.
 
-**R-02 is the highest-value check in the table.** A loss wider than $20 is
-either slippage or a stop moved away from entry, and the two are distinguishable
-by how far past $20 it lands — which is exactly what \`TOL\` is calibrated to
-separate. It is also the rule most likely to disagree with its own marker:
-\`followed_sl = true\` on a row with a $34 loss distance is a concrete
-discrepancy, not an inference.
+**R-02 is the highest-value check in the table.** A loss that closed further from
+entry than $20 was not a $20 stop — the stop had been moved — and there is no
+tolerance in the comparison, for the reason §0 gives. It is also the rule most
+likely to disagree with its own marker: \`followed_sl = true\` on a row with a $34
+loss distance is a concrete discrepancy, not an inference.
+
+**R-01 IS NOT ITS MIRROR, and the difference is what a larger distance means.**
+On a loss, further from entry is always worse than intended. On a WIN it can be
+better: a take profit sitting at $30 fills at $30 or through it, so a gap fills
+at $30.60 with the order never having moved. R-01 flags that identically to a
+target genuinely moved further out, and nothing on the row separates them.
+
+So an R-01 flag is a question rather than a finding — ask which it was. If gaps
+turn out to be common enough that the check stops being read, the honest fix is
+to record the target at entry, not to widen the number until the noise stops.
 
 **R-03 is \`field\`, not \`journal\`, and the reason is the population rather than
 the predicate.** The comparison itself is simple — within an \`open_day\`, no
@@ -203,7 +211,7 @@ nowhere on the row, so a $12 loss cannot be told apart from a manually tightened
 exit. Recording \`planned_stop\` at entry closes it.
 
 Until then a narrower version is available and should be labelled as what it is:
-losses within \`TOL\` of $20 are identifiable full stops, so the rule can be
+losses at $20 are identifiable full stops, so the rule can be
 checked over *those* and returns \`unknown\` rather than \`pass\` for a day whose
 only loss was tighter. That under-detects, and a clean result means less than it
 appears to.
@@ -428,17 +436,11 @@ stored and there is no override.
 closed, which differs on a partial exit. Lots are ounces ÷ 100. Poller-written
 only, and null on anything it never reached or that predates the column.
 
-**\`TOL\`.** The single price tolerance every distance rule compares against, set
-in §0 from the observed distribution of loss distances. Not a fudge factor: it
-is the width of real slippage on this account, and it is what separates slippage
-from a moved stop.
-
-**Full stop.** A loss closed at the stop — within \`TOL\` of $20 of price distance
-from entry, or tighter where the stop was set tighter at entry. The second half
-is not identifiable from a row today (see R-03), so *the checkable definition is
-the first half only* and it under-detects. Distinguished from a break-even and
-from a manually tightened exit, and it is the only close that ends the trading
-day.
+**Full stop.** A loss closed at the stop — $20 of price distance from entry, or
+tighter where the stop was set tighter at entry. The second half is not
+identifiable from a row today (see R-03), so *the checkable definition is the
+first half only* and it under-detects. Distinguished from a break-even and from a
+manually tightened exit, and it is the only close that ends the trading day.
 
 **Extreme.** The outer boundary of the marked range. Few, thick, and where
 Support & Resistance is traded.
@@ -470,6 +472,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.2 | [decide] | Tolerance settled at none: the stop is at most $20, so a loss further out is a stop that moved, and R-01/R-02 compare flat. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror — a gap through the target enlarges the distance without anything having moved. | His decision |
 | v1.1 | [decide] | \`TOL\` named in §0 and R-01/R-02 given executable predicates. R-03 relabelled \`field\` — the full-stop population needs a planned stop. §8 records \`size_oz\` and the account arithmetic it enables, and the \`pnl\` fallback that makes \`net_pnl\` the figure for any multi-day total. | Review of v1.0 against the live schema |`,
 
 };
