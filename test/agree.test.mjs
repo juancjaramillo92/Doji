@@ -744,6 +744,36 @@ test('the search function is not reachable by a public key', () => {
     'eugenia_search is not granted to the one role that should call it');
 });
 
+/* ─── Every read is bounded ──────────────────────────────────────────────────
+   Four reads in this function pull rows she is then charged for reasoning over,
+   and three of them were capped from the day they were written. The fourth —
+   the nightly pass — was not, and nothing failed: a normal day is a handful of
+   turns, so an unbounded window looks identical to a bounded one until the day
+   it does not.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every row-returning read of her own tables carries a limit', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  /* TWO NORMALISATIONS, AND BOTH WERE LEARNED BY THIS TEST FAILING ON CORRECT
+     CODE. Every URL here is built from template literals joined by `+`, so the
+     limit routinely sits in a different literal from the select and a pattern
+     that stops at the first backtick cannot see it. And a path is a READ only if
+     it names `select=` — a PATCH against one primary key is a REST path against
+     a growing table too, and needs no limit at all. */
+  const joined = src.replace(/`\s*\+\s*`/g, '');
+  const reads = [...joined.matchAll(/rest\/v1\/(eugenia_\w+|trades)\?(select=[^`]*)/g)];
+  assert.ok(reads.length >= 3,
+    `only ${reads.length} reads found — the reader has gone blind`);
+
+  for (const [, table, query] of reads) {
+    assert.match(query, /limit=/,
+      `the read of ${table} has no limit — an unusual day puts the whole window ` +
+      `into a model call with nothing to stop it`);
+  }
+});
+
 /* ─── Retirement, and the filter that is the whole of it ─────────────────────
    A superseded note is still in the table by design — the trail is the point.
    What keeps it out of her context is one clause in one query, and losing that
