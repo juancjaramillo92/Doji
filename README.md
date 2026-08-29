@@ -953,6 +953,18 @@ only by the retrieval contract's own list — and `get_strategy` names them rath
 than returning nothing, because a blank is something she would fill in herself,
 which is the one outcome worse than reporting it missing.
 
+§6 now holds R-08's five steps — top-down bias, liquidity pools and S&R, psychological
+levels, candle or chart pattern with signal then confirmation, and reward-to-risk
+of at least 1:1.5. The order is the rule: a failed step ends the sequence rather
+than being traded off against a later one. Steps 1–4 are read and nothing stored
+can see them; **step 5 is arithmetic**, and since the planned columns are
+recorded at entry it is the one step a row can be held to.
+
+Writing it settled a contradiction the document carried for six versions. **1:1.5
+is a condition at entry** and **1:1.25 is the floor of what can be realised**
+after a $30 target is shortened to $25 on a trade already open — two numbers at
+two moments, stated as one floor that disagreed with itself.
+
 §4 is the one section that answers a question the rules could not. **The two
 setups differ by method, not by location**: Break & Retest is a continuation
 trade taken through a level that has already broken and flipped, and Support &

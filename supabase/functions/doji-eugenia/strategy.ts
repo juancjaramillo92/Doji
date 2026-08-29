@@ -26,21 +26,22 @@
 // pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.6";
+export const VERSION = "v1.7";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.6. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.7. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
 opened for. Two setups, selected by where price sits in a marked structure:
 Support & Resistance at the outer extremes of the range, Break & Retest at
 interior levels and quarters. Every entry takes profit $30 from entry price — shortened
-to $25 where the level looks hard to reach or is showing reversal — and stops at
-most $20 from it, so reward-to-risk has a floor of 1:1.25. Stop moves to break-even once price has travelled $20 toward the
+to $25 after entry where the level looks hard to reach or is showing reversal — and stops at
+most $20 from it. Reward-to-risk must be at least 1:1.5 to enter, and 1:1.25 is
+the floor of what can be realised once a target is shortened. Stop moves to break-even once price has travelled $20 toward the
 target. One full stop ends the trading day. Position size is on the row in
 ounces; lots are ounces ÷ 100 and \`account = lots × 50,000\`. Target is +10% of
 account every month.
@@ -70,7 +71,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.6 · **Effective from** [decide] · **Supersedes** v1.5
+**Version** v1.7 · **Effective from** [decide] · **Supersedes** v1.6
 
 ### Summary
 
@@ -82,8 +83,9 @@ XAUUSD only, intraday to multi-session, positions held for the move they were
 opened for. Two setups, selected by where price sits in a marked structure:
 Support & Resistance at the outer extremes of the range, Break & Retest at
 interior levels and quarters. Every entry takes profit $30 from entry price — shortened
-to $25 where the level looks hard to reach or is showing reversal — and stops at
-most $20 from it, so reward-to-risk has a floor of 1:1.25. Stop moves to break-even once price has travelled $20 toward the
+to $25 after entry where the level looks hard to reach or is showing reversal — and stops at
+most $20 from it. Reward-to-risk must be at least 1:1.5 to enter, and 1:1.25 is
+the floor of what can be realised once a target is shortened. Stop moves to break-even once price has travelled $20 toward the
 target. One full stop ends the trading day. Position size is on the row in
 ounces; lots are ounces ÷ 100 and \`account = lots × 50,000\`. Target is +10% of
 account every month.
@@ -305,9 +307,28 @@ matters when it matters most.`,
 ### Before the trade
 
 R-08 requires a pre-trade sequence run in order, with a failed step ending it
-rather than being weighed against the others. **The steps themselves are not
-recorded here.** They exist — he runs them — but they have never been written
-into this document, so nothing can state them and nothing can check them.
+rather than being weighed against the others. **The same five steps for both
+setups:**
+
+1. **Top-down bias**
+2. **Liquidity pools and support/resistance**
+3. **Psychological levels**
+4. **Candle or chart pattern** — signal first, then confirmation
+5. **Reward-to-risk of at least 1:1.5**
+
+The order is the rule. A failed step ends the sequence rather than being traded
+off against a later one, so a setup that fails step 1 is not rescued by a clean
+step 4 — which is what separates this from a checklist where enough ticks carry
+a trade.
+
+Steps 1 to 4 are read, and nothing stored can see them. **Step 5 is arithmetic,**
+and since \`planned_stop\` and \`planned_target\` are recorded at entry it is the one
+step a row can be held to:
+
+    (planned_target − entry_price) / (entry_price − planned_stop)  >=  1.5
+
+Step 4 is where §6's signal and confirmation sit: the rejection is the signal,
+the close or the read is the confirmation, and R-07 is that step failing.
 
 R-09 restricts him to obvious trends and cycles, and what makes a trend obvious
 is read from **price action**. That is a judgment rather than a condition, which
@@ -392,17 +413,21 @@ underneath one is a discrepancy worth raising.
 
 ### Notes on individual rules
 
-**R-01 and R-02 are the two primitives, and the floor is their consequence.**
-It is 1:1.25 rather than 1:1.5, and the difference is the $25 target: the floor
-is the SHORTEST allowed target over the WIDEST allowed stop, not the pair he
-takes most often. A trade that runs to $30 against a $20 stop is 1:1.5, and most
-are — but a floor describes the worst case a rule set permits, or it is not a
-floor.
+**THERE ARE TWO REWARD-TO-RISK NUMBERS AND THEY ARE AT DIFFERENT MOMENTS.** The
+document carried them as one and they contradicted each other.
 
-There is still deliberately no rule enforcing it. With the target between 25 and
-30 and the stop capped at 20 it cannot be violated while both of these hold, and
-a third rule restating an arithmetic identity is a rule that can only ever agree
-with the other two.
+**At entry it is 1:1.5, and it is a condition.** Step 5 of §6's sequence refuses
+the trade below it, so with the stop at its $20 cap the target has to be $30. A
+$25 target set AT ENTRY would be 1:1.25 and fails step 5 — it is only reachable
+with a stop tighter than about $16.70.
+
+**After entry the realised floor is 1:1.25**, because the target may be shortened
+from $30 to $25 once the trade is on. That is a management decision under §6, not
+an entry that skipped step 5, and it is the whole reason the two numbers differ.
+
+So R-01 and R-02 bound what may be SET, and step 5 bounds what may be ENTERED.
+The floor is not a third rule restating an identity — it is a condition on the
+plan, and it is checkable from the planned columns rather than from the outcome.
 
 **R-01 IS TWO-SIDED, AND THE LOWER BOUND IS THE HALF THAT CATCHES ANYTHING.**
 The target may be shortened to $25 when the level looks hard to reach or is
@@ -703,9 +728,13 @@ close (*read*). Both are valid. Entering on the signal with neither is not.
 **Rung.** A step on the sizing ladder. \`account = lots × 50,000\`, continuous —
 0.02 lots per $1,000 at every size.
 
-**R:R.** In this document, planned: a target of $30, or $25 where it was
-shortened, over a stop of at most $20 — so between 1:1.5 and 1:1.25, and the
-floor is the second. In the app, realised: average win ÷ average loss over
+**R:R.** Planned and realised are two numbers at two moments. **Planned, at
+entry: at least 1:1.5**, which is step 5 of §6's sequence and a condition on
+taking the trade at all — with the stop at $20 that means a $30 target.
+**Realised: 1:1.25 at worst**, once a $30 target has been shortened to $25 on a
+trade already open. A realised 1.25 is the shortening working, not an entry that
+skipped step 5, and the two must not be compared as though they answered the
+same question. In the app, realised: average win ÷ average loss over
 closed P&L. They are different numbers and the app's cannot be read as the plan.
 Both are stored now, so on a row carrying a plan the two ARE comparable and a
 realised 1:1.25 can be told from a $30 target that was shortened. On a row
@@ -722,6 +751,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.7 | [decide] | R-08's five steps written: top-down bias, liquidity pools and S&R, psychological levels, candle or chart pattern with signal then confirmation, and reward-to-risk of at least 1:1.5. Step 5 is arithmetic and checkable from the planned columns. It also settles a contradiction the document was carrying — 1:1.5 is a condition at ENTRY, 1:1.25 the realised floor after a permitted shortening: two numbers at two moments rather than one disagreeing with itself. | His rules |
 | v1.6 | [decide] | §4 written. The two setups differ by METHOD, not location — Break & Retest is continuation through a level that has flipped, Support & Resistance is mean-reversion off a level that is holding; location is how each is recognised. Invalidation stated per setup, and §6's re-entry rule is shown to follow from S&R's rather than being an exception to it. | Method research, anchored to his stated rules |
 | v1.5 | [decide] | §5 and §6 written. Risk per trade is 4% and is deliberate; the rung moves by hand; 4% is also the daily limit, and there is no weekly or monthly one. One position at a time, nothing else changes size. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep that snaps back to the level. R-08's sequence is recorded as existing but not written down. | His answers |
 | v1.4 | [decide] | \`planned_stop\` and \`planned_target\` are recorded at journalling time. R-03 moves from \`field\` to \`journal\` — it was the full-stop population that was missing, not the predicate — and is \`unknown\` rather than \`pass\` on rows with no plan. §8 and §12 restated: intent is on the row, and planned R:R is recoverable where a plan exists. | Schema change |

@@ -744,6 +744,43 @@ test('the search function is not reachable by a public key', () => {
     'eugenia_search is not granted to the one role that should call it');
 });
 
+/* ─── The pre-trade sequence ─────────────────────────────────────────────────
+   R-08 is a rule about a list, and for six versions the list was not in the
+   document — the rule cited §6, §6 said the steps existed somewhere else, and
+   nothing anywhere could state them. A rule pointing at nothing reads exactly
+   like a rule pointing at something.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('R-08 cites a section that actually holds its steps', () => {
+  const row = ALWAYS.split('\n').find(l => l.startsWith('| R-08'));
+  assert.ok(row, 'R-08 is no longer in the rules table');
+
+  const cited = row.match(/§(\d+)/);
+  assert.ok(cited, 'R-08 cites no section at all');
+  const body = SECTIONS[cited[1]];
+  assert.ok(body, `R-08 cites §${cited[1]}, which get_strategy cannot serve`);
+
+  // Five, numbered, in the section the rule points at. The ORDER is the rule —
+  // a failed step ends the sequence rather than being traded off against a
+  // later one — so a list that has stopped being ordered is a different rule.
+  const steps = [...body.matchAll(/^\d\. \*\*/gm)];
+  assert.equal(steps.length, 5,
+    `§${cited[1]} lists ${steps.length} numbered steps, not the five R-08 requires`);
+});
+
+test('the two reward-to-risk numbers are kept apart', () => {
+  /* 1:1.5 is a condition at ENTRY — step 5 refuses the trade below it. 1:1.25 is
+     the floor of what can be REALISED after a $30 target is shortened to $25 on
+     a trade already open. The document stated one floor for six versions and the
+     two silently contradicted each other. */
+  assert.match(ALWAYS, /at least 1:1\.5 to enter/,
+    'the entry condition has stopped being stated in the always-loaded half');
+  assert.match(SECTIONS['12'], /Planned, at\s+entry: at least 1:1\.5/,
+    'the definition no longer separates planned from realised');
+  assert.match(SECTIONS['12'], /Realised: 1:1\.25 at worst/,
+    'the realised floor is gone from the definition');
+});
+
 /* ─── The strategy is markdown inside a template literal ─────────────────────
    Every backtick in that document is escaped, and the file is written by editing
    text that ALREADY contains escaped ones — so an editor that escapes a second

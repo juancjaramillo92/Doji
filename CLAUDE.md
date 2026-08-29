@@ -230,6 +230,11 @@ code you write near it:
   breaks the prefix each time the document is edited. It is markdown in a
   template literal, so every backtick in it is escaped.
 
+  R-08's five steps are in §6 and its step 5 is the only one a row can check:
+  `(planned_target - entry) / (entry - planned_stop) >= 1.5`. Do not read that
+  1.5 against the 1.25 in §0 — they are an ENTRY condition and a REALISED floor,
+  at two different moments, and collapsing them is the contradiction v1.7 fixed.
+
   She has no write path to it, deliberately: a document that decides whether he
   followed his rules cannot be edited by the thing checking them. Sections 1, 2,
   3, 9, 10 and 11 are not written — four of them cited, and in the PROSE of §7
