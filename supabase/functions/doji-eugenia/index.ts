@@ -185,7 +185,11 @@ const TRADES_TOOL = {
     "entry and fill time (UTC), pnl, size_oz, open_day, setup, and the three discipline " +
     "answers. A discipline answer of null means unanswered, which is NOT 'no'. " +
     "size_oz is the position size in ounces; lots are oz / 100. It is written by " +
-    "the poller alone, so a trade it never reached has none.",
+    "the poller alone, so a trade it never reached has none. planned_stop and " +
+    "planned_target are where he AIMED the trade, entered by hand at the time — " +
+    "null on everything before they existed and on anything he did not journal. " +
+    "They are the only record of intent: the broker reports the final stop, so a " +
+    "stop moved to break-even has erased the original everywhere else.",
   input_schema: {
     type: "object",
     properties: {

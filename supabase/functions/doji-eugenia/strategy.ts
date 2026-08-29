@@ -23,13 +23,13 @@
 // nothing — a rule pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.3";
+export const VERSION = "v1.4";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.3. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.4. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -52,7 +52,7 @@ counts as kept just because nothing contradicted it.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs \`planned_stop\` at entry to identify the full-stop population — see the note | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss closing at its \`planned_stop\`; \`unknown\` where no plan was recorded | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -67,7 +67,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.3 · **Effective from** [decide] · **Supersedes** v1.2
+**Version** v1.4 · **Effective from** [decide] · **Supersedes** v1.3
 
 ### Summary
 
@@ -161,7 +161,7 @@ underneath one is a discrepancy worth raising.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs \`planned_stop\` at entry to identify the full-stop population — see the note | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss closing at its \`planned_stop\`; \`unknown\` where no plan was recorded | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -214,20 +214,22 @@ So an R-01 flag is a question rather than a finding — ask which it was. If gap
 turn out to be common enough that the check stops being read, the honest fix is
 to record the target at entry, not to widen the number until the noise stops.
 
-**R-03 is \`field\`, not \`journal\`, and the reason is the population rather than
-the predicate.** The comparison itself is simple — within an \`open_day\`, no
-\`entry_time\` later than the \`fill_time\` of a full-stop loss — and \`fill_time\` is
-present on exactly the rows it depends on. What is not available is *which
-losses are full stops.* §12 defines a full stop as roughly $20 from entry **or
-tighter where the stop was set tighter at entry**, and the planned stop is
-nowhere on the row, so a $12 loss cannot be told apart from a manually tightened
-exit. Recording \`planned_stop\` at entry closes it.
+**R-03 IS CHECKABLE NOW, AND IT WAS THE POPULATION THAT WAS MISSING RATHER THAN
+THE PREDICATE.** The comparison was always simple — within an \`open_day\`, no
+\`entry_time\` later than the \`fill_time\` of a full-stop loss. What could not be
+answered was WHICH losses were full stops, because §12 allows a stop set tighter
+than $20 and the broker reports only the final one, so a $12 loss could not be
+told from an exit cut by hand.
 
-Until then a narrower version is available and should be labelled as what it is:
-losses at $20 are identifiable full stops, so the rule can be
-checked over *those* and returns \`unknown\` rather than \`pass\` for a day whose
-only loss was tighter. That under-detects, and a clean result means less than it
-appears to.
+\`planned_stop\` settles it: a loss that closed at its planned stop is a full stop,
+whatever the distance, and one that closed short of it was cut. The rule is
+\`journal\` on every row carrying a plan.
+
+**It is \`unknown\`, never \`pass\`, on the rest.** Every trade before the column
+existed has no plan, and so does anything he did not journal — and a day whose
+only loss cannot be classified has not been shown compliant, it has been left
+unexamined. The narrowed fallback that read losses at $20 as full stops is
+retired: it under-detected, and it is not needed now.
 
 **R-04 cannot be confirmed, only violated.** Whether a losing trade ever reached
 +$20 is not recoverable: \`entry_price\` and \`exit_price\` are endpoints, and the
@@ -309,10 +311,20 @@ column landed rather than at the start of the journal.
 Not stored and not available from the broker, which is what makes R-04 a probe
 and what makes asking at journalling time the only way it is ever recoverable.
 
-**The planned stop.** What the stop was set to at entry, as against the final
-stop the broker reports. Its absence is why R-03 is \`field\` and why realised R:R
-cannot be read as planned R:R. A stop moved to break-even has overwritten the
-original risk and nothing anywhere remembers it.
+**The planned stop and target are on the row now**, entered by hand at the time
+under \`planned_stop\` and \`planned_target\`. They are the only record of intent
+this system has: the broker reports the final stop, so a stop moved to
+break-even has erased the original everywhere else, and nothing recovers it
+afterwards.
+
+Three things become answerable that were not — R-03's full-stop population, the
+planned R:R, and whether a win at $25 was a shortened target or an early close.
+All three only on rows carrying a plan, and \`unknown\` on the rest rather than
+\`pass\`: everything before the columns existed is null, permanently.
+
+They are journal-owned and **app-entered rather than tappable**. Gladys takes
+\`callback_query\` alone and there is no inline keyboard for 4512.80, which is why
+her \`COLUMNS\` map holds four names while \`Data.OWNED\` holds six.
 
 **Which rule broke.** \`followed_rules\` is one boolean covering R-03 and R-05
 through R-09. It records that something broke, not what.
@@ -474,10 +486,10 @@ close (*read*). Both are valid. Entering on the signal with neither is not.
 shortened, over a stop of at most $20 — so between 1:1.5 and 1:1.25, and the
 floor is the second. In the app, realised: average win ÷ average loss over
 closed P&L. They are different numbers and the app's cannot be read as the plan.
-Neither the planned stop nor which target was set is stored, so the plan is not
-recoverable from any row, and a realised 1:1.25 cannot be told from a $30 target
-that was shortened, a $30 target that was hit after the stop moved, or a rule
-that was broken.`,
+Both are stored now, so on a row carrying a plan the two ARE comparable and a
+realised 1:1.25 can be told from a $30 target that was shortened. On a row
+without one — everything before the columns existed — it still cannot, and that
+is \`unknown\` rather than an assumption.`,
 
   "13": `## 13 · Changelog
 
@@ -489,6 +501,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.4 | [decide] | \`planned_stop\` and \`planned_target\` are recorded at journalling time. R-03 moves from \`field\` to \`journal\` — it was the full-stop population that was missing, not the predicate — and is \`unknown\` rather than \`pass\` on rows with no plan. §8 and §12 restated: intent is on the row, and planned R:R is recoverable where a plan exists. | Schema change |
 | v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach or is showing reversal. R-01 gains its lower bound and becomes two-sided — the §7 [decide] on early exits is answered. The R:R floor is restated as 1:1.25, being the shortest allowed target over the widest allowed stop. | His decision |
 | v1.2 | [decide] | Tolerance settled at none: the stop is at most $20, so a loss further out is a stop that moved, and R-01/R-02 compare flat. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror — a gap through the target enlarges the distance without anything having moved. | His decision |
 | v1.1 | [decide] | \`TOL\` named in §0 and R-01/R-02 given executable predicates. R-03 relabelled \`field\` — the full-stop population needs a planned stop. §8 records \`size_oz\` and the account arithmetic it enables, and the \`pnl\` fallback that makes \`net_pnl\` the figure for any multi-day total. | Review of v1.0 against the live schema |`,
