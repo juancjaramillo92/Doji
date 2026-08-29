@@ -1277,7 +1277,7 @@ which is what an existing database needs to pick up `security_invoker`:
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         size_oz, open_day, setup, followed_rules, followed_sl, followed_tp
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz
   from public.trades
   where deleted = false;
 
@@ -1336,8 +1336,16 @@ alter table public.trades add column if not exists size_oz numeric;
 ```
 
 Then re-run the `create or replace view public.eugenia_trades` statement from
-`003_eugenia.sql`. Adding a column to the end of a view's select list needs no
-drop; reordering or removing one would.
+`003_eugenia.sql`.
+
+**`size_oz` sits at the end of that select list on purpose.** `create or replace
+view` matches the existing view position by position and may only append, so a
+column inserted mid-list reads as renaming whatever used to sit at that
+position — `cannot change name of view column "open_day" to "size_oz"`. Moving
+it up beside the other broker columns, where it belongs by sense, is the tidy
+that breaks re-application on every database that already has the view.
+Reordering or removing needs a `drop view` first, which also drops the grants
+under it.
 
 The alter is the half that fails quietly. PostgREST drops a key the table does
 not have from a `merge-duplicates` payload instead of refusing the row, so a
