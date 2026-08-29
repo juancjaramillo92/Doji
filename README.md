@@ -745,6 +745,26 @@ The vocabulary rule is now "plain words first": *the gap between rates and
 inflation* before *real yields*, and the short name only once the long one has
 been said. The ideas stay exactly as sophisticated; only the words come down.
 
+**She teaches, and that is a rule about depth rather than length.** He is
+learning macro deliberately, so the paragraph on the day's one thing states its
+chain link by link — *hot inflation, so the Fed waits, so the gap between rates
+and inflation widens, so gold has stiffer competition* — because a cause named
+with no chain under it is something to memorise rather than understand. The
+character budget does not move to make room; the same words carry the why.
+
+Three rules keep that from turning into a lecture. A term explained this week is
+**used** the next time rather than redefined, since the second exposure is what
+turns vocabulary into something he thinks with. A simplification is signposted
+in a clause — *that is the clean version* — so he can tell a compressed story
+from a complete one. And what he has shown he understands is recorded as a note,
+because it is the only thing that says what **not** to explain; the five
+channels double as the map of which he reasons with unaided and which he has
+never once used himself.
+
+The single closing question is sometimes one he has to reason to answer rather
+than agree with. His answer is evidence about what he actually has, which no
+amount of explaining produces.
+
 **She remembers what she told you yesterday.** The briefing reads the last
 twelve turns, so it opens with how yesterday's print landed rather than from
 nothing. It did not until now — it wrote to `eugenia_turns` and never read back,
