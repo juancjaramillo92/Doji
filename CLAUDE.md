@@ -184,8 +184,12 @@ code you write near it:
 - **Do not extract the entry point.** All four functions authorise their callers
   with the same four lines, and that is the one shape that must stay readable in
   the file being edited rather than behind a helper.
-- **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
-  `Data.OWNED`, so no broker column is nameable from a tap. `tg_message_id` is
+- **The `COLUMNS` map is the whole guarantee.** It holds four of the six names in
+  `Data.OWNED` — a SUBSET, not an equality — so no broker column is nameable from
+  a tap. `planned_stop` and `planned_target` are journal-owned and app-entered:
+  Gladys takes `callback_query` alone and there is no keyboard for a price. The
+  redraw trigger follows `COLUMNS`, not `OWNED`, because a column her message
+  does not draw has nothing to redraw. `tg_message_id` is
   on neither list and must stay off both. `agree.test.mjs` asserts the two lists
   against each other, and both column lists inside `trades_telegram_on_answer`
   against them, rather than each against a literal; do not widen any of them

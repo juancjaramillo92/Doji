@@ -2128,7 +2128,10 @@ const Data = {
   // The definitive list. A save sends these and nothing else — the mechanism
   // that stops the app writing broker-owned data, enforced here rather than
   // trusted to each call site.
-  OWNED: ['setup','followed_rules','followed_sl','followed_tp'],
+  // SIX, AND FOUR OF THEM ARE TAPPABLE. Gladys takes callback_query alone, so a
+  // price cannot be asked for from Telegram and her COLUMNS map stays the four
+  // above — this list is the journal half, hers is the half a button can reach.
+  OWNED: ['setup','followed_rules','followed_sl','followed_tp','planned_stop','planned_target'],
 
   init() {
     this.sb = window.supabase.createClient(SUPABASE.URL, SUPABASE.KEY);
@@ -3308,7 +3311,9 @@ const Journal = {
       setup:          pickRadio('jf-setup') || null,
       followed_rules: pickYN('followed_rules'),
       followed_sl:    pickYN('followed_sl'),
-      followed_tp:    pickYN('followed_tp')
+      followed_tp:    pickYN('followed_tp'),
+      planned_stop:   pickPrice('planned_stop'),
+      planned_target: pickPrice('planned_target')
     });
     if (!ok) return;
 
@@ -3325,6 +3330,15 @@ function pickYN(name) {
   return v === 'yes' ? true : v === 'no' ? false : null;
 }
 const pickRadio  = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
+
+// Empty is null, the same three-state answer the pills give: a blank price is a
+// plan nobody recorded, never a plan of zero. Number() would read '' as 0.
+function pickPrice(name) {
+  const raw = $('jm-body')?.querySelector(`input[name="${name}"]`)?.value.trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function journalForm(t) {
   const setups = CONFIG.SETUPS.map(s => {
@@ -3348,6 +3362,22 @@ function journalForm(t) {
     </div>`;
   }).join('');
 
+  /* THE PLAN, AND IT IS THE ONLY THING HERE THAT CANNOT BE ANSWERED LATER. The
+     three questions above are about a trade that has closed and are as true a
+     week on; these two are where it was aimed, and the broker overwrites the
+     original stop the moment it moves. Blank stays blank — an unanswered plan
+     is not a plan of zero. */
+  const planned = [
+    ['planned_stop',   'Planned stop',   t.planned_stop],
+    ['planned_target', 'Planned target', t.planned_target]
+  ].map(([name, label, val]) => `
+    <div class="jf-yn-item">
+      <label class="journal-q-label" for="jf-${name}">${label}</label>
+      <input type="number" step="0.01" min="0" inputmode="decimal"
+             class="jf-price" id="jf-${name}" name="${name}"
+             value="${val == null ? '' : val}">
+    </div>`).join('');
+
   // Save and Cancel only. A destructive action should not share a row with the
   // way out of a dialog, where it would sit one button from Cancel and similar
   // enough to hit by accident. Deleting is the ✕ in the log, deliberate to
@@ -3357,6 +3387,7 @@ function journalForm(t) {
       <div class="jm-card">
         <div class="jf-setup-row">${setups}</div>
         <div class="jf-yn-row">${yn}</div>
+        <div class="jf-yn-row">${planned}</div>
       </div>
       <div class="journal-form-actions">
         <button class="jm-btn-save"   data-jm-action="save">Save</button>
