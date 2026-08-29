@@ -23,21 +23,21 @@
 // nothing — a rule pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.2";
+export const VERSION = "v1.3";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.2. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.3. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
 opened for. Two setups, selected by where price sits in a marked structure:
 Support & Resistance at the outer extremes of the range, Break & Retest at
-interior levels and quarters. Every entry takes profit $30 from entry price and
-stops at most $20 from it, so reward-to-risk has a floor of 1:1.5 by
-construction. Stop moves to break-even once price has travelled $20 toward the
+interior levels and quarters. Every entry takes profit $30 from entry price — shortened
+to $25 where the level looks hard to reach or is showing reversal — and stops at
+most $20 from it, so reward-to-risk has a floor of 1:1.25. Stop moves to break-even once price has travelled $20 toward the
 target. One full stop ends the trading day. Position size is on the row in
 ounces; lots are ounces ÷ 100 and \`account = lots × 50,000\`. Target is +10% of
 account every month.
@@ -50,7 +50,7 @@ counts as kept just because nothing contradicted it.
 
 | ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
 |---|---|---|---|---|---|---|---|
-| R-01 | Take profit set $30 from entry price | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) > 30\` | §5 | v1.0 |
+| R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
 | R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs \`planned_stop\` at entry to identify the full-stop population — see the note | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
@@ -67,7 +67,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.2 · **Effective from** [decide] · **Supersedes** v1.1
+**Version** v1.3 · **Effective from** [decide] · **Supersedes** v1.2
 
 ### Summary
 
@@ -78,9 +78,9 @@ the file.*
 XAUUSD only, intraday to multi-session, positions held for the move they were
 opened for. Two setups, selected by where price sits in a marked structure:
 Support & Resistance at the outer extremes of the range, Break & Retest at
-interior levels and quarters. Every entry takes profit $30 from entry price and
-stops at most $20 from it, so reward-to-risk has a floor of 1:1.5 by
-construction. Stop moves to break-even once price has travelled $20 toward the
+interior levels and quarters. Every entry takes profit $30 from entry price — shortened
+to $25 where the level looks hard to reach or is showing reversal — and stops at
+most $20 from it, so reward-to-risk has a floor of 1:1.25. Stop moves to break-even once price has travelled $20 toward the
 target. One full stop ends the trading day. Position size is on the row in
 ounces; lots are ounces ÷ 100 and \`account = lots × 50,000\`. Target is +10% of
 account every month.
@@ -159,7 +159,7 @@ underneath one is a discrepancy worth raising.
 
 | ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
 |---|---|---|---|---|---|---|---|
-| R-01 | Take profit set $30 from entry price | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) > 30\` | §5 | v1.0 |
+| R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
 | R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs \`planned_stop\` at entry to identify the full-stop population — see the note | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
@@ -171,19 +171,32 @@ underneath one is a discrepancy worth raising.
 
 ### Notes on individual rules
 
-**R-01 and R-02 are the two primitives, and the 1:1.5 floor is their
-consequence.** There is deliberately no rule enforcing the floor: with the
-target fixed at 30 and the stop capped at 20 it cannot be violated while both of
-these hold, and a third rule restating an arithmetic identity is a rule that can
-only ever agree with the other two.
+**R-01 and R-02 are the two primitives, and the floor is their consequence.**
+It is 1:1.25 rather than 1:1.5, and the difference is the $25 target: the floor
+is the SHORTEST allowed target over the WIDEST allowed stop, not the pair he
+takes most often. A trade that runs to $30 against a $20 stop is 1:1.5, and most
+are — but a floor describes the worst case a rule set permits, or it is not a
+floor.
 
-**R-01 catches overshoots only, and that is a decision not yet made.** A win
-closing at +$9 is a target that was not respected in the other direction, and it
-passes this predicate cleanly. If §6 permits discretionary early exits then the
-rule is right as written and §6 should say so plainly. If it does not, R-01
-needs a lower bound as well and the predicate above is half a rule.
-**[decide]** — and note the answer is not recoverable from history either way,
-so it has to be stated rather than measured.
+There is still deliberately no rule enforcing it. With the target between 25 and
+30 and the stop capped at 20 it cannot be violated while both of these hold, and
+a third rule restating an arithmetic identity is a rule that can only ever agree
+with the other two.
+
+**R-01 IS TWO-SIDED, AND THE LOWER BOUND IS THE HALF THAT CATCHES ANYTHING.**
+The target may be shortened to $25 when the level looks hard to reach or is
+turning, so a win at $25 is the rule working. A win BELOW $25 is a position
+closed before any target he is allowed to set, which is the discretionary exit
+the predicate exists to find — and it is the common failure, where an overshoot
+is not.
+
+Two targets are intended, $30 and $25. A win landing between them was neither,
+so it is worth a question even though the predicate lets it pass; the floor is
+what is checked because it is the only part that is unambiguous.
+
+Break-evens are not caught by this and must not be: an exit within $3 of entry
+is a scratch by result, not a win, so R-04 firing never reads as a target
+missed.
 
 **R-02 is the highest-value check in the table.** A loss that closed further from
 entry than $20 was not a $20 stop — the stop had been moved — and there is no
@@ -457,10 +470,14 @@ close (*read*). Both are valid. Entering on the signal with neither is not.
 **Rung.** A step on the sizing ladder. \`account = lots × 50,000\`, continuous —
 0.02 lots per $1,000 at every size.
 
-**R:R.** In this document, planned: $30 target over a stop of at most $20. In
-the app, realised: average win ÷ average loss over closed P&L. They are
-different numbers and the app's cannot be read as the plan — the planned stop is
-not stored, so the plan is not recoverable from any row.`,
+**R:R.** In this document, planned: a target of $30, or $25 where it was
+shortened, over a stop of at most $20 — so between 1:1.5 and 1:1.25, and the
+floor is the second. In the app, realised: average win ÷ average loss over
+closed P&L. They are different numbers and the app's cannot be read as the plan.
+Neither the planned stop nor which target was set is stored, so the plan is not
+recoverable from any row, and a realised 1:1.25 cannot be told from a $30 target
+that was shortened, a $30 target that was hit after the stop moved, or a rule
+that was broken.`,
 
   "13": `## 13 · Changelog
 
@@ -472,6 +489,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach or is showing reversal. R-01 gains its lower bound and becomes two-sided — the §7 [decide] on early exits is answered. The R:R floor is restated as 1:1.25, being the shortest allowed target over the widest allowed stop. | His decision |
 | v1.2 | [decide] | Tolerance settled at none: the stop is at most $20, so a loss further out is a stop that moved, and R-01/R-02 compare flat. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror — a gap through the target enlarges the distance without anything having moved. | His decision |
 | v1.1 | [decide] | \`TOL\` named in §0 and R-01/R-02 given executable predicates. R-03 relabelled \`field\` — the full-stop population needs a planned stop. §8 records \`size_oz\` and the account arithmetic it enables, and the \`pnl\` fallback that makes \`net_pnl\` the figure for any multi-day total. | Review of v1.0 against the live schema |`,
 
