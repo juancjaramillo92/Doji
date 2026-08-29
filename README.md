@@ -856,11 +856,22 @@ would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts the briefing, the pulse and a reply each read
 them.
 
-Append-only: superseding a note means writing a newer one, which is how a
-person's memory works — the recent account wins, and it is also what lets him
-change his mind about an instruction without anything having to be deleted. There is no update path and no
-delete path in the function, so the only thing she can do to that table is add a
-sentence to it.
+Append-only, and now with a way to retire a line rather than only bury it. Every
+note reaches her with a number in brackets, and `remember` takes an optional
+`supersedes` — so a new note that contradicts an old one names it, and the old
+one stops being read.
+
+**That filter is the whole feature and it fails silently.** Without
+`superseded_by is null` on the read she is handed the correction *and* the thing
+it corrected, every turn, with nothing marking which is current — no error, and
+a note count that looks perfectly healthy. `agree.test.mjs` reads the query for
+it, and checks the column, the filter and the tool parameter all exist together,
+since any one of the three missing leaves the other two doing nothing.
+
+The row itself never goes. It keeps what she used to believe and names what
+changed it, which is exactly what a search over this table will need later:
+findable, and marked as no longer true. There is still no delete path, so the
+only things she can do to that table are add a sentence and retire one.
 
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
@@ -1300,6 +1311,21 @@ create index if not exists eugenia_notes_kind_id_desc
   on public.eugenia_notes (kind, id desc);
 drop index if exists eugenia_notes_id_desc;
 ```
+
+An existing `eugenia_notes` needs its `superseded_by` column, and the index has
+to be replaced with the partial one the read now matches:
+
+```sql
+alter table public.eugenia_notes
+  add column if not exists superseded_by bigint references public.eugenia_notes(id);
+
+drop index if exists eugenia_notes_kind_id_desc;
+create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc)
+  where superseded_by is null;
+```
+
+Without the column the read's `superseded_by=is.null` is a 400 on every turn,
+and `notesBlock()` swallows it — she loses her whole memory and says nothing.
 
 An existing `trades` needs its `size_oz` column, and Eugenia's view has to be
 replaced to expose it — the view statement in `003_eugenia.sql` is `or replace`

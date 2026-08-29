@@ -110,6 +110,22 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_notes' and column_name = 'kind'),
    'text'),
 
+  -- Without this the read's `superseded_by=is.null` filter is a 400 from
+  -- PostgREST on every turn, which notesBlock() swallows — so she loses her
+  -- whole memory and says nothing about it.
+  ('eugenia_notes has its superseded_by column',
+   (select data_type from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_notes'
+       and column_name = 'superseded_by'),
+   'bigint'),
+
+  -- And the index has to carry the same filter or the read stops using it.
+  ('the notes index is partial on live notes',
+   (select count(*)::text from pg_indexes
+     where schemaname = 'public' and indexname = 'eugenia_notes_kind_id_desc'
+       and indexdef ilike '%where (superseded_by IS NULL)%'),
+   '1'),
+
   -- A single-table view is auto-updatable, so anything beyond SELECT here makes
   -- her read of the journal a write path.
   ('eugenia_trades is select-only, service_role only',

@@ -580,6 +580,48 @@ test('the documents name only symbols the repository has', () => {
    disagreed, forgot, or never read it.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── Retirement, and the filter that is the whole of it ─────────────────────
+   A superseded note is still in the table by design — the trail is the point.
+   What keeps it out of her context is one clause in one query, and losing that
+   clause fails in the worst available way: she is handed the correction AND the
+   thing it corrected, every turn, with nothing marking which is current. No
+   error, no log, and the note count merely looks healthy.
+
+   Three copies have to agree for the feature to exist at all: the column in the
+   schema, the filter in the read, and the parameter in the tool she calls. Any
+   one of them missing leaves the other two doing nothing.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the notes read asks for live notes only, and for the id that names one', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function readNotes(');
+  assert.ok(at > -1, 'doji-eugenia no longer has readNotes()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /superseded_by=is\.null/,
+    'readNotes no longer filters out retired notes — every correction she has ' +
+    'ever made comes back alongside the thing it corrected');
+  assert.match(body, /select=id,note/,
+    'readNotes no longer selects the id, so no note can be named in supersedes ' +
+    'and nothing can ever be retired');
+});
+
+test('the column, the filter and the tool parameter all exist together', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  assert.match(EUGENIA_SQL, /superseded_by\s+bigint\s+references\s+public\.eugenia_notes\(id\)/,
+    '003_eugenia.sql has no superseded_by column — the filter in the read would ' +
+    'match nothing and PostgREST would refuse it');
+  assert.match(src, /supersedes:\s*\{[\s\S]{0,80}type:\s*"integer"/,
+    'the remember tool no longer offers supersedes, so she cannot retire a note ' +
+    'however many she is shown');
+  // The index has to match the read or it stops being used for it.
+  assert.match(EUGENIA_SQL, /create index eugenia_notes_kind_id_desc[\s\S]*?where superseded_by is null/,
+    'the notes index no longer matches the read it exists for');
+});
+
 test('the briefing, the pulse and a reply all read his notes', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');

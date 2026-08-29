@@ -135,10 +135,29 @@ create table public.eugenia_notes (
   -- transcript, and a transcript is what eugenia_turns is already for.
   constraint eugenia_notes_note_length check (char_length(note) between 1 and 200),
   -- The vocabulary, enforced here rather than trusted to the tool schema.
-  constraint eugenia_notes_kind_check check (kind in ('fact', 'instruction'))
+  constraint eugenia_notes_kind_check check (kind in ('fact', 'instruction')),
+
+  -- RETIREMENT, WHICH IS WHAT MAKES THIS A MEMORY RATHER THAN A PILE. Append-only
+  -- with a newest-first read cannot correct anything: a note saying he trades the
+  -- London open stays visible after he moves to New York, both sit in her context
+  -- contradicting each other, and the stale one leaves the window twenty notes
+  -- later by accident rather than by decision.
+  --
+  -- Still no delete path and still append-only. The row stays and names the
+  -- newer note that replaced it, which keeps the trail — what she used to
+  -- believe, and what changed it — while taking the old line out of the reads
+  -- below. That is exactly the pair of properties a search over this table will
+  -- need later: findable, and marked as no longer true.
+  --
+  -- Self-referencing, so the chain is walkable from either end.
+  superseded_by bigint references public.eugenia_notes(id)
 );
 
--- Both reads are one kind, newest first, so the kind leads the index.
-create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc);
+-- Both reads are one kind, newest first, so the kind leads the index. PARTIAL,
+-- matching the read exactly: a retired note is never selected, so it has no
+-- business in the index either, and this grows with what is current rather than
+-- with the archive.
+create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc)
+  where superseded_by is null;
 
 alter table public.eugenia_notes enable row level security;

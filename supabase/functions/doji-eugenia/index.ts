@@ -222,6 +222,14 @@ const NOTES_TOOL = {
         enum: NOTE_KINDS,
         description: "'fact' for something you noticed about him; 'instruction' for something he told you.",
       },
+      supersedes: {
+        type: "integer",
+        description:
+          "Optional. The id of the note this one replaces, taken from the bracketed " +
+          "number beside it. Use it whenever the new line contradicts, corrects or " +
+          "updates an existing one — the old note stops being shown rather than " +
+          "sitting alongside the new one disagreeing with it.",
+      },
     },
     required: ["note", "kind"],
     additionalProperties: false,
@@ -233,13 +241,24 @@ const NOTES_TOOL = {
 // one sentence each, so the whole memory costs less than one paragraph.
 const NOTES = 20;
 
-async function readNotes(kind: string): Promise<string[]> {
+/* LIVE NOTES ONLY, and the filter is the whole feature. Drop `superseded_by=is.null`
+   and every retired line comes back — she is handed the correction and the thing
+   it corrected, with nothing to say which won. The failure is silent, which is
+   why agree.test.mjs reads this query for the filter.
+
+   The id comes back too, because a note she cannot name is a note she cannot
+   retire. It costs a few characters per line and it is what makes `supersedes`
+   callable at all. */
+async function readNotes(kind: string): Promise<Note[]> {
   const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_notes?select=note&kind=eq.${kind}&order=id.desc&limit=${NOTES}`,
+    `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
+    `&superseded_by=is.null&order=id.desc&limit=${NOTES}`,
     { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Notes read failed (HTTP ${res.status})`);
-  return (await res.json()).map((r: { note: string }) => r.note);
+  return await res.json();
 }
+
+type Note = { id: number; note: string };
 
 /* Truncated rather than refused, and it NEVER THROWS.
 
@@ -258,7 +277,7 @@ async function readNotes(kind: string): Promise<string[]> {
    means he stops repeating himself about a thing she will keep doing. Same for
    a truncation — an instruction cut mid-sentence becomes a standing rule
    nobody wrote. */
-async function writeNote(note: unknown, kind: unknown): Promise<string> {
+async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Promise<string> {
   const text = String(note ?? "").trim();
   if (!text) return "Nothing to remember.";
 
@@ -268,11 +287,35 @@ async function writeNote(note: unknown, kind: unknown): Promise<string> {
   const kept = text.slice(0, NOTE_MAX);
 
   try {
+    // return=representation, because retiring the old note means naming the new
+    // one and the id only exists once Postgres has minted it.
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
-      method: "POST", headers: sbHeaders("return=minimal"),
+      method: "POST", headers: sbHeaders("return=representation"),
       body: JSON.stringify([{ note: kept, kind: k }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    /* THE NEW NOTE IS SAFE BEFORE ANY OF THIS RUNS, and that ordering is the
+       point: a retirement that fails leaves two live notes, which is today's
+       behaviour and is recoverable. Retiring first and failing to write would
+       lose the correction and the thing it corrected in one go. */
+    const old = Math.trunc(Number(supersedes));
+    if (Number.isFinite(old) && old > 0) {
+      const [row] = await res.json();
+      const done = await fetch(
+        `${SB_URL}/rest/v1/eugenia_notes?id=eq.${old}&superseded_by=is.null`, {
+          method: "PATCH", headers: sbHeaders("return=representation"),
+          body: JSON.stringify({ superseded_by: row.id }),
+        });
+      // A miss is not an error — she may have named a note that never existed or
+      // one already retired — but it must not pass as done, or she believes a
+      // contradiction is gone while it is still being handed to her every turn.
+      if (!done.ok || (await done.json()).length === 0) {
+        return `Remembered, but note ${old} is not there to retire — ` +
+               `it may already be superseded. Check the list you were given.`;
+      }
+    }
+
     if (kept.length < text.length) {
       return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". ` +
              (k === 'instruction'
@@ -450,7 +493,7 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
           results.push({ type: "tool_result", tool_use_id: b.id, content: await readTrades(b.input?.days) });
         } else if (b.name === NOTES_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id,
-            content: await writeNote(b.input?.note, b.input?.kind) });
+            content: await writeNote(b.input?.note, b.input?.kind, b.input?.supersedes) });
         }
       }
       if (!results.length) throw new Error("tool_use with no tool this function serves");
@@ -615,7 +658,10 @@ async function notesBlock(): Promise<string> {
     const [told, noticed] = await Promise.all([
       readNotes('instruction'), readNotes('fact'),
     ]);
-    const list = (ns: string[]) => `\n· ${ns.join("\n· ")}`;
+    // `[12] he trades the London open` — the number is how she names one in
+    // `supersedes`, so it is part of the line rather than decoration.
+    const list = (ns: Note[]) =>
+      `\n· ` + ns.map(n => `[${n.id}] ${n.note}`).join("\n· ");
     return (told.length
              ? `\n\nWhat he has told you to do, newest first. These are not optional and a` +
                ` later one replaces an earlier one:${list(told)}`
