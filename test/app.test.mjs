@@ -137,6 +137,45 @@ test('a save sends the journal columns and nothing else', async () => {
    merely missing, it is unrecoverable from anywhere.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── The balance window ─────────────────────────────────────────────────────
+   openBal and lastBal are the same read against two different bounds, and that
+   bound is the only thing separating them. Lose it and a month opens and closes
+   on the identical figure — a roll-forward showing no movement at all, which
+   looks like a quiet month rather than like a broken one.
+
+   Nothing covered this until the two loops behind it were collapsed into one
+   and the mutation went unnoticed.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a month opens on the balance before it and closes on the last inside it', () => {
+  const rows = [
+    trade({ id: 'PID1', open_day: '2026-07-31', entry_time: '2026-07-31T14:00:00.000Z',
+            balance: 1000, pnl: 10 }),
+    trade({ id: 'PID2', open_day: '2026-08-10', entry_time: '2026-08-10T14:00:00.000Z',
+            balance: 1200, pnl: 20 }),
+    trade({ id: 'PID3', open_day: '2026-09-02', entry_time: '2026-09-02T14:00:00.000Z',
+            balance: 1500, pnl: 30 })
+  ];
+  const aug = app.rangeStats(rows, '2026-08-01', '2026-09-01');
+
+  // Half-open [start, end): July's balance opens August, August's closes it, and
+  // September's is outside the window entirely.
+  assert.equal(aug.openBal, 1000, 'the opening balance is not the one before the month');
+  assert.equal(aug.lastBal, 1200, 'the closing balance reached past the end of the month');
+  assert.notEqual(aug.openBal, aug.lastBal,
+    'the month opens and closes on one figure — the day bound has stopped applying');
+});
+
+test('a month with no balance before it opens on nothing rather than on its own', () => {
+  const rows = [
+    trade({ id: 'PID1', open_day: '2026-08-10', entry_time: '2026-08-10T14:00:00.000Z',
+            balance: 1200, pnl: 20 })
+  ];
+  const aug = app.rangeStats(rows, '2026-08-01', '2026-09-01');
+  assert.equal(aug.openBal, null, 'the month opened on a balance from inside itself');
+  assert.equal(aug.lastBal, 1200);
+});
+
 test('the form prefills a plan that is already recorded', () => {
   seed([journalled({ id: 'PID1', planned_stop: 4480, planned_target: 4530 })]);
   app.Journal.open('PID1');

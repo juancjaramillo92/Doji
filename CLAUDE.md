@@ -222,9 +222,11 @@ code you write near it:
   template literal, so every backtick in it is escaped.
 
   She has no write path to it, deliberately: a document that decides whether he
-  followed his rules cannot be edited by the thing checking them. Sections 1-6
-  and 9-11 are cited by rules and not written yet, and `readStrategy` answers for
-  them rather than returning nothing — a blank is a thing she fills in herself.
+  followed his rules cannot be edited by the thing checking them. Sections 1, 2,
+  3, 9, 10 and 11 are not written — four of them cited, and in the PROSE of §7
+  and §8 rather than in the rules table, which is why a scan of the table alone
+  reports them as unreferenced. `readStrategy` names them rather than returning
+  nothing: a blank is a thing she fills in herself.
 
 - **She is not a writer to `trades` and must not become one.** She reads the web,
   reads the journal through the `eugenia_trades` view, and writes only

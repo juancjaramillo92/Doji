@@ -946,10 +946,21 @@ checked against a row today, `field` that a column would have to exist first,
 it is one whose compliance is invisible, so it never counts as kept merely
 because nothing contradicted it.
 
-Sections 1–6 and 9–11 are drafted separately and are not in the file yet. Rules
-cite them, and `get_strategy` says so plainly rather than returning nothing —
-a blank is something she would fill in herself, which is the one outcome worse
-than reporting it missing. A `[decide]` in the text is a value he has not
+Sections 1, 2, 3, 9, 10 and 11 are not written. Four of them are cited — §2 for
+the market model, §9 for the leg of a failure that leaves no signature, §10 for
+what would have to change before a judgment rule could become checkable, and §1
+only by the retrieval contract's own list — and `get_strategy` names them rather
+than returning nothing, because a blank is something she would fill in herself,
+which is the one outcome worse than reporting it missing.
+
+§4 is the one section that answers a question the rules could not. **The two
+setups differ by method, not by location**: Break & Retest is a continuation
+trade taken through a level that has already broken and flipped, and Support &
+Resistance is a mean-reversion trade taken off a level that is holding. Interior
+levels are where levels break, the extremes are where they turn price back — so
+R-05 and R-06 read as rules about location and are rules about method. It also
+settles what a per-setup statistic is: a win rate split by `setup` compares
+continuation against mean-reversion, not one part of the chart against another. A `[decide]` in the text is a value he has not
 settled, and she is told to say so rather than supply one.
 
 A TS module rather than a markdown file for the reason `prompt.ts` is one: a
