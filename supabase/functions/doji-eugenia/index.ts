@@ -236,6 +236,78 @@ const NOTES_TOOL = {
   },
 } as const;
 
+/* ─── Reaching what the windows do not ─────────────────────────────────────
+   Twelve turns and twenty notes are what she is HANDED. Everything older is
+   still in the tables and simply never selected, so the archive is complete and
+   unreachable at the same time. This is the reach.
+
+   Deliberately not a wider window. Every token handed over is paid on every
+   request and competes with the briefing for attention; a search is paid only
+   when a question needs one, which is the same trade get_trades makes for the
+   journal.
+   ───────────────────────────────────────────────────────────────────────── */
+const SEARCH_TOOL = {
+  name: "search_memory",
+  description:
+    "Search everything you have ever said to him and every note you have kept — " +
+    "far past the recent turns and notes you are handed each message. Use it when " +
+    "he refers to something you discussed before that is not in front of you, when " +
+    "you need to know whether you have already explained something, or when he asks " +
+    "what you said or what he told you. Matches words, so search the terms that " +
+    "would appear in the text rather than a description of it. Results say whether " +
+    "each was a note or a turn, when it was, and whether a note has since been " +
+    "retired — a retired one is what you used to believe and is no longer true.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "The words to look for, as you would type them into a search box." },
+    },
+    required: ["query"],
+    additionalProperties: false,
+  },
+} as const;
+
+// Twelve hits and 300 characters each is roughly one briefing's worth of text —
+// enough to answer from, and bounded, because a turn can be a whole briefing and
+// an unbounded search result would push the conversation out of its own context.
+const SEARCH_HITS = 12;
+const SEARCH_CHARS = 300;
+
+type Hit = { source: string; id: number; at: string; retired: boolean; body: string };
+
+/* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
+   loop, and an exception here costs the answer she is in the middle of writing.
+   A search that fails comes back as a sentence she can carry on from. */
+async function searchMemory(query: unknown): Promise<string> {
+  const q = String(query ?? "").trim();
+  if (!q) return "Nothing to search for.";
+
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/eugenia_search`, {
+      method: "POST", headers: sbHeaders(),
+      body: JSON.stringify({ q, lim: SEARCH_HITS }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const hits: Hit[] = await res.json();
+
+    // An empty result is an ANSWER, and saying so plainly is what stops her
+    // reporting that she never discussed something when the search simply broke.
+    if (!hits.length) return `Nothing in your memory matches "${q}".`;
+
+    return hits.map(h => {
+      const when = shortDay(new Date(h.at));
+      const tag  = h.source === 'note'
+        ? `note ${h.id}${h.retired ? ', RETIRED — you no longer believe this' : ''}`
+        : `you said`;
+      const body = h.body.length > SEARCH_CHARS ? h.body.slice(0, SEARCH_CHARS) + '…' : h.body;
+      return `[${when}, ${tag}] ${body}`;
+    }).join("\n");
+  } catch (err) {
+    console.error("doji-eugenia: search failed —", err instanceof Error ? err.message : err);
+    return "Your memory could not be searched just now. Say you cannot check rather than answering as though you had.";
+  }
+}
+
 // Twenty of each is a season of observations at the few-a-week the prompt asks
 // for, and more standing instructions than he is ever likely to give — they are
 // one sentence each, so the whole memory costs less than one paragraph.
@@ -437,6 +509,7 @@ async function call(messages: any[], effort: Effort, container?: string) {
         { type: "web_search_20260209", name: "web_search", max_uses: 12 },
         TRADES_TOOL,
         NOTES_TOOL,
+        SEARCH_TOOL,
       ],
       thinking: { type: "adaptive" },
       output_config: { effort },
@@ -487,13 +560,16 @@ async function ask(messages: Turn[], effort: Effort): Promise<string> {
       const results = [];
       for (const b of body.content ?? []) {
         if (b.type !== "tool_use") continue;
-        // Only the two this function serves. web_search runs on Anthropic's
+        // Only the three this function serves. web_search runs on Anthropic's
         // side and never arrives here; anything else is a name we did not send.
         if (b.name === TRADES_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id, content: await readTrades(b.input?.days) });
         } else if (b.name === NOTES_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id,
             content: await writeNote(b.input?.note, b.input?.kind, b.input?.supersedes) });
+        } else if (b.name === SEARCH_TOOL.name) {
+          results.push({ type: "tool_result", tool_use_id: b.id,
+            content: await searchMemory(b.input?.query) });
         }
       }
       if (!results.length) throw new Error("tool_use with no tool this function serves");

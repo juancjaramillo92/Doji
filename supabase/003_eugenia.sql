@@ -172,3 +172,81 @@ create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc)
   where superseded_by is null;
 
 alter table public.eugenia_notes enable row level security;
+
+-- ─── Searching what she has already said ───────────────────────────────────
+-- The two tables above are append-only and grow without bound, but both reads
+-- are a fixed window — twelve turns, twenty notes of each kind. Everything
+-- older is still in the table and simply never selected. That is occlusion, not
+-- eviction: nothing has ever been lost, and none of it is reachable.
+--
+-- This is what reaches it. A question like "what did we conclude about the
+-- December cut" is answerable from turns written in March, and without this it
+-- is answerable only if March happens to be inside the last twelve.
+--
+-- SEARCHED, NOT LOADED, AND THAT IS THE WHOLE DESIGN. Widening the windows
+-- would put the archive in her context, where every token is paid on every
+-- request and competes for attention with the briefing itself. The windows stay
+-- small; this makes what is outside them addressable on demand, the same shape
+-- as get_trades.
+--
+-- GENERATED AND STORED rather than maintained by a trigger, for the reason
+-- `trades.pnl` is: a derived value with a write path of its own is a value that
+-- can disagree with what it derives from. There is no write path here at all.
+alter table public.eugenia_notes
+  add column if not exists search tsvector
+  generated always as (to_tsvector('english', note)) stored;
+
+alter table public.eugenia_turns
+  add column if not exists search tsvector
+  generated always as (to_tsvector('english', content)) stored;
+
+-- GIN, because these are the only queries that will ever run against these
+-- columns and a GIN index is what a tsvector `@@` match uses.
+create index if not exists eugenia_notes_search on public.eugenia_notes using gin (search);
+create index if not exists eugenia_turns_search on public.eugenia_turns using gin (search);
+
+-- ONE FUNCTION RATHER THAN TWO QUERIES, so the ranking is done across both
+-- sources rather than by merging two separately-ranked lists in the Edge
+-- Function, which cannot compare their scores. It is also where a vector search
+-- would be added later without the function file changing at all.
+--
+-- websearch_to_tsquery, NOT to_tsquery, and the difference is that this input is
+-- written by a model. to_tsquery throws a syntax error on an unbalanced quote or
+-- a bare `&`, and a throw inside her tool loop costs the whole answer;
+-- websearch_to_tsquery accepts anything a person would type into a search box
+-- and yields an empty query rather than an error.
+--
+-- A RETIRED NOTE IS RETURNED AND MARKED, never hidden. That is the promise
+-- superseded_by makes: the row stays findable and says it is no longer true.
+-- Hiding it here would make the archive lie by omission, and "what did I used to
+-- think" is a question worth being able to answer.
+create or replace function public.eugenia_search(q text, lim int default 12)
+returns table (source text, id bigint, at timestamptz, retired boolean, body text)
+language sql
+stable
+as $$
+  select source, id, at, retired, body
+  from (
+    select 'note' as source, n.id, n.created_at as at,
+           n.superseded_by is not null as retired, n.note as body,
+           ts_rank(n.search, websearch_to_tsquery('english', q)) as rank
+      from public.eugenia_notes n
+     where n.search @@ websearch_to_tsquery('english', q)
+    union all
+    select 'turn', t.id, t.created_at, false, t.content,
+           ts_rank(t.search, websearch_to_tsquery('english', q))
+      from public.eugenia_turns t
+     where t.search @@ websearch_to_tsquery('english', q)
+  ) hits
+  -- Clamped here as well as in the function that calls it: `lim` arrives from
+  -- the model through PostgREST, and this is the boundary that Postgres owns.
+  order by rank desc, at desc
+  limit greatest(1, least(coalesce(lim, 12), 25));
+$$;
+
+-- SECURITY INVOKER is the default for a function and is what is wanted, so it
+-- is not stated — but EXECUTE granted to PUBLIC IS a default, and that one has
+-- to be undone. anon and authenticated inherit from PUBLIC, so leaving it is a
+-- public entry point to her memory that only RLS stands behind.
+revoke execute on function public.eugenia_search(text, int) from public;
+grant execute on function public.eugenia_search(text, int) to service_role;

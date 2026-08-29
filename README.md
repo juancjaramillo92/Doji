@@ -873,6 +873,25 @@ changed it, which is exactly what a search over this table will need later:
 findable, and marked as no longer true. There is still no delete path, so the
 only things she can do to that table are add a sentence and retire one.
 
+**She can search everything she has ever said.** The twelve turns and twenty
+notes she is handed are the newest slice of two append-only tables; everything
+older was still there and simply never selected. `search_memory` reaches it —
+one RPC, `eugenia_search`, ranking notes and turns together with Postgres full
+text so a question like *"what did we conclude about the December cut"* is
+answerable from March.
+
+**Searched, not loaded, and that is the design rather than a limitation.**
+Widening the windows would put the archive in her context, where every token is
+paid on every request and competes with the briefing for attention. The windows
+stay small and what is outside them is addressable on demand — the same trade
+`get_trades` makes for the journal.
+
+`websearch_to_tsquery` rather than `to_tsquery`, because the query is written by
+a model: the strict parser throws on an unbalanced quote, and a throw inside the
+tool loop costs the whole answer. **A retired note is returned and marked, never
+hidden** — that is the promise `superseded_by` makes, and *what did I used to
+think* is worth being able to answer.
+
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
 it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no
@@ -1311,6 +1330,32 @@ create index if not exists eugenia_notes_kind_id_desc
   on public.eugenia_notes (kind, id desc);
 drop index if exists eugenia_notes_id_desc;
 ```
+
+Search is added to both of Eugenia's tables, and the whole block is idempotent —
+`add column if not exists`, `create index if not exists`, `create or replace
+function` — so it can be re-applied without a drop:
+
+```sql
+alter table public.eugenia_notes
+  add column if not exists search tsvector
+  generated always as (to_tsvector('english', note)) stored;
+
+alter table public.eugenia_turns
+  add column if not exists search tsvector
+  generated always as (to_tsvector('english', content)) stored;
+
+create index if not exists eugenia_notes_search on public.eugenia_notes using gin (search);
+create index if not exists eugenia_turns_search on public.eugenia_turns using gin (search);
+```
+
+…then the `create or replace function public.eugenia_search` statement from
+`003_eugenia.sql`, **including the `revoke` and `grant` under it** — EXECUTE is
+granted to PUBLIC by default and `anon` inherits it, so skipping those two lines
+leaves a public entry point to her memory with only RLS behind it.
+
+The generated columns backfill on the `alter`, so the whole archive is
+searchable the moment it runs — this is the one change today that works on
+history rather than only going forward.
 
 An existing `eugenia_notes` needs its `superseded_by` column, and the index has
 to be replaced with the partial one the read now matches:
