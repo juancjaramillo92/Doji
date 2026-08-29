@@ -149,6 +149,15 @@ pixels; say so on any visual change.
 - **Broker sync must never overwrite journal fields.** `Data.OWNED` is the
   definitive list — a save sends those columns and nothing else, enforced in one
   place. Deletes are a soft `deleted: true` flag.
+- **`size_oz` is poller-only, and the account is derived from it rather than
+  stored.** Both broker sources state size in ounces — cTrader sends a volume the
+  poller divides by a hundred, the alert email prints `Oz 4.00` — so ounces is
+  what the column holds. The email boundary stays at its five columns, so a
+  position the poller never reached carries no size, permanently. `latestBefore`
+  reads the newest one: the ladder is 0.02 lots per 1,000, so `size_oz × 500` is
+  the account the sizing implies, which is not the balance and must never be
+  labelled as one.
+
 - **A wrong direction, P&L or date cannot be fixed in `index.html`.** The app
   does not own those columns; the fault is upstream in the poller or the email
   path. Say so rather than looking for it in the app.
@@ -241,8 +250,28 @@ code you write near it:
   `open_day` is a civil day and a fixed number of milliseconds is not one.
   `writeNote` is the other boundary: it truncates rather than refusing, because
   a tool that errors mid-turn costs the whole answer.
+- **A note can be retired, and one filter is the whole of it.** `superseded_by`
+  keeps the row and takes it out of the read; drop `superseded_by=is.null` from
+  `readNotes` and she is handed the correction AND the thing it corrected, every
+  turn, with nothing marking which is current. No error, and a note count that
+  looks healthy. Three copies have to agree — the column, the filter, the tool
+  parameter — and any one missing leaves the other two doing nothing.
+
+- **The windows are small on purpose, and `search_memory` is what reaches past
+  them.** Twelve turns and twenty notes of each kind are what she is HANDED;
+  everything older was always in the tables and never selected. Widening a window
+  puts the archive in her context, where every token is paid on every request —
+  so the fix for "she cannot remember" is never a bigger limit. `eugenia_search`
+  ranks notes and turns together, uses `websearch_to_tsquery` because the query
+  is model-written and the strict parser throws on an unbalanced quote, and
+  returns a retired note MARKED rather than hidden.
+
+- **Every read of a growing table carries a limit.** Four hundred trades, twelve
+  turns, twenty notes, two hundred turns for the nightly pass. The last of those
+  was missing and nothing failed, because a normal day is a handful of turns.
+
 - **Her notes are the only channel he has for correcting her, so `notesBlock()`
-  is load-bearing on all three paths.** An instruction — *"stop mentioning the
+  is load-bearing on all four paths.** An instruction — *"stop mentioning the
   ten-year"* — is a note, and every later message obeys it; the conversation
   window would forget it by morning. Dropping the call from the briefing, the
   pulse or a reply fails silently: she carries on ignoring something he believes
