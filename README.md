@@ -744,11 +744,37 @@ shapes and different constraints. Merged, they would need a `kind` column, a
 nullable `role`, two constraints that each say "unless this is the other kind"
 and two partial indexes — more parts to hold one idea, not fewer.
 
+**She tidies her own memory at 22:00, every day.** Notes written mid-conversation
+are decided while she is busy answering, which is the worst moment to judge what
+will matter in November. The nightly pass is the only point at which she sees a
+whole day at once: it reads the last twenty-four hours of turns against the notes
+she is holding, writes what changed and will stay changed, and retires what is no
+longer true.
+
+**Its default is almost nothing.** Most days deserve no note — a conversation
+about today's data leaves nothing durable, and that is the normal outcome. The
+prompt pulls toward superseding rather than adding, because the visible window is
+twenty and five mediocre notes push five good ones out of it.
+
+Nothing is sent and no turn is stored: her reply is a line for the log, and
+storing it would spend two of tomorrow's twelve turns on bookkeeping she wrote to
+herself. `?consolidate=1` runs it on demand and is the only way to see what it
+does.
+
+**A fixed twenty-four hours and no watermark anywhere**, because the window and
+the gap between runs are the same length. A missed night loses that day's
+distillation and never the day — the turns stay in the table and stay searchable,
+which is what makes a lossy pass safe to run unattended.
+
 **The schedule is decided in the function, not in cron.** pg_cron schedules in
 UTC, so any fixed expression is an hour wrong for half the year and needs
 editing twice a year forever. The job runs hourly and the function asks
 America/New_York for its own clock — `briefDue()` for the briefing, `pulseDue()`
-for the pulse — and most of those calls find nothing due and spend nothing. It
+for the pulse, `consolidateDue()` for the nightly pass — and most of those calls
+find nothing due and spend nothing. Adding the fourth schedule needed no cron
+change at all, the job having always been `0 * * * *`, which is also how a
+schedule could be answered correctly and dispatched by nobody: `agree.test.mjs`
+reads `postScheduled` for a branch per answer `dueNow` can give. It
 is the same trade `marketOpen()` makes for the poller. A test walks every hour
 of a week and asserts the two never both fire, because one call cannot owe two
 answers.

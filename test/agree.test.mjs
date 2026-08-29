@@ -580,6 +580,36 @@ test('the documents name only symbols the repository has', () => {
    disagreed, forgot, or never read it.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── A schedule nothing dispatches ──────────────────────────────────────────
+   dueNow can answer 'consolidate' correctly every night for a year and the pass
+   never runs, because the branch that would call it is not there. The week-walk
+   in fold.test.mjs proves the ANSWER; nothing there proves anyone acts on it,
+   and the failure is a nightly no-op that returns 200 and looks healthy in
+   net._http_response.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every answer dueNow can give is dispatched by postScheduled', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // The literals in dueNow's return type, which is the one statement of what it
+  // can answer. 'weekday' and 'sunday' arrive as Brief and are handled together.
+  const sig = src.match(/export function dueNow\([^)]*\):\s*([^{]+)\{/);
+  assert.ok(sig, 'doji-eugenia no longer declares what dueNow returns');
+  const answers = [...sig[1].matchAll(/'(\w+)'/g)].map(m => m[1]);
+  assert.ok(answers.length, 'dueNow now returns no named answers — the reader has gone blind');
+
+  const at = src.indexOf('async function postScheduled(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  for (const a of answers) {
+    assert.match(body, new RegExp(`due === '${a}'`),
+      `dueNow can answer '${a}' and postScheduled never asks — that hour would ` +
+      `return 200 having done nothing at all`);
+  }
+});
+
 /* ─── Every tool sent is a tool served ───────────────────────────────────────
    The tools array in call() and the branches in ask() are two lists of the same
    names, and they fail in opposite directions. A tool sent but not served makes
@@ -596,14 +626,29 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  const sent = [...src.matchAll(/^\s{8}([A-Z_]+_TOOL),$/gm)].map(m => m[1]).sort();
-  assert.ok(sent.length >= 3,
-    `only ${sent.length} tools read out of the request — the reader has gone blind`);
+  // Read from the DEFINITIONS rather than from a tools array, because there are
+  // two arrays now and a tool belonging to either still has to be executable.
+  const defined = [...src.matchAll(/^const ([A-Z_]+_TOOL) = \{/gm)].map(m => m[1]).sort();
+  assert.ok(defined.length >= 3,
+    `only ${defined.length} tools read out of the file — the reader has gone blind`);
 
   const served = [...src.matchAll(/b\.name === ([A-Z_]+_TOOL)\.name/g)].map(m => m[1]).sort();
-  assert.deepEqual(served, sent,
-    'a tool is offered to the model that the loop cannot execute, or the reverse — ' +
-    'the first throws only once she happens to call it, the second is unreachable');
+  assert.deepEqual(served, defined,
+    'a tool is defined that the loop cannot execute, or the reverse — the first ' +
+    'throws only once she happens to call it, the second is unreachable');
+
+  /* AND EVERY TOOL SET IS DRAWN FROM THAT SAME LIST. A name appearing in a set
+     but nowhere as a definition is a tool the model is offered and the loop has
+     never heard of. */
+  for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS']) {
+    const block = src.match(new RegExp(`const ${set} = \\[([\\s\\S]*?)\\];`));
+    assert.ok(block, `doji-eugenia no longer defines ${set}`);
+    const named = [...block[1].matchAll(/([A-Z_]+_TOOL)/g)].map(m => m[1]);
+    assert.ok(named.length, `${set} offers no tool this file defines`);
+    for (const t of named) {
+      assert.ok(defined.includes(t), `${set} offers ${t}, which is not defined anywhere`);
+    }
+  }
 });
 
 test('the search tool names the function the database actually defines', () => {

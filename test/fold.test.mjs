@@ -962,13 +962,16 @@ const timetable = (briefed) => {
 test('an ordinary week owes one briefing and one pulse a day, and nothing else', () => {
   // August, so New York is EDT: 08:00 ET is 12:00 UTC, 10:00 ET is 14:00, and
   // the Sunday open at 17:00 ET is 21:00.
+  // And 22:00 ET is 02:00 UTC the NEXT day, so each night's consolidation sorts
+  // ahead of the morning it precedes rather than after the day it is about.
   assert.deepEqual(timetable(true), [
-    '2026-08-16T21:00 sunday',
-    '2026-08-17T12:00 weekday', '2026-08-17T14:00 pulse',
-    '2026-08-18T12:00 weekday', '2026-08-18T14:00 pulse',
-    '2026-08-19T12:00 weekday', '2026-08-19T14:00 pulse',
-    '2026-08-20T12:00 weekday', '2026-08-20T14:00 pulse',
-    '2026-08-21T12:00 weekday', '2026-08-21T14:00 pulse',
+    '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
+    '2026-08-17T02:00 consolidate', '2026-08-17T12:00 weekday', '2026-08-17T14:00 pulse',
+    '2026-08-18T02:00 consolidate', '2026-08-18T12:00 weekday', '2026-08-18T14:00 pulse',
+    '2026-08-19T02:00 consolidate', '2026-08-19T12:00 weekday', '2026-08-19T14:00 pulse',
+    '2026-08-20T02:00 consolidate', '2026-08-20T12:00 weekday', '2026-08-20T14:00 pulse',
+    '2026-08-21T02:00 consolidate', '2026-08-21T12:00 weekday', '2026-08-21T14:00 pulse',
+    '2026-08-22T02:00 consolidate',
   ]);
 });
 
@@ -976,11 +979,15 @@ test('a week of failed briefings owes the retry hours, and the pulse gives way',
   // 09:00, 10:00 and 11:00 ET are 13:00, 14:00 and 15:00 UTC. 14:00 is the one
   // hour the pulse also wants, and the retry takes it: a second look at a
   // morning he was never told about is not what is missing.
-  const day = (d) => [`2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
+  // Consolidation is untouched by any of it: it is not a briefing, so a briefing
+  // that failed neither delays nor replaces it.
+  const day = (d) => [`2026-08-${d}T02:00 consolidate`,
+                      `2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
                       `2026-08-${d}T14:00 weekday`, `2026-08-${d}T15:00 weekday`];
   assert.deepEqual(timetable(false), [
-    '2026-08-16T21:00 sunday',
+    '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
     ...day('17'), ...day('18'), ...day('19'), ...day('20'), ...day('21'),
+    '2026-08-22T02:00 consolidate',
   ]);
 });
 
@@ -992,7 +999,10 @@ test('the timetable holds its New York hours in winter too', () => {
     const due = dueNow(at, true);
     if (due) owed.push(`${at.toISOString().slice(11, 16)} ${due}`);
   }
-  assert.deepEqual(owed, ['13:00 weekday', '15:00 pulse']);
+  // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's
+  // consolidation, which is what a fixed UTC day of a New York timetable looks
+  // like from the inside.
+  assert.deepEqual(owed, ['03:00 consolidate', '13:00 weekday', '15:00 pulse']);
 });
 
 test('the pulse stays silent on the word it was told to use', () => {
