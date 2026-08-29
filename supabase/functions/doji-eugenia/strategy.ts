@@ -153,10 +153,32 @@ What 4% means in the shape of a month, so it is not abstract: **two and a half
 full stops erase a +10% month**, and **1.7 winners at $30 make one**. The target
 in §0 and the risk here are the same decision seen from two ends.
 
-Deriving it rather than storing it is deliberate too. \\\`size_oz\\\` is on the row, so
+Deriving it rather than storing it is deliberate too. \`size_oz\` is on the row, so
 the account tier and therefore the dollar risk of any past trade are recoverable
 from the trade itself, and a second column stating the percentage could disagree
-with the ladder that produced it.`,
+with the ladder that produced it.
+
+### Moving up a rung is a deposit, not a threshold
+
+He changes size by hand, and the trigger is performance sustained rather than
+reached: **holding the 10% for a couple of months at the current size**, then
+depositing and moving to the next level. The rung follows the money in, and the
+money in follows the months.
+
+So the ladder does not track the balance. It is not re-read per trade and it does
+not step the moment an account crosses a number — which is why §8 computes the
+month against the size actually traded rather than against a balance delta, and
+why that section says this account is funded in steps. These are those steps.
+
+Two things follow. A good month does not by itself move the rung, so a size that
+has not changed is not evidence of anything having gone wrong. And because the
+increase is funded rather than compounded, the 4% above survives the change: the
+new rung is 4% of the new account, not a larger share of the old one.
+
+**Coming back down is not stated.** The rule is written for the upward direction
+only, and nothing here says what happens to the rung after a bad stretch —
+whether it is reduced, and on what. That gap is the half of a sizing rule that
+matters when it matters most.`,
 
   "7": `## 7 · The rules, enumerated
 
