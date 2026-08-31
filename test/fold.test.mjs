@@ -37,8 +37,9 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import {
-  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, isBriefingMarker,
+  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
+  notesList,
 } from '../supabase/functions/doji-eugenia/index.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
@@ -1045,15 +1046,68 @@ test('the weekend never retries', () => {
   assert.equal(retryDue(new Date(Date.UTC(2026, 7, 23, 14))), false);   // Sunday
 });
 
-test('the retry recognises exactly what a briefing stores, and nothing else', () => {
-  // If it could not spot yesterday's shape it would send a second briefing
-  // every morning; if it matched too loosely, a question mentioning the word
-  // would suppress a real one.
-  assert.equal(isBriefingMarker(briefingMarker('weekday')), true);
-  assert.equal(isBriefingMarker(briefingMarker('sunday')), true);
-  assert.equal(isBriefingMarker('[pulse]'), false);
-  assert.equal(isBriefingMarker('what did the briefing say about CPI?'), false);
-  assert.equal(isBriefingMarker(''), false);
+test('the retry asks the database for exactly what a briefing stores', () => {
+  /* Both markers, or the briefing that stores the missing one is never seen and
+     the 09:00 retry sends a second. The equality is the database's now: the
+     filter names the two strings and nothing else can satisfy it, so a question
+     merely mentioning the word cannot suppress a real briefing. */
+  const q = briefedQuery();
+  assert.equal(q.split('?')[0], 'eugenia_turns');
+  for (const due of ['weekday', 'sunday']) {
+    assert.ok(q.includes(encodeURIComponent(briefingMarker(due))),
+      `briefedQuery does not name the ${due} marker — that briefing would go ` +
+      `unseen and the retry would generate and send another one`);
+  }
+  assert.ok(!q.includes(encodeURIComponent('[pulse]')));
+});
+
+test('the retry reads one row, not a window that a busy morning can overflow', () => {
+  /* This is the defect it replaced. Scanning the last thirty user turns for the
+     marker is correct on a quiet morning and wrong on a talkative one: thirty
+     messages between 08:00 and 09:00 push it out, briefedToday answers "no",
+     and the retry pays for a whole second briefing and sends it. A filter on
+     the marker cannot be crowded out, however much was said around it. */
+  const q = briefedQuery();
+  assert.match(q, /limit=1(&|$)/);
+  assert.match(q, /order=id\.desc/);
+  // The marker is written as the USER turn of the stored pair; her half is the
+  // briefing itself, which would match nothing here anyway.
+  assert.match(q, /role=eq\.user/);
+});
+
+/* ─── Eugenia: what he can see of her memory ─────────────────────────────────
+   notesBlock renders the notes for HER, framed as instructions to obey.
+   notesList renders the same rows for HIM, and is the only window he has into
+   what she is keeping — everything in there was written by her, a fact
+   silently, so an unreadable memory is one he can only audit by noticing an
+   absence.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('the listing carries the id each note is named by', () => {
+  // The number is how a note is retired. Without it he can read what she holds
+  // and still not be able to tell her which line to drop.
+  const out = notesList([{ id: 14, note: 'keep it under 1400' }],
+                        [{ id: 12, note: 'he trades the London open' }]);
+  assert.match(out, /\[14\] keep it under 1400/);
+  assert.match(out, /\[12\] he trades the London open/);
+});
+
+test('what he told her and what she noticed stay apart, and in that order', () => {
+  // Run together they invite exactly the confusion notesBlock keeps out of her
+  // context: an instruction is not an observation to be weighed against one.
+  const out = notesList([{ id: 2, note: 'stop mentioning the ten-year' }],
+                        [{ id: 1, note: 'he has the dollar channel' }]);
+  assert.ok(out.indexOf('[2]') < out.indexOf('[1]'),
+    'the instructions must come first — they are the half that is not optional');
+  assert.match(out, /told me/);
+  assert.match(out, /noticed/);
+});
+
+test('an empty memory says so, and an empty half prints no heading', () => {
+  // A blank reply reads as a bot that failed rather than one holding nothing.
+  assert.match(notesList([], []), /\S/);
+  assert.ok(!notesList([], [{ id: 1, note: 'x' }]).includes('told me'));
+  assert.ok(!notesList([{ id: 1, note: 'x' }], []).includes('noticed'));
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */

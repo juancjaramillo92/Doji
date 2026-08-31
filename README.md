@@ -890,6 +890,20 @@ would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts the briefing, the pulse and a reply each read
 them.
 
+**`/notes` is how he reads what she is keeping**, and it is answered from the
+database rather than by the model — `notesList()` renders the rows themselves,
+with the id each is named by, so the listing is an audit rather than her account
+of one. Asked to recite her own notes she could paraphrase a line, drop one, or
+produce a plausible sentence that is not in the table, and none of that would be
+visible.
+
+Without it her memory is the one part of this system he can write to and cannot
+read. A fact is recorded silently by design and an instruction is acknowledged
+in four words that scroll away, so the evidence that anything stuck lasts about
+a morning — and a wrong note fails in the worst available way. A fact saying he
+understands something he does not makes her **stop explaining it**, and the
+symptom is an absence, which is the hardest thing there is to notice.
+
 Append-only, and now with a way to retire a line rather than only bury it. Every
 note reaches her with a number in brackets, and `remember` takes an optional
 `supersedes` — so a new note that contradicts an old one names it, and the old
@@ -1028,9 +1042,33 @@ failed insert produce four briefings and four bills. A read failure counts as
 *already briefed* for the same reason: if the database is unwell the retry
 cannot check, and a second briefing sent on a guess is worse than a skipped one.
 
+**The database finds the marker; nothing scans a window of turns for it.**
+`briefedQuery()` filters on the two marker strings and returns one row, because
+the obvious alternative — read the last thirty user turns and look for it among
+them — is correct on a quiet morning and wrong on a talkative one. Thirty
+messages between 08:00 and 09:00 push the marker out of that window, the retry
+concludes nothing was sent, and generates and delivers a second briefing: a
+dozen searches at `high` effort, and a duplicate he did not ask for. A filter on
+the marker itself cannot be crowded out by whatever was said around it.
+
 At 10:00 the retry window and the pulse overlap, and `dueNow()` gives that hour
 to the retry — on a day the briefing failed, a second look at a morning he was
 never told about is not what is wanted.
+
+### What a turn cost
+
+`ask()` logs one line per turn — the caller, the rounds it took, the effort, the
+tokens in and out, how many were served from cache, and how many web searches
+were billed. `postBriefing` adds the briefing's length in characters, and
+`?force=1` returns it as `chars` so a manual run shows it without opening the
+logs.
+
+None of this changes what she does. It exists because nothing else can see any
+of it: the spend cap on the Anthropic key is a ceiling rather than a meter, web
+search bills separately from tokens, and the briefing's nine-hundred-to-fourteen-
+hundred-character target lives in the prompt, on the far side of a model call,
+where no test can hold it. Unmeasured, the briefing grew by a sixth and the way
+it surfaced was somebody counting the characters by hand.
 
 ### Programmatic tool calls need their container
 
@@ -1621,7 +1659,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `isBriefingMarker`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the journal columns across `Data.OWNED`, Gladys's `COLUMNS` — a subset, not an equality — the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the four paths that must call it — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
