@@ -145,6 +145,13 @@ export const greeting = (brief: Brief) =>
    paragraph is itself over the limit — a hard cut. The prompt puts a blank line
    between paragraphs and nowhere else, which is why the first choice is nearly
    always the one taken.
+
+   TWO LOOKUPS RATHER THAN A max() OVER THE PAIR, and the difference is that the
+   max() cannot express the preference above. Every blank line contains a
+   newline at a higher index, so lastIndexOf('\n') is always at or past
+   lastIndexOf('\n\n') and the paragraph term can never win — the split silently
+   took the last newline of any kind, which lands mid-list inside the one shape
+   FORMAT permits a newline in.
    ───────────────────────────────────────────────────────────────────────── */
 export const TG_LIMIT = 4096;
 
@@ -155,8 +162,9 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
   while (rest.length > limit) {
     const window = rest.slice(0, limit);
     // lastIndexOf on the window, so the break is always inside the budget.
-    const at = Math.max(window.lastIndexOf('\n\n'), window.lastIndexOf('\n'));
-    const cut = at > limit / 2 ? at : limit;
+    const para = window.lastIndexOf('\n\n');
+    const line = window.lastIndexOf('\n');
+    const cut = para > limit / 2 ? para : line > limit / 2 ? line : limit;
     out.push(rest.slice(0, cut).trim());
     rest = rest.slice(cut).trim();
   }
@@ -328,10 +336,21 @@ const STRATEGY_TOOL = {
 /* Synchronous and cannot fail: it is a module constant, not a database read.
    An unknown section is answered rather than refused — §7 cites sections that
    are drafted and not yet written, and "that part does not exist yet" is a
-   better answer than silence, which she would fill in herself. */
-function readStrategy(section: unknown): string {
+   better answer than silence, which she would fill in herself.
+
+   A SUBSECTION IS SERVED BY THE SECTION THAT HOLDS IT, and without that the two
+   citations she is handed on every single turn were the two this could not
+   answer. R-05 cites §4.1 and R-06 cites §4.2; both are written, in full,
+   inside §4 — and an exact lookup told her they did not exist, which is not a
+   blank she fills in herself but something worse: a wrong fact about the
+   document, delivered by the one tool that exists to stop her inventing one.
+
+   Exported because it is the decision. The test that was meant to catch this
+   read the file for the word `has no section` and passed, and the one that
+   reads citations captured `4` out of `§4.1`. */
+export function readStrategy(section: unknown): string {
   const key = String(section ?? "").trim().replace(/^§/, '');
-  const found = SECTIONS[key];
+  const found = SECTIONS[key] ?? SECTIONS[key.split('.')[0]];
   if (found) return found;
   return `The strategy has no section ${key}. It holds ${Object.keys(SECTIONS).join(", ")} ` +
          `at version ${VERSION}. Sections 1, 2, 3, 9, 10 and 11 are not written, ` +
@@ -357,8 +376,9 @@ const SEARCH_TOOL = {
     "you need to know whether you have already explained something, or when he asks " +
     "what you said or what he told you. Matches words, so search the terms that " +
     "would appear in the text rather than a description of it. Results say whether " +
-    "each was a note or a turn, when it was, and whether a note has since been " +
-    "retired — a retired one is what you used to believe and is no longer true.",
+    "each was a note, something you said or something HE said, when it was, and " +
+    "whether a note has since been retired — a retired one is what you used to " +
+    "believe and is no longer true.",
   input_schema: {
     type: "object",
     properties: {
@@ -375,7 +395,42 @@ const SEARCH_TOOL = {
 const SEARCH_HITS = 12;
 const SEARCH_CHARS = 300;
 
-type Hit = { source: string; id: number; at: string; retired: boolean; body: string };
+export type Hit = { source: string; id: number; at: string; retired: boolean; body: string };
+
+/* WHO SAID IT IS PART OF THE HIT, and it went missing on the way out of the
+   database. eugenia_turns carries `role`; eugenia_search did not select it, and
+   every turn came back rendered `you said` — so half of every result set was
+   HIS words handed back to her as her own. She would quote an instruction he
+   gave as her own analysis, or deny having said something he said, fluently and
+   with nothing anywhere reporting it.
+
+   The role rides in `source` rather than in a column of its own because
+   `create or replace function` may not change a return type, and dropping the
+   function to widen it takes its grants with it. Three values, one column, no
+   migration hazard: `note`, `you`, `him`.
+
+   The words themselves are a map rather than a chain of ternaries, because they
+   are one half of a vocabulary the database holds the other half of: a name
+   woven into a conditional is not something a reader can enumerate, and this
+   pair has to be comparable against the SQL's own literals or it is once again
+   a copy nothing can check. An unrecognised source renders as itself rather
+   than folding into hers — a value renamed on one side would otherwise land in
+   the default branch and quietly restore the misattribution.
+
+   Pure, so a test can drive all three renderings; the read stays with the
+   caller — the same split notesList and channelsList are written on. */
+export const SAID: Record<string, string> = { you: 'you said', him: 'he said' };
+
+export function searchList(hits: Hit[]): string {
+  return hits.map(h => {
+    const when = shortDay(new Date(h.at));
+    const tag  = h.source === 'note'
+      ? `note ${h.id}${h.retired ? ', RETIRED — you no longer believe this' : ''}`
+      : SAID[h.source] ?? h.source;
+    const body = h.body.length > SEARCH_CHARS ? h.body.slice(0, SEARCH_CHARS) + '…' : h.body;
+    return `[${when}, ${tag}] ${body}`;
+  }).join("\n");
+}
 
 /* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
    loop, and an exception here costs the answer she is in the middle of writing.
@@ -396,14 +451,7 @@ async function searchMemory(query: unknown): Promise<string> {
     // reporting that she never discussed something when the search simply broke.
     if (!hits.length) return `Nothing in your memory matches "${q}".`;
 
-    return hits.map(h => {
-      const when = shortDay(new Date(h.at));
-      const tag  = h.source === 'note'
-        ? `note ${h.id}${h.retired ? ', RETIRED — you no longer believe this' : ''}`
-        : `you said`;
-      const body = h.body.length > SEARCH_CHARS ? h.body.slice(0, SEARCH_CHARS) + '…' : h.body;
-      return `[${when}, ${tag}] ${body}`;
-    }).join("\n");
+    return searchList(hits);
   } catch (err) {
     console.error("doji-eugenia: search failed —", err instanceof Error ? err.message : err);
     return "Your memory could not be searched just now. Say you cannot check rather than answering as though you had.";
@@ -640,13 +688,19 @@ type Effort = 'medium' | 'high';
 /* TWO TOOL SETS, because the two jobs are not the same conversation.
 
    Consolidation is handed the day and the notes and asked what is worth
-   keeping; it has no question to research and nothing to look up in the
-   journal. Sending it the full set would let a nightly bookkeeping pass run a
-   dozen web searches, which is money for nothing and a slower job that can fail
-   in more ways.
+   keeping; it has no question to research. Sending it the full set would let a
+   nightly bookkeeping pass run a dozen web searches, which is money for nothing
+   and a slower job that can fail in more ways.
 
-   Both are served by the same loop below — a tool set is a list of what may be
-   offered, never of what can be executed. */
+   SEARCH IS THE EXCEPTION, AND IT IS NOT A LOOSENING. The instruction this
+   prompt leans hardest on is PREFER SUPERSEDING TO ADDING — and a pass that can
+   only see the twenty notes it was handed cannot tell a new observation from
+   one it wrote in June. It was being asked to avoid duplicating an archive it
+   had no way to look at. One database read, no web, and the tool it reaches for
+   is the same one every other caller has.
+
+   Both sets are served by the same loop below — a tool set is a list of what
+   may be offered, never of what can be executed. */
 const CHAT_TOOLS = [
   { type: "web_search_20260209", name: "web_search", max_uses: 12 },
   TRADES_TOOL,
@@ -654,7 +708,7 @@ const CHAT_TOOLS = [
   SEARCH_TOOL,
   STRATEGY_TOOL,
 ];
-const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL];
+const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL];
 
 async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -674,9 +728,23 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
     body: JSON.stringify({
       model: "claude-opus-5",
       max_tokens: 16000,
-      // Cached: both are long, fixed, and sent on every turn — which is exactly
-      // why the strategy rides here rather than in the message.
-      system: [{ type: "text", text: SYSTEM + ALWAYS, cache_control: { type: "ephemeral" } }],
+      /* Cached: both are long, fixed, and sent on every turn — which is exactly
+         why the strategy rides here rather than in the message.
+
+         AN HOUR, STATED, BECAUSE THE DEFAULT IS FIVE MINUTES AND HER CALLERS
+         ARE HOURS APART. What the cache actually buys is worth saying plainly
+         rather than assuming: the rounds WITHIN one turn, always — a briefing
+         that reads the journal and writes a note is three requests carrying
+         this prefix — and across turns only inside the window. Five minutes
+         caught almost nothing across turns; an hour catches the morning's
+         replies after a briefing, and the 09:00 retry after an 08:00 failure.
+         It does not catch 08:00 → 10:00, and nothing sensible would.
+
+         Not a beta: `ttl` is a plain field on cache_control. The meter is the
+         log line at the bottom of ask() — `cached` is the number that says
+         whether any of this is true, and it is the reason it is printed. */
+      system: [{ type: "text", text: SYSTEM + ALWAYS,
+                 cache_control: { type: "ephemeral", ttl: "1h" } }],
       messages,
       // web_search runs on Anthropic's side and needs no loop here; the rest
       // are ours and are executed below.
@@ -946,6 +1014,8 @@ async function notesBlock(): Promise<string> {
   }
 }
 
+type Channel = { channel: string; state: string; evidence: string | null; moved_on: string | null };
+
 /* THE SAME ROWS, RENDERED FOR HIM RATHER THAN FOR HER, and the only window he
    has into any of it.
 
@@ -959,49 +1029,89 @@ async function notesBlock(): Promise<string> {
 
    Pure, so a test can read the formatting; the read stays with the caller. The
    ids are the point rather than decoration — they are how she is told which
-   note to retire, and now how he is. */
-export function notesList(told: Note[], noticed: Note[]): string {
-  if (!told.length && !noticed.length) return "I have not kept anything yet, jefe.";
+   note to retire, and now how he is.
+
+   THE MAP IS PART OF THIS MESSAGE RATHER THAN APPENDED TO IT, and it has to be.
+   The `/notes` reply used to end with channelsBlock() — which is written for HER
+   context and opens `Where he stands on each channel`, so the one message
+   addressed to him switched into the third person about him halfway through.
+   Rendering the whole audit here fixes that and makes it one pure function
+   instead of a him-facing half glued to a her-facing half.
+
+   It also means a failed channels read now costs the whole `/notes` reply
+   rather than being swallowed. That is the right direction here and the
+   opposite of the rule the blocks follow: this is an AUDIT, answered from the
+   database precisely so nothing can quietly drop a row, and an audit that
+   silently omits half of what it audits is the defect it exists to prevent. */
+export function notesList(told: Note[], noticed: Note[], channels: Channel[]): string {
   const list = (ns: Note[]) => ns.map(noteLine).join("\n");
   return [
     told.length    ? `What you have told me, newest first:\n${list(told)}`  : "",
     noticed.length ? `What I have noticed, newest first:\n${list(noticed)}` : "",
+    told.length || noticed.length ? "" : "I have not kept any notes yet, jefe.",
+    `Where you stand on each channel:\n${channelsList(channels)}`,
   ].filter(Boolean).join("\n\n");
 }
 
-type Channel = { channel: string; state: string; evidence: string | null };
+/* A CIVIL DAY FORMATTED AS ONE, which shortDay cannot do. `moved_on` is already
+   a New York date written by setChannel, so re-zoning it moves it: new Date
+   ('2026-03-12') is midnight UTC, which is the 11th in New York, and every rung
+   would read a day early. Formatted in UTC off a midday anchor, the date that
+   was stored is the date that is shown. */
+const civilDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC', day: 'numeric', month: 'short',
+}).format(new Date(`${iso}T12:00:00Z`));
 
 /* RENDERED IN THE ORDER prompt.ts DECLARES THEM, not in whatever order the
    database returns — the list she reads should be the list she was taught, and
    a stable order is also what stops a rung looking like it moved when it did
    not. A channel with no row is shown at the bottom rung rather than dropped:
    the point of this block is that an absence is visible, so a missing row must
-   not be the one thing it hides. Pure, so a test can read the shape. */
+   not be the one thing it hides. Pure, so a test can read the shape.
+
+   AND EVERY RUNG CARRIES THE DAY IT LAST MOVED, which is what stops the map
+   going blind. The ladder only ever climbs — deliberately, since failing to
+   reach for a mechanism once is not the same as having lost it — so over a year
+   every channel he has ever used converges on `owns`, and a census with nothing
+   left at `unseen` has no absence left to show. That is the whole thing it is
+   for. `moved_on` was written by setChannel from the first day and read by
+   nobody: a rung set in March looked exactly like one set last night, which is
+   the difference between a channel he owns and a channel that has gone quiet.
+   Rendering it is the entire fix, and it costs one clause. */
 export function channelsList(rows: Channel[]): string {
   const byId = new Map(rows.map(r => [r.channel, r]));
   return CHANNELS.map(([id, name]) => {
     const row = byId.get(id);
     const state = row?.state ?? CHANNEL_STATES[0];
-    return `· ${name} — ${state}${row?.evidence ? ` (${row.evidence})` : ""}`;
+    const since = row?.moved_on ? ` since ${civilDay(row.moved_on)}` : "";
+    return `· ${name} — ${state}${since}${row?.evidence ? ` (${row.evidence})` : ""}`;
   }).join("\n");
+}
+
+/* THE READ, SEPARATE FROM EITHER RENDERING, because there are two of them now
+   and they are addressed to different people — `channelsBlock` below speaks to
+   her about him, `notesList` speaks to him about himself, and neither is the
+   place for a query. */
+async function readChannels(): Promise<Channel[]> {
+  const res = await fetch(
+    // Bounded by the list that defines it rather than by a literal: the table
+    // cannot hold a sixth row — the primary key sits on a five-value check —
+    // so this is the one read here whose limit can never bite. It is written
+    // anyway, because every read of her tables carrying one is the invariant,
+    // and the read that was allowed to be the exception was the one that got
+    // missed.
+    `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence,moved_on` +
+    `&limit=${CHANNELS.length}`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Channels read failed (HTTP ${res.status})`);
+  return await res.json();
 }
 
 /* Optional the same way notesBlock is: a database blip costs her the map, not
    the briefing. */
 async function channelsBlock(): Promise<string> {
   try {
-    const res = await fetch(
-      // Bounded by the list that defines it rather than by a literal: the table
-      // cannot hold a sixth row — the primary key sits on a five-value check —
-      // so this is the one read here whose limit can never bite. It is written
-      // anyway, because every read of her tables carrying one is the invariant,
-      // and the read that was allowed to be the exception was the one that got
-      // missed.
-      `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence` +
-      `&limit=${CHANNELS.length}`,
-      { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return `\n\nWhere he stands on each channel:\n${channelsList(await res.json())}`;
+    return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
   } catch (err) {
     console.error("doji-eugenia: channels unavailable —",
       err instanceof Error ? err.message : err);
@@ -1204,14 +1314,29 @@ const CONSOLIDATE_HOURS = 24;
 // effort call with nothing to stop it.
 const CONSOLIDATE_TURNS = 200;
 
+/* THE LIMIT HAS TO TAKE THE NEWEST, and it was taking the oldest.
+
+   `order=id.asc&limit=200` reads the FIRST two hundred turns of the window, so
+   the one day the bound bites is the day the pass distils the morning and drops
+   the evening — which is where a late instruction lives, and the only thing in
+   a day that must not be lost. Every other bounded read in this file selects
+   newest-first and reverses, which is also what recent() does; this was the one
+   that did not, and the bound looked identical from the outside either way.
+
+   Exported because it is the decision, the same reason tradesQuery and
+   briefedQuery are. */
+export function dayQuery(hours: number, now = Date.now()): string {
+  const from = new Date(now - hours * 3600_000).toISOString();
+  return `eugenia_turns?select=role,content,created_at` +
+         `&created_at=gte.${from}&order=id.desc&limit=${CONSOLIDATE_TURNS}`;
+}
+
 async function turnsSince(hours: number): Promise<Turn[]> {
-  const from = new Date(Date.now() - hours * 3600_000).toISOString();
-  const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at` +
-    `&created_at=gte.${from}&order=id.asc&limit=${CONSOLIDATE_TURNS}`,
-    { headers: sbHeaders() });
+  const res = await fetch(`${SB_URL}/rest/v1/${dayQuery(hours)}`, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Day read failed (HTTP ${res.status})`);
-  return dateTurns(await res.json());
+  // Reversed back into the order it is read in: the pass is handed the day
+  // oldest first, and only the SELECT needed to run the other way round.
+  return dateTurns((await res.json()).reverse());
 }
 
 async function postConsolidation(): Promise<Response> {
@@ -1220,7 +1345,13 @@ async function postConsolidation(): Promise<Response> {
   // a model round to be told what an empty array already said.
   if (!day.length) return json({ ok: true, skipped: "nothing said" });
 
-  const asked = CONSOLIDATE + await notesBlock() + await channelsBlock() +
+  /* THE WEEK GOES IN TOO, and without it the pass was asked to notice something
+     it could not see. What earns a note includes "he has started doing
+     something differently" — a claim about his trading, judged against a
+     transcript that on most days does not mention a trade at all. It is the
+     same read the briefing already makes through the same read-only view, so
+     this buys the evidence for that instruction and no new reach. */
+  const asked = CONSOLIDATE + await notesBlock() + await channelsBlock() + await tradesBlock() +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
@@ -1230,7 +1361,35 @@ async function postConsolidation(): Promise<Response> {
   const said = await ask([{ role: 'user', content: asked }], 'high', 'consolidation',
                          CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
+  await logChannels();
   return json({ ok: true, consolidated: day.length });
+}
+
+/* THE ONE CLAIM IN THIS SYSTEM THAT HAD NO METER.
+
+   Everything else that cannot be seen is counted where it happens and for that
+   exact reason: ask() logs tokens and searches because the spend cap is a
+   ceiling and not a meter, and postBriefing logs the character count because
+   the length target lives in prose past a model call — unmeasured, it grew by a
+   sixth and somebody found out by counting by hand.
+
+   What she is FOR is that his understanding grows, and the map is the designed
+   instrument for it. Nothing ever read that instrument back. A ladder that has
+   stopped moving looks exactly like one that never had to, and the nightly pass
+   is the only thing that can move a rung — so this is the line that says
+   whether it does, printed at the one moment a rung could just have changed.
+
+   Never throws: the pass has done its work by the time this runs, and a log
+   line must not turn a good night into a 500. */
+async function logChannels() {
+  try {
+    const rungs = channelsList(await readChannels())
+      .split('\n').map(l => l.replace(/^· /, '')).join(' · ');
+    console.log(`doji-eugenia: channels — ${rungs}`);
+  } catch (err) {
+    console.error("doji-eugenia: channels unavailable —",
+      err instanceof Error ? err.message : err);
+  }
 }
 
 async function postPulse(): Promise<Response> {
@@ -1278,12 +1437,14 @@ async function handleMessage(update: any): Promise<void> {
        an audit that can do that audits nothing. It also costs no model call. */
     if (msg.text.trim().toLowerCase() === '/notes') {
       try {
-        const [told, noticed] = await Promise.all([
-          readNotes('instruction'), readNotes('fact'),
-        ]);
         // The map goes out with them: it is the half of her memory he has never
         // been able to see at all, and the half that says what she is missing.
-        await say(notesList(told, noticed) + await channelsBlock());
+        // Read here and rendered by notesList, so the whole audit is one
+        // message written to him rather than his half plus hers.
+        const [told, noticed, channels] = await Promise.all([
+          readNotes('instruction'), readNotes('fact'), readChannels(),
+        ]);
+        await say(notesList(told, noticed, channels));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —",
           err instanceof Error ? err.message : err);

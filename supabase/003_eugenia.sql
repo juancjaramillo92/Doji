@@ -221,6 +221,19 @@ create index if not exists eugenia_turns_search on public.eugenia_turns using gi
 -- superseded_by makes: the row stays findable and says it is no longer true.
 -- Hiding it here would make the archive lie by omission, and "what did I used to
 -- think" is a question worth being able to answer.
+--
+-- AND A TURN SAYS WHO SAID IT, which this dropped for as long as it existed.
+-- `role` was on the table and was not selected, so every turn came back
+-- indistinguishable and the function rendered all of them as her own words —
+-- half of every result set was HIS messages handed back to her as things she
+-- had said. Silent, fluent, and exactly backwards on the question the tool is
+-- most often called to answer.
+--
+-- FOLDED INTO `source` RATHER THAN ADDED AS A COLUMN, because `create or replace
+-- function` may not change a return type: widening the signature needs a `drop
+-- function` first, which takes the grants at the bottom of this file with it.
+-- `source` is already the column that says what a hit is, and three values say
+-- it exactly: `note`, `you`, `him`.
 create or replace function public.eugenia_search(q text, lim int default 12)
 returns table (source text, id bigint, at timestamptz, retired boolean, body text)
 language sql
@@ -234,7 +247,8 @@ as $$
       from public.eugenia_notes n
      where n.search @@ websearch_to_tsquery('english', q)
     union all
-    select 'turn', t.id, t.created_at, false, t.content,
+    select case when t.role = 'user' then 'him' else 'you' end,
+           t.id, t.created_at, false, t.content,
            ts_rank(t.search, websearch_to_tsquery('english', q))
       from public.eugenia_turns t
      where t.search @@ websearch_to_tsquery('english', q)

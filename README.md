@@ -299,6 +299,7 @@ be single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **journal column names** | `Data.OWNED` (six), Gladys's `COLUMNS` (the four a button can carry), the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object, both of which follow `COLUMNS` rather than `OWNED` |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
@@ -759,6 +760,22 @@ whole day at once: it reads the last twenty-four hours of turns against the note
 she is holding, writes what changed and will stay changed, and retires what is no
 longer true.
 
+**It is given what it is asked to judge with**, which for two of its
+instructions it was not. It is told to notice what he has started doing
+differently — a claim about his trading, judged from a transcript that on most
+days never mentions a trade — so the week's trades go in beside the day, the same
+read the briefing already makes. And it is told to prefer superseding to adding
+while holding twenty notes out of an archive it had no way to look at, so
+`search_memory` is in its tool set. Still no web search: a bookkeeping pass has
+nothing to research, and that argument has not moved.
+
+**The window's limit takes the newest turns, not the oldest.** Two hundred is far
+more than a real day, so it bites only on a backfill or a very long day — and
+`order=id.asc&limit=200` read the *first* two hundred, which is a pass that
+distils the morning and drops the evening, where a late instruction lives. The
+select runs newest-first and is reversed for reading, exactly as `recent()` does.
+The two are indistinguishable from outside, which is why nothing caught it.
+
 **Its default is almost nothing.** Most days deserve no note — a conversation
 about today's data leaves nothing durable, and that is the normal outcome. The
 prompt pulls toward superseding rather than adding, because the visible window is
@@ -768,6 +785,15 @@ Nothing is sent and no turn is stored: her reply is a line for the log, and
 storing it would spend two of tomorrow's twelve turns on bookkeeping she wrote to
 herself. `?consolidate=1` runs it on demand and is the only way to see what it
 does.
+
+**And it prints where the five channels stand, at the one moment a rung could
+just have moved.** Everything else here that cannot be seen is counted where it
+happens and for that exact reason — `ask()` logs tokens because the spend cap is
+a ceiling and not a meter, `postBriefing` logs characters because the length
+target lives past a model call. What she is *for* is that his understanding
+grows, the map is the instrument built to measure it, and nothing ever read that
+instrument back. A ladder that has stopped moving looks exactly like one that
+never had to.
 
 **A fixed twenty-four hours and no watermark anywhere**, because the window and
 the gap between runs are the same length. A missed night loses that day's
@@ -914,6 +940,21 @@ The ladder is `unseen → explained → used → owns`. Order matters, and not o
 documentation: `channelsList` renders a row it was not given at the **first**
 rung, so reversing the list would render every unseeded channel as owned.
 
+**Every rung carries the day it last moved, and that is what stops the map going
+blind.** The ladder never comes back down — deliberately, since failing to reach
+for a mechanism once is not the same as having lost it — so over a year the
+channels he has used pile up at the top, and a census with nothing left at
+`unseen` has no absence left to show, which is the entire thing it is for.
+`moved_on` was written by `set_channel` from the first day and read by nobody: a
+rung set in March looked exactly like one set last night. The prompt now counts a
+rung that has not moved in months toward the tiebreaker the same way a low one
+counts — a channel that has gone quiet, not one he has lost.
+
+It is formatted as the civil day it was stored as. Read back through a New York
+formatter it would move: `new Date('2026-03-12')` is midnight UTC, which is the
+11th in New York, so every rung would read a day early in the one column that
+says how stale it is.
+
 **It is a tiebreaker, never a driver**, and the prompt says so in those words. It
 decides which of two mechanisms that are *both* live today she unpacks — lean
 toward the thinner one. It never decides what the day is about. A briefing that
@@ -948,9 +989,19 @@ a morning — and a wrong note fails in the worst available way. A fact saying h
 understands something he does not makes her **stop explaining it**, and the
 symptom is an absence, which is the hardest thing there is to notice.
 
-The channel map goes out with the listing, because it is the half of her memory
-he has never been able to see at all — and the half that says what she is
-missing rather than what she has.
+The channel map is part of the same listing, because it is the half of her
+memory he has never been able to see at all — and the half that says what she is
+missing rather than what she has. It is rendered *by* `notesList()` rather than
+appended after it: the block the briefing uses is written for her and opens
+*Where he stands on each channel*, so the one message in the system addressed to
+him used to switch into the third person about him halfway down. Rendering the
+whole audit in one place fixes that and makes it one pure function.
+
+It also means a failed channel read now costs the whole `/notes` reply rather
+than being swallowed, which is the opposite of the rule the briefing's blocks
+follow and is right here: this is an audit, answered from the database precisely
+so nothing can quietly drop a row, and one that silently omits half of what it
+audits is the defect it exists to prevent.
 
 Append-only, and now with a way to retire a line rather than only bury it. Every
 note reaches her with a number in brackets, and `remember` takes an optional
@@ -988,13 +1039,34 @@ tool loop costs the whole answer. **A retired note is returned and marked, never
 hidden** — that is the promise `superseded_by` makes, and *what did I used to
 think* is worth being able to answer.
 
+**And a hit says who said it.** `eugenia_turns` carries `role`; the search did
+not select it, so every turn came back rendered as *you said* and half of every
+result set was **his** messages handed back to her as her own words — she would
+quote an instruction he gave as her own analysis, or deny saying something he
+said, fluently, with nothing anywhere reporting it. The role rides in `source`
+rather than in a column of its own, because `create or replace function` may not
+change a return type and dropping the function to widen it takes its grants with
+it. Three words, one column: `note`, `you`, `him`. They are a vocabulary shared
+with `searchList`, so `agree.test.mjs` holds the two lists against each other.
+
 **She holds his strategy and can never write it.** `strategy.ts` is the document
 he wrote — what he trades, the rules, how each one is checked. Its own retrieval
 contract decides what she carries: the summary and the rules table ride on the
-**cached** system prompt, so they are in front of her on every turn and paid for
-once; `get_strategy` fetches the reasoning behind any of it. Loading the whole
+**cached** system prompt, so they are in front of her on every turn;
+`get_strategy` fetches the reasoning behind any of it. Loading the whole
 document instead would be roughly ten thousand characters against every message,
 competing with the briefing for attention.
+
+**A subsection is served by the section that holds it**, and without that the two
+citations she carries on every single turn were the two `get_strategy` could not
+answer. R-05 cites §4.1 and R-06 cites §4.2; both are written, in full, inside
+§4, and an exact lookup told her they did not exist — not a blank she fills in
+herself but a wrong fact about her own document, delivered by the one tool that
+exists to stop her inventing one. `agree.test.mjs` now resolves every citation in
+the rules table through the same lookup, and checks a dotted one names a heading
+that is actually in what came back: the fallback would otherwise answer a
+mistyped §4.7 with §4 and read exactly like a citation that worked. Its reader
+captured `4` out of `§4.1` and reported both as fine.
 
 **The asymmetry is the point.** A document that decides whether he followed his
 rules cannot be edited by the thing checking them — adherence to a moving target
@@ -1192,6 +1264,12 @@ characters, so `chunk()` splits on a blank line, then any newline, and only
 hard-cuts a single paragraph that is itself over the limit. Parts go
 sequentially, because Telegram does not promise ordering.
 
+That is what it does now. It was written as `Math.max` over the two
+`lastIndexOf` calls, and every blank line contains a newline at a higher index —
+so the paragraph term could never win the max and the split silently took the
+last newline of any kind. The one thing `FORMAT` lets carry an internal newline
+is a plain-dash list of times, which is exactly where the break then landed.
+
 **A refusal no longer costs the whole briefing.** Nothing retries the cron half
 — `pg_net` is fire-and-forget — so a model declining the request was simply a
 morning with no briefing and a line in a log nobody reads. The request now
@@ -1238,6 +1316,16 @@ finds nothing — call it $10 a month for six briefings and five pulses a week �
 of which a large share is web search at $10 per 1,000 searches rather than
 tokens. Questions are a few cents each. The model is the strongest one; at this
 volume the searches dominate, so a weaker model would save little.
+
+**What the prompt cache actually buys, said plainly.** Her system prefix is about
+5,300 tokens and it is cached — but the default window is five minutes and her
+callers are hours apart, so for most of this system's life the cache paid only
+for the rounds *within* one turn: a briefing that reads the journal and writes a
+note is three requests carrying that prefix. The window is now stated as an hour,
+which also catches the replies a briefing draws through the morning and the 09:00
+retry after an 08:00 failure. It does not catch 08:00 → 10:00, and nothing
+sensible would. `cache_read_input_tokens` is in `ask()`'s log line, and is the
+number that says whether any of this is true rather than argued.
 
 ### What she will not do
 
@@ -1569,6 +1657,16 @@ leaves a public entry point to her memory with only RLS behind it.
 The generated columns backfill on the `alter`, so the whole archive is
 searchable the moment it runs — this is the one change today that works on
 history rather than only going forward.
+
+**`eugenia_search` has changed since, and a database that already has it needs
+that statement run again.** Its turn arm now reads `role` and labels each hit
+`you` or `him` instead of `turn`; until it is re-applied she is still handed his
+messages as her own words, and nothing about that is visible from the app or the
+logs. `create or replace function` is the whole migration — the signature is
+unchanged, deliberately, so the `revoke` and `grant` under it are untouched and
+no grant is dropped. `verify.sql` confirms the function exists; that it reads
+`role` is a fact only the source shows, so re-run the statement rather than
+checking for it.
 
 An existing `eugenia_notes` needs its `superseded_by` column, and the index has
 to be replaced with the partial one the read now matches:

@@ -39,7 +39,7 @@ import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index
 import {
   briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
-  notesList, channelsList,
+  notesList, channelsList, searchList, readStrategy, dayQuery,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 
@@ -1084,11 +1084,14 @@ test('the retry reads one row, not a window that a busy morning can overflow', (
    absence.
    ───────────────────────────────────────────────────────────────────────── */
 
+// The map rides in the same message, so every case below supplies one.
+const MAP = CHANNELS.map(([channel]) => ({ channel, state: 'unseen', evidence: null, moved_on: null }));
+
 test('the listing carries the id each note is named by', () => {
   // The number is how a note is retired. Without it he can read what she holds
   // and still not be able to tell her which line to drop.
   const out = notesList([{ id: 14, note: 'keep it under 1400' }],
-                        [{ id: 12, note: 'he trades the London open' }]);
+                        [{ id: 12, note: 'he trades the London open' }], MAP);
   assert.match(out, /\[14\] keep it under 1400/);
   assert.match(out, /\[12\] he trades the London open/);
 });
@@ -1097,7 +1100,7 @@ test('what he told her and what she noticed stay apart, and in that order', () =
   // Run together they invite exactly the confusion notesBlock keeps out of her
   // context: an instruction is not an observation to be weighed against one.
   const out = notesList([{ id: 2, note: 'stop mentioning the ten-year' }],
-                        [{ id: 1, note: 'he has the dollar channel' }]);
+                        [{ id: 1, note: 'he has the dollar channel' }], MAP);
   assert.ok(out.indexOf('[2]') < out.indexOf('[1]'),
     'the instructions must come first — they are the half that is not optional');
   assert.match(out, /told me/);
@@ -1106,9 +1109,28 @@ test('what he told her and what she noticed stay apart, and in that order', () =
 
 test('an empty memory says so, and an empty half prints no heading', () => {
   // A blank reply reads as a bot that failed rather than one holding nothing.
-  assert.match(notesList([], []), /\S/);
-  assert.ok(!notesList([], [{ id: 1, note: 'x' }]).includes('told me'));
-  assert.ok(!notesList([{ id: 1, note: 'x' }], []).includes('noticed'));
+  assert.match(notesList([], [], MAP), /have not kept any notes/);
+  assert.ok(!notesList([], [{ id: 1, note: 'x' }], MAP).includes('told me'));
+  assert.ok(!notesList([{ id: 1, note: 'x' }], [], MAP).includes('noticed'));
+});
+
+test('the whole audit is addressed to him, never about him', () => {
+  /* THE DEFECT THIS EXISTS TO CATCH. The map used to be appended by
+     channelsBlock(), which is written for HER context and opens "Where he
+     stands on each channel" — so the one message in the system addressed to
+     him switched into the third person about him halfway down. The map is not
+     optional here: it is the half of her memory he could never see at all.
+
+     Read as a whole rather than by heading, because the failure was a heading
+     from the other rendering leaking in, and any of them would do it. */
+  const out = notesList([{ id: 2, note: 'stop mentioning the ten-year' }],
+                        [{ id: 1, note: 'he trades the London open' }], MAP);
+  for (const [, name] of CHANNELS) {
+    assert.ok(out.includes(name), `${name} is missing from his own audit`);
+  }
+  assert.ok(!/\bhe stands\b/.test(out),
+    `the map is still worded about him rather than to him: ${out}`);
+  assert.match(out, /Where you stand on each channel/);
 });
 
 /* ─── Eugenia: where he stands on each channel ───────────────────────────────
@@ -1124,7 +1146,7 @@ test('a channel with no row shows at the bottom rung, never vanishes', () => {
      simply not appear, and the one thing the map is for is that a channel he
      has never used is VISIBLE. Silently showing four channels reads exactly
      like a trader who has covered the fifth. */
-  const out = channelsList([{ channel: 'dollar', state: 'owns', evidence: null }]);
+  const out = channelsList([{ channel: 'dollar', state: 'owns', evidence: null, moved_on: null }]);
   for (const [, name] of CHANNELS) {
     assert.ok(out.includes(name), `${name} is missing from the map entirely`);
   }
@@ -1135,7 +1157,7 @@ test('the map is rendered in the order the prompt teaches them', () => {
   // Not in whatever order PostgREST returns. A stable order is what keeps a
   // rung from looking like it moved when nothing did.
   const shuffled = [...CHANNELS].reverse()
-    .map(([channel]) => ({ channel, state: 'used', evidence: null }));
+    .map(([channel]) => ({ channel, state: 'used', evidence: null, moved_on: null }));
   const out = channelsList(shuffled);
   const at = CHANNELS.map(([, name]) => out.indexOf(name));
   assert.deepEqual(at, [...at].sort((a, b) => a - b),
@@ -1153,17 +1175,51 @@ test('she is shown the name she says, never the id she stores', () => {
      whether an id appears is a question that cannot be answered. What can be
      answered is whether anything MACHINE-SHAPED got through, and snake_case is
      the whole of what that means here. */
-  const out = channelsList(CHANNELS.map(([channel]) => ({ channel, state: 'owns', evidence: null })));
+  const out = channelsList(CHANNELS.map(([channel]) => ({ channel, state: 'owns', evidence: null, moved_on: null })));
   assert.ok(!out.includes('_'), `a raw channel id reached her: ${out}`);
 });
 
 test('the evidence rides with the rung when there is any', () => {
   // A rung with no reason behind it is a number she cannot argue with, and the
   // nightly pass has to be able to see what it is about to overwrite.
-  const withIt = channelsList([{ channel: 'jobs', state: 'used', evidence: 'he asked what the claims trend implies' }]);
+  const withIt = channelsList([{ channel: 'jobs', state: 'used', evidence: 'he asked what the claims trend implies', moved_on: null }]);
   assert.match(withIt, /jobs — used \(he asked what the claims trend implies\)/);
   // And leaves no empty brackets when there is none.
-  assert.ok(!channelsList([{ channel: 'jobs', state: 'used', evidence: null }]).includes('()'));
+  assert.ok(!channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: null }]).includes('()'));
+});
+
+/* THE DATE IS WHAT KEEPS THE MAP FROM GOING BLIND. The ladder never comes down,
+   so a year of ordinary use piles every channel he has touched at `owns` and the
+   census stops being able to say which one is thin — which is the only thing it
+   is for. `moved_on` was written from the first day and rendered by nobody. */
+
+test('a rung says when it last moved', () => {
+  const out = channelsList([
+    { channel: 'dollar', state: 'owns', evidence: 'he got there unaided', moved_on: '2026-03-12' },
+  ]);
+  assert.match(out, /the dollar — owns since 12 Mar \(he got there unaided\)/);
+});
+
+test('the stored civil day is the day shown, not the day before it', () => {
+  /* moved_on is written by setChannel as a NEW YORK civil day. Read back
+     through a New York formatter it moves: new Date('2026-03-12') is midnight
+     UTC, which is 19:00 on the 11th in New York, so every rung in the map would
+     read a day early — quietly, and in the one column that says how stale a
+     rung is. Both halves of the year, since this is the shape of mistake that
+     only shows up in one of them. */
+  assert.match(channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: '2026-03-12' }]),
+    /jobs — used since 12 Mar/);
+  assert.match(channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: '2026-01-01' }]),
+    /jobs — used since 1 Jan/);
+});
+
+test('a rung that has never moved says nothing rather than a blank date', () => {
+  // Every channel is seeded before anything is known, so a null moved_on is the
+  // ordinary case rather than an error, and "since " with nothing after it
+  // would be the map reporting a fault that is not one.
+  const out = channelsList([{ channel: 'jobs', state: 'unseen', evidence: null, moved_on: null }]);
+  assert.match(out, /jobs — unseen/);
+  assert.ok(!out.includes('since'), out);
 });
 
 test('the bottom rung is the first one, because the map falls back to it', () => {
@@ -1171,6 +1227,101 @@ test('the bottom rung is the first one, because the map falls back to it', () =>
   // and every unseeded channel would render as owned — the exact inversion that
   // would make a thin channel look covered.
   assert.equal(CHANNEL_STATES[0], 'unseen');
+});
+
+/* ─── Eugenia: who said the thing the search found ───────────────────────────
+   eugenia_turns carries `role` and eugenia_search did not select it, so every
+   turn came back rendered as her own words — half of every result set was HIS
+   messages handed back to her as things she had said. She would quote an
+   instruction he gave as her own analysis, or deny saying something he said,
+   fluently, with nothing reporting it. The role now rides in `source`.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const AT = '2026-08-19T14:00:00Z';   // Wed 19 Aug 2026, 10:00 New York
+
+test('his words come back as his, and hers as hers', () => {
+  const out = searchList([
+    { source: 'him', id: 7, at: AT, retired: false, body: 'stop mentioning the ten-year' },
+    { source: 'you', id: 8, at: AT, retired: false, body: 'the gap between rates and inflation' },
+  ]);
+  assert.match(out, /he said\] stop mentioning the ten-year/);
+  assert.match(out, /you said\] the gap between rates and inflation/);
+});
+
+test('a note is named by its id, and a retired one says it is no longer true', () => {
+  // The id is how she retires one; RETIRED is what stops her repeating a belief
+  // she has already corrected as though it were current.
+  const out = searchList([
+    { source: 'note', id: 12, at: AT, retired: false, body: 'he trades the London open' },
+    { source: 'note', id: 3,  at: AT, retired: true,  body: 'he trades the New York open' },
+  ]);
+  assert.match(out, /note 12\] he trades the London open/);
+  assert.match(out, /note 3, RETIRED — you no longer believe this\] he trades/);
+});
+
+test('every hit is dated, and a long one is cut rather than sent whole', () => {
+  // A turn can be a whole briefing, and an unbounded result set would push the
+  // conversation out of its own context.
+  const [line] = searchList([
+    { source: 'you', id: 1, at: AT, retired: false, body: 'x'.repeat(400) },
+  ]).split('\n');
+  assert.match(line, /^\[Wed 19 Aug, you said\] /);
+  assert.ok(line.endsWith('…'), line.slice(-40));
+  assert.ok(line.length < 400, `${line.length} characters is not a bounded hit`);
+});
+
+/* ─── Eugenia: the strategy she can read ─────────────────────────────────────
+   A section she is cited to and cannot fetch is worse than a blank: readStrategy
+   answers "there is no section 4.1", which is a wrong fact about the document,
+   delivered by the one tool that exists to stop her inventing one.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('a subsection is served by the section that holds it', () => {
+  // §4.1 and §4.2 are the only citations in the half she carries on every turn,
+  // and both are written inside §4.
+  for (const key of ['4.1', '4.2', '§4.1']) {
+    assert.match(readStrategy(key), /## 4 · The setups/,
+      `${key} does not resolve, and it is cited on every single turn`);
+  }
+});
+
+test('a section that exists is served whole, with or without its sign', () => {
+  assert.match(readStrategy('5'),  /## 5 · Risk/);
+  assert.match(readStrategy('§5'), /## 5 · Risk/);
+  assert.match(readStrategy(' 5 '), /## 5 · Risk/);
+});
+
+test('a section that genuinely is not written says so rather than nothing', () => {
+  // §7 cites sections that are drafted and not yet written. An empty result is
+  // a blank she fills in herself.
+  for (const key of ['9', '9.1', 'nonsense', null, undefined]) {
+    assert.match(readStrategy(key), /has no section/, `${key} came back silently`);
+  }
+
+  // A subsection of a section that IS written resolves to it — §4 is the thing
+  // that would hold a §4.9, and handing it over lets her read that it is not
+  // there. The fallback only reaches one level up, never to a guess.
+  assert.match(readStrategy('4.9'), /## 4 · The setups/);
+});
+
+/* ─── Eugenia: the day the nightly pass reads ────────────────────────────────
+   The limit has to take the NEWEST turns of the window. Taking the oldest is a
+   pass that distils the morning and drops the evening — where a late
+   instruction lives — and the two look identical from outside.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('the day window keeps the newest turns, never the oldest', () => {
+  const q = dayQuery(24, Date.UTC(2026, 7, 19, 12, 0));
+  assert.equal(q.split('?')[0], 'eugenia_turns');
+  assert.match(q, /order=id\.desc/,
+    'the pass reads the first N turns of the day and drops the rest of it');
+  assert.match(q, /limit=\d+/);
+});
+
+test('the window starts exactly the stated number of hours back', () => {
+  const at = Date.UTC(2026, 7, 19, 12, 0);
+  assert.match(dayQuery(24, at), /gte\.2026-08-18T12:00:00/);
+  assert.match(dayQuery(1, at),  /gte\.2026-08-19T11:00:00/);
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
@@ -1198,6 +1349,33 @@ test('a briefing longer than one message is split, and never mid-sentence', () =
 test('a message that fits is sent whole, as one', () => {
   assert.deepEqual(chunk('Buenos dias jefesito, todays news below'),
     ['Buenos dias jefesito, todays news below']);
+});
+
+test('the seam lands on a paragraph break, not on the last newline in budget', () => {
+  /* THE DEFECT THIS EXISTS TO CATCH, and it was live for as long as chunk was.
+     The split read Math.max(lastIndexOf('\n\n'), lastIndexOf('\n')) — and every
+     blank line contains a newline at a higher index, so the paragraph term
+     could never win and the break always went to the last newline of any kind.
+
+     FORMAT permits exactly one thing to carry an internal newline: a plain-dash
+     list of times. So the fixture is a paragraph, then such a list, and the
+     break belongs before the list rather than inside it. */
+  const para = 'Gold is at 3,412, up nine overnight. '.repeat(3).trim();
+  const times = '- 08:30 ET claims\n- 10:00 ET Powell\n- 14:00 ET minutes';
+  const text  = `${para}\n\n${times}\n\n${para}`;
+
+  const parts = chunk(text, para.length + times.length + 3);
+  assert.equal(parts.length, 2);
+  assert.equal(parts[0], para,
+    `the break landed inside the list of times: ${JSON.stringify(parts[0].slice(-60))}`);
+  assert.equal(parts[1], `${times}\n\n${para}`);
+});
+
+test('a paragraph break too early in the budget gives way to a newline', () => {
+  // The order is a preference, not a rule: a blank line in the first half of
+  // the window would waste most of a message, so a later plain newline wins.
+  const parts = chunk(`short\n\n${'a'.repeat(60)}\nb`.trim(), 70);
+  assert.ok(parts[0].length > 35, `the split gave up most of the budget: ${parts[0].length}`);
 });
 
 test('a single paragraph over the limit is cut rather than dropped', () => {
