@@ -35,6 +35,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
+import { readStrategy, SAID } from '../supabase/functions/doji-eugenia/index.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -655,14 +656,52 @@ test('the strategy rides on the cached system prompt, not on a message', () => {
   assert.match(src, /system:\s*\[\{[^}]*text:\s*SYSTEM \+ ALWAYS[^}]*cache_control/,
     'the strategy is no longer part of the cached system prompt — either she has ' +
     'stopped being given it at all, or it is being paid for on every message');
+
+  /* AND THE WINDOW IS STATED, because the default is five minutes and her
+     callers are hours apart. Without a ttl the cache pays only for the rounds
+     within one turn and the comment above it claims more than that — the
+     briefing at 08:00 and the replies it draws through the morning share
+     nothing. Dropping the ttl is silent: the request still succeeds, and the
+     only sign is the `cached` figure in ask()'s log line. */
+  assert.match(src, /cache_control:\s*\{\s*type:\s*"ephemeral",\s*ttl:\s*"1h"\s*\}/,
+    'the cached prefix no longer states a ttl, so it falls back to five minutes ' +
+    'and almost nothing hits across turns');
 });
 
 test('what is summarised into every turn can also be read in full', () => {
   // Each rule cites the section holding its reasoning, and that citation is the
   // only route from a one-line rule to why it exists.
-  const cited = [...ALWAYS.matchAll(/§(\d+)/g)].map(m => m[1]);
+  /* THE SUBSECTION IS PART OF THE CITATION, and reading only the integer is how
+     this test passed over the defect it was written for. R-05 cites §4.1 and
+     R-06 cites §4.2 — the only two citations in the half she carries on every
+     turn — and `/§(\d+)/` captured `4` out of both, so the reader reported two
+     sections that resolve while she was being told they did not exist. */
+  const cited = [...ALWAYS.matchAll(/§(\d+(?:\.\d+)?)/g)].map(m => m[1]);
   assert.ok(cited.length >= 3,
     `only ${cited.length} section references read out of the rules table — the reader has gone blind`);
+  assert.ok(cited.some(k => k.includes('.')),
+    'no subsection citation read out of the rules table — the reader has gone blind ' +
+    'to exactly the shape that broke');
+
+  /* Every one of them, through the same resolution the tool uses. A citation
+     she cannot follow is answered "there is no section 4.1", which is not a
+     blank she fills in herself but a wrong fact about her own document.
+
+     AND A SUBSECTION HAS TO BE IN WHAT CAME BACK. readStrategy falls back to
+     the parent section, deliberately — §4.1 is prose inside §4 — which means a
+     citation to a §4.7 that was never written resolves to §4 and reads exactly
+     like a citation that worked. The heading is the only thing that separates
+     them, so it is the thing asserted. */
+  for (const k of cited) {
+    const body = readStrategy(k);
+    assert.ok(body.startsWith('## '),
+      `the rules table cites §${k} and get_strategy cannot serve it`);
+    if (k.includes('.')) {
+      assert.match(body, new RegExp(`^#+ ${k.replace('.', '\\.')} · `, 'm'),
+        `the rules table cites §${k}, and the section served in its place has no ` +
+        `such subsection in it — she would be handed the parent and never know`);
+    }
+  }
 
   /* §0 and §7 are the two the document's retrieval contract names as always
      loaded, and both are summarised to get there — the header down to its
@@ -772,6 +811,69 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   }
 });
 
+/* ─── What the nightly pass is given to judge with ───────────────────────────
+   Two instructions in CONSOLIDATE ask for something the pass could not see. It
+   is told to notice what he has started doing differently — a claim about his
+   trading, judged from a transcript that on most days never mentions a trade —
+   and it is told to prefer superseding to adding while holding twenty notes out
+   of an archive it had no way to look at. Both failed upward: the pass ran, the
+   notes looked fine, and the evidence was simply absent.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the nightly pass sees his week and can reach past its own window', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('async function postConsolidation(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postConsolidation()');
+  const code = src.slice(at, src.indexOf('\n}', at))
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  assert.match(code, /await\s+tradesBlock\(\)/,
+    'the pass is asked what he has started doing differently and is handed no ' +
+    'trades to see it in');
+
+  const set = src.match(/const CONSOLIDATE_TOOLS = \[([\s\S]*?)\];/);
+  assert.ok(set, 'doji-eugenia no longer defines CONSOLIDATE_TOOLS');
+  assert.match(set[1], /SEARCH_TOOL/,
+    'the pass cannot search, so PREFER SUPERSEDING TO ADDING is asked of ' +
+    'something that can only see the twenty notes it was handed');
+
+  /* And still no web search: the argument for a narrow set was that a nightly
+     bookkeeping pass has nothing to research, and that argument has not moved. */
+  assert.ok(!set[1].includes('web_search'),
+    'the nightly pass can now run web searches, which is money for nothing');
+});
+
+/* ─── The one thing nothing could measure ────────────────────────────────────
+   Everything else unobservable in this function is counted where it happens and
+   for that exact reason — ask() logs tokens because the spend cap is a ceiling
+   and not a meter, postBriefing logs characters because the length target lives
+   past a model call. What she is FOR is that his understanding grows, the map is
+   the instrument for it, and nothing ever read that instrument back. A ladder
+   that has stopped moving looks exactly like one that never had to.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the nightly pass reports the map it may just have moved', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('async function postConsolidation(');
+  const code = src.slice(at, src.indexOf('\n}', at))
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  assert.match(code, /await\s+logChannels\(\)/,
+    'nothing records where the channels stand, so the only claim this design ' +
+    'rests on is the only one with no meter on it');
+
+  const fn = src.indexOf('async function logChannels(');
+  assert.ok(fn > -1, 'doji-eugenia no longer has logChannels()');
+  const body = src.slice(fn, src.indexOf('\n}', fn));
+  // It runs after the pass has already written memory, so a throw here would
+  // turn a good night into a 500.
+  assert.match(body, /catch\s*\(/,
+    'logChannels can throw, and it runs after the work it reports on is done');
+});
+
 test('the search tool names the function the database actually defines', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
@@ -791,6 +893,54 @@ test('the search tool names the function the database actually defines', () => {
       new RegExp(`alter table public\\.${table}[\\s\\S]{0,120}add column if not exists search tsvector`),
       `${table} has no generated search column, so eugenia_search cannot match against it`);
   }
+});
+
+/* ─── Who said it, on both sides of the wire ─────────────────────────────────
+   `source` is a vocabulary now, not a constant: the SQL decides which of three
+   words a hit carries and searchList decides how each is rendered. A word on
+   one side and not the other is a hit attributed to the wrong person — the
+   exact defect that shipped, where the SQL emitted one value for every turn and
+   half of every result set came back as her own words.
+
+   Both lists are read out of the files rather than typed here, for the reason
+   the rest of this suite gives: a test asserting against a literal beside it is
+   a test that changes in the same pass as the thing it guards.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every source the search can return is a source the renderer knows', () => {
+  const fn = EUGENIA_SQL.match(
+    /create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
+  assert.ok(fn, '003_eugenia.sql no longer defines eugenia_search');
+
+  /* The literals in the two select lists — 'note' from the notes arm, and both
+     arms of the CASE that carries the turn's role. A turn arm that has gone
+     back to a bare 'turn' fails here rather than at the far end of a search. */
+  const emitted = [...new Set([...fn[0].matchAll(/'(note|turn|you|him)'/g)].map(m => m[1]))];
+  assert.ok(emitted.includes('note'), 'the notes arm no longer labels its hits');
+  assert.ok(!emitted.includes('turn'),
+    'the turn arm labels every turn the same way again — his words come back as hers');
+
+  // Every source that is not a note has to be a word the renderer holds. The
+  // map is imported rather than read as text, the same way SETUPS and COLUMNS
+  // are: a vocabulary compared against the file that shares it.
+  for (const word of emitted.filter(w => w !== 'note')) {
+    assert.ok(word in SAID,
+      `eugenia_search can return source '${word}' and searchList has no word for it — ` +
+      `it would be rendered as the raw value`);
+  }
+  for (const word of Object.keys(SAID)) {
+    assert.ok(emitted.includes(word),
+      `searchList renders source '${word}' and eugenia_search can never return it`);
+  }
+});
+
+test('the turn arm reads the column that says who was speaking', () => {
+  // eugenia_turns.role exists and was simply never selected, which is why the
+  // failure was silent: the query was valid and the answer was wrong.
+  assert.match(EUGENIA_SQL, /from public\.eugenia_turns t/);
+  assert.match(EUGENIA_SQL, /case when t\.role = 'user'/,
+    'eugenia_search does not read t.role, so nothing downstream can tell his ' +
+    'messages from hers');
 });
 
 test('the search function is not reachable by a public key', () => {
@@ -859,6 +1009,43 @@ test('no section reaches her carrying escape characters', () => {
   }
   assert.ok(!ALWAYS.includes('\\`'),
     'the always-loaded half carries escape characters into every single turn');
+});
+
+/* ─── The prompt is the product, and it is read as prose ─────────────────────
+   `strategy.ts` is scanned above for double-escaped backticks because that
+   defect is invisible in a diff and reaches her as literal noise. This is the
+   same class in the other file she is actually made of: a sentence inserted
+   into a wrapped paragraph without re-wrapping it, which leaves a line at
+   double the width and, where the insert landed on a dash, `— —` shipped into
+   the system prompt of every single request. Nothing anywhere reads this file
+   as text.
+
+   IT CATCHES THE MECHANICAL HALF ONLY, and saying so is the point of saying
+   anything: an over-long line and a doubled dash are artifacts nothing else
+   produces, so they can be asserted. The other half of the same edit — the
+   SHORT line left behind where the sentence was pulled out — is indistinguishable
+   from a deliberate break before a heading or a list, and a check for it would
+   fire on most of this prompt. That half is caught by reading and by nothing here.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no paragraph of the prompt shows where it was edited', () => {
+  /* The template literals as the FILE holds them, not the interpolated
+     constants: ${CHANNEL_NAMES} expands one short source line to 168
+     characters, and it is the source wrapping that is the artifact. */
+  const bodies = [...EUGENIA_PROMPT.matchAll(
+    /export const (SYSTEM|CONSOLIDATE) = `([\s\S]*?)`;/g)];
+  assert.equal(bodies.length, 2,
+    `read ${bodies.length} prompt bodies out of prompt.ts — the reader has gone blind`);
+
+  for (const [, name, body] of bodies) {
+    for (const [i, line] of body.split('\n').entries()) {
+      assert.ok(line.length <= 84,
+        `${name} line ${i + 1} is ${line.length} characters — a sentence was ` +
+        `inserted without re-wrapping the paragraph: ${line.slice(0, 60)}…`);
+      assert.ok(!line.includes('— —'),
+        `${name} line ${i + 1} carries a doubled em-dash: ${line.slice(0, 60)}…`);
+    }
+  }
 });
 
 /* ─── Every read is bounded ──────────────────────────────────────────────────

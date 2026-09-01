@@ -230,6 +230,13 @@ code you write near it:
   breaks the prefix each time the document is edited. It is markdown in a
   template literal, so every backtick in it is escaped.
 
+  THE PREFIX STATES `ttl: "1h"`, because the default window is five minutes and
+  her callers are hours apart — without it the cache only ever paid for the
+  rounds inside one turn, which is less than the comments around it claimed. An
+  hour also catches the replies a briefing draws through the morning and the
+  09:00 retry; nothing catches 08:00 to 22:00. `cached` in `ask()`'s log line is
+  the number that settles it rather than arguing it.
+
   R-08's five steps are in §6 and its step 5 is the only one a row can check:
   `(planned_target - entry) / (entry - planned_stop) >= 1.5`. Do not read that
   1.5 against the 1.25 in §0 — they are an ENTRY condition and a REALISED floor,
@@ -241,6 +248,16 @@ code you write near it:
   and §8 rather than in the rules table, which is why a scan of the table alone
   reports them as unreferenced. `readStrategy` names them rather than returning
   nothing: a blank is a thing she fills in herself.
+
+  §4.1 AND §4.2 ARE THE EXCEPTION AND THEY DO EXIST — as prose inside §4, and
+  they are the only two citations in the half she carries on every turn. An
+  exact lookup told her they were unwritten, which is worse than a blank: a
+  wrong fact about her own document from the tool that exists to stop her
+  inventing one. `readStrategy` falls back one level to the parent section, and
+  `agree.test.mjs` resolves every citation in the table through it — asserting a
+  dotted one names a heading actually present in what came back, since the
+  fallback would otherwise answer a mistyped §4.7 with §4 and look identical to
+  a citation that worked.
 
 - **She is not a writer to `trades` and must not become one.** She reads the web,
   reads the journal through the `eugenia_trades` view, and writes only
@@ -271,19 +288,46 @@ code you write near it:
   is model-written and the strict parser throws on an unbalanced quote, and
   returns a retired note MARKED rather than hidden.
 
-- **Every read of a growing table carries a limit.** Four hundred trades, twelve
-  turns, twenty notes, two hundred turns for the nightly pass. The last of those
-  was missing and nothing failed, because a normal day is a handful of turns.
+  IT ALSO SAYS WHO SAID IT, and for a long time it did not: `role` was on the
+  table and not selected, so every turn rendered as `you said` and half of every
+  result set was HIS words handed back as hers. The role rides in `source` —
+  `note`, `you`, `him` — because `create or replace function` may not change a
+  return type and dropping the function takes its grants. Those three words are
+  a vocabulary shared with `searchList`'s `SAID` map; both copies are in the
+  README's table and `agree.test.mjs` holds them against each other.
+
+- **Every read of a growing table carries a limit, and it has to take the newest
+  rows.** Four hundred trades, twelve turns, twenty notes, two hundred turns for
+  the nightly pass. The last of those was missing and nothing failed, because a
+  normal day is a handful of turns — and when it was added it was added to an
+  `order=id.asc`, so it kept the FIRST two hundred: a pass that distils the
+  morning and drops the evening, where a late instruction lives. Select
+  newest-first and reverse for reading, as `recent()` does. A limit at the wrong
+  end is indistinguishable from a limit at the right one until the day it bites.
 
 - **Her memory has three lifetimes, not one.** An observation rolls; a standing
   instruction must outlive twenty of them, which is what `kind` is for; and what
   he UNDERSTANDS outlives both, which is what `eugenia_channels` is for. Five
-  rows, never a window — a channel he has never once used is a row saying
+  rows, never a window — and every rung carries `moved_on`, the civil day it
+  last moved, formatted in UTC off a midday anchor because re-zoning a stored New
+  York date moves it a day back. The ladder never descends, so without that date
+  a year of use piles every channel at `owns` and the census loses the absence it
+  exists to show; a rung months old counts toward the tiebreaker as a low one
+  does. A channel he has never once used is a row saying
   `unseen`, where in the notes it is nothing written down and therefore
   unnoticeable. The map is a TIEBREAKER between two mechanisms that are both
   live today, never a driver of what the briefing is about; and only the nightly
   pass may move a rung, because one exchange is not evidence any more than one
   fill is a pattern.
+- **`/notes` is his audit, and the whole of it is addressed to him.** It is
+  answered from the database rather than by the model, so nothing can paraphrase
+  or drop a row — and `notesList` renders the channel map itself rather than
+  appending `channelsBlock()`, which is written for HER and opens *Where he
+  stands*. The one message written to him must not switch into the third person
+  about him. It also means a failed channel read costs the whole reply rather
+  than being swallowed, which is right here and wrong in the briefing: an audit
+  that silently omits half of what it audits is the defect it exists to prevent.
+
 - **Her notes are the only channel he has for correcting her, so `notesBlock()`
   is load-bearing on all four paths.** An instruction — *"stop mentioning the
   ten-year"* — is a note, and every later message obeys it; the conversation
@@ -323,6 +367,15 @@ code you write near it:
   run unattended. It is `high` effort, and that is not a latency decision — a
   careless note outlives a careless briefing by months.
 
+  IT IS GIVEN WHAT IT IS ASKED TO JUDGE WITH. Two of its instructions outran its
+  inputs: it is told to notice what he has started doing differently, from a
+  transcript that on most days never mentions a trade — so `tradesBlock()` goes
+  in — and told to prefer superseding to adding while holding twenty notes out of
+  an archive it could not look at — so `SEARCH_TOOL` is in `CONSOLIDATE_TOOLS`.
+  Never web search: a bookkeeping pass has nothing to research. It also logs
+  where the five channels stand, which is the only meter on the one claim this
+  whole design rests on.
+
 - **Superseding is what makes the pass safe, not a convenience.** A consolidator
   that can only add is a noise generator: it cannot fix what it got wrong last
   night, and five mediocre notes push five good ones out of a twenty-note
@@ -338,7 +391,11 @@ code you write near it:
   refuses outright. `openOnUser` trims to the first user turn; nothing may go
   back to depending on `HISTORY` being even.
 - **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
-  the parts go sequentially; Telegram does not promise ordering. The prompt aims
+  the parts go sequentially; Telegram does not promise ordering. Its preference
+  is paragraph break, then any newline, then a hard cut, and it must stay two
+  lookups rather than a `max()` over the pair: `lastIndexOf('\n')` is always at
+  or past `lastIndexOf('\n\n')`, so a max can only ever return the plain newline
+  and the paragraph preference silently never happens. The prompt aims
   well under the cap, so this is the exception now — do not delete it for being
   quiet.
 - **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
