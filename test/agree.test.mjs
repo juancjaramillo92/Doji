@@ -41,6 +41,8 @@ const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.met
 const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+const EUGENIA_PROMPT = readFileSync(
+  new URL('../supabase/functions/doji-eugenia/prompt.ts', import.meta.url), 'utf8');
 
 // The functions as the DIRECTORY holds them, not as a list typed here: the two
 // tests below both need it, and a fifth function added to one copy and not the
@@ -292,6 +294,62 @@ test('the note length is one number on both sides of the wire', () => {
    that kind vanish, reported to nobody. A kind the constraint allows and the
    tool never offers is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── The five channels, in three places ────────────────────────────────────
+   prompt.ts declares them once and the prose interpolates the names, so her
+   vocabulary cannot drift from the list. The other two copies can: the tool's
+   enum is what she is allowed to name, and the check constraint is what the
+   database will accept. An id the tool offers and the constraint refuses is a
+   set_channel that 400s — reported to her as a database fault, and to nobody
+   else at all. An id the constraint allows that the tool never offers is a rung
+   nothing can ever move: it reads as a channel he has not reached, forever.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the five channels are the same five ids in the prompt, the tool and the constraint', () => {
+  const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
+    .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
+  const enforced = [...(EUGENIA_SQL.match(/check \(channel in \(([^)]*)\)/i)?.[1] ?? '')
+    .matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
+
+  assert.deepEqual(declared,
+    ['central_bank_buying', 'dollar', 'inflation', 'jobs', 'rates_vs_inflation'],
+    'the channels have changed — say so here, then check the constraint and the seed');
+  assert.deepEqual(enforced, declared,
+    'the check constraint and prompt.ts no longer hold the same five channels');
+
+  // The tool offers whatever prompt.ts declares rather than a list of its own,
+  // which is what makes the third copy impossible rather than merely checked.
+  assert.match(EUGENIA_TS, /enum: CHANNELS\.map\(\(\[id\]\) => id\)/,
+    'set_channel names its channels literally again instead of reading CHANNELS');
+});
+
+test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
+  /* The read renders what it is given. A channel with no row would simply drop
+     out of her map — and the whole point of the map is that a channel he has
+     never touched is VISIBLE, so a missing row hides exactly what it exists to
+     show. */
+  const seeded = [...(EUGENIA_SQL.match(/insert into public\.eugenia_channels[\s\S]*?on conflict/)?.[0] ?? '')
+    .matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
+  const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
+    .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
+  assert.deepEqual(seeded, declared,
+    'the seed and the channel list disagree — an unseeded channel vanishes from her map');
+});
+
+test('the rungs are the same words in the tool and the constraint', () => {
+  const declared = [...(EUGENIA_PROMPT.match(/CHANNEL_STATES = \[([^\]]*)\]/)?.[1] ?? '')
+    .matchAll(/'([a-z]+)'/g)].map(m => m[1]);
+  const enforced = [...(EUGENIA_SQL.match(/check \(state in \(([^)]*)\)/i)?.[1] ?? '')
+    .matchAll(/'([a-z]+)'/g)].map(m => m[1]);
+
+  // ORDER MATTERS HERE, unlike the channels: this is a ladder, and the first
+  // element is the bottom rung — channelsList falls back to it for a row that
+  // is missing, and a reordered list would render an unseeded channel as owned.
+  assert.deepEqual(declared, ['unseen', 'explained', 'used', 'owns'],
+    'the ladder has changed — say so here, and check what channelsList falls back to');
+  assert.deepEqual(enforced.sort(), [...declared].sort(),
+    'the check constraint and prompt.ts no longer hold the same rungs');
+});
 
 test('the note kinds are the same two words in the tool and the constraint', () => {
   const offered = [...EUGENIA_TS.matchAll(/NOTE_KINDS = \[([^\]]*)\]/g)]
@@ -901,5 +959,16 @@ test('the briefing, the pulse and a reply all read his notes', () => {
     assert.match(code, /await\s+notesBlock\(\)/,
       `${fn} does not await notesBlock() — an instruction he gave would be ` +
       `ignored, or arrive as [object Promise], with nothing reporting either`);
+    /* AND THE MAP, on the same four paths and for a sharper version of the same
+       reason. Losing the notes costs continuity in one message; losing the map
+       costs the only thing that says which channels are THIN, and it fails
+       upward — she carries on teaching well, on whatever the day happens to be
+       about, and the channel he has never once used stays never used with
+       nothing anywhere reporting it. Worst on the nightly pass, which is also
+       the only thing that can move a rung: without the map in front of it, it
+       cannot see what it is moving from. */
+    assert.match(code, /await\s+channelsBlock\(\)/,
+      `${fn} does not await channelsBlock() — she would teach without knowing ` +
+      `which channels are thin, and nothing would report it`);
   }
 });

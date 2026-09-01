@@ -39,8 +39,9 @@ import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index
 import {
   briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
-  notesList,
+  notesList, channelsList,
 } from '../supabase/functions/doji-eugenia/index.ts';
+import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1108,6 +1109,68 @@ test('an empty memory says so, and an empty half prints no heading', () => {
   assert.match(notesList([], []), /\S/);
   assert.ok(!notesList([], [{ id: 1, note: 'x' }]).includes('told me'));
   assert.ok(!notesList([{ id: 1, note: 'x' }], []).includes('noticed'));
+});
+
+/* ─── Eugenia: where he stands on each channel ───────────────────────────────
+   The five channels are the only part of her memory that does not scroll, and
+   the only place an ABSENCE is legible. Everything below is about that second
+   property: a channel he has never touched has to SHOW, because in her notes it
+   is nothing written down, and nothing is not a thing anyone can notice.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('a channel with no row shows at the bottom rung, never vanishes', () => {
+  /* THE DEFECT THIS EXISTS TO CATCH. The map renders what the database gives
+     it, so a channel that was never seeded — or was dropped in a repair — would
+     simply not appear, and the one thing the map is for is that a channel he
+     has never used is VISIBLE. Silently showing four channels reads exactly
+     like a trader who has covered the fifth. */
+  const out = channelsList([{ channel: 'dollar', state: 'owns', evidence: null }]);
+  for (const [, name] of CHANNELS) {
+    assert.ok(out.includes(name), `${name} is missing from the map entirely`);
+  }
+  assert.match(out, /jobs — unseen/);
+});
+
+test('the map is rendered in the order the prompt teaches them', () => {
+  // Not in whatever order PostgREST returns. A stable order is what keeps a
+  // rung from looking like it moved when nothing did.
+  const shuffled = [...CHANNELS].reverse()
+    .map(([channel]) => ({ channel, state: 'used', evidence: null }));
+  const out = channelsList(shuffled);
+  const at = CHANNELS.map(([, name]) => out.indexOf(name));
+  assert.deepEqual(at, [...at].sort((a, b) => a - b),
+    'the map no longer reads in the order prompt.ts declares');
+});
+
+test('she is shown the name she says, never the id she stores', () => {
+  /* "central_bank_buying" is not something a person says across a desk, and a
+     prompt that hands her one is a prompt that will eventually see it repeated
+     back to him.
+
+     The underscore is the test rather than the id itself, and that is not
+     laziness: three of the five ids ARE their own display words — `jobs` is
+     `jobs`, and `inflation` is a substring of two of the names — so asking
+     whether an id appears is a question that cannot be answered. What can be
+     answered is whether anything MACHINE-SHAPED got through, and snake_case is
+     the whole of what that means here. */
+  const out = channelsList(CHANNELS.map(([channel]) => ({ channel, state: 'owns', evidence: null })));
+  assert.ok(!out.includes('_'), `a raw channel id reached her: ${out}`);
+});
+
+test('the evidence rides with the rung when there is any', () => {
+  // A rung with no reason behind it is a number she cannot argue with, and the
+  // nightly pass has to be able to see what it is about to overwrite.
+  const withIt = channelsList([{ channel: 'jobs', state: 'used', evidence: 'he asked what the claims trend implies' }]);
+  assert.match(withIt, /jobs — used \(he asked what the claims trend implies\)/);
+  // And leaves no empty brackets when there is none.
+  assert.ok(!channelsList([{ channel: 'jobs', state: 'used', evidence: null }]).includes('()'));
+});
+
+test('the bottom rung is the first one, because the map falls back to it', () => {
+  // channelsList renders a missing row at CHANNEL_STATES[0]. Reorder the ladder
+  // and every unseeded channel would render as owned — the exact inversion that
+  // would make a thin channel look covered.
+  assert.equal(CHANNEL_STATES[0], 'unseen');
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */

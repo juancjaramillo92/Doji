@@ -251,3 +251,62 @@ $$;
 -- public entry point to her memory that only RLS stands behind.
 revoke execute on function public.eugenia_search(text, int) from public;
 grant execute on function public.eugenia_search(text, int) to service_role;
+
+-- ─── Where he stands on each of the five channels ──────────────────────────
+-- THE SAME BUG THIS FILE ALREADY FIXED ONCE, in the other half of her memory.
+-- `kind` exists because one newest-20 window over notes and instructions
+-- together would evict "stop mentioning the ten-year" after a month of ordinary
+-- observations. This is that argument again with a third lifetime: what he
+-- UNDERSTANDS is not an observation about Tuesday, it is a durable fact about
+-- him, and it was sitting in the bucket that ages out. A note recording that he
+-- worked out the dollar link unaided leaves the window twenty notes later and
+-- she re-explains something the prompt forbids her to re-explain.
+--
+-- FIVE ROWS, FOREVER, AND THAT IS THE FEATURE. Not a window and not a list — a
+-- census over a fixed set, so it cannot be crowded out by a busy month. It is
+-- also the only place in the system where an ABSENCE is legible: a channel he
+-- has never once used is a row saying `unseen`, where in eugenia_notes it is
+-- simply nothing written down, and nothing is not a thing anyone can notice.
+--
+-- No id and no history. The row IS the current answer, `evidence` says what
+-- last moved it, and the trail of how he got there is the turns and the notes,
+-- which are both already searchable. A second append-only table here would be a
+-- second archive nobody reads.
+create table public.eugenia_channels (
+  -- The channel id, not the name she says. prompt.ts holds both and is the only
+  -- copy; the constraint below is the same list, enforced where the tool
+  -- schema cannot be bypassed.
+  channel  text primary key
+    constraint eugenia_channels_name_check check (channel in (
+      'rates_vs_inflation', 'dollar', 'inflation', 'jobs', 'central_bank_buying')),
+
+  -- The ladder, in order. Defaulted to the bottom rung so a row seeded before
+  -- anything is known reads as "never come up", which is true.
+  state    text not null default 'unseen'
+    constraint eugenia_channels_state_check check (state in (
+      'unseen', 'explained', 'used', 'owns')),
+
+  -- One line saying what last moved the rung. Same 200 as a note and for the
+  -- same reason: a sentence, not a transcript.
+  evidence text
+    constraint eugenia_channels_evidence_length
+      check (evidence is null or char_length(evidence) between 1 and 200),
+
+  -- A CIVIL DAY IN NEW YORK, written by the function rather than defaulted to
+  -- now(). `now()` is UTC, so an evening move would be filed on tomorrow — the
+  -- same mistake open_day exists to avoid, in a column read by a person.
+  moved_on date
+);
+
+-- The five rows exist from the start rather than being created on first write.
+-- A channel with no row and a channel he has never used are the same fact, and
+-- one of them would be invisible: the read renders what it is given, so a
+-- missing row is a channel that silently drops out of her map.
+-- Idempotent, so this file stays safe to re-run.
+insert into public.eugenia_channels (channel) values
+  ('rates_vs_inflation'), ('dollar'), ('inflation'), ('jobs'), ('central_bank_buying')
+on conflict (channel) do nothing;
+
+-- Five rows, read whole every turn: no index beyond the primary key, which is
+-- what the function's PATCH filters on.
+alter table public.eugenia_channels enable row level security;

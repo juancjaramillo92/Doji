@@ -868,6 +868,7 @@ Two kinds of memory, and they answer different questions.
 |---|---|---|---|
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
 | `eugenia_notes` | facts about him, and what he has told her to do | last 20 notes | her `remember` tool |
+| `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
@@ -890,6 +891,49 @@ would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts the briefing, the pulse and a reply each read
 them.
 
+### Where he stands on each channel
+
+**The same bug this schema already fixed once.** `kind` exists because one
+newest-20 window over notes and instructions together would evict *"stop
+mentioning the ten-year"* after a month of ordinary observations. What he
+**understands** has that property too and did not have that fix: a note saying
+he worked out the dollar link unaided is not an observation about Tuesday, it is
+a durable fact about him, and it was sitting in the bucket that ages out. Twenty
+notes later it is gone and she re-explains a mechanism the prompt forbids her to
+re-explain.
+
+`eugenia_channels` is five rows, one per channel, and it never scrolls. Not a
+window — a **census over a fixed set**, which is what makes it the only place in
+the system where an **absence** is legible. A channel he has never once used is
+a row saying `unseen`; in `eugenia_notes` it is nothing written down, and
+nothing is not a thing anyone can notice. That absence is the whole point: it is
+the one question her memory could never answer, and the only one that says where
+the teaching should go.
+
+The ladder is `unseen → explained → used → owns`. Order matters, and not only as
+documentation: `channelsList` renders a row it was not given at the **first**
+rung, so reversing the list would render every unseeded channel as owned.
+
+**It is a tiebreaker, never a driver**, and the prompt says so in those words. It
+decides which of two mechanisms that are *both* live today she unpacks — lean
+toward the thinner one. It never decides what the day is about. A briefing that
+worked through the channels in turn because one was `unseen` would be a
+curriculum, and the opening paragraph would stop being what actually matters
+that morning, which is the only thing it is for.
+
+**Only the nightly pass may move a rung.** `set_channel` is in
+`CONSOLIDATE_TOOLS` and deliberately not in `CHAT_TOOLS` beside `remember`: a
+note is a moment and is fairly written in one, but a rung is a judgment across
+days, and moving one on a single exchange is the same error as reading a pattern
+into one fill. Most nights nothing moves, and the prompt says that is the
+honest outcome rather than a wasted run.
+
+The five ids live in `prompt.ts` and are read from there by the tool's enum and
+interpolated into her prose, so only the check constraint is a genuine second
+copy — `agree.test.mjs` holds them together, along with the seed, because an id
+the tool offers and the constraint refuses is a `set_channel` that 400s and is
+reported to nobody.
+
 **`/notes` is how he reads what she is keeping**, and it is answered from the
 database rather than by the model — `notesList()` renders the rows themselves,
 with the id each is named by, so the listing is an audit rather than her account
@@ -903,6 +947,10 @@ in four words that scroll away, so the evidence that anything stuck lasts about
 a morning — and a wrong note fails in the worst available way. A fact saying he
 understands something he does not makes her **stop explaining it**, and the
 symptom is an absence, which is the hardest thing there is to notice.
+
+The channel map goes out with the listing, because it is the half of her memory
+he has never been able to see at all — and the half that says what she is
+missing rather than what she has.
 
 Append-only, and now with a way to retire a line rather than only bury it. Every
 note reaches her with a number in brackets, and `remember` takes an optional
@@ -1069,6 +1117,21 @@ search bills separately from tokens, and the briefing's nine-hundred-to-fourteen
 hundred-character target lives in the prompt, on the far side of a model call,
 where no test can hold it. Unmeasured, the briefing grew by a sixth and the way
 it surfaced was somebody counting the characters by hand.
+
+### Adding the channel map to an existing database
+
+`003_eugenia.sql` now ends with `eugenia_channels`. The statements are safe to
+re-run as they stand — the seed is `on conflict do nothing` — so applying just
+that block is the whole migration, and `verify.sql` then answers whether all
+five rows are actually there. That last check is the one `agree.test.mjs` cannot
+make: it reads the insert statement and confirms it names five channels, but
+whether five rows exist is a fact about the database.
+
+It matters more than it looks. `setChannel` PATCHes by primary key, so a missing
+row is a `200` with an empty array — the move is dropped silently, and that
+channel then renders at the bottom rung forever, which is indistinguishable from
+a channel he has genuinely never used. The function reports that case back to
+her rather than claiming success, but nothing reaches him.
 
 ### Programmatic tool calls need their container
 
@@ -1659,9 +1722,9 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the journal columns across `Data.OWNED`, Gladys's `COLUMNS` — a subset, not an equality — the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` against the four paths that must call it — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the journal columns across `Data.OWNED`, Gladys's `COLUMNS` — a subset, not an equality — the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels and the four rungs of the ladder across `prompt.ts`, the tool's enum, the check constraint and the seed; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
