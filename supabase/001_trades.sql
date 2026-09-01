@@ -77,30 +77,6 @@ create table public.trades (
   followed_sl    boolean,
   followed_tp    boolean,
 
-  -- WHAT HE INTENDED, WHICH NOTHING ELSE ON THE ROW REMEMBERS. Every other
-  -- column here is an outcome: the broker reports where a trade ended, never
-  -- where it was aimed. A stop moved to break-even overwrites the original, so
-  -- a trade entered at 4500 with a stop at 4480 and a target at 4530, stopped
-  -- out at break-even, lands as entry 4500 / exit 4500 and the 4480 is gone
-  -- from every system that ever knew it.
-  --
-  -- Three questions become answerable only with these, and none of them can be
-  -- answered afterwards: whether the stop was ever wider than the rules allow,
-  -- what the planned reward-to-risk actually was, and whether a loss closed at
-  -- the stop or was cut by hand.
-  --
-  -- JOURNAL-OWNED, so no broker writer ever sends them — but unlike the four
-  -- above they are not tappable, because a price is not a button. Gladys asks
-  -- with an inline keyboard and takes callback_query alone; these are entered
-  -- in the app, which is why COLUMNS in doji-gladys stays four names while
-  -- Data.OWNED is six.
-  --
-  -- Prices, so positive. No constraint tying them to entry_price or to
-  -- direction: those are broker-owned and can arrive after the journal entry,
-  -- and a check spanning two writers rejects rows for being early.
-  planned_stop   numeric,
-  planned_target numeric,
-
   -- ── Bookkeeping.
   -- Soft delete. It has to be soft: the poller re-upserts every position inside
   -- its window, so a hard delete would be undone within two minutes. The poller
@@ -122,9 +98,7 @@ create table public.trades (
   constraint trades_direction_check check (direction in ('BUY', 'SELL')),
   constraint trades_setup_check     check (setup in ('Break & Retest', 'Support & Resistance')),
   -- cTrader reports commission negative; the poller stores the magnitude.
-  constraint trades_commission_nonneg check (commission is null or commission >= 0),
-  constraint trades_planned_stop_pos   check (planned_stop is null or planned_stop > 0),
-  constraint trades_planned_target_pos check (planned_target is null or planned_target > 0)
+  constraint trades_commission_nonneg check (commission is null or commission >= 0)
 );
 
 -- Every read the client makes is one user's trades, newest day first. The

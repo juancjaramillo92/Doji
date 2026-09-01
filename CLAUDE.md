@@ -193,12 +193,8 @@ code you write near it:
 - **Do not extract the entry point.** All four functions authorise their callers
   with the same four lines, and that is the one shape that must stay readable in
   the file being edited rather than behind a helper.
-- **The `COLUMNS` map is the whole guarantee.** It holds four of the six names in
-  `Data.OWNED` — a SUBSET, not an equality — so no broker column is nameable from
-  a tap. `planned_stop` and `planned_target` are journal-owned and app-entered:
-  Gladys takes `callback_query` alone and there is no keyboard for a price. The
-  redraw trigger follows `COLUMNS`, not `OWNED`, because a column her message
-  does not draw has nothing to redraw. `tg_message_id` is
+- **The `COLUMNS` map is the whole guarantee.** It holds the same four names as
+  `Data.OWNED`, so no broker column is nameable from a tap. `tg_message_id` is
   on neither list and must stay off both. `agree.test.mjs` asserts the two lists
   against each other, and both column lists inside `trades_telegram_on_answer`
   against them, rather than each against a literal; do not widen any of them
@@ -237,10 +233,11 @@ code you write near it:
   09:00 retry; nothing catches 08:00 to 22:00. `cached` in `ask()`'s log line is
   the number that settles it rather than arguing it.
 
-  R-08's five steps are in §6 and its step 5 is the only one a row can check:
-  `(planned_target - entry) / (entry - planned_stop) >= 1.5`. Do not read that
-  1.5 against the 1.25 in §0 — they are an ENTRY condition and a REALISED floor,
-  at two different moments, and collapsing them is the contradiction v1.7 fixed.
+  R-08's five steps are in §6, and step 5 is arithmetic HE runs rather than one
+  a row can check: nothing records where the stop or the target were set, so the
+  ratio is asked and never computed. Do not read that 1.5 against the 1.25 in §0
+  — they are an ENTRY condition and a REALISED floor, at two different moments,
+  and collapsing them is the contradiction v1.7 fixed.
 
   She has no write path to it, deliberately: a document that decides whether he
   followed his rules cannot be edited by the thing checking them. Sections 1, 2,

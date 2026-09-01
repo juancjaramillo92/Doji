@@ -164,7 +164,7 @@ It is recoverable anyway, because the ladder is 0.02 lots per 1,000 continuous:
     account  = size_oz * 500
 
 So a size is a readout of the capital it was sized against. The caption under
-Current Balance reads `0.04 lots — sizing for 2000`, and *sizing for* is doing
+Balance at broker reads `0.04 lots — sizing for 2000`, and *sizing for* is doing
 real work in that sentence — it is what the ladder implies, not a figure anyone
 reported. It uses the **latest** size rather than an average, because rungs are
 stepped and a mean across a month describes no account that ever existed.
@@ -201,14 +201,6 @@ have history rather than starting from the day it was added.
 
 Written by the app and by the Telegram bot. Neither broker writer ever sends
 these keys.
-
-**Six columns, and only four of them are tappable.** Gladys takes
-`callback_query` alone — there is no inline keyboard for `4512.80` — so the two
-planned prices are entered in the app and her `COLUMNS` map stays four names
-while `Data.OWNED` is six. The guarantee that matters is unchanged and is now
-stated as what it is: everything nameable from a tap is a journal column, rather
-than the two lists being identical, which was a stronger property that held only
-while every journal answer was a question with fixed answers.
 
 | Column | Meaning |
 |---|---|
@@ -297,7 +289,7 @@ be single-sourced at run time:
 | The fact | Where its copies live |
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
-| the **journal column names** | `Data.OWNED` (six), Gladys's `COLUMNS` (the four a button can carry), the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object, both of which follow `COLUMNS` rather than `OWNED` |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
@@ -656,7 +648,7 @@ kept.** Journalling a trade in the app used to reach Telegram not at all — the
 message sat on `Setup: —` for the life of the trade, because nothing knew which
 message to edit. So `postOpen` stores what `sendMessage` hands back in
 `trades.tg_message_id`, and a second trigger, `trades_telegram_on_answer`, fires
-whenever any of the four columns Gladys asks actually changes on a row that has one. Not all six: the two planned prices are not on her form, so a redraw for them would edit the message to itself.
+whenever any of the four journal columns actually changes on a row that has one.
 The answers now travel in both directions: a tap reaches the app through the
 realtime subscription it already holds, and a save reaches Telegram through this.
 
@@ -696,7 +688,7 @@ reads `postAnswer`'s body for that call, because nothing in the suite can drive
 the function itself.
 
 **The write is the fourth writer and it stays in the journal half.** The webhook
-maps a button's field to a column through four of the six names in `Data.OWNED`,
+maps a button's field to a column through the same four names as `Data.OWNED`,
 so no broker column is nameable from a tap and there is nothing to arbitrate.
 `updated_at` moves, and the realtime subscription the app already holds
 re-renders any open tab for free. `tg_message_id` is on neither list, which is
@@ -1091,8 +1083,10 @@ which is the one outcome worse than reporting it missing.
 levels, candle or chart pattern with signal then confirmation, and reward-to-risk
 of at least 1:1.5. The order is the rule: a failed step ends the sequence rather
 than being traded off against a later one. Steps 1–4 are read and nothing stored
-can see them; **step 5 is arithmetic**, and since the planned columns are
-recorded at entry it is the one step a row can be held to.
+can see them; **step 5 is arithmetic he runs**, on two prices no row carries —
+the standard $30 target over the $20 cap is exactly 1:1.5, so the only entry it
+refuses on its own is a $25 target set with a stop wider than about $16.70, and
+nothing records which target was set.
 
 Writing it settled a contradiction the document carried for six versions. **1:1.5
 is a condition at entry** and **1:1.25 is the floor of what can be realised**
@@ -1583,8 +1577,7 @@ which is what an existing database needs to pick up `security_invoker`:
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
-         planned_stop, planned_target
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz
   from public.trades
   where deleted = false;
 
@@ -1619,27 +1612,25 @@ create index if not exists eugenia_notes_kind_id_desc
 drop index if exists eugenia_notes_id_desc;
 ```
 
-An existing `trades` needs the two planned columns, and Eugenia's view has to be
-replaced to expose them:
+A `trades` that carries `planned_stop` and `planned_target` sheds them, and the
+view goes first because it reads them — a column something depends on cannot be
+dropped out from under it:
 
 ```sql
-alter table public.trades add column if not exists planned_stop   numeric;
-alter table public.trades add column if not exists planned_target numeric;
+drop view if exists public.eugenia_trades;
 
 alter table public.trades
-  drop constraint if exists trades_planned_stop_pos,
-  add constraint trades_planned_stop_pos check (planned_stop is null or planned_stop > 0);
-alter table public.trades
-  drop constraint if exists trades_planned_target_pos,
-  add constraint trades_planned_target_pos check (planned_target is null or planned_target > 0);
+  drop column if exists planned_stop,
+  drop column if exists planned_target;
 ```
 
-…then re-run the view statement from `003_eugenia.sql`, which now ends with them.
-**They are appended, not inserted** — `create or replace view` matches position
-by position and may only append, which is the trap #30 was fixed for.
+…then re-run the view statement above **and the three grants under it**: a view
+is dropped with its privileges. `create or replace view` cannot do this half —
+it matches column by column and may only append, so a shorter list is a drop and
+a rebuild, which is the other side of the trap #30 was fixed for.
 
-There is no backfill and there cannot be. A plan not recorded at the time is not
-recoverable from anywhere, so every trade before this keeps a null.
+The two columns held a plan the journal no longer asks for. Nothing read them
+but Eugenia, and what she now says about a plan is in the strategy at v1.8.
 
 Search is added to both of Eugenia's tables, and the whole block is idempotent —
 `add column if not exists`, `create index if not exists`, `create or replace
@@ -1831,7 +1822,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the journal columns across `Data.OWNED`, Gladys's `COLUMNS` — a subset, not an equality — the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels and the four rungs of the ladder across `prompt.ts`, the tool's enum, the check constraint and the seed; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels and the four rungs of the ladder across `prompt.ts`, the tool's enum, the check constraint and the seed; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
