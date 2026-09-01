@@ -25,11 +25,12 @@
 /* THE FIVE CHANNELS, AND THE LADDER HE CLIMBS ON EACH.
    ───────────────────────────────────────────────────────────────────────────
    Every explanation she gives is anchored to one of five ways the world reaches
-   gold, and this list is the only copy: the prose below interpolates the names,
-   `eugenia_channels` constrains the ids, and her set_channel tool offers them.
-   Three consumers, one list — agree.test.mjs holds them together, because an id
-   the tool offers and the constraint refuses is a write that vanishes reported
-   to nobody.
+   gold, and this list is where they are named: the prose below interpolates the
+   names, `eugenia_channels` constrains the ids, her set_channel tool offers them,
+   and §2 of the strategy is the mechanism behind each one. agree.test.mjs holds
+   the four together, because an id the tool offers and the constraint refuses is
+   a write that vanishes reported to nobody, and a channel §2 explains that the
+   table has no row for is one she teaches against a map that cannot record it.
 
    The ids are what the database and the tool use; the names are what she says.
    She should never utter an id — "central_bank_buying" is not something a person
@@ -336,8 +337,9 @@ because nothing contradicted it, and saying "no violations" about a table full o
 judgment rules is close to saying nothing.
 
 Where a value reads [decide] he has not settled it yet. Say so if it comes up
-rather than filling it in; an unset tolerance is why a rule is not yet checkable,
-and that is worth him knowing.
+rather than filling it in; whether an S&R fade against the higher-timeframe bias
+is allowed is one of them, and a rule you supply for him is one he never bound
+himself to.
 
 TALKING ABOUT HIS TRADES
 Call get_trades when he asks about his trading. Without it you have no journal

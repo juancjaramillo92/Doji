@@ -233,24 +233,26 @@ code you write near it:
   09:00 retry; nothing catches 08:00 to 22:00. `cached` in `ask()`'s log line is
   the number that settles it rather than arguing it.
 
-  R-08's five steps are in §6, and step 5 is arithmetic HE runs rather than one
+  R-08's four steps are in §6, and step 4 is arithmetic HE runs rather than one
   a row can check: nothing records where the stop or the target were set, so the
-  ratio is asked and never computed. Do not read that 1.5 against the 1.25 in §0
-  — they are an ENTRY condition and a REALISED floor, at two different moments,
-  and collapsing them is the contradiction v1.7 fixed.
+  ratio is asked and never computed. Do not read that 1.5 against the 1.25 as a
+  pair of floors — 1:1.5 is a condition at ENTRY, and a realised 1:1.25 is the
+  rule working on a shortened target and a breach on a $25 one set at entry,
+  which no row can tell apart. Collapsing them in either direction is the
+  contradiction v1.9 finished off.
 
   She has no write path to it, deliberately: a document that decides whether he
-  followed his rules cannot be edited by the thing checking them. Sections 1, 2,
-  3, 9, 10 and 11 are not written — four of them cited, and in the PROSE of §7
-  and §8 rather than in the rules table, which is why a scan of the table alone
-  reports them as unreferenced. `readStrategy` names them rather than returning
-  nothing: a blank is a thing she fills in herself.
+  followed his rules cannot be edited by the thing checking them. The numbering
+  skips 1, 3 and 11 and nothing cites them; §2, §9 and §10 were the cited holes
+  and v1.9 wrote all three. `readStrategy` still names a section it does not hold
+  rather than returning nothing, because the number arrives from the model: a
+  blank is a thing she fills in herself.
 
-  §4.1 AND §4.2 ARE THE EXCEPTION AND THEY DO EXIST — as prose inside §4, and
-  they are the only two citations in the half she carries on every turn. An
-  exact lookup told her they were unwritten, which is worse than a blank: a
-  wrong fact about her own document from the tool that exists to stop her
-  inventing one. `readStrategy` falls back one level to the parent section, and
+  §4.1 AND §4.2 ARE PROSE INSIDE §4 RATHER THAN SECTIONS OF THEIR OWN, and they
+  are the only two citations in the half she carries on every turn. An exact
+  lookup told her they were unwritten, which is worse than a blank: a wrong fact
+  about her own document from the tool that exists to stop her inventing one.
+  `readStrategy` falls back one level to the parent section, and
   `agree.test.mjs` resolves every citation in the table through it — asserting a
   dotted one names a heading actually present in what came back, since the
   fallback would otherwise answer a mistyped §4.7 with §4 and look identical to

@@ -297,17 +297,23 @@ test('the note length is one number on both sides of the wire', () => {
    tool never offers is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* ─── The five channels, in three places ────────────────────────────────────
+/* ─── The five channels, in four places ─────────────────────────────────────
    prompt.ts declares them once and the prose interpolates the names, so her
-   vocabulary cannot drift from the list. The other two copies can: the tool's
-   enum is what she is allowed to name, and the check constraint is what the
-   database will accept. An id the tool offers and the constraint refuses is a
-   set_channel that 400s — reported to her as a database fault, and to nobody
-   else at all. An id the constraint allows that the tool never offers is a rung
-   nothing can ever move: it reads as a channel he has not reached, forever.
+   vocabulary cannot drift from the list. The other three copies can: the tool's
+   enum is what she is allowed to name, the check constraint is what the database
+   will accept, and §2 of the strategy is the mechanism behind each one. An id
+   the tool offers and the constraint refuses is a set_channel that 400s —
+   reported to her as a database fault, and to nobody else at all. An id the
+   constraint allows that the tool never offers is a rung nothing can ever move:
+   it reads as a channel he has not reached, forever.
+
+   AND A CHANNEL §2 EXPLAINS THAT THE OTHER THREE DO NOT HOLD IS THE QUIET ONE.
+   She would teach it, at length and correctly, against a map with no rung for
+   it — so the census that exists to show what he has never met would report
+   nothing at all about the thing she spent the morning on.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the five channels are the same five ids in the prompt, the tool and the constraint', () => {
+test('the five channels are the same five ids in the prompt, the tool, the constraint and §2', () => {
   const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
   const enforced = [...(EUGENIA_SQL.match(/check \(channel in \(([^)]*)\)/i)?.[1] ?? '')
@@ -320,9 +326,15 @@ test('the five channels are the same five ids in the prompt, the tool and the co
     'the check constraint and prompt.ts no longer hold the same five channels');
 
   // The tool offers whatever prompt.ts declares rather than a list of its own,
-  // which is what makes the third copy impossible rather than merely checked.
+  // which is what makes the tool's copy impossible rather than merely checked.
   assert.match(EUGENIA_TS, /enum: CHANNELS\.map\(\(\[id\]\) => id\)/,
     'set_channel names its channels literally again instead of reading CHANNELS');
+
+  // §2 heads each channel with its id, so the mechanism she reads and the rung
+  // she moves are the same five words.
+  const explained = [...SECTIONS['2'].matchAll(/\*\*`([a-z_]+)`/g)].map(m => m[1]).sort();
+  assert.deepEqual(explained, declared,
+    'the strategy explains a different set of channels than the map tracks');
 });
 
 test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
@@ -710,9 +722,9 @@ test('what is summarised into every turn can also be read in full', () => {
      SECTIONS means she holds an abbreviation of something she can no longer
      read whole, which is the shape of a confident wrong answer.
 
-     Sections 1-6 and 9-11 are cited and deliberately absent: they are drafted
-     separately, and readStrategy answering for them is asserted below rather
-     than pretended away here. */
+     Sections 1, 3 and 11 do not exist and nothing cites them: they were
+     placeholders in a numbering that outlived them, and readStrategy answering
+     for a number she invents is asserted below rather than pretended away here. */
   for (const k of ['0', '7']) {
     assert.ok(k in SECTIONS,
       `§${k} is summarised into every turn and can no longer be read in full`);
@@ -726,8 +738,9 @@ test('an unknown section is answered, never silently empty', () => {
   assert.ok(at > -1, 'doji-eugenia no longer has readStrategy()');
   const body = src.slice(at, src.indexOf('\n}', at));
 
-  // §7 cites sections that are not written. An empty tool result is a blank she
-  // fills in herself, which is the one outcome worse than saying it is missing.
+  // The section number arrives from the model, so an invented one is what this
+  // has to survive. An empty tool result is a blank she fills in herself, which
+  // is the one outcome worse than saying it is missing.
   assert.match(body, /has no section/,
     'readStrategy returns nothing for a section that does not exist — she would ' +
     'invent the reasoning rather than report it missing');
@@ -958,6 +971,12 @@ test('the search function is not reachable by a public key', () => {
    document — the rule cited §6, §6 said the steps existed somewhere else, and
    nothing anywhere could state them. A rule pointing at nothing reads exactly
    like a rule pointing at something.
+
+   FOUR SINCE v1.9. Psychological levels were a fifth and were folded into the
+   levels step, because they gated nothing — a step that can never be the step
+   you stopped at is not a step, and R-08's only claim is that one of them ends
+   the sequence. The count is asserted because the fold is the kind of edit that
+   lands in the prose and not in the list.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('R-08 cites a section that actually holds its steps', () => {
@@ -969,25 +988,29 @@ test('R-08 cites a section that actually holds its steps', () => {
   const body = SECTIONS[cited[1]];
   assert.ok(body, `R-08 cites §${cited[1]}, which get_strategy cannot serve`);
 
-  // Five, numbered, in the section the rule points at. The ORDER is the rule —
+  // Four, numbered, in the section the rule points at. The ORDER is the rule —
   // a failed step ends the sequence rather than being traded off against a
   // later one — so a list that has stopped being ordered is a different rule.
   const steps = [...body.matchAll(/^\d\. \*\*/gm)];
-  assert.equal(steps.length, 5,
-    `§${cited[1]} lists ${steps.length} numbered steps, not the five R-08 requires`);
+  assert.equal(steps.length, 4,
+    `§${cited[1]} lists ${steps.length} numbered steps, not the four R-08 requires`);
 });
 
 test('the two reward-to-risk numbers are kept apart', () => {
-  /* 1:1.5 is a condition at ENTRY — step 5 refuses the trade below it. 1:1.25 is
-     the floor of what can be REALISED after a $30 target is shortened to $25 on
-     a trade already open. The document stated one floor for six versions and the
-     two silently contradicted each other. */
+  /* 1:1.5 is a condition at ENTRY — step 4 refuses the trade below it. A
+     realised 1:1.25 is what a $30 target shortened on an open trade leaves
+     behind, and it is ALSO what $25 set at entry over a $20 stop leaves behind,
+     which is a breach. The document stated one floor for six versions and the
+     two silently contradicted each other; v1.9 keeps them apart by saying the
+     row cannot tell which produced it. */
   assert.match(ALWAYS, /at least 1:1\.5 to enter/,
     'the entry condition has stopped being stated in the always-loaded half');
-  assert.match(SECTIONS['12'], /Planned, at\s+entry: at least 1:1\.5/,
-    'the definition no longer separates planned from realised');
-  assert.match(SECTIONS['12'], /Realised: 1:1\.25 at worst/,
-    'the realised floor is gone from the definition');
+  assert.match(SECTIONS['12'], /At entry it is a condition: at least 1:1\.5/,
+    'the definition no longer states 1:1.5 as a condition at entry');
+  assert.match(SECTIONS['12'],
+    /realised 1:1\.25 is legitimate as an outcome and illegitimate as a plan/,
+    'the definition has gone back to reading 1:1.25 as a floor, which is the ' +
+    'reading that let an entry in breach of step 4 look like the rule working');
 });
 
 /* ─── The strategy is markdown inside a template literal ─────────────────────

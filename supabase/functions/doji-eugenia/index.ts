@@ -330,9 +330,10 @@ const STRATEGY_TOOL = {
 } as const;
 
 /* Synchronous and cannot fail: it is a module constant, not a database read.
-   An unknown section is answered rather than refused — §7 cites sections that
-   are drafted and not yet written, and "that part does not exist yet" is a
-   better answer than silence, which she would fill in herself.
+   An unknown section is answered rather than refused — the number arrives from
+   the model, so a mistyped or an invented one is what this has to survive, and
+   "there is no such section" is a better answer than silence, which she would
+   fill in herself.
 
    A SUBSECTION IS SERVED BY THE SECTION THAT HOLDS IT, and without that the two
    citations she is handed on every single turn were the two this could not
@@ -349,8 +350,8 @@ export function readStrategy(section: unknown): string {
   const found = SECTIONS[key] ?? SECTIONS[key.split('.')[0]];
   if (found) return found;
   return `The strategy has no section ${key}. It holds ${Object.keys(SECTIONS).join(", ")} ` +
-         `at version ${VERSION}. Sections 1, 2, 3, 9, 10 and 11 are not written, ` +
-         `so say that rather than guessing what it would have said.`;
+         `at version ${VERSION}. Sections 1, 3 and 11 do not exist and nothing ` +
+         `cites them, so say that rather than guessing what they would have said.`;
 }
 
 /* ─── Reaching what the windows do not ─────────────────────────────────────

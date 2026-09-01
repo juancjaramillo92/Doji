@@ -291,6 +291,7 @@ be single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| the **five channel ids** | `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`, and §2 of the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
@@ -1043,11 +1044,17 @@ with `searchList`, so `agree.test.mjs` holds the two lists against each other.
 
 **She holds his strategy and can never write it.** `strategy.ts` is the document
 he wrote — what he trades, the rules, how each one is checked. Its own retrieval
-contract decides what she carries: the summary and the rules table ride on the
-**cached** system prompt, so they are in front of her on every turn;
-`get_strategy` fetches the reasoning behind any of it. Loading the whole
-document instead would be roughly ten thousand characters against every message,
-competing with the briefing for attention.
+contract decides what she carries: the summary, a one-line index of every
+section, and the rules table ride on the **cached** system prompt, so they are in
+front of her on every turn; `get_strategy` fetches the reasoning behind any of
+it. Loading the whole document instead would be close to sixty thousand
+characters against every message, competing with the briefing for attention.
+
+**The index is there because nothing cites §8.** Every other section is reachable
+from a rule's `§` column, and §8 — which population, which filters, which figure
+is the honest one — is the section that decides whether a number means anything
+at all. No rule points at it. A tool she can call is not a tool she knows when to
+call.
 
 **A subsection is served by the section that holds it**, and without that the two
 citations she carries on every single turn were the two `get_strategy` could not
@@ -1072,26 +1079,58 @@ checked against a row today, `field` that a column would have to exist first,
 it is one whose compliance is invisible, so it never counts as kept merely
 because nothing contradicted it.
 
-Sections 1, 2, 3, 9, 10 and 11 are not written. Four of them are cited — §2 for
-the market model, §9 for the leg of a failure that leaves no signature, §10 for
-what would have to change before a judgment rule could become checkable, and §1
-only by the retrieval contract's own list — and `get_strategy` names them rather
-than returning nothing, because a blank is something she would fill in herself,
-which is the one outcome worse than reporting it missing.
+The numbering skips 1, 3 and 11, and that is a decision rather than an unfinished
+document. §2, §9 and §10 were the three holes anything actually cited — the
+market model, the leg of a failure that leaves no signature, and what would have
+to change before a judgment rule could become checkable — and v1.9 wrote all
+three, which left the other three as placeholders that had outlived themselves.
+Nothing now cites a section that does not exist. `get_strategy` still names a
+number it does not hold rather than returning nothing: the number arrives from
+the model, so a mistyped or an invented one is what it has to survive, and a
+blank is something she would fill in herself, which is the one outcome worse than
+reporting it missing.
 
-§6 now holds R-08's five steps — top-down bias, liquidity pools and S&R, psychological
-levels, candle or chart pattern with signal then confirmation, and reward-to-risk
-of at least 1:1.5. The order is the rule: a failed step ends the sequence rather
-than being traded off against a later one. Steps 1–4 are read and nothing stored
-can see them; **step 5 is arithmetic he runs**, on two prices no row carries —
-the standard $30 target over the $20 cap is exactly 1:1.5, so the only entry it
-refuses on its own is a $25 target set with a stop wider than about $16.70, and
-nothing records which target was set.
+§6 holds R-08's four steps — top-down bias; levels, meaning liquidity pools,
+support and resistance and the $25 grid; a candle or chart pattern with signal
+then confirmation; and reward-to-risk of at least 1:1.5. The order is the rule: a
+failed step ends the sequence rather than being traded off against a later one,
+and nothing stored can see any of the four. **Psychological levels were a fifth
+step until v1.9** and are now inside the levels step: they gated nothing of their
+own — attention rather than a test — and a step that can never be the step you
+stopped at breaks the one claim R-08 makes.
 
-Writing it settled a contradiction the document carried for six versions. **1:1.5
-is a condition at entry** and **1:1.25 is the floor of what can be realised**
-after a $30 target is shortened to $25 on a trade already open — two numbers at
-two moments, stated as one floor that disagreed with itself.
+**Step 4 is arithmetic he runs, and it binds in exactly one place.** The default
+$30 target over a stop of $20 or tighter is always at least 1:1.5, so on the
+default path the step refuses nothing. What it refuses is a $25 target set at
+entry, which needs a stop of $16.67 or tighter — and no row records which target
+was set.
+
+So a realised 1:1.25 is **legitimate as an outcome and illegitimate as a plan**:
+the rule working where a $30 target was shortened on a trade already open, and a
+breach where $25 was set at entry over a $20 stop. Nothing on the row separates
+them, so it is `unknown` rather than either. That is v1.9's correction to a
+contradiction the document carried for six versions and then papered over for
+two — one floor that disagreed with itself, restated as two numbers at two
+moments, when the honest statement is that the row cannot tell which happened.
+
+**The stop is a ceiling, not a value**, and that is what makes R-02 one-sided.
+$20 is the most it may ever be; where it actually goes is read off the chart at
+entry, so it is usually tighter, and it never moves except to break-even. A loss
+closing further than $20 from entry can therefore only be a stop that was
+widened, which is what the predicate catches — and a $10 stop that closed $18 out
+was widened by eight dollars and passes silently. A clean R-02 run means no stop
+went past $20. It never means stops were respected.
+
+**R-10 and R-11 arrived at v1.9 with IDs they should have had all along.** One
+position at a time, and the day ends at −4% of account: both were prose in §5
+from v1.5, neither was ever in the table, so neither was ever checked. Both come
+out of broker columns alone — two rows whose entry-to-fill spans overlap, and
+cumulative P&L against `size_oz × 500` — which is why they arrive as `journal`
+rather than as another thing waiting on a schema change. R-11 also separates two
+rules §5 had been stating as one: a full stop ends the day under R-03 and −4%
+ends it under R-11, and now that the stop is a ceiling the two can disagree in
+both directions — a $12 stop taken in full ends the day having spent 2.4%, and
+three hand-cut exits can spend the whole 4% without R-03 seeing anything.
 
 §4 is the one section that answers a question the rules could not. **The two
 setups differ by method, not by location**: Break & Retest is a continuation
@@ -1629,8 +1668,9 @@ is dropped with its privileges. `create or replace view` cannot do this half —
 it matches column by column and may only append, so a shorter list is a drop and
 a rebuild, which is the other side of the trap #30 was fixed for.
 
-The two columns held a plan the journal no longer asks for. Nothing read them
-but Eugenia, and what she now says about a plan is in the strategy at v1.8.
+The two columns held a plan the journal no longer asks for. Nothing read them but
+Eugenia, and what she now says about a plan is §8's list of what a row cannot
+answer and §10's record of why that door is shut.
 
 Search is added to both of Eugenia's tables, and the whole block is idempotent —
 `add column if not exists`, `create index if not exists`, `create or replace
