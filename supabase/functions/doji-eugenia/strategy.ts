@@ -573,8 +573,8 @@ and what makes asking at journalling time the only way it is ever recoverable.
 
 **The plan.** Where the stop and the target were set at entry, as against the
 final stop the broker reports. Nothing on the row carries it: a stop moved to
-break-even has overwritten the original everywhere, and no column ever held what
-it was before.
+break-even has overwritten the original everywhere, and no column holds what it
+was before.
 
 Three questions are unanswerable for that reason — R-03's full-stop population,
 the planned R:R, and whether a win at $25 was a shortened target or an early
