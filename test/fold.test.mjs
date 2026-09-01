@@ -37,9 +37,11 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import {
-  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, isBriefingMarker,
+  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
+  notesList, channelsList,
 } from '../supabase/functions/doji-eugenia/index.ts';
+import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1045,15 +1047,130 @@ test('the weekend never retries', () => {
   assert.equal(retryDue(new Date(Date.UTC(2026, 7, 23, 14))), false);   // Sunday
 });
 
-test('the retry recognises exactly what a briefing stores, and nothing else', () => {
-  // If it could not spot yesterday's shape it would send a second briefing
-  // every morning; if it matched too loosely, a question mentioning the word
-  // would suppress a real one.
-  assert.equal(isBriefingMarker(briefingMarker('weekday')), true);
-  assert.equal(isBriefingMarker(briefingMarker('sunday')), true);
-  assert.equal(isBriefingMarker('[pulse]'), false);
-  assert.equal(isBriefingMarker('what did the briefing say about CPI?'), false);
-  assert.equal(isBriefingMarker(''), false);
+test('the retry asks the database for exactly what a briefing stores', () => {
+  /* Both markers, or the briefing that stores the missing one is never seen and
+     the 09:00 retry sends a second. The equality is the database's now: the
+     filter names the two strings and nothing else can satisfy it, so a question
+     merely mentioning the word cannot suppress a real briefing. */
+  const q = briefedQuery();
+  assert.equal(q.split('?')[0], 'eugenia_turns');
+  for (const due of ['weekday', 'sunday']) {
+    assert.ok(q.includes(encodeURIComponent(briefingMarker(due))),
+      `briefedQuery does not name the ${due} marker — that briefing would go ` +
+      `unseen and the retry would generate and send another one`);
+  }
+  assert.ok(!q.includes(encodeURIComponent('[pulse]')));
+});
+
+test('the retry reads one row, not a window that a busy morning can overflow', () => {
+  /* This is the defect it replaced. Scanning the last thirty user turns for the
+     marker is correct on a quiet morning and wrong on a talkative one: thirty
+     messages between 08:00 and 09:00 push it out, briefedToday answers "no",
+     and the retry pays for a whole second briefing and sends it. A filter on
+     the marker cannot be crowded out, however much was said around it. */
+  const q = briefedQuery();
+  assert.match(q, /limit=1(&|$)/);
+  assert.match(q, /order=id\.desc/);
+  // The marker is written as the USER turn of the stored pair; her half is the
+  // briefing itself, which would match nothing here anyway.
+  assert.match(q, /role=eq\.user/);
+});
+
+/* ─── Eugenia: what he can see of her memory ─────────────────────────────────
+   notesBlock renders the notes for HER, framed as instructions to obey.
+   notesList renders the same rows for HIM, and is the only window he has into
+   what she is keeping — everything in there was written by her, a fact
+   silently, so an unreadable memory is one he can only audit by noticing an
+   absence.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('the listing carries the id each note is named by', () => {
+  // The number is how a note is retired. Without it he can read what she holds
+  // and still not be able to tell her which line to drop.
+  const out = notesList([{ id: 14, note: 'keep it under 1400' }],
+                        [{ id: 12, note: 'he trades the London open' }]);
+  assert.match(out, /\[14\] keep it under 1400/);
+  assert.match(out, /\[12\] he trades the London open/);
+});
+
+test('what he told her and what she noticed stay apart, and in that order', () => {
+  // Run together they invite exactly the confusion notesBlock keeps out of her
+  // context: an instruction is not an observation to be weighed against one.
+  const out = notesList([{ id: 2, note: 'stop mentioning the ten-year' }],
+                        [{ id: 1, note: 'he has the dollar channel' }]);
+  assert.ok(out.indexOf('[2]') < out.indexOf('[1]'),
+    'the instructions must come first — they are the half that is not optional');
+  assert.match(out, /told me/);
+  assert.match(out, /noticed/);
+});
+
+test('an empty memory says so, and an empty half prints no heading', () => {
+  // A blank reply reads as a bot that failed rather than one holding nothing.
+  assert.match(notesList([], []), /\S/);
+  assert.ok(!notesList([], [{ id: 1, note: 'x' }]).includes('told me'));
+  assert.ok(!notesList([{ id: 1, note: 'x' }], []).includes('noticed'));
+});
+
+/* ─── Eugenia: where he stands on each channel ───────────────────────────────
+   The five channels are the only part of her memory that does not scroll, and
+   the only place an ABSENCE is legible. Everything below is about that second
+   property: a channel he has never touched has to SHOW, because in her notes it
+   is nothing written down, and nothing is not a thing anyone can notice.
+   ───────────────────────────────────────────────────────────────────────── */
+
+test('a channel with no row shows at the bottom rung, never vanishes', () => {
+  /* THE DEFECT THIS EXISTS TO CATCH. The map renders what the database gives
+     it, so a channel that was never seeded — or was dropped in a repair — would
+     simply not appear, and the one thing the map is for is that a channel he
+     has never used is VISIBLE. Silently showing four channels reads exactly
+     like a trader who has covered the fifth. */
+  const out = channelsList([{ channel: 'dollar', state: 'owns', evidence: null }]);
+  for (const [, name] of CHANNELS) {
+    assert.ok(out.includes(name), `${name} is missing from the map entirely`);
+  }
+  assert.match(out, /jobs — unseen/);
+});
+
+test('the map is rendered in the order the prompt teaches them', () => {
+  // Not in whatever order PostgREST returns. A stable order is what keeps a
+  // rung from looking like it moved when nothing did.
+  const shuffled = [...CHANNELS].reverse()
+    .map(([channel]) => ({ channel, state: 'used', evidence: null }));
+  const out = channelsList(shuffled);
+  const at = CHANNELS.map(([, name]) => out.indexOf(name));
+  assert.deepEqual(at, [...at].sort((a, b) => a - b),
+    'the map no longer reads in the order prompt.ts declares');
+});
+
+test('she is shown the name she says, never the id she stores', () => {
+  /* "central_bank_buying" is not something a person says across a desk, and a
+     prompt that hands her one is a prompt that will eventually see it repeated
+     back to him.
+
+     The underscore is the test rather than the id itself, and that is not
+     laziness: three of the five ids ARE their own display words — `jobs` is
+     `jobs`, and `inflation` is a substring of two of the names — so asking
+     whether an id appears is a question that cannot be answered. What can be
+     answered is whether anything MACHINE-SHAPED got through, and snake_case is
+     the whole of what that means here. */
+  const out = channelsList(CHANNELS.map(([channel]) => ({ channel, state: 'owns', evidence: null })));
+  assert.ok(!out.includes('_'), `a raw channel id reached her: ${out}`);
+});
+
+test('the evidence rides with the rung when there is any', () => {
+  // A rung with no reason behind it is a number she cannot argue with, and the
+  // nightly pass has to be able to see what it is about to overwrite.
+  const withIt = channelsList([{ channel: 'jobs', state: 'used', evidence: 'he asked what the claims trend implies' }]);
+  assert.match(withIt, /jobs — used \(he asked what the claims trend implies\)/);
+  // And leaves no empty brackets when there is none.
+  assert.ok(!channelsList([{ channel: 'jobs', state: 'used', evidence: null }]).includes('()'));
+});
+
+test('the bottom rung is the first one, because the map falls back to it', () => {
+  // channelsList renders a missing row at CHANNEL_STATES[0]. Reorder the ladder
+  // and every unseeded channel would render as owned — the exact inversion that
+  // would make a thin channel look covered.
+  assert.equal(CHANNEL_STATES[0], 'unseen');
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */

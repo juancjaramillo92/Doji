@@ -36,8 +36,9 @@ from (values
   ('tables and the view exist',
    (select count(*)::text from information_schema.tables
      where table_schema = 'public'
-       and table_name in ('trades','eugenia_turns','eugenia_notes','eugenia_trades')),
-   '4'),
+       and table_name in ('trades','eugenia_turns','eugenia_notes','eugenia_trades',
+                          'eugenia_channels')),
+   '5'),
 
   -- If pnl is a plain column, the email-beats-computed rule is no longer stated
   -- in the schema and every client is reading a stored value nobody maintains.
@@ -97,6 +98,24 @@ from (values
   ('no policy on eugenia_notes',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_notes')),
    '0'),
+  ('RLS on eugenia_channels',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_channels')),
+   'true'),
+  ('no policy on eugenia_channels',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_channels')),
+   '0'),
+
+  -- THE SEED IS THE ONE THING agree.test.mjs CANNOT CHECK. It reads the insert
+  -- statement in 003 and confirms it names all five; whether those five rows are
+  -- actually IN the table is a fact about the database and only this file can
+  -- ask. It matters more than it looks: setChannel PATCHes by primary key, so a
+  -- missing row is a 200 with an empty array — the move is silently dropped, and
+  -- the channel then renders at the bottom rung forever, which is exactly what a
+  -- channel he has genuinely never used looks like. Every night, reported to
+  -- nobody.
+  ('all five channels are seeded',
+   (select count(*)::text from public.eugenia_channels),
+   '5'),
 
   -- Without this the view reads `trades` with its owner's rights, and what RLS
   -- does then depends on who ran 003 rather than on who is asking.

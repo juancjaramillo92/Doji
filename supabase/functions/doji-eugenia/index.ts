@@ -31,7 +31,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the
 // reason that file gives.
@@ -260,6 +260,42 @@ const NOTES_TOOL = {
   },
 } as const;
 
+/* ─── Where he stands on each channel ──────────────────────────────────────
+   The five channels are the map her teaching is anchored to, and this is the
+   only part of her memory that never scrolls: five rows rather than a window,
+   so a channel he has NEVER used is legible as a row saying so. Notes cannot
+   carry that — an absence is not something anybody writes down.
+
+   CONSOLIDATION ONLY, and deliberately not in CHAT_TOOLS beside `remember`.
+   A note is a moment and is fairly written in one; a rung is a judgment across
+   days, and moving one from a single exchange is the same error as reading a
+   pattern into one fill. The nightly pass is the only caller that sees a whole
+   day, which is exactly the argument that put note-writing there as well.
+   ───────────────────────────────────────────────────────────────────────── */
+const CHANNEL_TOOL = {
+  name: "set_channel",
+  description:
+    "Move one channel up the ladder, at the nightly pass and nowhere else. The " +
+    "rungs in order are " + CHANNEL_STATES.join(", ") + ": unseen is never come " +
+    "up, explained is you explained it and he has not used it back, used is he " +
+    "used it himself, owns is he reasoned with it unaided more than once. Move " +
+    "on evidence from the day in front of you, never on a nod, and most nights " +
+    "nothing moves at all.",
+  input_schema: {
+    type: "object",
+    properties: {
+      channel:  { type: "string", enum: CHANNELS.map(([id]) => id),
+                  description: "Which channel." },
+      state:    { type: "string", enum: CHANNEL_STATES,
+                  description: "The rung it moves to." },
+      evidence: { type: "string",
+                  description: `One line saying what moved it, at most ${NOTE_MAX} characters.` },
+    },
+    required: ["channel", "state", "evidence"],
+    additionalProperties: false,
+  },
+} as const;
+
 /* ─── What he has decided ──────────────────────────────────────────────────
    The summary and the rules table ride on the cached system prompt and are in
    front of her on every turn. This is the rest: the reasoning under a rule, how
@@ -398,6 +434,11 @@ async function readNotes(kind: string): Promise<Note[]> {
 
 type Note = { id: number; note: string };
 
+// `[12] he trades the London open` — the number is how a note is NAMED when one
+// is retired, so it is part of the line rather than decoration. Both renderings
+// carry it: hers, so she can pass `supersedes`, and his, so he can say which.
+const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
+
 /* Truncated rather than refused, and it NEVER THROWS.
 
    Both for the same reason: this tool exists for a side effect, and the answer
@@ -470,6 +511,50 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     return k === 'instruction'
       ? "That did NOT save. Tell him it did not stick and that he will have to say it again."
       : "That did not save. Carry on and do not mention it.";
+  }
+}
+
+/* NEVER THROWS, for the reason writeNote does not — it runs inside the tool
+   loop and an exception costs the answer being written. Both names are checked
+   against prompt.ts rather than trusted: the tool schema declares an enum, and
+   a value outside it would be refused by the check constraint as a 400 that
+   reads like a database fault rather than like a bad argument.
+
+   moved_on is a New York civil day, computed here. Defaulting it to now() in
+   the schema would file an evening move on tomorrow. */
+async function setChannel(channel: unknown, state: unknown, evidence: unknown): Promise<string> {
+  const id = String(channel ?? "");
+  const to = String(state ?? "");
+  if (!CHANNELS.some(([c]) => c === id)) {
+    return `There is no channel called "${id}". They are ` +
+           CHANNELS.map(([c]) => c).join(", ") + ".";
+  }
+  if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
+    return `"${to}" is not a rung. They are ` + CHANNEL_STATES.join(", ") + ".";
+  }
+
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_channels?channel=eq.${id}`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({
+        state: to,
+        evidence: String(evidence ?? "").trim().slice(0, NOTE_MAX) || null,
+        moved_on: nyDate(new Date()),
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // A PATCH that matches nothing is a 200 with an empty array, and it must not
+    // pass as done: the row is seeded by 003_eugenia.sql, so an empty answer
+    // means the migration has not been applied and every move is being dropped.
+    if ((await res.json()).length === 0) {
+      return `No row for ${id} — the channels table has not been seeded, so ` +
+             `nothing was saved. Say nothing about this to him.`;
+    }
+    return `${id} is now ${to}.`;
+  } catch (err) {
+    console.error("doji-eugenia: channel not moved —",
+      err instanceof Error ? err.message : err);
+    return "That did not save. Carry on and do not mention it.";
   }
 }
 
@@ -569,7 +654,7 @@ const CHAT_TOOLS = [
   SEARCH_TOOL,
   STRATEGY_TOOL,
 ];
-const CONSOLIDATE_TOOLS = [NOTES_TOOL];
+const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL];
 
 async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -620,16 +705,30 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
 // a working limit.
 const MAX_ROUNDS = 6;
 
-async function ask(messages: Turn[], effort: Effort, tools: unknown[] = CHAT_TOOLS): Promise<string> {
+/* `label` names the caller in the log line below and does nothing else. The
+   four jobs are not distinguishable from effort alone — the briefing and the
+   nightly pass both run high — and a cost line that cannot say which of them
+   spent the money is a cost line nobody can act on. */
+async function ask(messages: Turn[], effort: Effort, label: string,
+                   tools: unknown[] = CHAT_TOOLS): Promise<string> {
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
   // the missing one did.
   let container: string | undefined;
+  // Summed across the rounds rather than logged per round, because the unit
+  // worth knowing is what one briefing cost, not what one leg of it did.
+  let inTok = 0, outTok = 0, cached = 0, searches = 0;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const body = await call(convo, effort, tools, container);
     container = body.container?.id ?? container;
+
+    const used = body.usage ?? {};
+    inTok    += used.input_tokens ?? 0;
+    outTok   += used.output_tokens ?? 0;
+    cached   += used.cache_read_input_tokens ?? 0;
+    searches += used.server_tool_use?.web_search_requests ?? 0;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
     // content, so it is caught before the blocks are read rather than surfacing
@@ -658,6 +757,9 @@ async function ask(messages: Turn[], effort: Effort, tools: unknown[] = CHAT_TOO
         } else if (b.name === STRATEGY_TOOL.name) {
           results.push({ type: "tool_result", tool_use_id: b.id,
             content: readStrategy(b.input?.section) });
+        } else if (b.name === CHANNEL_TOOL.name) {
+          results.push({ type: "tool_result", tool_use_id: b.id,
+            content: await setChannel(b.input?.channel, b.input?.state, b.input?.evidence) });
         }
       }
       if (!results.length) throw new Error("tool_use with no tool this function serves");
@@ -668,6 +770,14 @@ async function ask(messages: Turn[], effort: Effort, tools: unknown[] = CHAT_TOO
     const text = (body.content ?? [])
       .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
     if (!text) throw new Error("Claude returned no text");
+    /* THE ONLY RECORD OF WHAT ANY OF THIS COSTS. Nothing else in this file
+       counts a token, and the spend cap on the Anthropic key is a ceiling
+       rather than a meter — so a briefing that quietly started running twelve
+       searches instead of four looks exactly like one that did not. Searches
+       bill separately, which is why they are counted apart from the tokens.
+       Only on the way out: a throw is reported by the caller. */
+    console.log(`doji-eugenia: ${label} — ${round + 1} round(s), ${effort} effort, ` +
+                `${inTok} in (${cached} cached), ${outTok} out, ${searches} search(es)`);
     return text;
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
@@ -822,10 +932,7 @@ async function notesBlock(): Promise<string> {
     const [told, noticed] = await Promise.all([
       readNotes('instruction'), readNotes('fact'),
     ]);
-    // `[12] he trades the London open` — the number is how she names one in
-    // `supersedes`, so it is part of the line rather than decoration.
-    const list = (ns: Note[]) =>
-      `\n· ` + ns.map(n => `[${n.id}] ${n.note}`).join("\n· ");
+    const list = (ns: Note[]) => `\n· ` + ns.map(noteLine).join("\n· ");
     return (told.length
              ? `\n\nWhat he has told you to do, newest first. These are not optional and a` +
                ` later one replaces an earlier one:${list(told)}`
@@ -835,6 +942,69 @@ async function notesBlock(): Promise<string> {
              : "");
   } catch (err) {
     console.error("doji-eugenia: notes unavailable —", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
+
+/* THE SAME ROWS, RENDERED FOR HIM RATHER THAN FOR HER, and the only window he
+   has into any of it.
+
+   Her memory is the one part of this system he can write to and could not read.
+   Notes are the only channel he has for correcting her, a fact is recorded
+   SILENTLY by design, and the acknowledgement for an instruction is four words
+   that scroll away — so the evidence that anything stuck lasts about a morning.
+   A wrong note then fails in the worst available way: a fact saying he
+   understands something he does not makes her STOP explaining it, and the
+   symptom is an absence, which is the hardest thing there is to notice.
+
+   Pure, so a test can read the formatting; the read stays with the caller. The
+   ids are the point rather than decoration — they are how she is told which
+   note to retire, and now how he is. */
+export function notesList(told: Note[], noticed: Note[]): string {
+  if (!told.length && !noticed.length) return "I have not kept anything yet, jefe.";
+  const list = (ns: Note[]) => ns.map(noteLine).join("\n");
+  return [
+    told.length    ? `What you have told me, newest first:\n${list(told)}`  : "",
+    noticed.length ? `What I have noticed, newest first:\n${list(noticed)}` : "",
+  ].filter(Boolean).join("\n\n");
+}
+
+type Channel = { channel: string; state: string; evidence: string | null };
+
+/* RENDERED IN THE ORDER prompt.ts DECLARES THEM, not in whatever order the
+   database returns — the list she reads should be the list she was taught, and
+   a stable order is also what stops a rung looking like it moved when it did
+   not. A channel with no row is shown at the bottom rung rather than dropped:
+   the point of this block is that an absence is visible, so a missing row must
+   not be the one thing it hides. Pure, so a test can read the shape. */
+export function channelsList(rows: Channel[]): string {
+  const byId = new Map(rows.map(r => [r.channel, r]));
+  return CHANNELS.map(([id, name]) => {
+    const row = byId.get(id);
+    const state = row?.state ?? CHANNEL_STATES[0];
+    return `· ${name} — ${state}${row?.evidence ? ` (${row.evidence})` : ""}`;
+  }).join("\n");
+}
+
+/* Optional the same way notesBlock is: a database blip costs her the map, not
+   the briefing. */
+async function channelsBlock(): Promise<string> {
+  try {
+    const res = await fetch(
+      // Bounded by the list that defines it rather than by a literal: the table
+      // cannot hold a sixth row — the primary key sits on a five-value check —
+      // so this is the one read here whose limit can never bite. It is written
+      // anyway, because every read of her tables carrying one is the invariant,
+      // and the read that was allowed to be the exception was the one that got
+      // missed.
+      `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence` +
+      `&limit=${CHANNELS.length}`,
+      { headers: sbHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return `\n\nWhere he stands on each channel:\n${channelsList(await res.json())}`;
+  } catch (err) {
+    console.error("doji-eugenia: channels unavailable —",
+      err instanceof Error ? err.message : err);
     return "";
   }
 }
@@ -902,6 +1072,28 @@ async function postScheduled(url: URL): Promise<Response> {
   }
 }
 
+/* What postBriefing stores instead of the text it sent. One definition, because
+   a retry that could not spot yesterday's shape would send a second briefing
+   every morning. */
+export const briefingMarker = (due: Brief) => `[${due} briefing]`;
+
+/* THE MARKER IS FOUND BY THE DATABASE, NOT BY SCANNING A WINDOW OF TURNS.
+
+   Reading the last thirty user turns and looking for it among them is right on
+   a quiet morning and wrong on a busy one: thirty messages between 08:00 and
+   09:00 push the marker out of that window, the retry concludes no briefing was
+   sent, and generates and sends a second one — a dozen searches at high effort
+   and a duplicate he did not ask for. Filtering on the marker itself is exact
+   whatever was said around it, and returns one row rather than thirty.
+
+   Exported because it is the decision, the same reason tradesQuery is. */
+export function briefedQuery(): string {
+  const markers = [briefingMarker('weekday'), briefingMarker('sunday')]
+    .map(m => `"${encodeURIComponent(m)}"`).join(',');
+  return `eugenia_turns?select=created_at&role=eq.user&content=in.(${markers})` +
+         `&order=id.desc&limit=1`;
+}
+
 /* Whether a briefing has already landed today, read off the marker
    postBriefing stores in place of the sent text. It is written just BEFORE the
    send, so it exists whenever a briefing was generated — which is the question
@@ -911,7 +1103,7 @@ async function postScheduled(url: URL): Promise<Response> {
    The day comparison is done HERE, in New York, rather than as a timestamp
    filter in the query. A `created_at=gte.<date>T00:00:00-05:00` would be an
    hour wrong for half the year, which is the same mistake briefDue and
-   marketOpen exist to avoid; asking Intl for the civil day of each row is
+   marketOpen exist to avoid; asking Intl for the civil day of the row is
    correct in both halves.
 
    A read failure counts as "yes, already briefed": if the database is unwell
@@ -919,26 +1111,16 @@ async function postScheduled(url: URL): Promise<Response> {
    than skipping one. */
 async function briefedToday(): Promise<boolean> {
   try {
-    const res = await fetch(
-      `${SB_URL}/rest/v1/eugenia_turns?select=content,created_at&role=eq.user` +
-      `&order=id.desc&limit=30`, { headers: sbHeaders() });
+    const res = await fetch(`${SB_URL}/rest/v1/${briefedQuery()}`, { headers: sbHeaders() });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const today = nyDate(new Date());
-    return (await res.json()).some((r: { content: string; created_at: string }) =>
-      isBriefingMarker(r.content) && nyDate(new Date(r.created_at)) === today);
+    const [latest] = await res.json();
+    return !!latest && nyDate(new Date(latest.created_at)) === nyDate(new Date());
   } catch (err) {
     console.error("doji-eugenia: could not check for today's briefing —",
       err instanceof Error ? err.message : err);
     return true;
   }
 }
-
-/* What postBriefing stores instead of the text it sent, and the only thing
-   briefedToday recognises. One definition, because a retry that could not spot
-   yesterday's shape would send a second briefing every morning. */
-export const briefingMarker = (due: Brief) => `[${due} briefing]`;
-export const isBriefingMarker = (content: string) =>
-  content === briefingMarker('weekday') || content === briefingMarker('sunday');
 
 
 /* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
@@ -954,9 +1136,17 @@ async function postBriefing(due: Brief): Promise<Response> {
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    + await notesBlock() + await tradesBlock();
+    + await notesBlock() + await channelsBlock() + await tradesBlock();
 
-  const brief = await ask([...await recent(), { role: 'user', content: asked }], 'high');
+  const brief = await ask([...await recent(), { role: 'user', content: asked }],
+                          'high', `${due} briefing`);
+
+  /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT. The prompt asks for
+     nine hundred to fourteen hundred characters and no test can hold it there —
+     the figure lives in prose, on the far side of a model call. Unmeasured, the
+     briefing grew by a sixth and the way it surfaced was someone counting the
+     characters by hand. */
+  console.log(`doji-eugenia: ${due} briefing — ${brief.length} characters`);
 
   /* THE MARKER GOES DOWN BEFORE THE SEND, and the order is the whole point.
      Written after, a remember() that fails leaves a briefing delivered, an
@@ -970,7 +1160,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   await say(`${greeting(due)}\n\n${brief}`);
-  return json({ ok: true, brief: due });
+  return json({ ok: true, brief: due, chars: brief.length });
 }
 
 /* How silence is said, since a tool call cannot express "do not send this".
@@ -1030,21 +1220,24 @@ async function postConsolidation(): Promise<Response> {
   // a model round to be told what an empty array already said.
   if (!day.length) return json({ ok: true, skipped: "nothing said" });
 
-  const asked = CONSOLIDATE + await notesBlock() +
+  const asked = CONSOLIDATE + await notesBlock() + await channelsBlock() +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
   // `high`, and it is the one place that is not a latency decision: this writes
   // the memory every later briefing reasons from, and a careless note outlives
   // a careless briefing by months.
-  const said = await ask([{ role: 'user', content: asked }], 'high', CONSOLIDATE_TOOLS);
+  const said = await ask([{ role: 'user', content: asked }], 'high', 'consolidation',
+                         CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
   return json({ ok: true, consolidated: day.length });
 }
 
 async function postPulse(): Promise<Response> {
-  const asked = "Pulse, please — anything since the briefing?" + await notesBlock();
-  const said = await ask([...await recent(), { role: 'user', content: asked }], 'medium');
+  const asked = "Pulse, please — anything since the briefing?"
+    + await notesBlock() + await channelsBlock();
+  const said = await ask([...await recent(), { role: 'user', content: asked }],
+                         'medium', 'pulse');
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
@@ -1078,12 +1271,33 @@ async function handleMessage(update: any): Promise<void> {
       console.error("doji-eugenia: message from unexpected chat");
       return;
     }
-    // A slash command is addressed to Telegram, not to her, and /start arrives
-    // once per install. Answering one costs a full model call with the notes
-    // attached, so it is answered from here instead — Gladys ignores everything
-    // that is not a tap for the same reason.
+    /* ANSWERED FROM THE DATABASE, NEVER BY THE MODEL, and that is the whole
+       value of it. This is an audit of what she is keeping, so it has to show
+       the rows themselves — asked to list her own notes she could paraphrase
+       one, drop one, or produce a plausible line that is not in the table, and
+       an audit that can do that audits nothing. It also costs no model call. */
+    if (msg.text.trim().toLowerCase() === '/notes') {
+      try {
+        const [told, noticed] = await Promise.all([
+          readNotes('instruction'), readNotes('fact'),
+        ]);
+        // The map goes out with them: it is the half of her memory he has never
+        // been able to see at all, and the half that says what she is missing.
+        await say(notesList(told, noticed) + await channelsBlock());
+      } catch (err) {
+        console.error("doji-eugenia: notes unavailable —",
+          err instanceof Error ? err.message : err);
+        await say("I cannot read my notes just now, jefe.");
+      }
+      return;
+    }
+    // Any other slash command is addressed to Telegram, not to her, and /start
+    // arrives once per install. Answering one costs a full model call with the
+    // notes attached, so it is answered from here instead — Gladys ignores
+    // everything that is not a tap for the same reason.
     if (msg.text.startsWith('/')) {
-      await tg("sendMessage", { chat_id: CHAT_ID, text: "Aqui estoy, jefe. Just talk to me." });
+      await tg("sendMessage", { chat_id: CHAT_ID,
+        text: "Aqui estoy, jefe. Just talk to me — or /notes to see what I have kept." });
       return;
     }
 
@@ -1101,7 +1315,9 @@ async function handleMessage(update: any): Promise<void> {
     try {
       const history = await recent();
       answer = await ask(
-        [...history, { role: 'user', content: msg.text + await notesBlock() }], 'medium');
+        [...history, { role: 'user',
+                       content: msg.text + await notesBlock() + await channelsBlock() }],
+        'medium', 'reply');
     } finally {
       // Stopped the moment there is something to send, not after sending it —
       // otherwise a ping fires between the message landing and the write, and

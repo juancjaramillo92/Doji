@@ -275,13 +275,22 @@ code you write near it:
   turns, twenty notes, two hundred turns for the nightly pass. The last of those
   was missing and nothing failed, because a normal day is a handful of turns.
 
+- **Her memory has three lifetimes, not one.** An observation rolls; a standing
+  instruction must outlive twenty of them, which is what `kind` is for; and what
+  he UNDERSTANDS outlives both, which is what `eugenia_channels` is for. Five
+  rows, never a window — a channel he has never once used is a row saying
+  `unseen`, where in the notes it is nothing written down and therefore
+  unnoticeable. The map is a TIEBREAKER between two mechanisms that are both
+  live today, never a driver of what the briefing is about; and only the nightly
+  pass may move a rung, because one exchange is not evidence any more than one
+  fill is a pattern.
 - **Her notes are the only channel he has for correcting her, so `notesBlock()`
   is load-bearing on all four paths.** An instruction — *"stop mentioning the
   ten-year"* — is a note, and every later message obeys it; the conversation
   window would forget it by morning. Dropping the call from the briefing, the
   pulse or a reply fails silently: she carries on ignoring something he believes
-  she took, and nothing anywhere reports it. `agree.test.mjs` reads the three
-  function bodies for it.
+  she took, and nothing anywhere reports it. `agree.test.mjs` reads the four
+  function bodies for it, and for `channelsBlock()` beside it.
 - **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
   no verdict on a trade, one question at a time. The line she may now cross is
   narrow and deliberate: *what the market is pricing* and *what would surprise
