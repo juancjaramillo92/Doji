@@ -425,7 +425,7 @@ nav {
    natural height and sits level with the Month row across the divider. */
 .pnl-net > div:first-child { flex:1; min-height:0; display:flex; flex-direction:column; }
 .pnl-net > div:last-child  { flex:none; }
-/* Current Balance takes the standard title rhythm, same as Performance and
+/* Balance at broker takes the standard title rhythm, same as Performance and
    Cumulative P&L. Net P&L sits tighter to its figure — it labels the number
    directly beneath it rather than opening a block, and the long gap above is
    what separates the two readings. */
@@ -1319,15 +1319,25 @@ tr.broker-pending td:first-child {
      wrapping can help — the pair on its own is wider than the column. Full
      width each, and the divider turns with them. */
   .pnl-card-inner { flex-direction:column; gap:16px; }
-  /* Stretched beside the stats, the balance block absorbs the spare pixels and
-     the figure's auto margins centre it in them. Stacked there are none, so
-     both the gap between the readings and the title rhythm above the first one
-     have to be stated rather than left to the space. */
+  /* The two readings inside it turn the other way, into the width the stack was
+     leaving empty. Two short figures fit a half each where the performance pair
+     could not, and side by side they read as the one comparison they are: what
+     the broker holds, against what the journal has made of it.
+
+     Both titles take the standard rhythm here. Stacked, Balance at broker
+     opened a block and Net P&L sat tight on its own figure, and across two
+     columns that difference alone lands the two figures on different lines.
+     The balance figure drops its auto margins for the same reason: they centre
+     it in a column stretched to the height of the taller one, which is that
+     misalignment from the other side. */
   .pnl-net {
-    gap:14px; padding-right:0; padding-bottom:16px;
+    flex-direction:row; gap:16px; padding-right:0; padding-bottom:16px;
     border-right:none; border-bottom:1px solid var(--bd);
   }
-  .pnl-net > div:first-child > .cbox-l { margin-bottom:var(--gap-title); }
+  .pnl-net > div:last-child { flex:1; }
+  .pnl-net > div:first-child > .cbox-l,
+  .pnl-net > div:last-child  > .cbox-l { margin-bottom:var(--gap-title); }
+  .pnl-balance-number { margin-top:0; margin-bottom:0; }
   /* Side by side would leave the table roughly 140px wide. Source order is
      kept, so the roll-forward lands beneath the log. */
   .log-split { grid-template-columns:1fr; }
@@ -1525,7 +1535,7 @@ tr.broker-pending td:first-child {
         <div class="pnl-card-inner">
           <div class="pnl-net">
             <div>
-              <div class="cbox-l">Current Balance</div>
+              <div class="cbox-l">Balance at broker</div>
               <div id="pnl-balance-number" class="pnl-balance-number">—</div>
               <div id="pnl-balance-at" class="pnl-balance-at"></div>
             </div>
@@ -2120,10 +2130,7 @@ const Data = {
   // The definitive list. A save sends these and nothing else — the mechanism
   // that stops the app writing broker-owned data, enforced here rather than
   // trusted to each call site.
-  // SIX, AND FOUR OF THEM ARE TAPPABLE. Gladys takes callback_query alone, so a
-  // price cannot be asked for from Telegram and her COLUMNS map stays the four
-  // above — this list is the journal half, hers is the half a button can reach.
-  OWNED: ['setup','followed_rules','followed_sl','followed_tp','planned_stop','planned_target'],
+  OWNED: ['setup','followed_rules','followed_sl','followed_tp'],
 
   init() {
     this.sb = window.supabase.createClient(SUPABASE.URL, SUPABASE.KEY);
@@ -3298,9 +3305,7 @@ const Journal = {
       setup:          pickRadio('jf-setup') || null,
       followed_rules: pickYN('followed_rules'),
       followed_sl:    pickYN('followed_sl'),
-      followed_tp:    pickYN('followed_tp'),
-      planned_stop:   pickPrice('planned_stop'),
-      planned_target: pickPrice('planned_target')
+      followed_tp:    pickYN('followed_tp')
     });
     if (!ok) return;
 
@@ -3317,15 +3322,6 @@ function pickYN(name) {
   return v === 'yes' ? true : v === 'no' ? false : null;
 }
 const pickRadio  = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
-
-// Empty is null, the same three-state answer the pills give: a blank price is a
-// plan nobody recorded, never a plan of zero. Number() would read '' as 0.
-function pickPrice(name) {
-  const raw = $('jm-body')?.querySelector(`input[name="${name}"]`)?.value.trim();
-  if (!raw) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 function journalForm(t) {
   const setups = CONFIG.SETUPS.map(s => {
@@ -3349,22 +3345,6 @@ function journalForm(t) {
     </div>`;
   }).join('');
 
-  /* THE PLAN, AND IT IS THE ONLY THING HERE THAT CANNOT BE ANSWERED LATER. The
-     three questions above are about a trade that has closed and are as true a
-     week on; these two are where it was aimed, and the broker overwrites the
-     original stop the moment it moves. Blank stays blank — an unanswered plan
-     is not a plan of zero. */
-  const planned = [
-    ['planned_stop',   'Planned stop',   t.planned_stop],
-    ['planned_target', 'Planned target', t.planned_target]
-  ].map(([name, label, val]) => `
-    <div class="jf-yn-item">
-      <label class="journal-q-label" for="jf-${name}">${label}</label>
-      <input type="number" step="0.01" min="0" inputmode="decimal"
-             class="jf-price" id="jf-${name}" name="${name}"
-             value="${val == null ? '' : val}">
-    </div>`).join('');
-
   // Save and Cancel only. A destructive action should not share a row with the
   // way out of a dialog, where it would sit one button from Cancel and similar
   // enough to hit by accident. Deleting is the ✕ in the log, deliberate to
@@ -3374,7 +3354,6 @@ function journalForm(t) {
       <div class="jm-card">
         <div class="jf-setup-row">${setups}</div>
         <div class="jf-yn-row">${yn}</div>
-        <div class="jf-yn-row">${planned}</div>
       </div>
       <div class="journal-form-actions">
         <button class="jm-btn-save"   data-jm-action="save">Save</button>

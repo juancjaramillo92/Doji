@@ -64,12 +64,11 @@ test('an open position with no P&L can still be complete', () => {
    trusted to each call site, so this is the one place to assert it.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('Data.OWNED names the six journal columns and nothing else', () => {
+test('Data.OWNED names the four journal columns and nothing else', () => {
   // Spread first: the app's array belongs to the jsdom realm, and a strict
   // deep-equal compares prototypes across realms as well as contents.
   assert.deepEqual([...app.Data.OWNED],
-    ['setup', 'followed_rules', 'followed_sl', 'followed_tp',
-     'planned_stop', 'planned_target']);
+    ['setup', 'followed_rules', 'followed_sl', 'followed_tp']);
 });
 
 /* ─── The load path ──────────────────────────────────────────────────────────
@@ -119,23 +118,14 @@ test('a save sends the journal columns and nothing else', async () => {
   await app.Data.save('PID1', {
     setup: 'Break & Retest',
     followed_rules: true, followed_sl: false, followed_tp: null,
-    planned_stop: 4480, planned_target: 4530,
     pnl: 999, direction: 'SELL', entry_time: '2026-01-01T00:00:00Z',
     size_oz: 4, deleted: true
   });
 
   assert.equal(db.patches.length, 1);
   assert.deepEqual(Object.keys(db.patches[0]).sort(),
-    ['followed_rules', 'followed_sl', 'followed_tp',
-     'planned_stop', 'planned_target', 'setup']);
+    ['followed_rules', 'followed_sl', 'followed_tp', 'setup']);
 });
-
-/* ─── The plan, which nothing else on the row remembers ──────────────────────
-   Every other journal answer describes a trade that has closed, and is as true
-   a week later. These two are where it was AIMED, and the broker overwrites the
-   original stop the moment it moves — so a plan not recorded at the time is not
-   merely missing, it is unrecoverable from anywhere.
-   ─────────────────────────────────────────────────────────────────────────── */
 
 /* ─── The balance window ─────────────────────────────────────────────────────
    openBal and lastBal are the same read against two different bounds, and that
@@ -174,54 +164,6 @@ test('a month with no balance before it opens on nothing rather than on its own'
   const aug = app.rangeStats(rows, '2026-08-01', '2026-09-01');
   assert.equal(aug.openBal, null, 'the month opened on a balance from inside itself');
   assert.equal(aug.lastBal, 1200);
-});
-
-test('the form prefills a plan that is already recorded', () => {
-  seed([journalled({ id: 'PID1', planned_stop: 4480, planned_target: 4530 })]);
-  app.Journal.open('PID1');
-  assert.equal($('jf-planned_stop').value, '4480');
-  assert.equal($('jf-planned_target').value, '4530');
-  app.Journal.close();
-});
-
-test('a trade with no plan opens blank, never zero', () => {
-  seed([journalled({ id: 'PID1' })]);
-  app.Journal.open('PID1');
-  // 0 is a plan he never made, and it would pass the > 0 constraint as a value.
-  assert.equal($('jf-planned_stop').value, '');
-  assert.equal($('jf-planned_target').value, '');
-  app.Journal.close();
-});
-
-test('saving sends a price as a number and a blank as null', async () => {
-  db.error = null;
-  db.rows = [journalled({ id: 'PID1' })];
-  await app.Data.load();
-  app.Journal.open('PID1');
-  $('jf-planned_stop').value = '4480.25';
-  $('jf-planned_target').value = '';
-  db.patches.length = 0;
-  await app.Journal.save();
-
-  assert.equal(db.patches[0].planned_stop, 4480.25);   // a number, not '4480.25'
-  assert.equal(db.patches[0].planned_target, null);    // unanswered, never 0
-});
-
-test('a price that is not a positive number is unanswered, not sent', async () => {
-  db.error = null;
-  db.rows = [journalled({ id: 'PID1' })];
-  await app.Data.load();
-  app.Journal.open('PID1');
-  // jsdom lets a number input hold anything, and so does a browser via paste.
-  $('jf-planned_stop').value = 'abc';
-  $('jf-planned_target').value = '-5';
-  db.patches.length = 0;
-  await app.Journal.save();
-
-  assert.equal(db.patches[0].planned_stop, null);
-  assert.equal(db.patches[0].planned_target, null,
-    'a negative price reached the payload — the check constraint would refuse the ' +
-    'whole row, losing the answers saved beside it');
 });
 
 test('a save replaces the row it names, in both row sets', async () => {
@@ -798,11 +740,9 @@ test('the modal opens onto the form alone, with no broker controls', () => {
   assert.equal(card.children.length, 1);                  // #jm-body and nothing above it
   assert.equal(card.querySelector('input:disabled'), null);
 
-  /* BY NAME, NOT BY INPUT TYPE. This used to assert there was no number input
-     at all, which worked only while every journal answer was a pill — the two
-     planned prices are number inputs and are journal-owned, so the proxy has
-     stopped meaning what it was standing in for. What must hold is that no
-     BROKER column is controllable here, and that is now said directly. */
+  /* BY NAME, NOT BY INPUT TYPE. Every answer on this form is a pill, so "no
+     free-text control" and "no broker control" happen to hold together here and
+     only one of them is the guarantee. Naming the columns says which. */
   for (const broker of ['direction', 'entry_time', 'fill_time', 'entry_price',
                         'exit_price', 'size_oz', 'open_day', 'commission',
                         'balance', 'net_pnl', 'computed_pnl', 'pnl']) {

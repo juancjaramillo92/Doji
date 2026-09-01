@@ -26,13 +26,13 @@
 // pointing at reasoning nobody can read is worth knowing about.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.7";
+export const VERSION = "v1.8";
 
 /* Always in context, appended to the cached system prompt. The summary is the
    whole strategy said once; the table is every rule with how it is checked. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.7. This is what he has decided, and it is not
+HIS TRADING STRATEGY, version v1.8. This is what he has decided, and it is not
 yours to change — you read it, you do not edit it.
 
 XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -56,7 +56,7 @@ counts as kept just because nothing contradicted it.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss closing at its \`planned_stop\`; \`unknown\` where no plan was recorded | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs a full-stop answer recorded at journalling time to identify the population — see the note | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -71,7 +71,7 @@ Call get_strategy for the reasoning behind any of this.`;
 export const SECTIONS: Record<string, string> = {
   "0": `## 0 · Header
 
-**Version** v1.7 · **Effective from** [decide] · **Supersedes** v1.6
+**Version** v1.8 · **Effective from** [decide] · **Supersedes** v1.7
 
 ### Summary
 
@@ -255,7 +255,7 @@ written beside it.
 It does mean losses that are not full stops still count toward it. Three exits
 cut by hand at a third of a stop each have spent the day exactly as one full stop
 would, and R-03's predicate does not see that, because the row it looks for is a
-loss closing at its planned stop. The limit is the 4%; the full stop is the usual
+loss closing at the stop. The limit is the 4%; the full stop is the usual
 shape of reaching it.
 
 ### Nothing else caps a loss, and that is deliberate
@@ -321,11 +321,19 @@ off against a later one, so a setup that fails step 1 is not rescued by a clean
 step 4 — which is what separates this from a checklist where enough ticks carry
 a trade.
 
-Steps 1 to 4 are read, and nothing stored can see them. **Step 5 is arithmetic,**
-and since \`planned_stop\` and \`planned_target\` are recorded at entry it is the one
-step a row can be held to:
+Steps 1 to 4 are read, and nothing stored can see them. **Step 5 is arithmetic,
+and it is arithmetic on two prices nothing records** — the stop goes wherever
+price action puts it inside the $20 cap, and the row afterwards carries only
+where the trade actually ended:
 
-    (planned_target − entry_price) / (entry_price − planned_stop)  >=  1.5
+    (planned target − entry_price) / (entry_price − planned stop)  >=  1.5
+
+What §5 settles is when the step can fail at all. The standard $30 target over
+the $20 cap is exactly 1:1.5, so an entry taking that target passes step 5
+wherever the stop sits inside the cap, and a stop outside it fails R-02 first.
+The one case step 5 refuses on its own is a $25 target set AT ENTRY, which needs
+a stop inside about $16.70 — and nothing on the row says which target was set.
+So it is asked rather than computed.
 
 Step 4 is where §6's signal and confirmation sit: the rejection is the signal,
 the close or the read is the confirmation, and R-07 is that step failing.
@@ -367,11 +375,14 @@ meant.
 
 ### Recording
 
-**He journals at entry**, which is what makes \`planned_stop\` and \`planned_target\`
-worth anything: they are written before the stop moves, so they record the plan
-rather than a memory of it. A journal filled in at the end of the day would
-capture the same two prices as whatever the trade ended up doing, and every
-question they exist to answer would quietly become circular.
+**He journals at entry**, and the entry is the setup and the three discipline
+answers. The plan itself is not written down and is not meant to be: §5 fixes
+it — target $30, stop inside $20 — so the only per-trade freedom is where inside
+the cap the stop went, which he sets off price action and does not record.
+
+That is a decision about what the journal is for rather than an omission, and it
+costs exactly what §8 says it costs. Do not ask him to record prices he has
+decided not to record; ask the question the price would have answered.
 
 The three discipline answers ask whether the stop and target were *respected*,
 not whether they were moved. \`null\` is unanswered and is not "no".`,
@@ -403,7 +414,7 @@ underneath one is a discrepancy worth raising.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss closing at its \`planned_stop\`; \`unknown\` where no plan was recorded | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs a full-stop answer recorded at journalling time to identify the population — see the note | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -427,7 +438,7 @@ an entry that skipped step 5, and it is the whole reason the two numbers differ.
 
 So R-01 and R-02 bound what may be SET, and step 5 bounds what may be ENTERED.
 The floor is not a third rule restating an identity — it is a condition on the
-plan, and it is checkable from the planned columns rather than from the outcome.
+plan, and the plan is nowhere on the row. §8 says what that costs.
 
 **R-01 IS TWO-SIDED, AND THE LOWER BOUND IS THE HALF THAT CATCHES ANYTHING.**
 The target may be shortened to $25 when the level looks hard to reach or is
@@ -458,24 +469,27 @@ target genuinely moved further out, and nothing on the row separates them.
 
 So an R-01 flag is a question rather than a finding — ask which it was. If gaps
 turn out to be common enough that the check stops being read, the honest fix is
-to record the target at entry, not to widen the number until the noise stops.
+to ask which target was set at journalling time, not to widen the number until
+the noise stops.
 
-**R-03 IS CHECKABLE NOW, AND IT WAS THE POPULATION THAT WAS MISSING RATHER THAN
-THE PREDICATE.** The comparison was always simple — within an \`open_day\`, no
-\`entry_time\` later than the \`fill_time\` of a full-stop loss. What could not be
-answered was WHICH losses were full stops, because §12 allows a stop set tighter
-than $20 and the broker reports only the final one, so a $12 loss could not be
-told from an exit cut by hand.
+**R-03 IS \`field\`, AND IT IS THE POPULATION THAT IS MISSING RATHER THAN THE
+PREDICATE.** The comparison itself is simple — within an \`open_day\`, no
+\`entry_time\` later than the \`fill_time\` of a full-stop loss — and \`fill_time\` is
+present on exactly the rows it depends on. What is not available is *which
+losses are full stops.* §5 caps the stop at $20 and leaves where inside the cap
+it goes to price action, the broker reports only the final one, and nothing
+records what it was set to — so a $12 loss cannot be told from an exit cut by
+hand.
 
-\`planned_stop\` settles it: a loss that closed at its planned stop is a full stop,
-whatever the distance, and one that closed short of it was cut. The rule is
-\`journal\` on every row carrying a plan.
+**The column that would close it is one he has decided against**, and the reason
+is §6: he journals a trade, not a plan. So the route is the one R-04 and R-05
+are waiting on — a question at journalling time, *was this one a full stop?* —
+rather than a price typed into a form.
 
-**It is \`unknown\`, never \`pass\`, on the rest.** Every trade before the column
-existed has no plan, and so does anything he did not journal — and a day whose
-only loss cannot be classified has not been shown compliant, it has been left
-unexamined. The narrowed fallback that read losses at $20 as full stops is
-retired: it under-detected, and it is not needed now.
+Until then a narrower version is available and should be labelled as what it is:
+losses at $20 are identifiable full stops, so the rule can be checked over
+*those* and returns \`unknown\` rather than \`pass\` for a day whose only loss was
+tighter. That under-detects, and a clean result means less than it appears to.
 
 **R-04 cannot be confirmed, only violated.** Whether a losing trade ever reached
 +$20 is not recoverable: \`entry_price\` and \`exit_price\` are endpoints, and the
@@ -557,20 +571,19 @@ column landed rather than at the start of the journal.
 Not stored and not available from the broker, which is what makes R-04 a probe
 and what makes asking at journalling time the only way it is ever recoverable.
 
-**The planned stop and target are on the row now**, entered by hand at the time
-under \`planned_stop\` and \`planned_target\`. They are the only record of intent
-this system has: the broker reports the final stop, so a stop moved to
-break-even has erased the original everywhere else, and nothing recovers it
-afterwards.
+**The plan.** Where the stop and the target were set at entry, as against the
+final stop the broker reports. Nothing on the row carries it: a stop moved to
+break-even has overwritten the original everywhere, and no column holds what it
+was before.
 
-Three things become answerable that were not — R-03's full-stop population, the
-planned R:R, and whether a win at $25 was a shortened target or an early close.
-All three only on rows carrying a plan, and \`unknown\` on the rest rather than
-\`pass\`: everything before the columns existed is null, permanently.
+Three questions are unanswerable for that reason — R-03's full-stop population,
+the planned R:R, and whether a win at $25 was a shortened target or an early
+close. §5 bounds all three without settling any of them, because the cap is a
+range and the row does not say where inside it the stop went.
 
-They are journal-owned and **app-entered rather than tappable**. Gladys takes
-\`callback_query\` alone and there is no inline keyboard for 4512.80, which is why
-her \`COLUMNS\` map holds four names while \`Data.OWNED\` holds six.
+It is not a gap waiting on a schema change. Journalling a plan was tried and
+retired (§13, v1.8): every one of those three is a question at journalling time,
+which is where they belong.
 
 **Which rule broke.** \`followed_rules\` is one boolean covering R-03 and R-05
 through R-09. It records that something broke, not what.
@@ -736,10 +749,10 @@ trade already open. A realised 1.25 is the shortening working, not an entry that
 skipped step 5, and the two must not be compared as though they answered the
 same question. In the app, realised: average win ÷ average loss over
 closed P&L. They are different numbers and the app's cannot be read as the plan.
-Both are stored now, so on a row carrying a plan the two ARE comparable and a
-realised 1:1.25 can be told from a $30 target that was shortened. On a row
-without one — everything before the columns existed — it still cannot, and that
-is \`unknown\` rather than an assumption.`,
+Neither the planned stop nor which target was set is stored, so the plan is not
+recoverable from any row, and a realised 1:1.25 cannot be told from a $30 target
+that was shortened, a $30 target that was hit after the stop moved, or a rule
+that was broken.`,
 
   "13": `## 13 · Changelog
 
@@ -751,6 +764,7 @@ history.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.8 | [decide] | \`planned_stop\` and \`planned_target\` retired: the columns dropped and the two fields removed from the app. **He journals a trade, not a plan** — §5 fixes the target at $30 and caps the stop at $20, and where inside that cap the stop goes is read off price action rather than typed into a form. R-03 returns to \`field\` and to the narrowed full-stop population; §6's step 5 is arithmetic he runs and nothing checks; §8 and §12 restated — no row carries intent, and planned R:R is not recoverable from one. The three questions the columns were meant to answer are questions at journalling time, alongside R-04's. | His decision |
 | v1.7 | [decide] | R-08's five steps written: top-down bias, liquidity pools and S&R, psychological levels, candle or chart pattern with signal then confirmation, and reward-to-risk of at least 1:1.5. Step 5 is arithmetic and checkable from the planned columns. It also settles a contradiction the document was carrying — 1:1.5 is a condition at ENTRY, 1:1.25 the realised floor after a permitted shortening: two numbers at two moments rather than one disagreeing with itself. | His rules |
 | v1.6 | [decide] | §4 written. The two setups differ by METHOD, not location — Break & Retest is continuation through a level that has flipped, Support & Resistance is mean-reversion off a level that is holding; location is how each is recognised. Invalidation stated per setup, and §6's re-entry rule is shown to follow from S&R's rather than being an exception to it. | Method research, anchored to his stated rules |
 | v1.5 | [decide] | §5 and §6 written. Risk per trade is 4% and is deliberate; the rung moves by hand; 4% is also the daily limit, and there is no weekly or monthly one. One position at a time, nothing else changes size. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep that snaps back to the level. R-08's sequence is recorded as existing but not written down. | His answers |

@@ -63,20 +63,6 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_trades' and column_name = 'size_oz'),
    '1'),
 
-  -- Journal-owned and app-entered. Missing, PostgREST drops them from the save
-  -- payload rather than refusing it, so the form keeps accepting a plan and
-  -- keeps discarding it.
-  ('trades has both planned columns',
-   (select count(*)::text from information_schema.columns
-     where table_schema = 'public' and table_name = 'trades'
-       and column_name in ('planned_stop', 'planned_target')),
-   '2'),
-  ('eugenia_trades exposes both planned columns',
-   (select count(*)::text from information_schema.columns
-     where table_schema = 'public' and table_name = 'eugenia_trades'
-       and column_name in ('planned_stop', 'planned_target')),
-   '2'),
-
   ('RLS on trades',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.trades')),
    'true'),
