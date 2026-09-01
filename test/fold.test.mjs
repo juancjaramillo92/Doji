@@ -39,7 +39,7 @@ import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index
 import {
   briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
-  notesList, channelsList, searchList, readStrategy, dayQuery,
+  notesList, channelsList, searchList, readStrategy, dayQuery, ask,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 
@@ -1519,6 +1519,69 @@ test('a window with no user turn at all becomes empty, not invalid', () => {
   // is a 400 and no answer at all.
   assert.deepEqual(openOnUser([a('one'), a('two')]), []);
   assert.deepEqual(openOnUser([]), []);
+});
+
+/* ─── Eugenia: which model actually answered ─────────────────────────────────
+   `fallbacks: "default"` re-runs a declined request on another model inside the
+   same call, and that is what stops a refusal costing the whole briefing. It
+   also means the briefing he read can have been written by a model nothing in
+   this system named — and on the page it reads exactly like one that was not.
+
+   DRIVEN THROUGH ask() RATHER THAN ASSERTED ON THE COMPARISON. The comparison
+   is one `!==` and was never the part at risk; the part at risk is the line
+   never being printed, which asserting on a hand-fed flag cannot discover.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Only what ask() actually reads out of a response.
+const served = (model, rest) => ({
+  ok: true,
+  json: async () => ({ model, usage: { input_tokens: 10, output_tokens: 5 }, ...rest }),
+});
+
+const answers = (model) =>
+  served(model, { stop_reason: 'end_turn', content: [{ type: 'text', text: 'an answer' }] });
+
+// get_strategy is the one tool the loop serves without a database read, which
+// is what makes a second round drivable here at all.
+const asksForStrategy = (model) =>
+  served(model, { stop_reason: 'tool_use', content: [
+    { type: 'tool_use', id: 'tu_1', name: 'get_strategy', input: { section: '§4.1' } }] });
+
+// The cost line ask() printed while those responses were served, in order.
+async function costLines(responses) {
+  const realFetch = globalThis.fetch, realLog = console.log;
+  const lines = [];
+  let n = 0;
+  globalThis.fetch = async () => responses[n++];
+  console.log = (line) => lines.push(line);
+  try {
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+  return lines;
+}
+
+test('the ordinary turn says nothing about the model, because nothing happened', async () => {
+  const [line] = await costLines([answers('claude-opus-5')]);
+  assert.match(line, /test — 1 round\(s\), medium effort/);
+  assert.doesNotMatch(line, /FELL BACK/);
+});
+
+test('a turn served by another model names it in the cost line', async () => {
+  const [line] = await costLines([answers('some-other-model')]);
+  assert.match(line, /FELL BACK TO some-other-model/);
+});
+
+test('a fallback on one round survives a later round that did not fall back', async () => {
+  // Round one declines and is rescued; round two runs on the model that was
+  // asked for. Clearing on the second would report the turn as ordinary, which
+  // is the shape of every silent failure in this system.
+  const [line] = await costLines([asksForStrategy('some-other-model'),
+                                  answers('claude-opus-5')]);
+  assert.match(line, /2 round\(s\)/);
+  assert.match(line, /FELL BACK TO some-other-model/);
 });
 
 /* ─── The email boundary ─────────────────────────────────────────────────────

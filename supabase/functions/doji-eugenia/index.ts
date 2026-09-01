@@ -710,6 +710,11 @@ const CHAT_TOOLS = [
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL];
 
+/* NAMED, BECAUSE TWO THINGS NOW READ IT. The request asks for this model and
+   ask() compares what answered against it. A second literal would report a
+   fallback on every call from the day someone edited one of the two. */
+const MODEL = "claude-opus-5";
+
 async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -726,7 +731,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-opus-5",
+      model: MODEL,
       max_tokens: 16000,
       /* Cached: both are long, fixed, and sent on every turn — which is exactly
          why the strategy rides here rather than in the message.
@@ -776,9 +781,14 @@ const MAX_ROUNDS = 6;
 /* `label` names the caller in the log line below and does nothing else. The
    four jobs are not distinguishable from effort alone — the briefing and the
    nightly pass both run high — and a cost line that cannot say which of them
-   spent the money is a cost line nobody can act on. */
-async function ask(messages: Turn[], effort: Effort, label: string,
-                   tools: unknown[] = CHAT_TOOLS): Promise<string> {
+   spent the money is a cost line nobody can act on.
+
+   Exported so a test can drive the loop itself against a stubbed `fetch`.
+   Asserting on a comparison in isolation would prove the arithmetic and not
+   that the line is ever printed, which is the half that has been wrong here
+   before. */
+export async function ask(messages: Turn[], effort: Effort, label: string,
+                          tools: unknown[] = CHAT_TOOLS): Promise<string> {
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -787,6 +797,16 @@ async function ask(messages: Turn[], effort: Effort, label: string,
   // Summed across the rounds rather than logged per round, because the unit
   // worth knowing is what one briefing cost, not what one leg of it did.
   let inTok = 0, outTok = 0, cached = 0, searches = 0;
+  /* EMPTY UNLESS `fallbacks` ACTUALLY FIRED, which is the whole reason to keep
+     it. A decline re-runs the request on another model inside the same call and
+     that is what rescues the briefing — but it also means the briefing he read
+     was written by a model nothing in this system named, and it reads exactly
+     like one that was not — so it is counted here, where the tokens and the
+     searches already are, for the reason they are.
+
+     Kept once set: a turn where one leg fell back is worth knowing about
+     whatever the remaining rounds came back on. */
+  let fellBack = "";
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const body = await call(convo, effort, tools, container);
@@ -797,6 +817,7 @@ async function ask(messages: Turn[], effort: Effort, label: string,
     outTok   += used.output_tokens ?? 0;
     cached   += used.cache_read_input_tokens ?? 0;
     searches += used.server_tool_use?.web_search_requests ?? 0;
+    if (body.model && body.model !== MODEL) fellBack = body.model;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
     // content, so it is caught before the blocks are read rather than surfacing
@@ -845,7 +866,8 @@ async function ask(messages: Turn[], effort: Effort, label: string,
        bill separately, which is why they are counted apart from the tokens.
        Only on the way out: a throw is reported by the caller. */
     console.log(`doji-eugenia: ${label} — ${round + 1} round(s), ${effort} effort, ` +
-                `${inTok} in (${cached} cached), ${outTok} out, ${searches} search(es)`);
+                `${inTok} in (${cached} cached), ${outTok} out, ${searches} search(es)` +
+                (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
     return text;
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);

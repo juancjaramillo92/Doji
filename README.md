@@ -1278,6 +1278,15 @@ call and routes by refusal category, so there is no model list here to go stale.
 A decline before any output is not billed. The `stop_reason === "refusal"` check
 stays and still fires: it is now the case where the whole chain declined.
 
+**And a fallback now says so.** It is invisible by construction — the call
+succeeds, the briefing arrives on time, and the only difference is that another
+model wrote it. `ask()` compares the `model` on each response against the one
+the request asked for and appends `FELL BACK TO <model>` to its cost line when
+they differ. It is kept for the whole turn rather than the round, because a
+briefing whose first round was rescued and whose second was ordinary is still a
+briefing worth knowing about; and the model is named once in the file so the
+request and the comparison cannot drift into reporting a fallback on every call.
+
 **She is told what time it is, and told when each past exchange happened.** Asked a
 question at 23:42 she opened with "morning" — not a model error, but the only
 inference available from what she was given: a system prompt about morning
