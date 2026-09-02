@@ -1502,16 +1502,42 @@ before producing any number, not after being asked to justify one.
 
 ### What is on a row
 
-**Broker-owned** — written by the poller and the email parser, never by the app:
-\`direction\` · \`entry_time\` · \`fill_time\` · \`entry_price\` · \`exit_price\` ·
-\`size_oz\` · \`open_day\` · \`commission\` · \`balance\` · \`net_pnl\` · \`computed_pnl\` ·
-\`pnl\`.
+**Broker-owned and served to you** — written by the poller and the email parser,
+never by the app: \`direction\` · \`entry_time\` · \`fill_time\` · \`entry_price\` ·
+\`exit_price\` · \`size_oz\` · \`open_day\` · \`pnl\` · \`net_pnl\`.
 
 **Journal-owned** — written by the app alone: \`setup\` · \`followed_rules\` ·
 \`followed_sl\` · \`followed_tp\`.
 
 **Derived at read time, never stored:** \`result\` · \`session\` · filing day ·
 completeness.
+
+### On the row and deliberately withheld
+
+Four columns exist in \`trades\` and do not reach you, and the reason each is
+withheld is a rule rather than a tidy. A fifth, \`deleted\`, is filtered before you
+see anything, so the soft-delete filter below is already applied and is listed
+because the rest of that table is not.
+
+\`commission\` is already inside both P&L figures — the poller folds it into
+\`computed_pnl\` and the broker's \`net_pnl\` is settled — so every figure you read
+is net of it. Held, it would only ever be a way to subtract costs a second time.
+
+\`balance\` moves on transfers with no trade behind them, and the account this
+document computes against is \`size_oz × 500\` (below). Held, it would only ever be
+a way to reach for the wrong denominator, which is the error §8 exists to stop.
+
+\`computed_pnl\` is the folded figure with no swap in it. \`pnl\` is already
+\`coalesce(net_pnl, computed_pnl)\`, so you can see the fallback where \`net_pnl\` is
+null without being able to reach for the unsettled number by name.
+
+\`user_id\` is not about trading at all.
+
+**The withholding is structural rather than instructed**, and that is the point:
+a rule you are told can be forgotten in the middle of a long answer, and a column
+you are never handed cannot be. Where this document says never do a thing with a
+number, check whether the number is even in front of you — several are not, and
+the absence is the enforcement.
 
 ### Position size, and what it makes computable
 

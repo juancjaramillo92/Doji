@@ -104,6 +104,61 @@ test('the README builds the same eugenia_trades view that 003 does', () => {
     'following the README would build the wrong view');
 });
 
+/* ─── What §8 says she holds, against what the view hands her ────────────────
+   §8 is the section she is told to read before producing any number, and its
+   first paragraph is the inventory of a row. For five versions it named four
+   columns the view does not serve — she followed its monthly instruction against
+   `net_pnl` and summed a column that was not there.
+
+   THE INVENTORY IS THEREFORE A COPY OF THE VIEW, in prose, in a file no SQL
+   change has any reason to touch. `id` is in the view and not in §8's list
+   because nothing in the document computes from it beyond the `PID` filter,
+   which §8 states separately — so it is added here rather than left as a
+   difference that would have to be explained every time this is read.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('§8 inventories exactly the columns the view serves', () => {
+  const between = (from, to) => {
+    const a = SECTIONS['8'].indexOf(from);
+    assert.ok(a > -1, `§8 no longer carries "${from}"`);
+    const b = SECTIONS['8'].indexOf(to, a);
+    assert.ok(b > a, `§8 no longer carries "${to}" after "${from}"`);
+    return [...SECTIONS['8'].slice(a, b).matchAll(/`([a-z_]+)`/g)].map(m => m[1]);
+  };
+
+  const served = between('**Broker-owned and served to you**', '**Journal-owned**');
+  const owned = between('**Journal-owned**', '**Derived at read time');
+  assert.ok(served.length >= 8 && owned.length === 4,
+    `§8's inventory read as ${served.length} broker and ${owned.length} journal ` +
+    `columns — the reader has gone blind rather than the lists having changed`);
+
+  assert.deepEqual(
+    [...served, ...owned, 'id'].sort(),
+    viewColumns(EUGENIA_SQL, '003_eugenia.sql').sort(),
+    'the section she reads before producing any number inventories a different ' +
+    'row than the view hands her — either she reasons about a column that is ' +
+    'not there, or one she has is invisible to her');
+
+  /* AND THE WITHHELD ONES STAY WITHHELD. §8 now explains why each is absent,
+     and every explanation is a rule she would otherwise have to be told: that
+     costs are already in the P&L, that balance is the wrong denominator, that
+     the unsettled figure is not reachable by name. Serving one silently turns
+     its paragraph into a wrong fact about her own document. */
+  const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
+  // Scoped to the block that explains them. `balance` and `computed_pnl` are
+  // named all over §8 for other reasons, so searching the section rather than
+  // the block is a check that cannot fail — it passed with the whole paragraph
+  // for `balance` deleted.
+  const withheld = between('### On the row and deliberately withheld', '### Position size');
+  for (const held of ['commission', 'balance', 'computed_pnl', 'user_id']) {
+    assert.ok(!cols.includes(held),
+      `${held} is served, and §8 tells her it is withheld and why`);
+    assert.ok(withheld.includes(held),
+      `§8 no longer says why ${held} is withheld, so the rule that absence ` +
+      `enforces is nowhere written down`);
+  }
+});
+
 test('the view exposes what the strategy computes from, and still hides the rest', () => {
   const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
   // Without this she can read every trade and never its size, so account tier

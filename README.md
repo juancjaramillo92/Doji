@@ -294,7 +294,7 @@ be single-sourced at run time:
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and §0's table of what to do at each one |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
-| the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
+| the **`eugenia_trades` column list** | `003_eugenia.sql`, the README's quoted copy of that statement, and §8's inventory of a row in the strategy — the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -1230,7 +1230,7 @@ loudly at build rather than subtly at runtime.
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
 it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no
-`balance`, no `commission`) and hides deleted rows; the grant on that view is
+`balance`, no `commission`, no `computed_pnl`) and hides deleted rows; the grant on that view is
 `select` and nothing else; and her function has exactly one database read of the
 journal and no write path to it anywhere. Said plainly, because it is the honest
 limit: the grant makes the *view* read-only, not the key — she holds the service
