@@ -294,7 +294,7 @@ be single-sourced at run time:
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and §0's table of what to do at each one |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
-| the **`eugenia_trades` column list** | `003_eugenia.sql`, the README's quoted copy of that statement, and §8's inventory of a row in the strategy — the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
+| the **`eugenia_trades` column list** | `003_eugenia.sql`, the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — and §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -1266,6 +1266,22 @@ nothing had arrived. The cron half now sends a short Telegram message naming the
 error instead. Silence is the worst thing this system can do and it had three
 separate ways of doing it.
 
+**A read that fails does not take the briefing with it.** `get_trades`,
+`search_memory`, `remember` and `set_channel` all run inside the tool loop,
+where an exception ends the turn outright: the model has asked a question and
+there is no answer to hand back. So each of them catches and returns a sentence
+instead — *his journal could not be read just now*, *your memory could not be
+searched* — and she writes around the gap and says what she could not see. The
+morning `eugenia_trades` was dropped and not rebuilt, the journal read threw
+rather than answering, and a failure that cost only the trades cost the whole
+day: four apologies, one an hour, and no briefing at all.
+
+**The sentence matters as much as the catch.** A read that comes back *no trades
+in that window* from a window nothing looked at is a briefing telling him he has
+not traded since Friday — a false statement about his own week, in her voice,
+with nothing anywhere reporting that the read never happened. An empty answer is
+only an answer when something was actually read.
+
 **A failed briefing tries again**, at 09:00, 10:00 and 11:00 ET, and stops the
 moment one has landed. `briefedToday()` reads the marker `postBriefing` stores
 — written *before* the send, so it exists whenever a briefing was generated. The
@@ -1733,7 +1749,17 @@ drop index if exists eugenia_notes_id_desc;
 
 A `trades` that carries `planned_stop` and `planned_target` sheds them, and the
 view goes first because it reads them — a column something depends on cannot be
-dropped out from under it:
+dropped out from under it. `create or replace view` cannot do this half: it
+matches column by column and may only append, so a shorter list is a drop and a
+rebuild, which is the other side of the trap #30 was fixed for.
+
+**The rebuild is in the same block as the drop, and that is not tidiness.** It
+was written as a drop followed by *"…then re-run the view statement above"* — a
+migration whose second half is a cross-reference, which is a half that gets read
+rather than run. Left undone, the columns are gone and so is the view, and every
+read Eugenia makes of the journal answers `404`: PostgREST's PGRST205, the
+relation is not in the schema cache. That is what 08:00, 09:00, 10:00 and 11:00
+each reported on 2 September, one sentence apiece and no briefing at all.
 
 ```sql
 drop view if exists public.eugenia_trades;
@@ -1741,12 +1767,25 @@ drop view if exists public.eugenia_trades;
 alter table public.trades
   drop column if exists planned_stop,
   drop column if exists planned_target;
+
+create or replace view public.eugenia_trades
+  with (security_invoker = true) as
+  select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
+         net_pnl
+  from public.trades
+  where deleted = false;
+
+-- A view is dropped with its privileges, so these are not optional either.
+revoke all on public.eugenia_trades from anon, authenticated, service_role;
+grant select on public.eugenia_trades to service_role;
+grant select on public.trades to service_role;
 ```
 
-…then re-run the view statement above **and the three grants under it**: a view
-is dropped with its privileges. `create or replace view` cannot do this half —
-it matches column by column and may only append, so a shorter list is a drop and
-a rebuild, which is the other side of the trap #30 was fixed for.
+Run `verify.sql` after it. *eugenia_trades is select-only, service_role only*
+answers `none` on a view that is missing and on one rebuilt without its grants,
+which are the two ways this ends badly and the only check that tells them from a
+healthy database.
 
 The two columns held a plan the journal no longer asks for. Nothing read them but
 Eugenia, and what she now says about a plan is §8's list of what a row cannot

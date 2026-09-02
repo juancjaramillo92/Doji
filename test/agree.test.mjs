@@ -86,22 +86,33 @@ const declaresColumn = (name) =>
    only the columns matter.
    ───────────────────────────────────────────────────────────────────────── */
 const viewColumns = (text, where) => {
-  const stmt = text.match(
-    /create or replace view public\.eugenia_trades[\s\S]*?select([\s\S]*?)from public\.trades/i);
-  assert.ok(stmt, `${where} no longer states the eugenia_trades view`);
-  const cols = stmt[1].split(',').map(c => c.trim()).filter(Boolean);
-  // An emptied match would make the comparison below vacuous and green.
-  assert.ok(cols.length >= 8, `only ${cols.length} columns read out of ${where}`);
-  return cols;
+  const stmts = [...text.matchAll(
+    /create or replace view public\.eugenia_trades[\s\S]*?select([\s\S]*?)from public\.trades/ig)];
+  assert.ok(stmts.length, `${where} no longer states the eugenia_trades view`);
+  return stmts.map(([, list]) => {
+    const cols = list.split(',').map(c => c.trim()).filter(Boolean);
+    // An emptied match would make the comparison below vacuous and green.
+    assert.ok(cols.length >= 8, `only ${cols.length} columns read out of ${where}`);
+    return cols;
+  });
 };
 
-test('the README builds the same eugenia_trades view that 003 does', () => {
+/* EVERY COPY IN THE README, NOT THE FIRST ONE. It states this view twice — as
+   the statement an existing database runs on its own, and again inside the
+   migration that drops the view and rebuilds it — and a plain `match` reads
+   only the one at the top. The second is the copy that runs immediately after a
+   `drop view`, so a stale column list there rebuilds the wrong view on a
+   database that has just lost the right one, which is the worst moment for it. */
+// The one view 003 creates, which every other copy of the list is read against.
+const served003 = () => viewColumns(EUGENIA_SQL, '003_eugenia.sql')[0];
+
+test('every eugenia_trades view the README states is the one 003 creates', () => {
   const README = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  assert.deepEqual(
-    viewColumns(README, 'README.md'),
-    viewColumns(EUGENIA_SQL, '003_eugenia.sql'),
-    'the README quotes a view with a different column list than 003_eugenia.sql creates — ' +
-    'following the README would build the wrong view');
+  for (const cols of viewColumns(README, 'README.md')) {
+    assert.deepEqual(cols, served003(),
+      'the README quotes a view with a different column list than 003_eugenia.sql creates — ' +
+      'following the README would build the wrong view');
+  }
 });
 
 /* ─── What §8 says she holds, against what the view hands her ────────────────
@@ -134,7 +145,7 @@ test('§8 inventories exactly the columns the view serves', () => {
 
   assert.deepEqual(
     [...served, ...owned, 'id'].sort(),
-    viewColumns(EUGENIA_SQL, '003_eugenia.sql').sort(),
+    served003().sort(),
     'the section she reads before producing any number inventories a different ' +
     'row than the view hands her — either she reasons about a column that is ' +
     'not there, or one she has is invisible to her');
@@ -144,7 +155,7 @@ test('§8 inventories exactly the columns the view serves', () => {
      costs are already in the P&L, that balance is the wrong denominator, that
      the unsettled figure is not reachable by name. Serving one silently turns
      its paragraph into a wrong fact about her own document. */
-  const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
+  const cols = served003();
   // Scoped to the block that explains them. `balance` and `computed_pnl` are
   // named all over §8 for other reasons, so searching the section rather than
   // the block is a check that cannot fail — it passed with the whole paragraph
@@ -160,7 +171,7 @@ test('§8 inventories exactly the columns the view serves', () => {
 });
 
 test('the view exposes what the strategy computes from, and still hides the rest', () => {
-  const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
+  const cols = served003();
   // Without this she can read every trade and never its size, so account tier
   // and per-trade risk stay underivable however the prompt is written.
   assert.ok(cols.includes('size_oz'), 'Eugenia cannot see position size');

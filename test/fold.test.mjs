@@ -1585,6 +1585,67 @@ test('a fallback on one round survives a later round that did not fall back', as
   assert.match(line, /FELL BACK TO some-other-model/);
 });
 
+/* ─── A failed tool read must not take the answer with it ────────────────────
+   THE 404 THAT COST A DAY. `eugenia_trades` was dropped and not rebuilt, and
+   the briefing did not come out thinner — it died, four times, at 08:00 and at
+   each retry, each one a single sentence saying something broke. tradesBlock
+   had already absorbed the identical failure a round earlier, so what was left
+   to kill the turn was the read the MODEL asked for.
+
+   Driven through ask() rather than asserted on readTrades, for the reason the
+   fallback tests above are: that readTrades returns a sentence is not the
+   claim. The claim is that the loop carries on and hands that sentence to the
+   next round, and only the sequence can show it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const asksForTrades = (model) =>
+  served(model, { stop_reason: 'tool_use', content: [
+    { type: 'tool_use', id: 'tu_1', name: 'get_trades', input: { days: 7 } }] });
+
+// Every request body ask() sent, with the journal read answering `status`.
+// SB_URL is "" under Node, so PostgREST is the caller whose path starts /rest.
+async function turnWithJournal(status, responses) {
+  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
+  const sent = [];
+  let n = 0;
+  globalThis.fetch = async (url, init) =>
+    String(url).startsWith('/rest/')
+      ? { ok: status === 200, status, json: async () => [] }
+      : (sent.push(JSON.parse(init.body)), responses[n++]);
+  console.log = () => {};
+  console.error = () => {};
+  try {
+    const text = await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
+    return { text, answered: sent[1].messages.at(-1).content[0].content };
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+    console.error = realErr;
+  }
+}
+
+const twoRounds = [asksForTrades('claude-opus-5'), answers('claude-opus-5')];
+
+test('a journal read that 404s is answered to her, and the turn finishes', async () => {
+  const { text, answered } = await turnWithJournal(404, twoRounds);
+  assert.equal(text, 'an answer');
+  assert.match(answered, /could not be read/);
+});
+
+test('a journal read that 404s never comes back as an empty window', async () => {
+  // The one answer it must not give. "No trades in that window" from a window
+  // nothing looked at is what a briefing reads as "you have not traded since
+  // Friday" — a false statement about his own week, in her voice, with nothing
+  // anywhere reporting that the read never happened.
+  const { answered } = await turnWithJournal(404, twoRounds);
+  assert.doesNotMatch(answered, /No trades in that window/);
+});
+
+test('an empty window still says it is empty, because that is an answer', async () => {
+  const { answered } = await turnWithJournal(200, twoRounds);
+  assert.match(answered, /No trades in that window/);
+});
+
 /* ─── The email boundary ─────────────────────────────────────────────────────
    doji-email-sync is the only function here that reads a request body, so it is
    the only one with a shape to check. What it must guarantee is what the Apps
