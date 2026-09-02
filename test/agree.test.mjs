@@ -103,11 +103,24 @@ test('the README builds the same eugenia_trades view that 003 does', () => {
     'following the README would build the wrong view');
 });
 
-test('the view exposes size_oz and still hides what it is meant to hide', () => {
+test('the view exposes what the strategy computes from, and still hides the rest', () => {
   const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
   // Without this she can read every trade and never its size, so account tier
   // and per-trade risk stay underivable however the prompt is written.
   assert.ok(cols.includes('size_oz'), 'Eugenia cannot see position size');
+
+  /* AND net_pnl, BECAUSE §8 SUMS IT AND `pnl` CANNOT BE SUMMED HONESTLY.
+     `pnl` is `coalesce(net_pnl, computed_pnl)`, so on a position whose broker
+     email has not landed it is the folded figure and carries no swap — and this
+     account holds through the 17:00 rollover. Served `pnl` alone she followed
+     §8's monthly instruction against a column that does not exist and produced
+     a total short by an unknown amount, on rows she could not identify. The
+     failure was silent for five versions of the document, which is why it is
+     asserted here rather than left to the prose in either file. */
+  assert.ok(cols.includes('net_pnl'),
+    'Eugenia cannot see net_pnl, so every multi-day total she gives silently ' +
+    'falls back to computed_pnl and omits swap');
+
   for (const hidden of ['user_id', 'balance', 'commission']) {
     assert.ok(!cols.includes(hidden), `${hidden} is exposed to Eugenia`);
   }

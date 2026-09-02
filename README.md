@@ -1688,7 +1688,8 @@ which is what an existing database needs to pick up `security_invoker`:
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
+         net_pnl
   from public.trades
   where deleted = false;
 
@@ -1806,12 +1807,22 @@ alter table public.trades add column if not exists size_oz numeric;
 Then re-run the `create or replace view public.eugenia_trades` statement from
 `003_eugenia.sql`.
 
-**`size_oz` sits at the end of that select list on purpose.** `create or replace
-view` matches the existing view position by position and may only append, so a
-column inserted mid-list reads as renaming whatever used to sit at that
-position — `cannot change name of view column "open_day" to "size_oz"`. Moving
-it up beside the other broker columns, where it belongs by sense, is the tidy
-that breaks re-application on every database that already has the view.
+**`net_pnl` was appended to that same list**, so an existing database picks it up
+by re-running the one statement and nothing else — no column to add, no grant to
+restore. It is there because `pnl` alone cannot be summed honestly: `pnl` is
+`coalesce(net_pnl, computed_pnl)`, so on a position whose broker email has not
+landed it is the folded figure and carries no swap. Served `pnl` alone, Eugenia
+followed the strategy's monthly instruction against a column she could not read
+and produced totals short by an unknown amount, on rows she could not identify.
+With both she sums the settled ones and says how many fell back.
+
+**The tail of that select list is in the order columns were added, on purpose.**
+`create or replace view` matches the existing view position by position and may
+only append, so a column inserted mid-list reads as renaming whatever used to sit
+at that position — `cannot change name of view column "open_day" to "size_oz"`.
+Moving `size_oz` or `net_pnl` up beside the other broker columns, where they
+belong by sense, is the tidy that breaks re-application on every database that
+already has the view.
 Reordering or removing needs a `drop view` first, which also drops the grants
 under it.
 

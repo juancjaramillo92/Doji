@@ -275,16 +275,14 @@ code you write near it:
   one database read of the journal, no write path to it in the file. Do not add
   one.
 
-  THE VIEW ALSO HIDES `net_pnl` AND `computed_pnl`, AND §8 OF THE STRATEGY DOES
-  NOT KNOW IT. It lists both among the columns on a row, filters on
-  `net_pnl is not null`, and computes the month as a sum of `net_pnl` — none of
-  which she can do, because `pnl` is the only P&L the view serves. So every
-  multi-day total she gives is a `pnl` sum, which is `computed_pnl` on any row
-  whose broker email has not landed: swap omitted, on a subset she cannot name.
-  That is the figure §8 exists to prevent, and it has been in the document since
-  v1.8. Either the view widens or §8 is rewritten to the one column she has;
-  until then do not write anything that reads §8's P&L instructions as
-  achievable.
+  `net_pnl` IS SERVED AND `pnl` ALONE IS NOT ENOUGH, which is the one widening
+  this view has had for a reason outside its own design. §8 sums `net_pnl` over
+  a month; `pnl` is `coalesce(net_pnl, computed_pnl)`, so on a position whose
+  broker email has not landed it is the folded figure and carries no swap — and
+  this account holds through the 17:00 rollover. With both columns she sums the
+  settled rows and reports how many fell back. Narrowing the view back to `pnl`
+  makes every multi-day total she gives short by an unknown amount on a subset
+  she cannot name, silently; `agree.test.mjs` asserts the column is there.
 - **`tradesQuery` is a boundary, and its window is counted in civil days.**
   `days` comes from the model, so it is clamped and row-limited there rather
   than trusted; the bound is stepped off today's New York date, because
