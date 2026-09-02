@@ -297,7 +297,7 @@ test('the note length is one number on both sides of the wire', () => {
    tool never offers is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* ─── The five channels, in four places ─────────────────────────────────────
+/* ─── The five channels, in four places and two vocabularies ────────────────
    prompt.ts declares them once and the prose interpolates the names, so her
    vocabulary cannot drift from the list. The other three copies can: the tool's
    enum is what she is allowed to name, the check constraint is what the database
@@ -307,13 +307,18 @@ test('the note length is one number on both sides of the wire', () => {
    constraint allows that the tool never offers is a rung nothing can ever move:
    it reads as a channel he has not reached, forever.
 
-   AND A CHANNEL §2 EXPLAINS THAT THE OTHER THREE DO NOT HOLD IS THE QUIET ONE.
-   She would teach it, at length and correctly, against a map with no rung for
-   it — so the census that exists to show what he has never met would report
-   nothing at all about the thing she spent the morning on.
+   §2 IS THE COPY THAT IS NOT AN ID, which is why it is checked separately and
+   against the other half of the pair. She never utters "central_bank_buying"
+   across a desk, so §2 heads each channel with the SPOKEN name — and a name can
+   therefore drift with every id in the repository still agreeing.
+
+   EITHER WAY IT IS THE QUIET FAILURE. She would teach the channel, at length and
+   correctly, against a map with no rung for it — so the census that exists to
+   show what he has never met would report nothing at all about the thing she
+   spent the morning on.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the five channels are the same five ids in the prompt, the tool, the constraint and §2', () => {
+test('the five channels are the same five in the prompt, the tool, the constraint and §2', () => {
   const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
   const enforced = [...(EUGENIA_SQL.match(/check \(channel in \(([^)]*)\)/i)?.[1] ?? '')
@@ -330,11 +335,19 @@ test('the five channels are the same five ids in the prompt, the tool, the const
   assert.match(EUGENIA_TS, /enum: CHANNELS\.map\(\(\[id\]\) => id\)/,
     'set_channel names its channels literally again instead of reading CHANNELS');
 
-  // §2 heads each channel with its id, so the mechanism she reads and the rung
-  // she moves are the same five words.
-  const explained = [...SECTIONS['2'].matchAll(/\*\*`([a-z_]+)`/g)].map(m => m[1]).sort();
-  assert.deepEqual(explained, declared,
-    'the strategy explains a different set of channels than the map tracks');
+  // §2 heads each channel with the name she says out loud, so the mechanism she
+  // reads and the rung she moves are the same five channels under two spellings.
+  const spoken = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
+    .matchAll(/\['[a-z_]+',\s*'([^']+)'\]/g)].map(m => m[1]);
+  assert.equal(spoken.length, declared.length,
+    'the channel list no longer pairs every id with the name she says');
+
+  const headed = [...SECTIONS['2'].matchAll(/^### (.+)$/gm)].map(m => m[1].toLowerCase());
+  for (const name of spoken) {
+    assert.ok(headed.includes(name),
+      `§2 has no section headed "${name}" — she reads the mechanism for a channel ` +
+      `under one name and moves the rung under another`);
+  }
 });
 
 test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
@@ -350,7 +363,7 @@ test('the five rows are seeded, or a channel is invisible rather than unseen', (
     'the seed and the channel list disagree — an unseeded channel vanishes from her map');
 });
 
-test('the rungs are the same words in the tool and the constraint', () => {
+test('the rungs are the same words in the tool, the constraint and §0', () => {
   const declared = [...(EUGENIA_PROMPT.match(/CHANNEL_STATES = \[([^\]]*)\]/)?.[1] ?? '')
     .matchAll(/'([a-z]+)'/g)].map(m => m[1]);
   const enforced = [...(EUGENIA_SQL.match(/check \(state in \(([^)]*)\)/i)?.[1] ?? '')
@@ -363,6 +376,15 @@ test('the rungs are the same words in the tool and the constraint', () => {
     'the ladder has changed — say so here, and check what channelsList falls back to');
   assert.deepEqual(enforced.sort(), [...declared].sort(),
     'the check constraint and prompt.ts no longer hold the same rungs');
+
+  /* AND §0 SAYS WHAT TO DO AT EACH ONE, a row per rung, which is what turned
+     the ladder from a census into an instruction. A rung renamed anywhere else
+     leaves that table answering for a state nothing produces and silent on the
+     state she is actually handed — and the silence is the half that shows,
+     because she falls back to explaining everything or to explaining nothing. */
+  const pitched = [...SECTIONS['0'].matchAll(/^\| `([a-z]+)` \| /gm)].map(m => m[1]);
+  assert.deepEqual(pitched, declared,
+    'the strategy pitches at a different set of rungs than the map carries');
 });
 
 test('the note kinds are the same two words in the tool and the constraint', () => {
@@ -722,9 +744,10 @@ test('what is summarised into every turn can also be read in full', () => {
      SECTIONS means she holds an abbreviation of something she can no longer
      read whole, which is the shape of a confident wrong answer.
 
-     Sections 1, 3 and 11 do not exist and nothing cites them: they were
-     placeholders in a numbering that outlived them, and readStrategy answering
-     for a number she invents is asserted below rather than pretended away here. */
+     Sections 1 and 11 do not exist and nothing cites them: a numbering that
+     skips reads as a decision where six holes read as an unfinished document,
+     and readStrategy answering for a number she invents is asserted below
+     rather than pretended away here. */
   for (const k of ['0', '7']) {
     assert.ok(k in SECTIONS,
       `§${k} is summarised into every turn and can no longer be read in full`);
@@ -1003,7 +1026,7 @@ test('the two reward-to-risk numbers are kept apart', () => {
      which is a breach. The document stated one floor for six versions and the
      two silently contradicted each other; v1.9 keeps them apart by saying the
      row cannot tell which produced it. */
-  assert.match(ALWAYS, /at least 1:1\.5 to enter/,
+  assert.match(ALWAYS, /at least 1:1\.5\s+to\s+enter/,
     'the entry condition has stopped being stated in the always-loaded half');
   assert.match(SECTIONS['12'], /At entry it is a condition: at least 1:1\.5/,
     'the definition no longer states 1:1.5 as a condition at entry');

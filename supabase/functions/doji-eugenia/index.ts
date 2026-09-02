@@ -350,7 +350,7 @@ export function readStrategy(section: unknown): string {
   const found = SECTIONS[key] ?? SECTIONS[key.split('.')[0]];
   if (found) return found;
   return `The strategy has no section ${key}. It holds ${Object.keys(SECTIONS).join(", ")} ` +
-         `at version ${VERSION}. Sections 1, 3 and 11 do not exist and nothing ` +
+         `at version ${VERSION}. Sections 1 and 11 do not exist and nothing ` +
          `cites them, so say that rather than guessing what they would have said.`;
 }
 

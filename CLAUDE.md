@@ -243,10 +243,19 @@ code you write near it:
 
   She has no write path to it, deliberately: a document that decides whether he
   followed his rules cannot be edited by the thing checking them. The numbering
-  skips 1, 3 and 11 and nothing cites them; §2, §9 and §10 were the cited holes
-  and v1.9 wrote all three. `readStrategy` still names a section it does not hold
-  rather than returning nothing, because the number arrives from the model: a
-  blank is a thing she fills in herself.
+  skips 1 and 11 and nothing cites them; every section anything cites is written.
+  `readStrategy` still names a section it does not hold rather than returning
+  nothing, because the number arrives from the model: a blank is a thing she
+  fills in herself.
+
+  §2 AND §3 ARE THE TWO SECTIONS THAT ARE NOT HIS — researched reference rather
+  than decisions, and labelled as such where they start. Both must use the SPOKEN
+  channel names from `prompt.ts` and never the database ids, which is a second
+  vocabulary and therefore a second thing that can drift: `agree.test.mjs`
+  resolves §2's headings against the names, not the ids. §0's table of what to do
+  at each rung is the same shape for `CHANNEL_STATES`. Everything else in the
+  file is his, and a rule he has not stated is a `[decide]` rather than a pattern
+  read as a rule.
 
   §4.1 AND §4.2 ARE PROSE INSIDE §4 RATHER THAN SECTIONS OF THEIR OWN, and they
   are the only two citations in the half she carries on every turn. An exact
@@ -265,6 +274,17 @@ code you write near it:
   secures the view, not the key, so the guarantee that matters is structural:
   one database read of the journal, no write path to it in the file. Do not add
   one.
+
+  THE VIEW ALSO HIDES `net_pnl` AND `computed_pnl`, AND §8 OF THE STRATEGY DOES
+  NOT KNOW IT. It lists both among the columns on a row, filters on
+  `net_pnl is not null`, and computes the month as a sum of `net_pnl` — none of
+  which she can do, because `pnl` is the only P&L the view serves. So every
+  multi-day total she gives is a `pnl` sum, which is `computed_pnl` on any row
+  whose broker email has not landed: swap omitted, on a subset she cannot name.
+  That is the figure §8 exists to prevent, and it has been in the document since
+  v1.8. Either the view widens or §8 is rewritten to the one column she has;
+  until then do not write anything that reads §8's P&L instructions as
+  achievable.
 - **`tradesQuery` is a boundary, and its window is counted in civil days.**
   `days` comes from the model, so it is clamped and row-limited there rather
   than trusted; the bound is stepped off today's New York date, because
@@ -315,9 +335,19 @@ code you write near it:
   does. A channel he has never once used is a row saying
   `unseen`, where in the notes it is nothing written down and therefore
   unnoticeable. The map is a TIEBREAKER between two mechanisms that are both
-  live today, never a driver of what the briefing is about; and only the nightly
-  pass may move a rung, because one exchange is not evidence any more than one
-  fill is a pattern.
+  live today, never a driver of what the briefing is about — but §0 of the
+  strategy gave it a second job, and that one it does drive: how much a term has
+  to be built before it is used. Subject and register are two questions and the
+  rung answers only the second. Only the nightly pass may move a rung, because
+  one exchange is not evidence any more than one fill is a pattern.
+
+  THE DEMOTION §0 PROMISES DOES NOT EXIST YET. §0 says *"I have lost this"* moves a channel
+  back immediately and is never argued with; `set_channel` is in
+  `CONSOLIDATE_TOOLS` and not in `CHAT_TOOLS`, so a reply cannot move a rung at
+  all, and the README says the ladder never comes back down. The nightly pass
+  reads the day's turns and holds the tool, so *that night* is the honest
+  version — but building it means changing what the README states, which is his
+  decision and not a repair to make while passing.
 - **`/notes` is his audit, and the whole of it is addressed to him.** It is
   answered from the database rather than by the model, so nothing can paraphrase
   or drop a row — and `notesList` renders the channel map itself rather than

@@ -1294,7 +1294,7 @@ test('a section that exists is served whole, with or without its sign', () => {
 test('a section that genuinely is not written says so rather than nothing', () => {
   // The number comes from the model, so a mistyped or an invented one is what
   // arrives. An empty result is a blank she fills in herself.
-  for (const key of ['3', '3.1', 'nonsense', null, undefined]) {
+  for (const key of ['1', '1.1', '11', 'nonsense', null, undefined]) {
     assert.match(readStrategy(key), /has no section/, `${key} came back silently`);
   }
 
