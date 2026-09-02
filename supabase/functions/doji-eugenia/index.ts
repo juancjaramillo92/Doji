@@ -643,11 +643,30 @@ export function tradesQuery(days: unknown, now = Date.now()): string {
          `&order=open_day.desc,entry_time.desc&limit=400`;
 }
 
+/* NEVER THROWS, for the reason searchMemory and writeNote do not: this runs
+   inside the tool loop, and an exception here costs the answer she is in the
+   middle of writing. It cost four — a briefing and its three retries, one
+   sentence each and nothing else all day — the morning the view behind it was
+   dropped and not rebuilt. The read that killed them was the one the model
+   ASKED for; the identical failure in tradesBlock had already been absorbed a
+   round earlier, which is how a briefing came to die of a read it had already
+   survived.
+
+   AND IT SAYS SO, rather than coming back empty. "No trades in that window" is
+   an answer and must be reserved for a window that was actually looked at: it
+   is the sentence a briefing turns into "you have not traded since Friday",
+   which is a false statement about his own week from the one thing he trusts
+   to have read it. */
 async function readTrades(days: unknown): Promise<string> {
-  const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Trades read failed (HTTP ${res.status})`);
-  const rows = await res.json();
-  return rows.length ? JSON.stringify(rows) : "No trades in that window.";
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    return rows.length ? JSON.stringify(rows) : "No trades in that window.";
+  } catch (err) {
+    console.error("doji-eugenia: trades read failed —", err instanceof Error ? err.message : err);
+    return "His journal could not be read just now. Say you cannot see it rather than saying he has not traded.";
+  }
 }
 
 /* ─── Claude ───────────────────────────────────────────────────────────────
@@ -1160,12 +1179,7 @@ async function channelsBlock(): Promise<string> {
 // no tool round. Same read as get_trades through the same read-only view — she
 // gains no reach here, only the saved trip.
 async function tradesBlock(): Promise<string> {
-  try {
-    return `\n\nHis trades this past week:\n${await readTrades(7)}`;
-  } catch (err) {
-    console.error("doji-eugenia: trades unavailable —", err instanceof Error ? err.message : err);
-    return "";
-  }
+  return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
 /* ─── The cron half: the briefing, and the quieter second look ───────────── */

@@ -289,6 +289,14 @@ code you write near it:
   `open_day` is a civil day and a fixed number of milliseconds is not one.
   `writeNote` is the other boundary: it truncates rather than refusing, because
   a tool that errors mid-turn costs the whole answer.
+- **Nothing the tool loop serves may throw, and it is a separate rule from the
+  one above.** A boundary coerces input the model wrote; this is about a read
+  that simply failed. All five return a sentence and she writes around the gap.
+  `readTrades` was the one that did not, and the briefing it killed had already
+  absorbed that same 404 a round earlier in `tradesBlock` — so the shape to
+  watch for is a helper reached from a caught call site and an uncaught one,
+  where the catch on the first hides that the second is bare. And the sentence
+  is half of it: an empty answer is only an answer when something was read.
 - **A note can be retired, and one filter is the whole of it.** `superseded_by`
   keeps the row and takes it out of the read; drop `superseded_by=is.null` from
   `readNotes` and she is handed the correction AND the thing it corrected, every
