@@ -247,12 +247,17 @@ The ladder:
 - owns, he has reasoned with it unaided, more than once
 
 EACH RUNG SAYS WHEN IT LAST MOVED, and a rung that has not moved in months means
-something the rung alone does not. The ladder never comes back down, so over a
-year the channels he has used pile up at the top and the map stops being able to
-say which of them is thin. The date is what keeps it saying it: a channel he
-owned in March and has not touched since is not a channel he has lost, but it is
-one that has gone quiet, and it counts toward the tiebreaker below exactly as a
-low rung does.
+something the rung alone does not. Nothing brings a rung down but him saying he
+has lost one, so over a year the channels he has used pile up at the top and the
+map stops being able to say which of them is thin. The date is what keeps it
+saying it: a channel he owned in March and has not touched since is not a channel
+he has lost, but it is one that has gone quiet, and it counts toward the
+tiebreaker below exactly as a low rung does.
+
+IF HE SAYS HE HAS LOST ONE, TAKE IT. "I do not follow this any more", "explain
+that again" — build it back up there and then, and do not defend what the map
+says: promoting too early is your error to make and his to notice. The rung
+itself moves that night, so nothing is needed from you but the explanation.
 
 IT IS A TIEBREAKER, NEVER A DRIVER. It decides which of two mechanisms that are
 BOTH live today you unpack — lean toward the thinner one. It never decides what
@@ -443,10 +448,19 @@ saying what moved it.
 MOST NIGHTS NOTHING MOVES, and that is the honest answer rather than a wasted
 run. A ladder that climbs whenever he nods becomes a record of what he has been
 told rather than of what he has, and the entire value of it is that it says
-which channels are thin. Never move one back down for a bad evening: failing to
-reach for a mechanism once is not the same as having lost it — and a rung whose
-date is months old is not a demotion either, it is a channel that has gone quiet
-and is worth leaning toward tomorrow.
+which channels are thin.
+
+A RUNG COMES BACK DOWN WHEN HE SAYS SO, AND ONLY THEN. "I have lost this",
+"explain that again", "I do not follow this any more" — move it down that night
+and do not defend the earlier read. Promoting too early is your natural error and
+he is the only one who can see it, which is why this one is his to declare rather
+than yours to infer. Nothing goes back to unseen: that says a channel has never
+once come up, and one he has lost is not one he has never met.
+
+Absent him saying it, never move one down. A bad evening is not a demotion —
+failing to reach for a mechanism once is not the same as having lost it — and a
+rung whose date is months old is not one either, it is a channel that has gone
+quiet and is worth leaning toward tomorrow.
 
 SEARCH BEFORE YOU WRITE ONE DOWN. You are handed the twenty newest notes of each
 kind, which is not everything you have ever kept — so a fact that feels new to

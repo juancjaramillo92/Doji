@@ -935,9 +935,9 @@ documentation: `channelsList` renders a row it was not given at the **first**
 rung, so reversing the list would render every unseeded channel as owned.
 
 **Every rung carries the day it last moved, and that is what stops the map going
-blind.** The ladder never comes back down — deliberately, since failing to reach
-for a mechanism once is not the same as having lost it — so over a year the
-channels he has used pile up at the top, and a census with nothing left at
+blind.** The ladder does not come down on her reading of a bad evening — failing
+to reach for a mechanism once is not the same as having lost it — so over a year
+the channels he has used pile up at the top, and a census with nothing left at
 `unseen` has no absence left to show, which is the entire thing it is for.
 `moved_on` was written by `set_channel` from the first day and read by nobody: a
 rung set in March looked exactly like one set last night. The prompt now counts a
@@ -967,6 +967,23 @@ note is a moment and is fairly written in one, but a rung is a judgment across
 days, and moving one on a single exchange is the same error as reading a pattern
 into one fill. Most nights nothing moves, and the prompt says that is the
 honest outcome rather than a wasted run.
+
+**It comes back down when he says so, and only then.** *"I have lost this"*,
+*"explain that again"* — the rung drops that night and she does not defend the
+earlier read. Promoting too early is her natural error and he is the only one who
+can see it, so this direction is his to declare where the other is hers to infer.
+It still lands at the pass rather than mid-conversation: the pass reads the whole
+day, so what he said is in front of it either way, and the rung is right before
+the next morning's briefing, which is the only place it is read. Putting the tool
+in `CHAT_TOOLS` would buy a few hours and cost its schema on every request and a
+promotion she could make from one exchange.
+
+**Nothing goes back to `unseen`, and `setChannel` refuses it before the write.**
+That rung says a channel has never once come up — a fact about history, not about
+how well he holds it. A demotion able to write it would report a channel she
+taught last week as one he has never met, which is the census saying the opposite
+of the truth in the one column it exists for. A channel he has lost goes to
+`explained`.
 
 The five ids live in `prompt.ts` and are read from there by the tool's enum and
 interpolated into her prose, so the check constraint and the seed are the genuine
@@ -1122,16 +1139,6 @@ mechanism in a clause at `explained`, say it plainly at `used`, say it bare at
 `owns`. Reaching for the build-up at `owns` is condescending, and skipping it at
 `unseen` is the term he nods past — so the same table that exists to show an
 absence now also sets the register.
-
-**The demotion §0 promises is not a mechanism yet.** §0 says a demotion from him — *"I have lost this"*, *"explain that again"* —
-moves a channel back immediately and is never argued with. Nothing can move it
-immediately: `set_channel` is in `CONSOLIDATE_TOOLS` and deliberately not in
-`CHAT_TOOLS`, so during a reply she has no way to touch a rung at all, and the
-ladder is described below as never coming back down. What a demotion does reach
-is the nightly pass, which reads the day's turns and holds the tool — so the
-honest version is *that night*, not *immediately*, and only if the pass is told
-that a rung may descend. Until one of those two sentences moves, the document
-promises him something the system does not keep.
 
 §6 holds R-08's four steps — top-down bias; levels, meaning liquidity pools,
 support and resistance and the $25 grid; a candle or chart pattern with signal

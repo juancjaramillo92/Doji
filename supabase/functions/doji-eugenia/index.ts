@@ -275,16 +275,26 @@ const NOTES_TOOL = {
    days, and moving one from a single exchange is the same error as reading a
    pattern into one fill. The nightly pass is the only caller that sees a whole
    day, which is exactly the argument that put note-writing there as well.
+
+   A DEMOTION IS NOT THAT JUDGMENT — IT IS SOMETHING HE SAID — and it still
+   lands here rather than mid-conversation. The pass reads the whole day, so
+   *"explain that again"* is in front of it either way, and the rung is fixed
+   before the next morning's briefing, which is the only place it is read. What
+   putting the tool in CHAT_TOOLS would buy is a few hours; what it would cost
+   is its schema on every single request and a promotion she could make from one
+   exchange.
    ───────────────────────────────────────────────────────────────────────── */
 const CHANNEL_TOOL = {
   name: "set_channel",
   description:
-    "Move one channel up the ladder, at the nightly pass and nowhere else. The " +
+    "Move one channel along the ladder, at the nightly pass and nowhere else. The " +
     "rungs in order are " + CHANNEL_STATES.join(", ") + ": unseen is never come " +
     "up, explained is you explained it and he has not used it back, used is he " +
     "used it himself, owns is he reasoned with it unaided more than once. Move " +
-    "on evidence from the day in front of you, never on a nod, and most nights " +
-    "nothing moves at all.",
+    "UP on evidence from the day in front of you, never on a nod, and most nights " +
+    "nothing moves at all. Move DOWN only when he has said he has lost one — that " +
+    "is his to declare and never yours to argue with. Nothing goes back to " +
+    CHANNEL_STATES[0] + ", which says a channel has never once come up.",
   input_schema: {
     type: "object",
     properties: {
@@ -576,6 +586,14 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
   }
   if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
     return `"${to}" is not a rung. They are ` + CHANNEL_STATES.join(", ") + ".";
+  }
+  /* THE BOTTOM RUNG IS A FACT ABOUT HISTORY, NOT ABOUT HOW WELL HE HOLDS IT, so
+     a demotion can reach every rung but that one. Written back, it would report
+     a channel she taught last week as one he has never met — and an absence that
+     can be manufactured is no longer the absence the census exists to show. */
+  if (to === CHANNEL_STATES[0]) {
+    return `${id} cannot go back to ${CHANNEL_STATES[0]} — it has come up. ` +
+           `Move it to ${CHANNEL_STATES[1]} if he has said he has lost it.`;
   }
 
   try {

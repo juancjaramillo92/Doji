@@ -327,9 +327,9 @@ code you write near it:
   he UNDERSTANDS outlives both, which is what `eugenia_channels` is for. Five
   rows, never a window — and every rung carries `moved_on`, the civil day it
   last moved, formatted in UTC off a midday anchor because re-zoning a stored New
-  York date moves it a day back. The ladder never descends, so without that date
-  a year of use piles every channel at `owns` and the census loses the absence it
-  exists to show; a rung months old counts toward the tiebreaker as a low one
+  York date moves it a day back. Nothing descends the ladder but him saying he has
+  lost one, so without that date a year of use piles every channel at `owns` and
+  the census loses the absence it exists to show; a rung months old counts toward the tiebreaker as a low one
   does. A channel he has never once used is a row saying
   `unseen`, where in the notes it is nothing written down and therefore
   unnoticeable. The map is a TIEBREAKER between two mechanisms that are both
@@ -339,13 +339,22 @@ code you write near it:
   rung answers only the second. Only the nightly pass may move a rung, because
   one exchange is not evidence any more than one fill is a pattern.
 
-  THE DEMOTION §0 PROMISES DOES NOT EXIST YET. §0 says *"I have lost this"* moves a channel
-  back immediately and is never argued with; `set_channel` is in
-  `CONSOLIDATE_TOOLS` and not in `CHAT_TOOLS`, so a reply cannot move a rung at
-  all, and the README says the ladder never comes back down. The nightly pass
-  reads the day's turns and holds the tool, so *that night* is the honest
-  version — but building it means changing what the README states, which is his
-  decision and not a repair to make while passing.
+  THE LADDER DESCENDS IN ONE CASE AND IT IS NOT HER READING OF ONE. A demotion
+  is something HE said — *"I have lost this"* — and it is not the judgment the
+  paragraph above is about, which is why it is allowed where a promotion from
+  one exchange still is not. It lands at the pass all the same: the pass reads
+  the whole day, so what he said is in front of it, and the rung is right before
+  the next briefing, which is the only place it is read. Three copies say this
+  and all three are needed — `CHANNEL_TOOL`'s description permits it, the
+  CONSOLIDATE prompt asks for it, and §0 tells her it is his to declare; the
+  prompt is the one whose absence is silent, so `agree.test.mjs` reads it.
+
+  AND `unseen` IS UNREACHABLE BY ANY OF IT, guarded in `setChannel` before the
+  write. That rung says a channel has never once come up — history, not
+  understanding — and it is the only absence this system can see. A demotion
+  able to write it would report a channel she taught last week as one he has
+  never met, which is the census saying the opposite of the truth in the one
+  column it exists for. A channel he has lost goes to `explained`.
 - **`/notes` is his audit, and the whole of it is addressed to him.** It is
   answered from the database rather than by the model, so nothing can paraphrase
   or drop a row — and `notesList` renders the channel map itself rather than

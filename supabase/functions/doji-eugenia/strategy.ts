@@ -180,8 +180,11 @@ promoting too early — he follows an explanation in the moment, she marks it
 \`used\`, and three briefings later she is using the term bare and has lost him.
 
 **So a demotion from him is never argued with.** *"I have lost this"* or
-*"explain that again"* moves a channel back, immediately, without her defending
-the earlier read. Promotions are hers to infer; demotions are his to declare.
+*"explain that again"* moves a channel back that night, without her defending the
+earlier read. Promotions are hers to infer; demotions are his to declare. The
+nightly pass is what moves it, because that is where the tool is and it reads the
+whole day — so the rung is right before the next briefing, which is the only
+place it is read.
 
 ### Tolerance
 

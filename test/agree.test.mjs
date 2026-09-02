@@ -36,6 +36,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID } from '../supabase/functions/doji-eugenia/index.ts';
+import { CONSOLIDATE } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -374,6 +375,47 @@ test('the five rows are seeded, or a channel is invisible rather than unseen', (
     .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
   assert.deepEqual(seeded, declared,
     'the seed and the channel list disagree — an unseeded channel vanishes from her map');
+});
+
+/* ─── The rung that comes back down, and the one that cannot ────────────────
+   The ladder climbed only, for a reason: failing to reach for a mechanism once
+   is not the same as having lost it. What that reasoning missed is that HE can
+   say he has lost it — and promoting too early is her natural error, so without
+   a way down she keeps using a term bare that he told her he no longer follows,
+   with nothing anywhere reporting it.
+
+   THE BOTTOM RUNG IS STILL UNREACHABLE, and that is the half worth testing.
+   `unseen` says a channel has never once come up. It is the only absence this
+   system can see, and a demotion able to write it would report a channel she
+   taught last week as one he has never met — which is the census reporting the
+   opposite of the truth in the one column it exists for.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a demotion can reach every rung but the bottom one', () => {
+  const at = EUGENIA_TS.indexOf('async function setChannel(');
+  assert.ok(at > -1, 'doji-eugenia no longer has setChannel()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+
+  // Before the write, not after it: a PATCH that has already landed cannot be
+  // refused, and `unseen` written once is indistinguishable from never taught.
+  const guard = body.indexOf('CHANNEL_STATES[0]');
+  assert.ok(guard > -1,
+    'setChannel no longer refuses the bottom rung, so a demotion can report a ' +
+    'channel she has taught as one he has never met');
+  assert.ok(guard < body.indexOf('method: "PATCH"'),
+    'the bottom-rung guard sits after the write, which is not a guard');
+});
+
+test('the nightly pass is told a demotion is his to declare', () => {
+  /* The tool permits it and the prompt is what asks for it. Silence here is the
+     shape this defect had for its whole life: a mechanism that exists, is
+     documented, and is never once invoked because nothing tells her to. */
+  assert.match(CONSOLIDATE, /comes back down when he says so/i,
+    'the nightly pass is no longer told that he can declare a demotion, so the ' +
+    'rung only ever climbs however the tool is written');
+  assert.match(CONSOLIDATE, /never move one down/i,
+    'the pass is no longer told that a demotion needs him to have said it — ' +
+    'she would start reading one off a quiet evening');
 });
 
 test('the rungs are the same words in the tool, the constraint and §0', () => {

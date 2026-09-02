@@ -1188,10 +1188,11 @@ test('the evidence rides with the rung when there is any', () => {
   assert.ok(!channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: null }]).includes('()'));
 });
 
-/* THE DATE IS WHAT KEEPS THE MAP FROM GOING BLIND. The ladder never comes down,
-   so a year of ordinary use piles every channel he has touched at `owns` and the
-   census stops being able to say which one is thin — which is the only thing it
-   is for. `moved_on` was written from the first day and rendered by nobody. */
+/* THE DATE IS WHAT KEEPS THE MAP FROM GOING BLIND. Nothing brings a rung down
+   but him saying he has lost one, so a year of ordinary use piles every channel
+   he has touched at `owns` and the census stops being able to say which one is
+   thin — which is the only thing it is for. `moved_on` was written from the
+   first day and rendered by nobody. */
 
 test('a rung says when it last moved', () => {
   const out = channelsList([
