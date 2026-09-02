@@ -291,8 +291,10 @@ be single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
+| the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and §0's table of what to do at each one |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
-| the **`eugenia_trades` column list** | `003_eugenia.sql`, and the README's quoted copy of that statement |
+| the **`eugenia_trades` column list** | `003_eugenia.sql`, the README's quoted copy of that statement, and §8's inventory of a row in the strategy — the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
 | each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -933,9 +935,9 @@ documentation: `channelsList` renders a row it was not given at the **first**
 rung, so reversing the list would render every unseeded channel as owned.
 
 **Every rung carries the day it last moved, and that is what stops the map going
-blind.** The ladder never comes back down — deliberately, since failing to reach
-for a mechanism once is not the same as having lost it — so over a year the
-channels he has used pile up at the top, and a census with nothing left at
+blind.** The ladder does not come down on her reading of a bad evening — failing
+to reach for a mechanism once is not the same as having lost it — so over a year
+the channels he has used pile up at the top, and a census with nothing left at
 `unseen` has no absence left to show, which is the entire thing it is for.
 `moved_on` was written by `set_channel` from the first day and read by nobody: a
 rung set in March looked exactly like one set last night. The prompt now counts a
@@ -947,12 +949,17 @@ formatter it would move: `new Date('2026-03-12')` is midnight UTC, which is the
 11th in New York, so every rung would read a day early in the one column that
 says how stale it is.
 
-**It is a tiebreaker, never a driver**, and the prompt says so in those words. It
-decides which of two mechanisms that are *both* live today she unpacks — lean
-toward the thinner one. It never decides what the day is about. A briefing that
-worked through the channels in turn because one was `unseen` would be a
-curriculum, and the opening paragraph would stop being what actually matters
-that morning, which is the only thing it is for.
+**It is a tiebreaker for what the briefing is about, never a driver**, and the
+prompt says so in those words. It decides which of two mechanisms that are *both*
+live today she unpacks — lean toward the thinner one. It never decides what the
+day is about. A briefing that worked through the channels in turn because one was
+`unseen` would be a curriculum, and the opening paragraph would stop being what
+actually matters that morning, which is the only thing it is for.
+
+**It does drive how a thing is said**, and that is the second job §0 of the
+strategy gave it: build the term from §3 at `unseen`, restate the mechanism in a
+clause at `explained`, say it plainly at `used`, say it bare at `owns`. Subject
+and register are two different questions, and the rung answers only the second.
 
 **Only the nightly pass may move a rung.** `set_channel` is in
 `CONSOLIDATE_TOOLS` and deliberately not in `CHAT_TOOLS` beside `remember`: a
@@ -961,11 +968,36 @@ days, and moving one on a single exchange is the same error as reading a pattern
 into one fill. Most nights nothing moves, and the prompt says that is the
 honest outcome rather than a wasted run.
 
+**It comes back down when he says so, and only then.** *"I have lost this"*,
+*"explain that again"* — the rung drops that night and she does not defend the
+earlier read. Promoting too early is her natural error and he is the only one who
+can see it, so this direction is his to declare where the other is hers to infer.
+It still lands at the pass rather than mid-conversation: the pass reads the whole
+day, so what he said is in front of it either way, and the rung is right before
+the next morning's briefing, which is the only place it is read. Putting the tool
+in `CHAT_TOOLS` would buy a few hours and cost its schema on every request and a
+promotion she could make from one exchange.
+
+**Nothing goes back to `unseen`, and `setChannel` refuses it before the write.**
+That rung says a channel has never once come up — a fact about history, not about
+how well he holds it. A demotion able to write it would report a channel she
+taught last week as one he has never met, which is the census saying the opposite
+of the truth in the one column it exists for. A channel he has lost goes to
+`explained`.
+
 The five ids live in `prompt.ts` and are read from there by the tool's enum and
-interpolated into her prose, so only the check constraint is a genuine second
-copy — `agree.test.mjs` holds them together, along with the seed, because an id
-the tool offers and the constraint refuses is a `set_channel` that 400s and is
-reported to nobody.
+interpolated into her prose, so the check constraint and the seed are the genuine
+second copies — `agree.test.mjs` holds them together, because an id the tool
+offers and the constraint refuses is a `set_channel` that 400s and is reported to
+nobody.
+
+**The strategy is a copy in the other vocabulary.** Each `CHANNELS` entry is an id
+and a spoken name, and §2 heads each channel with the *name*, because
+`central_bank_buying` is not something a person says across a desk. So the name
+can drift with every id in the repository still agreeing — she would read the
+mechanism under one name and move the rung under another — which is why the test
+resolves §2's headings against the names rather than the ids. §0's pitch table is
+the same shape for the four rungs.
 
 **`/notes` is how he reads what she is keeping**, and it is answered from the
 database rather than by the model — `notesList()` renders the rows themselves,
@@ -1043,11 +1075,17 @@ with `searchList`, so `agree.test.mjs` holds the two lists against each other.
 
 **She holds his strategy and can never write it.** `strategy.ts` is the document
 he wrote — what he trades, the rules, how each one is checked. Its own retrieval
-contract decides what she carries: the summary and the rules table ride on the
-**cached** system prompt, so they are in front of her on every turn;
-`get_strategy` fetches the reasoning behind any of it. Loading the whole
-document instead would be roughly ten thousand characters against every message,
-competing with the briefing for attention.
+contract decides what she carries: the summary, a one-line index of every
+section, and the rules table ride on the **cached** system prompt, so they are in
+front of her on every turn; `get_strategy` fetches the reasoning behind any of
+it. Loading the whole document instead would be close to a hundred thousand
+characters against every message, competing with the briefing for attention.
+
+**The index is there because nothing cites §8.** Every other section is reachable
+from a rule's `§` column, and §8 — which population, which filters, which figure
+is the honest one — is the section that decides whether a number means anything
+at all. No rule points at it. A tool she can call is not a tool she knows when to
+call.
 
 **A subsection is served by the section that holds it**, and without that the two
 citations she carries on every single turn were the two `get_strategy` could not
@@ -1072,26 +1110,99 @@ checked against a row today, `field` that a column would have to exist first,
 it is one whose compliance is invisible, so it never counts as kept merely
 because nothing contradicted it.
 
-Sections 1, 2, 3, 9, 10 and 11 are not written. Four of them are cited — §2 for
-the market model, §9 for the leg of a failure that leaves no signature, §10 for
-what would have to change before a judgment rule could become checkable, and §1
-only by the retrieval contract's own list — and `get_strategy` names them rather
-than returning nothing, because a blank is something she would fill in herself,
-which is the one outcome worse than reporting it missing.
+The numbering skips 1 and 11, and that is a decision rather than an unfinished
+document: a numbering that skips reads as deliberate where six holes read as a
+draft. Every section anything cites is written. `get_strategy` still names a
+number it does not hold rather than returning nothing: the number arrives from
+the model, so a mistyped or an invented one is what it has to survive, and a
+blank is something she would fill in herself, which is the one outcome worse than
+reporting it missing.
 
-§6 now holds R-08's five steps — top-down bias, liquidity pools and S&R, psychological
-levels, candle or chart pattern with signal then confirmation, and reward-to-risk
-of at least 1:1.5. The order is the rule: a failed step ends the sequence rather
-than being traded off against a later one. Steps 1–4 are read and nothing stored
-can see them; **step 5 is arithmetic he runs**, on two prices no row carries —
-the standard $30 target over the $20 cap is exactly 1:1.5, so the only entry it
-refuses on its own is a $25 target set with a stop wider than about $16.70, and
-nothing records which target was set.
+**Two of the sections are not his.** §2 and §3 are researched reference material
+rather than decisions he made, and both say so where they start. Everything else
+in the file is his, and a rule he has not stated is a `[decide]` rather than a
+pattern read as a rule — which is the difference between a document that records
+what he decided and one that tells him what he apparently does.
 
-Writing it settled a contradiction the document carried for six versions. **1:1.5
-is a condition at entry** and **1:1.25 is the floor of what can be realised**
-after a $30 target is shortened to $25 on a trade already open — two numbers at
-two moments, stated as one floor that disagreed with itself.
+**§3 is the foundation, and it exists because he said the briefings land as terms
+he nods past.** Nineteen thousand characters built from the ground up — what
+inflation is, what the Fed actually sets, how a rate hike transmits, what a bond
+yield is, what TIPS and breakevens measure, and why gold sits at the end of all
+of it — plus every metric a briefing uses. It is written to teach rather than to
+be looked up, and it is what she reaches for when a term needs building rather
+than naming.
+
+**§0 decides how much building a term needs, and it reads that off the channel
+map.** Each of the five channels carries `unseen → explained → used → owns`, and
+§0 turns the rung into an instruction: build it from §3 at `unseen`, restate the
+mechanism in a clause at `explained`, say it plainly at `used`, say it bare at
+`owns`. Reaching for the build-up at `owns` is condescending, and skipping it at
+`unseen` is the term he nods past — so the same table that exists to show an
+absence now also sets the register.
+
+§6 holds R-08's four steps — top-down bias; levels, meaning liquidity pools,
+support and resistance and the $25 grid; a candle or chart pattern with signal
+then confirmation; and reward-to-risk of at least 1:1.5. The order is the rule: a
+failed step ends the sequence rather than being traded off against a later one,
+and nothing stored can see any of the four. **Psychological levels were a fifth
+step until v1.9** and are now inside the levels step: they gated nothing of their
+own — attention rather than a test — and a step that can never be the step you
+stopped at breaks the one claim R-08 makes.
+
+**Step 4 is arithmetic he runs, and it binds in exactly one place.** The default
+$30 target over a stop of $20 or tighter is always at least 1:1.5, so on the
+default path the step refuses nothing. What it refuses is a $25 target set at
+entry, which needs a stop of $16.67 or tighter — and no row records which target
+was set.
+
+So a realised 1:1.25 is **legitimate as an outcome and illegitimate as a plan**:
+the rule working where a $30 target was shortened on a trade already open, and a
+breach where $25 was set at entry over a $20 stop. Nothing on the row separates
+them, so it is `unknown` rather than either. That is v1.9's correction to a
+contradiction the document carried for six versions and then papered over for
+two — one floor that disagreed with itself, restated as two numbers at two
+moments, when the honest statement is that the row cannot tell which happened.
+
+**The stop is a ceiling, not a value**, and that is what makes R-02 one-sided.
+$20 is the most it may ever be; where it actually goes is read off the chart at
+entry, so it is usually tighter, and the only way it moves is outward to
+break-even, or inward under R-19. A loss closing further than $20 from entry can
+therefore only be a stop that was widened, which is what the predicate catches —
+and a $10 stop that closed $18 out was widened by eight dollars and passes
+silently. A clean R-02 run means no stop went past $20. It never means stops were
+respected.
+
+**R-10 and R-11 arrived at v1.9 with IDs they should have had all along.** One
+position at a time, and the day ends at −4% of account: both were prose in §5
+from v1.5, neither was ever in the table, so neither was ever checked. Both come
+out of broker columns alone — two rows whose entry-to-fill spans overlap, and
+cumulative P&L against `size_oz × 500` — which is why they arrive as `journal`
+rather than as another thing waiting on a schema change. R-11 also separates two
+rules §5 had been stating as one: a full stop ends the day under R-03 and −4%
+ends it under R-11, and now that the stop is a ceiling the two can disagree in
+both directions — a $12 stop taken in full ends the day having spent 2.4%, and
+three hand-cut exits can spend the whole 4% without R-03 seeing anything.
+
+**The table is nineteen rules now, and the eight after R-11 came out of audits
+rather than out of new behaviour.** R-12 caps him at one entry a day, two only
+when the second is a sweep re-entry. R-13 pins a rung change to a month boundary.
+R-14 stands him aside in the hours before a high-impact release — the first rule
+connecting the briefing to the trading. R-15 closes anything live before the
+Friday close, because a weekend gap can open past the stop. R-16 keeps him off
+known low-volume days. R-17 stops him when the trading itself has deteriorated,
+and its trigger is behaviour rather than a drawdown number, which is why it is
+`judgment` and not a threshold.
+
+**R-18 is the one that changes what the older rules mean.** The stop and the
+target are resting broker orders and a position is never closed by hand, so a
+loss further from entry than $20 is an edited order rather than a decision at the
+screen — which turns R-01 and R-02 from suggestive into exact. R-19 is the single
+exception to *never tightened*: a high-impact print landing on a position
+inherited from an earlier session goes to break-even if it is in profit and to a
+closer invalidation if it is not, and the target never moves. It also costs a
+reading the journal had for free: a scratch on this account was reliably R-04
+having fired, and a scratch under $20 can now be R-19 instead — unless the trade
+was opened in the same session, in which case it is neither and is a question.
 
 §4 is the one section that answers a question the rules could not. **The two
 setups differ by method, not by location**: Break & Retest is a continuation
@@ -1100,8 +1211,15 @@ Resistance is a mean-reversion trade taken off a level that is holding. Interior
 levels are where levels break, the extremes are where they turn price back — so
 R-05 and R-06 read as rules about location and are rules about method. It also
 settles what a per-setup statistic is: a win rate split by `setup` compares
-continuation against mean-reversion, not one part of the chart against another. A `[decide]` in the text is a value he has not
-settled, and she is told to say so rather than supply one.
+continuation against mean-reversion, not one part of the chart against another.
+
+**An interior level is not only a quarter**, and reducing it to one was the error
+v1.12 corrected. A level is marked by the $25 grid — 00 and 50 psychological, 25
+and 75 the quarters between — or by a reaction point, a previous high or low where
+something actually happened, and it is strongest where the two agree. So a
+previous high mid-range is tradeable for Break & Retest, which the earlier reading
+excluded. A `[decide]` in the text is a value he has not settled, and she is told
+to say so rather than supply one.
 
 A TS module rather than a markdown file for the reason `prompt.ts` is one: a
 function deploys as its own directory, and an import is the one way to be certain
@@ -1112,7 +1230,7 @@ loudly at build rather than subtly at runtime.
 **She reads the journal and can never write it.** `get_trades` is a tool she
 calls when the conversation is about his trading, and three separate things make
 it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no
-`balance`, no `commission`) and hides deleted rows; the grant on that view is
+`balance`, no `commission`, no `computed_pnl`) and hides deleted rows; the grant on that view is
 `select` and nothing else; and her function has exactly one database read of the
 journal and no write path to it anywhere. Said plainly, because it is the honest
 limit: the grant makes the *view* read-only, not the key — she holds the service
@@ -1577,7 +1695,8 @@ which is what an existing database needs to pick up `security_invoker`:
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
+         net_pnl
   from public.trades
   where deleted = false;
 
@@ -1629,8 +1748,9 @@ is dropped with its privileges. `create or replace view` cannot do this half —
 it matches column by column and may only append, so a shorter list is a drop and
 a rebuild, which is the other side of the trap #30 was fixed for.
 
-The two columns held a plan the journal no longer asks for. Nothing read them
-but Eugenia, and what she now says about a plan is in the strategy at v1.8.
+The two columns held a plan the journal no longer asks for. Nothing read them but
+Eugenia, and what she now says about a plan is §8's list of what a row cannot
+answer and §10's record of why that door is shut.
 
 Search is added to both of Eugenia's tables, and the whole block is idempotent —
 `add column if not exists`, `create index if not exists`, `create or replace
@@ -1694,12 +1814,22 @@ alter table public.trades add column if not exists size_oz numeric;
 Then re-run the `create or replace view public.eugenia_trades` statement from
 `003_eugenia.sql`.
 
-**`size_oz` sits at the end of that select list on purpose.** `create or replace
-view` matches the existing view position by position and may only append, so a
-column inserted mid-list reads as renaming whatever used to sit at that
-position — `cannot change name of view column "open_day" to "size_oz"`. Moving
-it up beside the other broker columns, where it belongs by sense, is the tidy
-that breaks re-application on every database that already has the view.
+**`net_pnl` was appended to that same list**, so an existing database picks it up
+by re-running the one statement and nothing else — no column to add, no grant to
+restore. It is there because `pnl` alone cannot be summed honestly: `pnl` is
+`coalesce(net_pnl, computed_pnl)`, so on a position whose broker email has not
+landed it is the folded figure and carries no swap. Served `pnl` alone, Eugenia
+followed the strategy's monthly instruction against a column she could not read
+and produced totals short by an unknown amount, on rows she could not identify.
+With both she sums the settled ones and says how many fell back.
+
+**The tail of that select list is in the order columns were added, on purpose.**
+`create or replace view` matches the existing view position by position and may
+only append, so a column inserted mid-list reads as renaming whatever used to sit
+at that position — `cannot change name of view column "open_day" to "size_oz"`.
+Moving `size_oz` or `net_pnl` up beside the other broker columns, where they
+belong by sense, is the tidy that breaks re-application on every database that
+already has the view.
 Reordering or removing needs a `drop view` first, which also drops the grants
 under it.
 
@@ -1822,7 +1952,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels and the four rungs of the ladder across `prompt.ts`, the tool's enum, the check constraint and the seed; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

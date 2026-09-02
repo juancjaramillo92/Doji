@@ -233,24 +233,35 @@ code you write near it:
   09:00 retry; nothing catches 08:00 to 22:00. `cached` in `ask()`'s log line is
   the number that settles it rather than arguing it.
 
-  R-08's five steps are in §6, and step 5 is arithmetic HE runs rather than one
+  R-08's four steps are in §6, and step 4 is arithmetic HE runs rather than one
   a row can check: nothing records where the stop or the target were set, so the
-  ratio is asked and never computed. Do not read that 1.5 against the 1.25 in §0
-  — they are an ENTRY condition and a REALISED floor, at two different moments,
-  and collapsing them is the contradiction v1.7 fixed.
+  ratio is asked and never computed. Do not read that 1.5 against the 1.25 as a
+  pair of floors — 1:1.5 is a condition at ENTRY, and a realised 1:1.25 is the
+  rule working on a shortened target and a breach on a $25 one set at entry,
+  which no row can tell apart. Collapsing them in either direction is the
+  contradiction v1.9 finished off.
 
   She has no write path to it, deliberately: a document that decides whether he
-  followed his rules cannot be edited by the thing checking them. Sections 1, 2,
-  3, 9, 10 and 11 are not written — four of them cited, and in the PROSE of §7
-  and §8 rather than in the rules table, which is why a scan of the table alone
-  reports them as unreferenced. `readStrategy` names them rather than returning
-  nothing: a blank is a thing she fills in herself.
+  followed his rules cannot be edited by the thing checking them. The numbering
+  skips 1 and 11 and nothing cites them; every section anything cites is written.
+  `readStrategy` still names a section it does not hold rather than returning
+  nothing, because the number arrives from the model: a blank is a thing she
+  fills in herself.
 
-  §4.1 AND §4.2 ARE THE EXCEPTION AND THEY DO EXIST — as prose inside §4, and
-  they are the only two citations in the half she carries on every turn. An
-  exact lookup told her they were unwritten, which is worse than a blank: a
-  wrong fact about her own document from the tool that exists to stop her
-  inventing one. `readStrategy` falls back one level to the parent section, and
+  §2 AND §3 ARE THE TWO SECTIONS THAT ARE NOT HIS — researched reference rather
+  than decisions, and labelled as such where they start. Both must use the SPOKEN
+  channel names from `prompt.ts` and never the database ids, which is a second
+  vocabulary and therefore a second thing that can drift: `agree.test.mjs`
+  resolves §2's headings against the names, not the ids. §0's table of what to do
+  at each rung is the same shape for `CHANNEL_STATES`. Everything else in the
+  file is his, and a rule he has not stated is a `[decide]` rather than a pattern
+  read as a rule.
+
+  §4.1 AND §4.2 ARE PROSE INSIDE §4 RATHER THAN SECTIONS OF THEIR OWN, and they
+  are the only two citations in the half she carries on every turn. An exact
+  lookup told her they were unwritten, which is worse than a blank: a wrong fact
+  about her own document from the tool that exists to stop her inventing one.
+  `readStrategy` falls back one level to the parent section, and
   `agree.test.mjs` resolves every citation in the table through it — asserting a
   dotted one names a heading actually present in what came back, since the
   fallback would otherwise answer a mistyped §4.7 with §4 and look identical to
@@ -263,6 +274,15 @@ code you write near it:
   secures the view, not the key, so the guarantee that matters is structural:
   one database read of the journal, no write path to it in the file. Do not add
   one.
+
+  `net_pnl` IS SERVED AND `pnl` ALONE IS NOT ENOUGH, which is the one widening
+  this view has had for a reason outside its own design. §8 sums `net_pnl` over
+  a month; `pnl` is `coalesce(net_pnl, computed_pnl)`, so on a position whose
+  broker email has not landed it is the folded figure and carries no swap — and
+  this account holds through the 17:00 rollover. With both columns she sums the
+  settled rows and reports how many fell back. Narrowing the view back to `pnl`
+  makes every multi-day total she gives short by an unknown amount on a subset
+  she cannot name, silently; `agree.test.mjs` asserts the column is there.
 - **`tradesQuery` is a boundary, and its window is counted in civil days.**
   `days` comes from the model, so it is clamped and row-limited there rather
   than trusted; the bound is stepped off today's New York date, because
@@ -307,15 +327,34 @@ code you write near it:
   he UNDERSTANDS outlives both, which is what `eugenia_channels` is for. Five
   rows, never a window — and every rung carries `moved_on`, the civil day it
   last moved, formatted in UTC off a midday anchor because re-zoning a stored New
-  York date moves it a day back. The ladder never descends, so without that date
-  a year of use piles every channel at `owns` and the census loses the absence it
-  exists to show; a rung months old counts toward the tiebreaker as a low one
+  York date moves it a day back. Nothing descends the ladder but him saying he has
+  lost one, so without that date a year of use piles every channel at `owns` and
+  the census loses the absence it exists to show; a rung months old counts toward the tiebreaker as a low one
   does. A channel he has never once used is a row saying
   `unseen`, where in the notes it is nothing written down and therefore
   unnoticeable. The map is a TIEBREAKER between two mechanisms that are both
-  live today, never a driver of what the briefing is about; and only the nightly
-  pass may move a rung, because one exchange is not evidence any more than one
-  fill is a pattern.
+  live today, never a driver of what the briefing is about — but §0 of the
+  strategy gave it a second job, and that one it does drive: how much a term has
+  to be built before it is used. Subject and register are two questions and the
+  rung answers only the second. Only the nightly pass may move a rung, because
+  one exchange is not evidence any more than one fill is a pattern.
+
+  THE LADDER DESCENDS IN ONE CASE AND IT IS NOT HER READING OF ONE. A demotion
+  is something HE said — *"I have lost this"* — and it is not the judgment the
+  paragraph above is about, which is why it is allowed where a promotion from
+  one exchange still is not. It lands at the pass all the same: the pass reads
+  the whole day, so what he said is in front of it, and the rung is right before
+  the next briefing, which is the only place it is read. Three copies say this
+  and all three are needed — `CHANNEL_TOOL`'s description permits it, the
+  CONSOLIDATE prompt asks for it, and §0 tells her it is his to declare; the
+  prompt is the one whose absence is silent, so `agree.test.mjs` reads it.
+
+  AND `unseen` IS UNREACHABLE BY ANY OF IT, guarded in `setChannel` before the
+  write. That rung says a channel has never once come up — history, not
+  understanding — and it is the only absence this system can see. A demotion
+  able to write it would report a channel she taught last week as one he has
+  never met, which is the census saying the opposite of the truth in the one
+  column it exists for. A channel he has lost goes to `explained`.
 - **`/notes` is his audit, and the whole of it is addressed to him.** It is
   answered from the database rather than by the model, so nothing can paraphrase
   or drop a row — and `notesList` renders the channel map itself rather than

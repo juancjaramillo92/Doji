@@ -15,36 +15,76 @@
 // says the summary and the rules table are always in context and everything else
 // is fetched when a conversation needs it. ALWAYS rides on the cached system
 // prefix, so it is paid once rather than per turn; SECTIONS is what get_strategy
-// serves. Loading all of it instead would be roughly ten thousand characters
-// against every message, competing with the briefing for attention.
+// serves. Loading all of it instead would be close to a hundred thousand
+// characters against every message, competing with the briefing for attention.
 //
-// SECTIONS 1, 2, 3, 9, 10 AND 11 DO NOT EXIST. Four of them are cited — §2 for
-// the market model, §9 for the leg of a failure that leaves no signature, §10
-// for what would have to change before a judgment rule could be checked, and §1
-// only by the retrieval contract's own list. get_strategy says so plainly rather
-// than returning nothing: a blank is a thing she fills in herself, and a rule
-// pointing at reasoning nobody can read is worth knowing about.
+// THE SUMMARY IS WRITTEN ONCE, IN SUMMARY, AND INTERPOLATED INTO BOTH. It used
+// to be typed out twice — in ALWAYS and again in SECTIONS["0"] — which is two
+// hand-maintained copies of the one paragraph she carries on every single turn.
+//
+// §2 AND §3 ARE NOT HIS DECISIONS. Everything else here is what he trades and how
+// he judges it. §3 is the foundation — what inflation is, what the Fed does, how
+// a bond yield works — written to TEACH, bottom-up, assuming nothing. §2 is the
+// five channels, written to be LOOKED UP on a briefing day. Both are researched
+// reference material and both say so where they start. They must use the SPOKEN
+// channel names from prompt.ts, never the database ids.
+//
+// SECTIONS 1 AND 11 DO NOT EXIST AND ARE NOT CITED. A numbering that skips reads
+// as a decision; six holes read as an unfinished document.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const VERSION = "v1.8";
+export const VERSION = "v1.13";
 
-/* Always in context, appended to the cached system prompt. The summary is the
-   whole strategy said once; the table is every rule with how it is checked. */
+/* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
+   paragraph she holds on every turn and the paragraph get_strategy serves are
+   the same characters and cannot disagree. */
+const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
+opened for. Two setups, told apart by method: **Break & Retest trades the
+continuation** through an interior level that has broken and flipped, **Support &
+Resistance trades the reversal** off an outer extreme that is holding. Take
+profit is **$30 from entry by default**, $25 by exception where the level looks
+hard to reach. The stop is a **ceiling of $20** and is set at entry from where
+the chart shows the idea to be wrong, so it is usually tighter — it is never
+moved tighter once the trade is on. Reward-to-risk must be at least 1:1.5 to
+enter, which the default $30 target satisfies at any permitted stop. Stop moves
+to break-even once price has travelled $20 toward the target. **Stop and target are
+always resting orders and a position is never closed by hand.** **At most one entry
+per day** — two only when the second is a sweep re-entry — and one position at a
+time. One full stop ends the day, as does −4% of account. **No entries in the
+hours before a high-impact release, none across a Friday close, none on known
+low-volume days.** Position size is on the row in ounces; lots are ounces ÷ 100
+and \`account = lots × 50,000\`. The rung moves only between months. Target is +10%
+of account every month, and reaching it stops nothing.`;
+
+/* Always in context, appended to the cached system prompt. */
 export const ALWAYS = `
 
-HIS TRADING STRATEGY, version v1.8. This is what he has decided, and it is not
-yours to change — you read it, you do not edit it.
+HIS TRADING STRATEGY, version ${VERSION}. This is what he has decided, and it is
+not yours to change — you read it, you do not edit it.
 
-XAUUSD only, intraday to multi-session, positions held for the move they were
-opened for. Two setups, selected by where price sits in a marked structure:
-Support & Resistance at the outer extremes of the range, Break & Retest at
-interior levels and quarters. Every entry takes profit $30 from entry price — shortened
-to $25 after entry where the level looks hard to reach or is showing reversal — and stops at
-most $20 from it. Reward-to-risk must be at least 1:1.5 to enter, and 1:1.25 is
-the floor of what can be realised once a target is shortened. Stop moves to break-even once price has travelled $20 toward the
-target. One full stop ends the trading day. Position size is on the row in
-ounces; lots are ounces ÷ 100 and \`account = lots × 50,000\`. Target is +10% of
-account every month.
+${SUMMARY}
+
+WHAT IS IN THE REST OF THE DOCUMENT, so you know when a question needs it. Call
+get_strategy with the number.
+
+- §0 header, retrieval contract, tolerance, notation, how to pitch an explanation
+- §2 the five channels — mechanism only, no forecasting. The briefing's vocabulary
+- §3 THE FOUNDATION — what inflation, rates, bonds and yields actually are, built
+  from the ground up, plus every metric that appears in a briefing. Teaching, not
+  reference. Reach for it whenever a term needs building rather than naming
+- §4 the setups, the timeframes, and how a level gets marked
+- §5 risk, the sizing ladder, the day's limits, when he stops trading
+- §6 lifecycle — the four-step sequence, entry, management, exit, recording
+- §7 the rules, enumerated, with predicate or probe for each
+- §8 journal binding — what a row can answer, and the filters that come first
+- §9 how he actually fails, and why nothing stored can see it
+- §10 what would have to change for a judgment rule to become checkable
+- §12 definitions
+- §13 changelog
+
+§8 BEFORE ANY NUMBER. A rate computed over the wrong population looks exactly like
+a rate computed over the right one, and nothing cites §8 — it is on you to fetch
+it.
 
 THE RULES, and the Evaluable column is the one that matters: journal means it can
 be checked against a row today, field means a column would have to exist first,
@@ -54,24 +94,35 @@ counts as kept just because nothing contradicted it.
 
 | ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
 |---|---|---|---|---|---|---|---|
-| R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
-| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs a full-stop answer recorded at journalling time to identify the population — see the note | §5 | v1.0 |
+| R-01 | Take profit $30 from entry price, or $25 where the level looks hard to reach | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\`, except a Friday close-out, which is \`unknown\` | §5 | v1.0 |
+| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` — the CAP only, see §7 | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day, except one sweep re-entry | day | \`followed_rules\` | field | within an \`open_day\`, at most one \`entry_time\` later than the \`fill_time\` of a full-stop loss; only losses at $20 are identifiable, so \`unknown\` elsewhere | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
-| R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
+| R-05 | Break & Retest at interior levels only — marked by the grid or by a previous price reaction — never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
-| R-07 | A rejection alone is not an entry — confirmation required, by close or by read | trade | \`followed_rules\` | judgment | *"Close, read, or neither?"* | §6 | v1.0 |
+| R-07 | A rejection alone is not an entry — confirmation required, by close or by read | trade | \`followed_rules\` | judgment | *"Did you wait, or did you take the touch?"* — see §9 | §9 | v1.0 |
 | R-08 | Pre-trade sequence run in order; a failed step ends it rather than being weighed | trade | \`followed_rules\` | judgment | *"Which step did you stop at, if any?"* | §6 | v1.0 |
-| R-09 | Only operate in obvious trends and cycles | trade | \`followed_rules\` | judgment | *"Was the trend obvious, or were you reading into it?"* | §6 | v1.0 |
+| R-09 | Only operate in obvious trends and cycles | trade | \`followed_rules\` | judgment | *"Was the trend obvious on the daily and 4H, or were you reading into it?"* | §6 | v1.0 |
+| R-10 | One position at a time — no scaling in, no adding, no second trade open | trade | \`followed_rules\` | journal | no two rows whose \`entry_time\`→\`fill_time\` spans overlap | §5 | v1.9 |
+| R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
+| R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry more than 15 min after the prior \`fill_time\` is a \`fail\`, within 15 min is \`unknown\` | §5 | v1.10 |
+| R-13 | The sizing rung moves only between months, never inside one | month | \`followed_rules\` | journal | one distinct \`size_oz\` per calendar month, over rows carrying one | §5 | v1.10 |
+| R-14 | No entries in the hours before a high-impact release; resume only once the volatility has passed and the news has confirmed something | trade | \`followed_rules\` | judgment | *"Was there a high-impact print ahead of this, and had it landed and settled?"* | §6 | v1.11 |
+| R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
+| R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market holiday | §5 | v1.11 |
+| R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
+| R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | judgment | *"Did the orders do it, or did you?"* — R-15's Friday close-out is the one permitted manual close | §6 | v1.13 |
+| R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | judgment | *"Was a print pending, and was this trade opened in an earlier session?"* | §6 | v1.13 |
 
 Call get_strategy for the reasoning behind any of this.`;
 
 /* Fetched on demand. The keys are the section numbers as the document writes
    them, so a rule citing §8 names the thing get_strategy serves. */
 export const SECTIONS: Record<string, string> = {
+
   "0": `## 0 · Header
 
-**Version** v1.8 · **Effective from** [decide] · **Supersedes** v1.7
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.12
 
 ### Summary
 
@@ -79,115 +130,796 @@ export const SECTIONS: Record<string, string> = {
 below §0 is retrieved on demand. It earns its length more than anything else in
 the file.*
 
-XAUUSD only, intraday to multi-session, positions held for the move they were
-opened for. Two setups, selected by where price sits in a marked structure:
-Support & Resistance at the outer extremes of the range, Break & Retest at
-interior levels and quarters. Every entry takes profit $30 from entry price — shortened
-to $25 after entry where the level looks hard to reach or is showing reversal — and stops at
-most $20 from it. Reward-to-risk must be at least 1:1.5 to enter, and 1:1.25 is
-the floor of what can be realised once a target is shortened. Stop moves to break-even once price has travelled $20 toward the
-target. One full stop ends the trading day. Position size is on the row in
-ounces; lots are ounces ÷ 100 and \`account = lots × 50,000\`. Target is +10% of
-account every month.
+${SUMMARY}
 
 ### What this document is
 
 A description of behaviour and reasoning. It states no view on where price will
-go. Market behaviour appears in §2 as mechanism only.
+go. Market behaviour appears in §2 and §3 as mechanism only.
+
+**Everything here is his except §2 and §3.** Those are researched reference
+material rather than decisions he made, and both are labelled as such where they
+start. Nothing else in this file is inferred: a rule he has not stated is a
+\`[decide]\`, never a pattern read as a rule.
 
 ### Retrieval contract
 
-§0's summary and §7's table are always in context. §1–§6 and §8–§13 are fetched
-when a conversation needs them. §7 points back to the prose rather than
-restating it, so nothing in this file is written twice.
+§0's summary, a one-line index of every section, and §7's table are always in
+context. Everything else is fetched when a conversation needs it. §7 points back
+to the prose rather than restating it, so nothing in this file is written twice.
 
-**This is a contract, not a mechanism.** Nothing enforces it until a
-\`get_strategy\` tool exists that serves §0 and §7 by default and a named section
-on request. Until then the whole document is either in context or none of it is,
-and the split above is a description of what should happen rather than of what
-does.
+**It is a mechanism as well as a contract.** \`get_strategy\` serves any section by
+number and a subsection is served by the section that holds it, so a citation to
+§4.1 returns §4. A section that does not exist is *named* rather than answered
+with a blank, because a blank is something she fills in herself.
+
+**The index exists because nothing cites §8.** Every other section is reachable
+from a rule's § column; §8 is not, and it is the section that decides whether a
+number means anything.
+
+### How to pitch an explanation — the document teaches at more than one level
+
+**He is learning macro deliberately, from the inside out.** He has said plainly
+that a lot of the technical content in his briefings lands as terms he nods past.
+So this document is not a static reference: what she says is meant to change as
+he changes.
+
+**\`eugenia_channels\` is the state.** Each of the five channels carries
+\`unseen\` → \`explained\` → \`used\` → \`owns\`, with an evidence line. Read it as: how
+much of this can be said bare, and how much has to be built first.
+
+| State | What she does with a term from that channel |
+|---|---|
+| \`unseen\` | Build it from §3 before using it. Do not name and move on. |
+| \`explained\` | Use it, restating the mechanism in a clause as she goes. |
+| \`used\` | Use it plainly; unpack only if he asks or looks lost. |
+| \`owns\` | Use it bare. Reaching for the build-up now is condescending. |
+
+**She judges the state herself, and he can override it.** Her natural error is
+promoting too early — he follows an explanation in the moment, she marks it
+\`used\`, and three briefings later she is using the term bare and has lost him.
+
+**So a demotion from him is never argued with.** *"I have lost this"* or
+*"explain that again"* moves a channel back that night, without her defending the
+earlier read. Promotions are hers to infer; demotions are his to declare. The
+nightly pass is what moves it, because that is where the tool is and it reads the
+whole day — so the rung is right before the next briefing, which is the only
+place it is read.
 
 ### Tolerance
 
-**There is none, and that is a decision rather than an omission.** The stop is at
-most $20 from entry. A loss that closed further away than that was not a $20 stop
-being filled badly — it was a stop that had been moved — so the predicates
-compare against 20 and 30 flat, with nothing added.
+**There is none, and that is a decision rather than an omission.** The predicates
+compare against the rule's own numbers flat, with nothing added for slippage.
 
 Stated here rather than left implicit because the alternative was live for a
 version: a tolerance wide enough to absorb slippage is also wide enough to absorb
 a stop moved a couple of dollars, and every rule that compares a price distance
 would have inherited it.
 
-**A false positive costs a question, not a conclusion.** Reconciliation is
-one-way — she names the gap and stops, and never corrects a marker or decides
-what it meant — so a flagged trade is something he looks at, and erring tight is
-the right direction to err. What it must not become is frequent: a check that
-cries wolf teaches him to ignore it, which is the same failure §7 records for a
-stale zone map.
+**Slippage is his, and this is now confirmed rather than assumed.** He places the
+stop at $20 from the fill price on the chart, with no allowance for the spread. So
+the difference between where he clicked and where he filled is absorbed rather
+than budgeted for. One consequence, small but worth expecting: a broker stop
+triggers against the bid or ask rather than the chart price, so a $20 stop can
+close a dollar or so further out and R-02 will occasionally flag a stop he never
+touched.
+
+**The stop is a ceiling, not a value, and R-02 is one-sided because of it.** $20
+is the most it may ever be; where it sits is read off the chart at entry and is
+usually tighter. So a loss closing further than $20 from entry is a stop that was
+moved, and a loss closing at $14 is consistent with either a $14 stop respected or
+a $20 stop cut short — and no row says which. R-02 catches the first and is blind
+to the second, by construction rather than by oversight (§7).
+
+**A false positive costs a question, not a conclusion.** Reconciliation is one-way
+— she names the gap and stops, and never corrects a marker or decides what it
+meant. What it must not become is frequent: a check that cries wolf teaches him to
+ignore it.
+
+### Notation
+
+**\`[decide]\`** marks a value he has not settled. Say so rather than supplying one,
+and never infer it from behaviour — a pattern read as a decision produces findings
+about something he never bound himself to.
+
+**Rule IDs are never reused**, even after retirement. A recycled ID silently
+falsifies history.
 
 ### Write access
 
-Eugenia reads \`trades\` and cannot write to it. This document is her only
-persistent state: findings, retired experiments and rule changes are recorded in
-§13 by the trader, and the §7 table she reads next week is whatever §13 last
-left there.
+Eugenia reads \`trades\` and cannot write to it. **This document is the one part of
+her memory she cannot write** — turns are a window, notes are hers, and this is
+what he decided. Findings, retired experiments and rule changes are recorded in
+§13 by the trader.
 
-**The loop is missing its inbound edge.** She has no way to put a finding in
-front of you — \`eugenia_notes\` is her own memory, not a proposal queue — so a
-conclusion reached on a Tuesday reaches §13 only if you remember it. Until a
-proposal path exists, §13 is written from conversation and nothing guarantees a
-finding survives to reach it.`,
+**The loop is missing its inbound edge.** She has no way to put a finding in front
+of him — \`eugenia_notes\` is her own memory, not a proposal queue — so a conclusion
+reached on a Tuesday reaches §13 only if he remembers it.`,
+
+  "2": `## 2 · The five channels
+
+**NOT HIS DECISIONS.** Researched reference material, written for him because he
+is learning macro deliberately. Treat it as shared vocabulary, never as something
+he has committed to.
+
+**This section assumes the foundation. §3 is the foundation.** If a term here
+needs building rather than naming — real yield, breakeven, core, the dot plot —
+that build is in §3, and §0 says how to pitch it against his channel state.
+
+**Mechanism only, and the rule is: state the chain, stop at the chain.** *A
+hawkish repricing lifts real yields → the opportunity cost of holding a
+non-yielding asset rises → downward pressure on gold* is analysis. *So gold falls
+today* is a forecast and is not hers to make. The difference is not hedging
+language; it is where the sentence ends.
+
+The names below are the ones she says out loud. The database ids exist for the
+table and the tool; she never utters one, because "central_bank_buying" is not
+something a person says across a desk.
+
+---
+
+### The gap between rates and inflation
+
+The dominant channel, and the one everything else feeds into.
+
+**The chain.** Gold pays no interest and no dividend. Holding it means giving up
+whatever holding dollars would have earned — but *after inflation*, because a 5%
+yield while prices rise 5% leaves you no better off. That after-inflation number
+is the **real yield**, and it is what gold actually competes against. High real
+yields make holding gold expensive; low or negative real yields make its zero
+yield stop mattering.
+
+**Where to read it.** The 10-year TIPS yield is the market's real yield. The
+10-year breakeven — nominal minus TIPS — is expected inflation. §3 builds both.
+
+**What the history shows.** The measured correlation between real rates and gold
+is around **−0.82**, and gold has done best when real yields sat below 1% or went
+negative. The two great bull markets came from opposite directions: the 1970s,
+when inflation outran high nominal rates, and the 2000s, when both were low. Same
+condition — negative real rates — reached two different ways.
+
+**Why a hot inflation print is ambiguous rather than bullish.** It lifts expected
+inflation, which pushes the real yield *down*; and it lifts rate expectations,
+which pushes the nominal yield *up*. Which wins is the question, not the answer.
+2022 settled it in the second direction: inflation was high and gold fell, because
+nominal yields rose faster than expectations did.
+
+**Reading the two legs separately is the most useful skill in this channel**, and
+it is more informative than either level alone:
+
+| Real yield | Breakeven | What it is | Pressure on gold |
+|---|---|---|---|
+| Rising | Falling | Tightening working, disinflation | Against |
+| Rising | Rising | Growth reflation | Mixed — the legs disagree |
+| Falling | Rising | Stagflation risk | For |
+| Falling | Falling | Recession being priced | For, via cuts |
+
+---
+
+### The dollar
+
+**The arithmetic half.** Gold is quoted in dollars everywhere that matters. A
+stronger dollar means fewer dollars buy the same ounce, so the dollar price falls
+even if nothing about gold changed.
+
+**The demand half.** For a buyer holding euros, yen or rupees, a strong dollar
+makes gold more expensive in their own money, and demand outside the US softens.
+
+**DXY is the usual measure and it is not what most people think.** The basket is
+roughly **58% euro**, with the yen, pound, Canadian dollar, krona and franc
+behind. So DXY is substantially a EUR/USD story wearing a broader name — worth
+knowing before reading it as a verdict on the dollar in general.
+
+**The correlation is strong and is not a law** — commonly between **−0.5 and
+−0.8** depending on the window. It breaks in one specific circumstance: a genuine
+risk-off panic, when gold and the dollar are both bid as havens at the same time.
+
+**When the inverse relationship breaks, that is information rather than noise.**
+Something has become more important than the pricing mechanism, and finding out
+what is the day's actual question.
+
+---
+
+### Inflation itself
+
+CPI and PCE feed the first channel through expectations rather than acting on gold
+directly. §3 builds what they are and why they differ.
+
+**Three reading rules.** Core over headline, because policy responds to core. The
+**surprise against consensus** over the level, because a print that matches
+expectations is already in the price. And PCE over CPI for what the Fed will
+actually do — it is the measure the 2% target is written against — while CPI moves
+markets more, because it lands first and everyone watches it.
+
+---
+
+### Jobs
+
+Employment is the input the Fed reacts to fastest, so this channel runs almost
+entirely through the first one.
+
+**Nonfarm payrolls land at 8:30 a.m. ET on the first Friday of the month** and are
+usually negatively correlated with gold: a stronger-than-expected print firms rate
+expectations, lifts the dollar and yields, and weighs on gold. A weak print does
+the reverse.
+
+**It is a surprise effect, not a level effect.** There is no stable long-run
+relationship between job gains and the gold price — only a short-run reaction to
+the gap between the print and consensus. A strong number that everyone expected
+moves very little.
+
+**Watch the repricing, not the number.** CME FedWatch turns the print into changed
+probabilities for the next meeting, and gold tracks that repricing rather than the
+headline. §3 explains how those probabilities are built.
+
+**Weight forward-looking prints — payrolls, claims, PMIs — above backward-looking
+ones like GDP**, and say when doing so.
+
+---
+
+### What central banks are buying
+
+The slowest channel, and the only one that is a flow rather than a price.
+
+**Official-sector demand has run far above its historical norm since 2022:**
+1,082t in 2022, 1,037t in 2023, above 1,000t again in 2024, and 863t in 2025 —
+against a 2010–2021 average of about **473t**. The 2025 figure was a 21% fall from
+the prior year and still the fourth-largest year on record. Poland has led
+recently, adding 102t in 2025 to reach 550t. In the World Gold Council's 2026
+survey a record 45% of reserve managers expected their own institution to add
+gold, and 74% expected the dollar's share of global reserves to fall.
+
+**Why it matters mechanically.** This is price-insensitive, strategically
+motivated buying. A central bank diversifying reserves does not stop because gold
+got expensive, and none of it appears in a yield or a dollar series. It can hold a
+floor under a market the other four channels are pressing down on — which is
+exactly when it becomes the explanation for a move nothing else accounts for.
+
+Late in 2025 gold passed US Treasuries to become the largest reserve asset by
+value, which is the scale of the shift in one number.
+
+---
+
+### Two framings that apply to all five
+
+**Pre-priced versus new information.** Markets move on surprises, not on events. A
+speech confirming what is already priced is close to neutral however hawkish it
+sounds. Ask what was expected before asking what happened. **This is the single
+most common error in reading a briefing.**
+
+**The referee test.** Watch whether yields move *with* or *against* gold to
+identify which channel has control that day. Gold up with yields up is not the
+rates channel driving — look at the dollar, or at haven demand.
+
+### What this section is not
+
+Not a market view, not a bias, and not an input to a trade. §6's step 1 is his
+top-down bias read off price action on the daily, 4H and 1H, and nothing here
+feeds it.
+
+**One exception, and it is his rule rather than an analytical claim.** R-14 keeps
+him out of the market before a high-impact release and lets him back in once the
+volatility has passed and the news has confirmed something. That is macro touching
+an entry decision — not as a forecast, but as a condition on whether price is
+behaving readably. Macro still never licenses a trade; it can make him stand
+aside, and it can tell him the standing-aside is over.`,
+
+  "3": `## 3 · The foundation
+
+**NOT HIS DECISIONS.** Researched reference material. This section exists because
+he has said the technical content in his briefings often lands as terms he nods
+past, and he wants to understand it from the inside out rather than accumulate
+vocabulary.
+
+**§2 is for looking up on a briefing day. THIS section is for teaching.** It is
+built bottom-up and each part earns the next, so it reads in order and breaks if
+entered in the middle. Reach for it whenever a term needs building rather than
+naming, and pitch it against his channel state (§0).
+
+**Where he actually starts, recorded so nothing is pitched above it.** As of
+v1.11 he knows the conclusion — high rates make the dollar attractive and pull
+money out of gold, low rates the reverse — and not the machinery underneath it.
+He has said he does not know why a hike cools inflation. Build from there.
+
+### Where each term is built
+
+*So a term can be found without reading the whole section. The order still matters
+— anything below assumes what is above it.*
+
+| Part | Builds |
+|---|---|
+| **1** | inflation · demand-pull vs cost-push · deflation |
+| **2** | the dual mandate · the 2% target · anchored expectations |
+| **3** | the federal funds rate · target range · basis points |
+| **4** | how a hike cools inflation · long and variable lags · the mandate in tension with itself |
+| **5** | bonds · yields · why price and yield move opposite · the 10-year |
+| **6** | nominal vs real yield · TIPS · breakeven inflation |
+| **7** | why gold is priced off real yields · the full chain from a jobs print to the gold price |
+| **8** | CPI · PCE · core vs headline · PPI · NFP · unemployment · participation · claims · JOLTS · GDP · GDPNow · PMI · retail sales · consumer sentiment · FOMC · SEP · dot plot · FedWatch · QT and QE · hawkish and dovish · DXY · 10-year and 2-year · 2s10s · 5y5y · where to look each one up |
+
+---
+
+### 1 · What inflation actually is
+
+Not "prices going up." That is the symptom.
+
+**Inflation is a sustained rise in the general price level** — not one thing
+getting dearer, but money buying less of everything. The classic framing is *too
+much money chasing too few goods*: if the money in an economy grows faster than the
+stuff to buy, each unit of it buys less.
+
+That framing covers one of the two ways inflation starts, and the difference
+between them is why half the vocabulary exists:
+
+- **Demand-pull** — people have more money and want to spend it. Demand outruns
+  what the economy can produce, and sellers raise prices because they can.
+- **Cost-push** — producing things gets more expensive. Oil, wages, shipping. The
+  cost passes through to the shelf.
+
+**Why the distinction matters:** a central bank can do something about the first
+and very little about the second. Raising rates cannot drill an oil well. This is
+why an inflation print driven by energy is read differently from one driven by
+services, and it is the whole reason "core" exists.
+
+**Deflation is the mirror, and central banks fear it more.** Falling prices sound
+good until you
+notice that if a thing will be cheaper next month, you wait — and everybody
+waiting is a recession. Debts also get harder to repay, since you owe the same
+number of dollars but each one is worth more. This is why central banks target a
+small positive number rather than zero.
+
+---
+
+### 2 · Why 2%, and why a central bank targets anything
+
+The Federal Reserve has a **dual mandate** written into law: stable prices and
+maximum employment. In 2012 it put a number on the first half — **2% annual
+inflation**, measured by PCE.
+
+**Why not zero?** Two reasons. Zero leaves no margin for error — undershoot
+slightly and you are in deflation, which is hard to escape.
+
+And rates cannot easily go below zero, which matters more than it sounds. Nominal
+rates sit at roughly the real rate *plus* expected inflation, so a 2% target holds
+the whole rate structure about two points higher than a 0% target would. **That is
+two extra points of room to cut before hitting the floor.** Targeting zero would
+leave the Fed fighting the next recession with almost nothing to cut.
+
+**Why announce it at all?** Because expectations are self-fulfilling. If everyone
+believes prices will rise 2%, workers ask for 2% raises and firms plan 2% price
+increases, and inflation comes out near 2% because everyone acted as though it
+would. If belief slips, the belief itself becomes the problem.
+
+**This is what "anchored expectations" means**, and it is why the Fed watches
+breakevens so closely — they are the market betting real money on whether the
+anchor is holding.
+
+---
+
+### 3 · The federal funds rate — what the Fed actually sets
+
+**It is one specific, narrow thing: the rate banks charge each other for
+overnight loans.** Banks are required to hold reserves; some end the day short and
+some end long, and the short ones borrow from the long ones overnight. That rate
+is the federal funds rate.
+
+**The Fed does not decree it.** It sets a *target range* — "4.00 to 4.25 percent"
+— and then makes it true by changing how much money is in the banking system,
+buying and selling government securities to add or drain reserves.
+
+**Why one overnight rate matters to everything.** It is the cheapest, safest
+short-term borrowing there is, so it is the floor every other rate is built on. A
+bank lending to a business for three years prices off it, plus a margin for time
+and risk. Your mortgage, a company's bonds, a credit card, all of it stacks on
+that base. Move the base and the entire structure moves.
+
+**Basis points.** A basis point is one hundredth of a percentage point. 25bp = a
+quarter point. The Fed moves in 25bp steps by convention, so "50bp" means a double
+move and signals urgency.
+
+---
+
+### 4 · How a rate hike cools inflation
+
+This is the chain he said he did not have. It works by **deliberately slowing the
+economy down**, which is why it is a blunt tool and why the Fed hesitates.
+
+**Step by step:**
+
+1. **The Fed raises the funds rate.** Overnight borrowing between banks costs
+   more.
+2. **Every other rate follows.** Mortgages, car loans, business credit lines,
+   corporate bonds.
+3. **Borrowing falls.** A company deciding on a new factory at 4% may not build it
+   at 8%. A household stretching for a house at one mortgage rate cannot at
+   another.
+4. **Saving becomes more attractive.** Money in a deposit account now earns
+   something real, so some spending becomes saving instead.
+5. **Demand falls.** Less borrowing and less spending mean fewer dollars chasing
+   the same goods.
+6. **Firms stop raising prices** — and in the harder cases, cut them, or hire less,
+   or lay off.
+7. **Inflation slows.**
+
+**Two things about this chain that matter more than the chain itself:**
+
+**It is slow.** Typically twelve months or more from hike to visible effect. The
+Fed is steering something with a long delay between the wheel and the wheels,
+which is why it moves in small steps and why it can overshoot without knowing
+until later. "Long and variable lags" is the phrase.
+
+**Step 6 is where it hurts.** The mechanism reaches prices by weakening demand,
+and weaker demand means less hiring. **Cooling inflation and protecting employment
+pull in opposite directions**, which is the dual mandate in tension with itself —
+the whole reason FOMC members disagree and the reason there is anything to read in
+a dot plot.
+
+**Cutting rates runs the chain backwards:** borrowing gets cheap, spending and
+hiring rise, and inflation risk returns.
+
+---
+
+### 5 · Bonds and yields — the piece that is usually skipped
+
+Everything above happens in the real economy over months. The **bond market
+reprices it in seconds**, which is why gold reacts to a jobs number before any
+factory has changed a plan.
+
+**What a bond is.** A loan you can trade. Lend the US government $1,000 for ten
+years and it pays fixed interest and returns the $1,000 at the end. That security
+can then be bought and sold.
+
+**Why the yield moves opposite to the price — the one thing to actually
+understand.** The payments are fixed. A bond paying $50 a year:
+
+- Buy it at $1,000 → **5%**
+- Rates rise, new bonds pay more, nobody wants yours at $1,000. It trades at $900.
+  The buyer still gets $50 a year → **5.6%**
+- Rates fall and yours looks generous. It trades at $1,100 → **4.5%**
+
+**Price down, yield up. Always.** Nothing about the bond changed; only what someone
+will pay for it.
+
+**So a yield is a live vote on the future.** The 10-year Treasury yield is the
+market's collective view of where short-term rates will average over ten years,
+plus compensation for tying money up. It moves the instant expectations change —
+before the Fed acts, and often instead of the Fed acting.
+
+**The 10-year is the benchmark** because it is the deepest, most liquid, most
+watched. When people say "yields," this is usually the one.
+
+---
+
+### 6 · Real yields, TIPS and breakevens
+
+**A yield you can see is nominal — it says nothing about what it is worth.** 5% in
+your pocket while prices rise 5% leaves you exactly where you started.
+
+    real yield  ≈  nominal yield  −  expected inflation
+
+**That real number is what an asset paying nothing has to compete with**, which is
+the whole of the first channel in §2.
+
+**TIPS make it observable.** Treasury Inflation-Protected Securities are Treasuries
+whose principal adjusts with CPI, so the holder is compensated for inflation
+separately. What is left is the pure real return — **the TIPS yield is the real
+yield, quoted directly by the market.**
+
+**Breakeven inflation falls out of the pair:**
+
+    10-year breakeven  =  10-year nominal yield  −  10-year TIPS yield
+
+Nominal 4.50% and TIPS 2.00% gives a breakeven of **2.50%** — the inflation rate at
+which owning either bond leaves you equally well off. Above it, the TIPS holder
+wins; below it, the nominal holder does.
+
+**So the breakeven is what the market expects inflation to average**, priced by
+people with money at risk rather than by a survey. It is the anchor the Fed is
+watches for whether expectations are holding.
+
+**One trap in reading the level.** TIPS are indexed to CPI, but the 2% target is
+written against PCE — and PCE runs a few tenths below CPI (§3, part 8). So a
+breakeven around 2.3% is roughly consistent with the target being met rather than a
+breach of it. What matters is a sustained drift well above that, not any print over
+2.0%.
+
+**A caution worth carrying.** TIPS trade in a smaller, less liquid market. In a
+panic the liquidity discount widens, pushing TIPS yields up and squashing
+breakevens — so a breakeven can fall in a crisis while actual inflation
+expectations are rising. March 2020 was the extreme case.
+
+---
+
+### 7 · Why gold sits at the end of all of it
+
+Now the thing he already knew, resting on something.
+
+**Gold produces nothing.** No coupon, no dividend, no earnings. Its entire return
+is the price change, so the case for holding it is a comparison: what am I giving
+up by not holding something that pays?
+
+**That comparison is the real yield.** Not the headline rate — the after-inflation
+return on safe dollars.
+
+- **Real yields high** → dollars pay you well in real terms → holding a
+  zero-yield metal is expensive → pressure against gold
+- **Real yields low or negative** → dollars lose purchasing power just sitting
+  there → gold's zero yield costs nothing → pressure for gold
+
+**Which is why gold reacts to a jobs number.** Payrolls come in hot → the Fed
+looks likelier to stay tight → the market reprices rate expectations in seconds →
+nominal yields rise → if expected inflation does not rise as much, real yields
+rise → gold's opportunity cost went up. Six links, all of them in the bond market,
+none in a shop.
+
+**And why "high rates make the dollar attractive" is right but incomplete.** It is
+the second channel — the currency effect — and it is real. But it sits on top of
+the first one, and when the two disagree, knowing which is which is the day's
+question.
+
+---
+
+### 8 · The metrics, built rather than named
+
+Everything that shows up in a briefing.
+
+#### Inflation
+
+**CPI — Consumer Price Index.** Bureau of Labor Statistics, monthly, 8:30 a.m. ET,
+usually mid-month. A **fixed basket** of goods and services bought by urban
+consumers, priced repeatedly over time. Shelter is roughly a third of it, which
+makes housing the single biggest mover. **The market's number**, because it lands
+first and everyone watches it.
+
+**PCE — Personal Consumption Expenditures price index.** Bureau of Economic
+Analysis, monthly, later than CPI. Broader coverage — including spending made on
+your behalf, like employer-paid healthcare — and **weights that update
+continuously**, so it captures substitution: beef gets expensive, you buy chicken,
+the index notices. Shelter is about 15% rather than a third.
+
+**The Fed's target is written against PCE**, formally since 2012. PCE typically
+runs a few tenths *below* CPI because of the substitution effect. **So: CPI moves
+the market, PCE moves the Fed.**
+
+**Core versus headline.** Headline is everything. Core strips food and energy —
+not because they do not matter but because they are volatile and driven by
+supply, and monetary policy cannot do anything about an oil shock. **Core is the
+underlying trend; policy responds to core.**
+
+**PPI — Producer Price Index.** What businesses pay for inputs, before it reaches
+the consumer. Often a leading indicator of CPI.
+
+#### Employment
+
+**NFP — nonfarm payrolls.** BLS, **8:30 a.m. ET, first Friday of the month**. Net
+jobs added or lost, excluding farm work. The single highest-impact scheduled
+release for gold. Revisions to prior months arrive with it and are sometimes the
+bigger story.
+
+**Unemployment rate.** Same release. Share of people who want work and cannot find
+it. Watch the **participation rate** alongside it — unemployment can fall because
+people found jobs or because they stopped looking, and those mean opposite things.
+
+**Initial jobless claims.** Weekly, Thursday 8:30 a.m. ET. New unemployment
+filings. **Weekly and forward-looking**, so it turns before payrolls do.
+
+**JOLTS — Job Openings and Labor Turnover Survey.** Monthly, lagged. Openings,
+hires and quits. The **quits rate** is the interesting one: people quit when they
+are confident of finding better, so it reads labour-market strength from the
+worker's side.
+
+#### Growth
+
+**GDP.** Quarterly, revised twice. Total output. **Backward-looking by months** —
+which is why §2 says to weight it below forward-looking prints, and to say so when
+doing it.
+
+**GDPNow.** The Atlanta Fed's running estimate of current-quarter GDP, updated as
+data arrives. Not a forecast in the usual sense — a mechanical nowcast. Useful
+because it is current where GDP is not.
+
+**PMI — Purchasing Managers' Index.** Monthly survey of purchasing managers.
+**Above 50 = expansion, below 50 = contraction.** Fast and forward-looking, since
+it asks the people placing the orders. Two versions land in the same week — ISM and
+S&P Global — on different panels, so they can disagree. ISM is the one markets
+weight more heavily.
+
+**Retail sales.** Monthly, 8:30 a.m. ET. Consumer spending is roughly two-thirds of
+US output. Watch the **control group**, which strips autos, petrol, building
+materials and food services — the volatile parts — and is what feeds GDP.
+
+**Consumer sentiment (University of Michigan).** Twice monthly, preliminary then
+final. The headline is mood, and mood is weak information. **The part that moves
+markets is the inflation-expectations component** — a survey read on the same anchor
+breakevens price, so a jump there is read as the anchor slipping.
+
+#### Rates and policy
+
+**FOMC.** Federal Open Market Committee. Eight scheduled meetings a year, decision
+at **2:00 p.m. ET**, press conference at 2:30. The rate decision itself is usually
+priced in; the statement wording and the press conference are where surprise
+lives.
+
+**SEP — Summary of Economic Projections.** Published at four of the eight meetings
+— **March, June, September, December**. FOMC members' forecasts for growth,
+unemployment, inflation and rates.
+
+**The dot plot.** Inside the SEP. Nineteen anonymous dots when the board is fully
+staffed — one per FOMC *participant*, which is more than the twelve who vote —
+showing where each expects the funds rate at the end of each of the next years.
+**The median dot is the headline.** A shift in the median — one cut becoming two,
+or two becoming none — reprices the whole forward curve.
+
+**Why the dot plot often moves markets more than the decision does.** The decision
+is priced weeks ahead through futures. The dots are not published until the day
+and cannot be front-run. On a meeting where a hold is 95% priced, the dots are the
+only place a genuine surprise can come from — and when the dots match expectations,
+the surprise moves to the *revisions* underneath: a changed inflation or
+unemployment forecast implies a different path even when the dots did not move.
+
+**CME FedWatch.** Probabilities of each rate outcome at each upcoming meeting,
+derived from 30-day fed funds futures pricing. Those futures are priced at 100
+minus the expected average rate, so the market's implied probability is arithmetic
+rather than opinion. **This is what "the market has priced 80% odds of a cut"
+means**, and it is the number to check before deciding whether an event is news.
+
+**QT — quantitative tightening.** The Fed shrinking its balance sheet by letting
+bonds mature without replacing them, draining reserves from the system. The
+opposite, **QE**, is buying to add them. QT tightens alongside rate policy and is
+slower and less visible — a second lever running in the background.
+
+**Hawkish and dovish.** Hawkish leans toward fighting inflation: higher for longer.
+Dovish leans toward supporting employment: cut sooner. A "hawkish cut" is a cut
+delivered with language that says do not expect another.
+
+#### The dollar and yields
+
+**DXY — the dollar index.** The dollar against six currencies, weighted roughly
+**58% euro**, then yen, pound, Canadian dollar, krona, franc. Not a trade-weighted
+measure of the dollar against the world — substantially a EUR/USD proxy.
+
+**The 10-year Treasury yield.** The benchmark long rate. Rises when growth or
+inflation expectations rise, or when the Fed is expected to stay tight.
+
+**The 2-year Treasury yield.** Much more sensitive to near-term Fed expectations,
+so it moves hardest on a payrolls or CPI surprise. **The 2s10s spread** — 10-year
+minus 2-year — inverts when short rates exceed long ones, which historically has
+preceded recessions.
+
+**The 5y5y forward breakeven.** Expected inflation for the five years starting
+five years from now. Strips out near-term energy noise, so it is the cleanest read
+on whether long-run expectations are anchored.
+
+#### Where to look them up
+
+The rates series live on FRED, the St Louis Fed's free database, under short codes
+worth knowing because they are what a chart or an article will cite:
+
+| Code | Series |
+|---|---|
+| \`DGS10\` | 10-year nominal Treasury yield |
+| \`DFII10\` | 10-year TIPS yield — **the real yield** |
+| \`T10YIE\` | 10-year breakeven inflation |
+| \`T5YIFR\` | 5y5y forward breakeven |
+| \`DGS2\` | 2-year Treasury yield |
+| \`T10Y2Y\` | the 2s10s spread |
+| \`FEDFUNDS\` | effective federal funds rate |
+
+CPI and payrolls come from the BLS, PCE and GDP from the BEA, GDPNow from the
+Atlanta Fed, rate probabilities from CME FedWatch.`,
 
   "4": `## 4 · The setups
 
 Two, and **the difference between them is not where they are taken.** That is the
-consequence; the difference is which way each one trades relative to the level.
+consequence; the difference is which way each one trades relative to the level —
+and, following from that, which way it trades relative to the trend.
 
 **Break & Retest is a continuation trade.** A level has already broken, and the
 break is the premise. Price extends away, comes back, and the level it broke is
 now the other thing — resistance that has become support, or support that has
 become resistance. The entry is on that retest and it goes THROUGH the level, in
-the direction of the break.
+the direction of the break. **It runs with the trend.**
 
 **Support & Resistance is a mean-reversion trade.** Nothing has broken. The level
 is intact, price arrives at it and refuses, and the entry goes AWAY from the
-level, back into the range it came from.
+level, back into the range it came from. **It aims at the reversal**, and being
+counter-trend is the point rather than a problem — a trend is not a trend forever,
+and this is the setup that trades the end of one.
 
-So one trades a level that has failed, and the other trades a level that is
-holding. Interior levels and quarters are where levels break and flip as price
-works through a range, and the extremes are the boundaries that turn it back —
-which is why R-05 and R-06 read as rules about location. **They are rules about
-method, and location is how the method is recognised.**
+So the bias from step 1 does not gate the S&R entry. It tells him which side of
+the range he is fading and what he would be reversing. What keeps the reversal
+trade honest is not the bias but the conditions: **an important level — a previous
+high or low, not merely a place on the grid — plus rejection visible in the candle
+and in the price action.** Those are R-06 and R-07 doing the work.
 
 That distinction decides what a per-setup statistic means. A win rate split by
-\`setup\` is a comparison of continuation against mean-reversion, not of one part
-of the chart against another.
+\`setup\` is a comparison of continuation against mean-reversion, not of one part of
+the chart against another.
+
+### The timeframes
+
+Six charts with three jobs, and the hourly does two of them.
+
+| Job | Charts |
+|---|---|
+| **Bias** — step 1, and what R-09's *obvious trend* is read from | daily, 4H, 1H |
+| **Levels** — where the map is marked | 1H, 30m |
+| **Entry** — the signal, the confirmation, the fill | 15m, 5m |
+
+The 1H is the hinge: last of the bias charts and first of the level charts, which
+is where a top-down read meets the map.
+
+### How a level gets marked
+
+Two sources, and both are on the 1H and 30m.
+
+**The quarter grid** — the $25 increments. 4500, 4525, 4550, 4575, 4600. **00 and
+50 are the psychological levels**, 25 and 75 the quarters between them: one grid at
+two strengths, fixed and known before price arrives.
+
+**Reaction points** — where price has actually turned. Previous highs and lows,
+marked because something happened there rather than because of where they sit.
+
+**A level is stronger where the two agree.** A previous high sitting on a quarter is
+better than either alone. That confluence is the closest thing the document has to
+a statement about level *quality* as opposed to level *position*.
+
+Which structure is live is maintained in TradingView and deliberately not mirrored
+here. A map kept in two places disagrees with itself, and a stale boundary produces
+false violations that teach him to ignore real ones (§10).
+
+### The sessions have characters, and that is a read rather than a rule
+
+**There is no session rule** (§6) — the setup decides. But the sessions are not
+interchangeable, and he reads them differently:
+
+- **New York open is violent.** Sweeps that fail, levels taken and reclaimed, moves
+  that look like breaks and are not. A touch there is more likely to be noise than
+  signal.
+- **Asia is calmer and steadier.** A level holding in Asia is more likely to mean
+  what it looks like it means.
+
+**This matters most for §4.2's wick-versus-close read.** Telling a sweep from a
+genuine failure is harder in a violent session, which is the same judgment being
+made against a worse signal-to-noise ratio.
+
+**Asian and London appear thinly in his data because of when he sleeps, not
+because he avoids them.** He usually trades the Asian open until around 1–2 a.m.
+his time and is back for New York; London runs while he is asleep. If travel puts
+him at the screen for it, he trades it. **Never read a thin bucket as a
+preference** — it is availability, and inferring a rule from it is the failure §5
+guards against with the sizing rung.
+
+**The Asian session straddles the calendar date.** It opens the previous evening,
+so the Asian session he trades on a Tuesday morning opened Monday. A Tuesday
+release has nothing to do with it. R-12 counts entries per \`open_day\` — the
+broker's day, rolling at 17:00 New York — so a 1 a.m. Asian trade and a 10 a.m.
+New York trade on the same date are **two entries on one day**, which he has
+confirmed is how he counts it too.
 
 ### 4.1 · Break & Retest
 
-Journal value: \`Break & Retest\`. Taken at interior levels and quarters, never at
-an extreme (R-05).
+Journal value: \`Break & Retest\`. Taken at interior levels, never at an extreme
+(R-05). **An interior level is any level inside the range**, marked either by the
+quarter grid or by a previous price reaction — the grid is one of the two sources,
+not the definition.
 
-**The premise is the break, and the trade is the retest.** Entering on the
-breakout itself is a different trade and not this one: the retest is what
-separates a level that has genuinely flipped from a push that is about to fail
-back. It is also what makes the stop tight, since the level being retested is
-close by — and a tighter stop for the same target is where this setup's
-reward-to-risk comes from.
+**The premise is the break, and the trade is the retest.** Entering on the breakout
+itself is a different trade and not this one: the retest is what separates a level
+that has genuinely flipped from a push that is about to fail back. It is also what
+makes the stop tight, since the level being retested is close by — and a tighter
+stop under the same target is where this setup's reward-to-risk comes from.
 
 **Confirmation is required at the retest, not at the break.** A signal is price
 reaching the flipped level and rejecting it; confirmation is a close in the
 intended direction, or the reaction resolving clearly enough to enter before one
 (§6, R-07).
 
-**Invalidation is price closing back on the original side of the level.** That is
-the break having been false, and it is a different event from the stop being hit:
-the idea is wrong at that close whether or not price has travelled far enough to
-take the stop out.
-
-The stop sits beyond the retest extreme, within the $20 cap. Everything else —
-target, break-even at +$20, one position — is §5 and §6 and is not restated here.
+**Where the idea is wrong is price back on the original side of the level**, and
+that read is a stop-placement input rather than an exit rule — it is what §6's
+*Before the trade* turns into the stop. Gold moves far enough that a poke through
+is not by itself the break having failed; what the read produces is a price, not a
+decision to close.
 
 **How it loses:** the break was liquidity rather than intent, so the retest keeps
 going and closes back through. Read as continuation, it is the only failure this
@@ -197,336 +929,567 @@ setup has.
 
 Journal value: \`Support & Resistance\`. Taken at the outer extremes of the range
 only, never at an interior level (R-06). The extremes are few and thick, which is
-what makes them worth fading and what makes an entry there rarer than an interior
-one.
+what makes them worth fading and what makes an entry there rarer.
 
 **The premise is that the level holds.** Price arrives, refuses, and the trade is
-the refusal — a signal is that rejection, and confirmation is the close or the
-read (§6, R-07).
+the refusal — a signal is that rejection, and confirmation is the close or the read
+(§6, R-07).
 
-**INVALIDATION IS A CLOSE BEYOND THE LEVEL, NEVER A WICK THROUGH IT**, and this
-is the single most important line in either subsection. A wick that pierces the
-extreme and closes back inside is a liquidity sweep: the stops resting beyond the
-level were taken and price refused anyway, which is the level holding rather than
-failing.
+**A WICK THROUGH THE LEVEL IS NOT THE LEVEL FAILING**, and this is the single most
+important line in either subsection. A wick that pierces the extreme and closes
+back inside is a liquidity sweep: the stops resting beyond the level were taken and
+price refused anyway, which is the level holding rather than failing.
 
-That is why §6 allows re-entry after a sweep takes the stop and price comes
-rapidly back. It is not an exception to the rules and not a revenge trade — the
-idea was never invalidated, the stop was simply inside the sweep. The trade being
-stopped out and the idea being wrong are two different events at an extreme, and
-only the second one ends it.
+That is why §6 allows re-entry after a sweep takes the stop and price comes rapidly
+back. It is not an exception to the rules and not a revenge trade — the idea was
+never invalidated, the stop was simply inside the sweep. The trade being stopped
+out and the idea being wrong are two different events at an extreme, and only the
+second one ends it.
 
-**How it loses:** the range is over. A level that had turned price back stops
-doing so, and a fade taken into a break is the failure this setup has — the
-mirror of §4.1's, and the reason R-09 restricts both to obvious trends and
-cycles.`,
+**How it loses:** the range is over. A level that had turned price back stops doing
+so, and a fade taken into a break is the failure this setup has — the mirror of
+§4.1's, and the reason R-09 restricts both to obvious trends and cycles.`,
 
   "5": `## 5 · Risk
 
-### Risk per trade is 4% of account, and that is deliberate
+### The stop is a ceiling of $20, set at entry from the chart
 
-The stop is never beyond $20 of price distance from entry, and size comes from
-the ladder — 0.02 lots per $1,000, continuous. Those two facts fix the third:
+Not a value. **$20 is the most it may ever be**, and where it goes is read off
+price action at entry — the level beyond which the idea is wrong, as close as that
+can honestly be put. A $10 stop and a $20 stop are both compliant; a $22 stop is
+not. It is measured from the fill price on the chart, with no allowance for spread
+(§0).
 
-    0.02 lots = 2 oz    account $1,000    $20 stop = $40    = 4.0%
-    0.10 lots = 10 oz   account $5,000    $20 stop = $200   = 4.0%
+**Placed at entry and never moved tighter, with one exception.** The only movements
+a stop makes are to break-even at +$20 (R-04) and R-19's handling of a print landing
+on a position inherited from an earlier session.
 
-The ladder is linear, so the share is the same at every rung. **He set it knowing
-that**, which is why it is written here as a number rather than left to fall out
-of two others — a figure nobody has stated is a figure nobody can be held to, and
-this one is the single most consequential quantity in the document.
+**R-02 survives both**, which is why the exception costs nothing. A stop that only
+ever moves to break-even *or tighter* still cannot produce a loss beyond $20 without
+having been widened — the direction R-02 depends on is untouched.
 
-What 4% means in the shape of a month, so it is not abstract: **two and a half
-full stops erase a +10% month**, and **1.7 winners at $30 make one**. The target
-in §0 and the risk here are the same decision seen from two ends.
+### Risk per trade is at most 4% of account
 
-Deriving it rather than storing it is deliberate too. \`size_oz\` is on the row, so
-the account tier and therefore the dollar risk of any past trade are recoverable
-from the trade itself, and a second column stating the percentage could disagree
-with the ladder that produced it.
+The ladder is 0.02 lots per $1,000, continuous, so at the full $20 stop:
 
-### The day ends at 4%, which is one full stop
+    0.02 lots = 2 oz    account $1,000    $20 stop = $40   = 4.0%
+    0.10 lots = 10 oz   account $5,000    $20 stop = $200  = 4.0%
 
-The daily limit and the per-trade risk are the same number seen twice. 4% of
-account is what a full stop costs, so R-03 ending the day after a full stop and a
-4% daily cap are one rule, not two — which is why there is no second limit
-written beside it.
+Linear, so the share is the same at every rung. **4% is the ceiling rather than the
+figure** — a $12 stop at the same rung risks 2.4%.
 
-It does mean losses that are not full stops still count toward it. Three exits
-cut by hand at a third of a stop each have spent the day exactly as one full stop
-would, and R-03's predicate does not see that, because the row it looks for is a
-loss closing at the stop. The limit is the 4%; the full stop is the usual
-shape of reaching it.
+In the shape of a month: **two and a half maximum stops erase a +10% month**, and
+**1.7 winners at $30 make one**.
+
+Deriving it rather than storing it is deliberate. \`size_oz\` is on the row, so the
+account tier and the dollar risk of any past trade are recoverable from the trade
+itself, and a stored percentage could disagree with the ladder that produced it.
+
+### At most one entry a day, and this is the strictest rule here
+
+**One trade per day. Two only when the second is a sweep re-entry** (§6). A third is
+a violation on the face of the data — R-12 is a count.
+
+It is aimed directly at what §9 says goes wrong. The failure is impatience at a
+level, and a hard cap of one is the structural answer: a trade taken impatiently at
+nine in the morning costs the whole day rather than being followed by another.
+
+**What he is working toward is fewer — two or three trades a week.** An aim, NOT a
+rule, recorded the way this section records the sizing pattern. Report the weekly
+count as a plain number when asked, never as a verdict.
+
+It has a consequence for everything statistical here. At that frequency no rate
+means anything for a long time. **The value of the journal is the per-trade record,
+not the statistics.**
+
+### The day also ends at 4%, and a full stop is the usual way of reaching it
+
+**Two rules, not one seen twice.** A full stop on a $12 stop costs 2.4%, so R-03
+and R-11 can disagree in both directions: a tight stop taken in full ends the day
+under R-03 having spent well under the limit, and several hand-cut exits can spend
+the limit without R-03 firing.
+
+**R-11 is the limit. R-03 is the usual shape of hitting it.** In practice R-12's
+one-entry cap reaches first on most days.
 
 ### Nothing else caps a loss, and that is deliberate
 
 **No weekly maximum. No monthly maximum.** The day is the only window with a
-limit, and a run of bad days is not stopped by anything written here.
+number attached. What stops a bad run is R-17, and it is not a number.
+
+### When he stops trading altogether
+
+**R-17, and the trigger is behavioural rather than financial.** When the trading
+itself has gone wrong — rules being broken, losses running, chasing the move to
+get back to flat — he stops for a stretch, and he has done this. **Even at a 5%
+loss.** The size of the drawdown is not what tells him; the way he is trading is.
+
+**This is the only rule in the document that watches how he is trading rather than
+a price, a distance or a percentage.** Everything else is arithmetic. This one
+cannot be, because what it watches is not on a row.
+
+**Why a number would be worse.** A 5% loss traded calmly is not a problem. A 5%
+loss with the frequency climbing is, because the mechanism producing it is still
+running and getting stronger with each loss. A threshold fires on the wrong
+variable.
+
+**Roughly a week, and the week is a description rather than a rule.** What actually
+ends the break is the state, which he named precisely: **back to chasing setups and
+the plan, not results.** A stated seven days would have him breaking a rule by
+returning on day five when he was ready, or holding out on day nine when he was
+not.
+
+**That phrase is the whole of §9 in six words.** Entering on the touch is chasing
+the result instead of the setup. Revenge trading is the same thing under pressure.
+The break ends when the orientation flips back.
+
+**R-12 is the earliest guard against the stretch that triggers this**, since
+chasing requires repetition and one entry a day removes it.
 
 ### One position, always
 
-One trade at a time. He does not scale in, does not add, and does not hold two
-positions at once — so the $20 stop is the whole exposure rather than a per-leg
-figure, and 4% is the most that can be at risk at any moment.
+One trade at a time. No scaling in, no adding, no second position — so the stop is
+the whole exposure and 4% is the most at risk at any moment. R-10, and two rows
+whose entry-to-fill spans overlap are a violation on the face of the data.
 
 ### Nothing changes size but the ladder
 
-No setup is sized up, no session is sized down. The rung is the only input, and
-it moves only as above.
+No setup is sized up, no session is sized down, **no time of day changes anything.**
+The rung is the only input.
+
+### The rung moves between months, never inside one
+
+**R-13, from experience rather than theory:** he moved size mid-month once, it
+disrupted the flow, and the rule exists because of that.
+
+It also removes a bookkeeping problem. The monthly target is a percentage of the
+account, the account is read from \`size_oz × 500\`, and a month with two sizes has
+two answers to *did I hit 10%*. Pinned to month boundaries there is one size per
+month and the ambiguity disappears rather than being resolved by convention.
+
+Checkable: more than one distinct \`size_oz\` inside a calendar month is a broken
+rule visible in the data.
 
 ### Moving up a rung is discretionary, and it is a deposit rather than a threshold
 
-**He changes it by hand, when he feels like it.** That is the rule, and it is
-stated first because it is the part that decides what can be checked: there is no
-trigger a program could evaluate, so nothing here is ever a violation and no run
-of trades at one size means anything on its own.
+**He changes it by hand, when he feels like it** — at a month boundary, per R-13.
+No trigger a program could evaluate, so the timing is never a violation.
 
-What he described alongside it is the pattern, not a condition: **holding the 10%
-for a couple of months at the current size**, then depositing and moving to the
-next level. The rung follows the money in, and the money in follows the months.
-It is what he does, which is different from what he must do, and reading it as a
-rule would produce findings about a decision he never bound himself to.
+The pattern, not a condition: **holding the 10% for a couple of months at the
+current size**, then depositing and moving to the next level. The rung follows the
+money in, and the money in follows the months.
 
-So the ladder does not track the balance. It is not re-read per trade and it does
-not step the moment an account crosses a number — which is why §8 computes the
-month against the size actually traded rather than against a balance delta, and
-why that section says this account is funded in steps. These are those steps.
+So the ladder does not track the balance and does not step when an account crosses
+a number — which is why §8 computes the month against the size actually traded.
 
-Two things follow. A good month does not by itself move the rung, so a size that
-has not changed is not evidence of anything having gone wrong. And because the
-increase is funded rather than compounded, the 4% above survives the change: the
-new rung is 4% of the new account, not a larger share of the old one.
+Because the increase is funded rather than compounded, the 4% survives the change:
+the new rung is 4% of the new account, not a larger share of the old one.
 
-**Coming back down is not stated.** The rule is written for the upward direction
-only, and nothing here says what happens to the rung after a bad stretch —
-whether it is reduced, and on what. That gap is the half of a sizing rule that
-matters when it matters most.`,
+### Coming down a rung
+
+**When the implied account has halved, he drops to the previous rung** — at the
+next month boundary, like every other move.
+
+Not arbitrary and not really a drawdown threshold. The rungs are 0.02 lots per
+$1,000, so **the rung below sits at half the account**: halving is where the current
+size stops fitting the capital behind it. Better read as *keep the maximum stop at
+4% of what is actually there*.
+
+**Measured against the implied account, not the broker balance.** \`size_oz × 500\`
+is the base the ladder was applied to and includes what is held off-broker. Using
+the balance would delay the step while reserve capital sat unused.
+
+His reason is the psychological half of the same arithmetic: he does not want each
+trade's risk large relative to the account. Holding a rung through a halved account
+turns a 4% stop into an 8% one, and those are the same trade at different sizes —
+the second much harder to take properly.
+
+**The downward step is not funded.** The account shrank by what was lost, not to the
+lower rung's level, so trading the lower rung risks *less* than 4%. That is the
+brake working.
+
+Unlike the upward move it leaves a trace: a size the implied account no longer
+supports is visible. Not a violation — the move is by hand and there is a lag — but
+a question the data can raise.
+
+### Known low-volume days
+
+**R-16: no trading on US market and bank holidays, or through the Christmas-to-New-
+Year stretch.** Calendar-known rather than judged at the screen, so it is decidable
+the day before — and checkable, since a holiday is a known date.
+
+**It is the same reasoning as R-14.** Both setups depend on levels meaning
+something: a break that is real, a rejection that is real. Thin holiday liquidity
+and the minutes after a release both break that assumption, so the same response
+follows — stand aside rather than adapt.
+
+### The monthly target stops nothing
+
++10% of account a month is the yardstick §8's monthly figure is measured against.
+**Reaching it does not end the month.** He keeps trading, same rules, and no trade
+can violate anything by being taken after the target was met.`,
 
   "6": `## 6 · Lifecycle
 
 ### Before the trade
 
 R-08 requires a pre-trade sequence run in order, with a failed step ending it
-rather than being weighed against the others. **The same five steps for both
+rather than being weighed against the others. **The same four steps for both
 setups:**
 
-1. **Top-down bias**
-2. **Liquidity pools and support/resistance**
-3. **Psychological levels**
-4. **Candle or chart pattern** — signal first, then confirmation
-5. **Reward-to-risk of at least 1:1.5**
+1. **Top-down bias** — daily, 4H, 1H
+2. **Levels** — liquidity pools, support and resistance, and the grid: 00 and 50
+   psychological, 25 and 75 quarters, plus the reaction points where price has
+   actually turned. Marked on the 1H and 30m (§4)
+3. **Candle or chart pattern** — signal first, then confirmation. Read on the 15m
+   and 5m
+4. **Reward-to-risk of at least 1:1.5**
 
-The order is the rule. A failed step ends the sequence rather than being traded
-off against a later one, so a setup that fails step 1 is not rescued by a clean
-step 4 — which is what separates this from a checklist where enough ticks carry
-a trade.
+The order is the rule. A failed step ends the sequence rather than being traded off
+against a later one, so a setup that fails step 1 is not rescued by a clean step 3.
 
-Steps 1 to 4 are read, and nothing stored can see them. **Step 5 is arithmetic,
-and it is arithmetic on two prices nothing records** — the stop goes wherever
-price action puts it inside the $20 cap, and the row afterwards carries only
-where the trade actually ended:
+**Every step gates.** Psychological levels were a separate step through v1.8 and
+were folded into step 2 at v1.9, because they added no test of their own — and a
+step that can never be the step you stopped at breaks the one claim R-08 makes.
 
-    (planned target − entry_price) / (entry_price − planned stop)  >=  1.5
+### Before the sequence runs at all — the two standing-aside rules
 
-What §5 settles is when the step can fail at all. The standard $30 target over
-the $20 cap is exactly 1:1.5, so an entry taking that target passes step 5
-wherever the stop sits inside the cap, and a stop outside it fails R-02 first.
-The one case step 5 refuses on its own is a $25 target set AT ENTRY, which needs
-a stop inside about $16.70 — and nothing on the row says which target was set.
-So it is asked rather than computed.
+**R-14, the news rule, in three parts:**
 
-Step 4 is where §6's signal and confirmation sit: the rejection is the signal,
-the close or the read is the confirmation, and R-07 is that step failing.
+- **Before.** No entries in the hours ahead of a high-impact release. **The window
+  is open-ended rather than a fixed clock** — for a 10 a.m. print he may not trade
+  from the New York open onward. A stated "two hours" would be a number invented
+  for him, and he would breach it constantly without having broken anything.
+- **At the print.** Stand aside through the immediate volatility.
+- **After.** Entries resume once the move has settled and **the news has confirmed
+  something** — the release read as a condition on whether price is behaving
+  readably, not as a forecast (§2).
 
-R-09 restricts him to obvious trends and cycles, and what makes a trend obvious
-is read from **price action**. That is a judgment rather than a condition, which
-is why R-09 is marked \`judgment\` and asks him rather than checking anything.
+**It is local to the release, not to the calendar day.** A Tuesday 10 a.m. print
+does not touch the Asian session he traded that morning, which opened Monday
+evening (§4).
+
+**And at one entry a day, standing aside from the New York open usually costs the
+day rather than a slot** — consistent with R-12 rather than an extra constraint on
+top of it.
+
+**R-16, low-volume days** (§5), is the same reasoning on a calendar rather than a
+clock.
+
+### Where the stop comes from, and why it is the same read as the target
+
+Step 2 produces the level. **The read of where the idea would be wrong produces the
+stop** — the price beyond which the premise has failed, as close as that can
+honestly be placed, and never further than $20 (§5). A stop-placement input, not an
+exit rule: nothing closes a position for reaching an invalidation the stop was not
+at.
+
+Step 4 is arithmetic over what steps 2 and 3 produced:
+
+    (target distance) / (stop distance)  >=  1.5
+
+**On the default path it is satisfied by construction.** A $30 target over a stop of
+$20 or tighter is always at least 1:1.5, so step 4 refuses nothing and needs no
+checking. It binds in exactly one place, below.
+
+**Nothing stored can see any of the four steps**, including step 4 — the plan is not
+on the row (§8). Arithmetic he runs, not arithmetic anything verifies.
+
+### The $25 target is two different things
+
+Both permitted, not the same decision. **$30 is the target; $25 is the exception.**
+
+**As an entry choice.** The level looks hard to reach before he is in, so $25 is set
+from the start. **This is the one place step 4 binds:** $25 over a $20 stop is
+1:1.25 and fails the sequence, so a $25 entry target requires a stop of $16.67 or
+tighter. The only pairing that can enter in breach of his own rule, and no row will
+ever show it.
+
+**As a management decision.** A $30 target is on and structure shows it is genuinely
+hard to reach — multiple recent highs in the way, or the level turning. Pulling it
+to $25 is permitted; step 4 already passed at entry.
+
+**So a realised 1:1.25 is legitimate as an outcome and illegitimate as a plan**, and
+no row can tell which produced it.
 
 ### Entry
 
 A signal is price reaching a level and rejecting, and it is not an entry.
-Confirmation is required and is either a candle closing in the intended
-direction, or the reaction around the level resolving clearly enough to enter
-before a close. Entering on the signal with neither is the violation R-07 names.
+Confirmation is required and is either a candle closing in the intended direction,
+or the reaction around the level resolving clearly enough to enter before a close.
+Entering on the signal with neither is the violation R-07 names, and §9 is why it
+has its own section.
 
-**Entry is at market.** There is no resting limit back into the level, so the
-fill is where price was when he decided rather than a price he chose in advance —
-which is part of why slippage is treated as his in §0 rather than allowed for.
+**Entry is at market.** No resting limit back into the level, so the fill is where
+price was when he decided.
+
+### Session is not a step
+
+**There is no session rule.** The setup decides and the clock does not. Time of day
+is not one of the four steps and never disqualifies a trade.
+
+But the sessions are not interchangeable, and §4 records what they mean to him —
+New York violent, Asia calmer — as an input to the read rather than a gate.
+
+Recorded as his own description of himself, dated v1.9 and explicitly **not a rule
+and not a finding**: he is more careful around the New York open. §9 now gives the
+reason, so it is one coherent thing rather than two facts.
 
 ### While it is on
 
-The stop moves to break-even once price has travelled $20 toward the target. The
-target may be shortened from $30 to $25 where the level looks hard to reach or is
-showing reversal. Beyond those two, nothing is done to a position: no partial
-exits, no adding, no widening.
+Stop moves to break-even once price has travelled $20 toward the target. Target may
+be shortened to $25 as above. Beyond those two, nothing: no partial exits, no
+adding, no widening, and **no tightening**.
 
-**Re-entry after a stop-out is allowed, in one shape.** Where a liquidity sweep
-takes the stop and price comes rapidly back to the level he was trading, he may
-enter again. It is the same idea, not a new one, and it is the only case in which
-a level that has already stopped him out is tradeable again the same session.
+**One forced exception, and it is time-based: R-15, the Friday close** — below.
+
+**And one narrow one, R-19, for a print landing on a position he is already in.**
+
+### R-18 — the orders do the exiting
+
+**Stop and target are placed as resting broker orders, always, and a position is
+never closed by hand.** A rule in its own right, separate from where the orders sit:
+R-01 and R-02 say what price they are at, and this says that they — rather than he —
+are what ends the trade.
+
+**It makes the other two predicates exact rather than suggestive.** With a resting
+order, a loss closing beyond $20 is an order that was edited; there is nothing else
+that could produce it. And a win under $25 is not a judgment call made at the screen
+— it is the order not having been where the rule says it was, or the position having
+been closed by hand, which is itself the violation.
+
+**Two things are not manual closes and must not be flagged as such.** Moving the
+stop to break-even (R-04) is an order edit, and so is R-19's tightening. **R-15's
+Friday close-out is a genuine manual close and is the one permitted case** — forced
+by rule, not chosen.
+
+### R-19 — a print landing on a trade he is already in
+
+**This is the leftover case, not a routine.** R-14 keeps him out ahead of a release
+and R-12 caps him at one entry, so holding into a print is rare. The path that
+produces it is specific: **a trade opened in the Asian session and still running
+through London into New York**, where the print lands. He should not have positions
+open through a print; sometimes a multi-session hold collides with the calendar.
+
+**Why the stop has to move.** A $20 stop assumes price trades through it. A
+high-impact print can gap straight past, so ahead of one the real exposure is $20
+plus whatever the gap adds. Tightening reduces the exposure that is actually there
+— it is not a change of mind about the trade.
+
+- **In profit** — stop to break-even, **regardless of R-04's +$20 threshold**
+- **Losing** — tighten to a closer invalidation the chart gives; pull the stop in
+  only if there is none. Chart first, arbitrary as fallback, the same order as the
+  entry stop (§6, *Where the stop comes from*)
+- **The target never moves.** A print is not a reason to shorten to $25
+- **Never wider**, ever
+
+**Read narrowly or it becomes a door.** Written as a general tool it makes "there is
+news later" a reason to touch any position — the same shape as the sweep exception
+in R-03, which §7 already flags as pushable. It applies to a position inherited from
+an earlier session and to nothing else.
+
+### Re-entry after a sweep, and it is bounded twice
+
+Where a liquidity sweep takes the stop and price comes rapidly back, he may enter
+again. **Same level, same direction, and it has to be a true sweep** — the same
+trade re-entered because the idea was never invalidated, not another go at a loss.
+
+**Rapidly back means a couple of 5-minute candles, three at most** — about fifteen
+minutes from the sweep to the return. Past that it is not a sweep re-entry; it is a
+new idea.
+
+**Once.** One re-entry and the day is over regardless, which is R-12's second entry
+and the whole of the exception to R-03. Without the cap the reasoning is reusable,
+and a violent session would swallow the day one "sweep" at a time.
+
+**The fifteen minutes is checkable and the rest is not.** \`entry_time\` on the second
+trade against \`fill_time\` on the first gives the gap directly, so a late re-entry is
+a real \`fail\`. Inside the window, a genuine sweep re-entry and a fast revenge trade
+are identical rows. One-sided, like R-02 and R-03.
 
 ### Exit
 
-**Price-based, never time-based.** A trade ends at its target, at its stop, or at
-break-even once R-04 has moved the stop there. Nothing closes a position for
-having taken too long, and a trade going nowhere is left alone rather than cut —
-§0's *held for the move they were opened for* is what that phrase has always
-meant.
+**Price-based, with one time-based exception.** A trade ends at its target, at its
+stop, at break-even once R-04 has moved the stop there — or at the Friday close.
+Nothing else closes a position for taking too long; a trade going nowhere on a
+Tuesday is left alone.
+
+### R-15 — nothing is held over the weekend
+
+**A rule, and his reason is the right one:** weekend news makes the Monday open
+unpredictable and price can gap straight over the stop. A stop only holds if price
+has to trade through it, and across a weekend it does not.
+
+**Two parts, and they fail differently.**
+
+- **No position open across the Friday 17:00 New York close.** Checkable on the face
+  of the data, and a violation is unambiguous.
+- **A live trade is closed at market before it.** Target or not — so the exit is
+  neither target, stop, nor break-even.
+
+**He leaves it open right up to the close.** Not a Friday policy of flattening
+early: the trade gets every minute it can have, and the close-out is a last resort.
+
+**Which is what makes the R-01 exception narrow enough to be worth having.** A
+Friday close-out at +$12 is a win under $25, and R-01 would flag it as a
+discretionary exit every single time. Because the close-out sits at or very near
+17:00 New York, the exception can be tight: **a win under $25 filling at the Friday
+close is \`unknown\`; one filling at 2 p.m. Friday is still a flag.**
+
+**And weekday swap still applies.** §8's reasoning about \`net_pnl\` over
+\`computed_pnl\` survives — positions still cross the 17:00 rollover midweek, and
+Wednesday's triple swap is the expensive one. Only the weekend is off the table.
 
 ### Recording
 
-**He journals at entry**, and the entry is the setup and the three discipline
-answers. The plan itself is not written down and is not meant to be: §5 fixes
-it — target $30, stop inside $20 — so the only per-trade freedom is where inside
-the cap the stop went, which he sets off price action and does not record.
+**He journals at entry**, while the trade is fresh and before the outcome exists to
+colour the answer. The three discipline answers ask whether the stop and target were
+*respected*, not whether they were moved. \`null\` is unanswered and is not "no".
 
-That is a decision about what the journal is for rather than an omission, and it
-costs exactly what §8 says it costs. Do not ask him to record prices he has
-decided not to record; ask the question the price would have answered.
-
-The three discipline answers ask whether the stop and target were *respected*,
-not whether they were moved. \`null\` is unanswered and is not "no".`,
+The plan itself is not recorded. \`planned_stop\` and \`planned_target\` were tried and
+retired at v1.8 — he journals a trade, not a plan — and §8 lists what that costs.`,
 
   "7": `## 7 · The rules, enumerated
 
-Every rule the sections above impose, in one table a program can hold you to.
-The prose is not repeated here — the Rule column is a handle, and §-references
-point at the reasoning.
+Every rule the sections above impose, in one table a program can hold him to. The
+prose is not repeated here — the Rule column is a handle, and §-references point at
+the reasoning. The table itself is in the always-loaded half.
 
 **Evaluable** is the load-bearing column:
 
 - \`journal\` — computable from a row today. A predicate is given and it is not
   optional.
 - \`field\` — would be computable if a column existed. The column is named.
-- \`judgment\` — cannot be checked from stored data at all, permanently or until
-  §10's blockers clear. A probe is given instead: the question Eugenia asks
-  rather than the check she runs.
+- \`judgment\` — cannot be checked from stored data at all. A probe is given instead.
 
 A \`judgment\` rule is not a weaker rule. It is a rule whose compliance the system
 cannot see, and labelling it is what stops it quietly counting as passing.
 
-**Marker** is the rollup. \`followed_rules\`, \`followed_sl\` and \`followed_tp\` are
-one boolean each, covering every rule mapped to them — so a self-report of
-\`true\` is a claim about all of them at once, and a \`journal\` rule reading false
-underneath one is a discrepancy worth raising.
-
-| ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
-|---|---|---|---|---|---|---|---|
-| R-01 | Take profit set $30 from entry price, or $25 where the level looks hard to reach or is turning | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\` | §5 | v1.0 |
-| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day | day | \`followed_rules\` | field | needs a full-stop answer recorded at journalling time to identify the population — see the note | §5 | v1.0 |
-| R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
-| R-05 | Break & Retest at interior levels and quarters only, never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
-| R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
-| R-07 | A rejection alone is not an entry — confirmation required, by close or by read | trade | \`followed_rules\` | judgment | *"Close, read, or neither?"* | §6 | v1.0 |
-| R-08 | Pre-trade sequence run in order; a failed step ends it rather than being weighed | trade | \`followed_rules\` | judgment | *"Which step did you stop at, if any?"* | §6 | v1.0 |
-| R-09 | Only operate in obvious trends and cycles | trade | \`followed_rules\` | judgment | *"Was the trend obvious, or were you reading into it?"* | §6 | v1.0 |
+**Marker** is the rollup. \`followed_rules\`, \`followed_sl\` and \`followed_tp\` are one
+boolean each, covering every rule mapped to them.
 
 ### Notes on individual rules
 
-**THERE ARE TWO REWARD-TO-RISK NUMBERS AND THEY ARE AT DIFFERENT MOMENTS.** The
-document carried them as one and they contradicted each other.
+**R-18 is what makes R-01 and R-02 mean what they say.** With resting orders, a loss
+beyond $20 is an edited order rather than a decision at the screen, and a win under
+$25 is the order not having been where the rule puts it. Judgment rather than
+journal because nothing on the row says whether an exit was an order filling or a
+hand-close — the prices look the same either way.
 
-**At entry it is 1:1.5, and it is a condition.** Step 5 of §6's sequence refuses
-the trade below it, so with the stop at its $20 cap the target has to be $30. A
-$25 target set AT ENTRY would be 1:1.25 and fails step 5 — it is only reachable
-with a stop tighter than about $16.70.
+**R-19 is judgment and must stay narrow.** Nothing records that a print was pending,
+and the rule is written for one path: a position inherited from an earlier session
+when a release lands. Read generally it turns "there is news later" into a reason to
+touch any position, which is the same door §7 already flags on R-03's sweep
+exception.
 
-**After entry the realised floor is 1:1.25**, because the target may be shortened
-from $30 to $25 once the trade is on. That is a management decision under §6, not
-an entry that skipped step 5, and it is the whole reason the two numbers differ.
+**R-01's lower bound is the half that catches anything.** The target may be $25, so
+a win at $25 is the rule working. A win BELOW $25 is a position closed before any
+target he is allowed to set.
 
-So R-01 and R-02 bound what may be SET, and step 5 bounds what may be ENTERED.
-The floor is not a third rule restating an identity — it is a condition on the
-plan, and the plan is nowhere on the row. §8 says what that costs.
+**Its Friday exception is narrow on purpose.** R-15 forces a close at the Friday
+close regardless of where price is, so those wins are under $25 by rule rather than
+by discretion. Because the close-out sits at or near 17:00 New York, only a win
+filling *at the Friday close* is exempted — a Friday 2 p.m. close-out is still a
+flag. Exempting all of Friday would have been the lazy version and would have
+blinded the rule for a fifth of the week.
 
-**R-01 IS TWO-SIDED, AND THE LOWER BOUND IS THE HALF THAT CATCHES ANYTHING.**
-The target may be shortened to $25 when the level looks hard to reach or is
-turning, so a win at $25 is the rule working. A win BELOW $25 is a position
-closed before any target he is allowed to set, which is the discretionary exit
-the predicate exists to find — and it is the common failure, where an overshoot
-is not.
+**R-01 IS NOT R-02'S MIRROR.** On a loss, further from entry is always worse. On a
+WIN it can be better: a take profit at $30 fills at $30 or through it, so a gap
+fills at $30.60 with nothing having moved. An R-01 flag on an overshoot is a
+question, not a finding.
 
-Two targets are intended, $30 and $25. A win landing between them was neither,
-so it is worth a question even though the predicate lets it pass; the floor is
-what is checked because it is the only part that is unambiguous.
+Break-evens are not caught by this and must not be: an exit within $3 of entry is a
+scratch by result, so R-04 firing never reads as a target missed.
 
-Break-evens are not caught by this and must not be: an exit within $3 of entry
-is a scratch by result, not a win, so R-04 firing never reads as a target
-missed.
+**R-02 CHECKS THE CAP, NOT THE RESPECT, AND THE BLIND SPOT WIDENS AS THE STOP
+TIGHTENS.** The predicate compares against 20 flat. Since the stop is a ceiling and
+is usually tighter (§5), a trade whose stop sat at $10 and closed $18 from entry had
+its stop widened by eight dollars, and this passes it silently.
 
-**R-02 is the highest-value check in the table.** A loss that closed further from
-entry than $20 was not a $20 stop — the stop had been moved — and there is no
-tolerance in the comparison, for the reason §0 gives. It is also the rule most
-likely to disagree with its own marker: \`followed_sl = true\` on a row with a $34
-loss distance is a concrete discrepancy, not an inference.
+The version that would catch it compares against the trade's own planned stop, and
+that column was retired at v1.8 by decision. **Known, deliberate, one-sided.** Never
+read a clean R-02 run as stops respected — read it as no stop having gone past $20.
 
-**R-01 IS NOT ITS MIRROR, and the difference is what a larger distance means.**
-On a loss, further from entry is always worse than intended. On a WIN it can be
-better: a take profit sitting at $30 fills at $30 or through it, so a gap fills
-at $30.60 with the order never having moved. R-01 flags that identically to a
-target genuinely moved further out, and nothing on the row separates them.
-
-So an R-01 flag is a question rather than a finding — ask which it was. If gaps
-turn out to be common enough that the check stops being read, the honest fix is
-to ask which target was set at journalling time, not to widen the number until
-the noise stops.
+Expect occasional false positives from the spread: a broker stop fills against bid
+or ask, so a $20 stop can close a dollar further out (§0).
 
 **R-03 IS \`field\`, AND IT IS THE POPULATION THAT IS MISSING RATHER THAN THE
-PREDICATE.** The comparison itself is simple — within an \`open_day\`, no
-\`entry_time\` later than the \`fill_time\` of a full-stop loss — and \`fill_time\` is
-present on exactly the rows it depends on. What is not available is *which
-losses are full stops.* §5 caps the stop at $20 and leaves where inside the cap
-it goes to price action, the broker reports only the final one, and nothing
-records what it was set to — so a $12 loss cannot be told from an exit cut by
-hand.
+PREDICATE.** What is unavailable is *which losses are full stops*: the stop is
+capped at $20 and placed anywhere inside that, the broker reports only the final
+one, so a $12 loss cannot be told from a hand-cut exit. Losses at $20 are
+identifiable, so the rule runs over those and returns \`unknown\` elsewhere.
 
-**The column that would close it is one he has decided against**, and the reason
-is §6: he journals a trade, not a plan. So the route is the one R-04 and R-05
-are waiting on — a question at journalling time, *was this one a full stop?* —
-rather than a price typed into a form.
+**Its exception is real and it opens a door.** One re-entry is permitted after a
+sweep, so the predicate allows a second entry and fails on a third. But nothing
+separates a genuine sweep re-entry from a rationalised one — *"that was just a
+sweep"* is available every time. R-11, R-12 and R-17 are the backstops; the honesty
+is his.
 
-Until then a narrower version is available and should be labelled as what it is:
-losses at $20 are identifiable full stops, so the rule can be checked over
-*those* and returns \`unknown\` rather than \`pass\` for a day whose only loss was
-tighter. That under-detects, and a clean result means less than it appears to.
+**R-04 cannot be confirmed, only violated.** Whether a losing trade reached +$20 is
+not recoverable: the prices are endpoints and the path is stored nowhere, including
+at the broker. One-sided — a win proves its own excursion, a break-even is R-04
+having fired — so the probe fires on full-stop losses alone.
 
-**R-04 cannot be confirmed, only violated.** Whether a losing trade ever reached
-+$20 is not recoverable: \`entry_price\` and \`exit_price\` are endpoints, and the
-path between them is not stored anywhere, including at the broker. The gap is
-one-sided — a win proves its own excursion, and a break-even is R-04 having
-fired — so the probe fires on full-stop losses alone.
-
-**R-05 and R-06 are judgment because of where the zone map lives, not because
-they are vague.** Both are precise rules about position in a marked structure.
-The structure is maintained in TradingView and deliberately not mirrored here: a
-map kept in two places disagrees with itself, and a stale boundary produces
-false violations that teach the trader to ignore real ones. See §10.
+**R-05 and R-06 are judgment because of where the zone map lives**, not because they
+are vague. The probe can also ask the better question now that §4 records how a
+level is built: not only *extreme or interior*, but whether the grid and a reaction
+point agreed there.
 
 **R-05 can only ever be violated, never confirmed.** An empty population returns
-\`unknown\`, not \`pass\`. A clean run means either that the rule was kept or that
-no extreme has broken lately, and the journal cannot separate those. Silence is
-silence — it is not evidence of discipline.
+\`unknown\`. A clean run means either the rule was kept or no extreme has broken
+lately, and the journal cannot separate those.
 
-### Six of nine are judgment, and most of them need not be
+**R-07 IS THE ONE THAT MATTERS MOST AND THE ONE NOTHING CAN SEE.** His primary
+failure mode by his own account, invisible in every row. §9 is the section about it.
 
-R-04, R-05, R-06 and R-07 are each **a single question at journalling time**
-rather than an unanswerable one at analysis time. *Did it reach +$20 before it
-turned? Extreme or interior? Close, read, or neither?* Each is one tap while the
-trade is fresh, and each would move that rule from \`judgment\` to \`field\`.
+**R-09's probe names the charts.** *Obvious* is read from the daily, 4H and 1H (§4).
 
-Gladys already draws a four-row keyboard with \`callback_data\` under sixty-four
-bytes, so this is an established pattern rather than new machinery — subject to
-the same constraint that a longer setup name is how that budget silently
-overruns.
+**R-10 and R-11 were rules without IDs** until v1.9 — both stated in §5's prose from
+v1.5, neither ever checked. Both are computable from broker columns alone.
 
-R-04 is the strongest case: maximum favourable excursion is genuinely
-unrecoverable afterwards and trivially answerable in the moment. It is the one
-gap in this table that gets permanently worse every day it is not closed.
+R-11 needs the account from \`size_oz × 500\` (§8), so it is \`unknown\` on any day
+whose rows carry no size.
 
-This is a bigger change to what the table can see than any market data would be,
-and it is deliberately recorded here rather than acted on: widening what Gladys
-asks is a product decision. **[decide]**`,
+**R-12 is a count and it is the one that will fire.** One entry a day, two when the
+second is a sweep re-entry, three never. **The fifteen-minute window makes half of
+it checkable:** a second entry more than fifteen minutes after the prior \`fill_time\`
+is not the permitted re-entry and is a \`fail\`. Inside the window it is \`unknown\`,
+because the data cannot tell a sweep re-entry from a fast revenge trade.
+
+**R-13's violation is retrospective.** More than one distinct \`size_oz\` inside a
+calendar month means the rung moved mid-month.
+
+**R-14 is judgment by his own description, and deliberately so.** The standing-aside
+window is open-ended — a 10 a.m. print can cost the New York morning from the open.
+Writing a fixed window would invent a number he never set and would flag him
+constantly. The probe asks whether a print was ahead of the trade and whether it had
+landed and settled.
+
+The economic calendar is knowable, so a *partial* check exists — an entry in the
+half-hour before a scheduled high-impact release is suspicious on the face of it.
+It is not written as a predicate because the front edge, which is where he actually
+stands aside, has no boundary in the data.
+
+**R-15 is fully checkable in one half and not at all in the other.** A position open
+across the Friday close is unambiguous. Whether a Friday close-out was the rule
+firing or a discretionary exit is not — which is what R-01's narrow exception is
+for.
+
+**R-16 is the most checkable rule here.** A US market holiday is a known date, so an
+entry on one is a violation with no missing column and no judgment.
+
+**R-17 cannot be checked and must not be turned into a number.** The trigger is the
+quality of the trading, not the size of the loss — he has stopped at 5%. A
+drawdown threshold would fire on the wrong variable and would miss the case the rule
+exists for: a small loss with the frequency climbing. §5 has the reasoning; the
+probe is a question, and it is one he can answer better than any row.
+
+### The judgment set is now settled rather than pending
+
+R-04, R-05, R-06 and R-07 would each become checkable with a single question at
+journalling time. **He decided against adding them at v1.9**, and §10 records the
+decision and its cost. R-14 and R-17 were never candidates — both watch things no
+column could hold.`,
 
   "8": `## 8 · Journal binding
 
@@ -534,75 +1497,102 @@ What a row can answer, what it cannot, and the filters that have to be applied
 before any of it is read. This section exists because a rate computed over the
 wrong population looks exactly like a rate computed over the right one.
 
+**Nothing cites this section**, which is why §0's index names it explicitly. Read it
+before producing any number, not after being asked to justify one.
+
 ### What is on a row
 
-**Broker-owned** — written by the poller and the email parser, never by the app:
-\`direction\` · \`entry_time\` · \`fill_time\` · \`entry_price\` · \`exit_price\` ·
-\`size_oz\` · \`open_day\` · \`commission\` · \`balance\` · \`net_pnl\` · \`computed_pnl\` ·
-\`pnl\`.
+**Broker-owned and served to you** — written by the poller and the email parser,
+never by the app: \`direction\` · \`entry_time\` · \`fill_time\` · \`entry_price\` ·
+\`exit_price\` · \`size_oz\` · \`open_day\` · \`pnl\` · \`net_pnl\`.
 
 **Journal-owned** — written by the app alone: \`setup\` · \`followed_rules\` ·
 \`followed_sl\` · \`followed_tp\`.
 
-**Derived at read time, never stored:** \`result\` (win / loss / break-even) ·
-\`session\` (five buckets) · filing day · completeness.
+**Derived at read time, never stored:** \`result\` · \`session\` · filing day ·
+completeness.
 
-### Position size, and what it now makes computable
+### On the row and deliberately withheld
 
-\`size_oz\` is the position size **in ounces**, as opened. Ounces because that is
-the unit both broker sources state it in — cTrader sends a volume the poller
-divides by a hundred, and the alert email prints \`Volume  Oz 4.00\` — so storing
-anything else would mean converting away from what both of them actually said.
+Four columns exist in \`trades\` and do not reach you, and the reason each is
+withheld is a rule rather than a tidy. A fifth, \`deleted\`, is filtered before you
+see anything, so the soft-delete filter below is already applied and is listed
+because the rest of that table is not.
+
+\`commission\` is already inside both P&L figures — the poller folds it into
+\`computed_pnl\` and the broker's \`net_pnl\` is settled — so every figure you read
+is net of it. Held, it would only ever be a way to subtract costs a second time.
+
+\`balance\` moves on transfers with no trade behind them, and the account this
+document computes against is \`size_oz × 500\` (below). Held, it would only ever be
+a way to reach for the wrong denominator, which is the error §8 exists to stop.
+
+\`computed_pnl\` is the folded figure with no swap in it. \`pnl\` is already
+\`coalesce(net_pnl, computed_pnl)\`, so you can see the fallback where \`net_pnl\` is
+null without being able to reach for the unsettled number by name.
+
+\`user_id\` is not about trading at all.
+
+**The withholding is structural rather than instructed**, and that is the point:
+a rule you are told can be forgotten in the middle of a long answer, and a column
+you are never handed cannot be. Where this document says never do a thing with a
+number, check whether the number is even in front of you — several are not, and
+the absence is the enforcement.
+
+### Position size, and what it makes computable
+
+\`size_oz\` is the position size **in ounces**, as opened. Ounces because that is the
+unit both broker sources state it in, so storing anything else would mean converting
+away from what both of them said.
 
     lots     = size_oz / 100
     account  = lots × 50,000   =  size_oz × 500
 
-**Two limits, and neither is small.** It is written by the poller alone, so a
-position the poller never reached carries no size and never will — the email
-boundary is five columns by design and widening it would trade a stated property
-of that design for coverage of old rows. And it is null on every row that closed
-before the column existed. So anything reading sizes filters for it rather than
-assuming it, and any account figure derived from history starts at the date the
-column landed rather than at the start of the journal.
+**Two limits.** Written by the poller alone, so a position it never reached carries
+no size and never will. And null on every row that closed before the column existed.
+Filter for it rather than assuming it.
 
 ### What is still not on a row, and why
 
-**Maximum favourable excursion.** How far a trade travelled before it turned.
-Not stored and not available from the broker, which is what makes R-04 a probe
-and what makes asking at journalling time the only way it is ever recoverable.
+**Maximum favourable excursion.** How far a trade travelled before it turned. Not
+stored, not available from the broker — which is what makes R-04 a probe.
 
-**The plan.** Where the stop and the target were set at entry, as against the
-final stop the broker reports. Nothing on the row carries it: a stop moved to
-break-even has overwritten the original everywhere, and no column holds what it
-was before.
+**The plan.** Where the stop and target were set at entry. A stop moved to
+break-even has overwritten the original everywhere. Four questions are unanswerable
+for that reason: R-03's full-stop population, R-02's respect half, whether step 4
+was satisfied on a $25 entry, and whether a win at $25 was a shortened target or an
+early close.
 
-Three questions are unanswerable for that reason — R-03's full-stop population,
-the planned R:R, and whether a win at $25 was a shortened target or an early
-close. §5 bounds all three without settling any of them, because the cap is a
-range and the row does not say where inside it the stop went.
+Not a gap waiting on a schema change. Journalling a plan was tried and retired (§13,
+v1.8), and widening what Gladys asks was declined (§10).
 
-It is not a gap waiting on a schema change. Journalling a plan was tried and
-retired (§13, v1.8): every one of those three is a question at journalling time,
-which is where they belong.
+**Whether a second entry was a sweep re-entry.** R-12 permits two when the second
+follows a sweep. The fifteen-minute window makes a late second entry checkable; a
+prompt one is \`unknown\`.
 
-**Which rule broke.** \`followed_rules\` is one boolean covering R-03 and R-05
-through R-09. It records that something broke, not what.
+**Whether a Friday close-out was the rule or a choice.** R-15 forces the exit;
+nothing on the row says the exit was forced. Only the timing near 17:00 New York
+suggests it.
 
-**Whether an entry was an override.** A setup correctly identified as bad and
-taken anyway files identically to a good one. §9's first leg has no signature.
+**Whether a high-impact release was ahead of an entry.** R-14's standing-aside has no
+boundary in the data, because the window is open-ended by his own description.
+
+**Which rule broke.** \`followed_rules\` is one boolean covering R-03, R-05 through
+R-14, and R-16 and R-17. It records that something broke, not what — and on his own
+account (§9) it is mostly answering *did I wait?*
+
+**Whether an entry was an override.** A setup correctly identified as bad and taken
+anyway files identically to a good one. §9's first leg has no signature.
 
 ### Three verdicts
 
-\`pass\` · \`fail\` · \`unknown\`. The third is not a formality. It mirrors the
-journal's own three-state boolean, where \`null\` means unanswered and is not the
-same as \`no\` — every broker fill arrives with all three markers null, so a blank
-must never count as a miss.
+\`pass\` · \`fail\` · \`unknown\`. The third is not a formality. It mirrors the journal's
+own three-state boolean, where \`null\` means unanswered and is not the same as \`no\`.
 
 The same rule one layer up: a \`judgment\` rule with no answer is \`unknown\`, a
 \`journal\` rule whose population came back empty is \`unknown\`, and a rule whose
-population was narrowed by a missing column — R-03 today — is \`unknown\` outside
-the narrowed set rather than \`pass\` across the whole of it. None of them is
-\`pass\`.
+population was narrowed by a missing column is \`unknown\` outside the narrowed set
+rather than \`pass\` across the whole of it.
 
 ### Population filters
 
@@ -610,167 +1600,423 @@ Applied to every query, not remembered case by case.
 
 | Filter | Why |
 |---|---|
-| \`id like 'PID%'\` | Pre-sync rows carry client-generated ids and null timestamps. Any hunt for broker-data problems sweeps them up as false positives. |
+| \`id like 'PID%'\` | Pre-sync rows carry client ids and null timestamps. Any hunt for broker-data problems sweeps them up as false positives. |
 | \`deleted = false\` | Soft-deleted rows stay in the table so the poller cannot resurrect them. |
 | \`pnl is not null\` | An open position is in neither the win nor the loss side. A missing figure is not a break-even. |
-| both prices present | The scratch band is a distance in price. A row without both cannot be evaluated by it and falls back to the same $3 read against P&L. |
+| both prices present | The scratch band is a distance in price. A row without both falls back to the same $3 read against P&L. |
 | \`entry_time is not null\` | Anything reading \`session\` — see the seam below. |
-| \`size_oz is not null\` | Anything deriving account, lots or a percentage. Absent on poller-missed rows and on everything predating the column. |
+| \`size_oz is not null\` | Anything deriving account, lots or a percentage. |
 | \`net_pnl is not null\` | Monthly and multi-day P&L — see below. |
 
 ### The session seam
 
-\`session\` derives from \`entry_time\`, falling back to \`fill_time\` when there is
-none. So a fill the poller never reached is filed by when it **closed** rather
-than when it opened. This account holds across sessions deliberately, which
-means those rows land in a later bucket than they belong to, systematically.
+\`session\` derives from \`entry_time\`, falling back to \`fill_time\` when there is none.
+So a fill the poller never reached is filed by when it **closed** rather than when it
+opened, and those rows land in a later bucket than they belong to, systematically.
 
-Flag it whenever session data is read for a pattern spanning that boundary. The
-repair is \`?force=1&hours=N\` with a wide lookback, which fixes the rows
-permanently; the signature of a sliced row is \`exit_price is null\` on a closed
-trade. Repair, then read — do not exclude the rows and call the result clean.
+The repair is \`?force=1&hours=N\` with a wide lookback; the signature of a sliced row
+is \`exit_price is null\` on a closed trade. Repair, then read — do not exclude the
+rows and call the result clean.
+
+**And the Asian session straddles the calendar date** (§4), which is a different
+boundary from this one and is not a defect. A trade opened at 1 a.m. New York time
+is in the Asian session that opened the previous evening, and files under the current
+\`open_day\`. Both are true; do not "correct" either.
 
 ### \`pnl\` is a fallback, and reading it is not the same as choosing it
 
-\`pnl\` is a generated column: \`coalesce(net_pnl, computed_pnl)\`. So reading \`pnl\`
-**is** reading \`computed_pnl\` on every row whose broker email has not landed —
-which is the one case this account cannot afford, because \`computed_pnl\` is
-folded from deals and carries no swap, and positions here are held through the
-17:00 rollover.
+\`pnl\` is generated: \`coalesce(net_pnl, computed_pnl)\`. So reading \`pnl\` **is**
+reading \`computed_pnl\` on every row whose broker email has not landed — the one case
+this account cannot afford, because \`computed_pnl\` is folded from deals and carries
+no swap, and positions here cross the 17:00 rollover.
 
-"Read \`pnl\`, never \`computed_pnl\`" is therefore not achievable by naming a
-column. Any figure summed across days either requires \`net_pnl is not null\`, or
-reports how many rows fell back to \`computed_pnl\` alongside the total. A monthly
-P&L that quietly omits swap on an unknown subset is wrong by an unknown amount,
-which is worse than one that is late.
+**R-15 does not change this.** Nothing is held over a weekend, but weekday rollovers
+still apply and Wednesday's triple swap is the expensive one.
+
+Any figure summed across days either requires \`net_pnl is not null\`, or reports how
+many rows fell back to \`computed_pnl\` alongside the total.
 
 ### Break-even means R-04 fired
 
-The ±$3 scratch band is a price distance, so a stop moved to entry lands inside
-it by construction. Break-evens on this account are therefore mostly R-04
-working, not random scratches, which makes the break-even count a meaningful
-figure: roughly, how often a move went most of the way and turned.
+The ±$3 scratch band is a price distance, so a stop moved to entry lands inside it by
+construction. Break-evens here are mostly R-04 working, which makes the break-even
+count meaningful: roughly, how often a move went most of the way and turned.
 
-It follows that **a break-even close is never evidence of a violated stop.** The
-markers ask whether the stop and target were *respected*, not whether they were
-moved, and moving to break-even at +$20 is the rule. Do not invert the polarity.
+**R-19 muddies that, and the muddying is worth stating rather than glossing.** A
+pre-print stop to break-even fires at whatever profit the trade is sitting on — $8,
+$12 — so it lands in the same band without the move having gone most of the way. The
+count is no longer a clean read of near-misses.
+
+**It is separable in the common case.** R-19 only applies to a position inherited
+from an earlier session, so **a sub-$20 break-even on a trade opened in the same
+session is not R-19 and is a question.** One opened hours earlier, with a scheduled
+print in between, probably is.
+
+**A break-even close is never evidence of a violated stop.** The markers ask whether
+the stop was *respected*, not whether it was moved, and moving to break-even at +$20
+is the rule.
 
 ### Reconciliation is one-way
 
-Where a \`journal\` rule and its marker disagree, Eugenia names the gap and stops.
-She does not correct a marker, infer what was meant, or fill an \`unknown\`. She
-cannot resolve one — she can only ask, and the answer is the trader's to give or
-withhold.
+Where a \`journal\` rule and its marker disagree, Eugenia names the gap and stops. She
+does not correct a marker, infer what was meant, or fill an \`unknown\`.
 
 That disagreement is the most valuable signal the system produces. Neither the
 self-report nor the derived value says anything on its own.
 
-### Sample
+**And it has no scheduled moment.** He does not do a weekly review — he knows how a
+week went and has usually identified a bad stretch while it was happening (§9). So
+the document does not defer anything to a review that does not exist. **Things are
+examined when he raises them.** Worth being plain about the cost: his own read is
+currently the only read, and the disagreement above never gets a moment where it
+fires by default.
 
-No claim from a single trade. Per-trade conversations are for processing;
-patterns belong to the weekly. Where a comparison is under observation rather
-than under test — session performance, \`close\` versus \`read\` entries — it is
-reported on request only, never volunteered and never framed as a finding.
+### Sample, and why it is smaller than it looks
+
+No claim from a single trade. Per-trade conversations are for processing.
+
+**He is working toward two or three trades a week** (§5), so this is not the
+arithmetic of a day-trading journal. A month is a handful of trades. A rate over
+anything less than a long stretch is noise, and saying so is more useful than
+qualifying a number nobody should be reading.
+
+**Session is a reporting dimension, not a comparison.** There is no session rule, so
+a per-session rate tests nothing — and Asian and London are thin because of when he
+sleeps rather than because of anything he decided (§4). Report a bucket if he asks.
+**Never rank the five, at any sample size:** one of five is highest by chance even
+when all five are identical.
+
+**Direction is one of the few splits the data can actually make**, since
+\`direction\` is on every row. **He trades both ways.** He has noticed he prefers
+shorting so far — recorded as a preference and **explicitly not a rule**, the same
+shape as the sizing pattern in §5. Never read a long/short skew as confirming
+something he decided, and at two or three trades a week the split means very little
+for a long time yet.
+
+**The break-even win rate is 40%** — the line any win rate is read against. It falls
+out of the geometry: a $30 target against a $20 stop needs 20/(20+30), and 44.4% on
+a $25 target. Not a threshold he has to clear on a given stretch; it is what the
+number means.
 
 ### Monthly P&L
 
-Sum of \`net_pnl\` over the month's filing days, divided by the account the month
-was traded at — \`size_oz × 500\` off a representative row, since size is what
-account tier is read from and the tier is what the target is a percentage of.
+Sum of \`net_pnl\` over the month's filing days, divided by \`size_oz × 500\`.
 
-Never a balance delta: transfers move \`balance\` with no trade behind them, and
-this account is funded in steps.
+**One size per month, by rule.** R-13 pins rung changes to month boundaries, so there
+is one account figure and nothing to choose between. A month showing two sizes is
+R-13 broken rather than a question about which to use.
 
-\`net_pnl\` rather than \`pnl\` for the reason above, and rows lacking it are
-counted and reported rather than silently dropped — the count is the honest
-error bar on the figure.
+Never a balance delta: transfers move \`balance\` with no trade behind them.
 
-**Where the account tier is read from is a decision.** Size varies as rungs are
-stepped, so a month spanning a change has no single account. First trade of the
-month, last trade, or largest — **[decide]**, and once decided it goes in §12 as
-a definition rather than being chosen again each month.`,
+**+10% is the target and reaching it ends nothing** (§5).`,
+
+  "9": `## 9 · How he fails
+
+What happens when the process does not hold, in his own account, recorded at v1.9
+and corrected twice since. It is here because every rule in §7 that his failures
+touch is \`judgment\`, so the table cannot see any of this and would read a bad month
+as a column of unknowns.
+
+### One failure, one shape
+
+**Not fear.** In his words, not so much fear — fear breaks a trader out of good
+positions early, and that is not the pattern.
+
+**Not greed as a separate behaviour.** He named greed alongside FOMO and then
+corrected it: he does not hold past the target and does not increase size. The
+wanting is real but it does not show up as its own action. **Do not go looking for a
+greed signature in the data. There is none, and finding nothing would not tell you
+that.**
+
+**And not chasing a move that left without him.** The level is not behind him.
+
+What is left is specific: **price reaches a level he is already watching, and he
+enters on the touch.** Without letting the level react, without giving it room to
+breathe, without waiting for the close or the read. He enters early because he wants
+the win.
+
+So in the vocabulary of §12, he takes the **signal** as the entry. That is R-07
+exactly, and it is why the probe is worded as *did you wait*.
+
+### What that means structurally
+
+**Steps 1 and 2 are clean.** The bias is read and the level is right, which is why
+R-05 and R-06 are not where this shows up. **Step 3 is where it breaks** — signal
+without confirmation — and step 4 inherits nothing, because an entry at the level
+keeps the geometry intact: normal stop distance, fine R:R.
+
+That rules out the tempting story. No wide-stop signature, no compressed R:R, no
+entry far from a level. **A FOMO entry and a patient entry at the same level, same
+direction, same size, produce **identical price data** — entry, stop, target, R:R,
+session, all of it.
+
+**What is not identical is \`followed_rules\`.** He marks these false, and he can,
+because he knows at the time. So the marker is the signature, and it is the only
+one. That is the opposite of a reason to stop looking: it is the reason an
+unanswered journal costs more here than anywhere else in the system — it is not a
+gap in the data, it is the loss of the single distinguishing field.**
+
+His failure profile is unusually narrow. Sizing, exits, management, the day limits,
+the position rule — none of them is where this goes wrong. One step, one rule.
+
+### Where it bites hardest
+
+**The same everywhere, and somewhat worse at the New York open** — because that is
+where he expects quicker movement, and expecting speed is what makes waiting feel
+expensive.
+
+Which explains the self-report in §6 rather than leaving it as a personality note.
+He is more careful at the New York open **because that is the session where this
+weakness has the most pull.** One coherent thing: a violent session (§4), a
+heightened expectation of speed, and a known impatience — so he compensates.
+
+### He knows at the time
+
+**Not a recognition problem.** He is not misreading the level and would not be helped
+by more method. The rule is known, the violation is known while it is happening, and
+it happens anyway.
+
+**\`followed_rules = false\` is answerable honestly on these trades.** He knows in the
+moment, so the mark is a live observation rather than something reconstructed after a
+loss. That single boolean is the only instrument pointed at the thing that actually
+costs him.
+
+**And the useful question is never *what was the setup*.** It is what was happening
+in the seconds before he clicked. The setup is on the row; that is not.
+
+### Under drawdown it accelerates
+
+**The failure never changes shape. What changes is frequency and motive.**
+
+Normally he enters early because he wants the win. **In a bad stretch he enters early
+more often, chasing the move to recover what he has lost.** Same action, different
+pressure behind it — and it compounds, because each loss increases the pressure that
+caused it.
+
+**This is why R-17's trigger is behavioural rather than financial** (§5). A 5% loss
+traded calmly is not a problem; a 5% loss with the frequency climbing is, because the
+mechanism is still running and getting stronger. No drawdown number can see that.
+
+**And it is why R-12 matters more than it looks.** Chasing requires repetition. One
+entry a day removes repetition, so the cap is a drawdown control as much as a
+patience rule.
+
+### The one orientation underneath all of it
+
+He named it describing what ends a break: **back to chasing setups and the plan, not
+results.**
+
+That is the whole of this section in six words. Entering on the touch is chasing the
+result instead of the setup. Revenge trading is the same thing under pressure. There
+is not a patience problem and a FOMO problem and a revenge problem — there is one
+orientation that slips, and three places it shows up.
+
+### The first leg has no signature at all
+
+A trade correctly identified as bad and taken anyway files identically to a good one.
+No column, no derived value and no rate will ever separate them. The only record is
+his own answer, given at entry.
+
+**So a clean compliance rate over a period with unanswered journals says nothing.**
+It is not evidence of discipline; it is an absence of answers.
+
+### What is being done about it
+
+**R-12's one entry a day is the structural answer.** If impatience costs the whole
+session rather than being followed by another attempt, the cap does work no amount of
+resolve does.
+
+**R-17 is the backstop** when it has already gone wrong.
+
+**And he is training the wait.** Recorded as his current focus as of v1.9, not as a
+settled habit: he is deliberately working on not entering the moment a level is
+reached. A change in this over time is the single most valuable thing the journal
+could show, and the only way it will show is if the marker keeps being answered
+honestly while the behaviour is still bad.`,
+
+  "10": `## 10 · What would have to change, and what he has decided
+
+§7 labels seven rules \`judgment\`. This section is what would lift each, and which
+routes are open.
+
+### The two closed routes
+
+**Journalling the plan: tried and retired.** \`planned_stop\` and \`planned_target\`
+existed from v1.4 to v1.8 and were dropped — columns, app fields, view. He journals a
+trade, not a plan. The cost is in §8 and is real.
+
+**Widening what Gladys asks: declined.** Four rules would each become checkable with
+one tap at journalling time. Recorded because the analysis is sound and a future
+reader should see why the door was shut:
+
+- **\`level\`** (\`extreme\` | \`interior\`) would settle **R-05 and R-06 together**.
+- **\`confirmation\`** (\`close\` | \`read\` | \`neither\`) would settle **R-07** — the rule
+  §9 identifies as his primary failure — and \`neither\` would be a self-reported
+  violation, the strongest signal the system could carry.
+- **R-04 does not fit the existing pattern.** Gladys fires at OPEN, when the trade has
+  done nothing yet, so *did it reach +$20 before it turned* has no answer when the
+  form is drawn. It needs a close-time trigger and a second message path.
+- **A fifth question would have helped R-12** — whether a second entry was the sweep
+  re-entry — now partly covered by the fifteen-minute window (§6).
+
+**He decided against all of it at v1.9.** R-04 through R-07 are \`judgment\`
+permanently. R-04's cost compounds: excursion is unrecoverable afterwards, so *did it
+reach +$20* is a question no version of this system will answer from data.
+
+### The rules that were never candidates
+
+**R-14 and R-17 watch things no column could hold.** R-14's standing-aside window is
+open-ended by his own description, and R-17's trigger is the quality of his trading
+rather than any number. Turning either into a field would mean inventing a threshold
+he never set — the failure §5 names about the sizing rung.
+
+**R-08 and R-09 likewise.** *Which step did you stop at* and *was the trend obvious*
+are judgments, not fields.
+
+### The route that stays open, and it is not a schema change
+
+What lifts all of them in practice is the same thing: **the answer given at entry,
+while the trade is fresh.** That is the whole remaining instrument, and §9 is why it
+is worth protecting.
+
+### The zone map stays where it is
+
+R-05 and R-06 are precise rules about position in a marked structure, and that
+structure lives in TradingView. Mirroring it here was considered and rejected: a map
+kept in two places disagrees with itself, and a stale boundary produces false
+violations that teach him to ignore real ones. A decision, not a gap.`,
 
   "12": `## 12 · Definitions
 
-Terms used as if precise. Where the app already defines one, this is that
-definition and not a second version of it.
+Terms used as if precise. Where the app already defines one, this is that definition
+and not a second version of it. **§3 builds the macro terms** — this section is the
+trading vocabulary.
 
 **Break-even (scratch).** An exit within ±$3 of the entry price, at any size.
-Measured in price rather than dollars because $3 of P&L is $3 of gold at 0.01
-lots and three cents of it at 1.00 — a dollar band would mean something
-different at every rung of the ladder. Win and loss still come from the sign of
-the P&L; price distance is unsigned.
+Measured in price rather than dollars because $3 of P&L is $3 of gold at 0.01 lots
+and three cents of it at 1.00 — a dollar band would mean something different at every
+rung. Win and loss still come from the sign of the P&L.
 
-**Decided.** A trade carrying a P&L. Break-evens are decided and sit in the
-win-rate denominator, so scratches drag the rate down rather than vanishing from
-it. An open position is not decided and is absent from both sides.
+**Break-even win rate.** **40%.** The rate at which the geometry breaks even: a $30
+target against a $20 stop needs 20/(20+30), and 44.4% on a $25 target. The line any
+win rate is read against.
 
-**Complete.** A setup and all three discipline answers present. P&L is
-deliberately not required — an open position can be journalled before it closes.
+**Decided.** A trade carrying a P&L. Break-evens are decided and sit in the win-rate
+denominator, so scratches drag the rate down rather than vanishing. An open position
+is not decided.
+
+**Complete.** A setup and all three discipline answers present. P&L deliberately not
+required — an open position can be journalled before it closes.
 
 **Filing day.** \`open_day\` where the poller supplied one, otherwise the New York
-civil day of the closing fill. The day a trade is counted under.
+civil day of the closing fill. The day a trade is counted under, rolling at 17:00 New
+York — which is why an Asian-session trade taken at 1 a.m. files under that date
+even though its session opened the evening before.
 
-**Session.** One of five buckets — Asian, Asia+London, London, London+NY, New
-York — derived from \`entry_time\` against each financial centre's own local
-hours, so London's boundary moves with its own daylight saving. Nothing is
-stored and there is no override.
+**Session.** One of five buckets — Asian, Asia+London, London, London+NY, New York —
+derived from \`entry_time\` against each financial centre's own local hours. Nothing is
+stored and there is no override. **There is no session rule** (§6); the buckets are a
+reporting dimension. Sessions do have characters he reads (§4), which is not the same
+as a constraint.
 
-**Size.** \`size_oz\`, in ounces, as the position was opened — not as it was
-closed, which differs on a partial exit. Lots are ounces ÷ 100. Poller-written
-only, and null on anything it never reached or that predates the column.
+**Size.** \`size_oz\`, in ounces, as the position was opened. Lots are ounces ÷ 100.
+Poller-written only.
 
-**Full stop.** A loss closed at the stop — $20 of price distance from entry, or
-tighter where the stop was set tighter at entry. The second half is not
-identifiable from a row today (see R-03), so *the checkable definition is the
-first half only* and it under-detects. Distinguished from a break-even and from a
-manually tightened exit, and it is the only close that ends the trading day.
+**Stop.** A ceiling of $20 of price distance from the fill price on the chart, not a
+value, with no allowance for spread. Set at entry from where the chart shows the idea
+to be wrong, so usually tighter. **A resting broker order** (R-18). Moved only to
+break-even (R-04), or tightened under R-19 when a print lands on a position inherited
+from an earlier session — never wider, and never tightened outside that case.
 
-**Extreme.** The outer boundary of the marked range. Few, thick, and where
-Support & Resistance is traded.
+**Full stop.** A loss closed at the stop — $20 of price distance, or tighter where the
+stop was set tighter at entry. The second half is not identifiable from a row (R-03),
+so *the checkable definition is the first half only* and it under-detects.
 
-**Interior level.** A marked level inside the range, and quarters. Where Break &
-Retest is traded.
+**Grid.** The $25 increments. **Psychological levels** are 00 and 50; **quarters** are
+the 25 and 75 between them. One grid at two strengths, marked on the 1H and 30m.
+
+**Reaction point.** A place price has actually turned — a previous high or low. The
+second source of levels alongside the grid, and what makes an extreme worth fading.
+**Confluence** is where the two agree, and a level with both is stronger than either
+alone.
+
+**Extreme.** The outer boundary of the marked range. Few, thick, and where Support &
+Resistance is traded.
+
+**Interior level.** Any level inside the range — marked by the quarter grid, by a
+previous price reaction, or by both. Position is what makes it interior; the grid is
+one of the two ways it gets marked, not the definition. Where Break & Retest is
+traded.
 
 **Signal.** Price reaches a level and rejects. Not an entry on its own.
 
-**Confirmation.** Either a candle closing in the intended direction (*close*),
-or the reaction around the level resolving clearly enough to enter before a
-close (*read*). Both are valid. Entering on the signal with neither is not.
+**Confirmation.** Either a candle closing in the intended direction (*close*), or the
+reaction around the level resolving clearly enough to enter before a close (*read*).
+Both valid. Entering on the signal with neither is not — and per §9 it is his most
+common failure.
 
-**Rung.** A step on the sizing ladder. \`account = lots × 50,000\`, continuous —
-0.02 lots per $1,000 at every size.
+**Sweep.** A wick through a level that closes back inside: the stops beyond it were
+taken and price refused anyway. The level held. Distinguished from a close beyond the
+level, which is the level failing.
 
-**R:R.** Planned and realised are two numbers at two moments. **Planned, at
-entry: at least 1:1.5**, which is step 5 of §6's sequence and a condition on
-taking the trade at all — with the stop at $20 that means a $30 target.
-**Realised: 1:1.25 at worst**, once a $30 target has been shortened to $25 on a
-trade already open. A realised 1.25 is the shortening working, not an entry that
-skipped step 5, and the two must not be compared as though they answered the
-same question. In the app, realised: average win ÷ average loss over
-closed P&L. They are different numbers and the app's cannot be read as the plan.
-Neither the planned stop nor which target was set is stored, so the plan is not
-recoverable from any row, and a realised 1:1.25 cannot be told from a $30 target
-that was shortened, a $30 target that was hit after the stop moved, or a rule
-that was broken.`,
+**Sweep re-entry.** Re-entering the same level in the same direction after a sweep
+took the stop and price came back **within about three 5-minute candles**. Permitted
+once per day, and the only exception to R-03. Past fifteen minutes it is a new idea;
+inside it, indistinguishable in the data from a revenge trade.
+
+**High-impact release.** A scheduled economic print or decision capable of moving gold
+sharply — NFP, CPI, PCE, FOMC. §3 covers what each is. R-14 keeps him out before one
+and lets him back in once the volatility has passed and the news has confirmed
+something. R-19 covers the leftover case where one lands on a position he is already
+in.
+
+**Low-volume day.** A US market or bank holiday, or the Christmas-to-New-Year stretch.
+Calendar-known rather than judged at the screen (R-16).
+
+**Rung.** A step on the sizing ladder. \`account = lots × 50,000\`, continuous — 0.02
+lots per $1,000 at every size. Moves only between months (R-13): up by deposit, down
+when the implied account has halved.
+
+**Implied account.** \`size_oz × 500\` — the capital the ladder was applied to,
+including what is held off-broker. Distinct from \`balance\`, the deployed portion. The
+rung is measured against this.
+
+**R:R.** **At entry it is a condition: at least 1:1.5**, step 4 of §6's sequence. The
+default $30 target satisfies it at any permitted stop, so it binds in exactly one
+place — a $25 target set at entry, which needs a stop of $16.67 or tighter.
+
+**A realised 1:1.25 is legitimate as an outcome and illegitimate as a plan.** The rule
+working when a $30 target was shortened on a trade already open; a breach when $25 was
+set at entry over a $20 stop. Nothing on the row separates them, so it is \`unknown\`.
+
+In the app, realised R:R is a different number entirely: average win ÷ average loss
+over closed P&L. It cannot be read as the plan.`,
 
   "13": `## 13 · Changelog
 
-The write path. Findings, retired rules and rule changes are recorded here, and
-the §7 table read afterwards is whatever this section last left in place. Rule
-IDs are never reused, even after retirement — a recycled ID silently falsifies
-history.
+The write path. Findings, retired rules and rule changes are recorded here, and the
+§7 table read afterwards is whatever this section last left in place. Rule IDs are
+never reused — a recycled ID silently falsifies history.
+
+Rows below v1.11 are history and describe the document as it stood. Where one states
+something later corrected — v1.7's "five steps", v1.3's account of the $25 target —
+it stays as written, because correcting the record would falsify it.
 
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
-| v1.8 | [decide] | \`planned_stop\` and \`planned_target\` retired: the columns dropped and the two fields removed from the app. **He journals a trade, not a plan** — §5 fixes the target at $30 and caps the stop at $20, and where inside that cap the stop goes is read off price action rather than typed into a form. R-03 returns to \`field\` and to the narrowed full-stop population; §6's step 5 is arithmetic he runs and nothing checks; §8 and §12 restated — no row carries intent, and planned R:R is not recoverable from one. The three questions the columns were meant to answer are questions at journalling time, alongside R-04's. | His decision |
-| v1.7 | [decide] | R-08's five steps written: top-down bias, liquidity pools and S&R, psychological levels, candle or chart pattern with signal then confirmation, and reward-to-risk of at least 1:1.5. Step 5 is arithmetic and checkable from the planned columns. It also settles a contradiction the document was carrying — 1:1.5 is a condition at ENTRY, 1:1.25 the realised floor after a permitted shortening: two numbers at two moments rather than one disagreeing with itself. | His rules |
-| v1.6 | [decide] | §4 written. The two setups differ by METHOD, not location — Break & Retest is continuation through a level that has flipped, Support & Resistance is mean-reversion off a level that is holding; location is how each is recognised. Invalidation stated per setup, and §6's re-entry rule is shown to follow from S&R's rather than being an exception to it. | Method research, anchored to his stated rules |
-| v1.5 | [decide] | §5 and §6 written. Risk per trade is 4% and is deliberate; the rung moves by hand; 4% is also the daily limit, and there is no weekly or monthly one. One position at a time, nothing else changes size. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep that snaps back to the level. R-08's sequence is recorded as existing but not written down. | His answers |
-| v1.4 | [decide] | \`planned_stop\` and \`planned_target\` are recorded at journalling time. R-03 moves from \`field\` to \`journal\` — it was the full-stop population that was missing, not the predicate — and is \`unknown\` rather than \`pass\` on rows with no plan. §8 and §12 restated: intent is on the row, and planned R:R is recoverable where a plan exists. | Schema change |
-| v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach or is showing reversal. R-01 gains its lower bound and becomes two-sided — the §7 [decide] on early exits is answered. The R:R floor is restated as 1:1.25, being the shortest allowed target over the widest allowed stop. | His decision |
-| v1.2 | [decide] | Tolerance settled at none: the stop is at most $20, so a loss further out is a stop that moved, and R-01/R-02 compare flat. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror — a gap through the target enlarges the distance without anything having moved. | His decision |
-| v1.1 | [decide] | \`TOL\` named in §0 and R-01/R-02 given executable predicates. R-03 relabelled \`field\` — the full-stop population needs a planned stop. §8 records \`size_oz\` and the account arithmetic it enables, and the \`pnl\` fallback that makes \`net_pnl\` the figure for any multi-day total. | Review of v1.0 against the live schema |`,
+| v1.13 | [decide] | **Three gaps closed, found by asking what the document never asked.** R-18: **stop and target are always resting broker orders and a position is never closed by hand** — which makes R-01 and R-02 exact rather than suggestive, since a loss beyond $20 is now an edited order rather than a decision at the screen, and R-15's Friday close-out is named as the one permitted manual close. R-19: **a high-impact print landing on a position inherited from an earlier session** — in profit the stop goes to break-even regardless of R-04's threshold, losing it is tightened to a closer invalidation or pulled in if there is none, and the target never moves. Written narrowly on his instruction: he should not be holding through a print, and the path that produces this is an Asian-session trade still running into New York. §5's "never moved tighter" now carries that exception, and §8 records that R-19 muddies "break-even means R-04 fired" — a sub-$20 break-even on a trade opened in the same session is not R-19 and is a question. **Direction recorded: he trades both ways**, with a noticed preference for shorting held as a preference and explicitly not a rule, since \`direction\` is on every row and a skew would otherwise read as confirmation of a decision. | Asking what the document had never asked |
+| v1.12 | [decide] | **Verification pass rather than new rules.** Eighteen inherited claims — carried since before the audit and never confirmed by him — read back and confirmed, one corrected: **an interior level is any level inside the range, marked by the quarter grid OR by a previous price reaction**, so R-05, §4.1 and §12 no longer reduce interior levels to quarters and a previous high mid-range is tradeable for Break & Retest. §13's history confirmed as record rather than reconstruction. **§9's "identical rows" corrected** — the *price data* is identical, but \`followed_rules\` is not, and since he marks it honestly the marker is the signature and the only one. **§3 proofread**: the opening definition no longer contradicts cost-push, the room-to-cut argument now follows from nominal = real + expected inflation rather than asserting the Fed would have none, the 2.5% breakeven line is reconciled against the CPI/PCE gap, and the dot plot distinguishes participants from voters. **§3 given a term index** so a single lookup is not a scan of thirty thousand characters, plus retail sales, Michigan inflation expectations, the ISM/S&P PMI split, and the FRED codes for every rates series. | Verification of what was already written |
+| v1.11 | [decide] | **Four rules added, all from gaps an audit surfaced rather than from new behaviour.** R-14: no entries in the hours before a high-impact release, resuming once the volatility has passed and the news has confirmed something — the first rule connecting the briefing to the trading, and judgment because the window is open-ended by his description. R-15: nothing held across the Friday close, closed at market right before it, because a weekend gap can open past the stop — which forces a narrow R-01 exception for wins under $25 filling at that close. R-16: no trading on known low-volume days. R-17: **he stops trading when the trading has deteriorated — rules broken, losses running, chasing — and the trigger is behaviour, never drawdown.** He has stopped at a 5% loss; a threshold would fire on the wrong variable. **§3 written — the foundation**, built bottom-up from what inflation is through the funds rate, the transmission chain, bonds and yields, TIPS and breakevens, to why gold sits at the end of it, plus every metric a briefing uses. Written because he said the technical content lands as terms he nods past and he wants it from the inside out. **§0 records that the document teaches at more than one level**, against \`eugenia_channels\` states, with demotions from him never argued with. **§2 deepened** and pointed down to §3. **Sweep re-entry bounded at three 5-minute candles**, which makes half of R-12 checkable. **Session characters recorded** — New York violent, Asia calmer — as an input to the read, with London thin because of when he sleeps rather than by preference, and the Asian session's straddle of the calendar date written into §4, §8 and §12. **Slippage \`[decide]\` closed**: the stop is $20 from the chart fill with no spread allowance, so slippage is his. **The weekly review dropped** — he has never done one, and §8 no longer defers to it. **§9 corrected twice**: the NY-open caution now has its reason, and revenge trading is recorded as the same failure accelerating rather than a second failure. | A provenance and coverage audit, worked through question by question |
+| v1.10 | [decide] | R-12 caps entries at one a day (two when the second is a sweep re-entry); R-13 pins rung changes to month boundaries. **The sweep re-entry bounded at once** and stated as the one exception to R-03 — the two had contradicted each other since v1.5. Timeframes recorded: bias on daily/4H/1H, levels on 1H/30m, entry on 15m/5m. How a level is marked: the grid plus reaction points, with confluence. **B&R trades continuation, S&R trades the reversal** — counter-trend is the point, closing the fade-against-bias question. Coming down a rung written. §2 rewritten from research and marked as not his decisions. §9 corrected: greed is not a separate failure. Session floor removed; 40% kept in §12. | A full read of the document with him |
+| v1.9 | [decide] | **The stop is a ceiling, not a value** — under $20, set at entry from the chart's invalidation, never tightened. R-02 restated as a cap check with a stated blind spot. **The $25 target is two things**: an entry choice needing a stop under $16.67, and a management shortening. **R-08 folded from five steps to four.** Quarters defined. No session rule, stated. R-10 and R-11 given IDs. §5's "the day ends at 4%, which is one full stop" corrected: two rules. Sections 2, 9 and 10 written. §0 de-duplicated and given a section index. | His answers |
+| v1.8 | [decide] | \`planned_stop\` and \`planned_target\` retired: columns dropped, fields removed from the app. **He journals a trade, not a plan.** R-03 returns to \`field\` and the narrowed full-stop population; §8 and §12 restated — no row carries intent. | His decision |
+| v1.7 | [decide] | R-08's five steps written: top-down bias, liquidity pools and S&R, psychological levels, candle or chart pattern with signal then confirmation, and reward-to-risk of at least 1:1.5. Step 5 is arithmetic and checkable from the planned columns. Settles a contradiction the document was carrying — 1:1.5 at ENTRY, 1:1.25 the realised floor after a permitted shortening. | His rules |
+| v1.6 | [decide] | §4 written. The two setups differ by METHOD, not location. Invalidation stated per setup, and §6's re-entry rule shown to follow from S&R's. | Method research, anchored to his stated rules |
+| v1.5 | [decide] | §5 and §6 written. 4% per trade; the rung moves by hand; 4% is also the daily limit and there is no weekly or monthly one. One position at a time. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep. R-08's sequence recorded as existing but not written down. | His answers |
+| v1.4 | [decide] | \`planned_stop\` and \`planned_target\` recorded at journalling time. R-03 moves from \`field\` to \`journal\`. §8 and §12 restated: intent is on the row. | Schema change |
+| v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach. R-01 gains its lower bound. The R:R floor restated as 1:1.25. | His decision |
+| v1.2 | [decide] | Tolerance settled at none. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror. | His decision |
+| v1.1 | [decide] | \`TOL\` named and R-01/R-02 given executable predicates. R-03 relabelled \`field\`. §8 records \`size_oz\` and the \`pnl\` fallback. | Review of v1.0 against the live schema |`,
 
 };

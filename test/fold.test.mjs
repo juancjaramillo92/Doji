@@ -1188,10 +1188,11 @@ test('the evidence rides with the rung when there is any', () => {
   assert.ok(!channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: null }]).includes('()'));
 });
 
-/* THE DATE IS WHAT KEEPS THE MAP FROM GOING BLIND. The ladder never comes down,
-   so a year of ordinary use piles every channel he has touched at `owns` and the
-   census stops being able to say which one is thin — which is the only thing it
-   is for. `moved_on` was written from the first day and rendered by nobody. */
+/* THE DATE IS WHAT KEEPS THE MAP FROM GOING BLIND. Nothing brings a rung down
+   but him saying he has lost one, so a year of ordinary use piles every channel
+   he has touched at `owns` and the census stops being able to say which one is
+   thin — which is the only thing it is for. `moved_on` was written from the
+   first day and rendered by nobody. */
 
 test('a rung says when it last moved', () => {
   const out = channelsList([
@@ -1292,9 +1293,9 @@ test('a section that exists is served whole, with or without its sign', () => {
 });
 
 test('a section that genuinely is not written says so rather than nothing', () => {
-  // §7 cites sections that are drafted and not yet written. An empty result is
-  // a blank she fills in herself.
-  for (const key of ['9', '9.1', 'nonsense', null, undefined]) {
+  // The number comes from the model, so a mistyped or an invented one is what
+  // arrives. An empty result is a blank she fills in herself.
+  for (const key of ['1', '1.1', '11', 'nonsense', null, undefined]) {
     assert.match(readStrategy(key), /has no section/, `${key} came back silently`);
   }
 

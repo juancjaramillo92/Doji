@@ -36,6 +36,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID } from '../supabase/functions/doji-eugenia/index.ts';
+import { CONSOLIDATE } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -103,11 +104,79 @@ test('the README builds the same eugenia_trades view that 003 does', () => {
     'following the README would build the wrong view');
 });
 
-test('the view exposes size_oz and still hides what it is meant to hide', () => {
+/* ─── What §8 says she holds, against what the view hands her ────────────────
+   §8 is the section she is told to read before producing any number, and its
+   first paragraph is the inventory of a row. For five versions it named four
+   columns the view does not serve — she followed its monthly instruction against
+   `net_pnl` and summed a column that was not there.
+
+   THE INVENTORY IS THEREFORE A COPY OF THE VIEW, in prose, in a file no SQL
+   change has any reason to touch. `id` is in the view and not in §8's list
+   because nothing in the document computes from it beyond the `PID` filter,
+   which §8 states separately — so it is added here rather than left as a
+   difference that would have to be explained every time this is read.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('§8 inventories exactly the columns the view serves', () => {
+  const between = (from, to) => {
+    const a = SECTIONS['8'].indexOf(from);
+    assert.ok(a > -1, `§8 no longer carries "${from}"`);
+    const b = SECTIONS['8'].indexOf(to, a);
+    assert.ok(b > a, `§8 no longer carries "${to}" after "${from}"`);
+    return [...SECTIONS['8'].slice(a, b).matchAll(/`([a-z_]+)`/g)].map(m => m[1]);
+  };
+
+  const served = between('**Broker-owned and served to you**', '**Journal-owned**');
+  const owned = between('**Journal-owned**', '**Derived at read time');
+  assert.ok(served.length >= 8 && owned.length === 4,
+    `§8's inventory read as ${served.length} broker and ${owned.length} journal ` +
+    `columns — the reader has gone blind rather than the lists having changed`);
+
+  assert.deepEqual(
+    [...served, ...owned, 'id'].sort(),
+    viewColumns(EUGENIA_SQL, '003_eugenia.sql').sort(),
+    'the section she reads before producing any number inventories a different ' +
+    'row than the view hands her — either she reasons about a column that is ' +
+    'not there, or one she has is invisible to her');
+
+  /* AND THE WITHHELD ONES STAY WITHHELD. §8 now explains why each is absent,
+     and every explanation is a rule she would otherwise have to be told: that
+     costs are already in the P&L, that balance is the wrong denominator, that
+     the unsettled figure is not reachable by name. Serving one silently turns
+     its paragraph into a wrong fact about her own document. */
+  const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
+  // Scoped to the block that explains them. `balance` and `computed_pnl` are
+  // named all over §8 for other reasons, so searching the section rather than
+  // the block is a check that cannot fail — it passed with the whole paragraph
+  // for `balance` deleted.
+  const withheld = between('### On the row and deliberately withheld', '### Position size');
+  for (const held of ['commission', 'balance', 'computed_pnl', 'user_id']) {
+    assert.ok(!cols.includes(held),
+      `${held} is served, and §8 tells her it is withheld and why`);
+    assert.ok(withheld.includes(held),
+      `§8 no longer says why ${held} is withheld, so the rule that absence ` +
+      `enforces is nowhere written down`);
+  }
+});
+
+test('the view exposes what the strategy computes from, and still hides the rest', () => {
   const cols = viewColumns(EUGENIA_SQL, '003_eugenia.sql');
   // Without this she can read every trade and never its size, so account tier
   // and per-trade risk stay underivable however the prompt is written.
   assert.ok(cols.includes('size_oz'), 'Eugenia cannot see position size');
+
+  /* AND net_pnl, BECAUSE §8 SUMS IT AND `pnl` CANNOT BE SUMMED HONESTLY.
+     `pnl` is `coalesce(net_pnl, computed_pnl)`, so on a position whose broker
+     email has not landed it is the folded figure and carries no swap — and this
+     account holds through the 17:00 rollover. Served `pnl` alone she followed
+     §8's monthly instruction against a column that does not exist and produced
+     a total short by an unknown amount, on rows she could not identify. The
+     failure was silent for five versions of the document, which is why it is
+     asserted here rather than left to the prose in either file. */
+  assert.ok(cols.includes('net_pnl'),
+    'Eugenia cannot see net_pnl, so every multi-day total she gives silently ' +
+    'falls back to computed_pnl and omits swap');
+
   for (const hidden of ['user_id', 'balance', 'commission']) {
     assert.ok(!cols.includes(hidden), `${hidden} is exposed to Eugenia`);
   }
@@ -297,17 +366,28 @@ test('the note length is one number on both sides of the wire', () => {
    tool never offers is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* ─── The five channels, in three places ────────────────────────────────────
+/* ─── The five channels, in four places and two vocabularies ────────────────
    prompt.ts declares them once and the prose interpolates the names, so her
-   vocabulary cannot drift from the list. The other two copies can: the tool's
-   enum is what she is allowed to name, and the check constraint is what the
-   database will accept. An id the tool offers and the constraint refuses is a
-   set_channel that 400s — reported to her as a database fault, and to nobody
-   else at all. An id the constraint allows that the tool never offers is a rung
-   nothing can ever move: it reads as a channel he has not reached, forever.
+   vocabulary cannot drift from the list. The other three copies can: the tool's
+   enum is what she is allowed to name, the check constraint is what the database
+   will accept, and §2 of the strategy is the mechanism behind each one. An id
+   the tool offers and the constraint refuses is a set_channel that 400s —
+   reported to her as a database fault, and to nobody else at all. An id the
+   constraint allows that the tool never offers is a rung nothing can ever move:
+   it reads as a channel he has not reached, forever.
+
+   §2 IS THE COPY THAT IS NOT AN ID, which is why it is checked separately and
+   against the other half of the pair. She never utters "central_bank_buying"
+   across a desk, so §2 heads each channel with the SPOKEN name — and a name can
+   therefore drift with every id in the repository still agreeing.
+
+   EITHER WAY IT IS THE QUIET FAILURE. She would teach the channel, at length and
+   correctly, against a map with no rung for it — so the census that exists to
+   show what he has never met would report nothing at all about the thing she
+   spent the morning on.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the five channels are the same five ids in the prompt, the tool and the constraint', () => {
+test('the five channels are the same five in the prompt, the tool, the constraint and §2', () => {
   const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
   const enforced = [...(EUGENIA_SQL.match(/check \(channel in \(([^)]*)\)/i)?.[1] ?? '')
@@ -320,9 +400,23 @@ test('the five channels are the same five ids in the prompt, the tool and the co
     'the check constraint and prompt.ts no longer hold the same five channels');
 
   // The tool offers whatever prompt.ts declares rather than a list of its own,
-  // which is what makes the third copy impossible rather than merely checked.
+  // which is what makes the tool's copy impossible rather than merely checked.
   assert.match(EUGENIA_TS, /enum: CHANNELS\.map\(\(\[id\]\) => id\)/,
     'set_channel names its channels literally again instead of reading CHANNELS');
+
+  // §2 heads each channel with the name she says out loud, so the mechanism she
+  // reads and the rung she moves are the same five channels under two spellings.
+  const spoken = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
+    .matchAll(/\['[a-z_]+',\s*'([^']+)'\]/g)].map(m => m[1]);
+  assert.equal(spoken.length, declared.length,
+    'the channel list no longer pairs every id with the name she says');
+
+  const headed = [...SECTIONS['2'].matchAll(/^### (.+)$/gm)].map(m => m[1].toLowerCase());
+  for (const name of spoken) {
+    assert.ok(headed.includes(name),
+      `§2 has no section headed "${name}" — she reads the mechanism for a channel ` +
+      `under one name and moves the rung under another`);
+  }
 });
 
 test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
@@ -338,7 +432,48 @@ test('the five rows are seeded, or a channel is invisible rather than unseen', (
     'the seed and the channel list disagree — an unseeded channel vanishes from her map');
 });
 
-test('the rungs are the same words in the tool and the constraint', () => {
+/* ─── The rung that comes back down, and the one that cannot ────────────────
+   The ladder climbed only, for a reason: failing to reach for a mechanism once
+   is not the same as having lost it. What that reasoning missed is that HE can
+   say he has lost it — and promoting too early is her natural error, so without
+   a way down she keeps using a term bare that he told her he no longer follows,
+   with nothing anywhere reporting it.
+
+   THE BOTTOM RUNG IS STILL UNREACHABLE, and that is the half worth testing.
+   `unseen` says a channel has never once come up. It is the only absence this
+   system can see, and a demotion able to write it would report a channel she
+   taught last week as one he has never met — which is the census reporting the
+   opposite of the truth in the one column it exists for.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a demotion can reach every rung but the bottom one', () => {
+  const at = EUGENIA_TS.indexOf('async function setChannel(');
+  assert.ok(at > -1, 'doji-eugenia no longer has setChannel()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+
+  // Before the write, not after it: a PATCH that has already landed cannot be
+  // refused, and `unseen` written once is indistinguishable from never taught.
+  const guard = body.indexOf('CHANNEL_STATES[0]');
+  assert.ok(guard > -1,
+    'setChannel no longer refuses the bottom rung, so a demotion can report a ' +
+    'channel she has taught as one he has never met');
+  assert.ok(guard < body.indexOf('method: "PATCH"'),
+    'the bottom-rung guard sits after the write, which is not a guard');
+});
+
+test('the nightly pass is told a demotion is his to declare', () => {
+  /* The tool permits it and the prompt is what asks for it. Silence here is the
+     shape this defect had for its whole life: a mechanism that exists, is
+     documented, and is never once invoked because nothing tells her to. */
+  assert.match(CONSOLIDATE, /comes back down when he says so/i,
+    'the nightly pass is no longer told that he can declare a demotion, so the ' +
+    'rung only ever climbs however the tool is written');
+  assert.match(CONSOLIDATE, /never move one down/i,
+    'the pass is no longer told that a demotion needs him to have said it — ' +
+    'she would start reading one off a quiet evening');
+});
+
+test('the rungs are the same words in the tool, the constraint and §0', () => {
   const declared = [...(EUGENIA_PROMPT.match(/CHANNEL_STATES = \[([^\]]*)\]/)?.[1] ?? '')
     .matchAll(/'([a-z]+)'/g)].map(m => m[1]);
   const enforced = [...(EUGENIA_SQL.match(/check \(state in \(([^)]*)\)/i)?.[1] ?? '')
@@ -351,6 +486,15 @@ test('the rungs are the same words in the tool and the constraint', () => {
     'the ladder has changed — say so here, and check what channelsList falls back to');
   assert.deepEqual(enforced.sort(), [...declared].sort(),
     'the check constraint and prompt.ts no longer hold the same rungs');
+
+  /* AND §0 SAYS WHAT TO DO AT EACH ONE, a row per rung, which is what turned
+     the ladder from a census into an instruction. A rung renamed anywhere else
+     leaves that table answering for a state nothing produces and silent on the
+     state she is actually handed — and the silence is the half that shows,
+     because she falls back to explaining everything or to explaining nothing. */
+  const pitched = [...SECTIONS['0'].matchAll(/^\| `([a-z]+)` \| /gm)].map(m => m[1]);
+  assert.deepEqual(pitched, declared,
+    'the strategy pitches at a different set of rungs than the map carries');
 });
 
 test('the note kinds are the same two words in the tool and the constraint', () => {
@@ -710,9 +854,10 @@ test('what is summarised into every turn can also be read in full', () => {
      SECTIONS means she holds an abbreviation of something she can no longer
      read whole, which is the shape of a confident wrong answer.
 
-     Sections 1-6 and 9-11 are cited and deliberately absent: they are drafted
-     separately, and readStrategy answering for them is asserted below rather
-     than pretended away here. */
+     Sections 1 and 11 do not exist and nothing cites them: a numbering that
+     skips reads as a decision where six holes read as an unfinished document,
+     and readStrategy answering for a number she invents is asserted below
+     rather than pretended away here. */
   for (const k of ['0', '7']) {
     assert.ok(k in SECTIONS,
       `§${k} is summarised into every turn and can no longer be read in full`);
@@ -726,8 +871,9 @@ test('an unknown section is answered, never silently empty', () => {
   assert.ok(at > -1, 'doji-eugenia no longer has readStrategy()');
   const body = src.slice(at, src.indexOf('\n}', at));
 
-  // §7 cites sections that are not written. An empty tool result is a blank she
-  // fills in herself, which is the one outcome worse than saying it is missing.
+  // The section number arrives from the model, so an invented one is what this
+  // has to survive. An empty tool result is a blank she fills in herself, which
+  // is the one outcome worse than saying it is missing.
   assert.match(body, /has no section/,
     'readStrategy returns nothing for a section that does not exist — she would ' +
     'invent the reasoning rather than report it missing');
@@ -958,6 +1104,12 @@ test('the search function is not reachable by a public key', () => {
    document — the rule cited §6, §6 said the steps existed somewhere else, and
    nothing anywhere could state them. A rule pointing at nothing reads exactly
    like a rule pointing at something.
+
+   FOUR SINCE v1.9. Psychological levels were a fifth and were folded into the
+   levels step, because they gated nothing — a step that can never be the step
+   you stopped at is not a step, and R-08's only claim is that one of them ends
+   the sequence. The count is asserted because the fold is the kind of edit that
+   lands in the prose and not in the list.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('R-08 cites a section that actually holds its steps', () => {
@@ -969,25 +1121,29 @@ test('R-08 cites a section that actually holds its steps', () => {
   const body = SECTIONS[cited[1]];
   assert.ok(body, `R-08 cites §${cited[1]}, which get_strategy cannot serve`);
 
-  // Five, numbered, in the section the rule points at. The ORDER is the rule —
+  // Four, numbered, in the section the rule points at. The ORDER is the rule —
   // a failed step ends the sequence rather than being traded off against a
   // later one — so a list that has stopped being ordered is a different rule.
   const steps = [...body.matchAll(/^\d\. \*\*/gm)];
-  assert.equal(steps.length, 5,
-    `§${cited[1]} lists ${steps.length} numbered steps, not the five R-08 requires`);
+  assert.equal(steps.length, 4,
+    `§${cited[1]} lists ${steps.length} numbered steps, not the four R-08 requires`);
 });
 
 test('the two reward-to-risk numbers are kept apart', () => {
-  /* 1:1.5 is a condition at ENTRY — step 5 refuses the trade below it. 1:1.25 is
-     the floor of what can be REALISED after a $30 target is shortened to $25 on
-     a trade already open. The document stated one floor for six versions and the
-     two silently contradicted each other. */
-  assert.match(ALWAYS, /at least 1:1\.5 to enter/,
+  /* 1:1.5 is a condition at ENTRY — step 4 refuses the trade below it. A
+     realised 1:1.25 is what a $30 target shortened on an open trade leaves
+     behind, and it is ALSO what $25 set at entry over a $20 stop leaves behind,
+     which is a breach. The document stated one floor for six versions and the
+     two silently contradicted each other; v1.9 keeps them apart by saying the
+     row cannot tell which produced it. */
+  assert.match(ALWAYS, /at least 1:1\.5\s+to\s+enter/,
     'the entry condition has stopped being stated in the always-loaded half');
-  assert.match(SECTIONS['12'], /Planned, at\s+entry: at least 1:1\.5/,
-    'the definition no longer separates planned from realised');
-  assert.match(SECTIONS['12'], /Realised: 1:1\.25 at worst/,
-    'the realised floor is gone from the definition');
+  assert.match(SECTIONS['12'], /At entry it is a condition: at least 1:1\.5/,
+    'the definition no longer states 1:1.5 as a condition at entry');
+  assert.match(SECTIONS['12'],
+    /realised 1:1\.25 is legitimate as an outcome and illegitimate as a plan/,
+    'the definition has gone back to reading 1:1.25 as a floor, which is the ' +
+    'reading that let an entry in breach of step 4 look like the rule working');
 });
 
 /* ─── The strategy is markdown inside a template literal ─────────────────────

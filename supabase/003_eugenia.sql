@@ -74,17 +74,26 @@ alter table public.eugenia_turns enable row level security;
 -- A NEW COLUMN GOES ON THE END, AND NOTHING ELSE MOVES. `create or replace view`
 -- may only append: it matches the existing view position by position, so a name
 -- inserted mid-list reads as renaming the column that used to sit there and
--- Postgres refuses with `cannot change name of view column`. `size_oz` is last
--- for that reason and not because the order is meaningful — putting it beside
--- the other broker columns, where it belongs by sense, is exactly the tidy that
--- breaks re-application on every database that already has this view.
+-- Postgres refuses with `cannot change name of view column`. The tail of this
+-- list is therefore in the order the columns were added and not in the order
+-- they belong by sense — putting `size_oz` and `net_pnl` up beside the other
+-- broker columns is exactly the tidy that breaks re-application on every
+-- database that already has this view.
+--
+-- `net_pnl` IS HERE BECAUSE `pnl` ALONE CANNOT BE SUMMED HONESTLY. `pnl` is
+-- `coalesce(net_pnl, computed_pnl)`, so on any position whose broker email has
+-- not landed it is the folded figure, which carries no swap — and this account
+-- holds through the 17:00 rollover. With both columns she can sum the settled
+-- ones and say how many fell back; with `pnl` alone every multi-day total was
+-- short by an unknown amount on a subset she could not name.
 --
 -- Removing or reordering needs a `drop view` first, which also drops the grants
 -- below it. Appending never does.
 create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz
+         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
+         net_pnl
   from public.trades
   where deleted = false;
 
