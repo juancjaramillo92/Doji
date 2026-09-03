@@ -37,7 +37,7 @@ import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
-import { CONSOLIDATE } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CONSOLIDATE, SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -136,6 +136,35 @@ test('every eugenia_trades view the README states is the one the SQL ends with',
       'the README quotes a view with a different column list than the numbered SQL ' +
       'ends up with — following the README would build the wrong view');
   }
+});
+
+/* ─── The row as TWO files describe it ───────────────────────────────────────
+   `TradeRow` says in its own comment that it is the row eugenia_trades serves,
+   and it is the type every rule in adherence.ts is written against — so a
+   column the view gained and the interface did not is a column no rule can
+   name, invisibly. That is exactly what happened: 006 appended the plan to the
+   view and TradeRow went on describing the row without it for two releases.
+
+   IT MATTERS MORE NOW THAT A READ ASKS FOR `select=*`. readDesk takes whatever
+   the view serves precisely so the column list is not copied a fourth time —
+   which makes this interface the only description of what comes back, and a
+   wrong one indistinguishable from a right one at runtime.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('TradeRow names exactly the columns the view serves', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/adherence.ts', import.meta.url), 'utf8');
+  const declared = src.match(/export interface TradeRow \{([\s\S]*?)\n\}/);
+  assert.ok(declared, 'adherence.ts no longer declares TradeRow');
+
+  const named = [...declared[1].matchAll(/^\s*(\w+)\s*:/gm)].map(m => m[1]);
+  assert.ok(named.length >= 8,
+    `only ${named.length} fields read out of TradeRow — the reader has gone blind`);
+
+  assert.deepEqual(named.sort(), servedView().sort(),
+    'TradeRow and the view disagree about what a row is — a column the view ' +
+    'serves that the interface does not name is one no rule can be written ' +
+    'against, and one it names that the view drops is a rule reading undefined');
 });
 
 /* ─── What §8 says she holds, against what the view hands her ────────────────
@@ -493,6 +522,40 @@ test('a demotion can reach every rung but the bottom one', () => {
     'channel she has taught as one he has never met');
   assert.ok(guard < body.indexOf('method: "PATCH"'),
     'the bottom-rung guard sits after the write, which is not a guard');
+});
+
+/* ─── The guard on his levels is a paragraph, and nothing else holds it ──────
+   She is handed his entry, his stop and his target on six paths now, and the
+   only thing between that and her quoting them back at him every morning is a
+   rule in the prompt. There is no structural half here — unlike the broker
+   token she does not hold, or the write path to `trades` that does not exist —
+   because the whole point of giving her the numbers is that she can use them
+   when he ASKS.
+
+   So the failure is a briefing that opens on the level he is long from. It
+   reads as her being relevant, keeps every prohibition she has, and quietly
+   makes the morning about his position rather than about the day. Deleting the
+   paragraph breaks nothing anywhere else.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the prompt keeps his levels out of a message she starts', () => {
+  /* Read with the wrapping collapsed. The prompt is hard-wrapped at 84 columns
+     and a sentence that fits on one line today sits across two the moment a
+     word is added ahead of it — so a literal match here would go red on an edit
+     that changed nothing about the rule. */
+  const said = SYSTEM.replace(/\s+/g, ' ');
+
+  assert.match(said, /HIS LEVELS DO NOT APPEAR IN A MESSAGE YOU START/,
+    'the prompt no longer keeps his entry and his stop out of a message she ' +
+    'opens — she has them on every path and nothing now says not to lead with them');
+
+  /* AND THE ONE REFUSAL. Everything else about an open position she may discuss
+     when he raises it; this is the sentence that keeps the discussion short of
+     advice, and it is the whole of the prohibition on the path where he is most
+     likely to want one. */
+  assert.match(said, /any statement about what to DO with the position/,
+    'the prompt no longer refuses trade management on the open position, which ' +
+    'is the one thing the block was not built to enable');
 });
 
 test('the nightly pass is told a demotion is his to declare', () => {
@@ -1449,7 +1512,7 @@ const reaches = (code, fn) => {
   return false;
 };
 
-test('every path that speaks to him reads his notes and the map', () => {
+test('every path that speaks to him reads his notes, the map and his desk', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -1474,8 +1537,10 @@ test('every path that speaks to him reads his notes and the map', () => {
      the nightly pass was already fixed for: an instruction that outruns its
      inputs, and one that fails by teaching the wrong thing well rather than by
      failing at all. */
-  for (const fn of ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
-                    'postRelease']) {
+  const SPEAKS = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
+                  'postRelease'];
+
+  for (const fn of SPEAKS) {
     // Comments stripped, because the identifier appearing in prose about the
     // call is not the call. And `await` required: notesBlock is async, so an
     // un-awaited one interpolates "[object Promise]" into the prompt — which
@@ -1495,6 +1560,27 @@ test('every path that speaks to him reads his notes and the map', () => {
     assert.ok(reaches(code, 'channelsBlock'),
       `${fn} never gets channelsBlock() into the message it sends — she would teach without knowing ` +
       `which channels are thin, and nothing would report it`);
+  }
+
+  /* AND WHAT HE HAS ON, WHICH IS SIX PATHS RATHER THAN FIVE. The move look
+     joins because the message that talks past a live position is whichever one
+     happens to be next, and a sharp move is the likeliest of all of them to
+     arrive while he is in one.
+
+     Losing it is silent in the way that matters: she carries on writing well,
+     about a level or a shape, into a chat where he is sitting in a trade — and
+     the message reads as correct because every rule about what she may SAY is
+     still being kept. The only thing missing is the fact that would have
+     stopped her.
+
+     postTradeEvent is deliberately not here. It is reached FROM the position
+     and already carries the row that fired it, so the block would hand it what
+     it opened with. */
+  for (const fn of [...SPEAKS, 'postMove']) {
+    const code = body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    assert.ok(reaches(code, 'positionsBlock'),
+      `${fn} never gets positionsBlock() into the message it sends — it can talk ` +
+      `past an open position, and every rule about what she may say still passes`);
   }
 });
 

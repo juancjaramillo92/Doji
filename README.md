@@ -1376,6 +1376,54 @@ Telling her to build a mechanism he has never had built, without handing her the
 map that says which those are, is an instruction outrunning its inputs — and it
 fails by teaching the wrong thing well rather than by failing at all.
 
+### What he has on right now
+
+Every other thing she is handed is about the market, or about what he
+understands. **None of them said whether he was exposed.** So a briefing could
+open on an observation about a level while he sat in a position through the very
+print it was describing, and nothing about that message read as wrong from
+anywhere — every prohibition was kept, and the only thing missing was the fact
+that would have stopped her writing it.
+
+`positionsBlock()` is that fact. One read with two filters, because each half
+misses the other: an overnight hold is not in today's rows and today's closed
+trades are not open. It renders the open positions — age, side, size, entry, and
+the stop and target as first seen — the quarter-hourly mark **with its age**, and
+where the day stands against the 4% R-11 sets. When he is flat and has not traded
+today, which is most mornings, it is nothing at all.
+
+It is handed to six paths rather than five: the briefing, the pulse, a reply, the
+release look, the nightly pass, and the move look, which joins because a sharp
+move is the likeliest of all of them to arrive while he is in something. The
+trade-event look is deliberately outside it — that one is reached *from* the
+position and already holds the row that fired it.
+
+**What she may do with it is a narrower thing than what she can see, and that
+asymmetry is the design.** Unprompted it does two jobs: it stops her writing
+anything setup-flavoured while a position is open, and it lets her name a
+collision his own rules already name — a high-impact print against an open
+position (R-14, R-19), or a day past R-11. When *he* raises the position she
+discusses it properly, using his entry and his plan, and refuses exactly one
+thing: any statement about what to do with it.
+
+**His levels never appear in a message she starts.** A briefing that mentions the
+number he is long from has begun framing the day around his position rather than
+around what is happening — and it reads as relevance while being the opposite.
+That guard is a paragraph in the prompt and has no structural half, because the
+whole point of handing her the numbers is that she can use them when asked; a
+test reads the prompt for it, since deleting it breaks nothing else.
+
+**No unrealised P&L is computed.** The nearest price she holds is up to fifteen
+minutes old, and that figure would be both the most anchoring number in the block
+and the one staleness gets most wrong. Entry and mark are given as what they are,
+labelled, and she can subtract them if he asks.
+
+A run of losses is governed separately and by the same idea as the briefing's
+chain: she may never hand him a tally, because a scoreboard is read as the
+verdict she did not write. She raises a run only when she can say what the trades
+have **in common**, and then says the common thing rather than the count. A
+breach of one of his own rules is not withheld — that is his document deciding.
+
 ### Search that survives a rephrasing
 
 `eugenia_search` was `websearch_to_tsquery` ranked by `ts_rank`: it found rows
@@ -2733,7 +2781,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped` and `apologyFor` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the five paths that must call each — the briefing, the pulse, a reply, the release look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` and `channelsBlock()` against the five paths that must call each — the briefing, the pulse, a reply, the release look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; and `TradeRow` against the column list the view actually serves |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

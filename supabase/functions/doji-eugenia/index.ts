@@ -36,7 +36,10 @@ import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // The eight rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
 // are exported in the app: it is the part that has to be testable.
-import { checkRules, adherenceList, dayStanding, DAY_LOSS, type TradeRow } from "./adherence.ts";
+import {
+  checkRules, adherenceList, dayStanding, DAY_LOSS,
+  type TradeRow, type Standing,
+} from "./adherence.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the
 // reason that file gives.
 import {
@@ -2153,6 +2156,104 @@ async function calendarBlock(): Promise<string> {
   }
 }
 
+/* ─── What he has on, and where his day stands ─────────────────────────────
+   THE ONE THING SHE COULD NOT SEE. Every other block is about the market or
+   about what he understands, and none of them said whether he is exposed right
+   now — so a briefing could open on an observation about a level while he sat
+   in a position through the print it was describing, and nothing about that
+   read as wrong from anywhere. Six of the seven paths get it, because the
+   message that talks past a live trade is whichever one happens to be next —
+   postTradeEvent is the exception and is reached FROM the position it would
+   otherwise be told about.
+
+   ONE READ AND TWO FILTERS, because each half misses the other. An overnight
+   hold is not in today's rows and today's closed trades are not open; either
+   filter alone answers half the question. PostgREST's `or=` asks both at once,
+   and dayStanding does its own civil-day filter over what comes back.
+
+   THE CIVIL DAY IS READ ONCE AND PASSED IN, not taken from the clock at each
+   use. Two reads a few milliseconds apart are the same date every night but
+   one, and on that night the filter would fetch one day while the standing was
+   computed for the next — a wrong day's P&L, once a year, from code that looks
+   right.
+
+   `select=*` rather than the column list, which is the exception here and has a
+   reason: eugenia_trades exists precisely to BE the list of what she may see, so
+   naming the columns again would be a fourth copy of it that nothing compares.
+   ───────────────────────────────────────────────────────────────────────── */
+async function readDesk(day: string): Promise<TradeRow[]> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/eugenia_trades?select=*` +
+    `&or=(open_day.gte.${day},fill_time.is.null)` +
+    `&order=entry_time.desc&limit=50`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Desk read failed (HTTP ${res.status})`);
+  return await res.json();
+}
+
+/* THE MARK CARRIES ITS AGE AND NO UNREALISED FIGURE IS COMPUTED, which is one
+   decision rather than two. eugenia_price is rewritten quarter-hourly, so the
+   nearest price she holds can be fifteen minutes old — and an unrealised P&L
+   would be both the most anchoring number in this block and the one that
+   staleness gets most wrong. Entry and mark, each labelled as what it is, let
+   her do the subtraction when he asks and leave nothing pre-computed to lean on
+   when he does not.
+
+   A NULL FIELD IS SAID RATHER THAN PRINTED. Every column here is nullable and a
+   journal row he opened by hand carries almost none of them, so an unguarded
+   template puts `from null` in front of her — which reads as a price. */
+export function positionsList(
+  open: TradeRow[], standing: Standing | null, mark: Mark | null, now = Date.now(),
+): string {
+  const lines = open.map(t => {
+    const since = t.entry_time ? `open since ${nyTime(t.entry_time)} ET` : "open";
+    const what = [t.direction, t.size_oz != null ? `${t.size_oz}oz` : null]
+      .filter(Boolean).join(" ") || "side and size not recorded";
+    const from = t.entry_price != null ? ` from ${t.entry_price}` : "";
+    const plan = t.planned_sl != null && t.planned_tp != null
+      ? `, stop ${t.planned_sl} and target ${t.planned_tp} as first seen`
+      : "";
+    return `· ${since} — ${what}${from}${plan}`;
+  });
+
+  // Only beside a position: the mark is what she would subtract the entry from,
+  // and on a flat day it is a price with nothing to be a price OF.
+  if (lines.length && mark) {
+    lines.push(`· gold was ${mark.bid} ` +
+               `${Math.round((now - Date.parse(mark.at)) / 60_000)} minutes ago`);
+  }
+
+  if (standing) {
+    lines.push(
+      `· his day so far: ${standing.pnl.toFixed(2)} against an account of ` +
+      `${standing.account.toFixed(0)} implied by his size — ` +
+      `${standing.breached ? "PAST" : "inside"} the ${DAY_LOSS * 100}% R-11 sets`);
+  }
+
+  return lines.length
+    ? `\n\nWhat he has on, and where his day stands:\n${lines.join("\n")}`
+    : "";
+}
+
+/* THE MARK IS CAUGHT SEPARATELY, and that is the point of catching it at all: a
+   price she cannot read costs one line, where the outer catch would cost her the
+   position itself. Read only when something is open, which on most days is not
+   at all. */
+async function positionsBlock(): Promise<string> {
+  try {
+    const day = nyDate(new Date());
+    const rows = await readDesk(day);
+    const open = rows.filter(t => t.fill_time === null);
+    return positionsList(
+      open,
+      dayStanding(rows, day),
+      open.length ? await readMark().catch(() => null) : null);
+  } catch (err) {
+    console.error("doji-eugenia: positions unavailable —", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
+
 /* ─── The cron half: the briefing, and the quieter second look ───────────── */
 
 // pg_net is fire-and-forget and never retries, so this half may take as long as
@@ -2377,14 +2478,15 @@ async function postBriefing(due: Brief): Promise<Response> {
      run one after another they were six round trips before the first token of a
      briefing was asked for. Promise.all is the same argument the tool dispatch
      now makes: a batch should cost its slowest member. */
-  const [notes, channels, trades, story, loops, calendar] = await Promise.all([
-    notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
+  const [notes, channels, trades, story, loops, calendar, desk] = await Promise.all([
+    notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(), loopsBlock(),
+    calendarBlock(), positionsBlock(),
   ]);
 
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    + notes + channels + trades + story + loops + calendar;
+    + notes + channels + trades + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
@@ -2555,12 +2657,13 @@ async function postConsolidation(): Promise<Response> {
      transcript that on most days does not mention a trade at all. It is the
      same read the briefing already makes through the same read-only view, so
      this buys the evidence for that instruction and no new reach. */
-  const [notes, channels, trades, story, loops, calendar, verdicts] = await Promise.all([
+  const [notes, channels, trades, story, loops, calendar, verdicts, desk] = await Promise.all([
     notesBlock(), channelsBlock(), tradesBlock(),
-    thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(),
+    thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(),
   ]);
 
-  const asked = CONSOLIDATE + notes + channels + trades + story + loops + calendar + verdicts +
+  const asked = CONSOLIDATE + notes + channels + trades + story + loops + calendar +
+    verdicts + desk +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
@@ -2617,11 +2720,12 @@ async function logChannels() {
 }
 
 async function postPulse(): Promise<Response> {
-  const [notes, channels, story, loops, calendar] = await Promise.all([
+  const [notes, channels, story, loops, calendar, desk] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
+    positionsBlock(),
   ]);
   const asked = "Pulse, please — anything since the briefing?"
-    + notes + channels + story + loops + calendar;
+    + notes + channels + story + loops + calendar + desk;
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'pulse');
 
@@ -2692,14 +2796,14 @@ async function postRelease(): Promise<Response> {
   // built and cannot know which those are without it. Asking her to teach from
   // a ladder she is not handed is the shape the nightly pass was already fixed
   // for: an instruction that outruns its inputs.
-  const [notes, channels, story, loops] = await Promise.all([
-    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
+  const [notes, channels, story, loops, desk] = await Promise.all([
+    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(),
   ]);
   const asked = RELEASE +
     `\n\nWhat landed: ${nyTime(due.at)} ET ${due.name}` +
     (due.consensus ? `, ${due.consensus} expected` : "") +
     (due.prior ? `, after ${due.prior}` : "") + "." +
-    notes + channels + story + loops;
+    notes + channels + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'release look', RELEASE_TOOLS);
@@ -2951,8 +3055,8 @@ async function postMove(): Promise<Response> {
 
   await markPrice(spot.bid, true);
 
-  const [notes, story, loops, ahead] = await Promise.all([
-    notesBlock(), thesisBlock(), loopsBlock(), aheadToday(),
+  const [notes, story, loops, ahead, desk] = await Promise.all([
+    notesBlock(), thesisBlock(), loopsBlock(), aheadToday(), positionsBlock(),
   ]);
   // The window is STATED FROM THE MARK rather than asserted as a quarter of an
   // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
@@ -2968,7 +3072,7 @@ async function postMove(): Promise<Response> {
       ? `\nStill ahead today: ` +
         ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
       : "") +
-    notes + story + loops;
+    notes + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'move look', RELEASE_TOOLS);
@@ -3297,8 +3401,9 @@ async function handleMessage(update: any): Promise<void> {
 
     let answer: string;
     try {
-      const [history, notes, channels, story, loops, calendar] = await Promise.all([
-        recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
+      const [history, notes, channels, story, loops, calendar, desk] = await Promise.all([
+        recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
+        calendarBlock(), positionsBlock(),
       ]);
       /* TOLD THAT IT WILL BE HEARD, rather than left to a cap that silently
          drops the audio on a long answer. The instruction and SPEAK_MAX are one
@@ -3309,7 +3414,7 @@ async function handleMessage(update: any): Promise<void> {
           `aloud. Keep it under ${SPEAK_MAX} characters and write it to be heard — ` +
           `no lists, no headings, nothing that needs to be looked at.`
         : "";
-      const context = text + aloud + notes + channels + story + loops + calendar;
+      const context = text + aloud + notes + channels + story + loops + calendar + desk;
       answer = await ask(
         [...history, {
           role: 'user',
