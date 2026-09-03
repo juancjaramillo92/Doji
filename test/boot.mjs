@@ -28,7 +28,7 @@ const EXPOSED = [
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'pctSplit', 'byKey', 'round2',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
-  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc'
+  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch'
 ];
 
 export async function boot() {
@@ -78,14 +78,35 @@ export async function boot() {
   const answer = () => Promise.resolve(
     db.error ? { data: null, error: db.error } : { data: db.rows, error: null });
 
-  const table = {
-    select: () => table,
-    order:  () => table,
-    then: (ok, no) => answer().then(ok, no),
-    update(patch) { db.patches.push(patch); return table; },
-    eq: () => table,
-    single: () => Promise.resolve({ data: db.rows[0] ?? null, error: null })
+  /* PER-TABLE ANSWERS, because there are five of her tables now and one shared
+     row set would hand `trades` back to a query for the calendar — which reads
+     as a card that renders nonsense rather than as a stub that was never told
+     about the table. `db.tables[name]` when it exists, `db.rows` otherwise, so
+     every existing test is untouched. */
+  db.tables = {};
+  db.read = [];
+
+  const bind = (name) => {
+    const rows = () => (name in db.tables ? db.tables[name] : db.rows);
+    const reply = () => Promise.resolve(
+      db.error ? { data: null, error: db.error } : { data: rows(), error: null });
+    const t = {
+      select: () => t,
+      order:  () => t,
+      // The filter methods the app actually chains. Each returns the builder,
+      // because a stub that resolves on only one terminal method silently
+      // answers `undefined` the day a query drops it.
+      eq: () => t, gte: () => t, lte: () => t, is: () => t, limit: () => t,
+      then: (ok, no) => reply().then(ok, no),
+      update(patch) { db.patches.push(patch); return t; },
+      single: () => Promise.resolve({ data: rows()[0] ?? null, error: null }),
+      maybeSingle: () => Promise.resolve(
+        db.error ? { data: null, error: db.error } : { data: rows()[0] ?? null, error: null }),
+    };
+    return t;
   };
+
+  const table = bind('trades');
 
   win.supabase = {
     createClient: () => ({
@@ -95,7 +116,7 @@ export async function boot() {
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
       },
       channel: () => ({ on() { return this; }, subscribe() { return this; } }),
-      from: () => table,
+      from: (name) => { db.read.push(name); return name === 'trades' ? table : bind(name); },
       removeChannel: () => {}
     })
   };

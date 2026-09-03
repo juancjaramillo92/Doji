@@ -27,7 +27,7 @@
 -- (select it and press Run), read the `ok` column, and go looking below only
 -- where it says false.
 --
--- Each row is a fact 001-004 asserts, read back out of the catalogs. `expected`
+-- Each row is a fact 001-005 asserts, read back out of the catalogs. `expected`
 -- is what the files say; `actual` is what the database holds.
 -- coalesce, because a check whose subquery finds nothing yields NULL and NULL
 -- is not false — a missing table would print a blank `ok` and read as fine.
@@ -39,6 +39,59 @@ from (values
        and table_name in ('trades','eugenia_turns','eugenia_notes','eugenia_trades',
                           'eugenia_channels')),
    '5'),
+
+  -- 005's five. Separate from the row above rather than folded into it, because
+  -- a database with 003 and not 005 is a real and expected state — she runs,
+  -- every tool that touches one of these answers "that did not save", and the
+  -- only sign is a count. Which of the five is missing is in the table listing
+  -- further down.
+  ('005 tables exist',
+   (select count(*)::text from information_schema.tables
+     where table_schema = 'public'
+       and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
+                          'eugenia_loops','eugenia_feedback')),
+   '5'),
+
+  -- The thesis is a single row seeded by 005, and setThesis PATCHes it by
+  -- primary key — so a missing row is a 200 with an empty array and every
+  -- rewrite is dropped. The function reports that back to her; nothing reaches
+  -- him. Exactly the eugenia_channels seeding failure, in a second place.
+  ('the thesis row is seeded',
+   (select count(*)::text from public.eugenia_thesis where id = 'current'),
+   '1'),
+
+  -- Without pg_trgm the `<%` operator does not exist, so eugenia_search fails
+  -- to create — and if it were created before the extension were dropped, every
+  -- search would error inside her tool loop.
+  ('pg_trgm is installed',
+   (select count(*)::text from pg_extension where extname = 'pg_trgm'),
+   '1'),
+
+  -- THE EVENT SPINE'S OWN WIRING. Both triggers on `trades`, or a position
+  -- opens and closes with nothing telling her — which is indistinguishable from
+  -- a quiet day, because silence is this path's correct answer most of the time.
+  ('the trades triggers that call Eugenia exist',
+   (select count(*)::text from information_schema.triggers
+     where event_object_table = 'trades'
+       and trigger_name in ('trades_eugenia_opened','trades_eugenia_closed')),
+   '2'),
+
+  -- The app's card reads three of her tables and nothing else. No policy is an
+  -- empty list rather than an error, so the card hides itself and the reason is
+  -- unknowable from the browser.
+  ('the app can read the three tables its card draws',
+   (select count(*)::text from pg_policies
+     where schemaname = 'public'
+       and tablename in ('eugenia_calendar','eugenia_thesis','eugenia_loops')
+       and cmd = 'SELECT'),
+   '3'),
+
+  -- And her memory is still shut to it. This one is expected to be ZERO, and it
+  -- is the check that would catch a policy added to the wrong table.
+  ('her notes and turns stay closed to the app',
+   (select count(*)::text from pg_policies
+     where schemaname = 'public' and tablename in ('eugenia_notes','eugenia_turns')),
+   '0'),
 
   -- If pnl is a plain column, the email-beats-computed rule is no longer stated
   -- in the schema and every client is reading a stored value nobody maintains.
@@ -333,9 +386,13 @@ order by tablename;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
 -- Against 004_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
--- purge-cron-history nightly — three, all active. The summary block checks the
--- Vault secret name in the two calling jobs; this is where the schedules and
--- the timeouts are read.
+-- doji-eugenia-spine at 5,20,35,50 past, purge-cron-history nightly — four, all
+-- active. The summary block checks the Vault secret name in the calling jobs;
+-- this is where the schedules and the timeouts are read.
+--
+-- The spine is the one whose absence is silent in a new way: every release is
+-- still filed by the briefing, and none of them is ever looked at, so the
+-- calendar fills up and she simply never reacts to a print.
 select jobid, jobname, schedule, active, command
 from cron.job
 order by jobname;

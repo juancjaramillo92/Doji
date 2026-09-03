@@ -6,7 +6,7 @@ and you say so. The README is the contract for how the app behaves; this file is
 how to work on it, and it holds only what the README does not — every
 description of behaviour lives there, once.
 
-Doji is a personal XAUUSD trading journal: one `index.html` of ~3,800 lines, one
+Doji is a personal XAUUSD trading journal: one `index.html` of ~4,000 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, and three Edge Functions: `doji-mcp-sync` (the cTrader poller),
 `doji-email-sync` (which writes what the Apps Script parses out of Gmail) and
@@ -114,14 +114,15 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test
+npm test      # 317 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
 needs. Four suites, and the script globs `test/*.test.mjs` one level, so a test
 in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
-of all four Edge Functions and of `_shared`; `app.test.mjs` boots `index.html` in
-jsdom with a recording Supabase stand-in; `agree.test.mjs` holds the duplicated
+of all four Edge Functions, of `_shared` and of `adherence.ts`; `app.test.mjs`
+boots `index.html` in jsdom with a recording Supabase stand-in that answers
+per-table, so a query for her calendar cannot be served the trades; `agree.test.mjs` holds the duplicated
 vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
 Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
 suites.
@@ -379,6 +380,83 @@ code you write near it:
   pulse or a reply fails silently: she carries on ignoring something he believes
   she took, and nothing anywhere reports it. `agree.test.mjs` reads the four
   function bodies for it, and for `channelsBlock()` beside it.
+- **She has senses now, and they are data rather than a clock.** The briefing
+  files the day's calendar with `log_calendar`; a quarter-hourly cron job
+  (`?release=1`, its own job in `004_cron.sql`) looks at anything `high` that has
+  landed and is not yet `looked_at`. That column is stamped BEFORE the look, for
+  the reason the briefing marker is: a look that generates and fails to write
+  would otherwise repeat every fifteen minutes, each one billed. It is a second
+  job rather than a faster one because every hourly predicate tests `hour ===` —
+  a `*/15` on the existing job runs four briefings a morning.
+
+  A TRIGGER ON `trades` TELLS HER A POSITION OPENED, and the two things she may
+  say are both his own rules read back: R-14/R-19 on a print pending against an
+  open position, R-11 on a fill that took the day past its limit. Never a
+  verdict. Both branches decide from data BEFORE any model call, so the common
+  case — nothing pending, no breach — costs nothing at all. The close trigger
+  compares `old.fill_time is null and new.fill_time is distinct from null`;
+  `<>` is NULL there and the one event it exists for would never fire, and
+  without the guard the poller's two-minute re-upsert fires it forever.
+
+- **`adherence.ts` is the strategy executed, and the set of rules is not a
+  choice.** §7's `Evaluable` column decides it: eight `journal` rules, and the
+  eleven `judgment` and `field` ones stay out, because a judgment rule that
+  starts reporting `pass` is exactly the "no violations" claim §8 warns is close
+  to saying nothing. It is pure — rows in, verdicts out, no clock but the one
+  passed in — which is what lets every rule be driven in BOTH directions from a
+  test. `unknown` is never `pass`, and an empty population is `unknown`.
+  `agree.test.mjs` holds the eight against §7's table, because a rule marked
+  `journal` and never implemented is a check she cites that nobody runs.
+
+  Two numbers in it are decisions rather than facts and are named constants for
+  that reason: `CLOSEOUT_MIN` gives §6's "at or very near" the Friday close a
+  value, and `STRETCH` gives §5's "Christmas-to-New-Year stretch" one. The
+  holiday calendar is COMPUTED, Good Friday and the Saturday observance
+  included — a table of dates stops being true the year nobody extends it, and
+  that failure looks exactly like perfect compliance.
+
+- **Her memory has five lifetimes now, not three.** `eugenia_thesis` is one row
+  rewritten nightly — a thesis is a reading that is only ever current, which is
+  the opposite of a note and why it is not append-only. `eugenia_loops` holds
+  what she flagged and what she asked until it closes; opening one is a moment
+  and may happen anywhere, closing one is a judgment and belongs to the pass,
+  the same split as `remember` and `set_channel`. `eugenia_calendar` is both the
+  event spine's input and the only dataset here that compounds.
+
+- **`eugenia_runs` is where the meters survive.** Everything this file already
+  argues about `pg_net` — that nobody reads Edge logs — applied to every cost and
+  quality figure `ask()` was printing. One row per model call, plus one per
+  delivered briefing carrying its length, plus a row for the turns that FAILED,
+  which is the row that never existed. It never throws and never blocks an
+  answer. It is also what `consolidatedToday()` reads, which is how the nightly
+  pass finally gets the retry the briefing has always had: 23:00 New York, inside
+  the same civil day, gated so a pass that ran does not run twice.
+
+- **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
+  no tools. `keepDraft` is the guard: a revision that comes back empty,
+  apologetic or twice the length is a critic that failed, and the draft goes
+  instead. A critic that could make the briefing worse would be worse than none.
+
+- **A tool result is never dropped, and a round runs at once.** `serve()` answers
+  an unknown name with a sentence, because a user message missing the
+  `tool_result` for a `tool_use` block is a 400 — so a mistyped name would
+  present as a dead turn rather than as a mistake. The dispatch is
+  `Promise.all`: the model is taught to batch its calls and they were being
+  served in series.
+
+- **Voice and charts reach her; neither is stored as sent.** The transcript is
+  kept and the image is not — base64 in `eugenia_turns` is a megabyte resent as
+  history for six exchanges. `stamped` appends the clock as a trailing text
+  block, because concatenating against an array is `[object Object]` on exactly
+  the turns carrying the most context. Speech-to-text is the one external vendor
+  here; `STT_URL`/`STT_KEY` are OPTIONAL secrets and deliberately not in the boot
+  guard, and `agree.test.mjs` makes that exemption cost something — an optional
+  secret must be guarded where it is used.
+
+- **The apology names the job.** Every scheduled failure used to say "No
+  briefing", including the nightly pass, whose real symptom is that her memory
+  stops growing. `APOLOGY` is a word per job and a test asserts no two are alike.
+
 - **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
   no verdict on a trade, one question at a time. The line she may now cross is
   narrow and deliberate: *what the market is pricing* and *what would surprise
@@ -387,12 +465,18 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
-- **Four schedules, one hourly job, and `dueNow` picks between them.**
-  `briefDue`, `pulseDue`, `retryDue` and `consolidateDue` all read `nyClock`,
-  because pg_cron is UTC and a fixed expression is wrong for half the year. They
-  overlap, so each answering correctly on its own settles nothing: the
-  composition is the decision, and a test walks every hour of a week through
-  `dueNow` because one call cannot owe two answers. Adding an hour costs nothing
+- **Five schedules, two jobs, and `dueNow` picks between the clock-driven
+  four.** `briefDue`, `pulseDue`, `retryDue`, `consolidateDue` and
+  `consolidateRetryDue` all read `nyClock`, because pg_cron is UTC and a fixed
+  expression is wrong for half the year. They overlap, so each answering
+  correctly on its own settles nothing: the composition is the decision, and a
+  test walks every hour of a week through `dueNow`. That walk now DRIVES the
+  sequence rather than being handed a flag — the pass records itself, which is
+  what makes 23:00 a retry rather than a second pass, and a test called with a
+  fixed `consolidated` could not have discovered that. The fifth schedule, the
+  event spine, is deliberately not in `dueNow`: it is decided by a table rather
+  than by the clock, and folding a data-driven trigger into a clock predicate
+  would make both harder to read. Adding an hour costs nothing
   in cron — the job is `0 * * * *` and always was — which is exactly why a new
   schedule can be answered correctly and dispatched by nobody. `agree.test.mjs`
   reads `postScheduled` for a branch per answer.
@@ -509,6 +593,13 @@ and what could not be verified.
 - **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
+- **`005_eugenia_senses.sql` is safe to re-run in full, and `003` is not.**
+  Every statement is `if not exists`, `or replace` or `on conflict do nothing`,
+  and a test asserts it — this is the file that will grow. Note also that
+  `create or replace view` may only APPEND a column and `create or replace
+  function` may not change a return type: 005 replaces `eugenia_search` in place
+  for that reason, since dropping it would take the grants with it.
+
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file.

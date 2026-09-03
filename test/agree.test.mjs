@@ -35,12 +35,14 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID } from '../supabase/functions/doji-eugenia/index.ts';
+import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard }
+  from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
 const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
+const SENSES_SQL = readFileSync(new URL('../supabase/005_eugenia_senses.sql', import.meta.url), 'utf8');
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 const EUGENIA_PROMPT = readFileSync(
@@ -538,7 +540,8 @@ const read = (path) =>
   ({ path, text: readFileSync(new URL(`../${path}`, import.meta.url), 'utf8') });
 
 // The three that name a FUNCTION.
-const CALLERS = ['supabase/002_gladys.sql', 'supabase/004_cron.sql', 'doji_gmail_sync.gs']
+const CALLERS = ['supabase/002_gladys.sql', 'supabase/004_cron.sql',
+                'supabase/005_eugenia_senses.sql', 'doji_gmail_sync.gs']
   .map(read);
 
 // Every file that names the PROJECT, which is a longer list: the app connects
@@ -622,6 +625,37 @@ const guardClause = (text) => {
   return lines[at - 1].match(/^\s*if \((.+)\) \{\s*$/)?.[1] ?? null;
 };
 
+/* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, named here rather than waved
+   through. The boot guard exists because a missing secret used to surface as a
+   downstream failure hours later — so an exemption from it has to be a decision
+   somebody wrote down, not the absence of one.
+
+   Speech-to-text is the only one. The Messages API takes text and images and not
+   audio, and Telegram does not transcribe for bots, so hearing a voice note
+   needs a service this system otherwise has no use for. Unset, she says she
+   cannot hear it and every other path is untouched — which is a different kind
+   of thing entirely from EUGENIA_BOT_TOKEN being unset, where nothing works and
+   the right answer is to refuse every request.
+
+   THE EXEMPTION IS NOT FREE. Each one has to be guarded where it is USED, so
+   "optional" means a branch that handles its absence rather than a value that
+   reaches a fetch as an empty string. That check is below, and it is the half
+   that stops this list becoming somewhere to hide a secret that is actually
+   required. */
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY']);
+
+test('an optional secret is guarded where it is used', () => {
+  for (const { name, text } of FUNCTIONS) {
+    for (const { name: secret } of bound(text)) {
+      if (!OPTIONAL.has(secret)) continue;
+      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b`),
+        `${name} treats ${secret} as optional but never checks it before use — ` +
+        `unset, it would reach a request as an empty string rather than taking ` +
+        `the branch that says she cannot do that yet`);
+    }
+  }
+});
+
 test('a function refuses to run without every secret it reads', () => {
   for (const { name, text } of FUNCTIONS) {
     const clause = guardClause(text);
@@ -634,7 +668,10 @@ test('a function refuses to run without every secret it reads', () => {
     const guarded = [...clause.matchAll(/!([A-Z_]+)/g)].map(m => m[1]);
 
     // A read with a `||` default can never be unset, so it is not required.
-    const required = bound(text).filter(b => !b.line.includes('||')).map(b => b.name);
+    // Neither is one this file has deliberately made optional — see OPTIONAL.
+    const required = bound(text)
+      .filter(b => !b.line.includes('||') && !OPTIONAL.has(b.name))
+      .map(b => b.name);
     // SB_KEY is not bound here — it comes from _shared — so it has to be added
     // by hand, and it is the secret whose silent absence this whole guard is
     // named after.
@@ -950,7 +987,11 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   assert.ok(defined.length >= 3,
     `only ${defined.length} tools read out of the file — the reader has gone blind`);
 
-  const served = [...src.matchAll(/b\.name === ([A-Z_]+_TOOL)\.name/g)].map(m => m[1]).sort();
+  // A switch rather than a chain of ifs since there are ten of them, so the
+  // shape the dispatch is read out of moved with it. What is being asserted is
+  // unchanged: every tool defined is executable, and every tool executable is
+  // defined.
+  const served = [...src.matchAll(/case ([A-Z_]+_TOOL)\.name:/g)].map(m => m[1]).sort();
   assert.deepEqual(served, defined,
     'a tool is defined that the loop cannot execute, or the reverse — the first ' +
     'throws only once she happens to call it, the second is unreachable');
@@ -958,7 +999,7 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   /* AND EVERY TOOL SET IS DRAWN FROM THAT SAME LIST. A name appearing in a set
      but nowhere as a definition is a tool the model is offered and the loop has
      never heard of. */
-  for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS']) {
+  for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS', 'RELEASE_TOOLS', 'TRADE_TOOLS']) {
     const block = src.match(new RegExp(`const ${set} = \\[([\\s\\S]*?)\\];`));
     assert.ok(block, `doji-eugenia no longer defines ${set}`);
     const named = [...block[1].matchAll(/([A-Z_]+_TOOL)/g)].map(m => m[1]);
@@ -987,7 +1028,7 @@ test('the nightly pass sees his week and can reach past its own window', () => {
   const code = src.slice(at, src.indexOf('\n}', at))
     .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
 
-  assert.match(code, /await\s+tradesBlock\(\)/,
+  assert.ok(reaches(code, 'tradesBlock'),
     'the pass is asked what he has started doing differently and is handed no ' +
     'trades to see it in');
 
@@ -1201,8 +1242,8 @@ test('no paragraph of the prompt shows where it was edited', () => {
      constants: ${CHANNEL_NAMES} expands one short source line to 168
      characters, and it is the source wrapping that is the artifact. */
   const bodies = [...EUGENIA_PROMPT.matchAll(
-    /export const (SYSTEM|CONSOLIDATE) = `([\s\S]*?)`;/g)];
-  assert.equal(bodies.length, 2,
+    /export const (SYSTEM|CONSOLIDATE|CRITIC|RELEASE|TRADE_EVENT) = `([\s\S]*?)`;/g)];
+  assert.equal(bodies.length, 5,
     `read ${bodies.length} prompt bodies out of prompt.ts — the reader has gone blind`);
 
   for (const [, name, body] of bodies) {
@@ -1288,6 +1329,37 @@ test('the column, the filter and the tool parameter all exist together', () => {
     'the notes index no longer matches the read it exists for');
 });
 
+/* ─── A block reaches the message, however it was awaited ────────────────────
+   These calls used to be `await notesBlock()` spliced straight into the string
+   being built, and a regex for that exact shape was the whole check. They are
+   now gathered into a Promise.all — six independent reads that were six round
+   trips before a briefing asked for its first token — so the text the old regex
+   looked for is gone while the thing it was protecting is not.
+
+   So this follows the VALUE rather than the syntax: the call is made, and
+   whatever it was bound to is used again afterwards. A dropped call fails the
+   first half. A call whose result is read and then never concatenated into the
+   message fails the second — which is the new way this can break, is invisible
+   at runtime, and is precisely what the old regex could not have seen.
+   ─────────────────────────────────────────────────────────────────────────── */
+const reaches = (code, fn) => {
+  if (new RegExp(`await\\s+${fn}\\(\\)`).test(code)) return true;
+  // EVERY Promise.all IN THE BODY, not the first one. handleMessage has two —
+  // the /notes audit reads its own rows before the reply path gathers its
+  // context — and stopping at the first meant the check answered "no" for a
+  // call sitting in the second, which is a green test reporting the opposite of
+  // the truth.
+  for (const all of code.matchAll(/const \[([^\]]+)\] = await Promise\.all\(\[([\s\S]*?)\]\)/g)) {
+    const names = all[1].split(',').map(s => s.trim()).filter(Boolean);
+    const items = all[2].split(',').map(s => s.trim());
+    const at = items.findIndex(i => i.startsWith(`${fn}(`));
+    if (at < 0 || !names[at]) continue;
+    const after = code.slice(all.index + all[0].length);
+    if (new RegExp(`\\b${names[at]}\\b`).test(after)) return true;
+  }
+  return false;
+};
+
 test('the briefing, the pulse and a reply all read his notes', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
@@ -1311,9 +1383,9 @@ test('the briefing, the pulse and a reply all read his notes', () => {
     // un-awaited one interpolates "[object Promise]" into the prompt — which
     // reaches the model as text rather than as an error.
     const code = body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
-    assert.match(code, /await\s+notesBlock\(\)/,
-      `${fn} does not await notesBlock() — an instruction he gave would be ` +
-      `ignored, or arrive as [object Promise], with nothing reporting either`);
+    assert.ok(reaches(code, 'notesBlock'),
+      `${fn} never gets notesBlock() into the message it sends — an instruction ` +
+      `he gave would be ignored, with nothing anywhere reporting it`);
     /* AND THE MAP, on the same four paths and for a sharper version of the same
        reason. Losing the notes costs continuity in one message; losing the map
        costs the only thing that says which channels are THIN, and it fails
@@ -1322,8 +1394,240 @@ test('the briefing, the pulse and a reply all read his notes', () => {
        nothing anywhere reporting it. Worst on the nightly pass, which is also
        the only thing that can move a rung: without the map in front of it, it
        cannot see what it is moving from. */
-    assert.match(code, /await\s+channelsBlock\(\)/,
-      `${fn} does not await channelsBlock() — she would teach without knowing ` +
+    assert.ok(reaches(code, 'channelsBlock'),
+      `${fn} never gets channelsBlock() into the message it sends — she would teach without knowing ` +
       `which channels are thin, and nothing would report it`);
   }
+});
+
+/* ─── The senses, and the copies they add ────────────────────────────────────
+   005 brings five tables, a trigger and a hybrid search, and with them a fresh
+   crop of vocabularies stated in two places: a `kind` the tool offers and the
+   constraint refuses is a write that vanishes reported to nobody, which is the
+   exact failure eugenia_channels' ids were already held together against.
+
+   Every check below reads BOTH copies out of their files rather than either
+   against a literal typed here. A literal is a third copy and would go stale
+   with the other two.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// The values inside a `check (col in ('a', 'b'))`, whichever constraint it is.
+const checkValues = (sql, constraint) => {
+  const at = sql.indexOf(constraint);
+  if (at < 0) return null;
+  const clause = sql.slice(at, sql.indexOf('))', at));
+  return [...clause.matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
+};
+
+test('the kinds a loop may have are the kinds the table accepts', () => {
+  const declared = checkValues(SENSES_SQL, 'eugenia_loops_kind_check');
+  assert.ok(declared, '005 no longer constrains eugenia_loops.kind');
+  assert.deepEqual([...LOOP_KINDS].sort(), declared,
+    'index.ts offers a loop kind the table refuses, or the reverse — the first ' +
+    'is a 400 she reports to nobody, the second is a value nothing can write');
+});
+
+test('the importance a release may carry is the one the table accepts', () => {
+  const declared = checkValues(SENSES_SQL, 'eugenia_calendar_importance_check');
+  assert.ok(declared, '005 no longer constrains eugenia_calendar.importance');
+
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const offered = src.match(/importance: \{ type: "string", enum: \[([^\]]+)\]/);
+  assert.ok(offered, 'the log_calendar tool no longer declares an importance enum');
+  assert.deepEqual([...offered[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
+    'log_calendar offers an importance the table refuses, or the reverse');
+
+  /* AND THE ONE THAT WAKES HER IS ONE OF THEM. The event spine selects on
+     importance='high', so a rename on either side leaves a spine that matches
+     nothing — every release filed, none of them ever looked at, and no error
+     anywhere. */
+  assert.ok(declared.includes('high'), 'nothing is filed as high, so the spine can never fire');
+
+  /* READ OUT OF pendingRelease ITSELF, not out of the file. aheadToday filters
+     on the same value, so a whole-file match stayed green while the spine's own
+     filter was deleted — the query that decides whether she is ever woken by a
+     print, answering for a query that decides what to mention in a message. */
+  const at = src.indexOf('async function pendingRelease(');
+  assert.ok(at > -1, 'doji-eugenia no longer has pendingRelease()');
+  const spine = src.slice(at, src.indexOf('\n}', at));
+  assert.match(spine, /importance=eq\.high/,
+    'the release spine no longer filters on importance, so every medium and low ' +
+    'entry filed all week would wake her');
+  assert.match(spine, /looked_at=is\.null/,
+    'the release spine no longer filters on looked_at, so one print is looked at ' +
+    'every quarter of an hour until it ages out — each one a billed model call');
+});
+
+test('the verdicts a tap can carry are the verdicts the table accepts', () => {
+  const declared = checkValues(SENSES_SQL, 'eugenia_feedback_verdict_check');
+  assert.ok(declared, '005 no longer constrains eugenia_feedback.verdict');
+  for (const v of declared) {
+    assert.ok(parseFeedback(`fb|${v}|2026-03-12`),
+      `the table accepts a verdict of "${v}" and parseFeedback refuses it, so ` +
+      `that button could never be recorded`);
+  }
+  // And the keyboard only ever offers those.
+  for (const row of feedbackKeyboard('2026-03-12').inline_keyboard) {
+    for (const b of row) {
+      assert.ok(declared.includes(parseFeedback(b.callback_data).verdict),
+        `the keyboard offers ${b.callback_data}, which the table would refuse`);
+    }
+  }
+});
+
+test('the thesis budget is one number on both sides of the wire', () => {
+  const declared = SENSES_SQL.match(/eugenia_thesis_length check \(char_length\(thesis\) between 1 and (\d+)\)/);
+  assert.ok(declared, '005 no longer bounds the thesis');
+  assert.equal(THESIS_MAX, Number(declared[1]),
+    'index.ts truncates the thesis at a different length than the table accepts — ' +
+    'the longer side is a 400 on a write she reports as saved');
+});
+
+test('every table she reads or writes is one the schema creates', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const created = new Set([
+    ...[...EUGENIA_SQL.matchAll(/create table public\.(\w+)/g)].map(m => m[1]),
+    ...[...EUGENIA_SQL.matchAll(/create or replace view public\.(\w+)/g)].map(m => m[1]),
+    ...[...SENSES_SQL.matchAll(/create table if not exists public\.(\w+)/g)].map(m => m[1]),
+  ]);
+  assert.ok(created.size >= 7, `only ${created.size} objects read out of the schema — the reader has gone blind`);
+
+  const touched = new Set([...src.matchAll(/rest\/v1\/(eugenia_\w+)/g)].map(m => m[1]));
+  assert.ok(touched.size >= 6, `only ${touched.size} tables read out of the function — the reader has gone blind`);
+  for (const t of touched) {
+    assert.ok(created.has(t),
+      `doji-eugenia reads or writes ${t}, which neither 003 nor 005 creates — ` +
+      `every call against it is a 404 the tool handlers turn into "that did not save"`);
+  }
+});
+
+test('every column the cost meter writes is a column the table has', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const table = SENSES_SQL.match(/create table if not exists public\.eugenia_runs \(([\s\S]*?)\n\);/);
+  assert.ok(table, '005 no longer creates eugenia_runs');
+  const columns = new Set([...table[1].matchAll(/^\s{2}(\w+)\s+\w/gm)].map(m => m[1]));
+  assert.ok(columns.size >= 8, `only ${columns.size} columns read out of eugenia_runs — the reader has gone blind`);
+
+  const calls = [...src.matchAll(/recordRun\(\{([\s\S]*?)\}\)/g)];
+  assert.ok(calls.length >= 3, `only ${calls.length} recordRun call sites — the reader has gone blind`);
+
+  for (const [, body] of calls) {
+    // Shorthand and long form both, since `cached` and `caller: label` sit in
+    // the same literal. Comments stripped: a name in prose is not a key.
+    // Parenthesised sub-expressions come out first: `Date.now() - started` and
+    // `.slice(0, 500)` both carry commas that are not key separators, and
+    // splitting naively reads "500" as a column name.
+    let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    for (let i = 0; i < 8 && /\([^()]*\)/.test(flat); i++) flat = flat.replace(/\([^()]*\)/g, '');
+    const keys = flat.split(',').map(seg => seg.trim().match(/^(\w+)/)?.[1]).filter(Boolean);
+    for (const k of keys) {
+      assert.ok(columns.has(k),
+        `recordRun writes "${k}" and eugenia_runs has no such column — PostgREST ` +
+        `refuses the whole row, so the meter goes quiet and only the console says so`);
+    }
+  }
+});
+
+test('the trades trigger fires on the transition, not on every poll', () => {
+  /* `is distinct from`, NEVER `<>`, and this is the same three-state trap
+     trades_telegram_on_answer already documents. fill_time is null on every open
+     position, so `old.fill_time <> new.fill_time` is NULL rather than true on
+     exactly the transition this trigger exists for — a WHEN clause that is not
+     true does not fire, and the close event would be the one that never
+     happened. */
+  const closed = SENSES_SQL.match(/create trigger trades_eugenia_closed[\s\S]*?execute function/);
+  assert.ok(closed, '005 no longer creates trades_eugenia_closed');
+  assert.match(closed[0], /old\.fill_time is null/);
+  assert.match(closed[0], /is distinct from/);
+  assert.ok(!/fill_time\s*<>/.test(closed[0]),
+    'the close trigger compares fill_time with <>, which is NULL against an open ' +
+    'position and therefore never fires');
+
+  /* AND THE POLLER MUST NOT RE-FIRE IT. Every position in the window is
+     re-upserted every two minutes, so an update trigger without a transition
+     guard is a model call every two minutes for the life of the position. */
+  const opened = SENSES_SQL.match(/create trigger trades_eugenia_opened[\s\S]*?execute function/);
+  assert.ok(opened, '005 no longer creates trades_eugenia_opened');
+  assert.match(opened[0], /after insert/);
+  for (const t of [opened[0], closed[0]]) {
+    assert.match(t, /new\.id like 'PID%'/, 'the trigger fires on pre-sync rows too');
+    assert.match(t, /new\.deleted = false/, 'the trigger fires on soft-deleted rows');
+  }
+});
+
+test('the trigger reads the cron secret under the spelling Vault holds', () => {
+  // One value, two stores, two spellings, and Postgres compares the Vault name
+  // case-sensitively. Gladys's trigger shipped reading the upper-case one and
+  // went quiet without failing anything.
+  assert.match(SENSES_SQL, /where name = 'doji_cron_secret'/,
+    '005 reads the cron secret under a name Vault does not hold, so the trigger ' +
+    'presents null and doji-eugenia answers 401 — silently, to nobody');
+  assert.ok(!/DOJI_CRON_SECRET/.test(SENSES_SQL),
+    '005 uses the Edge-secret spelling against Vault, which yields null');
+});
+
+test('the app reads only the three tables it was given a policy for', () => {
+  const app = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const read = new Set([...app.matchAll(/\.from\('(eugenia_\w+)'\)/g)].map(m => m[1]));
+  assert.ok(read.size, 'the app no longer reads anything of hers — the card is dead');
+
+  for (const t of read) {
+    assert.match(SENSES_SQL, new RegExp(`create policy ${t}_app_read on public\\.${t}`),
+      `index.html reads ${t} and 005 grants the app no policy on it, so RLS ` +
+      `returns an empty list and the card silently shows nothing`);
+    assert.match(SENSES_SQL, new RegExp(`grant select on public\\.${t} to authenticated`),
+      `index.html reads ${t} and 005 never grants select on it`);
+  }
+
+  /* AND HER NOTES STAY OUT OF IT. eugenia_notes and eugenia_turns are working
+     memory; his window into them is /notes in her own thread, where an answer
+     can be asked a question back. A policy on either would make the app a
+     second reader of something 003 deliberately denies the publishable key. */
+  for (const shut of ['eugenia_notes', 'eugenia_turns']) {
+    assert.ok(!read.has(shut), `index.html now reads ${shut}, which is her memory`);
+    assert.ok(!new RegExp(`create policy .*on public\\.${shut}`).test(SENSES_SQL),
+      `005 opens ${shut} to the app, which 003 denies on purpose`);
+  }
+});
+
+test('the hybrid search still answers in the shape the function reads', () => {
+  /* THE RETURN TYPE IS LOAD-BEARING: `create or replace function` may not alter
+     one, so widening it needs a `drop function` — which takes the grants with
+     it. 005 replaces eugenia_search in place, and the columns searchList reads
+     have to survive that. */
+  const fn = SENSES_SQL.match(/create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
+  assert.ok(fn, '005 no longer replaces eugenia_search');
+  assert.match(fn[0], /returns table \(source text, id bigint, at timestamptz, retired boolean, body text\)/,
+    'the hybrid search changed the return type, which create or replace cannot do');
+
+  // The trigram half is what catches a rephrasing, and word_similarity rather
+  // than similarity is what makes it work against a long turn at all.
+  assert.match(fn[0], /q <% n\.note/, 'notes are no longer reachable by trigram');
+  assert.match(fn[0], /q <% t\.content/, 'turns are no longer reachable by trigram');
+  assert.ok(!/\bsimilarity\(q,/.test(fn[0]),
+    'plain similarity() normalises over both trigram sets, so a short question ' +
+    'against a briefing-length turn scores near zero and every long turn is lost');
+  assert.match(SENSES_SQL, /create extension if not exists pg_trgm/);
+  for (const idx of ['eugenia_notes_trgm', 'eugenia_turns_trgm']) {
+    assert.match(SENSES_SQL, new RegExp(`create index if not exists ${idx}[\\s\\S]*?gin_trgm_ops`),
+      `${idx} is missing, so <% falls back to a sequential scan of the archive`);
+  }
+});
+
+test('005 is safe to re-run, because it is the file that will grow', () => {
+  // 003's CREATE TABLEs make it run-once by design. This one is meant to be
+  // applied again, so anything that would refuse a second time is a bug.
+  const creates = [...SENSES_SQL.matchAll(/^create (table|index|policy|trigger|extension|or replace)/gm)];
+  assert.ok(creates.length >= 8, `only ${creates.length} statements read — the reader has gone blind`);
+  for (const line of SENSES_SQL.split('\n')) {
+    if (/^create (table|index) (?!if not exists)/.test(line)) {
+      assert.fail(`005 has a bare "${line.split(' ')[1]}" — it would refuse on a ` +
+                  `second run: ${line.trim()}`);
+    }
+  }
+  assert.match(SENSES_SQL, /on conflict \(id\) do nothing/, 'the thesis seed is not idempotent');
 });

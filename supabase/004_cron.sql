@@ -1,9 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — everything that runs on a timer
 -- ───────────────────────────────────────────────────────────────────────────
--- Three jobs: the poller every two minutes, Eugenia every hour, and a nightly
--- sweep of pg_cron's own history. One file, because "what fires on its own in
--- this system" should be one place to look rather than one file per feature.
+-- Four jobs: the poller every two minutes, Eugenia every hour, her event spine
+-- every quarter of an hour, and a nightly sweep of pg_cron's own history. One
+-- file, because "what fires on its own in this system" should be one place to
+-- look rather than one file per feature.
 --
 -- THE POLLER'S JOB WAS NOT IN THIS REPOSITORY UNTIL NOW, and it is the most
 -- load-bearing scheduled thing here — every trade arrives through it. Its
@@ -18,12 +19,12 @@
 -- run it and the database matches, rather than reading the database to find out
 -- whether it does.
 --
--- NEITHER OF THE TWO CALLING JOBS HOLDS DATABASE POWER. Each presents the cron
+-- NONE OF THE THREE CALLING JOBS HOLDS DATABASE POWER. Each presents the cron
 -- secret, read from Vault at call time rather than written into the job text.
 -- An earlier version of the poller's job carried a legacy service_role JWT —
--- full RLS-bypassing access, in a job definition, unrotatable. The third job is
--- the exception and is the reason for the distinction: it is a DELETE, and it
--- reaches nothing outside pg_cron's own history.
+-- full RLS-bypassing access, in a job definition, unrotatable. The housekeeping
+-- job is the exception and is the reason for the distinction: it is a DELETE,
+-- and it reaches nothing outside pg_cron's own history.
 --
 -- ONE VALUE, TWO STORES, TWO SPELLINGS, and it is worth knowing before touching
 -- either: the Edge Functions read it from their own secrets as
@@ -87,6 +88,41 @@ select cron.schedule(
       -- 20s would cut it off mid-thought; pg_net is fire-and-forget, so this
       -- bound only has to outlast the work.
       timeout_milliseconds := 300000
+    );
+  $$
+);
+
+-- ─── Eugenia's event spine ─────────────────────────────────────────────────
+-- EVERY QUARTER HOUR, AND IT DOES EXACTLY ONE THING: ask whether a high-impact
+-- release she filed this morning has landed and not yet been looked at.
+--
+-- A SECOND JOB RATHER THAN A FASTER ONE, and the reason is that the four
+-- schedules above are hour predicates. briefDue, pulseDue, retryDue and
+-- consolidateDue all test `hour === n`, so moving the hourly job to */15 would
+-- run four briefings every morning, four pulses every session and four nightly
+-- passes. Splitting the event-driven half off leaves every one of those
+-- untouched and gives a print a quarter of an hour rather than an hour to reach
+-- him — which for a number that moved the market is most of its usefulness.
+--
+-- OFFSET OFF THE HOUR so it never fires alongside the 08:00 briefing. Nothing
+-- would break if it did; it would simply be two model calls at once, one of
+-- them about a calendar the other is in the middle of writing.
+--
+-- Most of these ninety-six calls a day find nothing: one indexed query against
+-- a table with a partial index on exactly that predicate, and no model call at
+-- all. `looked_at` is what makes a look happen once.
+select cron.schedule(
+  'doji-eugenia-spine',
+  '5,20,35,50 * * * *',
+  $$
+    select net.http_post(
+      url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?release=1',
+      headers := jsonb_build_object(
+                   'Content-Type', 'application/json',
+                   'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
+                                    where name = 'doji_cron_secret')),
+      -- A look is a search and a short generation, nowhere near a briefing.
+      timeout_milliseconds := 120000
     );
   $$
 );

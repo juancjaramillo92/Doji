@@ -797,3 +797,118 @@ test('two rows with the identical key compare equal rather than swapping', () =>
   assert.deepEqual([a, b].sort(app.byKey).map(t => t.id), ['PID1', 'PID2']);
   assert.deepEqual([b, a].sort(app.byKey).map(t => t.id), ['PID2', 'PID1']);
 });
+
+/* ─── What Eugenia is watching ───────────────────────────────────────────────
+   The only place her work and this page meet. Everything she knows has lived in
+   a Telegram thread; three small reads put the three things worth a glance on
+   the screen he already opens every morning.
+
+   The card is drawn from model-written text, which is why the escaping test
+   below is not ceremony: her calendar entries and her thesis are prose she
+   composed, and prose reaches innerHTML.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const watching = async ({ calendar = [], thesis = [], loops = [] } = {}) => {
+  db.tables.eugenia_calendar = calendar;
+  db.tables.eugenia_thesis   = thesis;
+  db.tables.eugenia_loops    = loops;
+  db.error = null;
+  await app.Watch.draw();
+  return $('watch-card');
+};
+
+test('the card stays hidden when she has nothing to show', async () => {
+  // A database without 005 applied, or a quiet Sunday. An empty frame captioned
+  // "no data" is worse than the absence it describes.
+  const el = await watching();
+  assert.equal(el.style.display, 'none');
+});
+
+test('the card shows what lands today, the story, and what is still open', async () => {
+  const el = await watching({
+    calendar: [{ at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
+                 consensus: '0.3%', actual: null, note: null }],
+    thesis:   [{ thesis: 'Still trading the December cut.', moved_on: '2026-01-08' }],
+    loops:    [{ kind: 'question', body: 'Which does he think is bigger?' }],
+  });
+
+  assert.notEqual(el.style.display, 'none');
+  assert.match(el.innerHTML, /core CPI/);
+  assert.match(el.innerHTML, /0\.3% exp/);
+  assert.match(el.innerHTML, /Still trading the December cut/);
+  assert.match(el.innerHTML, /Which does he think is bigger/);
+  // The time is New York's, which is the clock every other time in this system
+  // is kept in. 13:30Z in January is 08:30 there.
+  assert.match(el.innerHTML, /08:30/);
+});
+
+test('a landed release is not drawn as one still to come', async () => {
+  const el = await watching({
+    calendar: [{ at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
+                 consensus: '0.3%', actual: '0.4%', note: 'Hotter.' }],
+  });
+  assert.match(el.innerHTML, /0\.4%/);
+  assert.match(el.innerHTML, /vs 0\.3%/);
+  // The class is how a landed one reads differently at a glance, and it takes
+  // an existing token rather than a fourth accent nobody could name.
+  assert.match(el.innerHTML, /watch-landed/);
+  assert.ok(!/exp<\/span>/.test(el.innerHTML), 'a printed number is still labelled as expected');
+});
+
+test('her prose is escaped before it reaches the page', async () => {
+  /* SHE WRITES THIS TEXT AND IT REACHES innerHTML. Nothing here is hostile, but
+     a thesis containing a stray angle bracket would silently eat the rest of
+     the card — and the same hole is the one that matters if anything ever
+     writes to these tables but her. */
+  const el = await watching({
+    thesis: [{ thesis: '<img src=x onerror="window.__pwned=1">', moved_on: null }],
+  });
+  assert.ok(!el.querySelector('img'), 'a tag in her thesis was parsed as markup');
+  assert.equal(win.__pwned, undefined);
+  assert.match(el.innerHTML, /&lt;img/);
+});
+
+test('a card that cannot be read costs the card and nothing else', async () => {
+  /* 005 NOT APPLIED IS THE LIKELY CAUSE, and it must not reach him as anything.
+     Drawn first, so the card is genuinely visible before the failing read —
+     otherwise this passes on a card that was already hidden, which is how the
+     check would go green against a catch that does nothing at all. */
+  await watching({ thesis: [{ thesis: 'A story.', moved_on: null }] });
+  assert.notEqual($('watch-card').style.display, 'none');
+
+  /* AND THE FAILURE IS NOTICED, not merely survived. supabase-js resolves a
+     failed read as `{ data: null, error }` rather than throwing, so `data || []`
+     turns a missing table into an empty calendar — the card hides itself, the
+     warning never fires, and why it is blank becomes unknowable. Asserting only
+     that it ends up hidden cannot tell that apart from a quiet Sunday, which is
+     the whole reason the warning is what this checks. */
+  const warned = [];
+  const realWarn = win.console.warn;
+  win.console.warn = (...a) => warned.push(a.join(' '));
+
+  db.error = { message: 'relation "eugenia_calendar" does not exist' };
+  await app.Watch.draw();
+  win.console.warn = realWarn;
+
+  assert.equal($('watch-card').style.display, 'none');
+  assert.ok(warned.some(w => /Eugenia card unavailable/.test(w)),
+    'a failed read hid the card without reporting it, which is indistinguishable ' +
+    'from a day with nothing on the calendar');
+  // The journal is untouched — which is the whole reason this read runs after
+  // the render and is never awaited by it.
+  assert.ok($('trade-table'));
+  db.error = null;
+});
+
+test('the card reads her three tables and never her notes', async () => {
+  db.read.length = 0;
+  await watching({ thesis: [{ thesis: 'A story.', moved_on: null }] });
+  const touched = new Set(db.read);
+  assert.ok(touched.has('eugenia_calendar'));
+  assert.ok(touched.has('eugenia_thesis'));
+  assert.ok(touched.has('eugenia_loops'));
+  /* HER NOTES STAY OUT. They are working memory, and his window into them is
+     /notes in her own thread, where an answer can be asked a question back. */
+  assert.ok(!touched.has('eugenia_notes'), 'the card reads her notes');
+  assert.ok(!touched.has('eugenia_turns'), 'the card reads her conversation');
+});
