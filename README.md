@@ -500,7 +500,55 @@ curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?tools=1" \
      -H "x-doji-key: $DOJI_CRON_SECRET"
 ```
 
-**Both read-only flags answer when the market is shut**, and a test holds that:
+**What it offers, established rather than assumed.** `?tools=1` was run, and the
+answer changed two things. It serves prices — `get_spot_prices` for bid/ask,
+`get_trendbars` for OHLCV candles from `M_1` to `MN_1` — which is what lets a
+briefing quote a number read off the instrument rather than paraphrased from a
+news page. It also serves `get_positions`, `get_symbols`, `get_assets`,
+`get_pending_orders`, `get_order_history` and `get_version`.
+
+And it serves `create_order`, `close_position`, `amend_position`, `amend_order`
+and `cancel_order`, **on the same credential**.
+
+**So the read-only guarantee is one array, not the key.** `ALLOWED_TOOLS` names
+what this function may call; every entry carries `readOnlyHint: true` on the
+broker's own listing, and `DESTRUCTIVE_TOOLS` names the five that do not so a
+test can assert none of them is ever reachable — through the list, or around it
+by a direct call. It also fails a name permitted but never called, because a
+destructive tool would arrive that way: added "for later" rather than used.
+
+The credential is the better place for that guarantee and is not where it lives.
+If cTrader can issue a read-only token, this array stops being load-bearing.
+Until then it is, and it should be read as such rather than as configuration.
+
+**`?positions=1` asks whether the plan is recoverable.** §8 says it is not —
+*where the stop and target were set at entry* is called unavailable from the
+broker, and four questions are marked unanswerable because of it, R-02's
+*respect* half among them. That claim was formed against `get_deals` and
+`get_position_details` on a **closed** position, where the broker reports only
+the final stop, and about those it is right. A **live** position was never asked:
+`amend_position` takes `stopLoss` and `takeProfit`, so positions carry them, and
+whether `get_positions` *serves* them is what this settles. If it does, the
+`trades_eugenia_opened` trigger already fires at the one moment worth sampling,
+and a stop recorded at open is the plan.
+
+**`?market=1` asks what a price looks like coming out of this endpoint.** Both
+calls at once — spot and two daily bars — because the two answers are only
+useful together, and whether they agree about scale is the thing being checked.
+cTrader's tool descriptions say *"DISPLAY price (not pipettes)"* about their
+**inputs**, which says nothing about what comes back, and the Open API has
+historically served prices scaled by a per-symbol digit count. A factor of 10⁵ in
+the wrong direction still produces four digits and still looks like gold — which
+is why nothing folds this yet.
+
+```sh
+curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?positions=1" \
+     -H "x-doji-key: $DOJI_CRON_SECRET"
+curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?market=1" \
+     -H "x-doji-key: $DOJI_CRON_SECRET"
+```
+
+**All four read-only flags answer when the market is shut**, and a test holds that:
 every flag the entry point reads must appear in the market gate. One left out
 replies `market closed` all weekend — which is exactly when a suspicious row gets
 looked at — and it fails silently, looks like the flag working, and is invisible
@@ -2547,7 +2595,7 @@ and it used to be described as though it were.** Say it per endpoint:
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, read the deals back with `?raw=1`, or list the broker's tools with `?tools=1` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`) or a price (`?market=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code; `?release=1` and a `{trade}` body reach the two cheaper event paths |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
