@@ -1608,6 +1608,54 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
 });
 
+test('a vendor that refuses costs the vector, never the note or the turn', () => {
+  /* embed() THROWS ON PURPOSE, so that `?embed=1` — a door run by hand and read
+     for its answer — reports WHY nothing was filled rather than `ok: true,
+     filled: 0`. No credit on the account, a key without the permission and a
+     mistyped secret otherwise look identical, and the one place the reason was
+     written is the Edge log this repository already says nobody reads.
+
+     WHICH MAKES THE TWO WRITE PATHS THE ONES THAT MUST SWALLOW IT. A helper
+     reached from a caught call site and a bare one is the exact shape that
+     killed a briefing here once. This asserts the asymmetry is the intended one
+     — the writers catch, the door does not — because getting it backwards means
+     a vendor outage stops her remembering anything at all, silently, while the
+     door that exists to report it stays cheerfully quiet. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  /* READ BY LINE RATHER THAN BY A REGEX OVER THE CALL. `embed(turns.map(t =>
+     String(t.content)))` closes three parens, and a pattern that walks to the
+     first one stops inside the argument — reporting the one call site that most
+     needs the catch as though it had none. Each call is one statement on one
+     line, so the line is the honest unit. */
+  const calls = src.split('\n').filter(l => l.includes('await embed('));
+  assert.equal(calls.length, 4,
+    `${calls.length} embed() call sites read — the reader has gone blind, or one ` +
+    `was added without deciding whether it may throw`);
+
+  const caught = calls.filter(l => l.includes('.catch(() => null)')).length;
+  assert.equal(caught, 3,
+    'the embed calls that must never cost a row are the note write, the turn ' +
+    'write and the search — one of them would now lose its row to a vendor ' +
+    'outage, or the door has started swallowing the reason it exists to report');
+
+  // AND THE ONE THAT DOES NOT CATCH IS THE SWEEP, reached only by the door and
+  // the nightly pass — which wraps it itself, for the same reason the writers do.
+  const at = src.indexOf('async function fillEmbeddings(');
+  assert.ok(at > -1, 'doji-eugenia no longer has fillEmbeddings()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  assert.ok(!/\.catch\(/.test(body),
+    'fillEmbeddings swallows the vendor error, so ?embed=1 is back to answering ' +
+    'ok with no reason');
+
+  // The message has to carry the vendor's own words, since the status alone
+  // sends someone to check the wrong one of three different repairs.
+  assert.match(src, /embedding refused \(HTTP \$\{res\.status\}\): \$\{\(await res\.text\(\)\)/,
+    'the embedding error reports a bare status and drops the body that names ' +
+    'which refusal it was');
+});
+
 test('the quote she reads is the quote the poller serves', () => {
   /* TWO FILES, ONE OBJECT, AND NO BUILD STEP BETWEEN THEM. The poller folds a
      cTrader price into `Spot` and serves it; doji-eugenia declares `Quote` and

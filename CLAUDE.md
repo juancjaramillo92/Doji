@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 358 tests, four suites
+npm test      # 359 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -366,7 +366,15 @@ code you write near it:
   unrelated scales and any weighting of them is a constant somebody guessed.
   With no `EMBED_KEY` the query vector is null, both semantic arms return
   nothing and the fusion over one arm reproduces the old ordering exactly —
-  which is what let 007 ship before the key. `foldVectors` is where the vendor's
+  which is what let 007 ship before the key. A VENDOR THAT REFUSES IS A
+  DIFFERENT THING FROM AN UNSET KEY, and `embed()` throws so the `?embed=1` door
+  can say which: it answered `ok: true, filled: 0` to a missing credit, a wrong
+  permission and a mistyped secret alike, with the reason in a log this file
+  already says nobody reads. The three WRITE paths swallow it — `.catch(() =>
+  null)` at each — and the door does not; `agree.test.mjs` counts both sides,
+  because the search's catch is the one that is not about losing a row: without
+  it a dead embedding vendor takes the LEXICAL arm down too, and she reports a
+  memory she could have searched perfectly well. `foldVectors` is where the vendor's
   answer is ordered by the index IT states and refused whole if it is short or
   the wrong width: a vector filed against the wrong row is undetectable
   afterwards, and surfaces months later as her misremembering. THE MODEL IS

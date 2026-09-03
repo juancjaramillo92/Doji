@@ -475,12 +475,25 @@ export function searchList(hits: Hit[]): string {
    request, and search is what reaches past it. Everything a vector finds was
    already in the table.
 
-   NEVER THROWS, AND UNSET IS A FIRST-CLASS STATE. With no EMBED_KEY every
-   caller here gets null, writes its row without a vector, and the search runs
-   exactly as it did before — the SQL's fusion over one arm reproduces the old
-   ordering. That is what lets this ship before the key exists rather than
-   after: the failure of an embedding must never cost the note, the turn, or
-   the answer she is in the middle of writing.
+   UNSET IS A FIRST-CLASS STATE. With no EMBED_KEY every caller here gets null,
+   writes its row without a vector, and the search runs exactly as it did before
+   — the SQL's fusion over one arm reproduces the old ordering. That is what
+   lets this ship before the key exists rather than after.
+
+   AND A VENDOR THAT REFUSES IS NOT THE SAME THING, which is the distinction the
+   first version of this file lost. It swallowed every failure into a console
+   line, so `?embed=1` — a door you run by hand and read the answer of — replied
+   `ok: true, filled: 0` and said nothing about why: no credit on the account, a
+   key with the wrong permission and a mistyped secret all looked identical, and
+   the one place the reason was written is the Edge log this repository already
+   says nobody reads.
+
+   So embed() THROWS, and the two write paths are the ones that swallow it —
+   `.catch(() => null)` at each, because a vendor failure must never cost the
+   note or the turn. The door does not, and that asymmetry is the whole design
+   rather than an oversight: `agree.test.mjs` asserts both write sites carry the
+   catch, since a helper reached from a caught call site and a bare one is
+   exactly the shape this file has been bitten by before.
    ───────────────────────────────────────────────────────────────────────── */
 const EMBED_URL = env("EMBED_URL") || "https://api.openai.com/v1/embeddings";
 const EMBED_KEY = env("EMBED_KEY");
@@ -531,21 +544,22 @@ export function foldVectors(data: any, want: number): string[] | null {
 async function embed(texts: string[]): Promise<string[] | null> {
   if (!EMBED_KEY || !texts.length) return null;
 
-  try {
-    const res = await fetch(EMBED_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${EMBED_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: EMBED_MODEL, dimensions: EMBED_DIMS, input: texts }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const vecs = foldVectors((await res.json())?.data, texts.length);
-    if (!vecs) throw new Error(`asked for ${texts.length} vectors of ${EMBED_DIMS}, got something else`);
-    return vecs;
-  } catch (err) {
-    console.error("doji-eugenia: embedding failed —", err instanceof Error ? err.message : err);
-    return null;
+  const res = await fetch(EMBED_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${EMBED_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: EMBED_MODEL, dimensions: EMBED_DIMS, input: texts }),
+  });
+  // THE BODY AND NOT ONLY THE STATUS. Every refusal this will actually meet is
+  // a 4xx whose body names it — no credit on the account, a key without the
+  // permission, a model the key may not reach — and they are three different
+  // repairs. A bare "HTTP 429" sends someone to check the wrong one.
+  if (!res.ok) {
+    throw new Error(`embedding refused (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
   }
+
+  const vecs = foldVectors((await res.json())?.data, texts.length);
+  if (!vecs) throw new Error(`asked for ${texts.length} vectors of ${EMBED_DIMS}, got something else`);
+  return vecs;
 }
 
 /* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
@@ -556,9 +570,14 @@ async function searchMemory(query: unknown): Promise<string> {
   if (!q) return "Nothing to search for.";
 
   try {
-    // Unset key, failed call, or a query that embeds to nothing — all three are
-    // one null, and the function answers lexically as it always did.
-    const [qv] = await embed([q]) ?? [];
+    /* CAUGHT HERE RATHER THAN LEFT TO THE try AROUND IT, and the difference is
+       the whole degradation. The enclosing catch answers "your memory could not
+       be searched" — true of a database that refused, and false of an embedding
+       vendor that did: the lexical arm is untouched and would have answered
+       perfectly well. Unset key, refused call, or a query that embeds to
+       nothing are one null here, and the search runs on words as it always
+       did. */
+    const [qv] = await embed([q]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/rpc/eugenia_search`, {
       method: "POST", headers: sbHeaders(),
       body: JSON.stringify({ q, lim: SEARCH_HITS, qv: qv ?? null }),
@@ -643,10 +662,10 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     /* INSIDE THE try AND BEFORE THE INSERT. Before, so the note lands with its
        vector in one statement rather than needing a second write that could
        fail on its own — a null here costs nothing but a place in the sweep.
-       Inside, because this function's whole contract is that it never throws:
-       embed() catches its own failures today, and a fetch outside the try would
-       make that promise depend on it continuing to. */
-    const [vec] = await embed([kept]) ?? [];
+       Inside, and caught: this function's whole contract is that it never
+       throws, and embed() does — deliberately, so the maintenance door can say
+       why. A lost vector must never read to him as a lost note. */
+    const [vec] = await embed([kept]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
       method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
       body: JSON.stringify([{ note: kept, kind: k, ...(vec ? { embedding: vec } : {}) }]),
@@ -1594,7 +1613,7 @@ async function recent(): Promise<Turn[]> {
    sequence value between them is what leaves the window opening on an assistant
    turn. */
 async function remember(turns: Turn[]) {
-  const vecs = await embed(turns.map(t => String(t.content)));
+  const vecs = await embed(turns.map(t => String(t.content))).catch(() => null);
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_turns`, {
     method: "POST", headers: sbHeaders("return=minimal"),
     body: JSON.stringify(vecs ? turns.map((t, i) => ({ ...t, embedding: vecs[i] })) : turns),
@@ -1628,8 +1647,10 @@ async function fillEmbeddings(table: string, column: string): Promise<{ filled: 
   if (!rows.length) return { filled: 0, left: 0 };
 
   const vecs = await embed(rows.map(r => String(r[column])));
-  // No key, or the vendor refused the batch. Nothing is written and nothing is
-  // lost — the same rows are still waiting the next time this runs.
+  // NOT CAUGHT HERE, and that is the point of the door: a vendor that refused
+  // reaches postScheduled, which puts its reason in the response and in the one
+  // message he actually reads. Only an unset key reaches this line, and it is
+  // the one case with nothing to report — the same rows wait for the key.
   if (!vecs) return { filled: 0, left };
 
   let filled = 0;

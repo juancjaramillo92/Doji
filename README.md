@@ -1990,6 +1990,16 @@ supabase secrets set EMBED_KEY=<key>
 supabase secrets set EMBED_URL=https://api.openai.com/v1/embeddings   # optional, this is the default
 ```
 
+**And it says why when it fills nothing.** `embed()` throws where the two write
+paths swallow it — a vendor failure must never cost a note or a turn, and the
+search still answers on words alone — but the door does not, because a door you
+run by hand and read the answer of is the one place a swallowed reason is
+indefensible. The first version replied `ok: true, filled: 0` to a missing
+credit, a key without the permission and a mistyped secret alike, with the reason
+written only to the Edge log this README already says nobody reads. The error now
+carries the vendor's own body, since those are three different repairs and a bare
+status sends you to the wrong one.
+
 **Then backfill, and keep calling until it says zero.** Every row written before
 this ran has a null embedding, which is invisible from the outside — the row is
 there, the search still answers, and that row simply never comes back from the
