@@ -1376,9 +1376,22 @@ Changing it is a code change, and it means re-embedding both tables.
 The query vector is a new argument and `create or replace function` cannot change
 an argument list — creating the three-argument form beside the two-argument one
 makes an *overload*, so a two-argument call matches both and Postgres refuses it
-as ambiguous. A drop takes the grants with it and a bare `create function` carries
-`EXECUTE` to `PUBLIC`, which `anon` inherits, so the `revoke` and `grant` are part
-of the statement rather than a follow-up.
+as ambiguous. A drop takes the grants with it, so the `revoke` and `grant` are
+part of the statement rather than a follow-up.
+
+**And `revoke … from public` is not the whole revoke**, which the live database
+had to be asked to find out. `public` there is the PUBLIC *pseudo-role*, which
+every new function carries `EXECUTE` for. `anon` and `authenticated` hold it
+*separately and by name*, from the default privileges Supabase sets on the
+`public` **schema** — two different things spelled the same way, so revoking one
+leaves the other in place and reports nothing. `eugenia_search` had been
+executable by the publishable key since 003 created it; nothing was exposed,
+because the function is not `security definer` and an `anon` caller meets RLS on
+two tables that have no policy for it, but the guarantee stated here was false.
+
+`verify.sql` now asks it of **every callable function in the schema** rather than
+of this one, through `has_function_privilege`, which answers for the role however
+the privilege arrived.
 
 **What cannot be checked from here is the part that matters most.** Nothing in
 the repository reaches a database or the vendor, so the ordering, the coverage

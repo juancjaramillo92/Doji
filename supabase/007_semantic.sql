@@ -175,8 +175,23 @@ as $$
    limit greatest(1, least(coalesce(lim, 25), 25));
 $$;
 
--- EXECUTE IS GRANTED TO PUBLIC BY DEFAULT and `anon` inherits it, so these two
--- lines are what keep her memory behind the service key. They are not optional
--- and they are not a follow-up: the drop above took the old grants with it.
+-- ─── And who may call it ───────────────────────────────────────────────────
+-- THREE LINES, AND THE FIRST TWO ARE NOT THE SAME LINE TWICE. `public` here is
+-- the PUBLIC pseudo-role, which every function carries EXECUTE for by default.
+-- `anon` and `authenticated` are granted it SEPARATELY and explicitly, by the
+-- default privileges Supabase sets on the `public` SCHEMA — two different
+-- things spelled the same way, which is why revoking from one leaves the other
+-- untouched and reports nothing.
+--
+-- This was the state of `eugenia_search` from the day 003 created it, because
+-- 003 revokes from PUBLIC and stops there and nothing ever asked the database
+-- the question. It was not a leak: the function is not `security definer`, so
+-- an anon caller executes it as anon and meets RLS on two tables that have no
+-- policy for it. It was the stated guarantee being false, and one mistaken
+-- policy away from being the other thing. `verify.sql` asks it now, of every
+-- callable function in the schema rather than of this one.
+--
+-- Not a follow-up to the create above: the drop took the old grants with it.
 revoke all on function public.eugenia_search(text, int, text) from public;
+revoke all on function public.eugenia_search(text, int, text) from anon, authenticated;
 grant execute on function public.eugenia_search(text, int, text) to service_role;
