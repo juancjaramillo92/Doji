@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 370 tests, four suites
+npm test      # 371 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -774,6 +774,18 @@ and what could not be verified.
 - **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
+
+  AN ERROR IN IT IS NOT A FAILED ROW, IT IS A FILE THAT STOPPED. The summary is
+  one query returning one row per fact, so anything that RAISES takes every
+  check below it with it — and the run then reports itself as a fault in the
+  database rather than in the file. A row asked `has_function_privilege` about
+  `public.eugenia_search(text, int)`, the signature 007 deliberately dropped;
+  a text signature that does not resolve raises 42883, so eleven checks stopped
+  running the day 007 was applied and nothing said so for two releases. Ask by
+  oid out of `pg_proc`, or with `to_regprocedure`, which answers null — never
+  with a written-out signature or a `regprocedure` cast, and `agree.test.mjs`
+  reads the file for both. The same care goes for any new row: it must be able
+  to come back FALSE on a wrong database rather than throw.
 - **`revoke ... from public` IS NOT THE WHOLE REVOKE, and this is a third pair of
   names that are one value.** `public` in a `revoke` is the PUBLIC pseudo-role;
   `anon` and `authenticated` hold `execute` separately and by name, from the

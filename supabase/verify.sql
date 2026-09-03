@@ -270,16 +270,27 @@ from (values
        and indexdef ilike '%where (superseded_by IS NULL)%'),
    '1'),
 
-  -- Without these she still answers, and answers as though the archive were
-  -- empty: searchMemory catches the 404 and reports that memory could not be
-  -- searched, which is indistinguishable from a database that is merely down.
+  /* Without these she still answers, and answers as though the archive were
+     empty: searchMemory catches the 404 and reports that memory could not be
+     searched, which is indistinguishable from a database that is merely down.
+
+     COUNTED BY NAME AND NEVER BY SIGNATURE, and that is the whole lesson of
+     this row. A companion check here asked has_function_privilege about
+     `public.eugenia_search(text, int)` — the signature 003 created and 007
+     deliberately dropped for the three-argument one. A hand-written signature
+     that no longer resolves does not fail: it THROWS, 42883, which aborts the
+     file, so the eleven checks below this point silently stopped running the
+     day 007 was applied and the whole run reported itself as a database fault.
+
+     It is gone rather than corrected. The grant question it asked is answered
+     for EVERY function above, by oid, for anon and authenticated — and since
+     every role is a member of PUBLIC, a privilege held through PUBLIC shows up
+     there too. A copy that can go stale, in a file whose errors are fatal, in
+     service of a question already answered, is three reasons to delete it. */
   ('eugenia_search exists',
    (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'eugenia_search'),
    '1'),
-  ('eugenia_search is not executable by PUBLIC',
-   (select has_function_privilege('public', 'public.eugenia_search(text, int)', 'EXECUTE')::text),
-   'false'),
   ('both search columns exist',
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and column_name = 'search'
