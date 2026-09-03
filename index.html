@@ -1359,7 +1359,11 @@ tr.broker-pending td:first-child {
     flex-direction:row; gap:16px; padding-right:0; padding-bottom:16px;
     border-right:none; border-bottom:1px solid var(--bd);
   }
-  .pnl-net > div:last-child { flex:1; }
+  /* And the net reading turns to face the right edge, where the performance
+     figures below it already sit. Stacked, these are the two things on the
+     card's right-hand side, and one starting edge and one ending edge read as
+     two columns that nearly line up rather than as one. */
+  .pnl-net > div:last-child { flex:1; text-align:right; }
   .pnl-net > div:first-child > .cbox-l,
   .pnl-net > div:last-child  > .cbox-l { margin-bottom:var(--gap-title); }
   .pnl-balance-number { margin-top:0; margin-bottom:0; }
@@ -1553,11 +1557,6 @@ tr.broker-pending td:first-child {
          it opens the oldest. -->
     <div id="broker-banner" class="broker-banner" style="display:none;" role="button" tabindex="0"></div>
 
-    <!-- What Eugenia is watching. Hidden until there is something in it, so a
-         database without 005 applied, or a quiet Sunday, shows nothing rather
-         than an empty frame. -->
-    <div id="watch-card" class="cbox section watch-card" style="display:none;"></div>
-
     <!-- No section title: the card labels its own parts, so a heading would
          only restate a word already inside them. -->
     <div class="grid-2">
@@ -1628,6 +1627,11 @@ tr.broker-pending td:first-child {
         <div id="roll-forward"></div>
       </div>
     </div>
+
+    <!-- What Eugenia is watching. Hidden until there is something in it, so a
+         database without 005 applied, or a quiet Sunday, shows nothing rather
+         than an empty frame. -->
+    <div id="watch-card" class="cbox section watch-card" style="display:none;"></div>
 
   </div>
 
