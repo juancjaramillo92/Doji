@@ -47,6 +47,7 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
+  positionsList,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
@@ -1918,7 +1919,7 @@ const trade = (o) => ({
   id: 'PID1', direction: 'BUY', entry_time: null, fill_time: null,
   entry_price: null, exit_price: null, pnl: null, open_day: null, setup: null,
   followed_rules: null, followed_sl: null, followed_tp: null,
-  size_oz: 4, net_pnl: null, ...o,
+  size_oz: 4, net_pnl: null, planned_sl: null, planned_tp: null, ...o,
 });
 const verdictOf = (rows, rule, now) =>
   checkRules(rows, now).find(r => r.rule === rule);
@@ -2698,4 +2699,90 @@ test('there is nothing to speak when there is nothing to say', () => {
   // An empty answer would be a zero-length voice note, which renders in
   // Telegram as a broken attachment rather than as nothing.
   assert.equal(speaksBack('', true), false);
+});
+
+/* ─── What he has on, rendered ───────────────────────────────────────────────
+   The block that closed the one thing she could not see. Every field on it is
+   nullable and most of them are null on a row he opened by hand, so the failure
+   this is driven against is not a missing block — it is a block that renders
+   and puts the word `null` where a price goes, which reads as a price.
+
+   THE MARK IS THE OTHER HALF. It is quarter-hourly, so its AGE is the thing
+   that makes it usable, and it belongs beside a position or nowhere: on a flat
+   day it is a number with nothing to be a number of.
+   ─────────────────────────────────────────────────────────────────────────── */
+const DESK_NOW = Date.parse('2026-09-03T14:20:00Z');
+const MARK_NOW = { bid: 4386.1, at: '2026-09-03T14:09:00Z', looked_at: null };
+const OPEN = trade({
+  id: 'PID9', direction: 'BUY', entry_time: '2026-09-03T13:14:00Z',
+  entry_price: 4388.2, size_oz: 4, open_day: '2026-09-03',
+  planned_sl: 4380, planned_tp: 4412,
+});
+
+test('a flat day with nothing traded is no block at all', () => {
+  assert.equal(positionsList([], null, MARK_NOW, DESK_NOW), '');
+});
+
+test('an open position states its age, its side, its size and its plan', () => {
+  const out = positionsList([OPEN], null, null, DESK_NOW);
+  assert.match(out, /open since 09:14 ET/);
+  assert.match(out, /BUY 4oz from 4388\.2/);
+  assert.match(out, /stop 4380 and target 4412 as first seen/);
+});
+
+test('a position with no plan recorded says nothing about a plan', () => {
+  const out = positionsList([trade({ ...OPEN, planned_sl: null, planned_tp: null })],
+                            null, null, DESK_NOW);
+  assert.match(out, /BUY 4oz from 4388\.2/);
+  assert.doesNotMatch(out, /stop|target/);
+});
+
+/* HALF A PLAN IS NOT A PLAN, and the columns are independently nullable however
+   the poller writes them — it PATCHes both in one body, but a hand correction in
+   the database sets whichever one it sets. Rendering the pair from either being
+   present puts "target null" in front of her, which reads as a target of
+   nothing rather than as an absent one.
+
+   THIS CASE IS THE TEST. The both-null row above passes whether the guard reads
+   `&&` or `||`, so it was proving nothing about the guard it was written for —
+   only a row carrying exactly one column can tell those two apart. */
+test('a row carrying one half of the plan is treated as carrying none', () => {
+  for (const half of [{ planned_tp: null }, { planned_sl: null }]) {
+    const out = positionsList([trade({ ...OPEN, ...half })], null, null, DESK_NOW);
+    assert.doesNotMatch(out, /null/,
+      `a row with only ${Object.keys(half)[0]} missing renders it: ${out}`);
+    assert.doesNotMatch(out, /stop|target/,
+      'half a plan is being shown as a plan');
+  }
+});
+
+test('a hand-opened row with no side, size or price prints no nulls', () => {
+  const out = positionsList([trade({
+    id: 'legacy-1', direction: null, entry_time: null,
+    entry_price: null, size_oz: null,
+  })], null, null, DESK_NOW);
+  assert.doesNotMatch(out, /null|undefined|NaN/);
+  assert.match(out, /side and size not recorded/);
+});
+
+test('the mark is given with its age, counted from the clock passed in', () => {
+  assert.match(positionsList([OPEN], null, MARK_NOW, DESK_NOW), /gold was 4386\.1 11 minutes ago/);
+});
+
+/* A PRICE WITH NOTHING TO BE A PRICE OF. On a flat day the mark is the number
+   she would otherwise subtract an entry from, and handing it over anyway is how
+   a spot quote fifteen minutes old ends up in a briefing as the current level. */
+test('the mark is withheld when nothing is open, however fresh it is', () => {
+  const standing = { day: '2026-09-03', pnl: -182.4, account: 2000, breached: false };
+  const out = positionsList([], standing, MARK_NOW, DESK_NOW);
+  assert.doesNotMatch(out, /gold was/);
+  assert.match(out, /his day so far: -182\.40/);
+});
+
+test('a day inside the limit and a day past it are not rendered the same', () => {
+  const inside = positionsList([], { day: 'd', pnl: -50, account: 2000, breached: false }, null, DESK_NOW);
+  const past   = positionsList([], { day: 'd', pnl: -90, account: 2000, breached: true }, null, DESK_NOW);
+  assert.match(inside, /inside the 4% R-11 sets/);
+  assert.match(past, /PAST the 4% R-11 sets/);
+  assert.doesNotMatch(inside, /PAST/);
 });

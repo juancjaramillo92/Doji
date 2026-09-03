@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 360 tests, four suites
+npm test      # 370 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -453,6 +453,40 @@ code you write near it:
   a mechanism he has never had built without handing her the map that says which
   those are is an instruction outrunning its inputs, and it fails by teaching the
   wrong thing well rather than by failing at all.
+- **`positionsBlock()` IS THE ONLY BLOCK WITH RULES ABOUT WHAT SHE MAY DO WITH
+  IT, and that asymmetry is the whole design rather than a compromise.** She sees
+  the full open row — entry, stop and target as first seen — so she can answer
+  properly when he raises it; unprompted it may only suppress a setup-flavoured
+  line and name a collision his OWN rules name (R-14/R-19, R-11). The guard that
+  keeps his levels out of a message SHE starts is a paragraph in `prompt.ts` and
+  has no structural half, unlike the broker token or the missing write path — so
+  `agree.test.mjs` reads the prompt for it, because deleting it breaks nothing
+  else and the result reads as her being relevant. The failure it prevents is a
+  briefing framed around his position instead of around the day.
+
+  NO UNREALISED P&L, AND THAT IS ONE DECISION RATHER THAN TWO. `eugenia_price` is
+  quarter-hourly, so the figure would be the most anchoring number in the block
+  and the one staleness gets most wrong; entry and mark go in labelled and she
+  subtracts them if asked. The mark is read only when something is open and is
+  caught SEPARATELY from the block, so a price she cannot read costs one line
+  rather than the position. Six paths, not the notes' five — the move look joins
+  because a sharp move is the likeliest thing to arrive while he is in
+  something; `postTradeEvent` stays out, being reached from the position it
+  would be told about.
+
+  A RUN OF LOSSES IS A TALLY AND A TALLY IS A VERDICT. She may never hand him
+  the count — only what the trades have in common, which is the briefing's own
+  rule about a cause with no chain under it. A breach of one of his rules is not
+  the same thing and is never withheld: that is his document deciding.
+
+- **`TradeRow` is a copy of the view's column list and now has a test.** Its own
+  comment calls it the row `eugenia_trades` serves, and every rule in
+  `adherence.ts` is written against it — so 006 appending the plan to the view
+  without adding it here left two columns no rule could name, invisibly, for two
+  releases. It matters more now that `readDesk` asks for `select=*` precisely so
+  the list is not copied a fourth time, which makes the interface the only
+  description of what comes back.
+
 - **She has senses now, and they are data rather than a clock.** The briefing
   files the day's calendar with `log_calendar`; a quarter-hourly cron job
   (`?release=1`, its own job in `004_cron.sql`) looks at anything `high` that has

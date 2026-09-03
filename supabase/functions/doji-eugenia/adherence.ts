@@ -48,6 +48,8 @@ export interface TradeRow {
   followed_tp: boolean | null;
   size_oz: number | null;
   net_pnl: number | null;
+  planned_sl: number | null;
+  planned_tp: number | null;
 }
 
 /* §8's three verdicts, and the third is not a formality — it mirrors the
