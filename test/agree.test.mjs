@@ -1301,6 +1301,51 @@ test('no paragraph of the prompt shows where it was edited', () => {
   }
 });
 
+/* ─── A preference of his is not the prompt's to state ───────────────────────
+   The prompt held *"he gets frustrated by walls of text"* and *"he has told you
+   so"*, and neither was ever said. They read as grounding and are the opposite:
+   a claim about a conversation this repository cannot see, sitting in the file
+   that decides how she talks to the person it is about — so the failure is her
+   handing him back a taste he never had, in the voice of someone quoting him.
+
+   THE RULE IS NOT "SOURCE IT PROPERLY", IT IS THAT THE PROMPT DOES NOT CARRY
+   HIS PREFERENCES AT ALL. There is already a channel for them and it is the one
+   he can correct: an instruction note, which `notesBlock()` puts in front of her
+   on all five paths and which the prompt itself says outranks the shape. A rule
+   worth keeping stands on why it is right; one that needs him behind it belongs
+   in a note.
+
+   So the words below are searched for as tastes rather than as attributions —
+   an invented preference and a real one are indistinguishable in this file, and
+   both are in the wrong place. The second pattern is the other half of the same
+   move: a rule stated on its own terms and then propped up with *and he has told
+   you so*, which is the form the RELEASE prompt shipped in. Bare `he told you`
+   and `he said` are left alone, since that is how the tool descriptions name the
+   notes mechanism — the thing this test is pointing at.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the prompt states no preference of his', () => {
+  const taste =
+    /\bhe (?:gets |is |gets a bit |grows )?\w*(?:frustrat|annoy|irritat|impatien|bored)|\bhe (?:hates|dislikes|prefers|resents)\b|\b(?:frustrates|annoys|irritates|bores) him\b/i;
+  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b/i;
+
+  const bodies = [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)];
+  assert.ok(bodies.length >= 5,
+    `read ${bodies.length} prompt bodies out of prompt.ts — the reader has gone blind`);
+
+  for (const [, name, body] of bodies) {
+    for (const sentence of body.split(/\n/).join(' ').split(/(?<=[.?!])\s+/)) {
+      assert.ok(!taste.test(sentence),
+        `${name} tells her what he does not like: "${sentence.trim().slice(0, 90)}…" — ` +
+        `a preference reaches her as an instruction note, where he can change it, ` +
+        `and a rule that cannot stand without him behind it is not a rule`);
+      assert.ok(!cited.test(sentence),
+        `${name} props a rule up with him: "${sentence.trim().slice(0, 90)}…" — ` +
+        `say why the rule is right, or move it to a note`);
+    }
+  }
+});
+
 /* ─── Every read is bounded ──────────────────────────────────────────────────
    Four reads in this function pull rows she is then charged for reasoning over,
    and three of them were capped from the day they were written. The fourth —
