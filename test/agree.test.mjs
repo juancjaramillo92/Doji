@@ -651,23 +651,24 @@ const guardClause = (text) => {
    downstream failure hours later — so an exemption from it has to be a decision
    somebody wrote down, not the absence of one.
 
-   Two, and both are external vendors this system otherwise has no use for.
-   Speech-to-text: the Messages API takes text and images and not audio, and
-   Telegram does not transcribe for bots, so hearing a voice note needs one.
+   Three, and all three are external vendors this system otherwise has no use
+   for. Speech-to-text: the Messages API takes text and images and not audio,
+   and Telegram does not transcribe for bots, so hearing a voice note needs one.
    Embeddings: Anthropic serves none, and semantic search is a widening of a
    reach that already works without it — unset, the search is full text and
-   trigram, which is what it was.
+   trigram, which is what it was. Speech: unset, she answers a voice note in
+   text, which is what every other message gets.
 
-   BOTH ARE A DIFFERENT KIND OF THING FROM EUGENIA_BOT_TOKEN being unset, where
-   nothing works at all and the right answer is to refuse every request. Here
-   one capability is absent and every other path is untouched.
+   ALL THREE ARE A DIFFERENT KIND OF THING FROM EUGENIA_BOT_TOKEN being unset,
+   where nothing works at all and the right answer is to refuse every request.
+   Here one capability is absent and every other path is untouched.
 
    THE EXEMPTION IS NOT FREE. Each one has to be guarded where it is USED, so
    "optional" means a branch that handles its absence rather than a value that
    reaches a fetch as an empty string. That check is below, and it is the half
    that stops this list becoming somewhere to hide a secret that is actually
    required. */
-const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY']);
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY']);
 
 test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {
@@ -1884,6 +1885,48 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
     assert.match(SEMANTIC_SQL, new RegExp(`alter table public\\.${table} add column if not exists embedding`),
       `the sweep fills ${table}.embedding and 007 never adds it`);
   }
+});
+
+test('the answer is his before it is ever spoken', () => {
+  /* THE ORDER IS THE WHOLE SAFETY OF THIS PATH. say() first, speak() after —
+     so an unset key, a vendor that refused, or a format Telegram will not
+     render costs the audio and nothing else. Reversed, a speech call that hung
+     would hold the reply behind it, and one that threw would lose it: he asked
+     a question aloud and got silence, which is the failure VOICE_TROUBLE exists
+     on the other side of.
+
+     Read as positions in the handler rather than as a call anywhere in the
+     file, because both are called exactly once and only their ORDER is wrong. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function handleMessage(');
+  assert.ok(at > -1, 'doji-eugenia no longer has handleMessage()');
+  const body = src.slice(at);
+
+  const said = body.indexOf('await say(answer);');
+  const spoke = body.indexOf('await speak(answer)');
+  assert.ok(said > -1, 'handleMessage no longer sends the answer as text');
+  assert.ok(spoke > -1, 'handleMessage never speaks the answer');
+  assert.ok(said < spoke,
+    'handleMessage speaks before it sends the text, so a speech vendor that ' +
+    'hangs or throws costs him the answer rather than the audio');
+
+  // AND IT IS GATED, not spoken every time. Without this every typed line comes
+  // back as a voice note he did not ask for.
+  assert.match(body.slice(said, spoke + 40), /if \(speaksBack\(answer, heard\)\)/,
+    'the answer is spoken unconditionally rather than only when he spoke first');
+});
+
+test('the length she is told to write to is the length that is spoken', () => {
+  /* TWO COPIES OF ONE NUMBER, and the failure of a disagreement is silent in
+     the worse direction: a prompt allowed to run longer than the cap produces
+     answers that are simply never spoken, and nothing tells him the audio was
+     dropped rather than never attempted. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  assert.match(src, /Keep it under \$\{SPEAK_MAX\} characters/,
+    'the instruction states a length as a literal rather than reading SPEAK_MAX, ' +
+    'so the two can disagree with nothing to reveal it');
 });
 
 test('every reason a voice note fails is one the handler can actually reach', () => {

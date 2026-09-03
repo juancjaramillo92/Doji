@@ -96,23 +96,31 @@ from (values
      where routine_schema = 'public' and routine_name = 'eugenia_search'
        and grantee = 'service_role' and privilege_type = 'EXECUTE'),
    '1'),
-  /* ASKED OF EVERY CALLABLE FUNCTION IN THE SCHEMA, not of eugenia_search. The
-     narrow version of this row is what found the hole, and the hole was not
-     specific to that function: `revoke ... from public` revokes the PUBLIC
-     pseudo-role, while Supabase's default privileges on the public SCHEMA grant
-     EXECUTE to anon and authenticated separately and by name. Two different
-     things spelled the same way, so every function created here has arrived
-     reachable by the publishable key and nothing ever asked.
+  /* ASKED OF EVERY FUNCTION THIS REPOSITORY CREATES, which is a narrower thing
+     than every function in the schema and the difference is a hundred and forty
+     of them. `revoke ... from public` revokes the PUBLIC pseudo-role, while
+     Supabase's default privileges on the public SCHEMA grant EXECUTE to anon
+     and authenticated separately and by name — two things spelled the same way,
+     so every function created here has arrived reachable by the publishable key
+     and nothing ever asked.
 
-     has_function_privilege rather than routine_privileges: it answers for the
-     role rather than for a grant row, so it is true whether the privilege came
-     by name or through PUBLIC. Trigger functions are excluded because PostgREST
-     cannot call one — the question is what a browser can reach. */
-  ('no callable function is reachable by the publishable key',
+     THREE EXCLUSIONS AND EACH ONE IS THE DIFFERENCE BETWEEN A CHECK AND A
+     NUMBER. `pg_depend ... deptype = 'e'` drops everything an EXTENSION owns:
+     pgvector installs about a hundred functions into this schema and pg_trgm a
+     score more, all of them meant to be executable, and counting them answered
+     149 to a row expecting 0 — a check that fires on everything, which is as
+     useless as one that fires on nothing. `prorettype <> trigger` drops the
+     three trigger functions, since PostgREST cannot call one and the question
+     is what a browser can reach. And has_function_privilege rather than
+     routine_privileges, because it answers for the ROLE however the privilege
+     arrived — by name or through PUBLIC. */
+  ('no function of ours is reachable by the publishable key',
    (select count(*)::text from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public'
        and p.prorettype <> 'trigger'::regtype
+       and not exists (select 1 from pg_depend d
+                        where d.objid = p.oid and d.deptype = 'e')
        and (has_function_privilege('anon', p.oid, 'EXECUTE')
          or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
    '0'),
