@@ -1652,6 +1652,84 @@ async function postEmbed(): Promise<Response> {
   return json({ ok: true, notes, turns });
 }
 
+/* ─── And she answers in the channel he used ───────────────────────────────
+   NO SETTING, NO TOGGLE, NO STORED PREFERENCE. He speaks because his hands are
+   busy — driving, at a screen, mid-session — and the whole point is over the
+   moment he has to look at a phone to read the answer. So the rule is the
+   message he sent: a voice note is answered aloud, a typed line is answered in
+   text, and nothing anywhere has to remember which he prefers.
+
+   IT FALLS OUT THAT NOTHING SCHEDULED EVER SPEAKS. The briefing, the pulse, the
+   release look, the move look and the trade event are not replies to anything —
+   they reach this file by another path entirely — so they stay text without a
+   rule saying so. That is the right answer for the briefing in particular: a
+   fourteen-hundred-character read is something you skim, and audio is the one
+   format you cannot.
+
+   THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE VOICE. It is what
+   remember() stores, what a later search finds, and what he re-reads at a desk;
+   a voice note is none of those. So it is already delivered before this is
+   attempted, which is what makes a failure here cost nothing but the audio.
+   ───────────────────────────────────────────────────────────────────────── */
+const TTS_URL   = env("TTS_URL") || "https://api.openai.com/v1/audio/speech";
+const TTS_KEY   = env("TTS_KEY");
+// Both from the environment, unlike EMBED_MODEL. Nothing is stored, so a change
+// here alters one message rather than what is comparable to what — and which
+// voice she has is his to change without a deploy.
+const TTS_MODEL = env("TTS_MODEL") || "tts-1";
+const TTS_VOICE = env("TTS_VOICE") || "nova";
+
+/* Roughly fifty seconds of speech. Past that a voice note stops being a reply
+   and becomes a recording to scrub through, and the text — already sent — is
+   the better artifact for anything that long. The prompt is told the number so
+   a long answer is one she chose rather than one silently left unspoken. */
+export const SPEAK_MAX = 700;
+
+// Exported because it is the decision, and because it is the one thing here a
+// test can drive: everything below it is a vendor and a wire.
+export const speaksBack = (answer: string, heard: boolean): boolean =>
+  heard && answer.length > 0 && answer.length <= SPEAK_MAX;
+
+/* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
+   format Telegram would not render — every one of them leaves him with the
+   answer he already has and no audio, which is a degraded reply rather than a
+   missing one. That is the opposite call from VOICE_TROUBLE, and the difference
+   is that a voice note she cannot hear costs the whole exchange while a reply
+   she cannot speak costs the convenience.
+
+   Its own fetch rather than the shared telegram() helper, for tgDownload's
+   reason: sendVoice is multipart and that helper posts JSON. And OGG/Opus
+   specifically — Telegram renders those as a voice note, with a waveform and
+   playback speed, and anything else as a file attachment. */
+async function speak(answer: string): Promise<void> {
+  if (!TTS_KEY) return;
+
+  try {
+    const spoken = await fetch(TTS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: TTS_MODEL, voice: TTS_VOICE, input: answer, response_format: "opus",
+      }),
+    });
+    if (!spoken.ok) throw new Error(`speech HTTP ${spoken.status}`);
+
+    const form = new FormData();
+    form.append("chat_id", CHAT_ID);
+    // Type and filename both, the same reasoning transcribe() gives for the
+    // other direction: it is not knowable which one Telegram reads.
+    form.append("voice", new Blob([new Uint8Array(await spoken.arrayBuffer())],
+                                  { type: "audio/ogg" }), "reply.ogg");
+    const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
+      method: "POST", body: form,
+    });
+    const said = await sent.json();
+    if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
+  } catch (err) {
+    console.error("doji-eugenia: could not speak —", err instanceof Error ? err.message : err);
+  }
+}
+
 /* ─── What she brings to a turn ────────────────────────────────────────────
    Folded into the opening user message rather than sent as a mid-conversation
    system message. That channel exists for exactly this and would keep the
@@ -3062,6 +3140,10 @@ async function handleMessage(update: any): Promise<void> {
     const blocks: any[] = [];
 
     const voice = msg.voice ?? msg.audio;
+    // Remembered rather than re-derived at the bottom: `text` is rewritten by
+    // the transcription, so by the time the answer exists there is nothing left
+    // in it that says how it arrived.
+    const heard = Boolean(voice?.file_id);
     if (voice?.file_id) {
       // The download and the transcription both take seconds, so the indicator
       // starts here rather than after — otherwise the wait for a voice note is
@@ -3167,7 +3249,16 @@ async function handleMessage(update: any): Promise<void> {
       const [history, notes, channels, story, loops, calendar] = await Promise.all([
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
       ]);
-      const context = text + notes + channels + story + loops + calendar;
+      /* TOLD THAT IT WILL BE HEARD, rather than left to a cap that silently
+         drops the audio on a long answer. The instruction and SPEAK_MAX are one
+         number stated once — an answer she keeps under it is one she chose,
+         where an answer trimmed by the cap is one he never learns was spoken. */
+      const aloud = heard
+        ? `\n\nHe sent this as a voice note, so your answer will be read back to him ` +
+          `aloud. Keep it under ${SPEAK_MAX} characters and write it to be heard — ` +
+          `no lists, no headings, nothing that needs to be looked at.`
+        : "";
+      const context = text + aloud + notes + channels + story + loops + calendar;
       answer = await ask(
         [...history, {
           role: 'user',
@@ -3185,9 +3276,15 @@ async function handleMessage(update: any): Promise<void> {
     }
 
     await say(answer);
+    // AFTER THE TEXT AND BEFORE THE WRITE. After, so the answer is already his
+    // whatever the vendor does; before, only because the write is the slower of
+    // the two and the audio is the half he is waiting on.
+    if (speaksBack(answer, heard)) await speak(answer);
     // THE TEXT, NEVER THE BLOCKS. A chart stored as base64 would be a megabyte
     // of history resent on every turn for the next six exchanges, and the
-    // transcript of a voice note is the part worth searching anyway.
+    // transcript of a voice note is the part worth searching anyway. What was
+    // SPOKEN is not stored either, for the same reason and more so: it is the
+    // same words, in a megabyte.
     await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);

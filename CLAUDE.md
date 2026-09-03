@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 352 tests, four suites
+npm test      # 357 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -527,10 +527,24 @@ code you write near it:
   kept and the image is not — base64 in `eugenia_turns` is a megabyte resent as
   history for six exchanges. `stamped` appends the clock as a trailing text
   block, because concatenating against an array is `[object Object]` on exactly
-  the turns carrying the most context. Speech-to-text is the one external vendor
-  here; `STT_URL`/`STT_KEY` are OPTIONAL secrets and deliberately not in the boot
-  guard, and `agree.test.mjs` makes that exemption cost something — an optional
-  secret must be guarded where it is used.
+  the turns carrying the most context. `STT_URL`/`STT_KEY`, `TTS_KEY` and
+  `EMBED_KEY` are OPTIONAL secrets, deliberately not in the boot guard, and
+  `agree.test.mjs` makes that exemption cost something — an optional secret must
+  be guarded where it is used.
+
+- **SHE ANSWERS IN THE CHANNEL HE USED, and that is the whole rule.** A voice
+  note is answered aloud, a typed line in text; no setting, no toggle, nothing
+  stored. It falls out that nothing SCHEDULED speaks, since none of those is a
+  reply — right for the briefing especially, which is a thing you skim. THE TEXT
+  GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember` stores
+  and what a search finds, so `say` before `speak`, and a speech vendor that
+  hangs or throws then costs the convenience rather than the answer. That
+  ordering is the one thing `agree.test.mjs` reads out of `handleMessage`.
+  `SPEAK_MAX` is stated to the prompt as well as enforced, because a cap alone
+  drops the audio on a long answer with nothing saying why. `TTS_VOICE` and
+  `TTS_MODEL` are environment rather than pinned, unlike `EMBED_MODEL` — nothing
+  is stored, so a change alters one message rather than what is comparable to
+  what.
 
 - **The apology names the job.** Every scheduled failure used to say "No
   briefing", including the nightly pass, whose real symptom is that her memory

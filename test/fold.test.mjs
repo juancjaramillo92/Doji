@@ -45,6 +45,7 @@ import {
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
   foldVectors, EMBED_DIMS,
+  speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -2668,4 +2669,33 @@ test('a batch that comes back wrong is refused whole', () => {
 test('an empty ask is answered empty rather than refused', () => {
   // Nothing was asked for and nothing came back, which is agreement.
   assert.deepEqual(foldVectors([], 0), []);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANSWERING IN THE CHANNEL HE USED
+   ───────────────────────────────────────────────────────────────────────────
+   No setting and no stored preference: the message he sent decides. Which makes
+   this one predicate the whole feature, and the only part of speaking back that
+   is not a vendor and a wire.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+test('a voice note is answered aloud and a typed line is not', () => {
+  assert.equal(speaksBack('Gold is holding 4,410.', true), true);
+  assert.equal(speaksBack('Gold is holding 4,410.', false), false,
+    'she speaks back to a typed message — he is at a keyboard and did not ask ' +
+    'to be read to');
+});
+
+test('an answer too long to listen to is left in text', () => {
+  /* PAST THE CAP IT IS A RECORDING TO SCRUB THROUGH rather than a reply, and
+     the text has already been sent — so the audio is what gives way. The prompt
+     is told the same number, so an answer over it is one she chose. */
+  assert.equal(speaksBack('x'.repeat(SPEAK_MAX), true), true);
+  assert.equal(speaksBack('x'.repeat(SPEAK_MAX + 1), true), false);
+});
+
+test('there is nothing to speak when there is nothing to say', () => {
+  // An empty answer would be a zero-length voice note, which renders in
+  // Telegram as a broken attachment rather than as nothing.
+  assert.equal(speaksBack('', true), false);
 });

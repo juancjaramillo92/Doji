@@ -1221,6 +1221,40 @@ the boot guard beside the secrets whose absence stops her working. `agree`
 enforces the exemption rather than waving it through: an optional secret must be
 guarded where it is used.
 
+**And she answers in the channel he used.** A voice note is answered aloud; a
+typed line is answered in text. **No setting, no toggle, no stored preference** —
+he speaks because his hands are busy, and the whole point is over the moment he
+has to look at a phone to read the reply, so the message he sent is the only
+thing that needs to decide.
+
+It falls out of that shape that **nothing scheduled ever speaks**: the briefing,
+the pulse, the release look, the move look and the trade event are not replies to
+anything, so they stay text without a rule saying so. Which is the right answer
+for the briefing especially — a fourteen-hundred-character read is something you
+skim, and audio is the one format you cannot.
+
+**The text goes first, and is never contingent on the voice.** It is what
+`remember()` stores, what a later search finds, and what he re-reads at a desk; a
+voice note is none of those. So it has already landed before speech is attempted,
+and an unset key, a vendor that refused or a format Telegram will not render
+costs the audio and nothing else. That is the opposite call from `VOICE_TROUBLE`
+below, and the difference is that a voice note she cannot *hear* costs the whole
+exchange while a reply she cannot *speak* costs a convenience.
+
+`SPEAK_MAX` is 700 characters, roughly fifty seconds — past that it stops being a
+reply and becomes a recording to scrub through. **The prompt is told the same
+number**, so an answer over it is one she chose rather than one silently left
+unspoken, and a test holds the two together: a prompt allowed to run longer than
+the cap produces answers that are never spoken with nothing saying why.
+
+`TTS_URL` and `TTS_KEY` are optional on the same terms as `STT_*`; `TTS_VOICE`
+and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,
+because nothing is stored — a change alters one message rather than what is
+comparable to what, and which voice she has is his to change without a deploy.
+The audio is requested as **OGG/Opus**, which is what Telegram renders as a voice
+note with a waveform and a speed control; anything else arrives as a file
+attachment.
+
 **A chart** she can now see, and the prohibitions do not move an inch because she
 can. She may describe what is on it and take it as context; she may not say
 whether a setup is valid or a level will hold, and the prompt says so in those
@@ -1877,11 +1911,19 @@ which reads from every other surface as a market that has not moved.
 `allowed_updates = ["message", "callback_query"]`, or the taps under a briefing
 are never delivered, the button spins, and nothing reports it.
 
-**`STT_URL` and `STT_KEY` are optional** and only enable voice notes. Unset, she
-says she cannot hear them and everything else is unaffected — which is why they
-are deliberately not in the boot guard, and why an exemption from it has to be
-guarded where the secret is *used*: `EMBED_KEY` is the second, and a test holds
-both to that.
+**Four optional secrets, and one key serves all of them.** `STT_URL`/`STT_KEY`
+enable hearing a voice note, `TTS_URL`/`TTS_KEY` enable answering in one, and
+`EMBED_KEY` enables semantic search. Unset, each capability is simply absent —
+she says she cannot hear, she answers in text, the search is lexical — and
+everything else is unaffected, which is why none of them is in the boot guard.
+An exemption from that guard is not free: each has to be guarded where the
+secret is *used*, and a test holds all three to it.
+
+```sh
+supabase secrets set STT_KEY=<key> STT_URL=https://api.openai.com/v1/audio/transcriptions
+supabase secrets set TTS_KEY=<key>
+supabase secrets set EMBED_KEY=<key>
+```
 
 ```sh
 supabase secrets set STT_URL=https://<provider>/v1/audio/transcriptions
@@ -2792,16 +2834,25 @@ what printed against what was expected, with her line beside it — is worth
 nothing this month and a great deal in a year, which is the whole argument for
 starting it before it is useful.
 
-**Voice notes are the one thing here that needs a second vendor.** The Messages
-API takes text and images and not audio, and Telegram does not transcribe for
-bots, so `STT_URL` and `STT_KEY` point at an external service. Unset, she says
-she cannot hear them and nothing else changes. It is written against the
-`/audio/transcriptions` shape rather than a named provider, and **it is the only
-thing in this system that sends his own words outside his own infrastructure** —
-worth knowing before setting the two secrets, and the reason leaving them unset
-is a supported state rather than a broken one. It is also the one path here that
-could not be exercised end to end from the machine it was written on — the call is guarded, its failure is reported to her as a
-sentence, and that is as far as reading can take it.
+**Three capabilities need a vendor Anthropic does not serve.** The Messages API
+takes text and images and not audio and Telegram does not transcribe for bots, so
+hearing goes through `STT_URL`/`STT_KEY` and speaking through `TTS_URL`/`TTS_KEY`;
+Anthropic serves no embeddings, so semantic search goes through `EMBED_KEY`. All
+three are written against a shape rather than a named provider, and each unset is
+a supported state rather than a broken one.
+
+**Together they are the only thing in this system that sends his own words
+outside his own infrastructure** — the audio of what he said, the text of what she
+answers, and every note and turn as it is written. Worth knowing before setting
+the secrets, and the reason leaving any of them unset changes nothing but that
+one capability.
+
+They are also the paths that could not be exercised end to end from the machine
+they were written on. Each call is guarded and each failure is handled — a
+transcription that produces no words names which of four things went wrong, a
+batch of embeddings that comes back mis-shaped is refused whole, and speech that
+fails costs the audio and not the answer — but **the first real call of each is
+the test**, and reading is as far as this could take them.
 
 **`web_fetch` grounds a number on a page that has to stay fetchable.** The four
 sources are named in the prompt because the tool only fetches URLs already in the
