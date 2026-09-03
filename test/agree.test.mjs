@@ -776,9 +776,23 @@ const looksLikeCode = (name) =>
 
      TODO                        a prohibition — CLAUDE.md forbids the marker
      background_color            }  manifest fields tried against the iOS
-     apple-touch-startup-image   }  launch frame, none of which reached it */
+     apple-touch-startup-image   }  launch frame, none of which reached it
+
+   AND THE BROKER'S OWN TOOL NAMES, which are named to say what its endpoint
+   OFFERS and what this repository therefore chooses not to call. They are the
+   one category this test cannot judge: they are real, they are just real
+   somewhere else. `create_order` and the other four destructive names are
+   deliberately NOT here — they are in DESTRUCTIVE_TOOLS in the poller, so they
+   validate against the code, which is what makes the read-only claim checkable
+   rather than merely written down.
+
+     get_symbols · get_assets · get_pending_orders · get_order_history ·
+     get_version   read-only tools cTrader serves and the poller does not call
+     MN_1          a get_trendbars period, one of nine the broker accepts */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
+  'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
+  'get_version', 'MN_1',
 ]);
 
 test('the documents name only symbols the repository has', () => {
