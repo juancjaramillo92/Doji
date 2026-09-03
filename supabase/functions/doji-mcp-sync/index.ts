@@ -328,6 +328,64 @@ async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unkn
   return JSON.parse(text);
 }
 
+/* ─── Two scales on one endpoint ───────────────────────────────────────────
+   ESTABLISHED BY PROBE, NOT BY READING THE DOCUMENTATION, and the two answers
+   disagreed — which is the entire reason it was probed.
+
+   `get_spot_prices` serves PIPETTES: bid 441982000 is 4419.82, a hundred
+   thousandth of what it prints. `get_positions` serves DISPLAY prices in the
+   same account on the same symbol: entryPrice 4402.71 is 4402.71. So one tool
+   is scaled and its neighbour is not, and cTrader's own tool descriptions —
+   which say "DISPLAY price (not pipettes)" about their INPUTS — say nothing
+   about either.
+
+   A briefing opening on a price a hundred thousand times wrong would still be
+   four digits and would still look like gold. That is the whole argument for
+   naming this constant here, applying it in exactly one place, and never
+   letting a second reading of it exist. */
+export const PIPETTES = 100_000;
+export const fromPipettes = (n: number) => Math.round(n / PIPETTES * 100) / 100;
+
+/* WHERE GOLD IS, AND WHAT IT DID OVERNIGHT — from one call and no arithmetic
+   anyone has to redo.
+
+   `sessionClose` is the previous session's close, which for gold is the 17:00
+   New York roll — so the overnight move is a subtraction rather than a second
+   request for yesterday's bar. That is the whole of the briefing's opening
+   line, and it is why this needs no trendbars.
+
+   Pure, and exported, because it is the decision: a scale applied twice or not
+   at all is invisible in the output and catastrophic in a briefing. A price
+   that will not parse yields null rather than NaN — `NaN` formats as "NaN" and
+   would reach him as text, where a null is something the caller must handle. */
+export interface Spot {
+  bid: number; ask: number; high: number; low: number;
+  prev_close: number; change: number; change_pct: number; at: string;
+}
+
+export function foldSpot(price: any): Spot | null {
+  const at = (k: string) => {
+    const n = Number(price?.[k]);
+    return Number.isFinite(n) ? fromPipettes(n) : null;
+  };
+  const bid = at('bid'), ask = at('ask'), prev = at('sessionClose');
+  if (bid === null || ask === null) return null;
+
+  // Against the previous close where there is one, and against itself where
+  // there is not — a null change is honest, a zero one is a claim that nothing
+  // moved.
+  const change = prev === null ? null : Math.round((bid - prev) * 100) / 100;
+
+  return {
+    bid, ask, high: at('high') ?? bid, low: at('low') ?? bid,
+    prev_close: prev as number,
+    change: change as number,
+    change_pct: change === null || !prev ? (null as any)
+      : Math.round(change / prev * 10000) / 100,
+    at: new Date(Number(price?.timestamp) || Date.now()).toISOString(),
+  };
+}
+
 /* ─── Units ────────────────────────────────────────────────────────────────
    Both verified against a real fill (position 562780708) whose broker email
    independently reported 57.24 gross / 57.10 net:
@@ -524,11 +582,14 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const raw   = url.searchParams.get("raw") === "1";
     const tools = url.searchParams.get("tools") === "1";
     const posns = url.searchParams.get("positions") === "1";
-    const market = url.searchParams.get("market") === "1";
+    // Two flags rather than one string, so the market gate below and the test
+    // over it can both enumerate what this entry point reads.
+    const market    = url.searchParams.get("market") === "1";
+    const marketRaw = url.searchParams.get("market") === "raw";
     // The two read-only flags answer over the weekend too, which is when a
     // suspicious row actually gets looked at. Neither writes, so the market
     // check has nothing to protect here.
-    if (!force && !raw && !tools && !posns && !market && !marketOpen()) {
+    if (!force && !raw && !tools && !posns && !market && !marketRaw && !marketOpen()) {
       return json({ ok: true, skipped: "market closed" });
     }
 
@@ -608,13 +669,39 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        because the two answers are only useful together: the spot says where it
        is, the daily bars say what it did overnight, and whether they agree
        about scale is the thing being checked. */
-    if (market) {
-      const [spot, bars] = await Promise.all([
-        mcpPost(sid, "get_spot_prices", { symbolId: SYMBOL_IDS }),
-        mcpPost(sid, "get_trendbars", { symbolId: SYMBOL_IDS[0], period: "D_1", count: 2 }),
-      ]);
-      return new Response(`--- get_spot_prices ---\n${spot}\n--- get_trendbars D_1 x2 ---\n${bars}`,
-        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    /* THE RANGE FORM, BECAUSE THE SERVER REFUSED THE ONE ITS OWN DESCRIPTION
+       OFFERS. `get_trendbars` documents "(count) → last N bars ending now" as
+       valid and answers that shape with `fromTimestamp: must not be null`. The
+       description and the implementation disagree, and the implementation is
+       the one that has to be satisfied — so bars are asked for by range, which
+       is the combination it does accept. Five days back for two daily bars,
+       since a weekend is three of them. */
+    const barArgs = {
+      symbolId: SYMBOL_IDS[0], period: "D_1",
+      fromTimestamp: String(to - 5 * 86_400_000),
+      toTimestamp: String(to),
+    };
+
+    // ?market=raw is the diagnosis, ?market=1 the answer — the same split
+    // ?raw=1 makes for the deals, and the reason the scale above was probed
+    // before anything folded it.
+    if (market || marketRaw) {
+      if (marketRaw) {
+        const [spot, bars] = await Promise.all([
+          mcpPost(sid, "get_spot_prices", { symbolId: SYMBOL_IDS }),
+          mcpPost(sid, "get_trendbars", barArgs),
+        ]);
+        return new Response(`--- get_spot_prices ---\n${spot}\n--- get_trendbars D_1 by range ---\n${bars}`,
+          { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      }
+
+      const quoted = await mcpCall(sid, "get_spot_prices", { symbolId: SYMBOL_IDS });
+      const spot = foldSpot((quoted.prices ?? [])[0]);
+      // Said rather than served empty: a price this function could not read is
+      // not a price of zero, and a briefing opening on one would be a confident
+      // wrong number — the failure this whole endpoint was probed to avoid.
+      if (!spot) throw new Error("get_spot_prices returned no readable bid/ask");
+      return json({ ok: true, symbol: SYMBOL_IDS[0], ...spot });
     }
 
     const dealArgs = {

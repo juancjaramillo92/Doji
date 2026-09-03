@@ -1702,7 +1702,10 @@ test('every query flag the poller reads is one the market gate considers', () =>
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  const flags = [...src.matchAll(/const (\w+)\s*=\s*url\.searchParams\.get\("(\w+)"\) === "1"/g)]
+  // Any compared value, not only "1": ?market=raw is a second flag on the same
+  // parameter, and a pattern anchored on "1" would have skipped it — leaving
+  // the one that answers "market closed" all weekend unchecked.
+  const flags = [...src.matchAll(/const (\w+)\s*=\s*url\.searchParams\.get\("(\w+)"\) === "[^"]+"/g)]
     .map(m => m[1]);
   assert.ok(flags.length >= 3, `only ${flags.length} flags read out of the poller — the reader has gone blind`);
 
@@ -1803,4 +1806,38 @@ test('every tool the poller may call is one it actually calls or probes', () => 
     assert.match(src, new RegExp(`(mcpPost|mcpCall)\\(sid, "${t}"`),
       `ALLOWED_TOOLS permits ${t} and nothing in the file ever calls it`);
   }
+});
+
+test('Eugenia reaches a price through the poller and never holds the broker token', () => {
+  /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. So the market
+     read is deliberately not hers to make: doji-mcp-sync holds
+     CTRADER_MCP_TOKEN and will only ever answer with a quote, and she presents
+     the cron secret she already has. Giving her that token to save a hop would
+     put a market order one prompt injection away from the bot whose entire
+     product is that she gives no signals.
+
+     Structural, not instructed — the same shape as her having exactly one
+     database read of the journal and no write path to it. */
+  const eugenia = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  /* THE READ, NOT THE MENTION. The comment above readMarket explains at length
+     why she does not hold this token, and a bare name match fired on the
+     explanation — a test that forbids saying the word rather than doing the
+     thing, which would push the reasoning out of the file to stay green. */
+  assert.ok(!/env\(\s*["']CTRADER_/.test(eugenia),
+    'doji-eugenia reads a cTrader credential — the market read must go through ' +
+    'the poller, which is the only function that may hold one');
+  assert.ok(!/mcp\.ctrader\.com/.test(eugenia),
+    'doji-eugenia addresses the broker directly, bypassing the allow-list that ' +
+    'is the only thing keeping create_order out of reach');
+
+  // And it reaches a function that exists, by a path this repository deploys.
+  const url = eugenia.match(/const MARKET_URL = `\$\{SB_URL\}\/functions\/v1\/([\w-]+)/);
+  assert.ok(url, 'doji-eugenia no longer builds a market URL from SB_URL');
+  assert.ok(DEPLOYED.includes(url[1]),
+    `doji-eugenia reads a price from /functions/v1/${url[1]}, which is not a ` +
+    `function this repository deploys — every call is a 404`);
+  assert.match(eugenia, /MARKET_URL[\s\S]{0,400}?x-doji-key/,
+    'the market read presents no secret, so the poller will refuse it 401');
 });

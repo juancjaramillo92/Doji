@@ -31,7 +31,8 @@ import { secretMatches, nyClock, nyDate } from '../supabase/functions/_shared/ed
 
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
-  lookbackFor, foldHours, balanceTarget, parseSse, marketOpen
+  lookbackFor, foldHours, balanceTarget, parseSse, marketOpen,
+  fromPipettes, foldSpot, PIPETTES,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -2361,4 +2362,98 @@ test('a voice note that produced no words says WHICH of the four things went wro
     'exact conflation splitting these apart was for');
   assert.ok(!/send it again/i.test(VOICE_TROUBLE.unconfigured),
     'an unconfigured transcriber asks him to repeat himself');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE PRICE, AND THE TWO SCALES ONE ENDPOINT USES
+   ───────────────────────────────────────────────────────────────────────────
+   Every number below is a REAL capture from `?market=raw` and `?positions=1`
+   against the live account, not a shape invented here. That matters more than
+   usual: cTrader serves `get_spot_prices` in pipettes and `get_positions` in
+   display prices, on the same account and the same symbol, and its own tool
+   descriptions say nothing about either. A parser written from the docs would
+   have been a hundred thousand out on one of the two and would still have
+   produced a four-digit number that looked like gold.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// get_spot_prices, symbol 41, exactly as it came back.
+const SPOT = {
+  symbolId: 41,
+  bid: 441982000, ask: 441993000,
+  high: 442014000, low: 438113000,
+  sessionClose: 438796000,
+  timestamp: 1788404105346,
+};
+
+test('a spot price is pipettes, and the scale is applied once', () => {
+  assert.equal(fromPipettes(SPOT.bid), 4419.82);
+  assert.equal(fromPipettes(SPOT.ask), 4419.93);
+  assert.equal(PIPETTES, 100_000);
+  // Two decimals, which is what gold quotes to. A scale that left more would
+  // reach a briefing as 4419.8200000001.
+  assert.equal(fromPipettes(438796000), 4387.96);
+});
+
+test('the overnight move comes out of the same call as the price', () => {
+  /* sessionClose is the previous session's close — the 17:00 New York roll for
+     gold — so "where it is, with the overnight move" needs no second request
+     and no trendbars. That is the whole of the briefing's opening line. */
+  const spot = foldSpot(SPOT);
+  assert.equal(spot.bid, 4419.82);
+  assert.equal(spot.ask, 4419.93);
+  assert.equal(spot.high, 4420.14);
+  assert.equal(spot.low, 4381.13);
+  assert.equal(spot.prev_close, 4387.96);
+  assert.equal(spot.change, 31.86);
+  assert.equal(spot.change_pct, 0.73);
+  assert.equal(spot.at, new Date(1788404105346).toISOString());
+});
+
+test('a price that will not parse is null rather than NaN', () => {
+  /* NaN formats as "NaN" and would reach him as text in a briefing; a null is
+     something the caller is forced to handle, and the caller throws. An empty
+     answer here is not a price of zero. */
+  assert.equal(foldSpot(undefined), null);
+  assert.equal(foldSpot({}), null);
+  assert.equal(foldSpot({ bid: 'x', ask: 441993000 }), null);
+  assert.equal(foldSpot({ bid: 441982000 }), null);
+});
+
+test('a quote with no previous close still gives a price', () => {
+  // The move is unknown rather than zero — a zero change is a claim that
+  // nothing moved, which is a different statement from having no reference.
+  const spot = foldSpot({ bid: 441982000, ask: 441993000, timestamp: 1788404105346 });
+  assert.equal(spot.bid, 4419.82);
+  assert.equal(spot.change, null);
+  // And the range falls back to the price rather than to zero, which would
+  // render as a day that traded down to nothing.
+  assert.equal(spot.high, 4419.82);
+  assert.equal(spot.low, 4419.82);
+});
+
+test('a live position carries its plan, and NOT in pipettes', () => {
+  /* THE CAPTURE THAT CONTRADICTS §8. It says the plan — where the stop and the
+     target were set — is not available from the broker, and four questions are
+     marked unanswerable because of it. That is true of a CLOSED position, which
+     is all this system had ever asked about. A live one carries both.
+
+     And it carries them as DISPLAY prices, beside a spot call that does not.
+     This test exists to hold that asymmetry in place: applying fromPipettes
+     here would put the stop at four one-hundredths of a cent. */
+  const position = {
+    positionId: 586244103, symbolId: 41, tradeSide: 'BUY', volume: 400,
+    entryPrice: 4402.71, stopLoss: 4403.24, takeProfit: 4432.1,
+    commission: -14, swap: 0,
+  };
+
+  // Already display prices — gold, four digits, no conversion wanted.
+  assert.ok(position.entryPrice > 1000 && position.entryPrice < 100000);
+  assert.ok(position.stopLoss > 1000 && position.stopLoss < 100000);
+  assert.equal(fromPipettes(position.entryPrice), 0.04,
+    'fromPipettes applied to a position price gives four hundredths of a cent — ' +
+    'which is why the two scales are named apart rather than assumed alike');
+
+  // The units the poller already knows are unchanged by any of this.
+  assert.equal(ozFromVolume(position.volume), 4);
+  assert.equal(usdFromCents(position.commission), -0.14);
 });
