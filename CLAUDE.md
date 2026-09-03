@@ -169,6 +169,18 @@ pixels; say so on any visual change.
 - **`null` is not `no`,** and the journal asks whether the stop and target were
   *respected*, not whether they were moved. Both halves of that trip people up.
   Column lists and the full account are in the README's Data model.
+- **`ALLOWED_TOOLS` is what stands between this system and a placed trade, and
+  it should be read that way rather than as configuration.** `?tools=1`
+  established that the broker's endpoint also serves `create_order`,
+  `close_position`, `amend_position`, `amend_order` and `cancel_order`, on the
+  same credential. Every name in the array carries `readOnlyHint: true` on the
+  broker's own listing; `DESTRUCTIVE_TOOLS` names the five that do not, and
+  `agree.test.mjs` asserts none of them is reachable through the list or around
+  it by a direct call — and that a permitted name nothing calls fails too, since
+  that is the shape a destructive one would arrive in. The credential is the
+  better place for this guarantee and is not where it lives; a read-only token
+  would retire the array.
+
 - **The poller's two windows are not the same question** — which positions get
   written, and which deals get read. The README explains why the fold window is
   wider. What it does not carry, and you will need for a repair: the signature of

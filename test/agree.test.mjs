@@ -776,9 +776,23 @@ const looksLikeCode = (name) =>
 
      TODO                        a prohibition — CLAUDE.md forbids the marker
      background_color            }  manifest fields tried against the iOS
-     apple-touch-startup-image   }  launch frame, none of which reached it */
+     apple-touch-startup-image   }  launch frame, none of which reached it
+
+   AND THE BROKER'S OWN TOOL NAMES, which are named to say what its endpoint
+   OFFERS and what this repository therefore chooses not to call. They are the
+   one category this test cannot judge: they are real, they are just real
+   somewhere else. `create_order` and the other four destructive names are
+   deliberately NOT here — they are in DESTRUCTIVE_TOOLS in the poller, so they
+   validate against the code, which is what makes the read-only claim checkable
+   rather than merely written down.
+
+     get_symbols · get_assets · get_pending_orders · get_order_history ·
+     get_version   read-only tools cTrader serves and the poller does not call
+     MN_1          a get_trendbars period, one of nine the broker accepts */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
+  'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
+  'get_version', 'MN_1',
 ]);
 
 test('the documents name only symbols the repository has', () => {
@@ -1728,4 +1742,65 @@ test('the poller answers its debug flags before it writes anything', () => {
   assert.ok(!/tools\/call/.test(block),
     'the tools probe calls a tool it discovered, which is exactly what the ' +
     'allow-list exists to prevent');
+});
+
+/* ─── Nothing this function can call may place a trade ───────────────────────
+   `?tools=1` established what the broker's endpoint actually offers, and the
+   answer has two halves. It serves prices, which is why ALLOWED_TOOLS grew. It
+   also serves create_order, close_position, amend_position, amend_order and
+   cancel_order — on the same credential, reachable by the same token.
+
+   So the read-only guarantee this repository states about the poller is not a
+   property of the key. It is a property of one array in one file, and the
+   failure mode of editing it carelessly is not a bug report.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the poller can call nothing that would place, move or close a trade', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+  const list = src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/);
+  assert.ok(list, 'doji-mcp-sync no longer declares ALLOWED_TOOLS');
+  const allowed = [...list[1].matchAll(/"(\w+)"/g)].map(m => m[1]);
+  assert.ok(allowed.length >= 2, `only ${allowed.length} tools read — the reader has gone blind`);
+
+  const banned = src.match(/export const DESTRUCTIVE_TOOLS = \[([\s\S]*?)\] as const;/);
+  assert.ok(banned, 'doji-mcp-sync no longer names the destructive tools');
+  const destructive = [...banned[1].matchAll(/"(\w+)"/g)].map(m => m[1]);
+  assert.ok(destructive.length >= 5,
+    `only ${destructive.length} destructive tools named — the endpoint offers five`);
+
+  for (const t of destructive) {
+    assert.ok(!allowed.includes(t),
+      `ALLOWED_TOOLS contains ${t}, which places, moves or closes a trade — the ` +
+      `poller is no longer read-only and nothing else in this system says so`);
+  }
+
+  /* AND EVERY READ STILL GOES THROUGH THE CHECK. The list is inert if the one
+     place a tool name becomes a request stops consulting it — which is a
+     likelier regression than someone typing create_order into the array. */
+  assert.match(src, /if \(!ALLOWED_TOOLS\.includes\(tool\)\) throw/,
+    'mcpPost no longer enforces the allow-list, so the array is decoration');
+
+  // Nowhere in the file may a destructive name appear as a call, whatever the
+  // array says — the probes call tools directly and must not be a way round it.
+  for (const t of destructive) {
+    assert.ok(!new RegExp(`mcpPost\\(sid, "${t}"|mcpCall\\(sid, "${t}"|name: "${t}"`).test(src),
+      `doji-mcp-sync calls ${t} somewhere, bypassing the allow-list entirely`);
+  }
+});
+
+test('every tool the poller may call is one it actually calls or probes', () => {
+  // A name in the array that nothing reaches is a widening with no feature
+  // behind it — which is the shape a destructive tool would arrive in if one
+  // ever did, since it would be added "for later" rather than used.
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const allowed = [...src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/)[1]
+    .matchAll(/"(\w+)"/g)].map(m => m[1]);
+
+  for (const t of allowed) {
+    assert.match(src, new RegExp(`(mcpPost|mcpCall)\\(sid, "${t}"`),
+      `ALLOWED_TOOLS permits ${t} and nothing in the file ever calls it`);
+  }
 });

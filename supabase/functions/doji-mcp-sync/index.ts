@@ -210,10 +210,36 @@ const SYMBOL_IDS: number[] = (() => {
 // Explicit: the server defaults to 50 and truncates silently.
 const MAX_ROWS = 500;
 
-// Both read-only, and both carry readOnlyHint on the server's own tool listing.
-// Nothing that amends, closes or creates is reachable from this function.
-const ALLOWED_TOOLS = ["get_deals", "get_balance"] as const;
+/* EVERY ONE READ-ONLY, AND THE LIST IS THE ONLY THING THAT MAKES THAT TRUE.
+
+   `?tools=1` established what this endpoint actually offers, and the answer
+   matters twice. It serves prices — `get_spot_prices` and `get_trendbars` —
+   which is what lets Eugenia read the instrument instead of a web page. And it
+   serves `create_order`, `close_position`, `amend_position`, `amend_order` and
+   `cancel_order`, which are on the same credential.
+
+   SO THIS ARRAY IS WHAT STANDS BETWEEN THIS SYSTEM AND A PLACED TRADE, and it
+   should be read that way rather than as configuration. Every name below
+   carries `readOnlyHint: true` on the server's own listing; nothing that
+   amends, closes or creates appears, and adding one is not a widening of a list
+   but a change of what this function is. A test asserts the destructive five
+   are absent, because the failure mode of getting this wrong is not a bug
+   report.
+
+   The credential is the better place for that guarantee and is not where it
+   lives today — if cTrader can issue a read-only token, this array stops being
+   load-bearing. Until then it is. */
+const ALLOWED_TOOLS = [
+  "get_deals", "get_balance", "get_positions", "get_spot_prices", "get_trendbars",
+] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
+
+// The five this endpoint offers that would place, move or close a trade. Named
+// so a test can assert none of them is ever reachable, rather than trusting the
+// list above to be read carefully by whoever edits it next.
+export const DESTRUCTIVE_TOOLS = [
+  "create_order", "close_position", "amend_position", "amend_order", "cancel_order",
+] as const;
 
 /* ─── MCP transport ────────────────────────────────────────────────────────
    Streamable HTTP. Three things make it fiddlier than a REST call: a session
@@ -497,10 +523,12 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const force = url.searchParams.get("force") === "1";
     const raw   = url.searchParams.get("raw") === "1";
     const tools = url.searchParams.get("tools") === "1";
+    const posns = url.searchParams.get("positions") === "1";
+    const market = url.searchParams.get("market") === "1";
     // The two read-only flags answer over the weekend too, which is when a
     // suspicious row actually gets looked at. Neither writes, so the market
     // check has nothing to protect here.
-    if (!force && !raw && !tools && !marketOpen()) {
+    if (!force && !raw && !tools && !posns && !market && !marketOpen()) {
       return json({ ok: true, skipped: "market closed" });
     }
 
@@ -540,6 +568,52 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       // read as the broker offering nothing at all.
       if (!listed.ok) throw new Error(`MCP tools/list: HTTP ${listed.status}`);
       return new Response(await listed.text(),
+        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+
+    /* ?positions=1 — WHETHER THE PLAN IS RECOVERABLE AFTER ALL.
+
+       §8 of the strategy says flatly that it is not: *where the stop and target
+       were set at entry* is called unavailable from the broker, and four
+       questions are marked unanswerable because of it — R-02's respect half
+       among them. That claim was formed against get_deals and
+       get_position_details on a CLOSED position, where the broker reports only
+       the final stop, and it is correct about those.
+
+       A LIVE position is a different question, and nothing here had ever asked
+       it. `amend_position` takes stopLoss and takeProfit, which says positions
+       carry them; whether get_positions SERVES them is what this answers. If it
+       does, the trades trigger already fires at the one moment worth sampling —
+       and a stop recorded at open is the plan, which would move R-02 and R-08's
+       step 4 out of the unanswerable set.
+
+       Raw text for the reason ?raw=1 is raw: the field names and their scale
+       are the whole question, and a fold written before seeing them would be
+       the guess this repository keeps paying for. */
+    if (posns) {
+      const body = await mcpPost(sid, "get_positions", {});
+      return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+
+    /* ?market=1 — WHAT A PRICE ACTUALLY LOOKS LIKE COMING OUT OF THIS ENDPOINT.
+
+       Also raw, and deliberately not yet folded into anything Eugenia reads.
+       cTrader's own tool descriptions say "DISPLAY price (not pipettes)" about
+       their INPUTS, which says nothing about what comes back — and the Open API
+       has historically served prices scaled by a per-symbol digit count. A
+       factor of ten to the fifth in the wrong direction produces a number that
+       is still four digits and still looks like gold.
+
+       So the shape is read before the parser is written. Both calls at once,
+       because the two answers are only useful together: the spot says where it
+       is, the daily bars say what it did overnight, and whether they agree
+       about scale is the thing being checked. */
+    if (market) {
+      const [spot, bars] = await Promise.all([
+        mcpPost(sid, "get_spot_prices", { symbolId: SYMBOL_IDS }),
+        mcpPost(sid, "get_trendbars", { symbolId: SYMBOL_IDS[0], period: "D_1", count: 2 }),
+      ]);
+      return new Response(`--- get_spot_prices ---\n${spot}\n--- get_trendbars D_1 x2 ---\n${bars}`,
         { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 
