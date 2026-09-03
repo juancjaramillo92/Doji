@@ -443,7 +443,16 @@ code you write near it:
   that silently omits half of what it audits is the defect it exists to prevent.
 
 - **Her notes are the only channel he has for correcting her, so `notesBlock()`
-  is load-bearing on all five paths.** An instruction — *"stop mentioning the
+  is load-bearing on all SEVEN paths, and the conversation window on the six
+  that speak.** The trade look had neither for its whole life: an instruction he
+  gave was obeyed everywhere except the two messages that reach him mid-trade,
+  and its R-14/R-19 line fires on exactly the print the morning briefing is
+  likeliest to have already named — so without the window the sharpest thing she
+  sends arrives as a repetition, which reads as emphasis rather than as a defect.
+  Both reads sit AFTER its two early returns, so an ordinary fill still costs
+  nothing. `channelsBlock()` stays on the five that are asked to build a term,
+  and `recent()` stays off the nightly pass, which reads its own fixed
+  twenty-four hours. An instruction — *"stop mentioning the
   ten-year"* — is a note, and every later message obeys it; the conversation
   window would forget it by morning. Dropping the call from the briefing, the
   pulse or a reply fails silently: she carries on ignoring something he believes

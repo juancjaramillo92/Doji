@@ -2893,8 +2893,24 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
       `R-11 sets. Read R-11 in the strategy before you say anything about it.`;
   }
 
-  const said = await ask([{ role: 'user', content: `${TRADE_EVENT}\n\n${situation}` }],
-                         'medium', 'trade look', TRADE_TOOLS);
+  /* THE TWO READS GO HERE AND NOT AT THE TOP, which is the whole of why this
+     path costs nothing on an ordinary fill. Both branches above return before
+     any of this on the common case — no print pending, no breach — and moving
+     the reads up would spend them on every open and close the poller sees, two
+     minutes apart, for a message that is not going to be sent.
+
+     HISTORY IS THE HALF THAT MATTERS MOST HERE, and it is the one this path
+     never had. The R-14/R-19 message fires on a print pending against an open
+     position — which is exactly what the morning briefing may have already
+     named. Without the window she cannot know she said it two hours ago, so
+     the sharpest thing she sends arrives as a repetition. And notes beside it
+     for the reason they are on every other path: an instruction he gave her is
+     obeyed everywhere except the two messages that reach him mid-trade. */
+  const [history, notes] = await Promise.all([recent(), notesBlock()]);
+
+  const said = await ask(
+    [...history, { role: 'user', content: `${TRADE_EVENT}\n\n${situation}${notes}` }],
+    'medium', 'trade look', TRADE_TOOLS);
 
   if (isSilent(said)) return json({ ok: true, trade: id, said: "quiet" });
 
