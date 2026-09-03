@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 357 tests, four suites
+npm test      # 358 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -544,7 +544,14 @@ code you write near it:
   drops the audio on a long answer with nothing saying why. `TTS_VOICE` and
   `TTS_MODEL` are environment rather than pinned, unlike `EMBED_MODEL` — nothing
   is stored, so a change alters one message rather than what is comparable to
-  what.
+  what — but they are COUPLED, since the older `tts-1` serves a smaller voice set
+  and takes no delivery instruction. `TTS_STYLE` is pinned where they are not:
+  which voice reads it is taste, how it is read is the product, and a breathless
+  delivery of a deliberately unexcited paragraph contradicts the prompt's whole
+  length. AND THE FORMAT IS THE ONE THING HERE THAT FAILS QUIETLY — mp3 is the
+  vendor's default and it WORKS, arriving as a file attachment rather than a
+  voice note, with nothing erroring and nothing logged; `agree.test.mjs` reads
+  `speak()` for `opus`, for `audio/ogg` and for the `.ogg` filename.
 
 - **The apology names the job.** Every scheduled failure used to say "No
   briefing", including the nightly pass, whose real symptom is that her memory

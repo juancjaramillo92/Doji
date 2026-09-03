@@ -1676,8 +1676,23 @@ const TTS_KEY   = env("TTS_KEY");
 // Both from the environment, unlike EMBED_MODEL. Nothing is stored, so a change
 // here alters one message rather than what is comparable to what — and which
 // voice she has is his to change without a deploy.
-const TTS_MODEL = env("TTS_MODEL") || "tts-1";
-const TTS_VOICE = env("TTS_VOICE") || "nova";
+//
+// THE TWO ARE COUPLED AND THE VENDOR DECIDES HOW. The older `tts-1` serves a
+// smaller set of voices and takes no delivery instruction, so overriding the
+// model alone can leave a voice it does not have — a 400 on every reply, which
+// costs the audio and not the answer, and is the reason both defaults name the
+// current model's recommended pairing rather than the safest-looking one.
+const TTS_MODEL = env("TTS_MODEL") || "gpt-4o-mini-tts";
+const TTS_VOICE = env("TTS_VOICE") || "marin";
+
+/* HOW IT IS READ, WHICH IS A PRODUCT DECISION AND NOT A SETTING. The prompt
+   spends most of its length keeping her off signals and verdicts, and a
+   breathless delivery of a deliberately unexcited paragraph contradicts the
+   whole of it — the register has to survive the trip through audio. Pinned
+   here for that reason where the voice is his to change: which voice reads it
+   is taste, how it is read is the product. */
+const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
+                  "person who is busy. Never breathless, never selling.";
 
 /* Roughly fifty seconds of speech. Past that a voice note stops being a reply
    and becomes a recording to scrub through, and the text — already sent — is
@@ -1698,9 +1713,13 @@ export const speaksBack = (answer: string, heard: boolean): boolean =>
    she cannot speak costs the convenience.
 
    Its own fetch rather than the shared telegram() helper, for tgDownload's
-   reason: sendVoice is multipart and that helper posts JSON. And OGG/Opus
-   specifically — Telegram renders those as a voice note, with a waveform and
-   playback speed, and anything else as a file attachment. */
+   reason: sendVoice is multipart and that helper posts JSON.
+
+   AND OGG/OPUS SPECIFICALLY, which is the one thing here that would fail
+   quietly rather than loudly. The default is mp3 and it would work — the
+   request succeeds, Telegram accepts the file, and it arrives as an ATTACHMENT
+   rather than a voice note, with no waveform and no speed control. Nothing
+   errors; the feature just stops being the thing it was for. */
 async function speak(answer: string): Promise<void> {
   if (!TTS_KEY) return;
 
@@ -1709,7 +1728,8 @@ async function speak(answer: string): Promise<void> {
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: TTS_MODEL, voice: TTS_VOICE, input: answer, response_format: "opus",
+        model: TTS_MODEL, voice: TTS_VOICE, input: answer,
+        instructions: TTS_STYLE, response_format: "opus",
       }),
     });
     if (!spoken.ok) throw new Error(`speech HTTP ${spoken.status}`);
