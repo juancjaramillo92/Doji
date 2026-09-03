@@ -814,11 +814,15 @@ const looksLikeCode = (name) =>
 
      get_symbols · get_assets · get_pending_orders · get_order_history ·
      get_version   read-only tools cTrader serves and the poller does not call
-     MN_1          a get_trendbars period, one of nine the broker accepts */
+     MN_1          a get_trendbars period, one of nine the broker accepts
+     insufficient_quota  the embedding vendor's own code for an unfunded
+                   account, quoted exactly because the README's account of what
+                   the ?embed=1 door reports is worth nothing if it paraphrases
+                   the string somebody will actually read */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
   'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
-  'get_version', 'MN_1',
+  'get_version', 'MN_1', 'insufficient_quota',
 ]);
 
 test('the documents name only symbols the repository has', () => {
