@@ -159,10 +159,12 @@ export const greeting = (brief: Brief) =>
     : 'Buenos dias jefesito, todays news below';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
-   The prompt aims at fourteen hundred characters, so a briefing now arrives as
-   one message and this does nothing. It stays for the day it does not — a heavy
-   week, or a Sunday that runs on — because splitting badly is worse than not
-   splitting: a break mid-sentence reads as a bug.
+   THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
+   characters and a briefing always arrived whole; it now caps only the market
+   half and lets the teaching take what a chain needs, so a morning that builds a
+   term properly can genuinely reach here. Splitting badly is worse than not
+   splitting — a break mid-sentence reads as a bug — which is why the preference
+   below is what it is.
 
    So the split prefers a blank line, then any newline, then — only if a single
    paragraph is itself over the limit — a hard cut. The prompt puts a blank line
@@ -2388,11 +2390,13 @@ async function postBriefing(due: Brief): Promise<Response> {
                           'high', `${due} briefing`);
   const brief = await critique(draft);
 
-  /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT. The prompt asks for
-     nine hundred to fourteen hundred characters and no test can hold it there —
-     the figure lives in prose, on the far side of a model call. Unmeasured, the
-     briefing grew by a sixth and the way it surfaced was someone counting the
-     characters by hand. */
+  /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT, and it matters more
+     now that the cap is off. The prompt holds the market half near nine hundred
+     characters and lets the teaching run — a figure that lives in prose, on the
+     far side of a model call, where no test can hold it. Unmeasured, the
+     briefing once grew by a sixth and the way it surfaced was someone counting
+     by hand. What this number can no longer tell you on its own is WHY it grew:
+     a briefing that built a term and one that padded look the same from here. */
   console.log(`doji-eugenia: ${due} briefing — ${brief.length} characters`);
 
   /* THE MARKER GOES DOWN BEFORE THE SEND, and the order is the whole point.
@@ -2684,12 +2688,18 @@ async function postRelease(): Promise<Response> {
 
   await markLooked(due.id);
 
-  const [notes, story, loops] = await Promise.all([notesBlock(), thesisBlock(), loopsBlock()]);
+  // THE MAP, because the prompt now asks it to build a term he has never had
+  // built and cannot know which those are without it. Asking her to teach from
+  // a ladder she is not handed is the shape the nightly pass was already fixed
+  // for: an instruction that outruns its inputs.
+  const [notes, channels, story, loops] = await Promise.all([
+    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
+  ]);
   const asked = RELEASE +
     `\n\nWhat landed: ${nyTime(due.at)} ET ${due.name}` +
     (due.consensus ? `, ${due.consensus} expected` : "") +
     (due.prior ? `, after ${due.prior}` : "") + "." +
-    notes + story + loops;
+    notes + channels + story + loops;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'release look', RELEASE_TOOLS);

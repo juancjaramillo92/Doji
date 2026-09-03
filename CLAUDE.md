@@ -443,12 +443,16 @@ code you write near it:
   that silently omits half of what it audits is the defect it exists to prevent.
 
 - **Her notes are the only channel he has for correcting her, so `notesBlock()`
-  is load-bearing on all four paths.** An instruction — *"stop mentioning the
+  is load-bearing on all five paths.** An instruction — *"stop mentioning the
   ten-year"* — is a note, and every later message obeys it; the conversation
   window would forget it by morning. Dropping the call from the briefing, the
   pulse or a reply fails silently: she carries on ignoring something he believes
-  she took, and nothing anywhere reports it. `agree.test.mjs` reads the four
-  function bodies for it, and for `channelsBlock()` beside it.
+  she took, and nothing anywhere reports it. `agree.test.mjs` reads the five
+  function bodies for it, and for `channelsBlock()` beside it — the release look
+  joined that list when its prompt was asked to teach, since telling her to build
+  a mechanism he has never had built without handing her the map that says which
+  those are is an instruction outrunning its inputs, and it fails by teaching the
+  wrong thing well rather than by failing at all.
 - **She has senses now, and they are data rather than a clock.** The briefing
   files the day's calendar with `log_calendar`; a quarter-hourly cron job
   (`?release=1`, its own job in `004_cron.sql`) looks at anything `high` that has
@@ -573,6 +577,16 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
+- **LENGTH IS TWO RULES AND THE CRITIC HOLDS THE SECOND COPY.** A flat nine
+  hundred to fourteen hundred for the whole briefing was what decided she could
+  not teach: with four channels at `unseen`, where §0 says build the term before
+  using it, there is room for four paragraphs of market OR three plus a build-up,
+  and one ceiling chose the first every morning. The market half stays near nine
+  hundred; the teaching paragraph is uncapped; four thousand characters is the
+  only bound and it is Telegram's, not a taste. THE CRITIC ENFORCED THE SAME
+  NUMBER — changing the briefing prompt alone would have had the critic cut the
+  teaching straight back out, which is the shape to check for whenever a prompt
+  rule moves: `CRITIC` restates several of them.
 - **Six schedules, three jobs, and `dueNow` picks between the clock-driven
   four.** `briefDue`, `pulseDue`, `retryDue`, `consolidateDue` and
   `consolidateRetryDue` all read `nyClock`, because pg_cron is UTC and a fixed

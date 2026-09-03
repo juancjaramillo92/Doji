@@ -981,8 +981,24 @@ genuinely odd fact, and a single question or nothing.
 It used to be seven numbered sections with impact emoji, and plain-Englishing
 the words inside them did not help — **seven numbered sections with headings
 *are* a report**, whatever the vocabulary. The scaffolding was doing the
-talking. Nine hundred to fourteen hundred characters, and running long is cut by
-dropping words, never events.
+talking.
+
+**Length is two rules rather than one, and that is a correction.** It was a flat
+nine hundred to fourteen hundred characters for the whole briefing, and with four
+of the five channels sitting at `unseen` — where §0 says *build it before using
+it* — that number was the thing deciding she could not. A briefing has room for
+four paragraphs of market or three plus a term built from the ground up, and a
+single ceiling silently chose the first every morning.
+
+So the market half — where gold is, everything else, the odd thing, the question
+— stays near nine hundred characters, because a wall of text there is the thing
+*he* said frustrates him. The paragraph that teaches is not capped: it takes the
+links the chain needs and, on an `unseen` channel, the build-up too. The only
+bound left is four thousand characters, which is not an aesthetic — it is where
+Telegram stops delivering one message.
+
+Running long is still cut by dropping words, never events, and never a link out
+of a chain.
 
 The vocabulary rule is now "plain words first": *the gap between rates and
 inflation* before *real yields*, and the short name only once the long one has
@@ -1349,10 +1365,14 @@ prompt otherwise asks for. She acknowledges an instruction in four words or
 fewer — a fact about him she records silently — because otherwise he cannot tell
 it stuck and will say it again.
 
-`notesBlock()` is therefore load-bearing on all four paths, and its absence
-would be silent: drop it from one and she carries on ignoring an instruction he
-believes she took. A test asserts the briefing, the pulse and a reply each read
-them.
+`notesBlock()` is therefore load-bearing on all five paths, and its absence would
+be silent: drop it from one and she carries on ignoring an instruction he
+believes she took. A test asserts that the briefing, the pulse, a reply, the
+nightly pass and the release look each read them — and `channelsBlock()` beside
+them, which the release look only joined when its prompt was asked to teach.
+Telling her to build a mechanism he has never had built, without handing her the
+map that says which those are, is an instruction outrunning its inputs — and it
+fails by teaching the wrong thing well rather than by failing at all.
 
 ### Search that survives a rephrasing
 
@@ -2711,7 +2731,7 @@ not run.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped` and `apologyFor` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the five paths that must call each — the briefing, the pulse, a reply, the release look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
