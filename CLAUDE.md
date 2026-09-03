@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 333 tests, four suites
+npm test      # 344 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -441,6 +441,24 @@ code you write near it:
   `<>` is NULL there and the one event it exists for would never fire, and
   without the guard the poller's two-minute re-upsert fires it forever.
 
+  THE THIRD SENSE HAS NO ROW BEHIND IT, WHICH IS WHY IT NEEDS A MARK. A release
+  landing and a position opening are both rows appearing; gold is always there,
+  so *it moved* is a fact about the instrument AND a previous reading.
+  `eugenia_price` is one row rewritten every quarter hour by its own job
+  (`?move=1`), so the window is the gap between firings rather than a number
+  anyone chose. Both gates are relative — a share of the session's range, and a
+  share of the price — because a fixed dollar threshold means two different
+  things to gold at 4,400 and gold at 2,000, and the year nobody revises it the
+  sense fires constantly or never; never looks exactly like a quiet market.
+  `MARK_STALE_MIN` stops a move measured across an outage counting as a
+  quarter-hour move, and `looked_at` is the one column written conditionally:
+  unconditionally, the quiet window never reopens and she says one thing about a
+  move and then nothing for the life of the deployment. A move a high-impact
+  print explains belongs to the spine and not here, or payrolls reaches him twice
+  in ten minutes from two senses saying the same thing. `marketOpen` moved into
+  `_shared/edge.ts` when this arrived, because the poller and this now ask the
+  same question.
+
 - **`adherence.ts` is the strategy executed, and the set of rules is not a
   choice.** §7's `Evaluable` column decides it: eight `journal` rules, and the
   eleven `judgment` and `field` ones stay out, because a judgment rule that
@@ -508,7 +526,7 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
-- **Five schedules, two jobs, and `dueNow` picks between the clock-driven
+- **Six schedules, three jobs, and `dueNow` picks between the clock-driven
   four.** `briefDue`, `pulseDue`, `retryDue`, `consolidateDue` and
   `consolidateRetryDue` all read `nyClock`, because pg_cron is UTC and a fixed
   expression is wrong for half the year. They overlap, so each answering
@@ -516,10 +534,14 @@ code you write near it:
   test walks every hour of a week through `dueNow`. That walk now DRIVES the
   sequence rather than being handed a flag — the pass records itself, which is
   what makes 23:00 a retry rather than a second pass, and a test called with a
-  fixed `consolidated` could not have discovered that. The fifth schedule, the
-  event spine, is deliberately not in `dueNow`: it is decided by a table rather
-  than by the clock, and folding a data-driven trigger into a clock predicate
-  would make both harder to read. Adding an hour costs nothing
+  fixed `consolidated` could not have discovered that. The two data-driven
+  schedules — the event spine and the price sense — are deliberately not in
+  `dueNow`: each is decided by a table rather than by the clock, and folding one
+  into a clock predicate would make both harder to read. Each has its own door
+  and its own quarter-hourly job, and THE FLAG IS THE COPY THAT MATTERS: renaming
+  one fails in complete silence, because pg_net discards the 200 an unread flag
+  still gets back from `nothing due this hour`. `agree.test.mjs` reads every
+  flagged cron URL against `postScheduled`. Adding an hour costs nothing
   in cron — the job is `0 * * * *` and always was — which is exactly why a new
   schedule can be answered correctly and dispatched by nobody. `agree.test.mjs`
   reads `postScheduled` for a branch per answer.

@@ -38,7 +38,7 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -572,26 +572,6 @@ async function writePlan(plan: OpenPlan): Promise<void> {
       body: JSON.stringify({ planned_sl: plan.planned_sl, planned_tp: plan.planned_tp }),
     });
   if (!res.ok) throw new Error(`Plan write failed (HTTP ${res.status}): ${await res.text()}`);
-}
-
-/* ─── Market hours ─────────────────────────────────────────────────────────
-   Gold trades Sunday 17:00 to Friday 17:00, New York. Polling through the
-   ~49-hour weekend close is roughly 1,400 pointless calls a week for data that
-   cannot have changed.
-
-   Decided here rather than in the cron expression on purpose: "continuous from
-   Sunday evening to Friday evening" takes three cron jobs, pg_cron schedules in
-   UTC, and every one of them would be an hour wrong whenever New York is on
-   standard time. nyClock asks America/New_York for its own clock instead, which
-   is correct all year — the same reading Eugenia's two schedules take, from the
-   same definition.
-   ───────────────────────────────────────────────────────────────────────── */
-export function marketOpen(now = new Date()): boolean {
-  const { wd, hour } = nyClock(now);
-  if (wd === 6) return false;                 // Saturday
-  if (wd === 5 && hour >= 17) return false;   // after the Friday close
-  if (wd === 0 && hour < 17) return false;    // before the Sunday open
-  return true;
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────

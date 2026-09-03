@@ -40,17 +40,17 @@ from (values
                           'eugenia_channels')),
    '5'),
 
-  -- 005's five. Separate from the row above rather than folded into it, because
+  -- 005's six. Separate from the row above rather than folded into it, because
   -- a database with 003 and not 005 is a real and expected state — she runs,
   -- every tool that touches one of these answers "that did not save", and the
-  -- only sign is a count. Which of the five is missing is in the table listing
+  -- only sign is a count. Which of the six is missing is in the table listing
   -- further down.
   ('005 tables exist',
    (select count(*)::text from information_schema.tables
      where table_schema = 'public'
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
-                          'eugenia_loops','eugenia_feedback')),
-   '5'),
+                          'eugenia_loops','eugenia_feedback','eugenia_price')),
+   '6'),
 
   -- The thesis is a single row seeded by 005, and setThesis PATCHes it by
   -- primary key — so a missing row is a 200 with an empty array and every
@@ -58,6 +58,14 @@ from (values
   -- him. Exactly the eugenia_channels seeding failure, in a second place.
   ('the thesis row is seeded',
    (select count(*)::text from public.eugenia_thesis where id = 'current'),
+   '1'),
+
+  -- And the price mark, for the same reason and with the same failure: markPrice
+  -- PATCHes by primary key, so without the row every reading is dropped, the mark
+  -- never advances, and the price sense answers "no mark yet" forever — which is
+  -- also what it answers on a genuinely quiet market.
+  ('the price mark row is seeded',
+   (select count(*)::text from public.eugenia_price where id = 'current'),
    '1'),
 
   -- Without pg_trgm the `<%` operator does not exist, so eugenia_search fails
@@ -271,19 +279,23 @@ from (values
      where pubname = 'supabase_realtime' and tablename = 'trades'),
    '1'),
 
-  ('three cron jobs, all active',
+  -- FIVE, AND THIS ROW HAS BEEN WRONG BEFORE. It said three while 004 defined
+  -- four, so a correct database reported a mismatch and the row that exists to
+  -- catch a missing job was the thing that looked broken. Count 004's
+  -- cron.schedule calls when this changes.
+  ('five cron jobs, all active',
    (select count(*)::text from cron.job where active),
-   '3'),
+   '5'),
 
   -- THE SECRET NAME, WHICH USED TO BE READ BY EYE AND IS THE FAILURE THIS
   -- SYSTEM HAS HAD TWICE. Postgres compares the Vault name case-sensitively, so
   -- the upper-case spelling matches nothing, yields null and makes the caller
-  -- give up without raising anything. Both calling jobs must name the lower-case
-  -- one; the third is a DELETE and presents no secret.
-  ('both calling jobs read the lower-case Vault secret',
+  -- give up without raising anything. Every calling job must name the lower-case
+  -- one; purge-cron-history is a DELETE and presents no secret.
+  ('all four calling jobs read the lower-case Vault secret',
    (select count(*)::text from cron.job
      where command like '%''doji_cron_secret''%'),
-   '2'),
+   '4'),
   -- The third caller, and the one that actually shipped with the upper-case
   -- spelling. It is a function body rather than a job, so it needs its own row.
   ('the Telegram trigger function reads the lower-case Vault secret',
@@ -400,13 +412,16 @@ order by tablename;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
 -- Against 004_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
--- doji-eugenia-spine at 5,20,35,50 past, purge-cron-history nightly — four, all
--- active. The summary block checks the Vault secret name in the calling jobs;
--- this is where the schedules and the timeouts are read.
+-- doji-eugenia-spine at 5,20,35,50 past, doji-eugenia-price at 12,27,42,57 and
+-- purge-cron-history nightly — five, all active. The summary block checks the
+-- Vault secret name in the calling jobs; this is where the schedules and the
+-- timeouts are read.
 --
--- The spine is the one whose absence is silent in a new way: every release is
--- still filed by the briefing, and none of them is ever looked at, so the
--- calendar fills up and she simply never reacts to a print.
+-- The two quarter-hourly jobs are the ones whose absence is silent in a new way.
+-- Without the spine every release is still filed by the briefing and none is
+-- ever looked at, so the calendar fills up and she never reacts to a print.
+-- Without the price job the mark simply stops advancing, which reads from every
+-- other surface as a market that has not moved.
 select jobid, jobname, schedule, active, command
 from cron.job
 order by jobname;

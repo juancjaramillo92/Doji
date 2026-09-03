@@ -1,10 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — everything that runs on a timer
 -- ───────────────────────────────────────────────────────────────────────────
--- Four jobs: the poller every two minutes, Eugenia every hour, her event spine
--- every quarter of an hour, and a nightly sweep of pg_cron's own history. One
--- file, because "what fires on its own in this system" should be one place to
--- look rather than one file per feature.
+-- Five jobs: the poller every two minutes, Eugenia every hour, her two
+-- quarter-hourly senses — the event spine and the price mark — and a nightly
+-- sweep of pg_cron's own history. One file, because "what fires on its own in
+-- this system" should be one place to look rather than one file per feature.
 --
 -- THE POLLER'S JOB WAS NOT IN THIS REPOSITORY UNTIL NOW, and it is the most
 -- load-bearing scheduled thing here — every trade arrives through it. Its
@@ -14,12 +14,12 @@
 -- repository that describes a system while the system runs something else.
 --
 -- SAFE TO RE-RUN. cron.schedule upserts on the job name, so applying this file
--- replaces whatever is scheduled under these three names with what it says. That
+-- replaces whatever is scheduled under these names with what it says. That
 -- is what makes the file the source of truth rather than a description of one —
 -- run it and the database matches, rather than reading the database to find out
 -- whether it does.
 --
--- NONE OF THE THREE CALLING JOBS HOLDS DATABASE POWER. Each presents the cron
+-- NONE OF THE CALLING JOBS HOLDS DATABASE POWER. Each presents the cron
 -- secret, read from Vault at call time rather than written into the job text.
 -- An earlier version of the poller's job carried a legacy service_role JWT —
 -- full RLS-bypassing access, in a job definition, unrotatable. The housekeeping
@@ -122,6 +122,41 @@ select cron.schedule(
                    'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
                                     where name = 'doji_cron_secret')),
       -- A look is a search and a short generation, nowhere near a briefing.
+      timeout_milliseconds := 120000
+    );
+  $$
+);
+
+-- ─── Eugenia's price sense ─────────────────────────────────────────────────
+-- THE SECOND QUARTER-HOURLY JOB, AND IT IS A SEPARATE ONE FOR THE REASON THE
+-- SPINE IS SEPARATE FROM THE HOURLY: each door does one thing, and a failure in
+-- either says which. It is also what makes the fifteen-minute window a fact of
+-- the schedule rather than a number chosen in code — the move is measured
+-- against the mark the previous run left, so the gap between these firings IS
+-- the window.
+--
+-- OFFSET FROM THE SPINE rather than sharing its minutes. They read the same
+-- calendar table for opposite purposes — the spine for a print to look at, this
+-- for a print that would explain the move — and running them together would
+-- have the price sense deciding "nothing explains this" in the same second the
+-- spine is writing what does.
+--
+-- Most of these calls cost one broker quote and one indexed read: the gates are
+-- arithmetic and there is no model call at all unless a move clears them. It
+-- answers `market closed` immediately at the weekend, which is the same rule
+-- and the same definition the poller keeps.
+select cron.schedule(
+  'doji-eugenia-price',
+  '12,27,42,57 * * * *',
+  $$
+    select net.http_post(
+      url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?move=1',
+      headers := jsonb_build_object(
+                   'Content-Type', 'application/json',
+                   'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
+                                    where name = 'doji_cron_secret')),
+      -- A quote through the poller, then at most one search and a short
+      -- generation. The spine's bound, for the same shape of work.
       timeout_milliseconds := 120000
     );
   $$

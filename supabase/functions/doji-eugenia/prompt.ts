@@ -708,6 +708,41 @@ If it surprised and you cannot yet see why the reaction went the way it did, tha
 is worth an open_loop rather than a guess.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
+// GOLD JUST MOVED, AND NOTHING SHE FILED EXPLAINS IT
+// ───────────────────────────────────────────────────────────────────────────
+// index.ts has already decided the move is large by the day's own measure and
+// that no high-impact print is behind it. So the question she is being asked is
+// narrow and is not "is this big": it is what is moving it.
+//
+// THE HONEST ANSWER IS OFTEN THAT SHE CANNOT TELL, and saying so is worth more
+// than a plausible cause invented to fill the message — which is the whole risk
+// on this path, since a search will always return something. An unexplained move
+// is a real finding and open_loop is where it goes.
+// ═══════════════════════════════════════════════════════════════════════════
+export const MOVE = `Gold has just moved sharply and nothing you filed on today's
+calendar explains it. Below is where it is and what it did.
+
+Find out what moved it. Search — a headline, a central bank line, a bid in the
+dollar or in yields, a large print somewhere you were not watching. Fetch the page
+if the detail matters.
+
+THEN DECIDE. Reply with the single word NOTHING — no punctuation, no explanation
+— unless you have something he does not already have from the number itself. A
+move you cannot explain is worth telling him ONLY as that: what it did, and that
+you cannot yet see why. Never a cause you are reaching for.
+
+If it matters, two or three sentences: what moved, what is behind it, and what it
+changes about the story you have been carrying. If it changes that story, say so
+plainly — the thesis itself is rewritten at night, not here.
+
+No greeting, no preamble, and nothing about where price goes next. What the market
+is now pricing is yours to say; what it does next is not, and it is not yours to
+say even by implication. He may be in a position while reading this.
+
+If you cannot see why it moved, open_loop is the right home for it — that is a
+question you can close tomorrow rather than a guess you have to defend.`;
+
+// ═══════════════════════════════════════════════════════════════════════════
 // A POSITION JUST OPENED, OR A DAY JUST HIT ITS LIMIT
 // ───────────────────────────────────────────────────────────────────────────
 // The narrowest thing she is allowed to say and the one that is worth waking her

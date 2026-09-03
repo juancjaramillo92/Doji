@@ -323,13 +323,15 @@ be single-sourced at run time:
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | the numbered SQL files — `003_eugenia.sql` creates it and `006_plan.sql` appends the plan, so the last definition is the one the database ends up with — the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — and §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
+| each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers |
+| the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
 | the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **columns of `eugenia_runs`** | the table, and the object literals `recordRun` is called with — a key with no column is a row PostgREST refuses whole, so the meter goes quiet |
 | **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the eight predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
-| the **project ref** | eight copies across six files, two of them not URLs at all |
+| the **project ref** | every `net.http_post` URL in the SQL, plus `index.html`, `config.toml`, the deploy workflow and the Apps Script — the middle two name it without a URL |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 
@@ -1089,6 +1091,56 @@ is NULL there, a `WHEN` that is not true does not fire, and the one event it
 exists for would be the one that never happened. The poller re-upserts every
 position in its window every two minutes, which is what the guard is holding off.
 
+### The price sense — the third thing that wakes her, and the first with no row behind it
+
+The two senses above are events: a print she filed lands, a position opens. Both
+are noticed by asking whether a row is there. **Gold is always there.** "It
+moved" is not a fact about the instrument at all — it is a fact about the
+instrument *and* a previous reading — which is why this one needs a mark and the
+other two need none.
+
+`eugenia_price` is that mark: one row, `bid` and `at`, rewritten every quarter
+hour by its own cron job. The move is a subtraction, and the window it is
+measured over is the gap between firings rather than a number anyone chose.
+
+**What makes a move worth waking her for is the day's own measure.** Gold at
+4,400 and gold at 2,000 are the same market, and a fixed $10 threshold means two
+different things to them; a table of thresholds goes stale the year nobody
+revises it, and that failure looks exactly like a quiet market. So the test is
+relative twice over, and the two halves bind at opposite ends of the day:
+
+| Gate | Value | What it is for |
+|---|---|---|
+| `MOVE_SHARE` | 0.35 of the session range so far | binds on an established session, where an ordinary swing clears any fixed floor |
+| `MOVE_FLOOR` | 0.001 of the price | binds an hour after the Sunday open, where the range is a couple of dollars and a third of it is noise |
+| `MARK_STALE_MIN` | 40 minutes | two missed runs and the gap is no longer a quarter of an hour — $15 in fifteen minutes is an event, $15 across an hour is a session |
+| `MOVE_QUIET_H` | 2 hours | one message about one move; a market that trends all afternoon is one story, and this is the only thing between it and eight messages before lunch |
+
+**And a move a print explains is not this sense's to report.** The spine is
+already looking at anything high-impact that landed, so a jump at 08:30 on
+payrolls would otherwise reach him twice in ten minutes saying the same thing.
+The calendar she filed is what tells them apart — anything `high` inside the last
+hour hands the move to the spine and this stays quiet.
+
+`looked_at` on that same row is the quiet window, and it is the one column
+written conditionally: the mark advances on **every** run and `looked_at` only
+when a move cleared the gates. Written unconditionally the window would never
+reopen and she would say one thing about a move and then nothing for the life of
+the deployment.
+
+**Silent by default after all of that.** The gates decide something happened;
+only she decides whether it is worth a sentence, and `isSilent` is shared with
+the pulse and the release look. The prompt pushes hard against the failure that
+belongs to this path specifically: a search will always return *something*, so an
+unexplained move must be told as an unexplained move — what it did, and that she
+cannot yet see why — rather than as a cause she reached for. That is what
+`open_loop` is for.
+
+It runs only while the market is open, by the same `marketOpen` the poller keeps
+— one definition in `_shared/edge.ts`, since both now ask it. Most firings cost
+one quote and one indexed read: **no model call at all unless a move clears every
+gate.**
+
 ### Checking his rules
 
 §7 of the strategy writes a concrete predicate for all nineteen rules and §8
@@ -1744,6 +1796,14 @@ rather than a faster one because the four hourly predicates all test `hour ===`
 — a `*/15` on the existing job would run four briefings every morning. It is
 offset off the hour so it never collides with the 08:00 briefing.
 
+**The price sense needs the second quarter-hourly job.** `004_cron.sql` gains
+`doji-eugenia-price` calling `?move=1`, offset from the spine rather than sharing
+its minutes: the two read the same calendar table for opposite purposes — the
+spine for a print to look at, this for a print that would *explain* a move — and
+running them together would have one deciding nothing explains it in the same
+second the other is writing what does. Without the job the mark never advances,
+which reads from every other surface as a market that has not moved.
+
 **The webhook has to allow `callback_query`.** Re-register with
 `allowed_updates = ["message", "callback_query"]`, or the taps under a briefing
 are never delivered, the button spins, and nothing reports it.
@@ -1758,9 +1818,11 @@ supabase secrets set STT_KEY=<key>
 supabase secrets set STT_MODEL=whisper-1     # optional, defaults to whisper-1
 ```
 
-`verify.sql` answers whether the five tables, the two triggers, the three
+`verify.sql` answers whether the six tables, the two triggers, the three
 policies and the `pg_trgm` extension are actually there, which is the half no
-test in the repository can reach.
+test in the repository can reach. It also counts the cron jobs — a row that had
+been wrong since the spine was added, reporting a mismatch on a correct database,
+which is the worst thing a check can do.
 
 ### Applying 006, which is two columns and one view
 

@@ -43,6 +43,7 @@ const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.ur
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
 const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
 const SENSES_SQL = readFileSync(new URL('../supabase/005_eugenia_senses.sql', import.meta.url), 'utf8');
+const CRON_SQL = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8');
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 const EUGENIA_PROMPT = readFileSync(
@@ -593,8 +594,8 @@ test('every function a caller names is a function that exists', () => {
    text around it — hunting for a bare twenty-letter word would find one in
    index.html sooner or later and fail for a reason that is not this.
 
-   Eight copies across five languages, none of them checked by anything else. A
-   restore into a new project means editing all eight, and the one that is
+   A copy in every language here and nothing else checking any of them. A
+   restore into a new project means editing every one, and the one that is
    missed keeps talking to the old project for as long as it exists. */
 const REF = /https:\/\/([a-z]+)\.supabase\.co|project_id\s*=\s*"([a-z]+)"|--project-ref\s+([a-z]+)/g;
 
@@ -1563,6 +1564,103 @@ test('every column the cost meter writes is a column the table has', () => {
         `refuses the whole row, so the meter goes quiet and only the console says so`);
     }
   }
+});
+
+/* ─── A door in the schedule and a door in the code ──────────────────────────
+   The two data-driven senses are reached by a query flag and nothing else, and
+   the flag is written twice: in the cron job's URL and in the branch that reads
+   it. They are the only two things in this system where a rename fails in
+   COMPLETE silence — pg_net discards the response, so a `?move=1` nothing reads
+   falls past every branch to "nothing due this hour", answers 200, and the sense
+   simply stops existing. No apology, because nothing threw; no missing message,
+   because the message was never due.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every flag a cron job calls with is a flag the function reads', () => {
+  const eugenia = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const called = [...CRON_SQL.matchAll(/functions\/v1\/([\w-]+)\?(\w+)=(\w+)/g)];
+  assert.ok(called.length >= 2,
+    `only ${called.length} flagged cron URLs read — the reader has gone blind`);
+
+  const at = eugenia.indexOf('async function postScheduled(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
+  const body = eugenia.slice(at, eugenia.indexOf('\n}', at));
+
+  for (const [, fn, flag, value] of called) {
+    assert.equal(fn, 'doji-eugenia',
+      `a cron job calls ${fn} with a flag, and only doji-eugenia's doors are checked here`);
+    assert.match(body, new RegExp(`searchParams\\.get\\("${flag}"\\) === "${value}"`),
+      `a cron job calls ?${flag}=${value} and postScheduled never reads it — the ` +
+      `job answers 200, nothing throws, and that sense quietly does not exist`);
+  }
+
+  // AND EACH DOOR REACHES ITS OWN WORK. A branch that reads the flag and then
+  // falls through to the briefing would pass the check above.
+  assert.match(body, /get\("release"\) === "1"\)\s*\{[^}]*postRelease\(\)/);
+  assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
+});
+
+test('the quote she reads is the quote the poller serves', () => {
+  /* TWO FILES, ONE OBJECT, AND NO BUILD STEP BETWEEN THEM. The poller folds a
+     cTrader price into `Spot` and serves it; doji-eugenia declares `Quote` and
+     reads the fields back out by name. Nothing resolves one against the other at
+     runtime, so a field renamed on the poller's side reaches her as undefined —
+     and the price sense would put "against a previous close of undefined" in
+     front of him rather than failing.
+
+     Both are read out of their own files. A list typed here would be a third
+     copy, and would go stale with whichever of the two it stopped matching. */
+  const poller = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const eugenia = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const fields = (src, name) => {
+    const m = src.match(new RegExp(`interface ${name} \\{([\\s\\S]*?)\\n\\}`));
+    assert.ok(m, `${name} is no longer declared as an interface`);
+    return [...m[1].matchAll(/(\w+)\s*:/g)].map(x => x[1]).sort();
+  };
+
+  const served = fields(poller, 'Spot');
+  assert.ok(served.length >= 6, `only ${served.length} fields read out of Spot — the reader has gone blind`);
+  assert.deepEqual(fields(eugenia, 'Quote'), served,
+    'the poller serves a quote with different fields than doji-eugenia declares — ' +
+    'the ones she names and it does not come back undefined, in a message');
+
+  // And the answer is that object plus what the poller adds around it, which is
+  // why `ok` is what marketQuote checks rather than the presence of a field.
+  assert.match(poller, /return json\(\{ ok: true, symbol: SYMBOL_IDS\[0\], \.\.\.spot \}\)/,
+    'the market answer no longer spreads the folded quote, so the fields above ' +
+    'agree with each other and with nothing that is actually sent');
+});
+
+test('every column the price mark writes is a column the table has', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const table = SENSES_SQL.match(/create table if not exists public\.eugenia_price \(([\s\S]*?)\n\);/);
+  assert.ok(table, '005 no longer creates eugenia_price');
+  const columns = new Set([...table[1].matchAll(/^\s{2}(\w+)\s+\w/gm)].map(m => m[1]));
+  assert.deepEqual([...columns].sort(), ['at', 'bid', 'id', 'looked_at'],
+    'eugenia_price has changed shape and the sense reading it has not');
+
+  /* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT, which is the whole
+     of the cooldown: written unconditionally it would stamp on every quarter
+     hour, the quiet gate would be permanently shut, and the sense would fire
+     exactly once ever. Read out of markPrice rather than the file, since
+     eugenia_calendar's own looked_at is written a few hundred lines above. */
+  const at = src.indexOf('async function markPrice(');
+  assert.ok(at > -1, 'doji-eugenia no longer has markPrice()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  assert.match(body, /\.\.\.\(looked \? \{ looked_at:/,
+    'markPrice writes looked_at unconditionally — every run stamps it, the quiet ' +
+    'window never opens again, and she says one thing about a move and then ' +
+    'nothing for the life of the deployment');
+  assert.match(body, /bid, at: new Date\(\)\.toISOString\(\)/,
+    'markPrice no longer advances the mark on every run, so the window a move is ' +
+    'measured over stops being the gap between runs');
 });
 
 test('the trades trigger fires on the transition, not on every poll', () => {
