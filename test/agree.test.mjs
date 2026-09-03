@@ -544,6 +544,41 @@ test('a demotion can reach every rung but the bottom one', () => {
    take the rest of it with them.
    ─────────────────────────────────────────────────────────────────────────── */
 
+test('verify.sql expects exactly the triggers the numbered SQL creates on trades', () => {
+  /* THE SECOND THING THE STALE SIGNATURE HID. This row expected three triggers
+     — 001's touch and 002's two — and 005 added the event spine's two without
+     anyone changing it. Because it sits below the line that was aborting the
+     file, it had never once run, so the drift lived from 005 to now and then
+     announced itself as a correct database being wrong.
+
+     Both halves are read out of files. The expected list is whatever verify.sql
+     names today, and the truth is every `create trigger` in the numbered SQL
+     whose target is public.trades — so adding a trigger and forgetting the
+     check fails here, which is the round trip nothing was making. */
+  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+  const expected = sql.match(
+    /\('exactly the five triggers on trades'[\s\S]*?\),\s*\n((?:\s*'[^']*'(?:\s*\|\|)?\s*\n?)+)\),/);
+  assert.ok(expected, 'verify.sql no longer states the trigger list — the reader has gone blind');
+  const named = expected[1].match(/'([^']*)'/g).join('').replace(/'/g, '')
+    .split(',').map(t => t.trim()).filter(Boolean).sort();
+
+  /* `create trigger` and `create or replace trigger` both, and the target table
+     is on a later line — 002 uses the replace form because a plain create is
+     not atomic against an existing one. */
+  const created = [...NUMBERED.matchAll(
+    /create\s+(?:or\s+replace\s+)?trigger\s+(\w+)\s+[\s\S]{0,120}?\bon\s+public\.trades\b/gi)]
+    .map(m => m[1]).sort();
+
+  assert.ok(created.length >= 3,
+    `only ${created.length} triggers on trades read out of the SQL — the reader has gone blind`);
+
+  assert.deepEqual(named, created,
+    'verify.sql expects a different set of triggers on trades than the numbered ' +
+    'SQL creates — run against a correct database it reports a fault, and run ' +
+    'against a database missing one it reports nothing');
+});
+
 test('verify.sql names no function in a form that throws when it is gone', () => {
   const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
   assert.ok(sql.length > 1000, 'verify.sql could not be read — the reader has gone blind');
