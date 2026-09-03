@@ -1674,3 +1674,58 @@ test('every reason a voice note fails is one the handler can actually reach', ()
     'the audio part carries no filename, so a provider that detects format from ' +
     'the extension has nothing to go on');
 });
+
+test('every query flag the poller reads is one the market gate considers', () => {
+  /* A READ-ONLY FLAG LEFT OUT OF THE GATE ANSWERS "market closed" AT THE
+     WEEKEND, which is precisely when it is reached for: a suspicious row gets
+     looked at on a Saturday, and the debug surface that exists to answer the
+     question replies that there is nothing to poll. The failure is silent, it
+     looks like the flag working, and it is invisible five days a week.
+
+     So the list is held against itself rather than against a literal here:
+     every flag the entry point reads must appear in the gate, whether it is
+     read-only or not. Adding one and forgetting it is the whole failure. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+  const flags = [...src.matchAll(/const (\w+)\s*=\s*url\.searchParams\.get\("(\w+)"\) === "1"/g)]
+    .map(m => m[1]);
+  assert.ok(flags.length >= 3, `only ${flags.length} flags read out of the poller — the reader has gone blind`);
+
+  const gate = src.match(/if \(([^)]*?)!marketOpen\(\)\) \{/);
+  assert.ok(gate, 'the poller no longer gates its work on the market being open');
+
+  for (const flag of flags) {
+    assert.match(gate[1], new RegExp(`!${flag}\\b`),
+      `?${flag}=1 is read but the market gate ignores it, so it answers ` +
+      `"market closed" every weekend — which is when it is actually used`);
+  }
+});
+
+test('the poller answers its debug flags before it writes anything', () => {
+  // Both read-only flags return a Response, and both must do it before the
+  // fold and the upsert are reached — a debug surface that writes on the way
+  // to answering is not a debug surface.
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+  const write = src.indexOf('const data = await mcpCall(sid, "get_deals", dealArgs)');
+  assert.ok(write > -1, 'the poller no longer folds the deals it was about to write');
+
+  for (const [flag, marker] of [['raw', 'if (raw) {'], ['tools', 'if (tools) {']]) {
+    const at = src.indexOf(marker);
+    assert.ok(at > -1, `the poller no longer answers ?${flag}=1`);
+    assert.ok(at < write,
+      `?${flag}=1 is answered after the poll has already folded its deals`);
+  }
+
+  /* AND tools/list GOES PAST THE ALLOW-LIST RATHER THAN THROUGH IT, which is
+     correct and worth stating: ALLOWED_TOOLS guards a tool NAME becoming a
+     request, and `tools/list` names none. What must stay true is that it
+     discovers tools without calling one. */
+  const block = src.slice(src.indexOf('if (tools) {'), write);
+  assert.match(block, /method: "tools\/list"/);
+  assert.ok(!/tools\/call/.test(block),
+    'the tools probe calls a tool it discovered, which is exactly what the ' +
+    'allow-list exists to prevent');
+});

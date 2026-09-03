@@ -481,6 +481,31 @@ curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72
      -H "x-doji-key: $DOJI_CRON_SECRET"
 ```
 
+**`?tools=1` asks the broker what it actually offers.** `ALLOWED_TOOLS` names the
+two this function calls, and it has never said anything about what *exists*: the
+poller needs deals and a balance, so those are what it asked for, and whether
+cTrader also serves a quote, a symbol list or an open-position feed was never
+established either way. That gap decides real things — whether Eugenia can read a
+price off the broker this system is already connected to, or has to reach for a
+third-party feed and the vendor decision that comes with it.
+
+It is a JSON-RPC **method**, not a tool call, so it goes past the allow-list
+rather than through it: the list guards a tool *name* becoming a request, and
+`tools/list` names none. It writes nothing, calls nothing it discovers, and
+answers at any hour — the same standing as `?raw=1`, and there for the same
+reason, which is that guessing has cost a day more than once.
+
+```sh
+curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?tools=1" \
+     -H "x-doji-key: $DOJI_CRON_SECRET"
+```
+
+**Both read-only flags answer when the market is shut**, and a test holds that:
+every flag the entry point reads must appear in the market gate. One left out
+replies `market closed` all weekend — which is exactly when a suspicious row gets
+looked at — and it fails silently, looks like the flag working, and is invisible
+five days a week.
+
 **Balance is read from a second tool, and only for a close just seen.**
 `get_deals` carries no balance — eleven fields, none of them the account — and
 `get_position_details` reports `balance`, `commission` and `swap` as zero on a
@@ -2522,7 +2547,7 @@ and it used to be described as though it were.** Say it per endpoint:
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read the deals back with `?raw=1` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, read the deals back with `?raw=1`, or list the broker's tools with `?tools=1` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code; `?release=1` and a `{trade}` body reach the two cheaper event paths |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
