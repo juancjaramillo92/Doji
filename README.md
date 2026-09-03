@@ -1251,9 +1251,29 @@ the cap produces answers that are never spoken with nothing saying why.
 and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,
 because nothing is stored — a change alters one message rather than what is
 comparable to what, and which voice she has is his to change without a deploy.
-The audio is requested as **OGG/Opus**, which is what Telegram renders as a voice
-note with a waveform and a speed control; anything else arrives as a file
-attachment.
+**The two are coupled, and the vendor decides how**: the older `tts-1` serves a
+smaller set of voices and takes no delivery instruction, so overriding the model
+alone can name a voice it does not have. That is a 400 costing the audio and not
+the answer, and it is why both defaults name the current model's own recommended
+pairing rather than the safest-looking one.
+
+**How it is read is pinned, where which voice reads it is not.** `TTS_STYLE`
+asks for calm and unhurried, because the prompt spends most of its length keeping
+her off signals and verdicts and a breathless delivery of a deliberately
+unexcited paragraph contradicts all of it. The register has to survive the trip
+through audio. Voice is taste; delivery is the product.
+
+**The audio is requested as OGG/Opus, and this is the one thing on the path that
+would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
+succeeds, Telegram accepts the file, and it arrives as an **attachment**: no
+waveform, no speed control, nothing you can play with a phone at your ear.
+Nothing errors and nothing logs. A test reads the request for `opus` and the
+upload for both its `audio/ogg` type and its `.ogg` filename.
+
+**Their policy requires the listener to know the voice is synthetic.** Here the
+only listener is the person who built the bot, so the disclosure is the context —
+but a voice note forwarded to anyone else carries no such context, and that is
+worth knowing before forwarding one.
 
 **A chart** she can now see, and the prohibitions do not move an inch because she
 can. She may describe what is on it and take it as context; she may not say

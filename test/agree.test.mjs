@@ -1917,6 +1917,29 @@ test('the answer is his before it is ever spoken', () => {
     'the answer is spoken unconditionally rather than only when he spoke first');
 });
 
+test('the audio is asked for in the one format Telegram renders as a voice note', () => {
+  /* THE ONLY THING ON THIS PATH THAT WOULD FAIL QUIETLY. The vendor's default
+     is mp3, and mp3 WORKS: the request succeeds, Telegram accepts the file, and
+     it arrives as an attachment — no waveform, no speed control, no playing it
+     with the phone at your ear. Nothing errors and nothing logs; the feature
+     simply stops being the thing it was built for, which is the one failure
+     shape a person would not think to report as a bug. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function speak(');
+  assert.ok(at > -1, 'doji-eugenia no longer has speak()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /response_format: "opus"/,
+    'the speech request no longer asks for opus — mp3 succeeds and arrives as a ' +
+    'file attachment rather than a voice note, silently');
+  assert.match(body, /type: "audio\/ogg"/,
+    'the upload no longer declares audio/ogg, so Telegram has only the filename ' +
+    'to go on');
+  assert.match(body, /"reply\.ogg"/,
+    'the upload no longer carries an .ogg filename');
+});
+
 test('the length she is told to write to is the length that is spoken', () => {
   /* TWO COPIES OF ONE NUMBER, and the failure of a disagreement is silent in
      the worse direction: a prompt allowed to run longer than the cap produces
