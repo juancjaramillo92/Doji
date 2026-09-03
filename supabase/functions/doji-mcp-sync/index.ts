@@ -38,7 +38,7 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -522,24 +522,56 @@ async function writeBalance(id: string, balance: number) {
   if (!res.ok) throw new Error(`Balance write failed (HTTP ${res.status}): ${await res.text()}`);
 }
 
-/* ─── Market hours ─────────────────────────────────────────────────────────
-   Gold trades Sunday 17:00 to Friday 17:00, New York. Polling through the
-   ~49-hour weekend close is roughly 1,400 pointless calls a week for data that
-   cannot have changed.
+/* ─── The plan, taken off the position while it is still open ──────────────
+   §8 says this is not recoverable, and it is right about a CLOSED position:
+   `get_deals` reports fills, and `get_position_details` on a closed one reports
+   the FINAL stop, so a stop moved to break-even has overwritten the original
+   everywhere it could be read.
 
-   Decided here rather than in the cron expression on purpose: "continuous from
-   Sunday evening to Friday evening" takes three cron jobs, pg_cron schedules in
-   UTC, and every one of them would be an hour wrong whenever New York is on
-   standard time. nyClock asks America/New_York for its own clock instead, which
-   is correct all year — the same reading Eugenia's two schedules take, from the
-   same definition.
+   A live position carries both, and the poller sees almost every position while
+   it is still open. Which makes the FIRST sighting the plan.
+
+   `where planned_sl is null` IS THE WHOLE ARBITRATION, and it is the filter
+   `balance` already uses for the same reason: this runs every two minutes,
+   R-04 moves the stop to break-even partway through, and any write after the
+   first would replace the plan with the thing the plan exists to be compared
+   against.
+
+   AS FIRST SEEN, NEVER AS SET. Up to two minutes separate the entry from the
+   poll that catches it. For R-04 that gap is immaterial — it moves a stop only
+   after +$20 — but a stop moved inside two minutes would be recorded wrong and
+   nothing here can tell that case apart. The column comments say so, and so
+   does §8.
+
+   Never throws the poll away: the deals are the reason this function exists and
+   they are already written by the time this runs. A plan that fails to record
+   is one trade with a null, which is the same state every historical row is in.
    ───────────────────────────────────────────────────────────────────────── */
-export function marketOpen(now = new Date()): boolean {
-  const { wd, hour } = nyClock(now);
-  if (wd === 6) return false;                 // Saturday
-  if (wd === 5 && hour >= 17) return false;   // after the Friday close
-  if (wd === 0 && hour < 17) return false;    // before the Sunday open
-  return true;
+export interface OpenPlan { id: string; planned_sl: number; planned_tp: number }
+
+/* Pure, so the shape the broker actually returned can be driven from a test.
+   Prices come off `get_positions` as DISPLAY values and must not meet
+   fromPipettes — a spot call in the same session serves the same symbol scaled
+   by a hundred thousand, and applying that here would file a stop at four
+   hundredths of a cent. A position missing either side is skipped rather than
+   half-written: half a plan cannot answer any question that needs it. */
+export function openPlans(positions: any[]): OpenPlan[] {
+  return (positions ?? []).flatMap((p: any) => {
+    const sl = Number(p?.stopLoss), tp = Number(p?.takeProfit);
+    const id = Number(p?.positionId);
+    if (!Number.isInteger(id) || id <= 0) return [];
+    if (!Number.isFinite(sl) || !Number.isFinite(tp) || sl <= 0 || tp <= 0) return [];
+    return [{ id: `PID${id}`, planned_sl: sl, planned_tp: tp }];
+  });
+}
+
+async function writePlan(plan: OpenPlan): Promise<void> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/trades?id=eq.${plan.id}&planned_sl=is.null`, {
+      method: "PATCH", headers: sbHeaders(),
+      body: JSON.stringify({ planned_sl: plan.planned_sl, planned_tp: plan.planned_tp }),
+    });
+  if (!res.ok) throw new Error(`Plan write failed (HTTP ${res.status}): ${await res.text()}`);
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
@@ -809,9 +841,32 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       await writeBalance(target, Math.round(account.balance / 10 ** account.moneyDigits * 100) / 100);
     }
 
+    /* THE PLAN, AND IT RUNS AFTER THE UPSERT BECAUSE THE ROW HAS TO EXIST.
+       A PATCH against an id nothing has inserted matches nothing and reports
+       success, so a position opened this minute would be filed with no plan and
+       never revisited — `planned_sl is null` would still be true next run, but
+       only if the row is there to be found. The upsert above is what puts it
+       there.
+
+       Never takes the poll down. The deals are why this function exists and
+       they are written by the time this runs; a plan that fails to record
+       leaves one trade in the state every historical row is already in. */
+    let planned = 0;
+    try {
+      const open = await mcpCall(sid, "get_positions", {});
+      const plans = openPlans(open.positions ?? []);
+      // Sequential rather than parallel: these are single-row PATCHes against
+      // one table and there are never more than a handful — R-10 permits one
+      // position at a time, so more than one here is itself unusual.
+      for (const plan of plans) { await writePlan(plan); planned++; }
+    } catch (err) {
+      console.error("doji-mcp-sync: plan not recorded —",
+        err instanceof Error ? err.message : err);
+    }
+
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
-      deals: deals.length, positions: n, balance_for: target,
+      deals: deals.length, positions: n, balance_for: target, planned,
       // Reported rather than acted on: it says more deals exist beyond the
       // window, which is true of almost every run.
       has_more: data.hasMore ?? null,

@@ -447,6 +447,27 @@ and must say so rather than guess.
 · When he mentions how he felt, slow down. One question at a time, and wait for
   the answer before the next. Sit in the discomfort rather than resolving it.
 
+WHERE A TRADE WAS AIMED, on the rows that carry it. planned_sl and planned_tp are
+the stop and target as the poller FIRST SAW them on the open position — so they
+are the plan, which nothing in this system could see until now. Two things about
+them and both matter.
+
+They are as first SEEN, not as SET. Up to two minutes separate the entry from the
+poll that caught it, so say "the stop was there when I first saw it" rather than
+"you set it there". A stop moved inside those two minutes would be recorded wrong
+and nothing can tell that apart.
+
+And they look forward only. Every trade that closed before the column existed
+carries null, which is most of his record — so any rate over them is a rate over
+the trades since, and saying so is the difference between a finding and a
+misleading one. §8 has the rest.
+
+What they make computable is the reward-to-risk he was AIMING at: target minus
+entry over entry minus stop. That is step 4 of R-08 as a number rather than a
+question. What they do NOT settle is whether he respected the stop — an exit past
+it is a widened stop or ordinary slippage on a gap, and the row cannot tell those
+apart, so do not treat one as the other.
+
 Reading the journal correctly:
 · The three discipline answers are followed_rules, followed_sl and followed_tp,
   and they ask whether the stop and target were RESPECTED, not whether they were
@@ -685,6 +706,41 @@ yours to say, where it goes is not.
 
 If it surprised and you cannot yet see why the reaction went the way it did, that
 is worth an open_loop rather than a guess.`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GOLD JUST MOVED, AND NOTHING SHE FILED EXPLAINS IT
+// ───────────────────────────────────────────────────────────────────────────
+// index.ts has already decided the move is large by the day's own measure and
+// that no high-impact print is behind it. So the question she is being asked is
+// narrow and is not "is this big": it is what is moving it.
+//
+// THE HONEST ANSWER IS OFTEN THAT SHE CANNOT TELL, and saying so is worth more
+// than a plausible cause invented to fill the message — which is the whole risk
+// on this path, since a search will always return something. An unexplained move
+// is a real finding and open_loop is where it goes.
+// ═══════════════════════════════════════════════════════════════════════════
+export const MOVE = `Gold has just moved sharply and nothing you filed on today's
+calendar explains it. Below is where it is and what it did.
+
+Find out what moved it. Search — a headline, a central bank line, a bid in the
+dollar or in yields, a large print somewhere you were not watching. Fetch the page
+if the detail matters.
+
+THEN DECIDE. Reply with the single word NOTHING — no punctuation, no explanation
+— unless you have something he does not already have from the number itself. A
+move you cannot explain is worth telling him ONLY as that: what it did, and that
+you cannot yet see why. Never a cause you are reaching for.
+
+If it matters, two or three sentences: what moved, what is behind it, and what it
+changes about the story you have been carrying. If it changes that story, say so
+plainly — the thesis itself is rewritten at night, not here.
+
+No greeting, no preamble, and nothing about where price goes next. What the market
+is now pricing is yours to say; what it does next is not, and it is not yours to
+say even by implication. He may be in a position while reading this.
+
+If you cannot see why it moved, open_loop is the right home for it — that is a
+question you can close tomorrow rather than a guess you have to defend.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // A POSITION JUST OPENED, OR A DAY JUST HIT ITS LIMIT

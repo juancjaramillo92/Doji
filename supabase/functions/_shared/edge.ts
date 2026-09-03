@@ -135,3 +135,24 @@ export function nyClock(now: Date): { wd: number; hour: number } {
 
   return { wd: WEEKDAY[at("weekday")], hour: +at("hour") };
 }
+
+/* ─── Market hours ─────────────────────────────────────────────────────────
+   Gold trades Sunday 17:00 to Friday 17:00, New York. The poller skips the
+   ~49-hour weekend close — roughly 1,400 pointless calls a week for data that
+   cannot have changed — and Eugenia's price sense skips it for the same reason
+   and by the same rule, which is why this is here rather than in either of
+   them.
+
+   Decided in code rather than in the cron expression on purpose: "continuous
+   from Sunday evening to Friday evening" takes three cron jobs, pg_cron
+   schedules in UTC, and every one of them would be an hour wrong whenever New
+   York is on standard time. nyClock asks America/New_York for its own clock
+   instead, which is correct all year.
+   ───────────────────────────────────────────────────────────────────────── */
+export function marketOpen(now = new Date()): boolean {
+  const { wd, hour } = nyClock(now);
+  if (wd === 6) return false;                 // Saturday
+  if (wd === 5 && hour >= 17) return false;   // after the Friday close
+  if (wd === 0 && hour < 17) return false;    // before the Sunday open
+  return true;
+}

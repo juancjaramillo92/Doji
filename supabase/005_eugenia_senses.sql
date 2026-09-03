@@ -6,7 +6,7 @@
 -- her except a clock, and nothing could tell her — or anyone — whether any of
 -- it was working.
 --
--- Five tables, and each answers a question none of the existing ones can:
+-- Six tables, and each answers a question none of the existing ones can:
 --
 --   eugenia_runs      what a turn cost, DURABLY. ask() has logged tokens and
 --                     searches from the start, to a console this repository
@@ -458,6 +458,50 @@ create trigger trades_eugenia_closed
   when (new.id like 'PID%' and new.deleted = false
         and old.fill_time is null and new.fill_time is distinct from null)
   execute function public.trades_eugenia_on_event();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- THE MARK SHE MEASURES A MOVE FROM
+-- ───────────────────────────────────────────────────────────────────────────
+-- The senses above are both events: a print she filed lands, a position opens.
+-- Price itself is neither — it is a level that is always there, and "gold moved"
+-- is only a fact against a previous reading. This row is that reading.
+--
+-- ONE ROW, REWRITTEN EVERY QUARTER HOUR, which is what makes the question
+-- answerable in one read: `bid` is where gold was at the last look and `at` is
+-- when, so the move is a subtraction and the window is the gap between runs
+-- rather than a number anyone has to choose.
+--
+-- `looked_at` IS A SEPARATE COLUMN BECAUSE IT ANSWERS A DIFFERENT QUESTION.
+-- The mark advances on every run; `looked_at` advances only when a move was
+-- worth waking her for, and it is what keeps a market that trends all afternoon
+-- from producing a message every fifteen minutes about the same story.
+--
+-- Stamped BEFORE the look, exactly as eugenia_calendar.looked_at is: a look that
+-- generates and then fails to write would otherwise re-fire on the next run,
+-- each one a billed model call.
+create table if not exists public.eugenia_price (
+  id        text primary key
+    constraint eugenia_price_singleton check (id = 'current'),
+
+  -- Display price, two decimals — the poller folds pipettes out of the quote
+  -- before she ever sees it, and this stores what she was shown.
+  bid       numeric not null,
+  at        timestamptz not null default now(),
+
+  -- Null until the first move worth a message. Nothing seeds it, because "she
+  -- has never spoken about a move" is a true thing to say on day one.
+  looked_at timestamptz
+);
+
+-- Seeded like eugenia_thesis, so the first run has a row to PATCH rather than a
+-- missing-row branch that exists for one moment in the life of the database. A
+-- zero mark cannot be mistaken for a price: the first look reads it, finds the
+-- move absurd against the floor it is measured in, and writes the real one.
+insert into public.eugenia_price (id, bid, at)
+  values ('current', 0, now())
+  on conflict (id) do nothing;
+
+alter table public.eugenia_price enable row level security;
 
 -- ─── What the app may see ──────────────────────────────────────────────────
 -- THE ONE PLACE HER WORK AND THE DASHBOARD MEET, AND IT IS DELIBERATELY NARROW.

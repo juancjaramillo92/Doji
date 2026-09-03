@@ -27,12 +27,12 @@ import { readFileSync } from 'node:fs';
 // is now one of it. That this import resolves is also what proves every
 // function's `../_shared/edge.ts` resolves — the same file, the same path
 // shape — which is the check standing between a bad extraction and a deploy.
-import { secretMatches, nyClock, nyDate } from '../supabase/functions/_shared/edge.ts';
+import { secretMatches, nyClock, nyDate, marketOpen } from '../supabase/functions/_shared/edge.ts';
 
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
-  lookbackFor, foldHours, balanceTarget, parseSse, marketOpen,
-  fromPipettes, foldSpot, PIPETTES,
+  lookbackFor, foldHours, balanceTarget, parseSse,
+  fromPipettes, foldSpot, PIPETTES, openPlans,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -43,6 +43,7 @@ import {
   notesList, channelsList, searchList, readStrategy, dayQuery, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
+  moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
   VOICE_TROUBLE,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -2456,4 +2457,155 @@ test('a live position carries its plan, and NOT in pipettes', () => {
   // The units the poller already knows are unchanged by any of this.
   assert.equal(ozFromVolume(position.volume), 4);
   assert.equal(usdFromCents(position.commission), -0.14);
+});
+
+/* ─── The plan, off the open position ───────────────────────────────────────
+   §8 said this was unrecoverable, and it was — of a CLOSED position. The
+   capture below is the live one that showed otherwise, unchanged.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('an open position yields its plan, keyed the way the poller files it', () => {
+  const plans = openPlans([{
+    positionId: 586244103, symbolId: 41, tradeSide: 'BUY', volume: 400,
+    entryPrice: 4402.71, stopLoss: 4403.24, takeProfit: 4432.1,
+    commission: -14, swap: 0,
+  }]);
+
+  assert.equal(plans.length, 1);
+  // The same id foldPosition writes, or the PATCH matches nothing and reports
+  // success — a plan silently filed against no row at all.
+  assert.equal(plans[0].id, 'PID586244103');
+  // Display prices, untouched. fromPipettes here would file the stop at four
+  // hundredths of a cent, which is the trap the two-scale probe found.
+  assert.equal(plans[0].planned_sl, 4403.24);
+  assert.equal(plans[0].planned_tp, 4432.1);
+});
+
+test('half a plan is no plan, and a bad id is dropped', () => {
+  /* HALF-WRITTEN IS WORSE THAN ABSENT: the reward-to-risk needs both sides, and
+     a row carrying one would look answerable and produce a division by a
+     missing number. A position with no stop set is a real state — it is what
+     R-02 exists about — and it is recorded as nothing rather than as half. */
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 4403.24 }]), []);
+  assert.deepEqual(openPlans([{ positionId: 1, takeProfit: 4432.1 }]), []);
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 4432.1 }]), []);
+  assert.deepEqual(openPlans([{ stopLoss: 4403.24, takeProfit: 4432.1 }]), []);
+  assert.deepEqual(openPlans([]), []);
+  assert.deepEqual(openPlans(undefined), []);
+});
+
+test('every open position with a plan is filed, not just the first', () => {
+  const plans = openPlans([
+    { positionId: 1, stopLoss: 4400, takeProfit: 4430 },
+    { positionId: 2, stopLoss: 4200, takeProfit: 4230 },
+  ]);
+  assert.deepEqual(plans.map(p => p.id), ['PID1', 'PID2']);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE PRICE SENSE — DRIVEN FROM BOTH SIDES OF EVERY GATE
+   ───────────────────────────────────────────────────────────────────────────
+   A sense that is silent by design is the one where a broken predicate and a
+   quiet market produce the same evidence: nothing, for weeks. `moveWorth`
+   returning "not worth it" to everything would look exactly like gold behaving
+   itself, and no log anywhere would say otherwise. So every gate is driven in
+   BOTH directions here — each one is shown to block, and shown to pass with the
+   one thing it objects to removed.
+
+   The quote below is the real `?market=1` capture folded, so the numbers the
+   gates are tested against are numbers this system has actually served.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const QUOTE = {                            // the SPOT capture, after foldSpot
+  bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
+  prev_close: 4387.96, change: 31.86, change_pct: 0.73,
+  at: '2026-09-03T12:15:05.346Z',
+};
+const LOOKED = Date.parse('2026-09-03T12:15:30Z');
+// A mark taken a quarter of an hour ago, at a price a big move below the quote.
+// The session range is 39.01, so 35% of it is 13.65 — this clears it.
+const MARK = { bid: 4404.82, at: '2026-09-03T12:00:30Z', looked_at: null };
+
+test('a move large by the day own measure is worth waking her for', () => {
+  const out = moveWorth(QUOTE, MARK, LOOKED);
+  assert.equal(out.worth, true);
+  assert.equal(out.move, 15);
+});
+
+test('the mark seeded at zero is not a price, and cannot be a move of 4,400', () => {
+  /* 005 SEEDS THE ROW so the first run has something to PATCH. Read as a price
+     that seed is a move of the entire value of gold, which passes every
+     threshold there is — a message on the first tick after any deploy that
+     rebuilt the table, saying gold had moved four and a half thousand dollars. */
+  const out = moveWorth(QUOTE, { ...MARK, bid: 0 }, LOOKED);
+  assert.equal(out.worth, false);
+  assert.match(out.why, /no mark/);
+});
+
+test('a move measured across an outage is not a quarter-hour move', () => {
+  // Two missed runs and the gap is no longer the window this sense is about:
+  // $15 in fifteen minutes is an event, $15 across an hour is a session.
+  const stale = { ...MARK, at: new Date(LOOKED - (MARK_STALE_MIN + 1) * 60_000).toISOString() };
+  assert.equal(moveWorth(QUOTE, stale, LOOKED).worth, false);
+  assert.match(moveWorth(QUOTE, stale, LOOKED).why, /stale/);
+
+  // And one missed run still counts, which is the half that makes it a bound
+  // rather than a rejection of anything but an exact fifteen minutes.
+  const late = { ...MARK, at: new Date(LOOKED - (MARK_STALE_MIN - 1) * 60_000).toISOString() };
+  assert.equal(moveWorth(QUOTE, late, LOOKED).worth, true);
+});
+
+test('she says one thing about one move, however long it keeps going', () => {
+  /* THE GATE A THRESHOLD CANNOT REPLACE. A market that trends $15 a quarter
+     hour clears every other gate on every run — this is the only thing between
+     that and eight messages before lunch about one story. */
+  const spoken = { ...MARK, looked_at: new Date(LOOKED - (MOVE_QUIET_H - 0.5) * 3600_000).toISOString() };
+  assert.equal(moveWorth(QUOTE, spoken, LOOKED).worth, false);
+  assert.match(moveWorth(QUOTE, spoken, LOOKED).why, /already said/);
+
+  // And it opens again once the window has passed, rather than latching shut.
+  const older = { ...MARK, looked_at: new Date(LOOKED - (MOVE_QUIET_H + 0.5) * 3600_000).toISOString() };
+  assert.equal(moveWorth(QUOTE, older, LOOKED).worth, true);
+});
+
+test('the floor is a share of the price, so it cannot go stale as gold moves', () => {
+  /* A FIXED $4 WOULD MEAN TWO DIFFERENT THINGS to gold at 4,400 and gold at
+     2,000, and the year nobody revises it the sense either fires constantly or
+     never — and never looks exactly like a quiet market. */
+  const small = { ...MARK, bid: QUOTE.bid - QUOTE.bid * MOVE_FLOOR * 0.9 };
+  assert.equal(moveWorth(QUOTE, small, LOOKED).worth, false);
+  assert.match(moveWorth(QUOTE, small, LOOKED).why, /floor/);
+
+  // The same absolute move at a much lower price does clear it, which is the
+  // whole point of expressing it as a share.
+  const cheap = { ...QUOTE, bid: 2000, high: 2000, low: 2000 };
+  assert.equal(moveWorth(cheap, { ...MARK, bid: 2000 - QUOTE.bid * MOVE_FLOOR * 0.9 }, LOOKED).worth, true);
+});
+
+test('a move small against the day range is the day, not an event', () => {
+  // Below the share and above the floor: $6 on a session that has already
+  // travelled $39 is an ordinary swing, and it is the case the floor alone
+  // would let through on every quiet afternoon.
+  const ordinary = { ...MARK, bid: QUOTE.bid - 6 };
+  const out = moveWorth(QUOTE, ordinary, LOOKED);
+  assert.equal(out.worth, false);
+  assert.match(out.why, /range/);
+  assert.ok(6 > QUOTE.bid * MOVE_FLOOR, 'the floor is doing the rejecting, not the share');
+  assert.ok(6 < (QUOTE.high - QUOTE.low) * MOVE_SHARE);
+});
+
+test('a quote with no range is decided by the floor alone', () => {
+  /* foldSpot FALLS BACK TO THE BID for a quote carrying no high or low, which
+     makes the range zero — and a share of zero is zero, so every move would
+     clear it. The floor is what still has to be satisfied. */
+  const flat = { ...QUOTE, high: QUOTE.bid, low: QUOTE.bid };
+  assert.equal(moveWorth(flat, MARK, LOOKED).worth, true);
+  assert.equal(moveWorth(flat, { ...MARK, bid: QUOTE.bid - 0.5 }, LOOKED).worth, false);
+});
+
+test('a fall is a move, and it is reported as one', () => {
+  // Signed, not absolute: the gates measure size and the message needs the
+  // direction, and a sense that only noticed rallies would be half a sense.
+  const out = moveWorth(QUOTE, { ...MARK, bid: QUOTE.bid + 15 }, LOOKED);
+  assert.equal(out.worth, true);
+  assert.equal(out.move, -15);
 });

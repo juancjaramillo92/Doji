@@ -31,7 +31,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, RELEASE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // The eight rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
@@ -40,7 +40,7 @@ import { checkRules, adherenceList, dayStanding, DAY_LOSS, type TradeRow } from 
 // Everything shared lives in _shared/edge.ts — one definition each, for the
 // reason that file gives.
 import {
-  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -869,21 +869,40 @@ const MARKET_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
-/* NEVER THROWS, for the reason every other tool here does not. And it says what
-   it could not do rather than coming back empty: a briefing that opens on a
-   silently missing price is one that either invents a number or drops the line
-   the whole first paragraph is built on. */
-async function readMarket(): Promise<string> {
+/* The fields of that answer this file actually reads. The poller folds pipettes
+   out of the quote and settles the scale before it is served, so everything
+   here is a display price — see the poller, where that asymmetry is named. */
+export interface Quote {
+  bid: number; ask: number; high: number; low: number;
+  prev_close: number; change: number; change_pct: number; at: string;
+}
+
+/* THE NUMBERS, AND NULL WHERE THERE ARE NONE. Two callers want two different
+   things from one read: the tool below wants a sentence it can hand the model,
+   and the price sense wants the figures — so the fetch is here once and each
+   caller says what an unreadable price means to it. A price that cannot be read
+   is not a price of zero, and neither caller may be given one. */
+async function marketQuote(): Promise<Quote | null> {
   try {
     const res = await fetch(MARKET_URL, { headers: { "x-doji-key": CRON_SECRET } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const quote = await res.json();
     if (!quote?.ok || typeof quote.bid !== 'number') throw new Error("no readable quote");
-    return JSON.stringify(quote);
+    return quote as Quote;
   } catch (err) {
     console.error("doji-eugenia: market read failed —", err instanceof Error ? err.message : err);
-    return "The live price could not be read just now. Say you do not have a current level rather than quoting one from a search.";
+    return null;
   }
+}
+
+/* NEVER THROWS, for the reason every other tool here does not. And it says what
+   it could not do rather than coming back empty: a briefing that opens on a
+   silently missing price is one that either invents a number or drops the line
+   the whole first paragraph is built on. */
+async function readMarket(): Promise<string> {
+  const quote = await marketQuote();
+  return quote ? JSON.stringify(quote)
+    : "The live price could not be read just now. Say you do not have a current level rather than quoting one from a search.";
 }
 
 /* ─── The running story ────────────────────────────────────────────────────
@@ -1891,6 +1910,7 @@ export const APOLOGY: Record<string, string> = {
   consolidate:  "My nightly tidy-up broke, jefe. I may not have kept what today was worth keeping.",
   release:      "I could not look at the number that just landed, jefe.",
   trade:        "Something broke while I was looking at your position, jefe.",
+  move:         "I lost sight of the price for a moment, jefe.",
 };
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
@@ -1903,9 +1923,12 @@ async function postScheduled(url: URL): Promise<Response> {
   try {
     if (url.searchParams.get("pulse") === "1")       { job = 'pulse';       return await postPulse(); }
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
-    // THE EVENT SPINE'S OWN DOOR. Its cron job calls nothing else, and it is
-    // also how a look is exercised by hand without waiting for a print.
+    /* THE TWO DATA-DRIVEN SENSES, EACH BEHIND ITS OWN DOOR. Their cron jobs
+       call nothing else, which is also how either is exercised by hand without
+       waiting for a print or a move. They are deliberately not folded into
+       dueNow: it decides from the clock, and these decide from a table. */
     if (url.searchParams.get("release") === "1")     { job = 'release';     return await postRelease(); }
+    if (url.searchParams.get("move") === "1")        { job = 'move';        return await postMove(); }
 
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
@@ -2469,6 +2492,187 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
   await remember([{ role: 'user', content: `[trade ${event}]` },
                   { role: 'assistant', content: said }]);
   return json({ ok: true, trade: id, said: "sent" });
+}
+
+/* ─── The move nobody filed ────────────────────────────────────────────────
+   THE OTHER TWO SENSES ARE EVENTS AND PRICE IS NOT. A release lands and a
+   position opens; both are rows appearing, and both are noticed by asking
+   whether a row is there. Gold is always there. "It moved" is not a fact about
+   the instrument at all — it is a fact about the instrument AND a previous
+   reading — which is why this sense needs a mark and the others need none.
+
+   WHAT MAKES A MOVE WORTH WAKING HER FOR IS THE DAY'S OWN MEASURE, not a number
+   in dollars. Gold at 4,400 and gold at 2,000 are the same market and a fixed
+   $10 threshold means two different things to them; a table of thresholds goes
+   stale the year nobody revises it, and that failure looks exactly like a quiet
+   market. So the test is relative twice over: against the range the session has
+   actually printed, and against the price itself.
+
+   AND A MOVE A PRINT EXPLAINS IS NOT THIS SENSE'S TO REPORT. The release spine
+   is already looking at anything high-impact that landed, so a jump at 08:30 on
+   payrolls would otherwise reach him twice in the same ten minutes, once from
+   each sense, saying the same thing. The calendar she filed is what tells them
+   apart.
+
+   SILENT BY DEFAULT AFTER ALL OF THAT, because the gates decide that something
+   happened and only she can decide whether it is worth a sentence. `isSilent`
+   is shared with the pulse and the release look rather than reimplemented.
+   ───────────────────────────────────────────────────────────────────────── */
+/* THE FIVE NUMBERS THIS SENSE RESTS ON, and every one of them is a decision
+   rather than a fact — which is why they are named here instead of appearing
+   inside the predicate, the same reason CLOSEOUT_MIN and STRETCH are named in
+   adherence.ts. */
+// A third of everything the day has done so far, inside a quarter of an hour.
+// The share binds on an established session, where the range is wide enough for
+// an ordinary swing to clear any fixed floor.
+export const MOVE_SHARE = 0.35;
+// And a tenth of a percent of the price — about $4.40 on gold at 4,400. The
+// floor binds at the other end of the day: an hour after the Sunday open the
+// range is a couple of dollars and a third of it is noise.
+export const MOVE_FLOOR = 0.001;
+// Two missed runs and the gap is no longer a quarter of an hour. A move measured
+// across an outage is a move across an hour, which is a different claim — so the
+// mark is advanced and the reading starts again.
+export const MARK_STALE_MIN = 40;
+// One message about one move. A market that trends all afternoon is one story,
+// and telling it every fifteen minutes is the failure a threshold alone cannot
+// prevent.
+export const MOVE_QUIET_H = 2;
+// How recently a high-impact print counts as the explanation. Six hours later a
+// move is its own event again; the release spine's own staleness window is wider
+// because it is asking a different question — whether the print has been looked
+// at, not whether it is what just moved the price.
+const MOVE_EXPLAINED_H = 1;
+
+export interface Mark { bid: number; at: string; looked_at: string | null }
+
+/* PURE, AND THE WHOLE DECISION IS HERE. Every gate can be driven from both
+   sides by a test, which for a sense that is silent by design is the only way
+   to know it can fire at all — a predicate that always answers "not worth it"
+   and a market that is genuinely quiet produce the same empty log for weeks. */
+export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
+  { worth: true; move: number } | { worth: false; why: string } {
+  // The seeded row, and the only shape that is not a price. It exists so the
+  // first run has something to PATCH rather than a branch that runs once in the
+  // life of the database.
+  if (!(mark.bid > 0)) return { worth: false, why: "no mark yet" };
+
+  const age = (now - Date.parse(mark.at)) / 60_000;
+  if (!(age <= MARK_STALE_MIN)) return { worth: false, why: "mark is stale" };
+
+  if (mark.looked_at &&
+      now - Date.parse(mark.looked_at) < MOVE_QUIET_H * 3600_000) {
+    return { worth: false, why: "already said something about a move" };
+  }
+
+  const move = Math.round((spot.bid - mark.bid) * 100) / 100;
+  const size = Math.abs(move);
+  if (size < spot.bid * MOVE_FLOOR) return { worth: false, why: "inside the floor" };
+
+  // high and low fall back to the bid on a quote that carries neither, which
+  // makes the range zero — and no size is below zero, so the share simply stops
+  // binding and the floor above is the whole test. A guard for that case would
+  // read as though it changed the answer.
+  const range = spot.high - spot.low;
+  if (size < range * MOVE_SHARE) {
+    return { worth: false, why: "small against the day's range" };
+  }
+
+  return { worth: true, move };
+}
+
+async function readMark(): Promise<Mark | null> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Mark read failed (HTTP ${res.status})`);
+  const [row] = await res.json();
+  return row ?? null;
+}
+
+/* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT, which is what makes
+   the window between readings the gap between runs rather than a number anyone
+   chose. Stamped BEFORE the look for markLooked's reason exactly: a look that
+   generates and then fails to write would re-fire on the next run, and on the
+   one after that, each one billed. */
+async function markPrice(bid: number, looked: boolean): Promise<void> {
+  const res = await fetch(`${SB_URL}/rest/v1/eugenia_price?id=eq.current`, {
+    method: "PATCH", headers: sbHeaders("return=minimal"),
+    body: JSON.stringify({
+      bid, at: new Date().toISOString(),
+      ...(looked ? { looked_at: new Date().toISOString() } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`Mark write failed (HTTP ${res.status})`);
+}
+
+// Anything high-impact that printed in the last hour, whether or not the
+// release spine has looked at it yet — either way that message is the one he
+// gets about this move.
+async function explained(now = Date.now()): Promise<Release | null> {
+  const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
+  const res = await fetch(
+    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `&importance=eq.high&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
+    `&order=at.desc&limit=1`, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Calendar read failed (HTTP ${res.status})`);
+  const [row] = await res.json();
+  return row ?? null;
+}
+
+async function postMove(): Promise<Response> {
+  // The weekend quote is Friday's last, so every reading is the same number and
+  // nothing could fire — but it is still a poll and a broker session every
+  // quarter of an hour for two days. The same rule the poller keeps, from the
+  // same definition.
+  if (!marketOpen()) return json({ ok: true, skipped: "market closed" });
+
+  const [spot, mark] = await Promise.all([marketQuote(), readMark()]);
+  if (!spot) return json({ ok: true, skipped: "no readable quote" });
+  if (!mark) throw new Error("eugenia_price has no row — 005 has not been applied");
+
+  const worth = moveWorth(spot, mark);
+  if (!worth.worth) {
+    await markPrice(spot.bid, false);
+    return json({ ok: true, bid: spot.bid, skipped: worth.why });
+  }
+
+  const behind = await explained();
+  if (behind) {
+    await markPrice(spot.bid, false);
+    return json({ ok: true, bid: spot.bid, skipped: `${behind.name} explains it` });
+  }
+
+  await markPrice(spot.bid, true);
+
+  const [notes, story, loops, ahead] = await Promise.all([
+    notesBlock(), thesisBlock(), loopsBlock(), aheadToday(),
+  ]);
+  // The window is STATED FROM THE MARK rather than asserted as a quarter of an
+  // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
+  // telling her it was fifteen is a wrong fact from the one place that knows.
+  const since = Math.round((Date.now() - Date.parse(mark.at)) / 60_000);
+  const asked = MOVE +
+    `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
+    `${Math.abs(worth.move)} in the last ${since} minutes. ` +
+    `The session has traded ${spot.low} to ${spot.high}, against a previous ` +
+    `close of ${spot.prev_close}. Nothing high-impact you filed has printed in ` +
+    `the last hour.` +
+    (ahead.length
+      ? `\nStill ahead today: ` +
+        ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
+      : "") +
+    notes + story + loops;
+
+  const said = await ask([...await recent(), { role: 'user', content: asked }],
+                         'medium', 'move look', RELEASE_TOOLS);
+
+  if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
+
+  await say(said);
+  await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
+                  { role: 'assistant', content: said }]);
+  return json({ ok: true, move: worth.move, said: "sent" });
 }
 
 
