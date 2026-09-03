@@ -169,6 +169,32 @@ pixels; say so on any visual change.
 - **`null` is not `no`,** and the journal asks whether the stop and target were
   *respected*, not whether they were moved. Both halves of that trip people up.
   Column lists and the full account are in the README's Data model.
+- **Two scales on one endpoint, and neither is documented.** `get_spot_prices`
+  serves PIPETTES and `get_positions` serves DISPLAY prices, on the same account
+  and the same symbol. `PIPETTES` and `fromPipettes` are named once and applied
+  to the spot read alone; applying them to a position price puts the stop at
+  four hundredths of a cent, and a test holds that asymmetry in place. Both were
+  established by probe — `?market=raw` and `?positions=1` — because the
+  documentation says "DISPLAY price (not pipettes)" about INPUTS and nothing
+  about outputs. `get_trendbars` also documents a `count`-only call it refuses;
+  the range form is what works.
+
+- **§8 SAYS THE PLAN IS UNRECOVERABLE AND THAT IS NOW FALSE FOR AN OPEN
+  POSITION.** `get_positions` carries `entryPrice`, `stopLoss` and `takeProfit`.
+  The claim was formed against closed positions, where it holds. Four of §8's
+  unanswerable questions rest on it — but the strategy is HIS document and this
+  is his to change, not something to quietly correct. Capturing the stop at open
+  is the feature that would follow, and it is a schema change to a table with
+  four writers.
+
+- **Eugenia reads a price through the poller and must never hold the broker
+  token.** The endpoint that serves a quote also serves `create_order`, so the
+  market read goes through `doji-mcp-sync`, which will only ever answer with a
+  quote, and she presents the cron secret she already has. `agree.test.mjs`
+  asserts she reads no `CTRADER_` credential and addresses no broker host —
+  matching the READ rather than the mention, since the comment explaining why
+  she does not hold it names the secret.
+
 - **`ALLOWED_TOOLS` is what stands between this system and a placed trade, and
   it should be read that way rather than as configuration.** `?tools=1`
   established that the broker's endpoint also serves `create_order`,

@@ -836,6 +836,56 @@ async function logCalendar(releases: unknown): Promise<string> {
   }
 }
 
+/* ─── The price, read off the instrument ───────────────────────────────────
+   She has quoted gold out of whatever a news page said, at whatever staleness
+   that page had, since she existed. The broker this system already polls serves
+   a live bid and ask, and now she can read it.
+
+   THROUGH THE POLLER, NOT THROUGH THE BROKER, and that is the whole design.
+   `doji-mcp-sync` holds CTRADER_MCP_TOKEN, and the same endpoint that serves a
+   price also serves `create_order`, `close_position` and `amend_position`.
+   Giving Eugenia that token would put a market order one prompt injection away
+   from the bot whose entire product is that she gives no signals — so she gets
+   a JSON price from a function that will only ever answer with one, and the
+   token stays where it was.
+
+   The cron secret is what she presents, which she already holds because her own
+   scheduled half checks it. Against the poller it opens exactly what the README
+   says it opens: a read-only poll that was going to run anyway.
+   ───────────────────────────────────────────────────────────────────────── */
+// SB_URL is already the project's own origin, so the poller is one path away
+// and needs no second copy of the project ref — which agree.test.mjs counts.
+const MARKET_URL = `${SB_URL}/functions/v1/doji-mcp-sync?market=1`;
+
+const MARKET_TOOL = {
+  name: "get_market",
+  description:
+    "The live gold price from his own broker — bid, ask, the session high and low, " +
+    "the previous session's close, and the move since it. Use it whenever you are " +
+    "about to state where gold is or what it has done overnight, which is every " +
+    "briefing. This is read off the instrument, so prefer it over any number a " +
+    "search or a page gives you; those are as stale as the page was. It says " +
+    "nothing about what price will do next and is not to be used as though it did.",
+  input_schema: { type: "object", properties: {}, additionalProperties: false },
+} as const;
+
+/* NEVER THROWS, for the reason every other tool here does not. And it says what
+   it could not do rather than coming back empty: a briefing that opens on a
+   silently missing price is one that either invents a number or drops the line
+   the whole first paragraph is built on. */
+async function readMarket(): Promise<string> {
+  try {
+    const res = await fetch(MARKET_URL, { headers: { "x-doji-key": CRON_SECRET } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const quote = await res.json();
+    if (!quote?.ok || typeof quote.bid !== 'number') throw new Error("no readable quote");
+    return JSON.stringify(quote);
+  } catch (err) {
+    console.error("doji-eugenia: market read failed —", err instanceof Error ? err.message : err);
+    return "The live price could not be read just now. Say you do not have a current level rather than quoting one from a search.";
+  }
+}
+
 /* ─── The running story ────────────────────────────────────────────────────
    Her memory had two timescales and needed three. Turns roll over in a morning;
    notes are durable facts about HIM. Nothing held what is going on in the
@@ -1091,6 +1141,7 @@ const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
+  MARKET_TOOL,
   TRADES_TOOL,
   CHECK_TOOL,
   NOTES_TOOL,
@@ -1100,7 +1151,7 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL];
-const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, CALENDAR_TOOL, LOOP_TOOL];
+const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, CALENDAR_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 // The critic reads a draft and returns a draft. Giving it a tool would let it
 // go and check something, which is a second briefing at a second price.
@@ -1195,6 +1246,7 @@ async function serve(name: string, input: any): Promise<string> {
     case SEARCH_TOOL.name:   return await searchMemory(input.query);
     case STRATEGY_TOOL.name: return readStrategy(input.section);
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
+    case MARKET_TOOL.name:   return await readMarket();
     case CALENDAR_TOOL.name: return await logCalendar(input.releases);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);

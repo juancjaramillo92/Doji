@@ -521,7 +521,19 @@ The credential is the better place for that guarantee and is not where it lives.
 If cTrader can issue a read-only token, this array stops being load-bearing.
 Until then it is, and it should be read as such rather than as configuration.
 
-**`?positions=1` asks whether the plan is recoverable.** §8 says it is not —
+**`?positions=1` answered a question §8 had closed, and answered it the other
+way.** A live position carries `entryPrice`, `stopLoss` and `takeProfit`. So the
+plan *is* available from the broker — for an **open** position. §8's claim was
+formed against closed ones, where it remains true, and the poller had never
+looked at an open one because it had no reason to.
+
+That is not a documentation fix: §8 is the trader's own document, and four of
+its unanswerable questions rest on that sentence. **Changing it is his call**,
+and what would follow from it — sampling the stop at open, where
+`trades_eugenia_opened` already fires — is a schema change to a table with four
+writers. Neither is done here.
+
+**The original question, for the record.** §8 says it is not —
 *where the stop and target were set at entry* is called unavailable from the
 broker, and four questions are marked unanswerable because of it, R-02's
 *respect* half among them. That claim was formed against `get_deals` and
@@ -532,14 +544,30 @@ whether `get_positions` *serves* them is what this settles. If it does, the
 `trades_eugenia_opened` trigger already fires at the one moment worth sampling,
 and a stop recorded at open is the plan.
 
-**`?market=1` asks what a price looks like coming out of this endpoint.** Both
-calls at once — spot and two daily bars — because the two answers are only
-useful together, and whether they agree about scale is the thing being checked.
-cTrader's tool descriptions say *"DISPLAY price (not pipettes)"* about their
-**inputs**, which says nothing about what comes back, and the Open API has
-historically served prices scaled by a per-symbol digit count. A factor of 10⁵ in
-the wrong direction still produces four digits and still looks like gold — which
-is why nothing folds this yet.
+**`?market=1` returns the price; `?market=raw` returns what the broker sent.**
+The same split `?raw=1` makes for the deals, and it earned itself immediately.
+
+**The endpoint uses two scales, and its documentation mentions neither.**
+`get_spot_prices` serves **pipettes** — `bid: 441982000` is 4419.82, a hundred
+thousandth of what it prints. `get_positions` serves **display prices** on the
+same account and the same symbol — `entryPrice: 4402.71` is 4402.71. cTrader's
+tool descriptions say *"DISPLAY price (not pipettes)"* about their **inputs**
+and nothing at all about their outputs. A parser written from the documentation
+would have been a hundred thousand out on one of the two, and would still have
+produced a four-digit number that looked like gold.
+
+`PIPETTES` is named once and applied in one place, and `foldSpot` is tested
+against the real capture rather than an invented shape.
+
+**The overnight move needs no second call.** `sessionClose` is the previous
+session's close — the 17:00 New York roll for gold — so *where it is, with the
+overnight move* is one request and a subtraction. That is the whole of the
+briefing's opening line.
+
+**And `get_trendbars` documents a call shape it refuses.** Its own description
+offers *"(count) → last N bars ending now"*; sending exactly that answers
+`fromTimestamp: must not be null`. The range form is what it accepts, so that is
+what is sent. Worth knowing before trusting any other combination it lists.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?positions=1" \
