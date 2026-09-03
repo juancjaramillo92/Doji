@@ -2877,12 +2877,20 @@ answers, and every note and turn as it is written. Worth knowing before setting
 the secrets, and the reason leaving any of them unset changes nothing but that
 one capability.
 
-They are also the paths that could not be exercised end to end from the machine
-they were written on. Each call is guarded and each failure is handled — a
-transcription that produces no words names which of four things went wrong, a
-batch of embeddings that comes back mis-shaped is refused whole, and speech that
-fails costs the audio and not the answer — but **the first real call of each is
-the test**, and reading is as far as this could take them.
+None of them could be exercised from the machine they were written on, so each
+shipped with its failures handled and its central claim unproven: a transcription
+that produces no words names which of four things went wrong, a batch of
+embeddings that comes back mis-shaped is refused whole, speech that fails costs
+the audio and not the answer — but whether any of it *worked* was a reading.
+
+**All three have since run against the live account**, and two of the three
+answers were worth having. The backfill embedded the whole archive on its second
+attempt; its first replied `filled: 0` and, once the door was made to say why,
+named `insufficient_quota` with the billing URL — a fault in the account rather
+than the code, which is a distinction the first version could not draw. And a
+voice note came back as a voice note: the transcript reached her, the text landed
+first, and the audio arrived as a playable bubble rather than a file attachment,
+which is the `opus` question settled by the only thing that could settle it.
 
 **`web_fetch` grounds a number on a page that has to stay fetchable.** The four
 sources are named in the prompt because the tool only fetches URLs already in the
