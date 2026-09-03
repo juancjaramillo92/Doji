@@ -524,6 +524,48 @@ test('a demotion can reach every rung but the bottom one', () => {
     'the bottom-rung guard sits after the write, which is not a guard');
 });
 
+/* ─── verify.sql is fatal on error, which makes a stale name expensive ───────
+   Nothing in this suite sees the live database, so verify.sql is the only check
+   on it — and it is one query returning one row per fact, which means an ERROR
+   is not a failed row. It aborts the statement, and every check below the line
+   that threw silently stops running.
+
+   THAT IS EXACTLY WHAT HAPPENED. A row asked has_function_privilege about
+   `public.eugenia_search(text, int)`, the signature 003 created and 007
+   deliberately dropped for the three-argument one. A text signature that does
+   not resolve raises 42883 rather than returning false, so from the day 007 was
+   applied the file died at that line, eleven checks below it never ran, and the
+   whole run reported itself as a fault in the database.
+
+   SO THE RULE IS ABOUT THE FORM, NOT ABOUT THAT NAME. Postgres has a
+   non-throwing way to ask about a function — an oid from pg_proc, or
+   to_regprocedure, which answers NULL — and the throwing forms are a text
+   signature and a regprocedure cast. Neither belongs in a file whose errors
+   take the rest of it with them.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('verify.sql names no function in a form that throws when it is gone', () => {
+  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  assert.ok(sql.length > 1000, 'verify.sql could not be read — the reader has gone blind');
+
+  /* A quoted `public.name(args)` is the shape has_function_privilege and
+     to_regprocedure both take, and the first of those throws on a miss. The
+     safe forms name no arguments at all, so a signature literal anywhere in
+     this file is the defect regardless of what consumes it. */
+  const signatures = [...sql.matchAll(/'public\.\w+\s*\([^']*\)'/g)].map(m => m[0]);
+  assert.deepEqual(signatures, [],
+    `verify.sql writes a function signature by hand: ${signatures.join(', ')} — it ` +
+    `goes stale the first time an argument list changes, and a signature that no ` +
+    `longer resolves THROWS rather than answering false, which takes every check ` +
+    `below it with it. Ask by oid out of pg_proc instead`);
+
+  // The same failure wearing a cast: 'public.f(int)'::regprocedure raises 42883
+  // where to_regprocedure returns null.
+  assert.doesNotMatch(sql, /::\s*regprocedure\b|::\s*regproc\b/,
+    'verify.sql casts to regprocedure, which throws on a function that is not ' +
+    'there — to_regprocedure answers null and lets the row simply fail');
+});
+
 /* ─── The guard on his levels is a paragraph, and nothing else holds it ──────
    She is handed his entry, his stop and his target on six paths now, and the
    only thing between that and her quoting them back at him every morning is a
@@ -881,11 +923,16 @@ const looksLikeCode = (name) =>
      insufficient_quota  the embedding vendor's own code for an unfunded
                    account, quoted exactly because the README's account of what
                    the ?embed=1 door reports is worth nothing if it paraphrases
-                   the string somebody will actually read */
+                   the string somebody will actually read
+     to_regprocedure  Postgres's non-throwing way to name a function, which
+                   both documents prescribe for verify.sql and neither file
+                   uses — because the row that needed it was deleted rather
+                   than rewritten. Naming the safe form is the point; calling
+                   it would mean keeping the copy that went stale */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
   'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
-  'get_version', 'MN_1', 'insufficient_quota',
+  'get_version', 'MN_1', 'insufficient_quota', 'to_regprocedure',
 ]);
 
 test('the documents name only symbols the repository has', () => {
