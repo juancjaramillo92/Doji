@@ -275,6 +275,31 @@ nav {
 /* Opt-in rather than part of .cbox: a card inside a grid takes its spacing from
    the grid gap, not the section rhythm. */
 .cbox.section { margin-bottom:var(--gap-section); }
+
+/* ─── What Eugenia is watching ──────────────────────────────────────────────
+   The only place her work and this app meet. Three columns that collapse to one
+   on a phone, because the three are independent lists rather than a table — a
+   grid keeps them level without any of them stretching over dead space.
+
+   No new colour: the whole card is drawn in the tokens already here. A landed
+   release takes --win the way a positive figure does elsewhere, because it is
+   the same idea — the thing has settled — and inventing a fourth accent for it
+   would be a palette entry nobody could name. */
+.watch-card { display:flex; flex-direction:column; gap:14px; }
+.watch-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));
+  gap:14px 22px;
+}
+.watch-col { display:flex; flex-direction:column; gap:7px; min-width:0; }
+.watch-line { display:flex; gap:8px; font-size:12.5px; line-height:1.45; color:var(--mt2); }
+.watch-when {
+  font-family:var(--mono); font-size:11.5px; color:var(--mt);
+  flex:0 0 auto; padding-top:1px;
+}
+.watch-what { min-width:0; overflow-wrap:anywhere; }
+.watch-landed { color:var(--win); }
+.watch-story { font-size:12.5px; line-height:1.5; color:var(--mt2); overflow-wrap:anywhere; }
+.watch-moved { color:var(--mt); }
 /* Divided column grids. 4px here plus each column's 14px lands content on the
    same 18px edge as plain cards, so both share one left margin. */
 .cbox.cols { padding:16px 4px; }
@@ -1527,6 +1552,11 @@ tr.broker-pending td:first-child {
     <!-- Shown while any synced trade still lacks its journal answers. Tapping
          it opens the oldest. -->
     <div id="broker-banner" class="broker-banner" style="display:none;" role="button" tabindex="0"></div>
+
+    <!-- What Eugenia is watching. Hidden until there is something in it, so a
+         database without 005 applied, or a quiet Sunday, shows nothing rather
+         than an empty frame. -->
+    <div id="watch-card" class="cbox section watch-card" style="display:none;"></div>
 
     <!-- No section title: the card labels its own parts, so a heading would
          only restate a word already inside them. -->
@@ -3218,6 +3248,119 @@ function renderRollForward(rows) {
 }
 
 /* ─── Trade log ──────────────────────────────────────────────────────────── */
+/* ─── What Eugenia is watching ───────────────────────────────────────────────
+   THE ONLY PLACE HER WORK AND THIS APP MEET, and it is deliberately narrow.
+
+   She and this page have shared a database and nothing else: everything she
+   knows has lived in a Telegram thread, so the three things worth a glance in
+   the morning — what lands today, what story she is carrying, what is still
+   open — were readable only by scrolling a chat. Three tables, three lists.
+
+   NOT HER NOTES AND NOT HER TURNS. Those stay denied to the publishable key
+   exactly as 003 left them. Her notes are working memory, and his audit of them
+   is `/notes` in her own thread, where an answer can be asked a question back.
+
+   ONE READ, AFTER THE RENDER, AND NEVER IN FRONT OF IT. The journal is what
+   this page is for. A failure here — 005 not applied, the policy missing, the
+   network gone — leaves the card hidden and everything else untouched, which is
+   the same trade the snapshot makes and the opposite of the roll-forward's:
+   nothing on this card is the reason anyone opened the app.
+   ─────────────────────────────────────────────────────────────────────────── */
+const Watch = {
+  // The same rolling window her own briefing reads, and for the same reason: a
+  // civil-day filter is at its worst exactly where this matters, since Sunday's
+  // 17:00 open is about a week that has not started. Twelve hours back and a day
+  // forward needs no boundary arithmetic to get wrong.
+  BACK_H: 12, AHEAD_H: 24,
+
+  when(iso) {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).format(new Date(iso));
+  },
+
+  async draw() {
+    const host = $('watch-card');
+    if (!host || !Data.sb) return;
+
+    try {
+      const from = new Date(Date.now() - this.BACK_H * 3600e3).toISOString();
+      const to   = new Date(Date.now() + this.AHEAD_H * 3600e3).toISOString();
+
+      const [cal, story, loops] = await Promise.all([
+        Data.sb.from('eugenia_calendar')
+          .select('at,name,importance,consensus,actual,note')
+          .gte('at', from).lte('at', to).order('at', { ascending: true }).limit(20),
+        Data.sb.from('eugenia_thesis').select('thesis,moved_on').eq('id', 'current').maybeSingle(),
+        Data.sb.from('eugenia_loops')
+          .select('kind,body').is('closed_on', null).order('id', { ascending: false }).limit(8)
+      ]);
+
+      /* AN ERROR IS NOT AN EMPTY LIST, and the client will not tell you the
+         difference unless you ask. supabase-js resolves rather than throwing —
+         a missing table, a policy that denies the row, an expired session all
+         come back as `{ data: null, error }`. Read as `data || []` that is
+         three failures wearing the same face as a quiet Sunday: the card hides
+         itself, nothing is logged, and the reason it is blank is unknowable.
+
+         The same rule readTrades follows on her side of the wire, in the same
+         words: an empty answer is only an answer when something was read. */
+      for (const [what, res] of [['calendar', cal], ['thesis', story], ['loops', loops]]) {
+        if (res.error) throw Object.assign(new Error(`${what}: ${res.error.message}`), { cause: res.error });
+      }
+
+      const releases = cal.data || [];
+      const threads  = loops.data || [];
+      const thesis   = story.data?.thesis || '';
+
+      // Nothing to say is said by not being there. An empty frame captioned
+      // "no data" is worse than the absence it describes.
+      if (!releases.length && !threads.length && !thesis) { host.style.display = 'none'; return; }
+
+      const cols = [];
+
+      if (releases.length) {
+        // A landed release reads differently from a pending one, and rendering
+        // them alike is how a card describes a print that already happened as
+        // something still to come.
+        const lines = releases.map(r => {
+          const landed = !!r.actual;
+          const what = landed
+            ? `${esc(r.name)} &middot; ${esc(r.actual)}` +
+              (r.consensus ? ` <span class="watch-moved">vs ${esc(r.consensus)}</span>` : '')
+            : esc(r.name) + (r.consensus ? ` <span class="watch-moved">${esc(r.consensus)} exp</span>` : '');
+          return `<div class="watch-line">`
+               + `<span class="watch-when${landed ? ' watch-landed' : ''}">${esc(this.when(r.at))}</span>`
+               + `<span class="watch-what">${what}</span></div>`;
+        });
+        cols.push(`<div class="watch-col"><div class="cbox-l">On the calendar</div>${lines.join('')}</div>`);
+      }
+
+      if (thesis) {
+        const moved = story.data?.moved_on
+          ? ` <span class="watch-moved">&middot; moved ${esc(story.data.moved_on)}</span>` : '';
+        cols.push(`<div class="watch-col"><div class="cbox-l">The story she is carrying${moved}</div>`
+                + `<div class="watch-story">${esc(thesis)}</div></div>`);
+      }
+
+      if (threads.length) {
+        const lines = threads.map(l =>
+          `<div class="watch-line"><span class="watch-when">${l.kind === 'question' ? 'asked' : 'watch'}</span>`
+          + `<span class="watch-what">${esc(l.body)}</span></div>`);
+        cols.push(`<div class="watch-col"><div class="cbox-l">Still open</div>${lines.join('')}</div>`);
+      }
+
+      host.innerHTML = `<div class="watch-grid">${cols.join('')}</div>`;
+      host.style.display = 'flex';
+    } catch (e) {
+      // Warned rather than surfaced: a card that cannot draw is not a reason to
+      // tell him anything, and 005 not being applied yet is the likely cause.
+      console.warn('Doji: Eugenia card unavailable', e);
+      host.style.display = 'none';
+    }
+  }
+};
+
 function renderTable(rows) {
   const host = $('trade-table'), pag = $('tlog-pagination');
   if (!rows.length) {
@@ -3873,6 +4016,9 @@ function bootState(text, failed) {
     render();
     bootState(null);
     BackupWatcher.check();
+    // Not awaited, and after the render on purpose: the journal is what this
+    // page is for, and her three small reads must never sit in front of it.
+    Watch.draw();
   } catch (e) {
     console.error('Doji: start failed', e);
     bootState(null);

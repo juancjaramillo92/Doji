@@ -27,7 +27,7 @@ import { readFileSync } from 'node:fs';
 // is now one of it. That this import resolves is also what proves every
 // function's `../_shared/edge.ts` resolves — the same file, the same path
 // shape — which is the check standing between a bad extraction and a deploy.
-import { secretMatches, nyClock } from '../supabase/functions/_shared/edge.ts';
+import { secretMatches, nyClock, nyDate } from '../supabase/functions/_shared/edge.ts';
 
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
@@ -40,8 +40,16 @@ import {
   briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, ask,
+  consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
+  parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
 } from '../supabase/functions/doji-eugenia/index.ts';
+import {
+  checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
+  nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
+  SWEEP_MIN, DAY_LOSS, STRETCH,
+} from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -951,12 +959,26 @@ test('a briefing hour and a pulse hour never collide', () => {
    weekend edges.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const timetable = (briefed) => {
+/* DRIVEN AS THE LOOP ACTUALLY RUNS, not called with a hand-picked flag.
+
+   dueNow now takes a second fact — whether tonight's pass has already run — and
+   asserting on it with a fixed `true` or `false` would be the exact shape of
+   test this repository has been bitten by: one that supplies the answer and so
+   cannot discover that the answer is never produced. The pass at 22:00 records
+   itself, which is what makes 23:00 a retry rather than a second pass, and only
+   a walk that carries that state forward can show it.
+
+   `passFails` is the night the recording never happens. Everything else is the
+   ordinary sequence. */
+const timetable = (briefed, passFails = false) => {
   const owed = [];
+  const done = new Set();
   for (let h = 0; h < 24 * 7; h++) {
     const at  = new Date(Date.UTC(2026, 7, 16, h));
-    const due = dueNow(at, briefed);
-    if (due) owed.push(`${at.toISOString().slice(0, 16)} ${due}`);
+    const due = dueNow(at, briefed, done.has(nyDate(at)));
+    if (!due) continue;
+    owed.push(`${at.toISOString().slice(0, 16)} ${due}`);
+    if (due === 'consolidate' && !passFails) done.add(nyDate(at));
   }
   return owed;
 };
@@ -996,10 +1018,13 @@ test('a week of failed briefings owes the retry hours, and the pulse gives way',
 test('the timetable holds its New York hours in winter too', () => {
   // January: EST (UTC-5), so every hour above moves one later in UTC.
   const owed = [];
+  const done = new Set();
   for (let h = 0; h < 24; h++) {
     const at  = new Date(Date.UTC(2026, 0, 14, h));   // Wed 14 Jan
-    const due = dueNow(at, true);
-    if (due) owed.push(`${at.toISOString().slice(11, 16)} ${due}`);
+    const due = dueNow(at, true, done.has(nyDate(at)));
+    if (!due) continue;
+    owed.push(`${at.toISOString().slice(11, 16)} ${due}`);
+    if (due === 'consolidate') done.add(nyDate(at));
   }
   // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's
   // consolidation, which is what a fixed UTC day of a New York timetable looks
@@ -1863,4 +1888,452 @@ test('the day is New York\'s, so a late turn is not filed under tomorrow', () =>
 test('created_at never leaks into the turn the API is sent', () => {
   const out = dateTurns([stored('user', 'hola', '2026-08-21T12:00:00Z')]);
   assert.deepEqual(Object.keys(out[0]).sort(), ['content', 'role']);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE STRATEGY, EXECUTED — adherence.ts
+   ───────────────────────────────────────────────────────────────────────────
+   §7 writes a predicate for every rule and §8 writes the population filters and
+   the three verdicts. Until now both were prose she applied by hand over four
+   hundred rows of JSON, which is the one thing a model is worst at and where a
+   wrong answer is least visible.
+
+   EVERY RULE IS DRIVEN IN BOTH DIRECTIONS, and that is the whole point of this
+   block rather than a stylistic preference. A predicate that can only be seen
+   to return `pass` has not been shown to work — it has been shown to be
+   reachable, which is what three "clean" results in this repository's history
+   turned out to mean. So each rule below is given a row that satisfies it and a
+   row that breaks it, and the third verdict is driven wherever the data can
+   produce one.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// A row with everything null but the id and a size, so each test names only the
+// columns its own rule reads and nothing else can quietly be doing the work.
+const trade = (o) => ({
+  id: 'PID1', direction: 'BUY', entry_time: null, fill_time: null,
+  entry_price: null, exit_price: null, pnl: null, open_day: null, setup: null,
+  followed_rules: null, followed_sl: null, followed_tp: null,
+  size_oz: 4, net_pnl: null, ...o,
+});
+const verdictOf = (rows, rule, now) =>
+  checkRules(rows, now).find(r => r.rule === rule);
+
+test('the worst outcome present is the verdict, and an empty population is unknown', () => {
+  assert.equal(settle(3, 0, 0), 'pass');
+  assert.equal(settle(3, 1, 0), 'fail');
+  assert.equal(settle(3, 0, 1), 'unknown');
+  assert.equal(settle(0, 1, 2), 'fail');
+  // §8's own rule, and the one that matters: nothing checked is not a pass.
+  assert.equal(settle(0, 0, 0), 'unknown');
+});
+
+test('R-01 flags a win that closed under $25, and spares the Friday close-out', () => {
+  const win = (o) => trade({ pnl: 100, entry_price: 4000, open_day: '2026-01-06', ...o });
+
+  assert.equal(verdictOf([win({ exit_price: 4030 })], 'R-01').verdict, 'pass');
+  // Exactly $25 is the target, not a breach of it.
+  assert.equal(verdictOf([win({ exit_price: 4025 })], 'R-01').verdict, 'pass');
+  assert.equal(
+    verdictOf([win({ exit_price: 4012, fill_time: '2026-01-06T18:00:00Z' })], 'R-01').verdict,
+    'fail', 'a $12 win on a Tuesday is a discretionary exit and R-01 flags it');
+
+  /* THE ONE EXCEPTION §6 CARVES, and it is narrow on purpose: R-15 forces a
+     close at the Friday 17:00 New York close, so a forced exit at +$12 would be
+     flagged every single week. 21:50Z is 16:50 in New York in January — inside
+     the window — and the same trade at 19:00Z is 14:00 there and still a flag,
+     which is exactly the pair §6 draws the line between. */
+  assert.equal(
+    verdictOf([win({ exit_price: 4012, fill_time: '2026-01-09T21:50:00Z' })], 'R-01').verdict,
+    'unknown');
+  assert.equal(
+    verdictOf([win({ exit_price: 4012, fill_time: '2026-01-09T19:00:00Z' })], 'R-01').verdict,
+    'fail');
+});
+
+test('R-02 checks the cap and nothing else', () => {
+  const loss = (exit) => trade({ pnl: -80, entry_price: 4000, exit_price: exit, open_day: '2026-01-06' });
+  // $20.00 exactly is the cap being honoured, and the tolerance is what stops a
+  // float landing at 20.000000001 reporting a breach of a rule kept exactly.
+  assert.equal(verdictOf([loss(3980)], 'R-02').verdict, 'pass');
+  assert.equal(verdictOf([loss(3979)], 'R-02').verdict, 'fail');
+  // A win is not R-02's population however far it travelled.
+  assert.equal(
+    verdictOf([trade({ pnl: 500, entry_price: 4000, exit_price: 4100, open_day: '2026-01-06' })], 'R-02').verdict,
+    'unknown', 'R-02 has no losses to look at, which is unknown rather than clean');
+});
+
+test('R-10 catches two positions open at once, and an open one still counts', () => {
+  const span = (id, from, to) => trade({ id, entry_time: from, fill_time: to });
+  assert.equal(verdictOf([
+    span('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T12:00:00Z'),
+    span('PIDb', '2026-01-06T11:00:00Z', '2026-01-06T13:00:00Z'),
+  ], 'R-10').verdict, 'fail');
+
+  assert.equal(verdictOf([
+    span('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T12:00:00Z'),
+    span('PIDb', '2026-01-06T12:30:00Z', '2026-01-06T13:00:00Z'),
+  ], 'R-10').verdict, 'pass');
+
+  /* A STILL-OPEN POSITION EXTENDS TO NOW RATHER THAN TO NOTHING. A trade left
+     running while a second one opened is the clearest breach this rule has, and
+     reading a null fill_time as "no span" is exactly how it would be missed. */
+  const now = Date.parse('2026-01-06T14:00:00Z');
+  assert.equal(verdictOf([
+    span('PIDa', '2026-01-06T10:00:00Z', null),
+    span('PIDb', '2026-01-06T11:00:00Z', '2026-01-06T13:00:00Z'),
+  ], 'R-10', now).verdict, 'fail');
+});
+
+test('R-11 reads the account off the size, and only flags trading after the limit', () => {
+  // 4 oz × 500 = an implied account of 2,000, so the day's floor is −80.
+  const leg = (id, pnl, from, to) =>
+    trade({ id, pnl, open_day: '2026-01-06', entry_time: from, fill_time: to });
+
+  assert.equal(verdictOf([
+    leg('PIDx', -90, '2026-01-06T10:00:00Z', '2026-01-06T11:00:00Z'),
+    leg('PIDy', 10,  '2026-01-06T12:00:00Z', '2026-01-06T13:00:00Z'),
+  ], 'R-11').verdict, 'fail');
+
+  // The same loss with nothing taken after it is the rule working.
+  assert.equal(verdictOf([
+    leg('PIDx', -90, '2026-01-06T10:00:00Z', '2026-01-06T11:00:00Z'),
+  ], 'R-11').verdict, 'pass');
+
+  // A limit with no denominator is not a limit. §8 withholds `balance` precisely
+  // so the wrong one cannot be reached for, which leaves a day with no size
+  // undecidable rather than clean.
+  assert.equal(verdictOf([
+    trade({ id: 'PIDz', pnl: -900, size_oz: null, open_day: '2026-01-06', fill_time: '2026-01-06T11:00:00Z' }),
+  ], 'R-11').verdict, 'unknown');
+});
+
+test('R-12 separates a late second entry from a sweep it cannot see', () => {
+  const entry = (id, at, filled) =>
+    trade({ id, open_day: '2026-01-06', entry_time: at, fill_time: filled });
+
+  assert.equal(verdictOf([entry('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T10:30:00Z')],
+    'R-12').verdict, 'pass');
+
+  assert.equal(verdictOf([
+    entry('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T10:30:00Z'),
+    entry('PIDb', '2026-01-06T11:30:00Z', '2026-01-06T12:00:00Z'),
+  ], 'R-12').verdict, 'fail', `a second entry more than ${SWEEP_MIN} minutes later is a fail`);
+
+  /* WITHIN THE WINDOW IS UNKNOWN, NOT PASS, and the difference is the whole
+     honesty of this rule: nothing on a row says an entry was a sweep re-entry —
+     §8 lists it among what is not stored — so a prompt second entry is
+     undecidable by construction rather than permitted. */
+  assert.equal(verdictOf([
+    entry('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T10:30:00Z'),
+    entry('PIDb', '2026-01-06T10:40:00Z', '2026-01-06T11:00:00Z'),
+  ], 'R-12').verdict, 'unknown');
+
+  // Three is a fail whatever the timing, because the rule permits two.
+  assert.equal(verdictOf(['a', 'b', 'c'].map((k, i) =>
+    entry('PID' + k, `2026-01-06T1${i}:00:00Z`, `2026-01-06T1${i}:30:00Z`)),
+    'R-12').verdict, 'fail');
+});
+
+test('R-13 allows the rung to move between months and not inside one', () => {
+  assert.equal(verdictOf([
+    trade({ id: 'PIDa', open_day: '2026-01-06', size_oz: 4 }),
+    trade({ id: 'PIDb', open_day: '2026-01-20', size_oz: 6 }),
+  ], 'R-13').verdict, 'fail');
+
+  assert.equal(verdictOf([
+    trade({ id: 'PIDa', open_day: '2026-01-06', size_oz: 4 }),
+    trade({ id: 'PIDb', open_day: '2026-02-20', size_oz: 6 }),
+  ], 'R-13').verdict, 'pass');
+});
+
+test('R-15 finds the Friday close inside a span, in both halves of the year', () => {
+  const held = (from, to) => verdictOf([trade({ entry_time: from, fill_time: to })], 'R-15').verdict;
+
+  // January: the close is 22:00Z. Entered Friday afternoon, out on Monday.
+  assert.equal(held('2026-01-09T20:00:00Z', '2026-01-12T14:00:00Z'), 'fail');
+  // Out before it.
+  assert.equal(held('2026-01-09T20:00:00Z', '2026-01-09T21:30:00Z'), 'pass');
+  // And through it by half an hour.
+  assert.equal(held('2026-01-09T20:00:00Z', '2026-01-09T22:30:00Z'), 'fail');
+
+  /* JULY, WHERE THE CLOSE IS 21:00Z RATHER THAN 22:00Z. A span ending at 21:30Z
+     is over the close in summer and short of it in winter — which is the exact
+     hour a fixed offset would get wrong, in the direction that reports a rule
+     kept as a rule broken, every summer, for half the year. */
+  assert.equal(held('2026-07-10T20:00:00Z', '2026-07-10T21:30:00Z'), 'fail');
+  assert.equal(held('2026-07-10T20:00:00Z', '2026-07-10T20:30:00Z'), 'pass');
+
+  // A midweek span never touches one.
+  assert.equal(held('2026-01-06T14:00:00Z', '2026-01-07T14:00:00Z'), 'pass');
+  // And a span too long to walk is answered rather than looped over.
+  assert.equal(crossesFridayClose(new Date('2026-01-06T14:00:00Z'),
+                                  new Date('2026-03-07T14:00:00Z')), null);
+});
+
+test('R-16 knows the market holidays, including the ones that move', () => {
+  const on = (at) => verdictOf([trade({ entry_time: at })], 'R-16').verdict;
+
+  // Good Friday 2026 is 3 April — the only moving holiday on the list, and the
+  // reason the calendar is computed rather than typed.
+  assert.equal(on('2026-04-03T14:00:00Z'), 'fail');
+  // 4 July 2026 is a Saturday, so the market shuts on Friday the 3rd. A naive
+  // date test calls that an open day.
+  assert.equal(on('2026-07-03T14:00:00Z'), 'fail');
+  // The Christmas stretch, which is an operational reading of §5 and is named.
+  assert.equal(on('2026-12-28T14:00:00Z'), 'fail');
+  assert.equal(on(`2026-12-${STRETCH.from}T14:00:00Z`), 'fail');
+  assert.equal(on('2026-12-23T14:00:00Z'), 'pass');
+  assert.equal(on('2026-07-06T14:00:00Z'), 'pass');
+});
+
+test('easter is right, which is what makes Good Friday right', () => {
+  // Four known years. Getting this wrong shifts one holiday a year by weeks and
+  // would look like a rule broken on a day the market was open.
+  assert.deepEqual(easter(2024), { m: 3, d: 31 });
+  assert.deepEqual(easter(2025), { m: 4, d: 20 });
+  assert.deepEqual(easter(2026), { m: 4, d: 5 });
+  assert.deepEqual(easter(2027), { m: 3, d: 28 });
+});
+
+test('the holiday set is the ten the market keeps, and nothing else', () => {
+  const days = marketHolidays(2026);
+  for (const d of ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25',
+                   '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25']) {
+    assert.ok(days.has(d), `${d} is a market holiday and is not in the set`);
+  }
+  for (const d of ['2026-01-02', '2026-03-17', '2026-07-06', '2026-11-25']) {
+    assert.ok(!days.has(d), `${d} is an ordinary trading day and the set closes the market on it`);
+  }
+});
+
+test('a New York wall time resolves to the instant it actually is', () => {
+  // The whole reason this exists: 17:00 in New York is 22:00Z in January and
+  // 21:00Z in July, and every Friday-close test above rests on it.
+  assert.equal(new Date(nyInstant(2026, 1, 9, 17)).toISOString(), '2026-01-09T22:00:00.000Z');
+  assert.equal(new Date(nyInstant(2026, 7, 10, 17)).toISOString(), '2026-07-10T21:00:00.000Z');
+  // And the reading back, which is the half the formatter does.
+  assert.equal(nyWall(new Date('2026-01-09T22:00:00Z')).hour, 17);
+  assert.equal(nyWall(new Date('2026-01-09T22:00:00Z')).wd, 5);
+});
+
+test('the Friday close-out window is a window, not the whole day', () => {
+  // 21:50Z is 16:50 New York — ten minutes before the close.
+  assert.equal(nearFridayClose(new Date('2026-01-09T21:50:00Z')), true);
+  // The far edge of it, exactly CLOSEOUT_MIN out.
+  assert.equal(nearFridayClose(new Date(Date.parse('2026-01-09T22:00:00Z') - CLOSEOUT_MIN * 60000)), true);
+  // One minute earlier is outside it.
+  assert.equal(nearFridayClose(new Date(Date.parse('2026-01-09T22:00:00Z') - (CLOSEOUT_MIN + 1) * 60000)), false);
+  // A Thursday at the same clock time is not a Friday close.
+  assert.equal(nearFridayClose(new Date('2026-01-08T21:50:00Z')), false);
+});
+
+test('a day that has hit its limit says so, and one that has not does not', () => {
+  const leg = (id, pnl) => trade({ id, pnl, open_day: '2026-01-06' });
+  // 4 oz implies a 2,000 account, so the floor is −80.
+  assert.equal(dayStanding([leg('PIDa', -90)], '2026-01-06').breached, true);
+  assert.equal(dayStanding([leg('PIDa', -70)], '2026-01-06').breached, false);
+  assert.equal(dayStanding([leg('PIDa', -40), leg('PIDb', -45)], '2026-01-06').breached, true);
+  assert.equal(dayStanding([leg('PIDa', -90)], '2026-01-06').account, 2000);
+  // The floor is the constant, not a number retyped here.
+  assert.equal(dayStanding([leg('PIDa', -DAY_LOSS * 2000)], '2026-01-06').breached, true);
+  // No rows and no size are both "cannot judge", never "fine".
+  assert.equal(dayStanding([], '2026-01-06'), null);
+  assert.equal(dayStanding([trade({ id: 'PIDa', pnl: -900, size_oz: null, open_day: '2026-01-06' })],
+    '2026-01-06'), null);
+});
+
+test('pre-sync rows are outside every population', () => {
+  // §8's first filter. A client-id row has no prices and null timestamps, and
+  // sweeping them in is how a hunt for broker-data problems fills with false
+  // positives.
+  const old = { ...trade({ id: 'abc123', pnl: 100, entry_price: 4000, exit_price: 4012 }) };
+  for (const r of checkRules([old])) {
+    assert.equal(r.verdict, 'unknown', `${r.rule} read a pre-sync row into its population`);
+  }
+});
+
+test('the render names the failures and says how much was unknown', () => {
+  const line = adherenceList(checkRules([
+    trade({ id: 'PIDa', open_day: '2026-01-06', entry_time: '2026-01-06T10:00:00Z', fill_time: '2026-01-06T10:30:00Z' }),
+    trade({ id: 'PIDb', open_day: '2026-01-06', entry_time: '2026-01-06T11:30:00Z', fill_time: '2026-01-06T12:00:00Z' }),
+  ])).split('\n').find(l => l.startsWith('R-12'));
+
+  assert.match(line, /FAIL/);
+  assert.match(line, /1 fail/);
+  // The day is named, so a finding can be checked rather than believed.
+  assert.match(line, /2026-01-06/);
+});
+
+test('every rule §7 marks journal is one this file actually evaluates', () => {
+  /* THE COPY THAT WOULD OTHERWISE BE UNCHECKABLE. §7's table is the strategy's
+     own statement of which rules a row can answer, and adherence.ts is a second
+     list of the same fact in a different file. Marking a rule `journal` in the
+     document without implementing it leaves her citing a check nobody runs;
+     implementing one the document calls `judgment` is worse, because it starts
+     reporting `pass` for something §8 says nothing stored can see. */
+  const table = [...ALWAYS.matchAll(/^\| (R-\d\d) \|.*?\| (journal|field|judgment) \|/gm)];
+  assert.ok(table.length >= 15, `read ${table.length} rules out of the table — the reader has gone blind`);
+
+  const journal = table.filter(([, , kind]) => kind === 'journal').map(([, id]) => id).sort();
+  const checked = checkRules([]).map(r => r.rule).sort();
+  assert.deepEqual(checked, journal,
+    'adherence.ts and §7 disagree about which rules a row can answer — either a ' +
+    'rule the document calls checkable is never checked, or one it calls ' +
+    'judgment is being reported as pass');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WHAT SHE CARRIES, AND WHAT SHE SAYS WHEN SOMETHING BREAKS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+test('the story carries the day it last moved, and an absent one says nothing', () => {
+  const line = thesisLine({ thesis: 'The market is still trading the December cut.', moved_on: '2026-03-12' });
+  assert.match(line, /December cut/);
+  /* THE DATE IS FORMATTED OFF A MIDDAY UTC ANCHOR, because moved_on is a stored
+     New York civil day: read back through a New York formatter, midnight UTC on
+     the 12th is the 11th there and every thesis would read a day early. */
+  assert.match(line, /12 Mar/);
+  assert.equal(thesisLine(null), '');
+});
+
+test('the open threads are split by what closes them', () => {
+  const out = loopsList([
+    { id: 4, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-12' },
+    { id: 5, kind: 'question', body: 'Which does he think is bigger?', opened_on: '2026-03-13' },
+  ]);
+  assert.match(out, /What you flagged[\s\S]*\[4\]/);
+  assert.match(out, /he has not answered[\s\S]*\[5\]/);
+  // The id is how a thread is named when it is closed, so it is part of the line.
+  assert.match(out, /\[4\]/);
+  assert.equal(loopsList([]), '');
+});
+
+test('a landed release is never described as one still to come', () => {
+  const out = calendarList([
+    { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
+      consensus: '0.3%', prior: '0.2%', actual: '0.4%', note: 'Hotter than expected.' },
+    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', importance: 'high',
+      consensus: null, prior: null, actual: null, note: null },
+  ]);
+  assert.match(out, /08:30 ET core CPI — LANDED at 0\.4%/);
+  assert.match(out, /15:00 ET FOMC minutes — due/);
+  assert.equal(calendarList([]), '');
+});
+
+test('the critic cannot destroy a briefing it was meant to check', () => {
+  const draft = 'x'.repeat(1200);
+  // A revision that came back empty, apologetic, or twice the length is a
+  // critic that failed, and the draft it was handed is better than any of them.
+  assert.equal(keepDraft(draft, ''), true);
+  assert.equal(keepDraft(draft, 'Sorry, I cannot do that.'), true);
+  assert.equal(keepDraft(draft, 'y'.repeat(2500)), true);
+  // An ordinary edit goes through.
+  assert.equal(keepDraft(draft, 'y'.repeat(1100)), false);
+});
+
+test('a tap under a briefing is read strictly or not at all', () => {
+  assert.deepEqual(parseFeedback('fb|good|2026-03-12'), { verdict: 'good', day: '2026-03-12' });
+  assert.deepEqual(parseFeedback('fb|off|2026-03-12'),  { verdict: 'off',  day: '2026-03-12' });
+  assert.equal(parseFeedback('fb|maybe|2026-03-12'), null);
+  assert.equal(parseFeedback('fb|good|yesterday'), null);
+  assert.equal(parseFeedback('nope'), null);
+  assert.equal(parseFeedback(undefined), null);
+});
+
+test('the keyboard stays inside the 64 bytes a tap may carry', () => {
+  /* THE SAME CAP GLADYS IS BUILT AROUND, and it is the entire state a tap
+     carries — no session table, no schema change on that path. A longer date
+     format or a third button label is how it would silently overrun. */
+  for (const row of feedbackKeyboard('2026-03-12').inline_keyboard) {
+    for (const b of row) {
+      assert.ok(new TextEncoder().encode(b.callback_data).length < 64,
+        `${b.callback_data} is over Telegram's 64-byte callback_data limit`);
+      assert.ok(parseFeedback(b.callback_data), `${b.callback_data} is not readable by parseFeedback`);
+    }
+  }
+});
+
+test('the clock reaches a turn whether it is a sentence or a chart', () => {
+  const now = new Date('2026-03-12T18:00:00Z');
+  assert.match(stamped('hola', now), /Right now it is/);
+
+  /* A CHART ARRIVES AS BLOCKS, and string concatenation against an array is
+     "[object Object]" attached to nothing — so the one line telling her what day
+     it is would land somewhere she cannot read it, silently, on exactly the
+     turns carrying the most context. */
+  const blocks = stamped([{ type: 'image', source: {} }], now);
+  assert.ok(Array.isArray(blocks));
+  assert.equal(blocks.length, 2);
+  assert.equal(blocks[0].type, 'image');
+  assert.match(blocks[1].text, /Right now it is/);
+});
+
+test('withClock stamps a picture turn as well as a typed one', () => {
+  const out = withClock([{ role: 'user', content: [{ type: 'image', source: {} }] }],
+                        new Date('2026-03-12T18:00:00Z'));
+  assert.ok(Array.isArray(out[0].content));
+  assert.match(out[0].content[1].text, /Right now it is/);
+});
+
+test('the apology names the job that actually died', () => {
+  /* IT USED TO SAY "No briefing" FOR ALL OF THEM. A consolidation that died at
+     22:00 reported itself as a missing briefing — sending him to look for the
+     wrong thing at the wrong time of day, and describing the failure whose
+     symptom is that her memory stops growing as the one whose symptom is a
+     message that never arrived. */
+  assert.match(apologyFor('briefing'), /No briefing/);
+  assert.match(apologyFor('consolidate'), /nightly/);
+  assert.match(apologyFor('pulse'), /second look/);
+  assert.match(apologyFor('release'), /number/);
+  // Every job says something different, or the map is not doing anything.
+  const said = Object.values(APOLOGY);
+  assert.equal(new Set(said).size, said.length, 'two jobs share an apology');
+  // An unnamed job still gets an answer rather than "undefined".
+  assert.equal(apologyFor('something new'), APOLOGY.briefing);
+});
+
+test('the audit he asks for carries everything she keeps', () => {
+  /* `/notes` IS HIS ONE WINDOW INTO ANY OF IT, and it is answered from the
+     database precisely so nothing can paraphrase or drop a row. An audit that
+     shows three of the five things it audits is the defect it exists to
+     prevent — and all of it is addressed to HIM, so nothing in it may switch
+     into the third person about him. */
+  const out = notesList(
+    [{ id: 1, note: 'stop mentioning the ten-year' }],
+    [{ id: 2, note: 'he trades the London open' }],
+    [{ channel: 'dollar', state: 'used', evidence: null, moved_on: '2026-03-12' }],
+    [{ id: 7, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-11' }],
+    { thesis: 'Still trading the December cut.', moved_on: '2026-03-12' });
+
+  assert.match(out, /What you have told me/);
+  assert.match(out, /What I have noticed/);
+  assert.match(out, /What I flagged/);
+  assert.match(out, /The story I am carrying/);
+  assert.match(out, /Where you stand on each channel/);
+  // Written to him: her own context block opens "Where he stands", and that
+  // wording reaching this message is the bug this shape exists to stop.
+  assert.ok(!/where he stands/i.test(out), 'the audit addressed to him talks about him in the third person');
+});
+
+test('the audit still works before any of the newer memory exists', () => {
+  // The two new arguments default, so a database with 003 and not 005 answers
+  // /notes rather than throwing on a read that returns nothing.
+  const out = notesList([], [{ id: 2, note: 'he trades the London open' }],
+    [{ channel: 'dollar', state: 'used', evidence: null, moved_on: null }]);
+  assert.match(out, /What I have noticed/);
+  assert.ok(!/The story I am carrying/.test(out));
+});
+
+test('the nightly pass gets a retry hour, and it is inside the same day', () => {
+  // 23:00 New York is still the day the pass is filed under, which is what makes
+  // "did tonight's pass run" a question with an answer.
+  assert.equal(consolidateRetryDue(new Date('2026-01-14T04:00:00Z')), true);   // 23:00 EST
+  assert.equal(consolidateRetryDue(new Date('2026-01-14T03:00:00Z')), false);  // 22:00 EST
+  assert.equal(consolidateRetryDue(new Date('2026-07-15T03:00:00Z')), true);   // 23:00 EDT
+});
+
+test('a night that already distilled itself does nothing at the retry hour', () => {
+  const at23 = new Date('2026-01-14T04:00:00Z');
+  assert.equal(dueNow(at23, true, false), 'consolidate', 'a failed pass gets its second chance');
+  assert.equal(dueNow(at23, true, true), null, 'a pass that ran does not run twice');
 });
