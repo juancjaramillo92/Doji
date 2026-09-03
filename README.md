@@ -1047,6 +1047,20 @@ whether a setup is valid or a level will hold, and the prompt says so in those
 words, because a picture is the most tempting place in this system to give a
 verdict on a trade.
 
+**And when it produces no words, she says which of four things happened.** They
+were one sentence: a rejected key, a wrong URL, an unsupported format and
+genuinely unclear audio all reached him as *"I could not make that out — send it
+again"*, so the one failure he cannot fix by speaking more clearly was the one he
+was being told to speak more clearly for. `VOICE_TROUBLE` is four lines, each
+naming whose problem it is, and a test asserts none of them asks him to repeat
+himself for a fault that is not his. It is the same rule `readTrades` is written
+on, one layer up: an empty answer is only an answer when something was read.
+
+The audio is sent with **both** its filename extension and its content type,
+because Telegram supplies both and the services that speak this API shape differ
+in which one they detect the format from. Sending only one is a bet on which
+provider is behind `STT_URL`.
+
 Neither is stored as sent. The transcript is kept and the image is not — a chart
 in `eugenia_turns` would be a megabyte of base64 resent as history for the next
 six exchanges. And the clock reaches a picture turn: `stamped` appends the New

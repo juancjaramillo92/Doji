@@ -2497,21 +2497,55 @@ const STT_URL   = env("STT_URL");
 const STT_KEY   = env("STT_KEY");
 const STT_MODEL = env("STT_MODEL") || "whisper-1";
 
-async function transcribe(bytes: Uint8Array, name: string): Promise<string | null> {
-  if (!STT_URL || !STT_KEY) return null;
+/* FOUR REASONS A VOICE NOTE PRODUCES NO WORDS, AND THEY ARE FOUR SENTENCES.
+
+   They were one. `transcribe` returned null for a rejected key, a wrong URL, an
+   unsupported format and genuinely unclear audio alike, so every one of them
+   reached him as "I could not make that out — send it again", and he would send
+   it again, and again. A misconfigured key is not something he can fix by
+   speaking more clearly, and telling him it is wastes his time on the only
+   failure here he is actually able to act on.
+
+   It is the same rule `readTrades` is written on, one layer up: an empty answer
+   is only an answer when something was read. Each line below says whose problem
+   it is and what to do about it, which is the whole difference. A map rather
+   than a chain of ternaries, for the reason APOLOGY and SAID are. */
+export const VOICE_TROUBLE: Record<string, string> = {
+  unconfigured: "I cannot hear voice notes yet, jefe — type it and I will answer.",
+  download:     "That voice note would not come through, jefe. Send it again?",
+  failed:       "My transcription is not answering, jefe — that is broken on my side, not something you said. Type it and I will answer.",
+  empty:        "I could not make out any words in that one, jefe. Send it again, or type it?",
+};
+
+// The reason, or the words. A string is what she heard; anything else names
+// which of the four above he is about to be told.
+type Heard = { said: string } | { trouble: keyof typeof VOICE_TROUBLE & string };
+
+async function transcribe(bytes: Uint8Array, name: string, mime: string): Promise<Heard> {
+  if (!STT_URL || !STT_KEY) return { trouble: 'unconfigured' };
   try {
     const form = new FormData();
-    form.append("file", new Blob([bytes]), name);
+    /* THE TYPE COMES FROM TELEGRAM RATHER THAN BEING LEFT OFF. It hands over
+       `audio/ogg` for a voice note and we were discarding it — and providers
+       differ in whether they read the format off the part's content type or off
+       the filename, so giving both is what makes this portable across the ones
+       that speak this shape. The extension is Telegram's own (`.oga` for a
+       voice note, whatever the file was for an audio one) rather than a
+       constant, since `msg.audio` is not always ogg. */
+    form.append("file", new Blob([bytes], { type: mime }), name);
     form.append("model", STT_MODEL);
     const res = await fetch(STT_URL, {
       method: "POST", headers: { Authorization: `Bearer ${STT_KEY}` }, body: form,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // The body on a failure, truncated: a 400 from one of these services names
+    // the actual complaint — an unsupported extension, a model that does not
+    // exist — and the status alone would send someone looking at the key.
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const said = String((await res.json())?.text ?? "").trim();
-    return said || null;
+    return said ? { said } : { trouble: 'empty' };
   } catch (err) {
     console.error("doji-eugenia: transcription failed —", err instanceof Error ? err.message : err);
-    return null;
+    return { trouble: 'failed' };
   }
 }
 
@@ -2601,16 +2635,15 @@ async function handleMessage(update: any): Promise<void> {
       // the one that looks most like nothing happening.
       await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
       const file = await tgDownload(voice.file_id);
-      const said = file ? await transcribe(file.bytes, file.path.split('/').pop() ?? "voice.ogg") : null;
-      if (!said) {
-        await say(STT_URL
-          ? "I could not make that out, jefe. Send it again or type it?"
-          : "I cannot hear voice notes yet, jefe — type it and I will answer.");
-        return;
-      }
+      const heard: Heard = file
+        ? await transcribe(file.bytes, file.path.split('/').pop() ?? "voice.oga",
+                           String(voice.mime_type ?? "audio/ogg"))
+        : { trouble: 'download' };
+
+      if ('trouble' in heard) { await say(VOICE_TROUBLE[heard.trouble]); return; }
       // Kept as his words with a marker, so a later search for what he said
       // finds it and the transcript is never passed off as something typed.
-      text = `[voice note] ${said}`;
+      text = `[voice note] ${heard.said}`;
     }
 
     /* A CHART, AND THE LINE IT MAY NOT CROSS IS IN THE PROMPT RATHER THAN HERE.

@@ -42,6 +42,7 @@ import {
   notesList, channelsList, searchList, readStrategy, dayQuery, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
+  VOICE_TROUBLE,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
@@ -2336,4 +2337,28 @@ test('a night that already distilled itself does nothing at the retry hour', () 
   const at23 = new Date('2026-01-14T04:00:00Z');
   assert.equal(dueNow(at23, true, false), 'consolidate', 'a failed pass gets its second chance');
   assert.equal(dueNow(at23, true, true), null, 'a pass that ran does not run twice');
+});
+
+test('a voice note that produced no words says WHICH of the four things went wrong', () => {
+  /* THEY WERE ONE SENTENCE, and that is the failure worth a test. A rejected
+     key, a wrong URL, an unsupported format and genuinely unclear audio all
+     reached him as "I could not make that out — send it again", so the one
+     failure he cannot fix by speaking more clearly was the one he was told to
+     try speaking more clearly for. */
+  const said = Object.values(VOICE_TROUBLE);
+  assert.equal(new Set(said).size, said.length, 'two of the four reasons share a sentence');
+  assert.equal(said.length, 4);
+
+  // Each names whose problem it is, which is the whole point of splitting them.
+  assert.match(VOICE_TROUBLE.unconfigured, /not .*yet|cannot hear/i);
+  assert.match(VOICE_TROUBLE.failed, /my side|broken/i);
+  assert.match(VOICE_TROUBLE.empty, /words/i);
+  assert.match(VOICE_TROUBLE.download, /come through|again/i);
+
+  // And none of them tells him to repeat himself for a fault that is not his.
+  assert.ok(!/send it again/i.test(VOICE_TROUBLE.failed),
+    'a transcription outage still asks him to repeat himself, which is the ' +
+    'exact conflation splitting these apart was for');
+  assert.ok(!/send it again/i.test(VOICE_TROUBLE.unconfigured),
+    'an unconfigured transcriber asks him to repeat himself');
 });

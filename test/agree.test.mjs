@@ -1631,3 +1631,46 @@ test('005 is safe to re-run, because it is the file that will grow', () => {
   }
   assert.match(SENSES_SQL, /on conflict \(id\) do nothing/, 'the thesis seed is not idempotent');
 });
+
+test('every reason a voice note fails is one the handler can actually reach', () => {
+  /* A SENTENCE NOTHING SELECTS IS A SENTENCE NOBODY READS, and the reverse is
+     worse — a key looked up in the map and not defined there renders as
+     `undefined` to him. Both halves, because either alone goes green while the
+     feature is broken in the other direction. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const block = src.match(/export const VOICE_TROUBLE: Record<string, string> = \{([\s\S]*?)\n\};/);
+  assert.ok(block, 'doji-eugenia no longer defines VOICE_TROUBLE');
+  const defined = [...block[1].matchAll(/^\s{2}(\w+):/gm)].map(m => m[1]).sort();
+  assert.ok(defined.length >= 3, `only ${defined.length} reasons read — the reader has gone blind`);
+
+  // The keys the code actually selects with, read out of the trouble literals
+  // the handler and the transcriber produce.
+  const reached = [...src.matchAll(/trouble: '(\w+)'/g)].map(m => m[1]);
+  assert.ok(reached.length >= 3, `only ${reached.length} reasons are ever selected`);
+
+  for (const key of new Set(reached)) {
+    assert.ok(defined.includes(key),
+      `the handler selects VOICE_TROUBLE['${key}'] and nothing defines it — he ` +
+      `would be sent the word "undefined"`);
+  }
+  for (const key of defined) {
+    assert.ok(reached.includes(key),
+      `VOICE_TROUBLE defines "${key}" and no path can ever produce it`);
+  }
+
+  /* AND THE FORMAT IS DECLARED BOTH WAYS. Telegram hands over `audio/ogg` and
+     the file's own extension; the services that speak this API shape differ in
+     which of the two they read the format off, so sending only one is a bet on
+     which provider is behind STT_URL. Both is the portable answer, and the
+     content type is the half that looks redundant and would be tidied away. */
+  const fn = src.match(/async function transcribe\([\s\S]*?\n\}/);
+  assert.ok(fn, 'doji-eugenia no longer has transcribe()');
+  assert.match(fn[0], /new Blob\(\[bytes\], \{ type: mime \}\)/,
+    'the audio part carries no content type, so a provider that detects format ' +
+    'from it rather than from the filename has nothing to go on');
+  assert.match(fn[0], /form\.append\("file",[\s\S]*?, name\)/,
+    'the audio part carries no filename, so a provider that detects format from ' +
+    'the extension has nothing to go on');
+});
