@@ -1404,7 +1404,7 @@ const reaches = (code, fn) => {
   return false;
 };
 
-test('the briefing, the pulse and a reply all read his notes', () => {
+test('every path that speaks to him reads his notes and the map', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -1417,11 +1417,20 @@ test('the briefing, the pulse and a reply all read his notes', () => {
     return src.slice(at, end);
   };
 
-  /* postConsolidation is the FOURTH and the worst one to lose. The other three
-     going without notes costs continuity in one message; consolidation going
-     without them means she cannot see what she already holds, so she never
-     supersedes and writes the same fact again every night. */
-  for (const fn of ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation']) {
+  /* postConsolidation is the worst one to lose. The others going without notes
+     costs continuity in one message; consolidation going without them means she
+     cannot see what she already holds, so she never supersedes and writes the
+     same fact again every night.
+
+     postRelease JOINED THE LIST WHEN THE PRINT LOOK WAS ASKED TO TEACH. Its
+     prompt now tells her to build a mechanism he has never had built before
+     saying what a number changed — and which those are is exactly what the map
+     holds. Asking it to teach from a ladder it is not handed is the same shape
+     the nightly pass was already fixed for: an instruction that outruns its
+     inputs, and one that fails by teaching the wrong thing well rather than by
+     failing at all. */
+  for (const fn of ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
+                    'postRelease']) {
     // Comments stripped, because the identifier appearing in prose about the
     // call is not the call. And `await` required: notesBlock is async, so an
     // un-awaited one interpolates "[object Promise]" into the prompt — which
