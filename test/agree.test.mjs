@@ -35,7 +35,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard }
+import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE } from '../supabase/functions/doji-eugenia/prompt.ts';
 
@@ -44,6 +44,7 @@ const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.met
 const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
 const SENSES_SQL = readFileSync(new URL('../supabase/005_eugenia_senses.sql', import.meta.url), 'utf8');
 const CRON_SQL = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8');
+const SEMANTIC_SQL = readFileSync(new URL('../supabase/007_semantic.sql', import.meta.url), 'utf8');
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 const EUGENIA_PROMPT = readFileSync(
@@ -650,19 +651,23 @@ const guardClause = (text) => {
    downstream failure hours later — so an exemption from it has to be a decision
    somebody wrote down, not the absence of one.
 
-   Speech-to-text is the only one. The Messages API takes text and images and not
-   audio, and Telegram does not transcribe for bots, so hearing a voice note
-   needs a service this system otherwise has no use for. Unset, she says she
-   cannot hear it and every other path is untouched — which is a different kind
-   of thing entirely from EUGENIA_BOT_TOKEN being unset, where nothing works and
-   the right answer is to refuse every request.
+   Two, and both are external vendors this system otherwise has no use for.
+   Speech-to-text: the Messages API takes text and images and not audio, and
+   Telegram does not transcribe for bots, so hearing a voice note needs one.
+   Embeddings: Anthropic serves none, and semantic search is a widening of a
+   reach that already works without it — unset, the search is full text and
+   trigram, which is what it was.
+
+   BOTH ARE A DIFFERENT KIND OF THING FROM EUGENIA_BOT_TOKEN being unset, where
+   nothing works at all and the right answer is to refuse every request. Here
+   one capability is absent and every other path is untouched.
 
    THE EXEMPTION IS NOT FREE. Each one has to be guarded where it is USED, so
    "optional" means a branch that handles its absence rather than a value that
    reaches a fetch as an empty string. That check is below, and it is the half
    that stops this list becoming somewhere to hide a secret that is actually
    required. */
-const OPTIONAL = new Set(['STT_URL', 'STT_KEY']);
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY']);
 
 test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {
@@ -1761,6 +1766,113 @@ test('005 is safe to re-run, because it is the file that will grow', () => {
     }
   }
   assert.match(SENSES_SQL, /on conflict \(id\) do nothing/, 'the thesis seed is not idempotent');
+});
+
+/* ─── Semantic search, and the three ways it fails without saying so ─────────
+   Nothing in this repository can reach a database or an embedding vendor, so
+   what a vector actually RETRIEVES is not knowable from here — that shows up in
+   use and nowhere else. What is knowable is the shape around it, and every one
+   of these failures is silent by construction: the search keeps answering, and
+   answers worse.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the width the vendor is asked for is the width the column accepts', () => {
+  // A disagreement is a 400 on every write — every note, every turn, forever —
+  // and the only place it would surface is a console nobody reads.
+  const declared = SEMANTIC_SQL.match(/add column if not exists embedding vector\((\d+)\)/g);
+  assert.ok(declared?.length === 2,
+    `${declared?.length ?? 0} embedding columns declared in 007 — notes and turns both need one`);
+  for (const line of declared) {
+    assert.equal(Number(line.match(/vector\((\d+)\)/)[1]), EMBED_DIMS,
+      'doji-eugenia asks the vendor for a different width than the column takes');
+  }
+  // And the cast inside the search has to agree with both, or every query with
+  // a vector throws inside the function and she reports she cannot search.
+  assert.match(SEMANTIC_SQL, new RegExp(`qv::vector\\(${EMBED_DIMS}\\)`),
+    'the search casts the query vector to a width neither the column nor the ' +
+    'request uses');
+});
+
+test('the lexical arm survives, because a null embedding vanishes silently', () => {
+  /* THE FLOOR UNDER THE SEMANTIC ARM. Every row written before 007 has a null
+     embedding, and so does any row whose vendor call failed — none of them
+     appears in a nearest-neighbour query, with no error and no log. Replacing
+     the lexical arm with the vector one rather than fusing them would make half
+     an archive unsearchable and look like a search that simply found nothing. */
+  const fn = SEMANTIC_SQL.slice(SEMANTIC_SQL.indexOf('create function public.eugenia_search'));
+  assert.match(fn, /websearch_to_tsquery/, 'the full-text arm is gone from the search');
+  assert.match(fn, /word_similarity\(q,/, 'the trigram arm is gone from the search');
+  assert.match(fn, /<%/, 'the trigram operator is gone, so its index is unused');
+
+  // BOTH null guards, and each stops a different thing. Without the first a row
+  // with no vector is ordered by a distance it does not have; without the
+  // second every distance is null on an unset key, `order by null` returns
+  // whatever the scan reaches first, and arbitrary rows enter the fusion.
+  const arms = [...fn.matchAll(/where \w\.embedding is not null and \(select vec from ask\) is not null/g)];
+  assert.equal(arms.length, 2,
+    'a semantic arm no longer guards on both nulls — with no key it would feed ' +
+    'arbitrary rows into the ranking rather than none');
+
+  // And each arm is ranked where the distance is still in scope. A CTE's own
+  // order is not carried out of it, so numbering the rows anywhere else is the
+  // ranking replaced by whatever order the scan produced.
+  assert.equal([...fn.matchAll(/row_number\(\) over \(order by dist\)/g)].length, 2,
+    'a semantic arm is numbered by something other than its distance');
+});
+
+test('the search that is dropped is granted again in the same file', () => {
+  /* 005 REPLACES THIS FUNCTION IN PLACE PRECISELY SO ITS GRANTS SURVIVE, and
+     007 cannot: the query vector is a new argument, and `create or replace`
+     cannot change an argument list. So the drop is deliberate — and a drop
+     takes the grants with it, while a bare `create function` carries EXECUTE to
+     PUBLIC, which `anon` inherits. Forgetting these two lines is a public
+     entry point to her memory with only RLS behind it. */
+  const at = SEMANTIC_SQL.indexOf('create function public.eugenia_search');
+  assert.ok(at > -1, '007 no longer creates eugenia_search');
+  /* THE `> -1` IS THE HALF THAT MAKES THIS A CHECK. Written as a bare position
+     comparison it passed with the drop deleted outright — indexOf answers -1,
+     which is duly less than everything, and the assertion that exists to catch
+     a missing statement was satisfied by its absence. */
+  const dropped = SEMANTIC_SQL.indexOf('drop function if exists public.eugenia_search(text, int)');
+  assert.ok(dropped > -1 && dropped < at,
+    'the old two-argument search is not dropped before the new one is created — ' +
+    'the two are an overload, and a two-argument call matches both, which ' +
+    'Postgres refuses as ambiguous');
+
+  const after = SEMANTIC_SQL.slice(at);
+  assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from public/,
+    '007 creates the search and leaves EXECUTE granted to PUBLIC');
+  assert.match(after, /grant execute on function public\.eugenia_search\(text, int, text\) to service_role/,
+    '007 revokes the search from PUBLIC and never grants it to the one caller ' +
+    'that needs it — every search would come back 403');
+});
+
+test('007 is safe to re-run, and the sweep names columns that exist', () => {
+  for (const line of SEMANTIC_SQL.split('\n')) {
+    if (/^create (table|index|extension) (?!if not exists)/.test(line)) {
+      assert.fail(`007 has a bare "${line.split(' ')[1]}": ${line.trim()}`);
+    }
+  }
+  // The function is create-not-replace, which is only re-runnable because the
+  // drop above it is unconditional.
+  assert.match(SEMANTIC_SQL, /drop function if exists public\.eugenia_search\(text, int, text\)/,
+    '007 creates the three-argument search without dropping it first, so a ' +
+    'second run refuses');
+
+  /* AND THE BACKFILL'S TABLE AND COLUMN ARE A PAIR THAT HAS TO BE REAL. It
+     builds its URL from arguments, so the reader that checks every
+     `rest/v1/eugenia_*` cannot see these two — a mistyped column here is a 400
+     on a maintenance door nobody runs twice. */
+  const calls = [...EUGENIA_TS.matchAll(/fillEmbeddings\('(\w+)', '(\w+)'\)/g)]
+    .map(m => `${m[1]}.${m[2]}`);
+  assert.ok(calls.length >= 4, `only ${calls.length} sweep call sites — the door and the nightly pass both call it`);
+  for (const pair of new Set(calls)) {
+    const [table, column] = pair.split('.');
+    assert.match(EUGENIA_SQL, new RegExp(`create table[^;]*?public\\.${table}[^;]*?\\n\\s+${column}\\s`),
+      `the sweep reads ${table}.${column} and 003 creates no such column`);
+    assert.match(SEMANTIC_SQL, new RegExp(`alter table public\\.${table} add column if not exists embedding`),
+      `the sweep fills ${table}.embedding and 007 never adds it`);
+  }
 });
 
 test('every reason a voice note fails is one the handler can actually reach', () => {

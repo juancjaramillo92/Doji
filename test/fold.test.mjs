@@ -44,6 +44,7 @@ import {
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
+  foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -2608,4 +2609,63 @@ test('a fall is a move, and it is reported as one', () => {
   const out = moveWorth(QUOTE, { ...MARK, bid: QUOTE.bid + 15 }, LOOKED);
   assert.equal(out.worth, true);
   assert.equal(out.move, -15);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE VENDOR'S ANSWER, FOLDED
+   ───────────────────────────────────────────────────────────────────────────
+   The embedding call is the one place in this system where a wrong answer is
+   completely undetectable afterwards. A vector filed against the wrong row does
+   not error, does not log, and does not look wrong in the table — it surfaces
+   only as a memory that returns the wrong text for the right question, months
+   later, as her seeming to misremember.
+
+   So the ordering, the count and the width are decided in a pure function and
+   driven from here, rather than proved by stubbing a vendor to return the order
+   the test wanted.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const vec = (fill) => Array(EMBED_DIMS).fill(fill);
+
+test('the vectors come back in the order they were asked for', () => {
+  /* THE RESPONSE CARRIES THE POSITION OF THE INPUT IT ANSWERS, and taking the
+     array as it arrives is the bug that cannot be found later: turn A gets
+     turn B's meaning and both rows look perfectly healthy. */
+  const out = foldVectors([
+    { index: 1, embedding: vec(0.2) },
+    { index: 0, embedding: vec(0.1) },
+  ], 2);
+  assert.equal(out[0], `[${vec(0.1).join(',')}]`);
+  assert.equal(out[1], `[${vec(0.2).join(',')}]`);
+});
+
+test('a vector is pgvector text, not a JSON array', () => {
+  // The same string goes into the column and into the query, and this is the
+  // form that crosses a JSON body into a `vector` without depending on a cast
+  // from json existing.
+  const [only] = foldVectors([{ index: 0, embedding: vec(0.5) }], 1);
+  assert.ok(only.startsWith('[') && only.endsWith(']'));
+  assert.equal(only.split(',').length, EMBED_DIMS);
+});
+
+test('a batch that comes back wrong is refused whole', () => {
+  /* ALL OR NOTHING, because a short answer gives no way to tell WHICH row lost
+     its vector. Writing the ones that arrived would silently pair the tail of
+     the batch with the wrong rows — the same undetectable failure as the
+     ordering, arrived at from the other direction. */
+  assert.equal(foldVectors([{ index: 0, embedding: vec(0.1) }], 2), null,
+    'a batch one vector short was accepted');
+  assert.equal(foldVectors([{ index: 0, embedding: vec(0.1) },
+                            { index: 1, embedding: vec(0.2) }], 1), null,
+    'a batch with a vector too many was accepted');
+  assert.equal(foldVectors([{ index: 0, embedding: [0.1, 0.2] }], 1), null,
+    'a vector of the wrong width was accepted — every insert would be a 400');
+  assert.equal(foldVectors([{ index: 0, embedding: 'not a vector' }], 1), null);
+  assert.equal(foldVectors([{ index: 0 }], 1), null);
+  assert.equal(foldVectors(undefined, 1), null);
+  assert.equal(foldVectors([], 1), null);
+});
+
+test('an empty ask is answered empty rather than refused', () => {
+  // Nothing was asked for and nothing came back, which is agreement.
+  assert.deepEqual(foldVectors([], 0), []);
 });

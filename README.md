@@ -50,6 +50,7 @@ supabase/003_eugenia.sql                Eugenia's tables, her view of the journa
 supabase/004_cron.sql                   every scheduled job
 supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her senses
 supabase/006_plan.sql                   where a trade was aimed, off the open position
+supabase/007_semantic.sql               her memory searchable by meaning
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -324,6 +325,7 @@ be single-sourced at run time:
 | the **`eugenia_trades` column list** | the numbered SQL files — `003_eugenia.sql` creates it and `006_plan.sql` appends the plan, so the last definition is the one the database ends up with — the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — and §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
 | each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers |
+| the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search — a disagreement is a 400 on every write, reported to a console nobody reads |
 | the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
 | the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
@@ -1309,10 +1311,11 @@ The failure is silent, and the prompt makes it worse by telling her an empty
 result is trustworthy: *if the search comes back empty, that is an answer worth
 trusting*. A lexical miss becomes a confident *"I have no record of that."*
 
-`pg_trgm` is the half that needs no new vendor — no embedding provider, no second
-AI key, no per-write cost, nothing to backfill. It is **not** semantic search and
-this does not claim it is; it is the reach that was missing, bought with an
-extension that ships with the database.
+`pg_trgm` is the half that needs no new vendor — no embedding provider, no per-write
+cost, nothing to backfill — and it is what catches a rephrasing, a typo or a
+half-remembered quote. It is not what catches a different *idea*, and for a while
+this said so and stopped there. The semantic arm below is that half, and the
+trigram one did not move to make room for it.
 
 `word_similarity`, never `similarity`, and the difference is total here.
 `similarity()` normalises over the union of both trigram sets, so a six-word
@@ -1325,9 +1328,62 @@ Ranked in two keys rather than one fused score. `ts_rank` lands around 0.0–0.1
 and `word_similarity` spans 0–1, so adding or maxing them needs a scale factor
 invented to make the arithmetic come out — a fudge that decides rankings while
 looking like a formula. Instead an exact word match outranks a near one, and
-within each group the stronger score wins. The return type is unchanged, because
-`create or replace function` may not alter one and widening it would need a
-`drop` that takes the grants with it.
+within each group the stronger score wins. That is still the order *inside* the
+lexical arm, and it is what the fusion below sees.
+
+### Search that survives a different idea
+
+The example above is the one trigram cannot reach. *"What did we conclude about
+the December cut"* and *"the market has mostly given up on easing this year"*
+share no substrings at all, so full text finds nothing, trigram finds nothing,
+and the answer she gives is that you never discussed it.
+
+`007_semantic.sql` adds an `embedding` column to both tables and a second arm to
+the same function. **It is not a sixth memory.** Her memories are lifetimes;
+this is the *reach* into two of them, and the windows do not move — twelve turns
+and twenty notes, because every token in a window is paid on every request.
+Everything a vector finds was already in the table.
+
+**The lexical arm stays, and that is the load-bearing decision.** Two reasons,
+both of which bite. A vector is worse than trigram at exact terms — a date, a
+ticker, `R-08`, a note id — where the thing being asked for *is* the string. And
+a row whose embedding is null does not appear in a nearest-neighbour query at
+all: no error, no log, half an archive quietly unsearchable. The lexical arm is
+full coverage over both tables and cannot have that failure, so it is the floor
+under the semantic one rather than a fallback beside it.
+
+**Reciprocal rank fusion, not a weighted sum**, and for the reason the two keys
+above exist: `ts_rank` and cosine distance are on unrelated scales, so any
+weighting of them is a constant somebody guessed. RRF compares only *positions*,
+needs no calibration, and makes a row found by both arms outrank one that is
+merely first in either.
+
+**Unset is a first-class state, so this shipped before the key existed.** With no
+`EMBED_KEY` every write stores its row without a vector, the query vector is
+null, both semantic arms return nothing, and the fusion over one arm reproduces
+exactly the ordering above. Turning it on is a secret and a backfill, not a
+deploy.
+
+**The embedding model is pinned in the file, not read from the environment**, and
+that is the whole difference between it and `STT_MODEL`. A transcription model
+chosen in a dashboard changes one answer. An embedding model chosen there changes
+what is *comparable to what* — vectors from two models are not comparable, the
+column type catches a change of width and cannot catch a change at the same
+width, and the ranking degrades into noise with nothing anywhere reporting it.
+Changing it is a code change, and it means re-embedding both tables.
+
+**The function is dropped and recreated, which this repository otherwise avoids.**
+The query vector is a new argument and `create or replace function` cannot change
+an argument list — creating the three-argument form beside the two-argument one
+makes an *overload*, so a two-argument call matches both and Postgres refuses it
+as ambiguous. A drop takes the grants with it and a bare `create function` carries
+`EXECUTE` to `PUBLIC`, which `anon` inherits, so the `revoke` and `grant` are part
+of the statement rather than a follow-up.
+
+**What cannot be checked from here is the part that matters most.** Nothing in
+the repository reaches a database or the vendor, so the ordering, the coverage
+floor, the widths and the grants are all held by tests and the *retrieval
+quality* is not. That shows up in use and nowhere else.
 
 ### Where he stands on each channel
 
@@ -1465,9 +1521,9 @@ only things she can do to that table are add a sentence and retire one.
 **She can search everything she has ever said.** The twelve turns and twenty
 notes she is handed are the newest slice of two append-only tables; everything
 older was still there and simply never selected. `search_memory` reaches it —
-one RPC, `eugenia_search`, ranking notes and turns together with Postgres full
-text so a question like *"what did we conclude about the December cut"* is
-answerable from March.
+one RPC, `eugenia_search`, ranking notes and turns together by words and by
+meaning so a question like *"what did we conclude about the December cut"* is
+answerable from March even when nobody used those words.
 
 **Searched, not loaded, and that is the design rather than a limitation.**
 Widening the windows would put the archive in her context, where every token is
@@ -1810,7 +1866,9 @@ are never delivered, the button spins, and nothing reports it.
 
 **`STT_URL` and `STT_KEY` are optional** and only enable voice notes. Unset, she
 says she cannot hear them and everything else is unaffected — which is why they
-are deliberately not in the boot guard.
+are deliberately not in the boot guard, and why an exemption from it has to be
+guarded where the secret is *used*: `EMBED_KEY` is the second, and a test holds
+both to that.
 
 ```sh
 supabase secrets set STT_URL=https://<provider>/v1/audio/transcriptions
@@ -1840,6 +1898,43 @@ that function exists and they are written by the time this runs — so the fills
 keep landing and `planned` comes back `0` in the response on every run. That
 figure is the check: a run with an open position and `planned: 0` means this file
 has not been applied.
+
+### Applying 007, and the one call you have to repeat
+
+`007_semantic.sql` adds `pgvector`, an `embedding` column and an HNSW index to
+each of her two memories, and replaces `eugenia_search` with the two-armed
+version. **Safe to re-run**: the alters and indexes are `if not exists`, and the
+function is dropped before it is created rather than replaced in place — which
+it cannot be, since the query vector is a new argument.
+
+**It changes nothing until `EMBED_KEY` is set.** Unset, every write stores its
+row without a vector and the search runs exactly as it did.
+
+```sh
+supabase secrets set EMBED_KEY=<key>
+supabase secrets set EMBED_URL=https://api.openai.com/v1/embeddings   # optional, this is the default
+```
+
+**Then backfill, and keep calling until it says zero.** Every row written before
+this ran has a null embedding, which is invisible from the outside — the row is
+there, the search still answers, and that row simply never comes back from the
+semantic arm.
+
+```sh
+curl -s "https://<project>.supabase.co/functions/v1/doji-eugenia?embed=1" \
+     -H "x-doji-key: $DOJI_CRON_SECRET"
+```
+
+Each call fills fifty rows per table and answers `{"notes":{"filled":…,"left":…},
+"turns":{…}}`. No cron job calls it: the archive is a one-off, and the trickle a
+failed vendor call leaves behind is swept by the nightly pass, which already runs
+and already reads the day. A schedule of its own would be a job doing nothing
+every hour for the one night a year it had something to do.
+
+`verify.sql` ends with the count that matters — how many rows in each table are
+still without an embedding. It should fall to zero and stay there. A number that
+climbs day after day means the key is unset or the vendor is refusing, and
+nothing else anywhere will say so.
 
 ### Programmatic tool calls need their container
 
@@ -2217,7 +2312,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `006_plan.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `007_semantic.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -2228,7 +2323,7 @@ it from here.
 the claim gets tested.** It writes nothing: it reads back the columns, the
 constraints, the indexes, the policies, the grants on Eugenia's view, the
 triggers, the realtime publication, all three cron jobs and the last ten function
-responses, to be compared against 001–006 by eye. Run it after any manual change
+responses, to be compared against 001–007 by eye. Run it after any manual change
 and before believing anything here about the database. A CI job cannot stand in
 for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
 plain Postgres container has, so a green pipeline would prove only that 001
@@ -2481,10 +2576,11 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
     rather than a subscription. **Set a spend cap on that key**: it is the only
     place a bound on what she can cost is actually enforceable.
 12. Run `supabase/003_eugenia.sql`, then `supabase/004_cron.sql`, then
-    `supabase/005_eugenia_senses.sql` and `supabase/006_plan.sql`. The hourly
-    job drives both the briefing and the pulse; the function decides which, or
-    neither. 005 and 006 are the two that are safe to re-run in full.
-13. Run `supabase/verify.sql` and read it against 001–006. Nothing is set up
+    `supabase/005_eugenia_senses.sql`, `supabase/006_plan.sql` and
+    `supabase/007_semantic.sql`. The hourly job drives both the briefing and the
+    pulse; the function decides which, or neither. 005, 006 and 007 are the
+    three that are safe to re-run in full.
+13. Run `supabase/verify.sql` and read it against 001–007. Nothing is set up
     until that agrees.
 
 ---
