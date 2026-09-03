@@ -1504,7 +1504,8 @@ before producing any number, not after being asked to justify one.
 
 **Broker-owned and served to you** — written by the poller and the email parser,
 never by the app: \`direction\` · \`entry_time\` · \`fill_time\` · \`entry_price\` ·
-\`exit_price\` · \`size_oz\` · \`open_day\` · \`pnl\` · \`net_pnl\`.
+\`exit_price\` · \`size_oz\` · \`open_day\` · \`pnl\` · \`net_pnl\` · \`planned_sl\` ·
+\`planned_tp\`.
 
 **Journal-owned** — written by the app alone: \`setup\` · \`followed_rules\` ·
 \`followed_sl\` · \`followed_tp\`.
@@ -1557,14 +1558,33 @@ Filter for it rather than assuming it.
 **Maximum favourable excursion.** How far a trade travelled before it turned. Not
 stored, not available from the broker — which is what makes R-04 a probe.
 
-**The plan.** Where the stop and target were set at entry. A stop moved to
-break-even has overwritten the original everywhere. Four questions are unanswerable
-for that reason: R-03's full-stop population, R-02's respect half, whether step 4
-was satisfied on a $25 entry, and whether a win at $25 was a shortened target or an
-early close.
+**The plan — no longer entirely absent, and the change is narrow.** This section
+said it was unrecoverable, and that was right about a CLOSED position: a stop moved
+to break-even has overwritten the original in everything the broker reports
+afterwards. Nobody had asked about an OPEN one. The broker serves \`stopLoss\` and
+\`takeProfit\` on a live position, and the poller runs every two minutes, so it now
+records both the first time it sees a position — \`planned_sl\` and \`planned_tp\`.
 
-Not a gap waiting on a schema change. Journalling a plan was tried and retired (§13,
-v1.8), and widening what Gladys asks was declined (§10).
+**AS FIRST SEEN, NEVER AS SET, and say it that way.** Up to two minutes separate the
+entry from the poll that caught it. For R-04, which moves a stop only after +$20,
+that gap is immaterial; for a stop moved inside two minutes it is wrong, and nothing
+can tell those apart.
+
+**It looks forward only.** Every trade that closed before the column existed carries
+null and always will, so the sample is small and grows one trade at a time. A rate
+computed over it is a rate over the trades since — never over his record.
+
+**What it makes computable:** the reward-to-risk the trade was AIMED at, which is
+step 4 of R-08 — \`(planned_tp − entry) ÷ (entry − planned_sl)\` on a buy, inverted on
+a sell. That is a number rather than a probe, on any row carrying both.
+
+**What it does NOT settle.** R-02's respect half stays open: an exit past the planned
+stop is a widened stop or ordinary slippage on a gap, and the row cannot tell those
+apart — so no rule verdict is computed from it. R-03's full-stop population, and
+whether a win at $25 was a shortened target or an early close, are unchanged.
+
+The Evaluable column in §7 is therefore unchanged too. A rule is \`journal\` when a
+row can answer it, and today almost no row carries this.
 
 **Whether a second entry was a sweep re-entry.** R-12 permits two when the second
 follows a sweep. The fifteen-minute window makes a late second entry checkable; a
@@ -1843,7 +1863,10 @@ routes are open.
 
 **Journalling the plan: tried and retired.** \`planned_stop\` and \`planned_target\`
 existed from v1.4 to v1.8 and were dropped — columns, app fields, view. He journals a
-trade, not a plan. The cost is in §8 and is real.
+trade, not a plan. That door is still shut: \`planned_sl\` and \`planned_tp\` are not
+those columns returning, they are the broker's own record of a live position and he
+types neither. The cost is in §8, smaller since the poller began taking that record
+and still whole for every trade that closed before it.
 
 **Widening what Gladys asks: declined.** Four rules would each become checkable with
 one tap at journalling time. Recorded because the analysis is sound and a future

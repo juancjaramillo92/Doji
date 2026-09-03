@@ -105,15 +105,34 @@ const viewColumns = (text, where) => {
    only the one at the top. The second is the copy that runs immediately after a
    `drop view`, so a stale column list there rebuilds the wrong view on a
    database that has just lost the right one, which is the worst moment for it. */
-// The one view 003 creates, which every other copy of the list is read against.
-const served003 = () => viewColumns(EUGENIA_SQL, '003_eugenia.sql')[0];
+/* THE LAST DEFINITION APPLIED IS THE ONE THE DATABASE HOLDS, and there is more
+   than one now. 003 creates the view; 006 replaces it to append the plan. A
+   reader — or a test — anchored on 003 would be describing a view that has not
+   existed since 006 ran, which is the same class of wrongness this whole file
+   exists to catch.
 
-test('every eugenia_trades view the README states is the one 003 creates', () => {
+   So the numbered files are read in order and the LAST statement wins, exactly
+   as Postgres resolves it. Nothing needs editing here when a future file
+   appends another column; the file simply joins the list. */
+// Read from the directory rather than from TRACKED, which is defined further
+// down this file — nothing may reference anything below it at load time.
+const NUMBERED = readdirSync(new URL('../supabase', import.meta.url))
+  .filter(f => /^\d{3}_.*\.sql$/.test(f))
+  .sort()
+  .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8'))
+  .join('\n');
+
+const servedView = () => {
+  const all = viewColumns(NUMBERED, 'the numbered SQL files');
+  return all[all.length - 1];
+};
+
+test('every eugenia_trades view the README states is the one the SQL ends with', () => {
   const README = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   for (const cols of viewColumns(README, 'README.md')) {
-    assert.deepEqual(cols, served003(),
-      'the README quotes a view with a different column list than 003_eugenia.sql creates — ' +
-      'following the README would build the wrong view');
+    assert.deepEqual(cols, servedView(),
+      'the README quotes a view with a different column list than the numbered SQL ' +
+      'ends up with — following the README would build the wrong view');
   }
 });
 
@@ -147,7 +166,7 @@ test('§8 inventories exactly the columns the view serves', () => {
 
   assert.deepEqual(
     [...served, ...owned, 'id'].sort(),
-    served003().sort(),
+    servedView().sort(),
     'the section she reads before producing any number inventories a different ' +
     'row than the view hands her — either she reasons about a column that is ' +
     'not there, or one she has is invisible to her');
@@ -157,7 +176,7 @@ test('§8 inventories exactly the columns the view serves', () => {
      costs are already in the P&L, that balance is the wrong denominator, that
      the unsettled figure is not reachable by name. Serving one silently turns
      its paragraph into a wrong fact about her own document. */
-  const cols = served003();
+  const cols = servedView();
   // Scoped to the block that explains them. `balance` and `computed_pnl` are
   // named all over §8 for other reasons, so searching the section rather than
   // the block is a check that cannot fail — it passed with the whole paragraph
@@ -173,7 +192,7 @@ test('§8 inventories exactly the columns the view serves', () => {
 });
 
 test('the view exposes what the strategy computes from, and still hides the rest', () => {
-  const cols = served003();
+  const cols = servedView();
   // Without this she can read every trade and never its size, so account tier
   // and per-trade risk stay underivable however the prompt is written.
   assert.ok(cols.includes('size_oz'), 'Eugenia cannot see position size');
@@ -1805,6 +1824,40 @@ test('every tool the poller may call is one it actually calls or probes', () => 
   for (const t of allowed) {
     assert.match(src, new RegExp(`(mcpPost|mcpCall)\\(sid, "${t}"`),
       `ALLOWED_TOOLS permits ${t} and nothing in the file ever calls it`);
+  }
+});
+
+/* ─── The two columns with two claimants are settled inside the UPDATE ───────
+   `balance` and the plan are the only columns here two writers both reach for,
+   and both are arbitrated the same way: a filter in the URL, evaluated by
+   Postgres inside the UPDATE, so there is no read to lose a race with.
+
+   Losing either filter is silent in the way that matters. The poller re-reads
+   every open position for the life of the position, and R-04 moves the stop to
+   break-even partway through — so an unfiltered write files the break-even stop
+   as the plan, and the plan is then the thing it exists to be compared against.
+   The number is present, plausible and wrong. `balance` fails the same way
+   against the figure the broker printed on the fill.
+
+   Read out of each function body rather than out of the file: both filters are
+   one clause in one template literal, and a whole-file match for `is.null` is
+   answered by the other function's copy. */
+
+test('the two columns with two claimants are filtered inside the UPDATE', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+  for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', 'planned_sl']]) {
+    const at = src.indexOf(`function ${fn}(`);
+    assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
+    const body = src.slice(at, src.indexOf('\n}', at));
+
+    assert.match(body, new RegExp(`${col}=is\\.null`),
+      `${fn} writes with no ${col}=is.null filter, so it writes on every poll — ` +
+      `the last sighting wins a column where the first one is the whole point`);
+    assert.match(body, /method: "PATCH"/,
+      `${fn} no longer PATCHes, and an upsert under merge-duplicates sets every ` +
+      `key it is handed — the filter in the URL would not be consulted at all`);
   }
 });
 

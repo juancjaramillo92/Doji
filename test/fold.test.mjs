@@ -32,7 +32,7 @@ import { secretMatches, nyClock, nyDate } from '../supabase/functions/_shared/ed
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget, parseSse, marketOpen,
-  fromPipettes, foldSpot, PIPETTES,
+  fromPipettes, foldSpot, PIPETTES, openPlans,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -2456,4 +2456,47 @@ test('a live position carries its plan, and NOT in pipettes', () => {
   // The units the poller already knows are unchanged by any of this.
   assert.equal(ozFromVolume(position.volume), 4);
   assert.equal(usdFromCents(position.commission), -0.14);
+});
+
+/* ─── The plan, off the open position ───────────────────────────────────────
+   §8 said this was unrecoverable, and it was — of a CLOSED position. The
+   capture below is the live one that showed otherwise, unchanged.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('an open position yields its plan, keyed the way the poller files it', () => {
+  const plans = openPlans([{
+    positionId: 586244103, symbolId: 41, tradeSide: 'BUY', volume: 400,
+    entryPrice: 4402.71, stopLoss: 4403.24, takeProfit: 4432.1,
+    commission: -14, swap: 0,
+  }]);
+
+  assert.equal(plans.length, 1);
+  // The same id foldPosition writes, or the PATCH matches nothing and reports
+  // success — a plan silently filed against no row at all.
+  assert.equal(plans[0].id, 'PID586244103');
+  // Display prices, untouched. fromPipettes here would file the stop at four
+  // hundredths of a cent, which is the trap the two-scale probe found.
+  assert.equal(plans[0].planned_sl, 4403.24);
+  assert.equal(plans[0].planned_tp, 4432.1);
+});
+
+test('half a plan is no plan, and a bad id is dropped', () => {
+  /* HALF-WRITTEN IS WORSE THAN ABSENT: the reward-to-risk needs both sides, and
+     a row carrying one would look answerable and produce a division by a
+     missing number. A position with no stop set is a real state — it is what
+     R-02 exists about — and it is recorded as nothing rather than as half. */
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 4403.24 }]), []);
+  assert.deepEqual(openPlans([{ positionId: 1, takeProfit: 4432.1 }]), []);
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 4432.1 }]), []);
+  assert.deepEqual(openPlans([{ stopLoss: 4403.24, takeProfit: 4432.1 }]), []);
+  assert.deepEqual(openPlans([]), []);
+  assert.deepEqual(openPlans(undefined), []);
+});
+
+test('every open position with a plan is filed, not just the first', () => {
+  const plans = openPlans([
+    { positionId: 1, stopLoss: 4400, takeProfit: 4430 },
+    { positionId: 2, stopLoss: 4200, takeProfit: 4230 },
+  ]);
+  assert.deepEqual(plans.map(p => p.id), ['PID1', 'PID2']);
 });

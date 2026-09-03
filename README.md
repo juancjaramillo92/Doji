@@ -49,6 +49,7 @@ supabase/002_gladys.sql                 Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
 supabase/004_cron.sql                   every scheduled job
 supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her senses
+supabase/006_plan.sql                   where a trade was aimed, off the open position
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -145,6 +146,7 @@ Written by the poller and the email parser. **The app never writes these.**
 | `fill_time` | closing instant, email only — the `open_day` fallback |
 | `entry_price`, `exit_price` | volume-weighted where the fill was scaled |
 | `size_oz` | position size in **ounces**, as opened — poller only |
+| `planned_sl`, `planned_tp` | the stop and target as **first seen** on the open position — poller only |
 | `open_day` | the New York civil day the trade is filed under |
 | `commission` | dollars, positive magnitude, **never subtracted** |
 | `balance` | account balance after the fill — from the email, or from the poller on a close under ten minutes old |
@@ -192,6 +194,29 @@ design — the secret in Google's infrastructure opens five columns, not the
 account — for coverage of trades the poller never reached. So a position it
 never saw carries no size, permanently, and anything reading sizes has to
 tolerate a null rather than assume one.
+
+**`planned_sl` and `planned_tp` are the plan, and it is only readable while the
+position is open.** A closed position reports its *final* stop, so one moved to
+break-even under R-04 has overwritten the original in everything the broker
+serves afterwards — which is why §8 of the strategy called the plan
+unrecoverable, and it is right about every closed trade. A live position is a
+different question: `get_positions` carries `stopLoss` and `takeProfit`, and the
+poller runs every two minutes, so it sees almost every position while it is
+still open.
+
+**Written once, and the filter in the URL is the whole of it.** `where planned_sl
+is null` inside the UPDATE, the same arbitration `balance` uses and for the same
+reason: the poller re-reads every open position on every run, and any write after
+the first would file the break-even stop as the plan — the thing the plan exists
+to be compared against.
+
+**As first seen, never as set.** Up to two minutes separate the entry from the
+poll that catches it. For R-04, which moves a stop only after +$20, that gap is
+immaterial; a stop moved inside the first two minutes would be recorded wrong and
+nothing here can tell that case apart. And it only ever looks forward — every
+trade that closed before these columns existed carries null for good, which is why
+§7's `Evaluable` column is unchanged: a rule is `journal` when a row can answer
+it, and today almost no row can.
 
 `commission` is recorded and never displayed. The P&L this app stores is already
 net of it — `net_pnl` includes costs and swap, `computed_pnl` is derived from
@@ -296,7 +321,7 @@ be single-sourced at run time:
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and §0's table of what to do at each one |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
-| the **`eugenia_trades` column list** | `003_eugenia.sql`, the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — and §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
+| the **`eugenia_trades` column list** | the numbered SQL files — `003_eugenia.sql` creates it and `006_plan.sql` appends the plan, so the last definition is the one the database ends up with — the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — and §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
 | the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
@@ -1737,6 +1762,23 @@ supabase secrets set STT_MODEL=whisper-1     # optional, defaults to whisper-1
 policies and the `pg_trgm` extension are actually there, which is the half no
 test in the repository can reach.
 
+### Applying 006, which is two columns and one view
+
+`006_plan.sql` adds `planned_sl` and `planned_tp` to `trades` and appends them to
+`eugenia_trades`. It is **safe to re-run**: both alters are `if not exists` and
+the view statement appends rather than reorders. Nothing outside the SQL moves
+with it — the poller writes the columns the moment it is deployed, and the app
+never names them.
+
+**Deploying the poller before running this file is the failure to watch for, and
+it is loud in exactly one place.** The plan write is a PATCH filtered on
+`planned_sl=is.null`, so against a table without the column PostgREST answers
+`400` and nothing is stored. It does not take the poll down — the deals are why
+that function exists and they are written by the time this runs — so the fills
+keep landing and `planned` comes back `0` in the response on every run. That
+figure is the check: a run with an open position and `planned: 0` means this file
+has not been applied.
+
 ### Programmatic tool calls need their container
 
 `web_search_20260209` does dynamic filtering, and **that runs code execution on
@@ -2113,7 +2155,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `004_cron.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `006_plan.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -2124,7 +2166,7 @@ it from here.
 the claim gets tested.** It writes nothing: it reads back the columns, the
 constraints, the indexes, the policies, the grants on Eugenia's view, the
 triggers, the realtime publication, all three cron jobs and the last ten function
-responses, to be compared against 001–004 by eye. Run it after any manual change
+responses, to be compared against 001–006 by eye. Run it after any manual change
 and before believing anything here about the database. A CI job cannot stand in
 for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
 plain Postgres container has, so a green pipeline would prove only that 001
@@ -2144,7 +2186,7 @@ create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
          open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
-         net_pnl
+         net_pnl, planned_sl, planned_tp
   from public.trades
   where deleted = false;
 
@@ -2204,7 +2246,7 @@ create or replace view public.eugenia_trades
   with (security_invoker = true) as
   select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
          open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
-         net_pnl
+         net_pnl, planned_sl, planned_tp
   from public.trades
   where deleted = false;
 
@@ -2219,9 +2261,11 @@ answers `none` on a view that is missing and on one rebuilt without its grants,
 which are the two ways this ends badly and the only check that tells them from a
 healthy database.
 
-The two columns held a plan the journal no longer asks for. Nothing read them but
-Eugenia, and what she now says about a plan is §8's list of what a row cannot
-answer and §10's record of why that door is shut.
+The two columns held a plan the journal asked *him* to type, and nothing read
+them but Eugenia. **`planned_sl` and `planned_tp` are not those columns coming
+back.** They are broker-owned, written by the poller off the open position, and
+he types neither — which is the distinction §10 turns on, since what was shut is
+the door to journalling a plan by hand.
 
 Search is added to both of Eugenia's tables, and the whole block is idempotent —
 `add column if not exists`, `create index if not exists`, `create or replace
@@ -2374,10 +2418,11 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
     platform.claude.com — the same Anthropic account, billed as prepaid credits
     rather than a subscription. **Set a spend cap on that key**: it is the only
     place a bound on what she can cost is actually enforceable.
-12. Run `supabase/003_eugenia.sql`, then `supabase/004_cron.sql`. The hourly
+12. Run `supabase/003_eugenia.sql`, then `supabase/004_cron.sql`, then
+    `supabase/005_eugenia_senses.sql` and `supabase/006_plan.sql`. The hourly
     job drives both the briefing and the pulse; the function decides which, or
-    neither.
-13. Run `supabase/verify.sql` and read it against 001–004. Nothing is set up
+    neither. 005 and 006 are the two that are safe to re-run in full.
+13. Run `supabase/verify.sql` and read it against 001–006. Nothing is set up
     until that agrees.
 
 ---

@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 317 tests, four suites
+npm test      # 333 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -179,13 +179,18 @@ pixels; say so on any visual change.
   about outputs. `get_trendbars` also documents a `count`-only call it refuses;
   the range form is what works.
 
-- **§8 SAYS THE PLAN IS UNRECOVERABLE AND THAT IS NOW FALSE FOR AN OPEN
-  POSITION.** `get_positions` carries `entryPrice`, `stopLoss` and `takeProfit`.
-  The claim was formed against closed positions, where it holds. Four of §8's
-  unanswerable questions rest on it — but the strategy is HIS document and this
-  is his to change, not something to quietly correct. Capturing the stop at open
-  is the feature that would follow, and it is a schema change to a table with
-  four writers.
+- **THE PLAN IS BROKER-OWNED NOW, AND `where planned_sl is null` IS THE WHOLE OF
+  IT.** §8 called the plan unrecoverable and was right about a CLOSED position,
+  where the final stop has overwritten the original; nobody had asked about an
+  open one. `get_positions` carries `stopLoss` and `takeProfit`, the poller
+  records both the first time it sees a position, and every write after the first
+  would file R-04's break-even stop as the plan — which is the filter, the same
+  arbitration `balance` uses and the second-ever use of it. Say **as first
+  seen**, never as set: up to two minutes separate the entry from the poll that
+  caught it. It looks forward only, which is why §7's `Evaluable` column did NOT
+  move — a rule is `journal` when a row can answer it, and almost no row carries
+  this. §10's shut door is still shut: what was retired is *journalling* a plan,
+  and he types neither column.
 
 - **Eugenia reads a price through the poller and must never hold the broker
   token.** The endpoint that serves a quote also serves `create_order`, so the

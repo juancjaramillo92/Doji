@@ -116,6 +116,20 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_trades' and column_name = 'size_oz'),
    '1'),
 
+  -- 006. The plan write is a PATCH filtered on `planned_sl=is.null`, so without
+  -- the columns it is a 400 the poller swallows to keep the deals landing —
+  -- every run then reports planned: 0 and nothing else says why.
+  ('trades has its plan columns',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'trades'
+       and column_name in ('planned_sl','planned_tp')),
+   '2'),
+  ('eugenia_trades exposes the plan',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_trades'
+       and column_name in ('planned_sl','planned_tp')),
+   '2'),
+
   ('RLS on trades',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.trades')),
    'true'),

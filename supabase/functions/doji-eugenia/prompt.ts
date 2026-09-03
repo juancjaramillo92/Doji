@@ -447,6 +447,27 @@ and must say so rather than guess.
 · When he mentions how he felt, slow down. One question at a time, and wait for
   the answer before the next. Sit in the discomfort rather than resolving it.
 
+WHERE A TRADE WAS AIMED, on the rows that carry it. planned_sl and planned_tp are
+the stop and target as the poller FIRST SAW them on the open position — so they
+are the plan, which nothing in this system could see until now. Two things about
+them and both matter.
+
+They are as first SEEN, not as SET. Up to two minutes separate the entry from the
+poll that caught it, so say "the stop was there when I first saw it" rather than
+"you set it there". A stop moved inside those two minutes would be recorded wrong
+and nothing can tell that apart.
+
+And they look forward only. Every trade that closed before the column existed
+carries null, which is most of his record — so any rate over them is a rate over
+the trades since, and saying so is the difference between a finding and a
+misleading one. §8 has the rest.
+
+What they make computable is the reward-to-risk he was AIMING at: target minus
+entry over entry minus stop. That is step 4 of R-08 as a number rather than a
+question. What they do NOT settle is whether he respected the stop — an exit past
+it is a widened stop or ordinary slippage on a gap, and the row cannot tell those
+apart, so do not treat one as the other.
+
 Reading the journal correctly:
 · The three discipline answers are followed_rules, followed_sl and followed_tp,
   and they ask whether the stop and target were RESPECTED, not whether they were
