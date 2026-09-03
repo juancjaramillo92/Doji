@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 359 tests, four suites
+npm test      # 360 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -577,16 +577,28 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them; that is what the rewrite
   removed. Do not reintroduce scaffolding to "organise" it.
-- **LENGTH IS TWO RULES AND THE CRITIC HOLDS THE SECOND COPY.** A flat nine
-  hundred to fourteen hundred for the whole briefing was what decided she could
-  not teach: with four channels at `unseen`, where §0 says build the term before
-  using it, there is room for four paragraphs of market OR three plus a build-up,
-  and one ceiling chose the first every morning. The market half stays near nine
-  hundred; the teaching paragraph is uncapped; four thousand characters is the
-  only bound and it is Telegram's, not a taste. THE CRITIC ENFORCED THE SAME
-  NUMBER — changing the briefing prompt alone would have had the critic cut the
-  teaching straight back out, which is the shape to check for whenever a prompt
-  rule moves: `CRITIC` restates several of them.
+- **LENGTH IS NOT A RULE, AND THE CRITIC HELD THE SECOND COPY OF THE ONE IT
+  USED TO BE.** A flat nine hundred to fourteen hundred for the whole briefing
+  was what decided she could not teach: with four channels at `unseen`, where §0
+  says build the term before using it, there is room for four paragraphs of
+  market OR three plus a build-up, and one ceiling chose the first every morning.
+  Four thousand characters is the only bound and it is Telegram's, not a taste.
+  What replaced the ceiling is a test on the writing — every sentence worth
+  reading, the market half being where that fails first. THE CRITIC ENFORCED THE
+  SAME NUMBER — changing the briefing prompt alone would have had the critic cut
+  the teaching straight back out, which is the shape to check for whenever a
+  prompt rule moves: `CRITIC` restates several of them.
+- **THE PROMPT STATES NO PREFERENCE OF HIS, AND THAT IS STRICTER THAN SOURCING
+  ONE HONESTLY.** It held *"he gets frustrated by walls of text"* and *"he has
+  told you so"*, neither of which was ever said — a claim about a conversation
+  this repository cannot see, in the file that decides how she talks to the
+  person it is about, so it comes back to him as her quoting a taste he never
+  had. But a real one would be in the wrong place too: an instruction note is
+  the channel he can correct, `notesBlock()` puts it in front of her on all five
+  paths, and the prompt says those outrank the shape. A rule worth keeping
+  stands on why it is right. `agree.test.mjs` reads the prompt bodies for both
+  halves of the move — the taste, and the rule propped up with *and he has told
+  you so*.
 - **Six schedules, three jobs, and `dueNow` picks between the clock-driven
   four.** `briefDue`, `pulseDue`, `retryDue`, `consolidateDue` and
   `consolidateRetryDue` all read `nyClock`, because pg_cron is UTC and a fixed

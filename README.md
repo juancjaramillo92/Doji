@@ -983,19 +983,20 @@ the words inside them did not help — **seven numbered sections with headings
 *are* a report**, whatever the vocabulary. The scaffolding was doing the
 talking.
 
-**Length is two rules rather than one, and that is a correction.** It was a flat
-nine hundred to fourteen hundred characters for the whole briefing, and with four
+**Length is not a rule at all, and that is a correction.** It was a flat nine
+hundred to fourteen hundred characters for the whole briefing, and with four
 of the five channels sitting at `unseen` — where §0 says *build it before using
 it* — that number was the thing deciding she could not. A briefing has room for
 four paragraphs of market or three plus a term built from the ground up, and a
 single ceiling silently chose the first every morning.
 
-So the market half — where gold is, everything else, the odd thing, the question
-— stays near nine hundred characters, because a wall of text there is the thing
-*he* said frustrates him. The paragraph that teaches is not capped: it takes the
-links the chain needs and, on an `unseen` channel, the build-up too. The only
-bound left is four thousand characters, which is not an aesthetic — it is where
-Telegram stops delivering one message.
+The only bound left is four thousand characters, which is not an aesthetic — it
+is where Telegram stops delivering one message. What replaced the ceiling is a
+test on the writing rather than on the size: **every sentence has to be worth
+reading**, and the market half is where that fails first, since a line restating
+the number above it or a caveat protecting the analyst still reads like content.
+The paragraph that teaches takes the links the chain needs and, on an `unseen`
+channel, the build-up too.
 
 Running long is still cut by dropping words, never events, and never a link out
 of a chain.
@@ -1008,8 +1009,9 @@ been said. The ideas stay exactly as sophisticated; only the words come down.
 learning macro deliberately, so the paragraph on the day's one thing states its
 chain link by link — *hot inflation, so the Fed waits, so the gap between rates
 and inflation widens, so gold has stiffer competition* — because a cause named
-with no chain under it is something to memorise rather than understand. The
-character budget does not move to make room; the same words carry the why.
+with no chain under it is something to memorise rather than understand. Depth is
+not word count — a longer briefing that names a cause and skips its chain has
+taught nothing — but where the chain genuinely costs words, it gets them.
 
 Three rules keep that from turning into a lecture. A term explained this week is
 **used** the next time rather than redefined, since the second exposure is what
