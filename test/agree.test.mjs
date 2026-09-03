@@ -1842,6 +1842,17 @@ test('the search that is dropped is granted again in the same file', () => {
   const after = SEMANTIC_SQL.slice(at);
   assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from public/,
     '007 creates the search and leaves EXECUTE granted to PUBLIC');
+
+  /* AND FROM anon AND authenticated BY NAME, which is a SECOND revoke and not
+     the same one written twice. `public` above is the PUBLIC pseudo-role; these
+     two are granted EXECUTE separately by the default privileges Supabase sets
+     on the public SCHEMA. Two different things spelled the same way — the live
+     database answered 2 to "executable by anyone else" with the PUBLIC revoke
+     in place, and had done since 003 created this function. */
+  assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from anon, authenticated/,
+    "007 revokes the search from PUBLIC and leaves it granted to anon and " +
+    "authenticated, which is what Supabase's default privileges give every new " +
+    'function in the public schema');
   assert.match(after, /grant execute on function public\.eugenia_search\(text, int, text\) to service_role/,
     '007 revokes the search from PUBLIC and never grants it to the one caller ' +
     'that needs it — every search would come back 403');

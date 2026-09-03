@@ -96,10 +96,25 @@ from (values
      where routine_schema = 'public' and routine_name = 'eugenia_search'
        and grantee = 'service_role' and privilege_type = 'EXECUTE'),
    '1'),
-  ('the search is not executable by anon or authenticated',
-   (select count(*)::text from information_schema.routine_privileges
-     where routine_schema = 'public' and routine_name = 'eugenia_search'
-       and grantee in ('anon','authenticated','PUBLIC')),
+  /* ASKED OF EVERY CALLABLE FUNCTION IN THE SCHEMA, not of eugenia_search. The
+     narrow version of this row is what found the hole, and the hole was not
+     specific to that function: `revoke ... from public` revokes the PUBLIC
+     pseudo-role, while Supabase's default privileges on the public SCHEMA grant
+     EXECUTE to anon and authenticated separately and by name. Two different
+     things spelled the same way, so every function created here has arrived
+     reachable by the publishable key and nothing ever asked.
+
+     has_function_privilege rather than routine_privileges: it answers for the
+     role rather than for a grant row, so it is true whether the privilege came
+     by name or through PUBLIC. Trigger functions are excluded because PostgREST
+     cannot call one — the question is what a browser can reach. */
+  ('no callable function is reachable by the publishable key',
+   (select count(*)::text from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prorettype <> 'trigger'::regtype
+       and (has_function_privilege('anon', p.oid, 'EXECUTE')
+         or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
    '0'),
 
   -- THE EVENT SPINE'S OWN WIRING. Both triggers on `trades`, or a position

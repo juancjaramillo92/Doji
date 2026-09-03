@@ -676,6 +676,19 @@ and what could not be verified.
 - **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
+- **`revoke ... from public` IS NOT THE WHOLE REVOKE, and this is a third pair of
+  names that are one value.** `public` in a `revoke` is the PUBLIC pseudo-role;
+  `anon` and `authenticated` hold `execute` separately and by name, from the
+  default privileges Supabase sets on the public SCHEMA. So a new function
+  arrives reachable by the publishable key and revoking from PUBLIC does not
+  change that, silently. `eugenia_search` was in that state from the day 003
+  created it — not a leak, since it is not `security definer` and an anon caller
+  meets RLS on two tables with no policy for it, but the guarantee this
+  repository states was false and nothing had ever asked the database. Both
+  revokes are in 007 now, and `verify.sql` asks it of EVERY callable function
+  through `has_function_privilege`, which answers for the role however the
+  privilege arrived.
+
 - **`007_semantic.sql` is dropped-and-recreated on purpose, which nothing else
   here does.** `create or replace function` cannot change an argument list, so
   the three-argument search beside the two-argument one is an OVERLOAD: a
