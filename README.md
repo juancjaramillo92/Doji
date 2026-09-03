@@ -2049,14 +2049,26 @@ the view statement appends rather than reorders. Nothing outside the SQL moves
 with it — the poller writes the columns the moment it is deployed, and the app
 never names them.
 
-**Deploying the poller before running this file is the failure to watch for, and
-it is loud in exactly one place.** The plan write is a PATCH filtered on
-`planned_sl=is.null`, so against a table without the column PostgREST answers
-`400` and nothing is stored. It does not take the poll down — the deals are why
-that function exists and they are written by the time this runs — so the fills
-keep landing and `planned` comes back `0` in the response on every run. That
-figure is the check: a run with an open position and `planned: 0` means this file
-has not been applied.
+**Deploying the poller before running this file is the failure to watch for.**
+The plan write is a PATCH filtered on `planned_sl=is.null`, so against a table
+without the column PostgREST answers `400` and nothing is stored. It does not
+take the poll down — the deals are why that function exists and they are written
+by the time this runs — so the fills keep landing and the only sign is a line in
+an Edge log nobody reads.
+
+**`planned` in the poller's answer is not that sign, and used to be read as
+one.** It counts rows written rather than calls made, so on a healthy run with a
+position whose plan was recorded hours ago it is `0` — the same `0` the missing
+column produces. That is the right trade: counting calls made it `1` every two
+minutes, which a working filter, a filter that had stopped filtering, and a row
+the upsert had not yet reached all produced alike, so the meter could not see
+the failure it sits beside. What it reports now is `1` exactly once per position,
+on the poll that first sees it, and `1` on every poll only if the arbitration has
+broken.
+
+So the check for whether this file has been applied is `verify.sql`'s **`trades
+has its plan columns`** row, which asks the database directly. That is what
+`verify.sql` is for.
 
 ### Applying 007, and the one call you have to repeat
 

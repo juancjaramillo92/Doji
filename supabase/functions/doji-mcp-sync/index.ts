@@ -565,13 +565,25 @@ export function openPlans(positions: any[]): OpenPlan[] {
   });
 }
 
-async function writePlan(plan: OpenPlan): Promise<void> {
+/* ANSWERS WHETHER IT WROTE, AND `return=representation` IS WHAT MAKES THAT
+   ANSWERABLE. A PATCH filtered to nothing is a 200 with no rows, so success
+   alone cannot tell a plan recorded from a plan correctly skipped — and the
+   count above it read the same on a working filter, a broken one rewriting the
+   plan every two minutes, and a position whose row had not been inserted yet.
+   Three states, one number, which is the shape of meter this repository keeps
+   finding out was never a meter.
+
+   Without the Prefer header the body is empty and this returns false forever,
+   which reads as the healthy steady state. That is the silent half, so a test
+   reads for it. */
+async function writePlan(plan: OpenPlan): Promise<boolean> {
   const res = await fetch(
     `${SB_URL}/rest/v1/trades?id=eq.${plan.id}&planned_sl=is.null`, {
-      method: "PATCH", headers: sbHeaders(),
+      method: "PATCH", headers: sbHeaders("return=representation"),
       body: JSON.stringify({ planned_sl: plan.planned_sl, planned_tp: plan.planned_tp }),
     });
   if (!res.ok) throw new Error(`Plan write failed (HTTP ${res.status}): ${await res.text()}`);
+  return ((await res.json()) as unknown[]).length > 0;
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
@@ -858,7 +870,10 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       // Sequential rather than parallel: these are single-row PATCHes against
       // one table and there are never more than a handful — R-10 permits one
       // position at a time, so more than one here is itself unusual.
-      for (const plan of plans) { await writePlan(plan); planned++; }
+      // Counted on the answer rather than on the attempt: steady state is 0
+      // with a position open, the poll that first sees one reads 1, and a
+      // filter that stopped filtering would read 1 every two minutes forever.
+      for (const plan of plans) { if (await writePlan(plan)) planned++; }
     } catch (err) {
       console.error("doji-mcp-sync: plan not recorded —",
         err instanceof Error ? err.message : err);

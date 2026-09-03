@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 372 tests, four suites
+npm test      # 373 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -187,7 +187,13 @@ pixels; say so on any visual change.
   would file R-04's break-even stop as the plan — which is the filter, the same
   arbitration `balance` uses and the second-ever use of it. Say **as first
   seen**, never as set: up to two minutes separate the entry from the poll that
-  caught it. It looks forward only, which is why §7's `Evaluable` column did NOT
+  caught it. `planned` IN THE ANSWER COUNTS ROWS WRITTEN, NOT CALLS MADE, which
+  it did not: with a position open it read 1 every two minutes, and a working
+  filter, one that had stopped filtering, and a row the upsert had not yet
+  reached all looked identical — the meter could not see the failure it sits
+  beside. `return=representation` is what makes the count answerable, since a
+  PATCH filtered to nothing is a 200 with an empty body; dropping the header
+  reads as a permanently quiet poll, so `agree.test.mjs` reads for it. It looks forward only, which is why §7's `Evaluable` column did NOT
   move — a rule is `journal` when a row can answer it, and almost no row carries
   this. §10's shut door is still shut: what was retired is *journalling* a plan,
   and he types neither column.
