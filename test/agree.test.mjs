@@ -1374,7 +1374,7 @@ test('no paragraph of the prompt shows where it was edited', () => {
    THE RULE IS NOT "SOURCE IT PROPERLY", IT IS THAT THE PROMPT DOES NOT CARRY
    HIS PREFERENCES AT ALL. There is already a channel for them and it is the one
    he can correct: an instruction note, which `notesBlock()` puts in front of her
-   on all five paths and which the prompt itself says outranks the shape. A rule
+   on every path and which the prompt itself says outranks the shape. A rule
    worth keeping stands on why it is right; one that needs him behind it belongs
    in a note.
 
@@ -1537,10 +1537,23 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
      the nightly pass was already fixed for: an instruction that outruns its
      inputs, and one that fails by teaching the wrong thing well rather than by
      failing at all. */
-  const SPEAKS = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
-                  'postRelease'];
+  /* FOUR LISTS, BECAUSE THEY ANSWER FOUR DIFFERENT QUESTIONS, and collapsing
+     them into one would either assert something a path has no business holding
+     or quietly stop asserting it of a path that needs it.
 
-  for (const fn of SPEAKS) {
+     `TEACHES` is the five whose prompts build a term, so those get the map.
+     `SENDS` is the six that put a message in front of him right now — the
+     nightly pass is not one, it writes memory and sends nothing. His notes go
+     to all seven, because an instruction he gave is not optional anywhere. */
+  const TEACHES = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
+                   'postRelease'];
+  const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
+                 'postMove', 'postTradeEvent'];
+
+  const reads = (fn) =>
+    body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  for (const fn of TEACHES) {
     // Comments stripped, because the identifier appearing in prose about the
     // call is not the call. And `await` required: notesBlock is async, so an
     // un-awaited one interpolates "[object Promise]" into the prompt — which
@@ -1562,6 +1575,33 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
       `which channels are thin, and nothing would report it`);
   }
 
+  /* NOTES REACH SEVEN PATHS, NOT FIVE. The move look and the trade look send
+     him messages like any other, and the trade look was deaf to his notes for
+     its whole life — so an instruction he had given her was obeyed everywhere
+     except the two messages that arrive while he is in a position, which are
+     the ones he is least able to ignore. */
+  for (const fn of [...new Set([...TEACHES, ...SENDS])]) {
+    assert.ok(reaches(reads(fn), 'notesBlock'),
+      `${fn} never gets notesBlock() into the message it sends — an instruction ` +
+      `he gave would be ignored, with nothing anywhere reporting it`);
+  }
+
+  /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS. Its absence is the
+     quietest failure on this list: she simply says a thing she already said,
+     and a repetition reads as emphasis rather than as a defect. It bites
+     hardest on the trade look, whose R-14/R-19 message fires on a print pending
+     against an open position — which is exactly what the morning briefing is
+     most likely to have named already.
+
+     postConsolidation is deliberately absent: it reads a fixed twenty-four
+     hours of its own and the twelve-turn window would be a second, shorter copy
+     of the same day. */
+  for (const fn of SENDS) {
+    assert.ok(reaches(reads(fn), 'recent'),
+      `${fn} sends him a message with no conversation window — she cannot know ` +
+      `she said the same thing an hour ago, and a repetition reads as emphasis`);
+  }
+
   /* AND WHAT HE HAS ON, WHICH IS SIX PATHS RATHER THAN FIVE. The move look
      joins because the message that talks past a live position is whichever one
      happens to be next, and a sharp move is the likeliest of all of them to
@@ -1576,8 +1616,8 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
      postTradeEvent is deliberately not here. It is reached FROM the position
      and already carries the row that fired it, so the block would hand it what
      it opened with. */
-  for (const fn of [...SPEAKS, 'postMove']) {
-    const code = body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  for (const fn of [...TEACHES, 'postMove']) {
+    const code = reads(fn);
     assert.ok(reaches(code, 'positionsBlock'),
       `${fn} never gets positionsBlock() into the message it sends — it can talk ` +
       `past an open position, and every rule about what she may say still passes`);
