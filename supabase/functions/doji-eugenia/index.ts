@@ -404,15 +404,16 @@ const SEARCH_TOOL = {
     "far past the recent turns and notes you are handed each message. Use it when " +
     "he refers to something you discussed before that is not in front of you, when " +
     "you need to know whether you have already explained something, or when he asks " +
-    "what you said or what he told you. Matches words, so search the terms that " +
-    "would appear in the text rather than a description of it. Results say whether " +
+    "what you said or what he told you. It matches both the words and the MEANING, " +
+    "so ask it as you would ask a person — and still include any exact term that " +
+    "matters, a date or a rule number, since those are found by the words. Results say whether " +
     "each was a note, something you said or something HE said, when it was, and " +
     "whether a note has since been retired — a retired one is what you used to " +
     "believe and is no longer true.",
   input_schema: {
     type: "object",
     properties: {
-      query: { type: "string", description: "The words to look for, as you would type them into a search box." },
+      query: { type: "string", description: "What you are looking for, phrased as a question or a description — with any exact terms that matter included in it." },
     },
     required: ["query"],
     additionalProperties: false,
@@ -462,6 +463,91 @@ export function searchList(hits: Hit[]): string {
   }).join("\n");
 }
 
+/* ─── Meaning, rather than words ───────────────────────────────────────────
+   THE SEARCH BELOW WAS FULL TEXT AND TRIGRAM, WHICH FIND A REPHRASING AND NOT
+   A DIFFERENT IDEA. *"What did we conclude about the December cut"* against a
+   turn that said *"the market has mostly given up on easing this year"* shares
+   no substrings at all — so she answers that they never discussed it, which is
+   worse than answering that she cannot find it.
+
+   THIS ADDS NO MEMORY AND NO WINDOW. Twelve turns and twenty notes are what she
+   is handed and that does not move: every token in a window is paid on every
+   request, and search is what reaches past it. Everything a vector finds was
+   already in the table.
+
+   NEVER THROWS, AND UNSET IS A FIRST-CLASS STATE. With no EMBED_KEY every
+   caller here gets null, writes its row without a vector, and the search runs
+   exactly as it did before — the SQL's fusion over one arm reproduces the old
+   ordering. That is what lets this ship before the key exists rather than
+   after: the failure of an embedding must never cost the note, the turn, or
+   the answer she is in the middle of writing.
+   ───────────────────────────────────────────────────────────────────────── */
+const EMBED_URL = env("EMBED_URL") || "https://api.openai.com/v1/embeddings";
+const EMBED_KEY = env("EMBED_KEY");
+
+/* PINNED HERE RATHER THAN READ FROM THE ENVIRONMENT, and that is the whole
+   difference between this and STT_MODEL. A transcription model chosen in the
+   dashboard changes one answer; an EMBEDDING model chosen there changes what is
+   comparable to what. Vectors from two models are not comparable and nothing
+   says so — the column type catches a change of WIDTH and cannot catch a change
+   at the same width, so ranking would degrade into noise with no error
+   anywhere. Changing it is therefore a code change, reviewable in a diff, and
+   it means re-embedding both tables. */
+const EMBED_MODEL = "text-embedding-3-small";
+export const EMBED_DIMS = 1536;
+
+/* Fifty at a time. The vendor call is one request whatever the count, so the
+   batch is sized by the writes that follow it — those are one PATCH per row,
+   since an upsert cannot be used here: PostgREST would send a row carrying only
+   `id` and `embedding`, and `content not null` is checked when the tuple is
+   built, before any conflict is detected. */
+const EMBED_BATCH = 50;
+
+/* ORDERED BY THE INDEX THE VENDOR STATES, never by arrival. Each object carries
+   the position of the input it answers, and taking the array as it comes would
+   file a vector against the wrong row — a memory that returns the wrong text
+   for the right question, with nothing anywhere able to reveal it.
+
+   ALL OR NOTHING for the same reason: a short answer, or one of the wrong
+   width, gives no way to tell WHICH row lost its vector, so none is written and
+   the sweep tries the batch again.
+
+   Pure and exported because it is the decision, and because the alternative is
+   a test that stubs a vendor to prove a sort it supplied the answer to. Returns
+   pgvector's own text form rather than numbers: the same string goes into the
+   column and into the search, and `[0.1,0.2,…]` crosses a JSON body into a
+   `vector` intact where a JSON array would depend on a cast from json that
+   pgvector does not promise. */
+export function foldVectors(data: any, want: number): string[] | null {
+  const rows = Array.isArray(data) ? [...data] : [];
+  rows.sort((a: any, b: any) => (a?.index ?? 0) - (b?.index ?? 0));
+  const vecs = rows.map((d: any) => d?.embedding);
+
+  if (vecs.length !== want) return null;
+  if (vecs.some((v: any) => !Array.isArray(v) || v.length !== EMBED_DIMS)) return null;
+  return vecs.map((v: number[]) => `[${v.join(",")}]`);
+}
+
+async function embed(texts: string[]): Promise<string[] | null> {
+  if (!EMBED_KEY || !texts.length) return null;
+
+  try {
+    const res = await fetch(EMBED_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${EMBED_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: EMBED_MODEL, dimensions: EMBED_DIMS, input: texts }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const vecs = foldVectors((await res.json())?.data, texts.length);
+    if (!vecs) throw new Error(`asked for ${texts.length} vectors of ${EMBED_DIMS}, got something else`);
+    return vecs;
+  } catch (err) {
+    console.error("doji-eugenia: embedding failed —", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 /* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
    loop, and an exception here costs the answer she is in the middle of writing.
    A search that fails comes back as a sentence she can carry on from. */
@@ -470,9 +556,12 @@ async function searchMemory(query: unknown): Promise<string> {
   if (!q) return "Nothing to search for.";
 
   try {
+    // Unset key, failed call, or a query that embeds to nothing — all three are
+    // one null, and the function answers lexically as it always did.
+    const [qv] = await embed([q]) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/rpc/eugenia_search`, {
       method: "POST", headers: sbHeaders(),
-      body: JSON.stringify({ q, lim: SEARCH_HITS }),
+      body: JSON.stringify({ q, lim: SEARCH_HITS, qv: qv ?? null }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const hits: Hit[] = await res.json();
@@ -551,9 +640,16 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   const retiring = Number.isFinite(old) && old > 0;
 
   try {
+    /* INSIDE THE try AND BEFORE THE INSERT. Before, so the note lands with its
+       vector in one statement rather than needing a second write that could
+       fail on its own — a null here costs nothing but a place in the sweep.
+       Inside, because this function's whole contract is that it never throws:
+       embed() catches its own failures today, and a fetch outside the try would
+       make that promise depend on it continuing to. */
+    const [vec] = await embed([kept]) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
       method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
-      body: JSON.stringify([{ note: kept, kind: k }]),
+      body: JSON.stringify([{ note: kept, kind: k, ...(vec ? { embedding: vec } : {}) }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -1491,11 +1587,69 @@ async function recent(): Promise<Turn[]> {
   return openOnUser(dateTurns((await res.json()).reverse()));
 }
 
+/* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
+   in the only sense that matters: he has the message before this runs. Both
+   turns go in one vendor call and one INSERT — and the pair still has to be one
+   INSERT for the reason openOnUser exists, since a concurrent write taking a
+   sequence value between them is what leaves the window opening on an assistant
+   turn. */
 async function remember(turns: Turn[]) {
+  const vecs = await embed(turns.map(t => String(t.content)));
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_turns`, {
-    method: "POST", headers: sbHeaders("return=minimal"), body: JSON.stringify(turns),
+    method: "POST", headers: sbHeaders("return=minimal"),
+    body: JSON.stringify(vecs ? turns.map((t, i) => ({ ...t, embedding: vecs[i] })) : turns),
   });
   if (!res.ok) throw new Error(`History write failed (HTTP ${res.status})`);
+}
+
+/* ─── What the vendor missed ───────────────────────────────────────────────
+   A null embedding is every row written before 007 ran, plus any row whose
+   vendor call failed. Both are invisible from the outside: the row is there,
+   the search still answers, and it simply never returns that row from its
+   semantic arm.
+
+   ONE PATCH PER ROW, WHICH IS DELIBERATE RATHER THAN LAZY. An upsert would be
+   one request, and PostgREST would send rows carrying only `id` and
+   `embedding`: `content not null` is checked when the tuple is built, before
+   any conflict is detected, so the whole batch would be refused. The expensive
+   half is the vendor call and that is one request for the batch either way.
+
+   RESUMABLE, AND IT SAYS HOW MUCH IS LEFT. `count=exact` is what turns this
+   from a call you repeat hopefully into one you repeat until it answers zero.
+   ───────────────────────────────────────────────────────────────────────── */
+async function fillEmbeddings(table: string, column: string): Promise<{ filled: number; left: number }> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/${table}?select=id,${column}&embedding=is.null&order=id.asc&limit=${EMBED_BATCH}`,
+    { headers: sbHeaders("count=exact") });
+  if (!res.ok) throw new Error(`${table} read failed (HTTP ${res.status})`);
+
+  const rows = await res.json() as Record<string, any>[];
+  const left = Number(res.headers.get('content-range')?.split('/')[1] ?? rows.length);
+  if (!rows.length) return { filled: 0, left: 0 };
+
+  const vecs = await embed(rows.map(r => String(r[column])));
+  // No key, or the vendor refused the batch. Nothing is written and nothing is
+  // lost — the same rows are still waiting the next time this runs.
+  if (!vecs) return { filled: 0, left };
+
+  let filled = 0;
+  for (const [i, row] of rows.entries()) {
+    const done = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${row.id}`, {
+      method: "PATCH", headers: sbHeaders("return=minimal"),
+      body: JSON.stringify({ embedding: vecs[i] }),
+    });
+    if (!done.ok) throw new Error(`${table} embedding write failed (HTTP ${done.status})`);
+    filled++;
+  }
+  return { filled, left: left - filled };
+}
+
+async function postEmbed(): Promise<Response> {
+  // One after the other rather than together: each is fifty single-row PATCHes,
+  // and there is nothing to be gained by having a hundred of them in flight.
+  const notes = await fillEmbeddings('eugenia_notes', 'note');
+  const turns = await fillEmbeddings('eugenia_turns', 'content');
+  return json({ ok: true, notes, turns });
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -1911,6 +2065,7 @@ export const APOLOGY: Record<string, string> = {
   release:      "I could not look at the number that just landed, jefe.",
   trade:        "Something broke while I was looking at your position, jefe.",
   move:         "I lost sight of the price for a moment, jefe.",
+  embed:        "I could not file what I remember for searching, jefe.",
 };
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
@@ -1929,6 +2084,13 @@ async function postScheduled(url: URL): Promise<Response> {
        dueNow: it decides from the clock, and these decide from a table. */
     if (url.searchParams.get("release") === "1")     { job = 'release';     return await postRelease(); }
     if (url.searchParams.get("move") === "1")        { job = 'move';        return await postMove(); }
+
+    /* THE BACKFILL, AND NO CRON JOB CALLS IT. The archive is filled in by hand
+       — call it until it answers `left: 0` — and the trickle a failed vendor
+       call leaves behind is swept by the nightly pass, which already runs and
+       already sees the day. A schedule of its own would be a job doing nothing
+       every hour for the one night a year it had something to do. */
+    if (url.searchParams.get("embed") === "1")       { job = 'embed';       return await postEmbed(); }
 
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
@@ -2286,6 +2448,21 @@ async function postConsolidation(): Promise<Response> {
                          CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
   await logChannels();
+
+  /* AND THE SWEEP, WHICH IS BOOKKEEPING RATHER THAN PART OF THE PASS. It runs
+     here because this job already runs nightly and already reads the day, so it
+     needs no schedule of its own — and it runs AFTER, wrapped, because a vendor
+     that is down must not report itself to him as a pass that failed. The rows
+     it misses are still waiting tomorrow. */
+  try {
+    const notes = await fillEmbeddings('eugenia_notes', 'note');
+    const turns = await fillEmbeddings('eugenia_turns', 'content');
+    console.log("doji-eugenia: embeddings swept —", JSON.stringify({ notes, turns }));
+  } catch (err) {
+    console.error("doji-eugenia: embedding sweep failed —",
+                  err instanceof Error ? err.message : err);
+  }
+
   return json({ ok: true, consolidated: day.length });
 }
 

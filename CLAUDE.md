@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 344 tests, four suites
+npm test      # 352 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -356,6 +356,24 @@ code you write near it:
   ranks notes and turns together, uses `websearch_to_tsquery` because the query
   is model-written and the strict parser throws on an unbalanced quote, and
   returns a retired note MARKED rather than hidden.
+
+  IT IS TWO ARMS NOW AND THE LEXICAL ONE IS THE FLOOR, not a fallback beside
+  the vector. A row whose `embedding` is null does not appear in a
+  nearest-neighbour query at all — no error, no log, half an archive quietly
+  unsearchable — and a vector is worse than trigram wherever the thing asked for
+  IS the string: a date, a ticker, `R-08`. The two are fused by reciprocal rank,
+  never by a weighted sum, because `ts_rank` and cosine distance are on
+  unrelated scales and any weighting of them is a constant somebody guessed.
+  With no `EMBED_KEY` the query vector is null, both semantic arms return
+  nothing and the fusion over one arm reproduces the old ordering exactly —
+  which is what let 007 ship before the key. `foldVectors` is where the vendor's
+  answer is ordered by the index IT states and refused whole if it is short or
+  the wrong width: a vector filed against the wrong row is undetectable
+  afterwards, and surfaces months later as her misremembering. THE MODEL IS
+  PINNED IN THE FILE, not read from the environment, and that is the difference
+  between it and `STT_MODEL` — vectors from two models are not comparable, the
+  column type catches a change of width and not one at the same width, and the
+  ranking would degrade into noise silently.
 
   IT ALSO SAYS WHO SAID IT, and for a long time it did not: `role` was on the
   table and not selected, so every turn rendered as `you said` and half of every
@@ -658,6 +676,17 @@ and what could not be verified.
 - **The files are a claim; `verify.sql` is how it is tested.** Applying by hand
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
+- **`007_semantic.sql` is dropped-and-recreated on purpose, which nothing else
+  here does.** `create or replace function` cannot change an argument list, so
+  the three-argument search beside the two-argument one is an OVERLOAD: a
+  two-argument call matches both and Postgres refuses it as ambiguous. The drop
+  takes the grants, and a bare `create function` carries `execute` to PUBLIC
+  which `anon` inherits — so the `revoke` and `grant` are part of the statement,
+  not a follow-up, and `agree.test.mjs` reads for all three. The backfill door
+  (`?embed=1`) has no cron job by design: the archive is a one-off and the
+  trickle a failed vendor call leaves is swept by the nightly pass, which
+  already runs and already reads the day.
+
 - **`005_eugenia_senses.sql` is safe to re-run in full, and `003` is not.**
   Every statement is `if not exists`, `or replace` or `on conflict do nothing`,
   and a test asserts it — this is the file that will grow. Note also that

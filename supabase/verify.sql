@@ -75,6 +75,33 @@ from (values
    (select count(*)::text from pg_extension where extname = 'pg_trgm'),
    '1'),
 
+  -- 007. Without the extension the column type does not exist and the whole
+  -- file refuses; with it and no columns, every write still lands and the
+  -- semantic arm is simply never reached.
+  ('pgvector is installed',
+   (select count(*)::text from pg_extension where extname = 'vector'),
+   '1'),
+  ('both memories have an embedding column',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and column_name = 'embedding'
+       and table_name in ('eugenia_notes','eugenia_turns')),
+   '2'),
+
+  -- THE GRANTS THE DROP TOOK WITH IT. 007 drops the two-argument search — it
+  -- cannot replace it in place, because the query vector is a new argument —
+  -- and a bare `create function` carries EXECUTE to PUBLIC, which anon
+  -- inherits. Expected: granted to service_role and to nobody else.
+  ('the search is executable by service_role alone',
+   (select count(*)::text from information_schema.routine_privileges
+     where routine_schema = 'public' and routine_name = 'eugenia_search'
+       and grantee = 'service_role' and privilege_type = 'EXECUTE'),
+   '1'),
+  ('the search is not executable by anon or authenticated',
+   (select count(*)::text from information_schema.routine_privileges
+     where routine_schema = 'public' and routine_name = 'eugenia_search'
+       and grantee in ('anon','authenticated','PUBLIC')),
+   '0'),
+
   -- THE EVENT SPINE'S OWN WIRING. Both triggers on `trades`, or a position
   -- opens and closes with nothing telling her — which is indistinguishable from
   -- a quiet day, because silence is this path's correct answer most of the time.
@@ -409,6 +436,22 @@ select schemaname, tablename
 from pg_publication_tables
 where pubname = 'supabase_realtime'
 order by tablename;
+
+-- ─── How much of her memory is actually searchable by meaning ──────────────
+-- THE ONE NUMBER THE SUMMARY ABOVE CANNOT BE. A null embedding is not an error
+-- and not a missing row: the search still answers, and simply never returns
+-- that row from its semantic arm. Every row written before 007 has one, and so
+-- does any row whose vendor call failed.
+--
+-- Expect `pending` to fall to zero as `?embed=1` is called, and to sit at zero
+-- afterwards. A number that climbs day after day means the embedding key is
+-- unset or the vendor is refusing, and nothing else anywhere will say so.
+select 'eugenia_notes' as table, count(*) filter (where embedding is null) as pending,
+       count(*) as rows
+  from public.eugenia_notes
+union all
+select 'eugenia_turns', count(*) filter (where embedding is null), count(*)
+  from public.eugenia_turns;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
 -- Against 004_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
