@@ -2462,6 +2462,43 @@ test('the two columns with two claimants are filtered inside the UPDATE', () => 
   }
 });
 
+/* ─── And the meter beside the filter has to be able to report it failing ────
+   `planned` in the poller's answer counted CALLS. With a position open it read
+   1 every two minutes — which is what a working filter, a filter that had
+   stopped filtering, and a row the upsert had not yet inserted all look like.
+   Three states, one number, and the number nobody could learn anything from sat
+   directly beside the arbitration above: the meter could not see the failure it
+   was adjacent to.
+
+   It counts rows now, and `return=representation` is what makes that possible —
+   a PATCH filtered to nothing is a 200 with an empty body, so `res.ok` alone
+   can never answer the question. DROPPING THE PREFER HEADER IS THE SILENT HALF:
+   the body comes back empty, every write reads as no write, and the meter
+   settles on 0, which is exactly the healthy steady state. Nothing else in the
+   suite would notice.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the poller counts the plans it wrote, not the plans it tried', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('function writePlan(');
+  assert.ok(at > -1, 'doji-mcp-sync no longer has writePlan()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /Promise<boolean>/,
+    'writePlan no longer answers whether it wrote, so the count beside it is ' +
+    'back to counting calls');
+  assert.match(body, /sbHeaders\("return=representation"\)/,
+    'writePlan asks for no representation, so a PATCH that matched nothing and ' +
+    'one that wrote a plan come back identical — the meter reads 0 forever, ' +
+    'which is indistinguishable from a quiet poll');
+
+  assert.match(src, /if \(await writePlan\([^)]*\)\)\s*planned\+\+/,
+    'the poller increments its plan count on the call rather than on the answer, ' +
+    'so a filter that stopped filtering would report exactly what a working one does');
+});
+
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {
   /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. So the market
      read is deliberately not hers to make: doji-mcp-sync holds
