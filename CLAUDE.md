@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 371 tests, four suites
+npm test      # 372 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -786,6 +786,16 @@ and what could not be verified.
   with a written-out signature or a `regprocedure` cast, and `agree.test.mjs`
   reads the file for both. The same care goes for any new row: it must be able
   to come back FALSE on a wrong database rather than throw.
+
+  AND A ROW THAT COUNTS GOES STALE WHERE A ROW THAT NAMES DOES NOT. Below that
+  same dead line sat `three triggers on trades` — 001's touch and 002's two —
+  which 005 made wrong by adding the event spine's two, so the first run it ever
+  got reported a correct database as broken. It names the five now, sorted, and
+  `agree.test.mjs` reads that list against every `create trigger ... on
+  public.trades` in the numbered SQL. Prefer a name or a `string_agg` to a
+  count: five is still five when one is renamed and another added, and the two
+  that matter most here fail silently — a position opening with nothing telling
+  her looks exactly like a quiet day.
 - **`revoke ... from public` IS NOT THE WHOLE REVOKE, and this is a third pair of
   names that are one value.** `public` in a `revoke` is the PUBLIC pseudo-role;
   `anon` and `authenticated` hold `execute` separately and by name, from the

@@ -125,15 +125,6 @@ from (values
          or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
    '0'),
 
-  -- THE EVENT SPINE'S OWN WIRING. Both triggers on `trades`, or a position
-  -- opens and closes with nothing telling her — which is indistinguishable from
-  -- a quiet day, because silence is this path's correct answer most of the time.
-  ('the trades triggers that call Eugenia exist',
-   (select count(*)::text from information_schema.triggers
-     where event_object_table = 'trades'
-       and trigger_name in ('trades_eugenia_opened','trades_eugenia_closed')),
-   '2'),
-
   -- The app's card reads three of her tables and nothing else. No policy is an
   -- empty list rather than an error, so the card hides itself and the reason is
   -- unknowable from the browser.
@@ -317,10 +308,24 @@ from (values
   ('the Telegram trigger function calls doji-gladys',
    (select (prosrc like '%doji-gladys%')::text from pg_proc where proname = 'trades_telegram'),
    'true'),
-  ('three triggers on trades',
-   (select count(*)::text from pg_trigger
+  /* NAMED RATHER THAN COUNTED, and the count is why. This row expected THREE —
+     001's touch and 002's two — and 005 added the event spine's two without
+     anyone changing it, so the first time it ever ran it reported a correct
+     database as wrong. It had never run before that: it sits below the stale
+     signature that was aborting the file.
+
+     A count is the wrong shape for this even when its number is right. Five is
+     still five if one is renamed and another added, which is precisely the
+     drift a trigger suffers — and the two that matter most fail silently, since
+     a position opening or closing with nothing telling her is indistinguishable
+     from a quiet day. Silence is this path's correct answer most of the time.
+
+     Sorted, so the expected string is stable however Postgres returns them. */
+  ('exactly the five triggers on trades',
+   (select string_agg(tgname, ',' order by tgname) from pg_trigger
      where tgrelid = to_regclass('public.trades') and not tgisinternal),
-   '3'),
+   'trades_eugenia_closed,trades_eugenia_opened,trades_telegram_on_answer,' ||
+   'trades_telegram_on_open,trades_touch_updated_at'),
 
   -- Without it Gladys has no message to edit, and a trade journalled in the app
   -- leaves her Telegram message showing an empty one for good. Nothing else
