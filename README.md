@@ -48,12 +48,14 @@ supabase/001_trades.sql                 the schema
 supabase/002_gladys.sql                 Gladys's trade-open trigger
 supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
 supabase/004_cron.sql                   every scheduled job
+supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her senses
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-email-sync/     Edge Function: the email fill's write
 supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
+  doji-eugenia/adherence.ts             the eight rules a journal row can answer
 doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
@@ -295,7 +297,13 @@ be single-sourced at run time:
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and §0's table of what to do at each one |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | `003_eugenia.sql`, the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — and §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document |
-| each **function's name** | its directory, the trigger, the cron jobs, the Apps Script |
+| the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
+| the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
+| the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
+| the **thesis length** | `THESIS_MAX` and the check constraint |
+| the **columns of `eugenia_runs`** | the table, and the object literals `recordRun` is called with — a key with no column is a row PostgREST refuses whole, so the meter goes quiet |
+| **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the eight predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
+| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
 | the **project ref** | eight copies across six files, two of them not URLs at all |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
@@ -728,15 +736,19 @@ better retried by the trader's own second tap than by a redelivery loop.
 
 ## Eugenia — the market bot
 
-A daily XAU/USD briefing, a quieter look later in the morning, and a
-conversation about either. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
+A daily XAU/USD briefing, a quieter look later in the morning, a look at any
+number that actually lands, a word when a position opens into one, and a
+conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 second is the gold open, so the week's first briefing lands exactly as the
 market does. She greets with `Buenos dias jefesito` in the morning and `Buenas
 tardes jefesito` on Sunday evening.
 
-Reply to her and she answers. `supabase/003_eugenia.sql` holds both her tables
-and her read of the journal, `004_cron.sql` her clock; `prompt.ts` holds who she
-is; `index.ts` is the wiring.
+Reply to her and she answers — by typing, by voice, or by sending a chart.
+`supabase/003_eugenia.sql` holds her memory and her read of the journal,
+`005_eugenia_senses.sql` her meters, her calendar and the trigger that tells her
+about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
+`strategy.ts` what he decided, `adherence.ts` the eight rules a row can answer;
+`index.ts` is the wiring.
 
 **Three objects in the database, and only two of them store anything.**
 `eugenia_turns` is the conversation window, `eugenia_notes` is what she
@@ -793,6 +805,29 @@ never had to.
 the gap between runs are the same length. A missed night loses that day's
 distillation and never the day — the turns stay in the table and stay searchable,
 which is what makes a lossy pass safe to run unattended.
+
+**And it finally gets the retry the briefing has always had.** It was the one
+schedule here with no meter and no second chance: a briefing that dies is retried
+three times and apologised for, while a pass that died was silent, and its
+symptom is that her memory quietly stops growing — which looks exactly like a bot
+with nothing worth remembering. That is the same invisible-absence shape `unseen`
+and `moved_on` exist to defeat, arriving a third time in a different place.
+
+23:00 New York, still inside the same civil day, gated on whether tonight's pass
+already ran. The check reads `eugenia_runs` rather than a marker turn, because
+the pass deliberately stores no turn and giving it one would spend two of
+tomorrow's twelve on bookkeeping it wrote to itself — so the meter that had to
+exist anyway turns out to be exactly the record the retry needs. A read failure
+counts as *already run*, as `briefedToday`'s does: a second pass on a guess is
+worse than a skipped one. A quiet day records itself too, so the retry does not
+re-run a pass that correctly decided nothing.
+
+**It also moves the story and closes what resolved.** `set_thesis` rewrites the
+running thesis — *moved* rather than replaced, since most nights it should read
+as the same story one day further on — and `close_loop` closes a thread that
+actually resolved. Both are nightly-only for the reason `set_channel` is: they
+are judgments across days, and one exchange should not be able to redirect the
+week's story.
 
 **The schedule is decided in the function, not in cron.** pg_cron schedules in
 UTC, so any fixed expression is an hour wrong for half the year and needs
@@ -880,6 +915,163 @@ changed, except gold is up forty"* is news wearing the word and gets sent. The
 failure direction is deliberate: a swallowed message is invisible, an extra one
 is merely extra.
 
+### The event spine — the first thing here that is not a clock
+
+Every schedule above fires at an hour someone chose in advance. So a print at
+08:30 landed into a briefing that had already gone, and waited for a 10:00 pulse
+whose default answer is silence — the one moment of the day when something
+genuinely happened was the moment she was least likely to speak.
+
+**She files the calendar she reads.** `log_calendar` records what is scheduled —
+the time in UTC, the name, the consensus, the prior — and the briefing calls it
+every morning before writing a word. A **quarter-hourly job** then asks one
+question: has anything marked `high` landed and not yet been looked at? If so she
+searches for what it printed, files the actual, and decides whether it is worth
+saying. `looked_at` is what makes that once-only; it is stamped **before** the
+look for the reason the briefing marker is, since a look that generates and fails
+to write would otherwise repeat every fifteen minutes, each one a billed call.
+
+It is a second schedule rather than a faster one, because the four hourly
+predicates all test `hour ===` and a `*/15` job would have run four briefings
+every morning. `?release=1` is its door and the way to exercise a look by hand.
+
+**Its default is silence**, on the pulse's reasoning exactly: a number landing
+where everyone expected it is not news. `isSilent` is shared with it rather than
+written twice.
+
+**And a trade reaches her in two minutes.** `doji-mcp-sync` writes a position
+almost as it opens, and nothing told her: a trade taken at 10:47 arrived the next
+morning as one row inside a week of JSON. A trigger on `trades` now calls her,
+and the two things she is allowed to say are both **his own rules read back at
+the moment they apply**:
+
+| Event | What she may say |
+|---|---|
+| opened | a high-impact print is pending and he is now in a position — R-14 is about standing aside before one, R-19 about a position inherited into one |
+| closed | that fill took the day past −4% of the account his size implies, and R-11 says the day ends there |
+
+Naming the rule is citation; saying what he should do about it is not hers and
+the prompt forbids it in those words. **Silence costs nothing and is the common
+case**: both branches decide from data *before* any model call, so no pending
+print and no breach means the function returns having spent nothing. A trade
+event that always ran a model call would be a bill attached to every fill for a
+message that usually should not be sent.
+
+The trigger fires on the transition and not on every poll. `fill_time` is null on
+every open position, so the close clause compares with `is distinct from` — `<>`
+is NULL there, a `WHEN` that is not true does not fire, and the one event it
+exists for would be the one that never happened. The poller re-upserts every
+position in its window every two minutes, which is what the guard is holding off.
+
+### Checking his rules
+
+§7 of the strategy writes a concrete predicate for all nineteen rules and §8
+writes the population filters and the three verdicts. **Nothing executed any of
+it.** She was handed up to four hundred rows of JSON and expected to apply seven
+filters and three-state logic in her head on the way to producing a number —
+which is the one thing a model is worst at, and where a wrong answer is least
+visible, because a rate computed over the wrong population looks exactly like one
+computed over the right one. That is §8's own opening sentence.
+
+`adherence.ts` evaluates the eight rules a row can answer — **R-01, R-02, R-10,
+R-11, R-12, R-13, R-15 and R-16** — and `check_rules` serves it. The set is not a
+choice: §7's `Evaluable` column decides it, and `agree` holds the two lists
+against each other, because a rule marked `journal` and never implemented is a
+check she cites that nobody runs, and one marked `judgment` and implemented
+anyway starts reporting `pass` for something nothing stored can see.
+
+**`unknown` is not a pass**, and the code says so rather than the prompt: the
+verdict is the worst outcome present, and an empty population is `unknown`. A
+Friday close-out under $25, a second entry inside the fifteen-minute sweep
+window, a day with no size to derive an account from — each is undecidable by
+construction, and each is reported as undecidable with its count beside it.
+
+It is pure, so every rule is driven from a test in **both** directions. A
+predicate only ever seen to return `pass` has been shown to be reachable, not to
+work, and three "clean" results in this repository's history turned out to mean
+exactly that.
+
+**It gives no verdict on a trade and could not.** It reports whether a row
+satisfies a predicate he wrote. *"Two entries eleven days ago were 41 minutes
+apart, and R-12 allows fifteen"* is a fact about his own rule; what it meant is
+his to say.
+
+Two figures in it are operational readings rather than facts, and both are named
+constants so they can be argued with: `CLOSEOUT_MIN` is thirty minutes, giving
+§6's *"at or very near"* the Friday close a number; `STRETCH` is 24–31 December,
+giving §5's *"Christmas-to-New-Year stretch"* one. The holiday calendar is
+computed rather than listed — including Good Friday, and including the
+observance shift that closes the market on Friday 3 July 2026 — because a table
+of dates stops being true the year nobody extends it, and that failure looks
+exactly like perfect compliance.
+
+### The second read
+
+The briefing is researched and written in one generation, and its quality target
+lives in prose on the far side of a model call where no test can reach it. That
+is not hypothetical: unmeasured, it grew by a sixth and the way anyone found out
+was by counting the characters by hand.
+
+So it is read once more before it goes, at `medium` effort with no tools, against
+the rules it was written to — is the first sentence only true today, was a term
+redefined after it was already explained, is the chain missing a link, is there a
+forward call in it, is it inside the budget, does it obey his standing
+instructions. It returns the briefing, not notes about it.
+
+**It cannot make things worse, and that is enforced rather than trusted.** A
+revision that comes back empty, apologetic, or twice the length is a critic that
+failed, and the draft is kept. Same direction as the pulse: the failure that
+sends the original is better than the failure that sends nothing.
+
+### Hearing him, and seeing what he sees
+
+`if (!msg.text) return` silently dropped the two things a trader at a desk is
+most likely to send.
+
+**A voice note** now reaches her as text marked `[voice note]`, and the prompt
+tells her to read it as him talking rather than writing — it will ramble, and it
+is likely to be about how a trade felt, which is exactly when she slows down and
+asks one thing. This is the one capability here that needs something the system
+does not otherwise have: the Messages API takes text and images and not audio,
+and Telegram does not transcribe for bots. `STT_URL` and `STT_KEY` are therefore
+optional secrets, written against the `/audio/transcriptions` shape so the
+provider is configuration. **Unset is a first-class state** — she says she cannot
+hear it, and nothing else is affected, which is why they are deliberately not in
+the boot guard beside the secrets whose absence stops her working. `agree`
+enforces the exemption rather than waving it through: an optional secret must be
+guarded where it is used.
+
+**A chart** she can now see, and the prohibitions do not move an inch because she
+can. She may describe what is on it and take it as context; she may not say
+whether a setup is valid or a level will hold, and the prompt says so in those
+words, because a picture is the most tempting place in this system to give a
+verdict on a trade.
+
+Neither is stored as sent. The transcript is kept and the image is not — a chart
+in `eugenia_turns` would be a megabyte of base64 resent as history for the next
+six exchanges. And the clock reaches a picture turn: `stamped` appends the New
+York time as a trailing text block rather than concatenating against an array,
+which would have produced `[object Object]` on exactly the turns carrying the
+most context.
+
+### Whether it landed
+
+An instruction note is the only correction channel he has, and it is a good one —
+but it fires only when something annoys him enough to type. On every ordinary
+morning there was no signal at all, so the nightly pass judged her own output
+with no evidence about how any of it went.
+
+Two buttons ride under the briefing — the mechanism Gladys has used since she
+shipped — and the nightly pass reads the last two days of them. `callback_data`
+stays far under Telegram's 64 bytes for the same reason hers does. **It is not a
+score and the prompt forbids treating it as one**: a bot optimising a thumbs-up
+average writes briefings that flatter rather than teach, and what he *told* her
+always outranks what he tapped.
+
+Registering the webhook for `["message"]` alone means the taps are never
+delivered, the button spins, and nothing reports it — `allowed_updates` must name
+`callback_query` too.
+
 ### What she remembers
 
 Two kinds of memory, and they answer different questions.
@@ -889,6 +1081,9 @@ Two kinds of memory, and they answer different questions.
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
 | `eugenia_notes` | facts about him, and what he has told her to do | last 20 notes | her `remember` tool |
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
+| `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
+| `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
+| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
@@ -910,6 +1105,37 @@ it stuck and will say it again.
 would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts the briefing, the pulse and a reply each read
 them.
+
+### Search that survives a rephrasing
+
+`eugenia_search` was `websearch_to_tsquery` ranked by `ts_rank`: it found rows
+containing the words asked for and nothing else. Ask *"what did we conclude about
+the December cut"* and a turn saying *the market has mostly given up on easing
+this year* is invisible — same subject, no shared stem.
+
+The failure is silent, and the prompt makes it worse by telling her an empty
+result is trustworthy: *if the search comes back empty, that is an answer worth
+trusting*. A lexical miss becomes a confident *"I have no record of that."*
+
+`pg_trgm` is the half that needs no new vendor — no embedding provider, no second
+AI key, no per-write cost, nothing to backfill. It is **not** semantic search and
+this does not claim it is; it is the reach that was missing, bought with an
+extension that ships with the database.
+
+`word_similarity`, never `similarity`, and the difference is total here.
+`similarity()` normalises over the union of both trigram sets, so a six-word
+question against a fourteen-hundred-character briefing scores near zero however
+well it matches, and every long turn would be unreachable. `word_similarity`
+scores the query against the best matching *extent* inside the target, which is
+exactly this shape: a short query, a long document.
+
+Ranked in two keys rather than one fused score. `ts_rank` lands around 0.0–0.1
+and `word_similarity` spans 0–1, so adding or maxing them needs a scale factor
+invented to make the arithmetic come out — a fudge that decides rankings while
+looking like a formula. Instead an exact word match outranks a near one, and
+within each group the stronger score wins. The return type is unchanged, because
+`create or replace function` may not alter one and widening it would need a
+`drop` that takes the grants with it.
 
 ### Where he stands on each channel
 
@@ -1303,6 +1529,14 @@ At 10:00 the retry window and the pulse overlap, and `dueNow()` gives that hour
 to the retry — on a day the briefing failed, a second look at a morning he was
 never told about is not what is wanted.
 
+**And the apology names the job that actually died.** Every scheduled failure said
+*"No briefing, jefe"* — including a pulse, the nightly pass, a release look and a
+trade event. So a consolidation that died at 22:00 reported itself to him as a
+missing briefing, sending him to look for the wrong thing at the wrong time of
+day; and the failure whose real symptom is that her memory stops growing was
+described as the one whose symptom is a message that never arrived. `APOLOGY` is
+a word per job, and a test asserts no two of them are the same sentence.
+
 ### What a turn cost
 
 `ask()` logs one line per turn — the caller, the rounds it took, the effort, the
@@ -1318,6 +1552,27 @@ hundred-character target lives in the prompt, on the far side of a model call,
 where no test can hold it. Unmeasured, the briefing grew by a sixth and the way
 it surfaced was somebody counting the characters by hand.
 
+**And all of it went somewhere it did not survive.** This repository's own
+account of `pg_net` says plainly that nobody reads Edge logs — it is the whole
+reason a failed briefing messages Telegram instead. Every cost and quality meter
+was still writing there and nowhere else, so *"is the briefing drifting long
+again"*, *"what did last month cost"* and *"how often does `fallbacks` actually
+fire"* were questions whose answers were collected and then discarded within
+hours.
+
+`eugenia_runs` is those same figures somewhere they last. One row per model call
+on the way out, plus a third row per briefing carrying what he actually received
+and how long the whole thing took — kept apart on purpose, so *the critic costs
+more than it is worth* and *the briefing is drifting long* stay two answerable
+questions rather than one blurred figure. **A failed turn is a row too**, which
+is the row that never existed: a briefing that dies costs the same searches as
+one that lands, and the only trace was an apology, which is a message rather than
+data.
+
+It never throws and never blocks the answer. A briefing that was written, paid
+for and delivered must not be lost because an instrumentation insert failed — or
+because `005` has not been applied yet.
+
 ### Adding the channel map to an existing database
 
 `003_eugenia.sql` now ends with `eugenia_channels`. The statements are safe to
@@ -1332,6 +1587,40 @@ row is a `200` with an empty array — the move is dropped silently, and that
 channel then renders at the bottom rung forever, which is indistinguishable from
 a channel he has genuinely never used. The function reports that case back to
 her rather than claiming success, but nothing reaches him.
+
+### Applying 005, and the wiring it needs
+
+`005_eugenia_senses.sql` is the senses, the meters and the compounding half. It
+is **safe to re-run in full** — every statement is `if not exists`, `or replace`
+or `on conflict do nothing` — which `003` deliberately is not, because this is
+the file that will grow. A test asserts that: a bare `create table` or
+`create index` in it would refuse on the second run.
+
+Three things outside the SQL have to move with it, and none of them fails loudly:
+
+**The event spine needs its own cron job.** `004_cron.sql` gains a
+quarter-hourly `doji-eugenia-spine` calling `?release=1`. It is a second job
+rather than a faster one because the four hourly predicates all test `hour ===`
+— a `*/15` on the existing job would run four briefings every morning. It is
+offset off the hour so it never collides with the 08:00 briefing.
+
+**The webhook has to allow `callback_query`.** Re-register with
+`allowed_updates = ["message", "callback_query"]`, or the taps under a briefing
+are never delivered, the button spins, and nothing reports it.
+
+**`STT_URL` and `STT_KEY` are optional** and only enable voice notes. Unset, she
+says she cannot hear them and everything else is unaffected — which is why they
+are deliberately not in the boot guard.
+
+```sh
+supabase secrets set STT_URL=https://<provider>/v1/audio/transcriptions
+supabase secrets set STT_KEY=<key>
+supabase secrets set STT_MODEL=whisper-1     # optional, defaults to whisper-1
+```
+
+`verify.sql` answers whether the five tables, the two triggers, the three
+policies and the `pg_trgm` extension are actually there, which is the half no
+test in the repository can reach.
 
 ### Programmatic tool calls need their container
 
@@ -1463,6 +1752,32 @@ which also catches the replies a briefing draws through the morning and the 09:0
 retry after an 08:00 failure. It does not catch 08:00 → 10:00, and nothing
 sensible would. `cache_read_input_tokens` is in `ask()`'s log line, and is the
 number that says whether any of this is true rather than argued.
+
+### What she is watching, on the dashboard
+
+She and the app have shared a database and nothing else: everything she knew
+lived in a Telegram thread. Three things are worth a glance on the screen he
+already opens every morning — what lands today, what story she is carrying, and
+what is still open — and none of them is private to her.
+
+**Not her notes and not her turns.** Those stay denied to the publishable key
+exactly as `003` left them; his window into them is `/notes`, in her own thread,
+where an answer can be asked a question back. The three tables the card reads
+carry no `user_id` and nothing to scope a policy by, so `using (true)` for
+`authenticated` is the honest statement of what is true rather than a view
+standing in front of tables that deny everyone. A test asserts the card reads
+only those three, and that `005` opens no policy on the other two.
+
+**One read, after the render, never in front of it.** The journal is what the
+page is for. A failure — `005` not applied, the policy missing, the network gone
+— hides the card and touches nothing else.
+
+That failure is checked rather than inferred, which it was not at first:
+`supabase-js` resolves a failed read as `{ data: null, error }` rather than
+throwing, so `data || []` turned a missing table into an empty calendar. The card
+hid itself, nothing was logged, and why it was blank became unknowable — the same
+mistake `readTrades` is written against on her side of the wire, in the same
+words: **an empty answer is only an answer when something was read.**
 
 ### What she will not do
 
@@ -1624,7 +1939,9 @@ the same rule.** `.github/workflows/deploy-functions.yml` runs
 secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
 
 All four functions go on each run rather than only the changed one, so none of
-them can drift apart from the others. `verify_jwt` lives in
+them can drift apart from the others. `adherence.ts` ships inside
+`doji-eugenia` the way `prompt.ts` and `strategy.ts` do — it is a module of that
+function, not a fifth one. `verify_jwt` lives in
 `supabase/config.toml` rather than in a dashboard toggle, which is what makes
 the committed file the whole description of how a function is deployed.
 
@@ -1989,8 +2306,8 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns` |
-| `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped` and `apologyFor` |
+| `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; and `notesBlock()` and `channelsBlock()` against the four paths that must call each — the briefing, the pulse, a reply, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
@@ -2128,6 +2445,39 @@ curl -s https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-<ver>.tgz
   | openssl dgst -sha512 -binary | openssl base64 -A
 ```
 
+**A release reaches her within a quarter of an hour, not instantly.** The event
+spine is a cron job, so a print at 08:30 is looked at somewhere between 08:35 and
+08:50. That is the trade: a `*/15` job on the existing hourly one would have run
+four briefings a morning, and a per-minute job is ninety-six times the
+invocations for a granularity nothing here needs. If a number's first five
+minutes ever matter, the fix is a shorter interval on that job alone — the
+predicate is already data-driven and would not change.
+
+**The calendar is only as good as the search that filled it.** She writes
+`eugenia_calendar` from what she read on the web, so a release she never found is
+one the spine will never wake her for, silently. `source` records where it came
+from; nothing downstream treats these as broker data. The accumulating half —
+what printed against what was expected, with her line beside it — is worth
+nothing this month and a great deal in a year, which is the whole argument for
+starting it before it is useful.
+
+**Voice notes are the one thing here that needs a second vendor.** The Messages
+API takes text and images and not audio, and Telegram does not transcribe for
+bots, so `STT_URL` and `STT_KEY` point at an external service. Unset, she says
+she cannot hear them and nothing else changes. It is written against the
+`/audio/transcriptions` shape rather than a named provider, and **it is the only
+thing in this system that sends his own words outside his own infrastructure** —
+worth knowing before setting the two secrets, and the reason leaving them unset
+is a supported state rather than a broken one. It is also the one path here that
+could not be exercised end to end from the machine it was written on — the call is guarded, its failure is reported to her as a
+sentence, and that is as far as reading can take it.
+
+**`web_fetch` grounds a number on a page that has to stay fetchable.** The four
+sources are named in the prompt because the tool only fetches URLs already in the
+conversation. A page that moves or starts refusing bots degrades to search, which
+is what she did before — quietly, and with no signal that the number in the
+opening line came from prose rather than from the instrument.
+
 **The session seam.** Fills the poller never reached have no `entry_time`, so
 their session derives from close time rather than entry time. Flag it whenever
 session data is read for a pattern spanning that boundary. A `?force=1` run with
@@ -2141,12 +2491,14 @@ account. The planned floor is **not recoverable from the data** — the broker
 reports only the *final* stop, so a stop moved to break-even has overwritten the
 original risk. Never infer what the planned R:R was; ask.
 
-**The two calling pg_cron jobs hold no database power**, and that is a claim
-about the database rather than about the secret. Neither can read or write a
-table: each presents the cron secret, read from Vault at call time, and the
+**The three calling pg_cron jobs hold no database power**, and that is a claim
+about the database rather than about the secret. None can read or write a table:
+each presents the cron secret, read from Vault at call time, and the
 service-role key lives in the functions' own secrets and never appears in a job.
-The third job is the exception and is why the distinction is worth making — it
-is a DELETE, and it reaches nothing outside pg_cron's own history.
+The housekeeping job is the exception and is why the distinction is worth making
+— it is a DELETE, and it reaches nothing outside pg_cron's own history. The two
+`trades` triggers are `security definer` and reach nothing either: both build one
+`net.http_post` and return.
 This replaced an arrangement where the job text carried a legacy service_role
 JWT — full RLS-bypassing access, in a job definition, and unrotatable, because
 legacy keys are tied to the project's JWT secret.
@@ -2157,7 +2509,7 @@ and it used to be described as though it were.** Say it per endpoint:
 | Function | What a holder of the secret can do |
 |---|---|
 | `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read the deals back with `?raw=1` |
-| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code |
+| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code; `?release=1` and a `{trade}` body reach the two cheaper event paths |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
 Neither of the last two can reach a column: Gladys's trigger half never names
@@ -2176,7 +2528,7 @@ places rather than three, with no Vault spelling to get wrong.
 One value, two stores, two spellings, and it is worth knowing before you touch
 either: the Edge Functions read the cron secret from their own secrets as
 **`DOJI_CRON_SECRET`**, while the database reads it from Vault as
-**`doji_cron_secret`**. The two calling jobs and Gladys's trigger all read the
+**`doji_cron_secret`**. The three calling jobs and both triggers all read the
 lower-case Vault name, and `verify.sql` asserts all three. That trigger shipped reading the upper-case one, found nothing, and
 went quiet without failing anything.
 

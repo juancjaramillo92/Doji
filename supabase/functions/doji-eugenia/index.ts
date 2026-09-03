@@ -2432,9 +2432,18 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
    `telegram()` helper, which posts JSON to the method endpoint.
    ───────────────────────────────────────────────────────────────────────── */
 // Telegram's own ceiling for a bot download is 20MB. This is far lower on
-// purpose: an image goes into the request as base64, where it is roughly a
-// third larger again and is paid for as input tokens.
-const FILE_MAX = 4 * 1024 * 1024;
+// purpose: an image goes into the request as base64, which is a third larger
+// again — so the ceiling that matters is the one on the far side, and a photo
+// Telegram has already compressed is nowhere near either. It is also paid for
+// as input tokens on every round of the turn it appears in.
+const FILE_MAX = 3 * 1024 * 1024;
+
+/* THE FOUR THE API ACCEPTS, checked here rather than discovered as a 400 in the
+   middle of a reply. A photo is always JPEG; a DOCUMENT is whatever he attached,
+   and "send it as a file to keep the quality" is the ordinary way a chart
+   arrives as a PNG — or as a BMP, a HEIC or a TIFF, none of which are readable
+   and all of which would otherwise reach the model as an image block. */
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 async function tgDownload(fileId: string): Promise<{ bytes: Uint8Array; path: string } | null> {
   const meta = await tg("getFile", { file_id: fileId });
@@ -2610,7 +2619,10 @@ async function handleMessage(update: any): Promise<void> {
        trade he has not taken yet and is the one prohibition an image makes
        tempting to break. Largest size last, which is Telegram's ordering. */
     const photo = Array.isArray(msg.photo) && msg.photo.length ? msg.photo[msg.photo.length - 1] : null;
-    const asImage = photo ?? (String(msg.document?.mime_type ?? "").startsWith("image/") ? msg.document : null);
+    // A photo is always JPEG; a document carries whatever he attached, and only
+    // the four the API reads are worth downloading.
+    const docType = String(msg.document?.mime_type ?? "");
+    const asImage = photo ?? (IMAGE_TYPES.includes(docType) ? msg.document : null);
     if (asImage?.file_id) {
       await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
       const file = await tgDownload(asImage.file_id);
@@ -2622,11 +2634,18 @@ async function handleMessage(update: any): Promise<void> {
         type: "image",
         source: {
           type: "base64",
-          media_type: String(msg.document?.mime_type ?? "image/jpeg"),
+          media_type: photo ? "image/jpeg" : docType,
           data: base64(file.bytes),
         },
       });
       text = String(msg.caption ?? "").trim() || "Have a look at this chart.";
+    }
+    // An attachment that is neither readable audio nor a readable image. Said
+    // rather than dropped: a silent non-answer is what this whole branch exists
+    // to stop, and "I cannot open that" is a complete reply.
+    if (!blocks.length && !text && msg.document) {
+      await say(`I cannot open ${docType || 'that kind of file'}, jefe. A screenshot works.`);
+      return;
     }
 
     if (!text) return;
