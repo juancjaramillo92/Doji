@@ -489,16 +489,18 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   try {
     // ?force=1 bypasses the schedule for manual runs and backfills.
     // ?raw=1   returns the get_deals body unparsed — see below.
+    // ?tools=1 returns what the broker's MCP actually offers — see below.
     // ?hours=N widens the window for one call, clamped to cTrader's 720h cap.
-    // None of the three selects a tool or reaches an MCP call with
+    // None of the four selects a tool or reaches an MCP call with
     // request-supplied data, so the read-only guarantee is untouched.
     const url   = new URL(req.url);
     const force = url.searchParams.get("force") === "1";
     const raw   = url.searchParams.get("raw") === "1";
-    // ?raw=1 answers over the weekend too, which is when a suspicious row
-    // actually gets looked at. It writes nothing, so the market check has
-    // nothing to protect here.
-    if (!force && !raw && !marketOpen()) {
+    const tools = url.searchParams.get("tools") === "1";
+    // The two read-only flags answer over the weekend too, which is when a
+    // suspicious row actually gets looked at. Neither writes, so the market
+    // check has nothing to protect here.
+    if (!force && !raw && !tools && !marketOpen()) {
       return json({ ok: true, skipped: "market closed" });
     }
 
@@ -508,6 +510,39 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const foldFrom = to - foldHours(hours) * 3600_000;    // what gets read
 
     const sid = await mcpInit();
+
+    /* ?tools=1 — WHAT THE BROKER ACTUALLY OFFERS, which is a question this
+       repository has had to answer by reading its own allow-list and hoping.
+
+       ALLOWED_TOOLS names the two this function calls. It has never said
+       anything about what EXISTS: the poller needs deals and a balance, so
+       those are what it asked for, and whether cTrader also serves a quote, a
+       symbol list or an open-position feed was never established either way.
+       That gap decides real things — whether Eugenia can read a price off the
+       broker she already has a connection to, or has to reach for a third-party
+       feed and a vendor decision.
+
+       A METHOD, NOT A TOOL CALL, so it goes past mcpPost rather than through
+       it: the allow-list guards a tool NAME becoming a request, and `tools/list`
+       names none. It writes nothing, calls nothing it discovers, and is safe at
+       any hour — the same standing as ?raw=1, and here for the same reason,
+       which is that guessing has already cost a day more than once.
+
+       Text rather than JSON, because the SSE framing is part of what a reader
+       is checking. */
+    if (tools) {
+      const listed = await fetch(MCP_URL, {
+        method: "POST",
+        headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+      });
+      // Checked for the reason mcpPost checks: a 401 body under a 200 would
+      // read as the broker offering nothing at all.
+      if (!listed.ok) throw new Error(`MCP tools/list: HTTP ${listed.status}`);
+      return new Response(await listed.text(),
+        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+
     const dealArgs = {
       fromTimestamp: String(foldFrom),
       toTimestamp:   String(to),
