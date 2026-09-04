@@ -326,6 +326,7 @@ be single-sourced at run time:
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
 | each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search — a disagreement is a 400 on every write, reported to a console nobody reads |
+| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, which closes Friday and opens Sunday on it, and `ROLL_HOUR` in `index.ts`, which decides whether a quote is describing the night or the evening — one boundary, and a disagreement is a window labelled wrong for an hour a day |
 | the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
 | the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
@@ -592,6 +593,19 @@ against the real capture rather than an invented shape.
 session's close — the 17:00 New York roll for gold — so *where it is, with the
 overnight move* is one request and a subtraction. That is the whole of the
 briefing's opening line.
+
+**And that roll is a window, which the quote used not to say.** `high`, `low`,
+`prev_close` and `change` are all measured from the session open, so the same
+`change` is the overnight move for the sixteen hours before 17:00 New York and
+only the evening's move for the seven after it. Served as bare JSON it read as
+neither, which is to say it read as *on the day* — and at 20:57 Eugenia said
+gold was up $12 on the day when the calendar day was up more than $40. Both
+figures were real; the label was not. `quoteWindow` states which side of the
+roll the reading is on, and `readMarket` and the price sense both carry it.
+
+Nothing here can see the calendar day. `get_trendbars` serves the broker's daily
+bars, which roll on the same boundary, so the honest answer is to name the window
+rather than to compute a figure out of numbers that cannot carry one.
 
 **And `get_trendbars` documents a call shape it refuses.** Its own description
 offers *"(count) → last N bars ending now"*; sending exactly that answers
@@ -1132,9 +1146,21 @@ relative twice over, and the two halves bind at opposite ends of the day:
 | Gate | Value | What it is for |
 |---|---|---|
 | `MOVE_SHARE` | 0.35 of the session range so far | binds on an established session, where an ordinary swing clears any fixed floor |
-| `MOVE_FLOOR` | 0.001 of the price | binds an hour after the Sunday open, where the range is a couple of dollars and a third of it is noise |
+| `MOVE_FLOOR` | 0.0025 of the price | binds wherever the range is too young or too quiet to be a measure — which is every weekday evening, not just the hour after the Sunday open |
 | `MARK_STALE_MIN` | 40 minutes | two missed runs and the gap is no longer a quarter of an hour — $15 in fifteen minutes is an event, $15 across an hour is a session |
 | `MOVE_QUIET_H` | 2 hours | one message about one move; a market that trends all afternoon is one story, and this is the only thing between it and eight messages before lunch |
+
+**The share is measured against the BROKER'S session, and that session restarts
+every weekday at 17:00.** The pair above was built believing the share was the
+real test and the floor was for the ragged hour after the Sunday open — one edge
+case, once a week. It is not: from the roll until the range has been rebuilt the
+share is taken against a few hours of thin evening trade, stops binding, and the
+floor carries the whole test for a third of the week. A tenth of a percent was
+written to be generous because something above it was expected to be working;
+alone it is $4.49 on gold at 4,485, which gold covers on an ordinary afternoon,
+and it let a $7 drift at 20:57 reach him as a sharp move. A quarter of a percent
+is an event in the thin hours as well as the busy ones, and it costs nothing on
+an established session — a $50 range already asks $17.50 of the share.
 
 **And a move a print explains is not this sense's to report.** The spine is
 already looking at anything high-impact that landed, so a jump at 08:30 on
@@ -1155,6 +1181,15 @@ belongs to this path specifically: a search will always return *something*, so a
 unexplained move must be told as an unexplained move — what it did, and that she
 cannot yet see why — rather than as a cause she reached for. That is what
 `open_loop` is for.
+
+**And it teaches, which for a long time it was the only unscheduled look that
+did not.** The print look builds a mechanism he has never had built before saying
+what a number changed; this one only reported. But what moves gold runs through a
+channel as surely as what a print changes does — a message saying the dollar came
+off teaches nothing to someone for whom the dollar is `unseen`, and that is the
+likeliest message this path sends. It is handed the map and told to build from it
+on the release look's own terms: build where the channel is thin, and where he
+owns it say what moved and stop.
 
 It runs only while the market is open, by the same `marketOpen` the poller keeps
 — one definition in `_shared/edge.ts`, since both now ask it. Most firings cost
@@ -1374,8 +1409,13 @@ nightly pass, the release look, the move look and the trade look each read
 them — the last of those was deaf for its whole life, so an instruction he had
 given was obeyed everywhere except the two messages that arrive while he is in
 a position, which are the ones he is least able to ignore. `channelsBlock()`
-goes to the five that are asked to build a term, the release look having joined
-when its prompt was asked to teach.
+goes to the six that are asked to build a term — the release look having joined
+when its prompt was asked to teach, and the move look one release later, for the
+same reason and after the same failure. The two are the same shape: an
+unscheduled message about something the morning did not cover. What moves gold
+runs through a channel as surely as what a print changes does, so a message
+saying the dollar came off teaches nothing to someone for whom the dollar is
+`unseen` — and that is the likeliest message this path sends.
 
 **And the conversation window goes to everything that speaks**, which is the
 same list minus the nightly pass — that one reads a fixed twenty-four hours of
@@ -2808,7 +2848,7 @@ not run.
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped` and `apologyFor` |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the five — the briefing, the pulse, a reply, the release look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

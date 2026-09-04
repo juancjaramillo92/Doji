@@ -456,18 +456,24 @@ code you write near it:
   likeliest to have already named — so without the window the sharpest thing she
   sends arrives as a repetition, which reads as emphasis rather than as a defect.
   Both reads sit AFTER its two early returns, so an ordinary fill still costs
-  nothing. `channelsBlock()` stays on the five that are asked to build a term,
+  nothing. `channelsBlock()` stays on the six that are asked to build a term,
   and `recent()` stays off the nightly pass, which reads its own fixed
   twenty-four hours. An instruction — *"stop mentioning the
   ten-year"* — is a note, and every later message obeys it; the conversation
   window would forget it by morning. Dropping the call from the briefing, the
   pulse or a reply fails silently: she carries on ignoring something he believes
-  she took, and nothing anywhere reports it. `agree.test.mjs` reads the five
+  she took, and nothing anywhere reports it. `agree.test.mjs` reads the six
   function bodies for it, and for `channelsBlock()` beside it — the release look
   joined that list when its prompt was asked to teach, since telling her to build
   a mechanism he has never had built without handing her the map that says which
   those are is an instruction outrunning its inputs, and it fails by teaching the
-  wrong thing well rather than by failing at all.
+  wrong thing well rather than by failing at all. THE MOVE LOOK JOINED IT NEXT,
+  and the two are one case: both are unscheduled messages about something the
+  morning did not cover, and what moves gold runs through a channel exactly as
+  what a print changes does. Adding the map is half of it — `agree.test.mjs`
+  reads BOTH prompts for the instruction to use it, because a path handed the
+  ladder with nothing telling it to build fails identically to one told to build
+  with no ladder.
 - **`positionsBlock()` IS THE ONLY BLOCK WITH RULES ABOUT WHAT SHE MAY DO WITH
   IT, and that asymmetry is the whole design rather than a compromise.** She sees
   the full open row — entry, stop and target as first seen — so she can answer
@@ -529,6 +535,19 @@ code you write near it:
   share of the price — because a fixed dollar threshold means two different
   things to gold at 4,400 and gold at 2,000, and the year nobody revises it the
   sense fires constantly or never; never looks exactly like a quiet market.
+  THE SHARE IS TAKEN AGAINST THE BROKER'S SESSION AND THAT SESSION RESTARTS AT
+  17:00 NEW YORK, which this pair was built not knowing: the floor was written
+  for the ragged hour after the Sunday open, one edge case once a week, and it is
+  in fact alone for seven hours of every weekday while the evening range
+  rebuilds. A tenth of a percent was generous because something above it was
+  meant to be working; alone it is $4.49 on gold at 4,485 and it sent a $7 drift
+  at 20:57. The same roll is why `quoteWindow` exists — `high`, `low`,
+  `prev_close` and `change` are all session figures, so the SAME `change` is the
+  overnight move before 17:00 and the evening's after it, and served as bare JSON
+  it read as "on the day". Nothing here can see the calendar day; `get_trendbars`
+  rolls on the same boundary, so the window is NAMED rather than computed, and
+  `agree.test.mjs` reads both `readMarket` and `postMove` for the call — dropping
+  it breaks nothing and the message still reads as a working price.
   `MARK_STALE_MIN` stops a move measured across an outage counting as a
   quarter-hour move, and `looked_at` is the one column written conditionally:
   unconditionally, the quiet window never reopens and she says one thing about a

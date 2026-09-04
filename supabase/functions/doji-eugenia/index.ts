@@ -984,7 +984,10 @@ const MARKET_TOOL = {
     "the previous session's close, and the move since it. Use it whenever you are " +
     "about to state where gold is or what it has done overnight, which is every " +
     "briefing. This is read off the instrument, so prefer it over any number a " +
-    "search or a page gives you; those are as stale as the page was. It says " +
+    "search or a page gives you; those are as stale as the page was. Everything " +
+    "but the bid and the ask is measured from the session open, which for gold is " +
+    "the 17:00 New York roll — the answer says which side of that roll you are on, " +
+    "and after it those figures are the evening rather than the day. It says " +
     "nothing about what price will do next and is not to be used as though it did.",
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
@@ -1015,13 +1018,47 @@ async function marketQuote(): Promise<Quote | null> {
   }
 }
 
+/* THE ROLL IS THE WINDOW EVERY ONE OF THOSE NUMBERS IS MEASURED OVER, AND THE
+   QUOTE USED NOT TO SAY SO. `high`, `low`, `prev_close` and `change` all belong
+   to the broker's session, which for gold restarts at the 17:00 New York roll —
+   so `change` is the overnight move for the sixteen hours before that roll and
+   only the evening's move for the seven after it. Served as a bare `change` in
+   a JSON blob it reads as neither, which is to say it reads as "on the day",
+   and that is what she said at 20:57 on a session under four hours old: up $12
+   where the calendar day was up more than $40. Both numbers were real. One
+   label was wrong, and it was the one nothing in this file had ever written
+   down.
+
+   A LABEL RATHER THAN A SECOND CALL, because there is no second call to make.
+   Nothing this system can read spans the calendar day — `get_trendbars` serves
+   the broker's daily bars, which roll on the same boundary — so the honest fix
+   is to name the window and say plainly that the day is not in it, rather than
+   to compute a figure out of numbers that cannot carry one.
+
+   Pure and exported for the reason foldSpot is: a window named wrongly is
+   invisible in the output and arrives as a confident wrong number, and this is
+   the one thing here a test can drive from both sides of the roll. */
+export const ROLL_HOUR = 17;
+
+export function quoteWindow(now: Date): string {
+  return nyClock(now).hour >= ROLL_HOUR
+    ? "The broker's session began at the 17:00 New York roll THIS EVENING, so " +
+      "the high, the low, the previous close and the move since it cover only " +
+      "the hours since that roll. They are NOT the calendar day, and what gold " +
+      "has done since midnight is not something this quote can tell you — do " +
+      "not describe any of it as the move on the day."
+    : "The broker's session began at the 17:00 New York roll YESTERDAY evening, " +
+      "so the move since that close is the overnight move and the high and low " +
+      "are the overnight range.";
+}
+
 /* NEVER THROWS, for the reason every other tool here does not. And it says what
    it could not do rather than coming back empty: a briefing that opens on a
    silently missing price is one that either invents a number or drops the line
    the whole first paragraph is built on. */
 async function readMarket(): Promise<string> {
   const quote = await marketQuote();
-  return quote ? JSON.stringify(quote)
+  return quote ? `${JSON.stringify(quote)}\n\n${quoteWindow(new Date())}`
     : "The live price could not be read just now. Say you do not have a current level rather than quoting one from a search.";
 }
 
@@ -2948,14 +2985,32 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
    rather than a fact — which is why they are named here instead of appearing
    inside the predicate, the same reason CLOSEOUT_MIN and STRETCH are named in
    adherence.ts. */
-// A third of everything the day has done so far, inside a quarter of an hour.
-// The share binds on an established session, where the range is wide enough for
-// an ordinary swing to clear any fixed floor.
+// A third of everything the session has done so far, inside a quarter of an
+// hour. The share binds on an established session, where the range is wide
+// enough for an ordinary swing to clear any fixed floor.
 export const MOVE_SHARE = 0.35;
-// And a tenth of a percent of the price — about $4.40 on gold at 4,400. The
-// floor binds at the other end of the day: an hour after the Sunday open the
-// range is a couple of dollars and a third of it is noise.
-export const MOVE_FLOOR = 0.001;
+/* AND THE FLOOR BINDS FOR SEVEN HOURS OF EVERY WEEKDAY, WHICH IS NOT WHAT THIS
+   PAIR WAS BUILT BELIEVING. The share was the real test and the floor was for
+   the ragged hour after the Sunday open — one edge case, once a week. But the
+   range this share is taken against is the BROKER'S session range, and that
+   session restarts at the 17:00 New York roll every single weekday. So from
+   17:00 until the range has been rebuilt the share is measured against a few
+   hours of thin evening trade, it stops binding, and the floor is the whole
+   test — for a third of the week rather than for an hour of it.
+
+   A tenth of a percent was a floor written to be generous, because something
+   above it was expected to be doing the work. It is $4.49 on gold at 4,485,
+   which gold covers in a quarter of an hour on an ordinary afternoon, and it is
+   what let a $7 drift at 20:57 reach him as a sharp move. A quarter of a
+   percent — $11.21 at the same price — is a figure that is an event in the thin
+   hours as well as the busy ones, which is what the floor now has to be, since
+   the thin hours are exactly when it is alone.
+
+   It costs nothing on an established session: a range of $50 asks $17.50 of the
+   share, which is already above the floor. The floor binds only where the range
+   is under about $32, which is to say on a session too young or too quiet for
+   its own range to be a measure of anything. That is the case this is for. */
+export const MOVE_FLOOR = 0.0025;
 // Two missed runs and the gap is no longer a quarter of an hour. A move measured
 // across an outage is a move across an hour, which is a different claim — so the
 // mark is advanced and the reading starts again.
@@ -3071,8 +3126,9 @@ async function postMove(): Promise<Response> {
 
   await markPrice(spot.bid, true);
 
-  const [notes, story, loops, ahead, desk] = await Promise.all([
-    notesBlock(), thesisBlock(), loopsBlock(), aheadToday(), positionsBlock(),
+  const [notes, map, story, loops, ahead, desk] = await Promise.all([
+    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), aheadToday(),
+    positionsBlock(),
   ]);
   // The window is STATED FROM THE MARK rather than asserted as a quarter of an
   // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
@@ -3083,12 +3139,15 @@ async function postMove(): Promise<Response> {
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
     `The session has traded ${spot.low} to ${spot.high}, against a previous ` +
     `close of ${spot.prev_close}. Nothing high-impact you filed has printed in ` +
-    `the last hour.` +
+    // The same label readMarket carries, and needed most here: this path is the
+    // one that fires in the evening, which is the only time the two windows
+    // disagree and the only time she can call a four-hour session "the day".
+    `the last hour.\n\n${quoteWindow(new Date())}` +
     (ahead.length
       ? `\nStill ahead today: ` +
         ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
       : "") +
-    notes + story + loops + desk;
+    notes + map + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'move look', RELEASE_TOOLS);
