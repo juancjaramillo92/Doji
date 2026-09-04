@@ -37,7 +37,7 @@ import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
-import { CONSOLIDATE, SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -666,9 +666,47 @@ test('the rungs are the same words in the tool, the constraint and §0', () => {
      leaves that table answering for a state nothing produces and silent on the
      state she is actually handed — and the silence is the half that shows,
      because she falls back to explaining everything or to explaining nothing. */
-  const pitched = [...SECTIONS['0'].matchAll(/^\| `([a-z]+)` \| /gm)].map(m => m[1]);
+  const pitched = [...PITCH.matchAll(/^\| `([a-z]+)` \| /gm)].map(m => m[1]);
   assert.deepEqual(pitched, declared,
     'the strategy pitches at a different set of rungs than the map carries');
+});
+
+/* ─── The table she is handed, not the one she could fetch ───────────────────
+   THE TABLE WAS ALWAYS WELL-FORMED AND WAS NEVER READ, which is the exact shape
+   this repository keeps re-learning: the test above proved a row per rung and
+   proved nothing about whether the rows reach her.
+
+   §0 below its summary is `get_strategy`-only, and no prompt on any path tells
+   her to fetch it — so the one rule deciding how every explanation is pitched
+   sat in a section nothing opened. What she actually held was a pair of ends
+   quoted in two prompts, and the bottom of those is a rung `setChannel` refuses
+   to write back. She stopped building the week each channel was first mentioned
+   and could never start again, and every message after that was her following
+   the instruction she had.
+
+   So this asserts the table is IN the cached prefix, and that §0 serves the same
+   characters rather than a second copy of them.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('the rule that decides how a term is pitched is in her context, not fetchable', () => {
+  assert.ok(SYSTEM.includes(PITCH),
+    'the pitch table is no longer in the system prompt — it would be reachable ' +
+    'only through get_strategy, which nothing instructs her to call, so every ' +
+    'explanation would be pitched from the two ends the prompts happen to name');
+
+  assert.ok(SECTIONS['0'].includes(PITCH),
+    '§0 no longer serves the same table she is handed — a second copy of the one ' +
+    'rule that decides how she teaches, with nothing comparing them');
+
+  /* AND THE MIDDLE RUNGS CARRY AN INSTRUCTION, which is the half that was
+     missing rather than wrong. `unseen` stops being true permanently the first
+     time a subject comes up and `owns` is the far end; everything real sits
+     between them, and a table silent there leaves the binary rule standing. */
+  for (const rung of ['explained', 'used']) {
+    const row = PITCH.split('\n').find(l => l.startsWith(`| \`${rung}\``));
+    assert.ok(row && row.replace(/\|/g, '').trim().length > rung.length + 30,
+      `the ${rung} rung has no instruction against it, so the ladder is once ` +
+      `again a pair of ends — and that is the rung nearly every channel sits at`);
+  }
 });
 
 test('the note kinds are the same two words in the tool and the constraint', () => {
@@ -2054,14 +2092,26 @@ test('the two unscheduled looks both build a term before they use one', () => {
     return m[1];
   };
 
+  /* THE RUNG THEY NAME IS `explained`, AND NAMING `unseen` INSTEAD IS THE BUG
+     THIS REPLACED. Both prompts used to read "build it at unseen, do not at
+     owns" — a pair of ends over a four-rung ladder, and the bottom one is a
+     ONE-WAY DOOR: `setChannel` refuses to write it back, because it means the
+     subject has never once come up. So the only build instruction either path
+     had stopped being reachable the first time a channel was mentioned, and the
+     two rungs every channel actually sits at had no instruction at all.
+
+     A binary rule over four states reads as "the other case". She used the term
+     bare, correctly, for weeks — and no prompt tweak could fix it, because the
+     rule being followed was the one written down. */
   for (const name of ['RELEASE', 'MOVE']) {
     const text = section(name);
     assert.match(text, /where he stands on each channel/i,
       `${name} never tells her she has the channel map, so the block reaches her ` +
       `as context she has no instruction to use`);
-    assert.match(text, /\bunseen\b/,
-      `${name} no longer names the rung that decides whether to build a term — ` +
-      `the map is a tiebreaker she has not been told how to break`);
+    assert.match(text, /\bexplained\b/,
+      `${name} no longer names the rung nearly every channel sits at — bound to ` +
+      `the bottom rung instead, it stops building the first time a subject comes ` +
+      `up and never starts again`);
     assert.match(text, /\bowns\b/,
       `${name} no longer says when NOT to build, and explaining something he owns ` +
       `is the one failure worse than saying nothing`);

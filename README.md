@@ -320,7 +320,7 @@ be single-sourced at run time:
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
-| the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and §0's table of what to do at each one |
+| the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` — which is one constant interpolated into both the cached prefix and §0, so the rungs are a copy and the table is not |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | the numbered SQL files — `003_eugenia.sql` creates it and `006_plan.sql` appends the plan, so the last definition is the one the database ends up with — the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document, and `TradeRow` in `adherence.ts`, which calls itself the row the view serves and is what every rule is written against — so a column it does not name is one no rule can be written against, and `readDesk` asking for `select=*` makes it the only description of what comes back |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
@@ -1025,8 +1025,9 @@ is where Telegram stops delivering one message. What replaced the ceiling is a
 test on the writing rather than on the size: **every sentence has to be worth
 reading**, and the market half is where that fails first, since a line restating
 the number above it or a caveat protecting the analyst still reads like content.
-The paragraph that teaches takes the links the chain needs and, on an `unseen`
-channel, the build-up too.
+The paragraph that teaches takes the links the chain needs and the build-up the
+rung asks for on top of them — which on most mornings is a clause restating the
+mechanism, since most channels sit at `explained` rather than at either end.
 
 Running long is still cut by dropping words, never events, and never a link out
 of a chain.
@@ -1659,6 +1660,29 @@ actually matters that morning, which is the only thing it is for.
 strategy gave it: build the term from §3 at `unseen`, restate the mechanism in a
 clause at `explained`, say it plainly at `used`, say it bare at `owns`. Subject
 and register are two different questions, and the rung answers only the second.
+On subject it is a tiebreaker; on register it drives outright.
+
+**That table is `PITCH`, and for a long time she was never handed it.** It was
+written in §0 — and §0 below its summary is `get_strategy`-only, with no prompt
+on any path telling her to fetch it. So the rule that decides how every
+explanation is pitched sat in a section nothing ever opened, and what she
+actually held was a pair of ends quoted in two prompts: *build it at `unseen`,
+do not at `owns`*.
+
+`unseen` is a **one-way door**. `setChannel` refuses to write it back, correctly,
+because it means a channel has never once come up — history, not understanding.
+So the only build instruction she had stopped being reachable the first time each
+subject was mentioned, and the two rungs every channel actually sits at had no
+instruction at all. A binary rule over four states reads as *the other case*, and
+she used every term bare. Every message she sent was her following the rule she
+had; no prompt tweak could reach it, because the rule that would have produced
+the teaching was in a file she never read from.
+
+`PITCH` now lives in `prompt.ts` beside the ladder, is interpolated into the
+cached prefix **and** into §0 — the way `SUMMARY` already is, so the two are the
+same characters — and `agree` asserts it is in `SYSTEM` rather than merely
+well-formed. The old test proved a row per rung and proved nothing about whether
+the rows reached her, which is this repository's oldest shape of mistake.
 
 **Only the nightly pass may move a rung.** `set_channel` is in
 `CONSOLIDATE_TOOLS` and deliberately not in `CHAT_TOOLS` beside `remember`: a
