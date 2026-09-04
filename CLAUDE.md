@@ -174,12 +174,18 @@ pixels; say so on any visual change.
   the shape `balance` and `direction` already use — and `isOpen` is exported
   because the filter was the half no test could reach: `positionsList` is pure,
   was driven from both sides for its whole life, and renders correctly whatever
-  it is handed. THE ROOT IS STILL THERE AND IS DELIBERATE FOR NOW: the poller
-  has `closedAt` in hand (it computes it for `balanceTarget`) and could write
-  `fill_time`, which would fix every consumer at once — but that makes a third
-  two-claimant column, and back-filling it would fire `trades_eugenia_closed`
-  once per historical row, which is a burst of "your position closed" messages
-  to him. Decide that before doing it.
+  it is handed. THE ROOT IS FIXED AT THE POLLER NOW: it writes
+  `fill_time` off the `closedAt` it already computes for `balanceTarget`, under
+  `where fill_time is null`, so the email still owns the column wherever it
+  lands. The trigger that sets off is the POINT rather than a side effect — that
+  transition is how she learns a position closed, and it had never once fired.
+  Only rows the fold window reaches are stamped, so the historical gap needs
+  `?force=1&hours=N` and is opt-in; on a close event `postTradeEvent` reads the
+  day's standing first and returns silently unless R-11 was breached, so a
+  backfill is quiet rather than a burst. WHAT THE POLLER CANNOT REPAIR IS
+  `net_pnl`: the email owns that alone, `pnl` is `coalesce(net_pnl,
+  computed_pnl)`, and a row it never stamped carries the folded figure with no
+  swap in it.
 
 - **Two columns have two claimants, and their arbitration differs.** `balance`
   is settled by a filter inside the UPDATE (`where balance is null`); `direction`
