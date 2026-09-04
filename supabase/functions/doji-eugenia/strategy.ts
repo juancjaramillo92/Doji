@@ -33,6 +33,14 @@
 // as a decision; six holes read as an unfinished document.
 // ═══════════════════════════════════════════════════════════════════════════
 
+/* THE ONE THING THIS FILE TAKES FROM HERS. The pitch table is an instruction to
+   HER about how to talk, so it lives in prompt.ts beside the ladder it acts on
+   and beside the cached prefix that has to carry it — and §0 interpolates the
+   same constant rather than restating it, the way ALWAYS and §0 already share
+   SUMMARY. It was written out twice here and there before, and only this copy
+   was ever reachable: §0 below its summary is get_strategy-only. */
+import { PITCH } from "./prompt.ts";
+
 export const VERSION = "v1.13";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
@@ -168,12 +176,12 @@ he changes.
 \`unseen\` → \`explained\` → \`used\` → \`owns\`, with an evidence line. Read it as: how
 much of this can be said bare, and how much has to be built first.
 
-| State | What she does with a term from that channel |
-|---|---|
-| \`unseen\` | Build it from §3 before using it. Do not name and move on. |
-| \`explained\` | Use it, restating the mechanism in a clause as she goes. |
-| \`used\` | Use it plainly; unpack only if he asks or looks lost. |
-| \`owns\` | Use it bare. Reaching for the build-up now is condescending. |
+**The table below is in her context on every turn, not fetched from here.** It is
+the rule that decides how every explanation is pitched, so it cannot live only in
+a section she has to ask for — asking is a thing she has to remember to do, and
+nothing told her to.
+
+${PITCH}
 
 **She judges the state herself, and he can override it.** Her natural error is
 promoting too early — he follows an explanation in the moment, she marks it

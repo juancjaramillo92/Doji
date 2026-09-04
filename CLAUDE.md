@@ -437,7 +437,23 @@ code you write near it:
   live today, never a driver of what the briefing is about — but §0 of the
   strategy gave it a second job, and that one it does drive: how much a term has
   to be built before it is used. Subject and register are two questions and the
-  rung answers only the second. Only the nightly pass may move a rung, because
+  rung answers only the second.
+
+  AND THE TABLE THAT ANSWERS IT WAS NEVER IN FRONT OF HER, WHICH IS WHY WEEKS OF
+  PROMPT WORK CHANGED NOTHING. It lived in §0, and §0 below its summary is
+  `get_strategy`-only with nothing instructing her to fetch it. What she held
+  was a pair of ends quoted in RELEASE and MOVE — build at `unseen`, do not at
+  `owns` — and `unseen` is a ONE-WAY DOOR: `setChannel` refuses to write it
+  back, because it says a subject has never once come up. So the only build
+  instruction she had went unreachable the first time each channel was
+  mentioned, the two rungs everything actually sits at had no instruction, and a
+  binary rule over four states reads as the other case. She said every term
+  bare, correctly, following the rule she was given. `PITCH` is that table,
+  defined once in `prompt.ts` and interpolated into the cached prefix AND into
+  §0 the way `SUMMARY` already is; `agree.test.mjs` asserts it is IN `SYSTEM`,
+  because the old test proved a row per rung and nothing about whether the rows
+  were ever read. A prompt rule gated on a state that cannot recur is the shape
+  to look for next. Only the nightly pass may move a rung, because
   one exchange is not evidence any more than one fill is a pattern.
 
   THE LADDER DESCENDS IN ONE CASE AND IT IS NOT HER READING OF ONE. A demotion
