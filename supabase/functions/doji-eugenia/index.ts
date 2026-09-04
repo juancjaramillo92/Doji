@@ -895,7 +895,8 @@ const STATS_TOOL = {
   description:
     "The journal summarised over the last N days — win rate, wins/losses/break-evens, " +
     "gross, losses and net, average win and average loss, the realised " +
-    "reward-to-risk, and the same broken down by session and by setup. These are " +
+    "reward-to-risk, how much of the total is the broker's settled figure, and " +
+    "the same broken down by session and by setup. These are " +
     "the figures his own journal app shows him, computed from the rows the same " +
     "way, so they agree with what is on his screen. USE THIS RATHER THAN WORKING " +
     "IT OUT of get_trades: a break-even is measured in price and sits in the win " +
