@@ -2698,11 +2698,19 @@ test('every tool the poller may call is one it actually calls or probes', () => 
    one clause in one template literal, and a whole-file match for `is.null` is
    answered by the other function's copy. */
 
-test('the two columns with two claimants are filtered inside the UPDATE', () => {
+test('the three columns with two claimants are filtered inside the UPDATE', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', 'planned_sl']]) {
+  /* `fill_time` JOINED THEM, AND ARRIVED HERE THE HARD WAY. It had ONE writer
+     and it was the email — the poller saw every close within two minutes,
+     already knew the instant, and never wrote it. So a close with no alert
+     behind it left the column null for ever: Eugenia reported eight positions
+     he had closed, cited R-19 and R-15 at him about them, and her close sense
+     never fired once. The filter is what keeps the email owning it wherever it
+     lands, with this filling the gaps rather than racing it. */
+  for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', 'planned_sl'],
+                           ['writeFill', 'fill_time']]) {
     const at = src.indexOf(`function ${fn}(`);
     assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
     const body = src.slice(at, src.indexOf('\n}', at));
@@ -2714,6 +2722,48 @@ test('the two columns with two claimants are filtered inside the UPDATE', () => 
       `${fn} no longer PATCHes, and an upsert under merge-duplicates sets every ` +
       `key it is handed — the filter in the URL would not be consulted at all`);
   }
+});
+
+test('the close instant is written only where the deals say it closed', () => {
+  /* THE SAME SET THE BALANCE WRITE TAKES, and it has to be: a fully closed
+     position cannot end on an opening deal, so wherever there is an exit price
+     the latest deal IS the closing one. On a partial close there is no exit
+     price and there is no close to stamp — writing one would file a position
+     still running as finished, which is the reported bug in reverse and worse.
+
+     Read out of the handler rather than the helper, because the helper cannot
+     see which rows it is called for. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+
+  assert.match(src, /folded\.filter\(f => f\.row\.exit_price !== null\)[\s\S]{0,120}writeFill\(f\.row\.id, f\.closedAt\)/,
+    'the close instant is no longer confined to positions the deals show closed — ' +
+    'an open position stamped with a fill_time is reported as finished, and the ' +
+    'close trigger fires for a trade that is still running');
+
+  // AFTER the upsert, for writePlan's reason: a PATCH against an id nothing has
+  // inserted matches nothing and reports success.
+  assert.ok(src.indexOf('await upsert(folded.map(f => f.row))') < src.indexOf('writeFill(f.row.id'),
+    'the close instant is written before the row exists, so every first sighting ' +
+    'of a close is silently skipped');
+
+  /* AND IT NEVER TAKES THE POLL DOWN. The deals are why this function exists
+     and are written by the time this runs; a close instant that fails to record
+     leaves one row in the state every unstamped row is already in. */
+  const at = src.indexOf('let stamped = 0;');
+  assert.ok(at > -1, 'the poller no longer counts the close instants it wrote');
+  assert.match(src.slice(at, at + 400), /try \{[\s\S]*?\} catch/,
+    'the close-instant write is unguarded, so one failed PATCH loses the whole poll');
+
+  // Counted on the ANSWER rather than the attempt, for `planned`'s reason: a
+  // PATCH filtered to nothing is a 200, so a count of calls reads the same on a
+  // working filter and a broken one.
+  assert.match(src.slice(at, at + 400), /if \(await writeFill\([^)]*\)\) stamped\+\+;/,
+    'stamped counts calls made rather than rows written — the number would read ' +
+    'the same whether the filter works or has stopped filtering');
+  assert.match(src, /balance_for: target, planned, stamped,/,
+    'the poller no longer reports what it stamped, so the one meter on this ' +
+    'arbitration is not in the answer anybody reads');
 });
 
 /* ─── And the meter beside the filter has to be able to report it failing ────
@@ -2736,17 +2786,25 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  const at = src.indexOf('function writePlan(');
-  assert.ok(at > -1, 'doji-mcp-sync no longer has writePlan()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  /* BOTH FILTERED WRITERS, because the silent half is a property of the shape
+     rather than of one function: a PATCH under a `is.null` filter always
+     answers 200, so without the representation there is nothing to count and
+     the meter settles on the healthy steady state. writeFill was added with
+     this uncovered and a falsification found it — dropping its header turned
+     nothing red. */
+  for (const fn of ['writePlan', 'writeFill']) {
+    const at = src.indexOf(`function ${fn}(`);
+    assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
+    const body = src.slice(at, src.indexOf('\n}', at));
 
-  assert.match(body, /Promise<boolean>/,
-    'writePlan no longer answers whether it wrote, so the count beside it is ' +
-    'back to counting calls');
-  assert.match(body, /sbHeaders\("return=representation"\)/,
-    'writePlan asks for no representation, so a PATCH that matched nothing and ' +
-    'one that wrote a plan come back identical — the meter reads 0 forever, ' +
-    'which is indistinguishable from a quiet poll');
+    assert.match(body, /Promise<boolean>/,
+      `${fn} no longer answers whether it wrote, so the count beside it is ` +
+      `back to counting calls`);
+    assert.match(body, /sbHeaders\("return=representation"\)/,
+      `${fn} asks for no representation, so a PATCH that matched nothing and ` +
+      `one that wrote come back identical — the meter reads 0 forever, which ` +
+      `is indistinguishable from a quiet poll`);
+  }
 
   assert.match(src, /if \(await writePlan\([^)]*\)\)\s*planned\+\+/,
     'the poller increments its plan count on the call rather than on the answer, ' +

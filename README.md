@@ -1474,8 +1474,13 @@ misses the other: an overnight hold is not in today's rows and today's closed
 trades are not open.
 
 **A position is closed on either witness, and reading one column told him he was
-in a trade he had closed days earlier.** `fill_time` has exactly one writer and
-it is `doji-email-sync` — the poller never sets it, on any row. What the poller
+in a trade he had closed days earlier.** `fill_time` had exactly one writer and
+it was `doji-email-sync` — the poller never set it, on any row. **It writes it
+now**, off the `closedAt` it already computes, under `where fill_time is null`:
+the third use of the balance filter, so the email still owns the column wherever
+it lands and the poller fills the gaps. Both reads below stay as they are — two
+witnesses is the right test whichever of them got there first, and a row the
+fold window never reaches is still stamped by neither. What the poller
 records when a position closes is `exit_price`, folded from the broker's own
 deals every two minutes. So a close with no alert email behind it — a manual
 close, R-15's Friday close-out, a parse that failed, an email that never came —

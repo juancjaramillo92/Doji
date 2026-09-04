@@ -586,6 +586,44 @@ async function writePlan(plan: OpenPlan): Promise<boolean> {
   return ((await res.json()) as unknown[]).length > 0;
 }
 
+/* ─── The close instant ────────────────────────────────────────────────────
+   `fill_time` HAD ONE WRITER AND IT WAS AN EMAIL. `doji-email-sync` set it off
+   cTrader's alert; this function, which sees every close within two minutes and
+   already knows when it happened, never touched it. So a close with no alert
+   behind it — one whose subject the Apps Script skips, or that cTrader never
+   sends — left the column null for ever, and everything downstream that read it
+   as "still open" said so for ever. Eugenia reported eight positions he had
+   closed, cited his own R-19 and R-15 at him about them, and her close sense
+   never fired once.
+
+   THE SAME ARBITRATION THE PLAN AND THE BALANCE USE, and the third use of it:
+   `where fill_time is null`, so the email still wins wherever it lands and this
+   fills the gaps it leaves. Both should carry the same instant anyway — the
+   alert states the fill and this is the last deal of the position — so the
+   filter is about ownership rather than about disagreement.
+
+   IT WRITES ONLY WHERE `exit_price` IS SET, which is the caller's filter and
+   the same one the balance write uses: a fully closed position cannot end on an
+   opening deal, so the latest deal IS the closing one. On a partial close there
+   is no exit price and no close to stamp.
+
+   Answers whether it wrote, for the reason writePlan does — a PATCH filtered to
+   nothing is a 200 with an empty body, so `res.ok` alone reads the same on a
+   working filter, a broken one, and a row nothing matched. Steady state is 0.
+
+   THE TRIGGER THIS SETS OFF IS THE POINT, not a side effect.
+   `trades_eugenia_closed` fires on exactly this transition, and it is how she
+   learns a position closed at all. */
+async function writeFill(id: string, closedAt: number): Promise<boolean> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/trades?id=eq.${id}&fill_time=is.null`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ fill_time: new Date(closedAt).toISOString() }),
+    });
+  if (!res.ok) throw new Error(`Fill write failed (HTTP ${res.status}): ${await res.text()}`);
+  return ((await res.json()) as unknown[]).length > 0;
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing — the file loads under plain
 // Node, where Deno.serve does not exist.
@@ -830,6 +868,24 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }));
     const n = await upsert(folded.map(f => f.row));
 
+    /* THE CLOSE INSTANT, AND IT RUNS AFTER THE UPSERT FOR writePlan's REASON:
+       a PATCH against an id nothing has inserted matches nothing and reports
+       success. `exit_price !== null` is the same set the balance write takes —
+       the positions this run saw close.
+
+       Never takes the poll down. The deals are why this function exists and are
+       written by the time this runs; a close instant that fails to record
+       leaves one row in the state every unstamped row is already in. */
+    let stamped = 0;
+    try {
+      for (const f of folded.filter(f => f.row.exit_price !== null)) {
+        if (await writeFill(f.row.id, f.closedAt)) stamped++;
+      }
+    } catch (err) {
+      console.error("doji-mcp-sync: close instant not recorded —",
+        err instanceof Error ? err.message : err);
+    }
+
     // BALANCE REACHES THE TABLE NO OTHER WAY FROM HERE.
     //
     // get_deals carries no balance at all — eleven fields, none of them the
@@ -881,7 +937,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
-      deals: deals.length, positions: n, balance_for: target, planned,
+      deals: deals.length, positions: n, balance_for: target, planned, stamped,
       // Reported rather than acted on: it says more deals exist beyond the
       // window, which is true of almost every run.
       has_more: data.hasMore ?? null,
