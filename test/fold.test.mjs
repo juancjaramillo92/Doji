@@ -3194,3 +3194,39 @@ test('the summary states every figure with the population it was taken over', ()
   // An empty window says so rather than rendering a page of dashes.
   assert.match(statsList(journalStats([]), 7), /No trades in the last 7 days/);
 });
+
+/* ─── The one signal a total cannot carry, and §8 built the journal to keep ───
+   `pnl` is `coalesce(net_pnl, computed_pnl)`. §8 withholds `computed_pnl` by
+   name and serves `net_pnl` beside `pnl` precisely so a fallback row is VISIBLE
+   without the unsettled number being reachable — reading rows she can see it.
+
+   A total cannot, and this tool is the one the prompt now tells her to prefer
+   OVER reading the rows. So a summary that sums `pnl` and says one net figure
+   takes away the only thing §8 put there.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a total says how much of it is settled and how much is the fold', () => {
+  const settled  = jt({ id: 'PIDa', entry_price: 4400, exit_price: 4460, pnl: 60, net_pnl: 60 });
+  const fellBack = jt({ id: 'PIDb', entry_price: 4400, exit_price: 4430, pnl: 30 });
+
+  const s = journalStats([settled, fellBack]);
+  assert.equal(s.settled, 1);
+  assert.equal(s.fellBack, 1);
+
+  const out = statsList(s, 30);
+  assert.match(out, /1 of those are the broker's settled figure and 1 fell back/);
+  assert.match(out, /carries no swap/, 'the reason it matters has to travel with the count');
+
+  // An open trade is in neither: it has no P&L to be settled or folded.
+  assert.equal(journalStats([settled, jt({ id: 'PIDc' })]).fellBack, 0);
+});
+
+test('a window where nothing fell back says nothing about it', () => {
+  /* Noise on every ordinary window otherwise — swap accrues only across the
+     17:00 roll, so the common case is that every row is settled or intraday
+     and the line would appear saying zero, every time, forever. */
+  const out = statsList(journalStats([
+    jt({ id: 'PIDa', entry_price: 4400, exit_price: 4460, pnl: 60, net_pnl: 60 }),
+  ]), 30);
+  assert.doesNotMatch(out, /fell back/);
+  assert.match(out, /net \$60\.00/, 'the total is still there');
+});

@@ -173,6 +173,18 @@ function sliceBy(rows: TradeRow[], key: (t: TradeRow) => string | null): Slice[]
     ({ key: k, n: list.length, counts: counts(list), money: money(list) }));
 }
 
+/* HOW MANY OF THOSE DOLLARS ARE SETTLED, which a single net figure cannot say.
+   §8 withholds `computed_pnl` by name and serves `net_pnl` beside `pnl` for
+   exactly this: `pnl` is `coalesce(net_pnl, computed_pnl)`, so a row where
+   `net_pnl` is null is the FOLDED figure and carries no swap. Reading the rows
+   she can see that; a total cannot, and this tool exists to be preferred over
+   reading the rows — so aggregating without it takes away the one signal §8
+   built in.
+
+   Small in practice and not nothing: swap accrues only across the 17:00 roll,
+   so an intraday close is exact and a multi-session hold closed by hand is
+   short by a night's carry. Counted rather than corrected, because the figure
+   itself is unreachable from here — the email is its only source. */
 export interface Stats {
   n: number;
   journalled: number;
@@ -180,12 +192,17 @@ export interface Stats {
   money: Money;
   averages: Averages;
   rr: number | null;
+  // Of the rows carrying a P&L, how many are the broker's settled figure and
+  // how many fell back to the fold.
+  settled: number;
+  fellBack: number;
   bySession: Slice[];
   bySetup: Slice[];
 }
 
 export function journalStats(rows: TradeRow[]): Stats {
   const avg = averages(rows);
+  const priced = rows.filter(t => t.pnl != null);
   return {
     n: rows.length,
     journalled: rows.filter(isJournalled).length,
@@ -193,6 +210,8 @@ export function journalStats(rows: TradeRow[]): Stats {
     money: money(rows),
     averages: avg,
     rr: realisedRR(avg),
+    settled: priced.filter(t => t.net_pnl != null).length,
+    fellBack: priced.filter(t => t.net_pnl == null).length,
     // Ordered by the app's own list rather than by whatever the rows produced,
     // so a session with no trades is absent and the rest read in the order he
     // sees them on screen.
@@ -224,6 +243,14 @@ export function statsList(s: Stats, days: number): string {
       `over ${c.decided} decided. Break-evens are IN that denominator.`,
     `· gross ${usd(s.money.gross)}, losses ${usd(s.money.loss)}, net ${usd(s.money.net)}, ` +
       `over ${s.money.n} rows carrying a P&L`,
+    // Only where there is one. A line saying nothing fell back is noise on
+    // every ordinary window, and the tool description carries the meaning.
+    s.fellBack
+      ? `· ${s.settled} of those are the broker's settled figure and ${s.fellBack} ` +
+        `fell back to the folded one, which carries no swap — so the net above is ` +
+        `short by whatever those ${s.fellBack} accrued across a 17:00 roll. Say so ` +
+        `if you give him this total.`
+      : '',
     `· average win ${usd(s.averages.avgWin)}, average loss ${usd(s.averages.avgLoss)}, ` +
       `realised reward-to-risk ${s.rr === null ? '—' : `1:${s.rr}`} — realised, not planned`,
     s.bySession.length ? `\nBy session:\n${s.bySession.map(line).join('\n')}` : '',
