@@ -37,7 +37,7 @@ import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // and imported rather than inlined for the reason balanceTarget and foldHours
 // are exported in the app: it is the part that has to be testable.
 import {
-  checkRules, adherenceList, dayStanding, DAY_LOSS,
+  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker,
   type TradeRow, type Standing,
 } from "./adherence.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the
@@ -2270,7 +2270,7 @@ async function calendarBlock(): Promise<string> {
 async function readDesk(day: string): Promise<TradeRow[]> {
   const res = await fetch(
     `${SB_URL}/rest/v1/eugenia_trades?select=*` +
-    `&or=(open_day.gte.${day},fill_time.is.null)` +
+    `&or=(open_day.gte.${day},and(exit_price.is.null,fill_time.is.null))` +
     `&order=entry_time.desc&limit=50`,
     { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Desk read failed (HTTP ${res.status})`);
@@ -2342,11 +2342,41 @@ export function positionsList(
    price she cannot read costs one line, where the outer catch would cost her the
    position itself. Read only when something is open, which on most days is not
    at all. */
+/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` has exactly one
+   writer and it is the EMAIL path — the poller never sets it, on any row. What
+   the poller records when a position closes is `exit_price`, off the broker's
+   own deals, every two minutes.
+
+   So a position that closed without an alert email landing — a manual close,
+   R-15's Friday close-out, a parse that failed, an email that never came — kept
+   `fill_time` null for ever, and this block told him he was in a trade for ever.
+   It did it while citing R-19 and R-15 at him about a position that had not
+   existed since Wednesday, which is the worst thing this block can do: it is the
+   one place she speaks with his own rules behind her.
+
+   Closed on EITHER witness, therefore. Two independent sources see the close and
+   either one is enough — the same shape as `balance` and `direction`, the two
+   columns this schema already arbitrates. A row the poller folded without its
+   entry deal carries a null `exit_price` on a closed trade, and the email
+   catches that one; a close with no email is caught by the poller. Only a row
+   neither has closed is open.
+
+   AND BROKER ROWS ONLY. Pre-sync rows carry client ids, no entry_time and no
+   exit_price, so every one of them read as an open position — permanently, in
+   the same list. `dayStanding` has always filtered them and this never did.
+
+   Exported because it is the decision, and because the filter was the half no
+   test could reach: `positionsList` is pure and was driven from both sides for
+   its whole life, on rows a caller had already decided were open. It renders
+   what it is handed, correctly, and the mistake was upstream of it. */
+export const isOpen = (t: TradeRow): boolean =>
+  isBroker(t) && t.exit_price === null && t.fill_time === null;
+
 async function positionsBlock(): Promise<string> {
   try {
     const day = nyDate(new Date());
     const rows = await readDesk(day);
-    const open = rows.filter(t => t.fill_time === null);
+    const open = rows.filter(isOpen);
     return positionsList(
       open,
       dayStanding(rows, day),

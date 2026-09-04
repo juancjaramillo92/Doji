@@ -292,6 +292,20 @@ function r02(rows: TradeRow[]): RuleResult {
    second one opened is the clearest possible breach of this rule, and treating
    a null fill_time as "no span" would drop exactly that case.
 
+   BUT A NULL fill_time IS NOT ALWAYS AN OPEN POSITION, and reading it as one
+   manufactured breaches out of nothing. That column has a single writer and it
+   is the EMAIL path; the poller records a close as `exit_price` and never
+   touches fill_time at all. So a position closed with no alert email behind it
+   ran to `now` here for ever — and every trade taken after it overlapped it, so
+   one missing email turned a clean month into a cascade of R-10 failures, each
+   naming a real row and each wrong.
+
+   Three states rather than two. Closed with a time: the span ends there. Closed
+   with no time — `exit_price` set, `fill_time` null — the END IS UNKNOWN, and
+   an unknown end cannot be compared with anything, so the row is unresolved
+   rather than assumed to run to now. Only a row neither witness has closed is
+   still open, and only that one extends to now.
+
    TWO SWEEPS, BECAUSE COMPARING EACH SPAN WITH THE ONE BEFORE IT IS NOT THE
    SAME QUESTION. Sorted by entry, the previous span is not the only earlier one
    still running: a multi-session hold — which the summary says is a shape he
@@ -311,8 +325,16 @@ function r02(rows: TradeRow[]): RuleResult {
    that ends after a later one starts. Between them they name every span
    overlapping any other, in one pass each rather than a scan per row. */
 function r10(rows: TradeRow[], now: number): RuleResult {
-  const spans = rows
-    .filter(t => isBroker(t) && t.entry_time)
+  const dated = rows.filter(t => isBroker(t) && t.entry_time);
+
+  // Closed by the poller and never stamped by the email: there is no instant to
+  // end the span at, so it is named as undecidable rather than run to now.
+  const unknown = dated
+    .filter(t => !t.fill_time && t.exit_price !== null)
+    .map(t => t.id);
+
+  const spans = dated
+    .filter(t => t.fill_time || t.exit_price === null)
     .map(t => ({
       id: t.id,
       from: new Date(t.entry_time as string).getTime(),
@@ -341,7 +363,7 @@ function r10(rows: TradeRow[], now: number): RuleResult {
   }
 
   for (const s of spans) (bad.has(s.id) ? fail : pass).push(s.id);
-  return result('R-10', 'positions whose open spans overlap another', pass, fail, []);
+  return result('R-10', 'positions whose open spans overlap another', pass, fail, unknown);
 }
 
 /* ─── R-11 ─────────────────────────────────────────────────────────────────
@@ -463,7 +485,18 @@ export function crossesFridayClose(from: Date, to: Date): boolean | null {
 function r15(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
-    if (!isBroker(t) || !t.entry_time || !t.fill_time) continue;
+    if (!isBroker(t) || !t.entry_time) continue;
+    /* CLOSED, WITH NO INSTANT SAYING WHEN. `fill_time` is the email path's
+       column and the poller never writes it, so a close with no alert behind it
+       has an `exit_price` and no time — and this rule is entirely about whether
+       a span crossed a particular Friday instant. It used to `continue` past
+       those, which drops them from the population silently: the one shape §8
+       says a rate must never be computed over. A position still genuinely open
+       is a different case and is still skipped, since it has not closed at all. */
+    if (!t.fill_time) {
+      if (t.exit_price !== null) unknown.push(t.id);
+      continue;
+    }
     const crossed = crossesFridayClose(new Date(t.entry_time), new Date(t.fill_time));
     if (crossed === null) unknown.push(t.id);
     else (crossed ? fail : pass).push(t.id);
