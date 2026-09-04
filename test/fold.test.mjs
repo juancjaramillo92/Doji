@@ -1991,6 +1991,54 @@ test('R-10 catches two positions open at once, and an open one still counts', ()
   ], 'R-10', now).verdict, 'fail');
 });
 
+/* ─── The breach that was counted as a pass ──────────────────────────────────
+   R-10 COMPARED EACH SPAN WITH THE ONE BEFORE IT, which answers for a neighbour
+   and not for the rule. A long hold covers everything opened inside it, so the
+   second short trade taken within it sits beside a `to` that has already been
+   left behind — and it came back counted as a PASS and named nowhere, while
+   genuinely breaching.
+
+   The verdict is what hid it. A span nested inside an earlier one always has a
+   neighbour that overlaps as well, so something was always flagged and the rule
+   always answered `fail` — which is why no test asserting on a verdict alone
+   could ever have found this. THE COUNTS AND THE IDS ARE THE ASSERTION, and
+   they are what she actually hands him: `check_rules` promises the rows behind
+   the finding, and a breach missing from that list is one he cannot check.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('every position inside a longer hold is a breach, not just the first', () => {
+  const span = (id, from, to) => trade({ id, entry_time: from, fill_time: to });
+
+  // Two short trades entirely inside one long one. All three were open at the
+  // same time as something else, so all three breach R-10.
+  const out = verdictOf([
+    span('PIDlong',  '2026-01-06T10:00:00Z', '2026-01-06T14:00:00Z'),
+    span('PIDfirst', '2026-01-06T10:30:00Z', '2026-01-06T10:45:00Z'),
+    span('PIDthird', '2026-01-06T11:00:00Z', '2026-01-06T11:30:00Z'),
+  ], 'R-10');
+
+  assert.equal(out.verdict, 'fail');
+  assert.equal(out.failed, 3, 'the trade nested inside the hold is a breach like the others');
+  assert.equal(out.passed, 0, 'nothing here was a clean single position');
+  assert.deepEqual([...out.ids].sort(), ['PIDfirst', 'PIDlong', 'PIDthird'],
+    'a breach he is not handed the id of is one he cannot check');
+});
+
+test('a clean handover is still clean, however many of them there are', () => {
+  /* THE OTHER DIRECTION, because a fix that flags everything would pass the
+     test above and destroy the rule. Three trades back to back, each opening
+     exactly as the last one closed — strict comparison, so touching endpoints
+     are a handover rather than an overlap. */
+  const span = (id, from, to) => trade({ id, entry_time: from, fill_time: to });
+  const out = verdictOf([
+    span('PID1', '2026-01-06T10:00:00Z', '2026-01-06T11:00:00Z'),
+    span('PID2', '2026-01-06T11:00:00Z', '2026-01-06T12:00:00Z'),
+    span('PID3', '2026-01-06T12:00:00Z', '2026-01-06T13:00:00Z'),
+  ], 'R-10');
+  assert.equal(out.verdict, 'pass');
+  assert.equal(out.passed, 3);
+  assert.deepEqual(out.ids, []);
+});
+
 test('R-11 reads the account off the size, and only flags trading after the limit', () => {
   // 4 oz × 500 = an implied account of 2,000, so the day's floor is −80.
   const leg = (id, pnl, from, to) =>
@@ -2831,6 +2879,33 @@ test('an open position states its age, its side, its size and its plan', () => {
   assert.match(out, /open since 09:14 ET/);
   assert.match(out, /BUY 4oz from 4388\.2/);
   assert.match(out, /stop 4380 and target 4412 as first seen/);
+});
+
+/* ─── A hold from another day said only what hour it opened ──────────────────
+   THE BLOCK IS HEADED "what he has on RIGHT NOW", and inside it a position read
+   `open since 09:15 ET` whether it opened this morning or on Monday. There is
+   one way to read a bare clock time under that heading and it is the wrong one.
+
+   Not an edge case: the strategy's own summary calls his positions "intraday to
+   multi-session", and R-15 bounds a hold at the Friday close rather than at
+   midnight. So the shape this got wrong is one he trades, and what it produced
+   is a confident wrong fact about his own open position — in the one block
+   whose whole purpose is that she knows what he is exposed to.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a position opened on an earlier day says which day', () => {
+  // Opened 09:14 New York on the 1st, still open on the 3rd.
+  const held = trade({ ...OPEN, entry_time: '2026-09-01T13:14:00Z', open_day: '2026-09-01' });
+  const out = positionsList([held], null, null, DESK_NOW);
+  assert.match(out, /open since 09:14 ET on 1 Sep/,
+    'a multi-session hold that names only an hour reads as having opened today');
+});
+
+test("a position opened today says the hour and no date", () => {
+  // The other direction, because dating every fill would bury the one line
+  // where the date is the point.
+  const out = positionsList([OPEN], null, null, DESK_NOW);
+  assert.match(out, /open since 09:14 ET —/);
+  assert.doesNotMatch(out, /on \d+ Sep/);
 });
 
 test('a position with no plan recorded says nothing about a plan', () => {

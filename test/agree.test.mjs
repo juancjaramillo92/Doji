@@ -1986,19 +1986,41 @@ test('every number off the quote reaches her with the window it was measured ove
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  const body = (name) => {
-    const at = src.indexOf(`async function ${name}(`);
+  const body = (name, kind = 'async function') => {
+    const at = src.indexOf(`${kind} ${name}(`);
     assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
     const end = src.indexOf('\n}', at);
     return src.slice(at, end).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
   };
 
-  for (const fn of ['readMarket', 'postMove']) {
-    assert.match(body(fn), /quoteWindow\(/,
-      `${fn} hands her the quote with nothing saying which session it covers — ` +
-      `after the 17:00 roll she would call a few hours of evening trade the day, ` +
-      `which is a number he can check against his own screen and find wrong`);
+  /* THE WINDOW IS INSIDE THE RENDERING RATHER THAN BESIDE IT, which is what
+     makes this one assertion rather than one per caller. A quote said three
+     ways is three chances to print `change` without saying what it changed
+     from, so there is one `quoteLine` and it carries the label itself. */
+  assert.match(body('quoteLine', 'export function'), /quoteWindow\(/,
+    'quoteLine no longer says which session its figures cover, so every caller ' +
+    'of it now hands her a `change` with no window on it — which after the 17:00 ' +
+    'roll reads as the move on the day and is not');
+
+  /* AND EVERY PATH THAT PUTS A PRICE IN FRONT OF HER GOES THROUGH IT. The tool
+     any turn may call, the block the briefing is handed, and the price sense —
+     three callers, and a fourth that rendered its own would be the way this
+     comes back. */
+  for (const fn of ['readMarket', 'marketBlock', 'postMove']) {
+    assert.match(body(fn), /quoteLine\(/,
+      `${fn} renders the quote its own way instead of through quoteLine — a ` +
+      `second rendering is a second chance to state a figure without its window`);
   }
+
+  /* THE BRIEFING IS HANDED THE PRICE RATHER THAN ASKED TO FETCH IT. Every other
+     thing it always needs is read before the call; the price was a tool she had
+     to remember to reach for, which is an instruction standing where an input
+     belongs. It fails silently — a level off a search page is four digits and
+     looks like gold. */
+  assert.match(body('postBriefing'), /marketBlock\(/,
+    'the briefing no longer reads the price before it writes, so its opening ' +
+    'line depends on her choosing to call a tool — and a stale level quoted ' +
+    'from a search is indistinguishable from a live one');
 
   /* AND THE BOUNDARY IS THE ONE THE REST OF THE SYSTEM ALREADY KEEPS. 17:00 New
      York is the Friday close, the Sunday open and the poller's whole definition

@@ -1052,14 +1052,53 @@ export function quoteWindow(now: Date): string {
       "are the overnight range.";
 }
 
-/* NEVER THROWS, for the reason every other tool here does not. And it says what
-   it could not do rather than coming back empty: a briefing that opens on a
-   silently missing price is one that either invents a number or drops the line
-   the whole first paragraph is built on. */
+/* ONE RENDERING OF A QUOTE, AND THE WINDOW IS PART OF IT RATHER THAN BESIDE IT.
+   Three callers want this — the tool, the briefing's own block and the price
+   sense — and a quote said three ways is three chances to say `change` without
+   saying what it is a change FROM, which is the mistake this whole section is
+   here about. Prose rather than the JSON the tool used to return, for the same
+   reason: a bare field name in a blob is read as whatever it sounds like, and
+   `change` sounds like the day. */
+export function quoteLine(q: Quote, now: Date): string {
+  return `Gold, read off his own broker: bid ${q.bid}, ask ${q.ask}. The session ` +
+    `has traded ${q.low} to ${q.high} against a previous close of ${q.prev_close} — ` +
+    `${q.change >= 0 ? "up" : "down"} ${Math.abs(q.change)} since it. ` +
+    quoteWindow(now);
+}
+
+// Said rather than served empty, on both paths that can meet it: a briefing
+// that opens on a silently missing price either invents a number or drops the
+// line the whole first paragraph is built on.
+const NO_PRICE =
+  "The live price could not be read just now. Say you do not have a current " +
+  "level rather than quoting one from a search.";
+
+/* NEVER THROWS, for the reason every other tool here does not. */
 async function readMarket(): Promise<string> {
   const quote = await marketQuote();
-  return quote ? `${JSON.stringify(quote)}\n\n${quoteWindow(new Date())}`
-    : "The live price could not be read just now. Say you do not have a current level rather than quoting one from a search.";
+  return quote ? quoteLine(quote, new Date()) : NO_PRICE;
+}
+
+/* THE ONE NUMBER EVERY BRIEFING OPENS ON WAS THE ONLY INPUT IT WAS NOT HANDED.
+
+   Notes, the channel map, his week of trades, the thesis, the open threads, the
+   calendar and his desk are all read before the call and put in front of her.
+   The price — which the prompt calls the opening line, and the one figure he
+   checks against his own screen — was a TOOL she had to remember to reach for.
+   That is an instruction standing where an input belongs, and it fails the way
+   this file's instructions always fail: she quotes a level off a search page,
+   it is four digits and looks like gold, and nothing anywhere reports that it
+   is however stale that page was.
+
+   The tool stays, because a reply asking where gold is needs it and most
+   replies do not — which is the same trade get_trades makes. This is the one
+   path where the answer is known in advance to be wanted.
+
+   NEVER THROWS, and it has no catch: marketQuote already swallows its own
+   failure and answers null, so the sentence below is the whole handling. */
+async function marketBlock(): Promise<string> {
+  const quote = await marketQuote();
+  return "\n\n" + (quote ? quoteLine(quote, new Date()) : NO_PRICE);
 }
 
 /* ─── The running story ────────────────────────────────────────────────────
@@ -1677,10 +1716,20 @@ async function remember(turns: Turn[]) {
 
    RESUMABLE, AND IT SAYS HOW MUCH IS LEFT. `count=exact` is what turns this
    from a call you repeat hopefully into one you repeat until it answers zero.
+
+   NEWEST FIRST, AND THAT IS THE SAME MISTAKE THE NIGHTLY WINDOW ALREADY MADE.
+   This drained `id.asc`, which finishes the same backlog either way — so it
+   looked like a choice with no consequence, exactly as `order=id.asc&limit=200`
+   did on the day's turns. The consequence is WHEN. The nightly sweep fills
+   fifty rows a night, so a vendor outage that left a fortnight of turns without
+   vectors becomes searchable oldest-first: last month's archive comes back
+   before last week's conversation, and the rows he is likeliest to ask her
+   about are the last to arrive. Ordering by id.desc drains the same rows in the
+   order they are worth having.
    ───────────────────────────────────────────────────────────────────────── */
 async function fillEmbeddings(table: string, column: string): Promise<{ filled: number; left: number }> {
   const res = await fetch(
-    `${SB_URL}/rest/v1/${table}?select=id,${column}&embedding=is.null&order=id.asc&limit=${EMBED_BATCH}`,
+    `${SB_URL}/rest/v1/${table}?select=id,${column}&embedding=is.null&order=id.desc&limit=${EMBED_BATCH}`,
     { headers: sbHeaders("count=exact") });
   if (!res.ok) throw new Error(`${table} read failed (HTTP ${res.status})`);
 
@@ -2238,12 +2287,29 @@ async function readDesk(day: string): Promise<TradeRow[]> {
 
    A NULL FIELD IS SAID RATHER THAN PRINTED. Every column here is nullable and a
    journal row he opened by hand carries almost none of them, so an unguarded
-   template puts `from null` in front of her — which reads as a price. */
+   template puts `from null` in front of her — which reads as a price.
+
+   AND AN ENTRY FROM ANOTHER DAY SAYS WHICH DAY. This read an hour and a minute
+   and nothing else, so a position opened on Monday and still open on Wednesday
+   reached her as `open since 09:15 ET` — a clock time with no date against it,
+   in a block headed by what he has on RIGHT NOW. There is only one way to read
+   that and it is the wrong one. The summary calls his positions "intraday to
+   MULTI-SESSION" and R-15 bounds them at the Friday close rather than at
+   midnight, so a hold spanning days is a shape he trades rather than an edge
+   case — and the failure is a confident wrong fact about his own position,
+   which is the worst place in this block for one. Today stays bare, because
+   naming the date on every intraday fill would bury the one line where it
+   matters. */
 export function positionsList(
   open: TradeRow[], standing: Standing | null, mark: Mark | null, now = Date.now(),
 ): string {
+  const today = nyDate(new Date(now));
   const lines = open.map(t => {
-    const since = t.entry_time ? `open since ${nyTime(t.entry_time)} ET` : "open";
+    const opened = t.entry_time ? nyDate(new Date(t.entry_time)) : null;
+    const since = t.entry_time
+      ? `open since ${nyTime(t.entry_time)} ET` +
+        (opened === today ? "" : ` on ${civilDay(opened as string)}`)
+      : "open";
     const what = [t.direction, t.size_oz != null ? `${t.size_oz}oz` : null]
       .filter(Boolean).join(" ") || "side and size not recorded";
     const from = t.entry_price != null ? ` from ${t.entry_price}` : "";
@@ -2515,15 +2581,15 @@ async function postBriefing(due: Brief): Promise<Response> {
      run one after another they were six round trips before the first token of a
      briefing was asked for. Promise.all is the same argument the tool dispatch
      now makes: a batch should cost its slowest member. */
-  const [notes, channels, trades, story, loops, calendar, desk] = await Promise.all([
-    notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(), loopsBlock(),
-    calendarBlock(), positionsBlock(),
+  const [price, notes, channels, trades, story, loops, calendar, desk] = await Promise.all([
+    marketBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
+    loopsBlock(), calendarBlock(), positionsBlock(),
   ]);
 
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    + notes + channels + trades + story + loops + calendar + desk;
+    + price + notes + channels + trades + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
@@ -3137,12 +3203,11 @@ async function postMove(): Promise<Response> {
   const asked = MOVE +
     `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
-    `The session has traded ${spot.low} to ${spot.high}, against a previous ` +
-    `close of ${spot.prev_close}. Nothing high-impact you filed has printed in ` +
-    // The same label readMarket carries, and needed most here: this path is the
-    // one that fires in the evening, which is the only time the two windows
-    // disagree and the only time she can call a four-hour session "the day".
-    `the last hour.\n\n${quoteWindow(new Date())}` +
+    `Nothing high-impact you filed has printed in the last hour.` +
+    // The session said the one way it is said anywhere, which matters most on
+    // this path: it is the one that fires in the evening, the only hours when
+    // the broker's session and the calendar day disagree.
+    `\n\n${quoteLine(spot, new Date())}` +
     (ahead.length
       ? `\nStill ahead today: ` +
         ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
