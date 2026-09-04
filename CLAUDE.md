@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 373 tests, four suites
+npm test      # 402 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -233,6 +233,17 @@ pixels; say so on any visual change.
   because a quote said three ways is three chances to print `change` without
   saying what it changed from.
 
+  AND THE WINDOW IS INSIDE THAT RENDERING RATHER THAN BESIDE IT. `high`, `low`,
+  `prev_close` and `change` are all measured from the BROKER'S session open,
+  which for gold restarts at the 17:00 New York roll — so the SAME `change` is
+  the overnight move before that hour and the evening's after it. Served as bare
+  JSON it read as "on the day", and she said so at 20:57 about a session under
+  four hours old. Nothing here can see the calendar day; `get_trendbars` rolls on
+  the same boundary, so `quoteWindow` NAMES the window rather than computing one
+  out of numbers that cannot carry it, and `agree.test.mjs` reads `readMarket`,
+  `marketBlock` and `postMove` for the call — dropping it breaks nothing and the
+  message still reads as a working price.
+
 - **Eugenia reads a price through the poller and must never hold the broker
   token.** The endpoint that serves a quote also serves `create_order`, so the
   market read goes through `doji-mcp-sync`, which will only ever answer with a
@@ -304,251 +315,261 @@ code you write near it:
 
 ## Eugenia
 
-- **The strategy is a fourth memory and the only one she cannot write.**
-  `strategy.ts` holds it; its own retrieval contract splits it — the summary and
-  the rules table are appended to the CACHED system prompt, everything else is
-  `get_strategy`. Putting it in a message instead pays for it on every turn and
-  breaks the prefix each time the document is edited. It is markdown in a
-  template literal, so every backtick in it is escaped.
+### What she is, and what she may never do
 
-  THE PREFIX STATES `ttl: "1h"`, because the default window is five minutes and
-  her callers are hours apart — without it the cache only ever paid for the
-  rounds inside one turn, which is less than the comments around it claimed. An
-  hour also catches the replies a briefing draws through the morning and the
-  09:00 retry; nothing catches 08:00 to 22:00. `cached` in `ask()`'s log line is
-  the number that settles it rather than arguing it.
-
-  R-08's four steps are in §6, and step 4 is arithmetic HE runs rather than one
-  a row can check: nothing records where the stop or the target were set, so the
-  ratio is asked and never computed. Do not read that 1.5 against the 1.25 as a
-  pair of floors — 1:1.5 is a condition at ENTRY, and a realised 1:1.25 is the
-  rule working on a shortened target and a breach on a $25 one set at entry,
-  which no row can tell apart. Collapsing them in either direction is the
-  contradiction v1.9 finished off.
-
-  She has no write path to it, deliberately: a document that decides whether he
-  followed his rules cannot be edited by the thing checking them. The numbering
-  skips 1 and 11 and nothing cites them; every section anything cites is written.
-  `readStrategy` still names a section it does not hold rather than returning
-  nothing, because the number arrives from the model: a blank is a thing she
-  fills in herself.
-
-  §2 AND §3 ARE THE TWO SECTIONS THAT ARE NOT HIS — researched reference rather
-  than decisions, and labelled as such where they start. Both must use the SPOKEN
-  channel names from `prompt.ts` and never the database ids, which is a second
-  vocabulary and therefore a second thing that can drift: `agree.test.mjs`
-  resolves §2's headings against the names, not the ids. §0's table of what to do
-  at each rung is the same shape for `CHANNEL_STATES`. Everything else in the
-  file is his, and a rule he has not stated is a `[decide]` rather than a pattern
-  read as a rule.
-
-  §4.1 AND §4.2 ARE PROSE INSIDE §4 RATHER THAN SECTIONS OF THEIR OWN, and they
-  are the only two citations in the half she carries on every turn. An exact
-  lookup told her they were unwritten, which is worse than a blank: a wrong fact
-  about her own document from the tool that exists to stop her inventing one.
-  `readStrategy` falls back one level to the parent section, and
-  `agree.test.mjs` resolves every citation in the table through it — asserting a
-  dotted one names a heading actually present in what came back, since the
-  fallback would otherwise answer a mistyped §4.7 with §4 and look identical to
-  a citation that worked.
-
+- **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
+  no verdict on a trade, one question at a time. The line she may cross is narrow
+  and deliberate: *what the market is pricing* and *what would surprise it* are
+  facts about today and are hers to say; what price will do never is. Widening
+  that is a product decision, not a prompt tweak.
+- **The briefing is prose and must stay prose.** Numbered sections with headings
+  are a report however plain the words inside them. Do not reintroduce
+  scaffolding to "organise" it.
+- **LENGTH IS NOT A RULE, AND THE CRITIC HOLDS A SECOND COPY OF EVERY RULE IT
+  RESTATES.** A flat ceiling for the whole briefing was what decided she could
+  not teach: with channels at `unseen`, where §0 says build the term before using
+  it, there is room for four paragraphs of market OR three plus a build-up, and
+  one ceiling chose the first every morning. Four thousand characters is the only
+  bound and it is Telegram's. What replaced the ceiling is a test on the writing —
+  every sentence worth reading, the market half being where that fails first.
+  `CRITIC` restates several of the prompt's rules, so changing one there and not
+  here has the critic undo it; that is the shape to check whenever a prompt rule
+  moves.
+- **THE PROMPT STATES NO PREFERENCE OF HIS, AND THAT IS STRICTER THAN SOURCING
+  ONE HONESTLY.** It held a taste he had never expressed, in the file that decides
+  how she talks to the person it is about — so it reached him as her quoting
+  something he never said. A real preference would be in the wrong place too: an
+  instruction note is the channel he can correct, `notesBlock()` puts it in front
+  of her, and the prompt says notes outrank the shape. A rule worth keeping stands
+  on why it is right. `agree.test.mjs` reads the prompt for both halves — the
+  taste, and any rule propped up with *and he has told you so*.
 - **She is not a writer to `trades` and must not become one.** She reads the web,
   reads the journal through the `eugenia_trades` view, and writes only
   `eugenia_turns` and `eugenia_notes`. The view is granted `select` alone and
   hides `user_id`, `balance`, `commission` and deleted rows — but the grant
-  secures the view, not the key, so the guarantee that matters is structural:
-  one database read of the journal, no write path to it in the file. Do not add
-  one.
+  secures the view, not the key, so the guarantee that matters is structural: one
+  database read of the journal, no write path to it in the file. Do not add one.
 
-  `net_pnl` IS SERVED AND `pnl` ALONE IS NOT ENOUGH, which is the one widening
-  this view has had for a reason outside its own design. §8 sums `net_pnl` over
-  a month; `pnl` is `coalesce(net_pnl, computed_pnl)`, so on a position whose
-  broker email has not landed it is the folded figure and carries no swap — and
-  this account holds through the 17:00 rollover. With both columns she sums the
-  settled rows and reports how many fell back. Narrowing the view back to `pnl`
-  makes every multi-day total she gives short by an unknown amount on a subset
-  she cannot name, silently; `agree.test.mjs` asserts the column is there.
-- **`tradesQuery` is a boundary, and its window is counted in civil days.**
-  `days` comes from the model, so it is clamped and row-limited there rather
-  than trusted; the bound is stepped off today's New York date, because
-  `open_day` is a civil day and a fixed number of milliseconds is not one.
-  `writeNote` is the other boundary: it truncates rather than refusing, because
-  a tool that errors mid-turn costs the whole answer.
-- **Nothing the tool loop serves may throw, and it is a separate rule from the
-  one above.** A boundary coerces input the model wrote; this is about a read
-  that simply failed. All five return a sentence and she writes around the gap.
-  `readTrades` was the one that did not, and the briefing it killed had already
-  absorbed that same 404 a round earlier in `tradesBlock` — so the shape to
-  watch for is a helper reached from a caught call site and an uncaught one,
-  where the catch on the first hides that the second is bare. And the sentence
-  is half of it: an empty answer is only an answer when something was read.
+### Her memory, which has five lifetimes
+
+A turn rolls inside a morning. A note about him outlives twenty of those, which
+is what `kind` is for. What he UNDERSTANDS outlives both, which is
+`eugenia_channels`. `eugenia_thesis` is one row rewritten nightly — a reading
+that is only ever current, the opposite of a note and why it is not append-only.
+`eugenia_loops` holds what she flagged and what she asked until it closes.
+`eugenia_calendar` is both the event spine's input and the only dataset here that
+compounds.
+
+- **The strategy is a fourth memory and the only one she cannot write.**
+  `strategy.ts` holds it; its retrieval contract splits it — the summary and the
+  rules table are appended to the CACHED system prompt, everything else is
+  `get_strategy`. Putting it in a message pays for it on every turn and breaks
+  the prefix each time the document is edited. It is markdown in a template
+  literal, so every backtick in it is escaped.
+
+  THE PREFIX STATES `ttl: "1h"`, because the default window is five minutes and
+  her callers are hours apart. An hour catches the replies a briefing draws
+  through the morning and the 09:00 retry; nothing catches 08:00 to 22:00.
+  `cached` in `ask()`'s log line is the number that settles it rather than
+  arguing it.
+
+  She has no write path to it, deliberately: a document that decides whether he
+  followed his rules cannot be edited by the thing checking them. The numbering
+  skips 1 and 11 and nothing cites them. `readStrategy` NAMES a section it does
+  not hold rather than returning nothing, because the number arrives from the
+  model and a blank is a thing she fills in herself.
+
+  §4.1 AND §4.2 ARE PROSE INSIDE §4, and they are the only two citations in the
+  half she carries on every turn. An exact lookup told her they were unwritten,
+  which is worse than a blank: a wrong fact about her own document from the tool
+  that exists to stop her inventing one. `readStrategy` falls back one level to
+  the parent, and `agree.test.mjs` resolves every citation through it — asserting
+  a dotted one names a heading actually present in what came back, since the
+  fallback would answer a mistyped §4.7 with §4 and look identical to one that
+  worked.
+
+  §2 AND §3 ARE THE TWO SECTIONS THAT ARE NOT HIS — researched reference rather
+  than decisions, labelled as such where they start. Both must use the SPOKEN
+  channel names from `prompt.ts`, never the database ids: `agree.test.mjs`
+  resolves §2's headings against the names. Everything else in the file is his,
+  and a rule he has not stated is a `[decide]` rather than a pattern read as one.
+
+  R-08's four steps are in §6, and step 4 is arithmetic HE runs: nothing records
+  where the stop or target were set, so the ratio is asked and never computed. Do
+  not read that 1.5 against the 1.25 as a pair of floors — 1:1.5 is a condition
+  at ENTRY, and a realised 1:1.25 is the rule working on a shortened target and a
+  breach on a $25 one set at entry, which no row can tell apart.
+
 - **A note can be retired, and one filter is the whole of it.** `superseded_by`
   keeps the row and takes it out of the read; drop `superseded_by=is.null` from
   `readNotes` and she is handed the correction AND the thing it corrected, every
   turn, with nothing marking which is current. No error, and a note count that
   looks healthy. Three copies have to agree — the column, the filter, the tool
-  parameter — and any one missing leaves the other two doing nothing.
+  parameter.
+
+- **Superseding is what makes the nightly pass safe, not a convenience.** A
+  consolidator that can only add is a noise generator: it cannot fix what it got
+  wrong last night, and five mediocre notes push five good ones out of a
+  twenty-note window. The prompt pulls toward writing almost nothing and toward
+  retiring rather than adding.
 
 - **The windows are small on purpose, and `search_memory` is what reaches past
   them.** Twelve turns and twenty notes of each kind are what she is HANDED;
   everything older was always in the tables and never selected. Widening a window
-  puts the archive in her context, where every token is paid on every request —
-  so the fix for "she cannot remember" is never a bigger limit. `eugenia_search`
-  ranks notes and turns together, uses `websearch_to_tsquery` because the query
-  is model-written and the strict parser throws on an unbalanced quote, and
-  returns a retired note MARKED rather than hidden.
+  puts the archive in her context, where every token is paid on every request — so
+  the fix for "she cannot remember" is never a bigger limit. `eugenia_search`
+  ranks notes and turns together, uses `websearch_to_tsquery` because the query is
+  model-written and the strict parser throws on an unbalanced quote, and returns a
+  retired note MARKED rather than hidden.
 
-  IT IS TWO ARMS NOW AND THE LEXICAL ONE IS THE FLOOR, not a fallback beside
-  the vector. A row whose `embedding` is null does not appear in a
-  nearest-neighbour query at all — no error, no log, half an archive quietly
-  unsearchable — and a vector is worse than trigram wherever the thing asked for
-  IS the string: a date, a ticker, `R-08`. The two are fused by reciprocal rank,
-  never by a weighted sum, because `ts_rank` and cosine distance are on
-  unrelated scales and any weighting of them is a constant somebody guessed.
-  With no `EMBED_KEY` the query vector is null, both semantic arms return
-  nothing and the fusion over one arm reproduces the old ordering exactly —
-  which is what let 007 ship before the key. A VENDOR THAT REFUSES IS A
-  DIFFERENT THING FROM AN UNSET KEY, and `embed()` throws so the `?embed=1` door
-  can say which: it answered `ok: true, filled: 0` to a missing credit, a wrong
-  permission and a mistyped secret alike, with the reason in a log this file
-  already says nobody reads. The three WRITE paths swallow it — `.catch(() =>
-  null)` at each — and the door does not; `agree.test.mjs` counts both sides,
-  because the search's catch is the one that is not about losing a row: without
-  it a dead embedding vendor takes the LEXICAL arm down too, and she reports a
-  memory she could have searched perfectly well. `foldVectors` is where the vendor's
-  answer is ordered by the index IT states and refused whole if it is short or
-  the wrong width: a vector filed against the wrong row is undetectable
-  afterwards, and surfaces months later as her misremembering. THE MODEL IS
-  PINNED IN THE FILE, not read from the environment, and that is the difference
-  between it and `STT_MODEL` — vectors from two models are not comparable, the
-  column type catches a change of width and not one at the same width, and the
-  ranking would degrade into noise silently.
+  IT IS TWO ARMS AND THE LEXICAL ONE IS THE FLOOR, not a fallback beside the
+  vector. A row whose `embedding` is null does not appear in a nearest-neighbour
+  query at all — no error, no log, half an archive quietly unsearchable — and a
+  vector is worse than trigram wherever the thing asked for IS the string: a date,
+  a ticker, `R-08`. The two are fused by reciprocal rank, never by a weighted sum,
+  because `ts_rank` and cosine distance are on unrelated scales and any weighting
+  of them is a constant somebody guessed. With no `EMBED_KEY` the query vector is
+  null, both semantic arms return nothing, and the fusion over one arm reproduces
+  the old ordering exactly.
 
-  IT ALSO SAYS WHO SAID IT, and for a long time it did not: `role` was on the
-  table and not selected, so every turn rendered as `you said` and half of every
-  result set was HIS words handed back as hers. The role rides in `source` —
-  `note`, `you`, `him` — because `create or replace function` may not change a
-  return type and dropping the function takes its grants. Those three words are
-  a vocabulary shared with `searchList`'s `SAID` map; both copies are in the
-  README's table and `agree.test.mjs` holds them against each other.
+  A VENDOR THAT REFUSES IS A DIFFERENT THING FROM AN UNSET KEY, and `embed()`
+  throws so the `?embed=1` door can say which — a missing credit, a wrong
+  permission and a mistyped secret are three different repairs and once looked
+  identical. The three WRITE paths swallow it with `.catch(() => null)` and the
+  door does not; `agree.test.mjs` counts both sides, because the search's catch is
+  the one that is not about losing a row: without it a dead embedding vendor takes
+  the LEXICAL arm down too, and she reports a memory she could have searched
+  perfectly well.
+
+  `foldVectors` orders the vendor's answer by the index IT states and refuses it
+  whole if it is short or the wrong width: a vector filed against the wrong row is
+  undetectable afterwards and surfaces months later as her misremembering. THE
+  MODEL IS PINNED IN THE FILE, unlike `STT_MODEL` — vectors from two models are
+  not comparable, the column type catches a change of width and not one at the
+  same width, and the ranking would degrade into noise silently.
+
+  IT ALSO SAYS WHO SAID IT. `role` was on the table and not selected, so every
+  turn rendered as `you said` and half of every result set was HIS words handed
+  back as hers. The role rides in `source` — `note`, `you`, `him` — because
+  `create or replace function` may not change a return type and dropping the
+  function takes its grants. Those three words are a vocabulary shared with
+  `searchList`'s `SAID` map, and `agree.test.mjs` holds the copies together.
 
 - **Every read of a growing table carries a limit, and it has to take the newest
   rows.** Four hundred trades, twelve turns, twenty notes, two hundred turns for
-  the nightly pass. The last of those was missing and nothing failed, because a
-  normal day is a handful of turns — and when it was added it was added to an
-  `order=id.asc`, so it kept the FIRST two hundred: a pass that distils the
-  morning and drops the evening, where a late instruction lives. Select
-  newest-first and reverse for reading, as `recent()` does. A limit at the wrong
-  end is indistinguishable from a limit at the right one until the day it bites.
-
-  AND IT BIT A SECOND TIME, IN `fillEmbeddings`. That one drains a backlog, so
-  the order looked consequence-free — the same rows get filled either way. What
-  it decides is WHEN: fifty a night, `id.asc`, and a vendor outage becomes
-  searchable oldest-first, so last month's archive returns before last week's
-  conversation. Same rule, same tell; a read whose order "cannot matter" is
-  where to look next.
-
-- **Her memory has three lifetimes, not one.** An observation rolls; a standing
-  instruction must outlive twenty of them, which is what `kind` is for; and what
-  he UNDERSTANDS outlives both, which is what `eugenia_channels` is for. Five
-  rows, never a window — and every rung carries `moved_on`, the civil day it
-  last moved, formatted in UTC off a midday anchor because re-zoning a stored New
-  York date moves it a day back. Nothing descends the ladder but him saying he has
-  lost one, so without that date a year of use piles every channel at `owns` and
-  the census loses the absence it exists to show; a rung months old counts toward the tiebreaker as a low one
-  does. A channel he has never once used is a row saying
-  `unseen`, where in the notes it is nothing written down and therefore
-  unnoticeable. The map is a TIEBREAKER between two mechanisms that are both
-  live today, never a driver of what the briefing is about — but §0 of the
-  strategy gave it a second job, and that one it does drive: how much a term has
-  to be built before it is used. Subject and register are two questions and the
-  rung answers only the second.
-
-  AND THE TABLE THAT ANSWERS IT WAS NEVER IN FRONT OF HER, WHICH IS WHY WEEKS OF
-  PROMPT WORK CHANGED NOTHING. It lived in §0, and §0 below its summary is
-  `get_strategy`-only with nothing instructing her to fetch it. What she held
-  was a pair of ends quoted in RELEASE and MOVE — build at `unseen`, do not at
-  `owns` — and `unseen` is a ONE-WAY DOOR: `setChannel` refuses to write it
-  back, because it says a subject has never once come up. So the only build
-  instruction she had went unreachable the first time each channel was
-  mentioned, the two rungs everything actually sits at had no instruction, and a
-  binary rule over four states reads as the other case. She said every term
-  bare, correctly, following the rule she was given. `PITCH` is that table,
-  defined once in `prompt.ts` and interpolated into the cached prefix AND into
-  §0 the way `SUMMARY` already is; `agree.test.mjs` asserts it is IN `SYSTEM`,
-  because the old test proved a row per rung and nothing about whether the rows
-  were ever read. A prompt rule gated on a state that cannot recur is the shape
-  to look for next. Only the nightly pass may move a rung, because
-  one exchange is not evidence any more than one fill is a pattern.
-
-  THE LADDER DESCENDS IN ONE CASE AND IT IS NOT HER READING OF ONE. A demotion
-  is something HE said — *"I have lost this"* — and it is not the judgment the
-  paragraph above is about, which is why it is allowed where a promotion from
-  one exchange still is not. It lands at the pass all the same: the pass reads
-  the whole day, so what he said is in front of it, and the rung is right before
-  the next briefing, which is the only place it is read. Three copies say this
-  and all three are needed — `CHANNEL_TOOL`'s description permits it, the
-  CONSOLIDATE prompt asks for it, and §0 tells her it is his to declare; the
-  prompt is the one whose absence is silent, so `agree.test.mjs` reads it.
-
-  AND `unseen` IS UNREACHABLE BY ANY OF IT, guarded in `setChannel` before the
-  write. That rung says a channel has never once come up — history, not
-  understanding — and it is the only absence this system can see. A demotion
-  able to write it would report a channel she taught last week as one he has
-  never met, which is the census saying the opposite of the truth in the one
-  column it exists for. A channel he has lost goes to `explained`.
-- **`/notes` is his audit, and the whole of it is addressed to him.** It is
-  answered from the database rather than by the model, so nothing can paraphrase
-  or drop a row — and `notesList` renders the channel map itself rather than
-  appending `channelsBlock()`, which is written for HER and opens *Where he
-  stands*. The one message written to him must not switch into the third person
-  about him. It also means a failed channel read costs the whole reply rather
-  than being swallowed, which is right here and wrong in the briefing: an audit
-  that silently omits half of what it audits is the defect it exists to prevent.
+  the nightly pass. Select newest-first and reverse for reading, as `recent()`
+  does. A limit at the wrong end is indistinguishable from a limit at the right
+  one until the day it bites — which it has twice: the pass once kept the FIRST
+  two hundred turns of a day, distilling the morning and dropping the evening
+  where a late instruction lives; and `fillEmbeddings` drained a backlog `id.asc`,
+  where the order looks consequence-free because the same rows fill either way.
+  What it decides is WHEN. A read whose order "cannot matter" is where to look
+  next.
 
 - **Her notes are the only channel he has for correcting her, so `notesBlock()`
-  is load-bearing on all SEVEN paths, and the conversation window on the six
-  that speak.** The trade look had neither for its whole life: an instruction he
-  gave was obeyed everywhere except the two messages that reach him mid-trade,
-  and its R-14/R-19 line fires on exactly the print the morning briefing is
-  likeliest to have already named — so without the window the sharpest thing she
-  sends arrives as a repetition, which reads as emphasis rather than as a defect.
-  Both reads sit AFTER its two early returns, so an ordinary fill still costs
-  nothing. `channelsBlock()` stays on the six that are asked to build a term,
-  and `recent()` stays off the nightly pass, which reads its own fixed
-  twenty-four hours. An instruction — *"stop mentioning the
-  ten-year"* — is a note, and every later message obeys it; the conversation
-  window would forget it by morning. Dropping the call from the briefing, the
-  pulse or a reply fails silently: she carries on ignoring something he believes
-  she took, and nothing anywhere reports it. `agree.test.mjs` reads the six
-  function bodies for it, and for `channelsBlock()` beside it — the release look
-  joined that list when its prompt was asked to teach, since telling her to build
-  a mechanism he has never had built without handing her the map that says which
-  those are is an instruction outrunning its inputs, and it fails by teaching the
-  wrong thing well rather than by failing at all. THE MOVE LOOK JOINED IT NEXT,
-  and the two are one case: both are unscheduled messages about something the
-  morning did not cover, and what moves gold runs through a channel exactly as
-  what a print changes does. Adding the map is half of it — `agree.test.mjs`
-  reads BOTH prompts for the instruction to use it, because a path handed the
-  ladder with nothing telling it to build fails identically to one told to build
-  with no ladder.
+  is load-bearing on all SEVEN paths, and the conversation window on the six that
+  speak.** An instruction — *"stop mentioning the ten-year"* — is a note, and every
+  later message obeys it; the conversation window would forget it by morning.
+  Dropping the call from a path fails silently: she carries on ignoring something
+  he believes she took, and nothing anywhere reports it. `channelsBlock()` goes to
+  the six asked to build a term, and `recent()` stays off the nightly pass, which
+  reads its own fixed twenty-four hours. `agree.test.mjs` reads the function
+  bodies for all three.
+
+  THE TWO MID-TRADE MESSAGES ARE THE ONES THIS BITES HARDEST. The trade look had
+  neither for its whole life, so an instruction he gave was obeyed everywhere
+  except the messages that reach him while he is in a position — and its
+  R-14/R-19 line fires on exactly the print the morning briefing is likeliest to
+  have named, so without the window the sharpest thing she sends arrives as a
+  repetition. Both reads sit AFTER its early returns, so an ordinary fill still
+  costs nothing.
+
+- **`/notes` is his audit, and the whole of it is addressed to him.** Answered
+  from the database rather than by the model, so nothing can paraphrase or drop a
+  row — and `notesList` renders the channel map itself rather than appending
+  `channelsBlock()`, which is written for HER and opens *Where he stands*. The one
+  message written to him must not switch into the third person about him. It also
+  means a failed channel read costs the whole reply rather than being swallowed,
+  which is right here and wrong in the briefing: an audit that silently omits half
+  of what it audits is the defect it exists to prevent.
+
+- **What is stored is the raw turn, never the augmented one.** Notes and the
+  week's trades are rebuilt every turn; storing them would resend a stale copy as
+  history for the next six briefings.
+- **The history window is repaired, not assumed.** Pairs are written in one
+  INSERT, but a concurrent one can take a sequence value between them, so an even
+  window can still open on an assistant turn — which the Messages API refuses.
+  `openOnUser` trims to the first user turn; nothing may go back to depending on
+  `HISTORY` being even.
+
+### Where he stands on each channel
+
+- **Five rows, never a window, and the only absence this system can see.** Every
+  rung carries `moved_on`, the civil day it last moved, formatted in UTC off a
+  midday anchor because re-zoning a stored New York date moves it a day back.
+  Nothing descends the ladder but him saying he has lost one, so without that date
+  a year of use piles every channel at `owns` and the census loses the absence it
+  exists to show; a rung months old counts toward the tiebreaker as a low one
+  does. A channel he has never once used is a row saying `unseen`, where in the
+  notes it is nothing written down and therefore unnoticeable.
+
+- **Subject and register are two questions and the rung answers only the second.**
+  The map is a TIEBREAKER between two mechanisms both live today, never a driver
+  of what the briefing is about. On REGISTER it drives outright: how much a term
+  has to be built before it is used.
+
+  AND THE TABLE THAT ANSWERS THAT WAS NEVER IN FRONT OF HER, WHICH IS WHY WEEKS OF
+  PROMPT WORK CHANGED NOTHING. It lived in §0, and §0 below its summary is
+  `get_strategy`-only with nothing instructing her to fetch it. What she held was a
+  pair of ends quoted in two prompts — build at `unseen`, do not at `owns` — and
+  `unseen` is a ONE-WAY DOOR: `setChannel` refuses to write it back, because it
+  says a subject has never once come up. So the only build instruction she had
+  went unreachable the first time each channel was mentioned, the two rungs
+  everything actually sits at had no instruction, and a binary rule over four
+  states reads as the other case. She said every term bare, correctly, following
+  the rule she was given. `PITCH` is that table, defined once in `prompt.ts` and
+  interpolated into the cached prefix AND into §0 the way `SUMMARY` already is;
+  `agree.test.mjs` asserts it is IN `SYSTEM` and holds its rungs against
+  `CHANNEL_STATES`, where the old test proved a row per rung and nothing about
+  whether the rows were ever read. **A prompt rule
+  gated on a state that cannot recur is the shape to look for next.**
+
+- **Only the nightly pass may move a rung**, because one exchange is not evidence
+  any more than one fill is a pattern — which is why `set_channel` is in
+  `CONSOLIDATE_TOOLS` and not beside `remember` in `CHAT_TOOLS`. Closing a loop
+  is the same split: opening one is a moment and may happen anywhere, closing one
+  is a judgment and belongs to the pass. THE LADDER DESCENDS IN ONE CASE AND IT IS
+  NOT HER READING OF ONE: a demotion is something HE said — *"I have lost this"* —
+  which is why it is allowed where a promotion from one exchange is not. It lands
+  at the pass all the same, and the rung is right before the next briefing, the
+  only place it is read. Three copies say this and all three are needed —
+  `CHANNEL_TOOL`'s description, the CONSOLIDATE prompt, and §0; the prompt is the
+  one whose absence is silent, so `agree.test.mjs` reads it.
+
+- **`unseen` IS UNREACHABLE BY ANY OF IT**, guarded in `setChannel` before the
+  write. That rung says a channel has never once come up — history, not
+  understanding — and a demotion able to write it would report a channel she
+  taught last week as one he has never met, which is the census saying the
+  opposite of the truth in the one column it exists for. A channel he has lost
+  goes to `explained`.
+
+### What she is handed about his desk
+
 - **`positionsBlock()` IS THE ONLY BLOCK WITH RULES ABOUT WHAT SHE MAY DO WITH
-  IT, and that asymmetry is the whole design rather than a compromise.** She sees
-  the full open row — entry, stop and target as first seen — so she can answer
-  properly when he raises it; unprompted it may only suppress a setup-flavoured
-  line and name a collision his OWN rules name (R-14/R-19, R-11). The guard that
-  keeps his levels out of a message SHE starts is a paragraph in `prompt.ts` and
-  has no structural half, unlike the broker token or the missing write path — so
-  `agree.test.mjs` reads the prompt for it, because deleting it breaks nothing
-  else and the result reads as her being relevant. The failure it prevents is a
-  briefing framed around his position instead of around the day.
+  IT, and that asymmetry is the design.** She sees the full open row — entry, stop
+  and target as first seen — so she can answer properly when he raises it;
+  unprompted it may only suppress a setup-flavoured line and name a collision his
+  OWN rules name (R-14/R-19, R-11). The guard keeping his levels out of a message
+  SHE starts is a paragraph in `prompt.ts` with no structural half, so
+  `agree.test.mjs` reads the prompt for it: deleting it breaks nothing else and
+  the result reads as her being relevant. The failure it prevents is a briefing
+  framed around his position instead of around the day.
 
   AN ENTRY FROM ANOTHER DAY NAMES THE DAY. The line read `open since 09:15 ET`
   under a heading that says what he has on RIGHT NOW, whether the fill was this
-  morning or on Monday — one way to read that and it is the wrong one. Not an
-  edge case: the summary calls his positions intraday to MULTI-SESSION and R-15
-  bounds a hold at the Friday close, not at midnight. Today stays bare, or the
-  date is noise on every intraday fill.
+  morning or on Monday. Not an edge case: the summary calls his positions intraday
+  to MULTI-SESSION and R-15 bounds a hold at the Friday close, not at midnight.
+  Today stays bare, or the date is noise on every intraday fill.
 
   NO UNREALISED P&L, AND THAT IS ONE DECISION RATHER THAN TWO. `eugenia_price` is
   quarter-hourly, so the figure would be the most anchoring number in the block
@@ -556,294 +577,267 @@ code you write near it:
   subtracts them if asked. The mark is read only when something is open and is
   caught SEPARATELY from the block, so a price she cannot read costs one line
   rather than the position. Six paths, not the notes' five — the move look joins
-  because a sharp move is the likeliest thing to arrive while he is in
-  something; `postTradeEvent` stays out, being reached from the position it
-  would be told about.
+  because a sharp move is the likeliest thing to arrive while he is in something;
+  `postTradeEvent` stays out, being reached from the position it would be told
+  about.
 
-  A RUN OF LOSSES IS A TALLY AND A TALLY IS A VERDICT. She may never hand him
-  the count — only what the trades have in common, which is the briefing's own
-  rule about a cause with no chain under it. A breach of one of his rules is not
-  the same thing and is never withheld: that is his document deciding.
+  A RUN OF LOSSES IS A TALLY AND A TALLY IS A VERDICT. She may never hand him the
+  count — only what the trades have in common, which is the briefing's own rule
+  about a cause with no chain under it. A breach of one of his rules is not the
+  same thing and is never withheld: that is his document deciding.
 
-- **`TradeRow` is a copy of the view's column list and now has a test.** Its own
+- **`TradeRow` is a copy of the view's column list and has a test.** Its own
   comment calls it the row `eugenia_trades` serves, and every rule in
-  `adherence.ts` is written against it — so 006 appending the plan to the view
-  without adding it here left two columns no rule could name, invisibly, for two
-  releases. It matters more now that `readDesk` asks for `select=*` precisely so
-  the list is not copied a fourth time, which makes the interface the only
-  description of what comes back.
+  `adherence.ts` is written against it — so appending a column to the view without
+  adding it here leaves columns no rule can name, invisibly. It matters more now
+  that `readDesk` asks for `select=*` precisely so the list is not copied a fourth
+  time, which makes the interface the only description of what comes back.
 
-- **She has senses now, and they are data rather than a clock.** The briefing
-  files the day's calendar with `log_calendar`; a quarter-hourly cron job
-  (`?release=1`, its own job in `004_cron.sql`) looks at anything `high` that has
-  landed and is not yet `looked_at`. That column is stamped BEFORE the look, for
-  the reason the briefing marker is: a look that generates and fails to write
-  would otherwise repeat every fifteen minutes, each one billed. It is a second
-  job rather than a faster one because every hourly predicate tests `hour ===` —
-  a `*/15` on the existing job runs four briefings a morning.
+- **`tradesQuery` is a boundary, and its window is counted in civil days.** `days`
+  comes from the model, so it is clamped and row-limited there rather than
+  trusted; the bound is stepped off today's New York date, because `open_day` is a
+  civil day and a fixed number of milliseconds is not one. `writeNote` is the
+  other boundary: it truncates rather than refusing, because a tool that errors
+  mid-turn costs the whole answer.
 
-  A TRIGGER ON `trades` TELLS HER A POSITION OPENED, and the two things she may
-  say are both his own rules read back: R-14/R-19 on a print pending against an
-  open position, R-11 on a fill that took the day past its limit. Never a
-  verdict.
+- **A SUMMARY INHERITS EVERY GUARANTEE THE DETAILED READ CARRIED.** `journal.ts`
+  is the app's own arithmetic — the win rate over decided trades, the money split
+  on the sign, the averages on the result label, the realised reward-to-risk, the
+  session and setup breakdowns — ported so `get_stats` can answer without her
+  doing it by hand over four hundred rows. It is a copy of `index.html` with no
+  build step between them, so `agree.test.mjs` reads both for `CONFIG.BE`, the
+  session names, all four sets of market hours and the SHAPE of the three
+  definitions that look identical in every ordinary case and part on one.
 
-  AND BOTH ARE ABOUT TODAY, WHICH NOTHING CHECKED. The trigger fires on a
-  transition rather than on a clock, so the row it carries is only today's by
-  habit — and anything stamping an old close fires it for an old day. The
-  poller's first `fill_time` backfill is how it surfaced: two messages saying
-  "today's realised P&L is −61.78" and "the day sits at −318.88", about the 11th
-  and 19th of August, in the present tense, three weeks late. `open_day !==
-  nyDate(now)` returns before either branch, because it is a property of the
-  EVENT rather than of what she would have said — placed after the branches it
-  is two guards and the second is the one that gets forgotten. An overnight hold
-  closing this morning is filed under yesterday and is skipped too, which is
-  right: R-11 forbids an entry LATER than the breaching loss, and a finished day
-  can have no later entry. Both branches decide from data BEFORE any model call, so the common
-  case — nothing pending, no breach — costs nothing at all. The close trigger
-  compares `old.fill_time is null and new.fill_time is distinct from null`;
-  `<>` is NULL there and the one event it exists for would never fire, and
-  without the guard the poller's two-minute re-upsert fires it forever.
+  IT SHIPPED DROPPING THE ONE SIGNAL §8 BUILT THE JOURNAL TO KEEP. `pnl` is
+  `coalesce(net_pnl, computed_pnl)`, and §8 withholds `computed_pnl` by name and
+  serves `net_pnl` beside `pnl` so a fallback row is visible without the unsettled
+  number being reachable. A total cannot carry that, and the prompt now tells her
+  to prefer the total over the rows — so `journalStats` counts `settled` and
+  `fellBack` and says so where anything did. Ask it of every new aggregate: what
+  did the read underneath this one guarantee?
 
-  THE THIRD SENSE HAS NO ROW BEHIND IT, WHICH IS WHY IT NEEDS A MARK. A release
-  landing and a position opening are both rows appearing; gold is always there,
-  so *it moved* is a fact about the instrument AND a previous reading.
-  `eugenia_price` is one row rewritten every quarter hour by its own job
-  (`?move=1`), so the window is the gap between firings rather than a number
-  anyone chose. Both gates are relative — a share of the session's range, and a
-  share of the price — because a fixed dollar threshold means two different
-  things to gold at 4,400 and gold at 2,000, and the year nobody revises it the
-  sense fires constantly or never; never looks exactly like a quiet market.
-  THE SHARE IS TAKEN AGAINST THE BROKER'S SESSION AND THAT SESSION RESTARTS AT
-  17:00 NEW YORK, which this pair was built not knowing: the floor was written
-  for the ragged hour after the Sunday open, one edge case once a week, and it is
-  in fact alone for seven hours of every weekday while the evening range
-  rebuilds. A tenth of a percent was generous because something above it was
-  meant to be working; alone it is $4.49 on gold at 4,485 and it sent a $7 drift
-  at 20:57. The same roll is why `quoteWindow` exists — `high`, `low`,
-  `prev_close` and `change` are all session figures, so the SAME `change` is the
-  overnight move before 17:00 and the evening's after it, and served as bare JSON
-  it read as "on the day". Nothing here can see the calendar day; `get_trendbars`
-  rolls on the same boundary, so the window is NAMED rather than computed, and
-  `agree.test.mjs` reads both `readMarket` and `postMove` for the call — dropping
-  it breaks nothing and the message still reads as a working price.
+### Her senses, which are data rather than a clock
+
+- **The event spine.** The briefing files the day's calendar with `log_calendar`;
+  a quarter-hourly cron job (`?release=1`, its own job in `004_cron.sql`) looks at
+  anything `high` that has landed
+  and is not yet `looked_at`. That column is stamped BEFORE the look, for the
+  reason the briefing marker is: a look that generates and fails to write would
+  repeat every fifteen minutes, each one billed. It is a second job rather than a
+  faster one because every hourly predicate tests `hour ===` — a `*/15` on the
+  existing job runs four briefings a morning.
+
+- **A trigger on `trades` tells her a position opened or closed**, and the two
+  things she may say are both his own rules read back: R-14/R-19 on a print
+  pending against an open position, R-11 on a fill that took the day past its
+  limit. Never a verdict. Both branches decide from data BEFORE any model call, so
+  the common case costs nothing.
+
+  BOTH ARE ABOUT TODAY AND NOTHING CHECKED THAT THE TRADE IS. The trigger fires on
+  a transition rather than on a clock, so the row it carries is only today's by
+  habit — and anything stamping an old close fires it for an old day, which is how
+  two messages arrived reporting August in the present tense weeks later.
+  `open_day !== nyDate(now)` returns before either branch, because it is a property
+  of the EVENT rather than of what she would have said; placed after the branches
+  it is two guards and the second gets forgotten. An overnight hold closing this
+  morning is filed under yesterday and is skipped too, which is right: R-11 forbids
+  an entry LATER than the breaching loss, and a finished day can have no later
+  entry.
+
+  The close trigger compares `old.fill_time is null and new.fill_time is distinct
+  from null`; `<>` is NULL there and the one event it exists for would never fire,
+  and without the guard the poller's two-minute re-upsert fires it forever.
+
+- **THE THIRD SENSE HAS NO ROW BEHIND IT, WHICH IS WHY IT NEEDS A MARK.** A release
+  landing and a position opening are both rows appearing; gold is always there, so
+  *it moved* is a fact about the instrument AND a previous reading. `eugenia_price`
+  is one row rewritten every quarter hour by its own job (`?move=1`), so the window
+  is the gap between firings rather than a number anyone chose.
+
+  Both gates are relative — a share of the session's range, and a share of the
+  price — because a fixed dollar threshold means two different things to gold at
+  4,400 and at 2,000, and the year nobody revises it the sense fires constantly or
+  never; never looks exactly like a quiet market. THE SHARE IS TAKEN AGAINST THE
+  BROKER'S SESSION AND THAT SESSION RESTARTS AT 17:00 NEW YORK, which the pair was
+  built not knowing: the floor was written for the ragged hour after the Sunday
+  open and is in fact alone for seven hours of every weekday while the evening
+  range rebuilds.
+
   `MARK_STALE_MIN` stops a move measured across an outage counting as a
   quarter-hour move, and `looked_at` is the one column written conditionally:
   unconditionally, the quiet window never reopens and she says one thing about a
-  move and then nothing for the life of the deployment. A move a high-impact
-  print explains belongs to the spine and not here, or payrolls reaches him twice
-  in ten minutes from two senses saying the same thing. `marketOpen` moved into
-  `_shared/edge.ts` when this arrived, because the poller and this now ask the
-  same question.
+  move and then nothing for the life of the deployment. A move a high-impact print
+  explains belongs to the spine and not here, or payrolls reaches him twice in ten
+  minutes from two senses saying the same thing. `marketOpen` moved into
+  `_shared/edge.ts` when this arrived, because the poller and this ask the same
+  question.
+
+### Checking his rules
 
 - **`adherence.ts` is the strategy executed, and the set of rules is not a
   choice.** §7's `Evaluable` column decides it: eight `journal` rules, and the
-  eleven `judgment` and `field` ones stay out, because a judgment rule that
-  starts reporting `pass` is exactly the "no violations" claim §8 warns is close
-  to saying nothing. It is pure — rows in, verdicts out, no clock but the one
-  passed in — which is what lets every rule be driven in BOTH directions from a
-  test. `unknown` is never `pass`, and an empty population is `unknown`.
-  `agree.test.mjs` holds the eight against §7's table, because a rule marked
-  `journal` and never implemented is a check she cites that nobody runs.
+  eleven `judgment` and `field` ones stay out, because a judgment rule that starts
+  reporting `pass` is exactly the "no violations" claim §8 warns is close to
+  saying nothing. It is pure — rows in, verdicts out, no clock but the one passed
+  in — which is what lets every rule be driven in BOTH directions from a test.
+  `unknown` is never `pass`, and an empty population is `unknown`.
+  `agree.test.mjs` holds the eight against §7's table.
 
   A VERDICT IS NOT THE WHOLE ANSWER, WHICH IS HOW R-10 HID A MISCOUNT FOR ITS
   WHOLE LIFE. It compared each span with the one BEFORE it in entry order, which
-  is a question about a neighbour rather than about the rule: a multi-session
-  hold covers everything opened inside it, so the second trade taken within one
-  came back counted as a PASS and named nowhere while genuinely breaching. The
-  verdict never moved — a nested span always has a neighbour that overlaps too,
-  so something was always flagged — so a test asserting on `verdict` alone could
-  not have found it. Assert on the counts and on `ids`: those are what
-  `check_rules` hands him to check, and a breach missing from that list is one
-  he cannot see. Two sweeps now, one from each end.
+  is a question about a neighbour rather than about the rule: a multi-session hold
+  covers everything opened inside it, so the second trade taken within one came
+  back counted as a PASS and named nowhere while genuinely breaching. The verdict
+  never moved — a nested span always has a neighbour that overlaps too — so a test
+  asserting on `verdict` alone could not have found it. **Assert on the counts and
+  on `ids`:** those are what `check_rules` hands him to check, and a breach missing
+  from that list is one he cannot see.
 
   Two numbers in it are decisions rather than facts and are named constants for
   that reason: `CLOSEOUT_MIN` gives §6's "at or very near" the Friday close a
-  value, and `STRETCH` gives §5's "Christmas-to-New-Year stretch" one. The
-  holiday calendar is COMPUTED, Good Friday and the Saturday observance
-  included — a table of dates stops being true the year nobody extends it, and
-  that failure looks exactly like perfect compliance.
+  value, and `STRETCH` gives §5's "Christmas-to-New-Year stretch" one. The holiday
+  calendar is COMPUTED, Good Friday and the Saturday observance included — a table
+  of dates stops being true the year nobody extends it, and that failure looks
+  exactly like perfect compliance.
 
-- **Her memory has five lifetimes now, not three.** `eugenia_thesis` is one row
-  rewritten nightly — a thesis is a reading that is only ever current, which is
-  the opposite of a note and why it is not append-only. `eugenia_loops` holds
-  what she flagged and what she asked until it closes; opening one is a moment
-  and may happen anywhere, closing one is a judgment and belongs to the pass,
-  the same split as `remember` and `set_channel`. `eugenia_calendar` is both the
-  event spine's input and the only dataset here that compounds.
+### The jobs, the clock and the meters
 
-- **`eugenia_runs` is where the meters survive.** Everything this file already
-  argues about `pg_net` — that nobody reads Edge logs — applied to every cost and
-  quality figure `ask()` was printing. One row per model call, plus one per
-  delivered briefing carrying its length, plus a row for the turns that FAILED,
-  which is the row that never existed. It never throws and never blocks an
-  answer. It is also what `consolidatedToday()` reads, which is how the nightly
-  pass finally gets the retry the briefing has always had: 23:00 New York, inside
-  the same civil day, gated so a pass that ran does not run twice.
+- **Six schedules, three jobs, and `dueNow` picks between the clock-driven four.**
+  `briefDue`, `pulseDue`, `retryDue`, `consolidateDue` and `consolidateRetryDue`
+  all read `nyClock`, because pg_cron is UTC and a fixed expression is wrong for
+  half the year. They overlap, so each answering correctly on its own settles
+  nothing: the composition is the decision, and a test walks every hour of a week
+  through `dueNow`, DRIVING the sequence rather than being handed a flag — the
+  pass records itself, which is what makes 23:00 a retry rather than a second
+  pass.
+
+  The two data-driven schedules are deliberately not in `dueNow`: each is decided
+  by a table rather than by the clock. Each has its own door and its own
+  quarter-hourly job, and THE FLAG IS THE COPY THAT MATTERS — renaming one fails
+  in complete silence, because pg_net discards the 200 an unread flag still gets
+  back from `nothing due this hour`. `agree.test.mjs` reads every flagged cron URL
+  against `postScheduled`, and reads `postScheduled` for a branch per answer.
+  Adding an hour costs nothing in cron — the job is `0 * * * *` — which is exactly
+  why a new schedule can be answered correctly and dispatched by nobody.
+
+- **The pulse's default is silence, and `isSilent` is how it is said.** It matches
+  the bare word only, so a sentence merely opening with it is sent. Err toward
+  sending: a swallowed message is invisible, an extra one is extra. Nothing is
+  stored on a quiet pulse — twelve turns is the whole window and empty pairs would
+  push the briefing out of it.
+
+- **The nightly pass writes memory and sends nothing.** 22:00 New York, every day.
+  Notes written mid-conversation are decided at the worst possible moment — while
+  she is busy answering — and this is the only point at which she sees a whole day
+  at once. The window is a fixed twenty-four hours and there is no watermark,
+  because the window and the gap between runs are the same length; a missed night
+  loses that day's distillation and never the day, since the turns stay in the
+  table and stay searchable. That is what makes a lossy pass safe to run
+  unattended. It is `high` effort, and that is not a latency decision — a careless
+  note outlives a careless briefing by months.
+
+  IT IS GIVEN WHAT IT IS ASKED TO JUDGE WITH. Two of its instructions outran its
+  inputs: it is told to notice what he has started doing differently, from a
+  transcript that on most days never mentions a trade — so `tradesBlock()` goes in
+  — and told to prefer superseding while holding twenty notes out of an archive it
+  could not look at — so `SEARCH_TOOL` is in `CONSOLIDATE_TOOLS`. Never web
+  search: a bookkeeping pass has nothing to research. It also logs where the five
+  channels stand, which is the only meter on the one claim this whole design rests
+  on.
+
+- **`eugenia_runs` is where the meters survive.** Everything this file argues
+  about `pg_net` — that nobody reads Edge logs — applied to every cost and quality
+  figure `ask()` was printing. One row per model call, plus one per delivered
+  briefing carrying its length, plus a row for the turns that FAILED, which is the
+  row that never existed. It never throws and never blocks an answer. It is also
+  what `consolidatedToday()` reads, which is how the nightly pass gets the retry
+  the briefing has always had.
 
 - **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
-  no tools. `keepDraft` is the guard: a revision that comes back empty,
-  apologetic or twice the length is a critic that failed, and the draft goes
-  instead. A critic that could make the briefing worse would be worse than none.
-
-- **A tool result is never dropped, and a round runs at once.** `serve()` answers
-  an unknown name with a sentence, because a user message missing the
-  `tool_result` for a `tool_use` block is a 400 — so a mistyped name would
-  present as a dead turn rather than as a mistake. The dispatch is
-  `Promise.all`: the model is taught to batch its calls and they were being
-  served in series.
-
-- **Voice and charts reach her; neither is stored as sent.** The transcript is
-  kept and the image is not — base64 in `eugenia_turns` is a megabyte resent as
-  history for six exchanges. `stamped` appends the clock as a trailing text
-  block, because concatenating against an array is `[object Object]` on exactly
-  the turns carrying the most context. `STT_URL`/`STT_KEY`, `TTS_KEY` and
-  `EMBED_KEY` are OPTIONAL secrets, deliberately not in the boot guard, and
-  `agree.test.mjs` makes that exemption cost something — an optional secret must
-  be guarded where it is used.
-
-- **SHE ANSWERS IN THE CHANNEL HE USED, and that is the whole rule.** A voice
-  note is answered aloud, a typed line in text; no setting, no toggle, nothing
-  stored. It falls out that nothing SCHEDULED speaks, since none of those is a
-  reply — right for the briefing especially, which is a thing you skim. THE TEXT
-  GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember` stores
-  and what a search finds, so `say` before `speak`, and a speech vendor that
-  hangs or throws then costs the convenience rather than the answer. That
-  ordering is the one thing `agree.test.mjs` reads out of `handleMessage`.
-  `SPEAK_MAX` is stated to the prompt as well as enforced, because a cap alone
-  drops the audio on a long answer with nothing saying why. `TTS_VOICE` and
-  `TTS_MODEL` are environment rather than pinned, unlike `EMBED_MODEL` — nothing
-  is stored, so a change alters one message rather than what is comparable to
-  what — but they are COUPLED, since the older `tts-1` serves a smaller voice set
-  and takes no delivery instruction. `TTS_STYLE` is pinned where they are not:
-  which voice reads it is taste, how it is read is the product, and a breathless
-  delivery of a deliberately unexcited paragraph contradicts the prompt's whole
-  length. AND THE FORMAT IS THE ONE THING HERE THAT FAILS QUIETLY — mp3 is the
-  vendor's default and it WORKS, arriving as a file attachment rather than a
-  voice note, with nothing erroring and nothing logged; `agree.test.mjs` reads
-  `speak()` for `opus`, for `audio/ogg` and for the `.ogg` filename.
+  no tools. `keepDraft` is the guard: a revision that comes back empty, apologetic
+  or twice the length is a critic that failed, and the draft goes instead. A critic
+  that could make the briefing worse would be worse than none.
 
 - **The apology names the job.** Every scheduled failure used to say "No
   briefing", including the nightly pass, whose real symptom is that her memory
   stops growing. `APOLOGY` is a word per job and a test asserts no two are alike.
 
-- **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
-  no verdict on a trade, one question at a time. The line she may now cross is
-  narrow and deliberate: *what the market is pricing* and *what would surprise
-  it* are facts about today and are hers to say; what price will do never is.
-  Widening that further is a product decision, not a prompt tweak.
-- **The briefing is prose and must stay prose.** Numbered sections with headings
-  are a report however plain the words inside them; that is what the rewrite
-  removed. Do not reintroduce scaffolding to "organise" it.
-- **LENGTH IS NOT A RULE, AND THE CRITIC HELD THE SECOND COPY OF THE ONE IT
-  USED TO BE.** A flat nine hundred to fourteen hundred for the whole briefing
-  was what decided she could not teach: with four channels at `unseen`, where §0
-  says build the term before using it, there is room for four paragraphs of
-  market OR three plus a build-up, and one ceiling chose the first every morning.
-  Four thousand characters is the only bound and it is Telegram's, not a taste.
-  What replaced the ceiling is a test on the writing — every sentence worth
-  reading, the market half being where that fails first. THE CRITIC ENFORCED THE
-  SAME NUMBER — changing the briefing prompt alone would have had the critic cut
-  the teaching straight back out, which is the shape to check for whenever a
-  prompt rule moves: `CRITIC` restates several of them.
-- **THE PROMPT STATES NO PREFERENCE OF HIS, AND THAT IS STRICTER THAN SOURCING
-  ONE HONESTLY.** It held *"he gets frustrated by walls of text"* and *"he has
-  told you so"*, neither of which was ever said — a claim about a conversation
-  this repository cannot see, in the file that decides how she talks to the
-  person it is about, so it comes back to him as her quoting a taste he never
-  had. But a real one would be in the wrong place too: an instruction note is
-  the channel he can correct, `notesBlock()` puts it in front of her on all five
-  paths, and the prompt says those outrank the shape. A rule worth keeping
-  stands on why it is right. `agree.test.mjs` reads the prompt bodies for both
-  halves of the move — the taste, and the rule propped up with *and he has told
-  you so*.
-- **Six schedules, three jobs, and `dueNow` picks between the clock-driven
-  four.** `briefDue`, `pulseDue`, `retryDue`, `consolidateDue` and
-  `consolidateRetryDue` all read `nyClock`, because pg_cron is UTC and a fixed
-  expression is wrong for half the year. They overlap, so each answering
-  correctly on its own settles nothing: the composition is the decision, and a
-  test walks every hour of a week through `dueNow`. That walk now DRIVES the
-  sequence rather than being handed a flag — the pass records itself, which is
-  what makes 23:00 a retry rather than a second pass, and a test called with a
-  fixed `consolidated` could not have discovered that. The two data-driven
-  schedules — the event spine and the price sense — are deliberately not in
-  `dueNow`: each is decided by a table rather than by the clock, and folding one
-  into a clock predicate would make both harder to read. Each has its own door
-  and its own quarter-hourly job, and THE FLAG IS THE COPY THAT MATTERS: renaming
-  one fails in complete silence, because pg_net discards the 200 an unread flag
-  still gets back from `nothing due this hour`. `agree.test.mjs` reads every
-  flagged cron URL against `postScheduled`. Adding an hour costs nothing
-  in cron — the job is `0 * * * *` and always was — which is exactly why a new
-  schedule can be answered correctly and dispatched by nobody. `agree.test.mjs`
-  reads `postScheduled` for a branch per answer.
-- **The pulse's default is silence, and `isSilent` is how it is said.** It
-  matches the bare word only, so a sentence merely opening with it is sent. Err
-  toward sending: a swallowed message is invisible, an extra one is extra.
-  Nothing is stored on a quiet pulse — twelve turns is the whole window and
-  empty pairs would push the briefing out of it.
-- **The nightly pass writes memory and sends nothing.** 22:00 New York, every
-  day. Notes written mid-conversation are decided at the worst possible moment —
-  while she is busy answering — and this is the only point at which she sees a
-  whole day at once. The window is a fixed twenty-four hours and there is no
-  watermark, because the window and the gap between runs are the same length; a
-  missed night loses that day's distillation and never the day, since the turns
-  stay in the table and stay searchable. That is what makes a lossy pass safe to
-  run unattended. It is `high` effort, and that is not a latency decision — a
-  careless note outlives a careless briefing by months.
+- **A failure must reach him, not the console.** pg_net discards the response,
+  `net._http_response` is pruned within hours, and nobody reads Edge logs — so the
+  cron half messages Telegram on failure and retries at 09:00–11:00 ET until
+  `briefedToday()` sees the marker. Do not quietly remove either half.
 
-  IT IS GIVEN WHAT IT IS ASKED TO JUDGE WITH. Two of its instructions outran its
-  inputs: it is told to notice what he has started doing differently, from a
-  transcript that on most days never mentions a trade — so `tradesBlock()` goes
-  in — and told to prefer superseding to adding while holding twenty notes out of
-  an archive it could not look at — so `SEARCH_TOOL` is in `CONSOLIDATE_TOOLS`.
-  Never web search: a bookkeeping pass has nothing to research. It also logs
-  where the five channels stand, which is the only meter on the one claim this
-  whole design rests on.
+- **Her Telegram half must answer before it works, never after.** Telegram gives a
+  webhook about a minute and then redelivers — which would run a whole briefing
+  twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is what makes
+  the 200 immediate. The cron half has no such limit: pg_net never retries.
 
-- **Superseding is what makes the pass safe, not a convenience.** A consolidator
-  that can only add is a noise generator: it cannot fix what it got wrong last
-  night, and five mediocre notes push five good ones out of a twenty-note
-  window. The prompt pulls toward writing almost nothing and toward retiring
-  rather than adding.
+### The model call
 
-- **What is stored is the raw turn, never the augmented one.** Notes and the
-  week's trades are rebuilt every turn; storing them would resend a stale copy
-  as history for the next six briefings.
-- **The history window is repaired, not assumed.** Pairs are written in one
-  INSERT, but a concurrent one can take a sequence value between them, so an
-  even window can still open on an assistant turn — which the Messages API
-  refuses outright. `openOnUser` trims to the first user turn; nothing may go
-  back to depending on `HISTORY` being even.
-- **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and
-  the parts go sequentially; Telegram does not promise ordering. Its preference
-  is paragraph break, then any newline, then a hard cut, and it must stay two
-  lookups rather than a `max()` over the pair: `lastIndexOf('\n')` is always at
-  or past `lastIndexOf('\n\n')`, so a max can only ever return the plain newline
-  and the paragraph preference silently never happens. The prompt aims
-  well under the cap, so this is the exception now — do not delete it for being
-  quiet.
-- **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
-  a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
-  read of the journal is worse than a slow one.
+- **Nothing the tool loop serves may throw**, and it is a separate rule from the
+  boundaries above: a boundary coerces input the model wrote, this is about a read
+  that simply failed. All of them return a sentence and she writes around the gap.
+  `readTrades` was the one that did not, and the briefing it killed had already
+  absorbed that same 404 a round earlier in `tradesBlock` — so the shape to watch
+  for is a helper reached from a caught call site and an uncaught one, where the
+  catch on the first hides that the second is bare. And the sentence is half of
+  it: an empty answer is only an answer when something was read.
+- **A tool result is never dropped, and a round runs at once.** `serve()` answers
+  an unknown name with a sentence, because a user message missing the
+  `tool_result` for a `tool_use` block is a 400 — so a mistyped name would present
+  as a dead turn rather than as a mistake. The dispatch is `Promise.all`: the model
+  is taught to batch its calls and they were being served in series.
 - **A beta flag is a header on a raw fetch, never a `betas` body field.** The
   `betas: [...]` array is the SDKs' parameter and they turn it into
   `anthropic-beta`. This file uses `fetch`, so the header is the only form that
   works — and an unknown top-level parameter is a 400, which is every call.
-- **The container is not optional once web search is in play.** `web_search_20260209`
-  runs code execution for its dynamic filtering, so the model can call
-  `get_trades` from inside that container; the continuation must carry
-  `container` (a bare string on the request, `container.id` on the response) or
-  the API rejects it. Neither tool may set `strict: true`, and the message
-  answering those calls must hold only `tool_result` blocks. Getting this wrong
-  is a 400 that kills the whole briefing, and it did.
-- **A failure must reach him, not the console.** pg_net discards the response,
-  `net._http_response` is pruned within hours, and nobody reads Edge logs — so
-  the cron half messages Telegram on failure and retries at 09:00–11:00 ET until
-  `briefedToday()` sees the marker. Do not quietly remove either half.
-- **Her Telegram half must answer before it works, never after.** Telegram gives
-  a webhook about a minute and then redelivers — which would run a whole
-  briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is
-  what makes the 200 immediate. The cron half has no such limit: pg_net never
-  retries.
+- **The container is not optional once web search is in play.**
+  `web_search_20260209` runs code execution for its dynamic filtering, so the model
+  can call `get_trades` from inside that container; the continuation must carry
+  `container` (a bare string on the request, `container.id` on the response) or the
+  API rejects it. Neither tool may set `strict: true`, and the message answering
+  those calls must hold only `tool_result` blocks.
+- **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
+  a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
+  read of the journal is worse than a slow one.
+- **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and the
+  parts go sequentially; Telegram does not promise ordering. Its preference is
+  paragraph break, then any newline, then a hard cut, and it must stay two lookups
+  rather than a `max()` over the pair: `lastIndexOf('\n')` is always at or past
+  `lastIndexOf('\n\n')`, so a max can only ever return the plain newline and the
+  paragraph preference silently never happens.
+
+### Voice and charts
+
+- **Neither is stored as sent.** The transcript is kept and the image is not —
+  base64 in `eugenia_turns` is a megabyte resent as history for six exchanges.
+  `stamped` appends the clock as a trailing text block, because concatenating
+  against an array is `[object Object]` on exactly the turns carrying the most
+  context. `STT_URL`/`STT_KEY`, `TTS_KEY` and `EMBED_KEY` are OPTIONAL secrets,
+  deliberately not in the boot guard, and `agree.test.mjs` makes that exemption
+  cost something — an optional secret must be guarded where it is used.
+
+- **SHE ANSWERS IN THE CHANNEL HE USED, and that is the whole rule.** A voice note
+  is answered aloud, a typed line in text; no setting, no toggle, nothing stored.
+  It falls out that nothing SCHEDULED speaks, since none of those is a reply.
+
+  THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember`
+  stores and what a search finds, so `say` before `speak`, and a speech vendor
+  that hangs or throws then costs the convenience rather than the answer. That
+  ordering is the one thing `agree.test.mjs` reads out of `handleMessage`.
+  `SPEAK_MAX` is stated to the prompt as well as enforced, because a cap alone
+  drops the audio on a long answer with nothing saying why.
+
+  `TTS_VOICE` and `TTS_MODEL` are environment rather than pinned, unlike
+  `EMBED_MODEL` — nothing is stored, so a change alters one message rather than
+  what is comparable to what — but they are COUPLED, since the older `tts-1`
+  serves a smaller voice set and takes no delivery instruction. `TTS_STYLE` is
+  pinned where they are not: which voice reads it is taste, how it is read is the
+  product. AND THE FORMAT IS THE ONE THING HERE THAT FAILS QUIETLY — mp3 is the
+  vendor's default and it WORKS, arriving as a file attachment rather than a voice
+  note, with nothing erroring and nothing logged; `agree.test.mjs` reads `speak()`
+  for `opus`, for `audio/ogg` and for the `.ogg` filename.
 
 ---
 
