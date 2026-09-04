@@ -44,6 +44,7 @@ import {
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
+  quoteWindow, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
@@ -2585,15 +2586,61 @@ test('the floor is a share of the price, so it cannot go stale as gold moves', (
 });
 
 test('a move small against the day range is the day, not an event', () => {
-  // Below the share and above the floor: $6 on a session that has already
+  // Below the share and above the floor: $12.50 on a session that has already
   // travelled $39 is an ordinary swing, and it is the case the floor alone
-  // would let through on every quiet afternoon.
-  const ordinary = { ...MARK, bid: QUOTE.bid - 6 };
+  // would let through on every quiet afternoon. The band between the two gates
+  // is narrow — $11.05 to $13.65 on this quote — so the figure is asserted to
+  // be inside it rather than assumed, which is what makes this a test of the
+  // SHARE rather than a second test of the floor.
+  const ordinary = { ...MARK, bid: QUOTE.bid - 12.5 };
   const out = moveWorth(QUOTE, ordinary, LOOKED);
   assert.equal(out.worth, false);
   assert.match(out.why, /range/);
-  assert.ok(6 > QUOTE.bid * MOVE_FLOOR, 'the floor is doing the rejecting, not the share');
-  assert.ok(6 < (QUOTE.high - QUOTE.low) * MOVE_SHARE);
+  assert.ok(12.5 > QUOTE.bid * MOVE_FLOOR, 'the floor is doing the rejecting, not the share');
+  assert.ok(12.5 < (QUOTE.high - QUOTE.low) * MOVE_SHARE);
+});
+
+/* ─── The evening roll, which is where both gates were weakest ───────────────
+   THE ONE MESSAGE THIS SENSE HAS ACTUALLY SENT WRONG, replayed from what he was
+   shown. At 20:57 New York it said gold was "up $12 on the day and $7 of that
+   in the last quarter hour", on a day that had opened near 4,440 and was up
+   more than $40.
+
+   Both halves of that come from the same fact and it is the one nothing in the
+   code had written down: the broker's session rolls at 17:00 New York, so at
+   20:57 every figure in the quote was under four hours old. The $12 was the
+   move since that roll, read off `change` and reported as the day. And the $7
+   cleared the share gate only because the range it is taken against had
+   restarted with the session — $7 of a $20 evening range passes a test written
+   for $7 of a $39 day.
+
+   The share cannot be fixed from here; nothing this system reads spans the
+   calendar day. The floor can, and this is the case that says what it has to
+   be: an amount that is an event in the thin hours, since the thin hours are
+   exactly when the share has stopped binding and the floor is alone. */
+test('the $7 evening drift that reached him does not clear the gates now', () => {
+  // The session as she described it: 4,485 the top, and a range that began at
+  // the 17:00 roll rather than at the day's low near 4,440.
+  const evening = {
+    ...QUOTE, bid: 4485, high: 4485, low: 4467, prev_close: 4473,
+    change: 12, change_pct: 0.27,
+  };
+  const before = { ...MARK, bid: 4478 };
+
+  const out = moveWorth(evening, before, LOOKED);
+  assert.equal(out.worth, false, 'a $7 drift in thin evening trade is not a sharp move');
+  assert.match(out.why, /floor/);
+
+  // And the share is shown to be no help here, which is the finding rather than
+  // an aside: $7 of a $20 range passes it. The floor is the only gate left
+  // standing between the roll and a rebuilt range, which is why it carries the
+  // whole test for seven hours of every weekday.
+  assert.ok(7 >= (evening.high - evening.low) * MOVE_SHARE,
+    'the share still admits this — the floor is what now rejects it');
+
+  // The gate is not simply shut: a move that is genuinely sharp for the hour
+  // still gets through, or this would be a sense that fires on nothing.
+  assert.equal(moveWorth(evening, { ...MARK, bid: 4470 }, LOOKED).worth, true);
 });
 
 test('a quote with no range is decided by the floor alone', () => {
@@ -2611,6 +2658,62 @@ test('a fall is a move, and it is reported as one', () => {
   const out = moveWorth(QUOTE, { ...MARK, bid: QUOTE.bid + 15 }, LOOKED);
   assert.equal(out.worth, true);
   assert.equal(out.move, -15);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WHICH SESSION THE QUOTE IS DESCRIBING
+   ───────────────────────────────────────────────────────────────────────────
+   `high`, `low`, `prev_close` and `change` are all measured from the broker's
+   session open, and gold's session opens at the 17:00 New York roll. Before
+   that hour the window reaches back through the night and `change` really is
+   the overnight move, which is what the briefing's opening line wants. After
+   it the window is a few hours old and `change` is the evening's move — and
+   served as a bare number in a JSON blob there is nothing to tell the two
+   apart, which is how "up $12 on the day" was said at 20:57 about a day that
+   was up more than $40.
+
+   So the label is driven from both sides of the roll, and from both sides of
+   the daylight-saving change as well: the boundary is 17:00 in New York, not a
+   fixed UTC hour, and a test pinned to one offset would pass all summer and be
+   an hour wrong every winter evening.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test('before the roll the quote covers the night, and says so', () => {
+  // 08:00 New York on a summer weekday — the briefing's own hour, where the
+  // session began at 17:00 the previous evening.
+  const said = quoteWindow(new Date('2026-09-03T12:00:00Z'));
+  assert.match(said, /YESTERDAY/);
+  assert.match(said, /overnight move/);
+  assert.doesNotMatch(said, /THIS EVENING/);
+});
+
+test('after the roll the quote is not the day, and says that instead', () => {
+  // 20:57 New York — the minute of the message that prompted this. The window
+  // is under four hours old, and the whole job of the label is to stop the
+  // figure inside it being called the move on the day.
+  const said = quoteWindow(new Date('2026-09-04T00:57:00Z'));
+  assert.match(said, /THIS EVENING/);
+  assert.match(said, /NOT the calendar day/);
+  assert.doesNotMatch(said, /overnight move/);
+});
+
+test('the roll is 17:00 in New York, in winter as well as in summer', () => {
+  /* THE CASE A FIXED UTC HOUR GETS WRONG FOR HALF THE YEAR, and it is the same
+     argument that keeps every other schedule here on nyClock. 22:00 UTC is
+     18:00 in New York in September and 17:00 in January — one is past the roll
+     and both would be past a boundary written as 22. */
+  assert.match(quoteWindow(new Date('2026-09-03T20:59:00Z')), /YESTERDAY/); // 16:59 ET
+  assert.match(quoteWindow(new Date('2026-09-03T21:01:00Z')), /THIS EVENING/); // 17:01 ET
+  assert.match(quoteWindow(new Date('2026-01-14T21:59:00Z')), /YESTERDAY/); // 16:59 ET
+  assert.match(quoteWindow(new Date('2026-01-14T22:01:00Z')), /THIS EVENING/); // 17:01 ET
+});
+
+test('the roll hour is the one the market hours are already kept on', () => {
+  // marketOpen closes Friday and opens Sunday at this same hour, because it is
+  // one boundary rather than two that happen to agree. A second literal here
+  // would be a copy nothing compares.
+  assert.equal(ROLL_HOUR, 17);
+  assert.equal(marketOpen(new Date('2026-09-04T20:59:00Z')), true);  // Fri 16:59 ET
+  assert.equal(marketOpen(new Date('2026-09-04T21:01:00Z')), false); // Fri 17:01 ET
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -1618,17 +1618,26 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
      holds. Asking it to teach from a ladder it is not handed is the same shape
      the nightly pass was already fixed for: an instruction that outruns its
      inputs, and one that fails by teaching the wrong thing well rather than by
-     failing at all. */
+     failing at all.
+
+     AND postMove JOINED IT FOR THE SAME REASON, ONE RELEASE LATER. The two
+     looks are the same shape — an unscheduled message about something the
+     morning did not cover — and the move look was the one of the pair that
+     could only report. What is behind a move runs through a channel as surely
+     as what is behind a print does, so a message saying the dollar came off
+     teaches nothing to a man for whom the dollar is `unseen`, and that is the
+     likeliest message this path sends. It reached him as a number and a name,
+     which is the failure the map exists to prevent. */
   /* FOUR LISTS, BECAUSE THEY ANSWER FOUR DIFFERENT QUESTIONS, and collapsing
      them into one would either assert something a path has no business holding
      or quietly stop asserting it of a path that needs it.
 
-     `TEACHES` is the five whose prompts build a term, so those get the map.
+     `TEACHES` is the six whose prompts build a term, so those get the map.
      `SENDS` is the six that put a message in front of him right now — the
      nightly pass is not one, it writes memory and sends nothing. His notes go
      to all seven, because an instruction he gave is not optional anywhere. */
   const TEACHES = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
-                   'postRelease'];
+                   'postRelease', 'postMove'];
   const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
                  'postMove', 'postTradeEvent'];
 
@@ -1954,6 +1963,95 @@ test('the quote she reads is the quote the poller serves', () => {
   assert.match(poller, /return json\(\{ ok: true, symbol: SYMBOL_IDS\[0\], \.\.\.spot \}\)/,
     'the market answer no longer spreads the folded quote, so the fields above ' +
     'agree with each other and with nothing that is actually sent');
+});
+
+test('every number off the quote reaches her with the window it was measured over', () => {
+  /* THE FAILURE THIS EXISTS TO PREVENT HAS ALREADY HAPPENED ONCE, and it left
+     no trace anywhere except in the message he read. `readMarket` served the
+     folded quote as raw JSON, so `change` arrived as a bare number with no
+     window attached — and every window in that object is the BROKER'S session,
+     which for gold restarts at the 17:00 New York roll. Before the roll that
+     makes `change` the overnight move, which is what the briefing's opening
+     line wants and why nobody noticed. After it, the same field is a few hours
+     of evening trade, and at 20:57 it reached him as "up $12 on the day" about
+     a day that was up more than $40.
+
+     NOTHING ELSE BREAKS IF THE LABEL GOES. The quote is still served, the
+     numbers are still right, the message still reads as a working price — the
+     only thing missing is the sentence saying what the numbers are of, which is
+     exactly the shape of the positionsBlock guard and of the prompt's own
+     sourcing rule. So it is read here, on both of the paths that carry it: the
+     tool every briefing calls, and the one message that is sent in the hours
+     when the two windows disagree. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const body = (name) => {
+    const at = src.indexOf(`async function ${name}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
+    const end = src.indexOf('\n}', at);
+    return src.slice(at, end).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  };
+
+  for (const fn of ['readMarket', 'postMove']) {
+    assert.match(body(fn), /quoteWindow\(/,
+      `${fn} hands her the quote with nothing saying which session it covers — ` +
+      `after the 17:00 roll she would call a few hours of evening trade the day, ` +
+      `which is a number he can check against his own screen and find wrong`);
+  }
+
+  /* AND THE BOUNDARY IS THE ONE THE REST OF THE SYSTEM ALREADY KEEPS. 17:00 New
+     York is the Friday close, the Sunday open and the poller's whole definition
+     of market hours; a second literal here would be a fourth copy of one value
+     with nothing comparing them. It reads nyClock for the same reason every
+     other schedule does — a fixed UTC hour is right for half the year. */
+  assert.match(src, /export const ROLL_HOUR = 17;/,
+    'the roll hour is no longer named, so the window label is deciding from a literal');
+  assert.match(src, /nyClock\(now\)\.hour >= ROLL_HOUR/,
+    'the window is no longer decided on the New York clock — a fixed offset is ' +
+    'an hour wrong for every winter evening, which is half the hours this matters in');
+});
+
+test('the two unscheduled looks both build a term before they use one', () => {
+  /* THE PRINT LOOK AND THE MOVE LOOK ARE THE SAME SHAPE — something happened
+     that this morning did not cover — and for a release the move look was the
+     half that could only report. Both are handed the channel map (asserted with
+     the rest of the blocks above); this is the other half, which is that the
+     prompt actually asks for the thing the map is for.
+
+     Handing a path the ladder and not telling it to build from it fails exactly
+     the way handing it the instruction without the ladder does: she teaches
+     well, about whatever the message happens to be about, and the channel he
+     has never once used stays never used. Neither half is visible at runtime. */
+  const prompts = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/prompt.ts', import.meta.url), 'utf8');
+
+  const section = (name) => {
+    const m = prompts.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`));
+    assert.ok(m, `prompt.ts no longer exports ${name}`);
+    return m[1];
+  };
+
+  for (const name of ['RELEASE', 'MOVE']) {
+    const text = section(name);
+    assert.match(text, /where he stands on each channel/i,
+      `${name} never tells her she has the channel map, so the block reaches her ` +
+      `as context she has no instruction to use`);
+    assert.match(text, /\bunseen\b/,
+      `${name} no longer names the rung that decides whether to build a term — ` +
+      `the map is a tiebreaker she has not been told how to break`);
+    assert.match(text, /\bowns\b/,
+      `${name} no longer says when NOT to build, and explaining something he owns ` +
+      `is the one failure worse than saying nothing`);
+  }
+
+  /* AND THE MOVE LOOK IS TOLD WHAT ITS OWN FIGURES ARE OF. It is the only path
+     that fires in the evening, which is the only time the broker's session and
+     the calendar day disagree — so the prompt carrying the roll is not a
+     restatement of the block above it but the rule for reading it. */
+  assert.match(section('MOVE'), /17:00 New York/,
+    'the move look is no longer told where its session starts, and the evening ' +
+    'is the only time it runs where that matters');
 });
 
 test('every column the price mark writes is a column the table has', () => {
