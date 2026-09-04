@@ -607,6 +607,22 @@ Nothing here can see the calendar day. `get_trendbars` serves the broker's daily
 bars, which roll on the same boundary, so the honest answer is to name the window
 rather than to compute a figure out of numbers that cannot carry one.
 
+**One rendering, three callers.** `quoteLine` is the only place a quote becomes
+words — the `get_market` tool, the block the briefing is handed, and the price
+sense — and the window sentence is inside it rather than beside it. A quote said
+three ways is three chances to print `change` without saying what it changed
+from, which is the whole of what went wrong. The tool used to return raw JSON,
+which is the same failure with the field name doing the talking.
+
+**And the briefing is handed the price rather than asked to fetch it.** Notes,
+the channel map, his week of trades, the thesis, the open threads, the calendar
+and his desk are all read before the call. The price — the opening line, and the
+one figure he checks against his own screen — was a *tool she had to remember to
+reach for*: an instruction standing where an input belongs, failing the way
+instructions here always fail, with a level off a search page that is four digits
+and looks like gold. The tool stays for replies, where most turns do not need it;
+`marketBlock()` is the briefing's, and `agree` reads `postBriefing` for it.
+
 **And `get_trendbars` documents a call shape it refuses.** Its own description
 offers *"(count) → last N bars ending now"*; sending exactly that answers
 `fromTimestamp: must not be null`. The range form is what it accepts, so that is
@@ -1224,6 +1240,19 @@ predicate only ever seen to return `pass` has been shown to be reachable, not to
 work, and three "clean" results in this repository's history turned out to mean
 exactly that.
 
+**And a verdict is not the whole answer, which is how R-10 hid a miscount.** It
+asked whether each span overlapped *the one before it* in entry order — which is
+not the rule. A multi-session hold covers everything opened inside it, so the
+second short trade taken within one sat beside a `to` already left behind and
+came back **counted as a pass**, named nowhere, while genuinely breaching. The
+verdict survived it every time: a span nested inside an earlier one always has a
+neighbour that overlaps too, so something was always flagged and the rule always
+said `fail`. What was wrong was the counts and the ids — the rows `check_rules`
+promises so a finding can be checked rather than believed. Two sweeps now, one
+from each end, naming every span that overlaps any other. **A test asserting only
+on the verdict could never have found it**, which is why the one that replaces it
+asserts on the counts and the list.
+
 **It gives no verdict on a trade and could not.** It reports whether a row
 satisfies a predicate he wrote. *"Two entries eleven days ago were 41 minutes
 apart, and R-12 allows fifteen"* is a fact about his own rule; what it meant is
@@ -1443,7 +1472,12 @@ that would have stopped her writing it.
 misses the other: an overnight hold is not in today's rows and today's closed
 trades are not open. It renders the open positions — age, side, size, entry, and
 the stop and target as first seen — the quarter-hourly mark **with its age**, and
-where the day stands against the 4% R-11 sets. When he is flat and has not traded
+where the day stands against the 4% R-11 sets. **A position opened on an earlier
+day names that day**; it used to render a bare `open since 09:15 ET` under a
+heading that says *right now*, and there is one way to read that and it is the
+wrong one. The summary calls his positions *intraday to multi-session* and R-15
+bounds a hold at the Friday close rather than at midnight, so this is a shape he
+trades. Today stays bare, or the date would be noise on every intraday fill. When he is flat and has not traded
 today, which is most mornings, it is nothing at all.
 
 It is handed to six paths rather than five: the briefing, the pulse, a reply, the
@@ -2151,6 +2185,14 @@ Each call fills fifty rows per table and answers `{"notes":{"filled":…,"left":
 failed vendor call leaves behind is swept by the nightly pass, which already runs
 and already reads the day. A schedule of its own would be a job doing nothing
 every hour for the one night a year it had something to do.
+
+**It drains newest first, which is the same decision the day's window got wrong.**
+The sweep took `id.asc`, and since the backlog empties either way that looked
+like a choice with no consequence — exactly how `order=id.asc&limit=200` looked
+on the nightly turns. The consequence is *when*: at fifty rows a night, a vendor
+outage that left a fortnight without vectors became searchable oldest-first, so
+last month's archive came back before last week's conversation and the rows he is
+likeliest to ask about arrived last.
 
 `verify.sql` ends with the count that matters — how many rows in each table are
 still without an embedding. It should fall to zero and stay there. A number that

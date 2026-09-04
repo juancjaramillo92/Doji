@@ -290,7 +290,26 @@ function r02(rows: TradeRow[]): RuleResult {
 
    AN OPEN POSITION EXTENDS TO NOW, not to null. A trade still running while a
    second one opened is the clearest possible breach of this rule, and treating
-   a null fill_time as "no span" would drop exactly that case. */
+   a null fill_time as "no span" would drop exactly that case.
+
+   TWO SWEEPS, BECAUSE COMPARING EACH SPAN WITH THE ONE BEFORE IT IS NOT THE
+   SAME QUESTION. Sorted by entry, the previous span is not the only earlier one
+   still running: a multi-session hold — which the summary says is a shape he
+   trades — covers everything opened inside it, and a second trade taken after a
+   first one has closed sits beside a `to` that has already been left behind. So
+   `spans[i].from < spans[i-1].to` answered for one neighbour and the third
+   trade of a nested set came back PASSED, named nowhere.
+
+   The verdict survived that, which is why it went unseen: a span nested inside
+   an earlier one always has a neighbour that overlaps too, so something was
+   always flagged and the rule always said `fail`. What was wrong is what she
+   REPORTS — the counts, and the ids she hands him to check. A breach counted as
+   a pass and left out of the list is this file's own opening argument about a
+   rate over the wrong population, arriving inside one rule.
+
+   Forward for a span that starts before an earlier one ends, backward for one
+   that ends after a later one starts. Between them they name every span
+   overlapping any other, in one pass each rather than a scan per row. */
 function r10(rows: TradeRow[], now: number): RuleResult {
   const spans = rows
     .filter(t => isBroker(t) && t.entry_time)
@@ -303,9 +322,24 @@ function r10(rows: TradeRow[], now: number): RuleResult {
 
   const pass: string[] = [], fail: string[] = [];
   const bad = new Set<string>();
-  for (let i = 1; i < spans.length; i++) {
-    if (spans[i].from < spans[i - 1].to) { bad.add(spans[i - 1].id); bad.add(spans[i].id); }
+
+  // The furthest any earlier span runs to. Strict, so a position closing in the
+  // same instant the next one opens is a clean handover rather than a breach.
+  let ends = -Infinity;
+  for (const s of spans) {
+    if (s.from < ends) bad.add(s.id);
+    ends = Math.max(ends, s.to);
   }
+
+  // And the earliest any later span starts, which is the same test read from
+  // the other side — it catches the long hold that the ones nested inside it
+  // were already caught against.
+  let starts = Infinity;
+  for (let i = spans.length - 1; i >= 0; i--) {
+    if (spans[i].to > starts) bad.add(spans[i].id);
+    starts = Math.min(starts, spans[i].from);
+  }
+
   for (const s of spans) (bad.has(s.id) ? fail : pass).push(s.id);
   return result('R-10', 'positions whose open spans overlap another', pass, fail, []);
 }

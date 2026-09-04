@@ -198,6 +198,16 @@ pixels; say so on any visual change.
   this. §10's shut door is still shut: what was retired is *journalling* a plan,
   and he types neither column.
 
+- **The price is HANDED to the briefing and is a tool everywhere else, and
+  `quoteLine` is the only place a quote becomes words.** Every other thing the
+  briefing always needs is read before the call; the price — its opening line —
+  was a tool she had to remember to reach for, which is an instruction standing
+  where an input belongs and fails the way instructions here always fail: a
+  level off a search page is four digits and looks like gold. One rendering for
+  all three callers, with the window sentence inside it rather than beside it,
+  because a quote said three ways is three chances to print `change` without
+  saying what it changed from.
+
 - **Eugenia reads a price through the poller and must never hold the broker
   token.** The endpoint that serves a quote also serves `create_order`, so the
   market read goes through `doji-mcp-sync`, which will only ever answer with a
@@ -406,6 +416,13 @@ code you write near it:
   newest-first and reverse for reading, as `recent()` does. A limit at the wrong
   end is indistinguishable from a limit at the right one until the day it bites.
 
+  AND IT BIT A SECOND TIME, IN `fillEmbeddings`. That one drains a backlog, so
+  the order looked consequence-free — the same rows get filled either way. What
+  it decides is WHEN: fifty a night, `id.asc`, and a vendor outage becomes
+  searchable oldest-first, so last month's archive returns before last week's
+  conversation. Same rule, same tell; a read whose order "cannot matter" is
+  where to look next.
+
 - **Her memory has three lifetimes, not one.** An observation rolls; a standing
   instruction must outlive twenty of them, which is what `kind` is for; and what
   he UNDERSTANDS outlives both, which is what `eugenia_channels` is for. Five
@@ -484,6 +501,13 @@ code you write near it:
   `agree.test.mjs` reads the prompt for it, because deleting it breaks nothing
   else and the result reads as her being relevant. The failure it prevents is a
   briefing framed around his position instead of around the day.
+
+  AN ENTRY FROM ANOTHER DAY NAMES THE DAY. The line read `open since 09:15 ET`
+  under a heading that says what he has on RIGHT NOW, whether the fill was this
+  morning or on Monday — one way to read that and it is the wrong one. Not an
+  edge case: the summary calls his positions intraday to MULTI-SESSION and R-15
+  bounds a hold at the Friday close, not at midnight. Today stays bare, or the
+  date is noise on every intraday fill.
 
   NO UNREALISED P&L, AND THAT IS ONE DECISION RATHER THAN TWO. `eugenia_price` is
   quarter-hourly, so the figure would be the most anchoring number in the block
@@ -566,6 +590,17 @@ code you write near it:
   test. `unknown` is never `pass`, and an empty population is `unknown`.
   `agree.test.mjs` holds the eight against §7's table, because a rule marked
   `journal` and never implemented is a check she cites that nobody runs.
+
+  A VERDICT IS NOT THE WHOLE ANSWER, WHICH IS HOW R-10 HID A MISCOUNT FOR ITS
+  WHOLE LIFE. It compared each span with the one BEFORE it in entry order, which
+  is a question about a neighbour rather than about the rule: a multi-session
+  hold covers everything opened inside it, so the second trade taken within one
+  came back counted as a PASS and named nowhere while genuinely breaching. The
+  verdict never moved — a nested span always has a neighbour that overlaps too,
+  so something was always flagged — so a test asserting on `verdict` alone could
+  not have found it. Assert on the counts and on `ids`: those are what
+  `check_rules` hands him to check, and a breach missing from that list is one
+  he cannot see. Two sweeps now, one from each end.
 
   Two numbers in it are decisions rather than facts and are named constants for
   that reason: `CLOSEOUT_MIN` gives §6's "at or very near" the Friday close a
