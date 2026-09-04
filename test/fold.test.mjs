@@ -51,6 +51,10 @@ import {
   positionsList, isOpen,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
+  journalStats, statsList, resultOf, counts, money, averages, realisedRR,
+  sessionAt, isJournalled, BE,
+} from '../supabase/functions/doji-eugenia/journal.ts';
+import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
   SWEEP_MIN, DAY_LOSS, STRETCH,
@@ -3062,4 +3066,131 @@ test('a day inside the limit and a day past it are not rendered the same', () =>
   assert.match(inside, /inside the 4% R-11 sets/);
   assert.match(past, /PAST the 4% R-11 sets/);
   assert.doesNotMatch(inside, /PAST/);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE JOURNAL SUMMARISED — the app's arithmetic, driven from both sides
+   ───────────────────────────────────────────────────────────────────────────
+   Every definition here was previously a sentence in the prompt that she
+   applied by hand over four hundred rows. The three the app is deliberately
+   subtle about are the three she got wrong, and each is driven here against the
+   case that distinguishes it from the plausible alternative — a test that only
+   showed a win rate coming back would pass on every one of the wrong ones.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const jt = (o) => trade({ id: 'PID1', ...o });
+
+test('a scratch is measured in price, not in dollars', () => {
+  /* ±$3 OF THE ENTRY PRICE AT ANY LOT SIZE. Read against P&L the band means
+     something different every time size changes — $3 of P&L is $3 of gold at
+     0.01 lots and three cents of gold at 1.00. The case that tells them apart
+     is a big position that went nowhere: $2 of price, $200 of P&L. */
+  assert.equal(resultOf(jt({ entry_price: 4400, exit_price: 4402, pnl: 200 })), 'be',
+    'two dollars of price is a scratch however much money was on it');
+  assert.equal(resultOf(jt({ entry_price: 4400, exit_price: 4410, pnl: 2 })), 'win',
+    'ten dollars of price is a win however little money was on it');
+
+  // Rows with no prices pre-date the broker sync and have only P&L to go on.
+  assert.equal(resultOf(jt({ pnl: 2 })), 'be');
+  assert.equal(resultOf(jt({ pnl: 40 })), 'win');
+  assert.equal(resultOf(jt({ pnl: -40 })), 'loss');
+
+  // No P&L is UNDECIDED and is not a loss.
+  assert.equal(resultOf(jt({})), null);
+  assert.equal(BE, 3);
+});
+
+test('break-evens are in the win rate denominator, not dropped from it', () => {
+  /* A rate that quietly drops scratches is HIGHER than the truth, and highest
+     on exactly the trader who scratches a lot. One win and one scratch is 50%,
+     not 100%. */
+  const c = counts([
+    jt({ id: 'PIDa', entry_price: 4400, exit_price: 4440, pnl: 40 }),
+    jt({ id: 'PIDb', entry_price: 4400, exit_price: 4401, pnl: 1 }),
+  ]);
+  assert.deepEqual([c.win, c.loss, c.be, c.decided], [1, 0, 1, 2]);
+  assert.equal(c.wr, 50);
+
+  // An undecided row is in neither the numerator nor the denominator.
+  const withOpen = counts([...[
+    jt({ id: 'PIDa', entry_price: 4400, exit_price: 4440, pnl: 40 }),
+    jt({ id: 'PIDb', entry_price: 4400, exit_price: 4401, pnl: 1 }),
+  ], jt({ id: 'PIDc' })]);
+  assert.equal(withOpen.decided, 2, 'an open trade is not a loss');
+
+  // Nothing decided is not a win rate of zero.
+  assert.equal(counts([jt({})]).wr, null);
+  assert.equal(counts([]).wr, null);
+});
+
+test('money splits on the sign and averages split on the label', () => {
+  /* THE ONE PLACE THE TWO MUST DIFFER, and the case that shows it is a scratch
+     with a positive P&L: money() must count its dollars on the gross side, so
+     gross − loss still equals net exactly, while averages() must keep it out of
+     the average win, which it would otherwise halve. */
+  const rows = [
+    jt({ id: 'PIDa', entry_price: 4400, exit_price: 4460, pnl: 60 }),
+    jt({ id: 'PIDb', entry_price: 4400, exit_price: 4402, pnl: 2 }),   // scratch, positive
+    jt({ id: 'PIDc', entry_price: 4400, exit_price: 4380, pnl: -20 }),
+  ];
+  const m = money(rows);
+  assert.equal(m.gross, 62, 'the scratch dollar is on the gross side');
+  assert.equal(m.loss, 20);
+  assert.equal(round2(m.gross - m.loss), m.net, 'gross minus loss is exactly net');
+
+  const a = averages(rows);
+  assert.equal(a.avgWin, 60, 'the scratch is not in the average win');
+  assert.equal(a.avgLoss, 20);
+  assert.equal(realisedRR(a), 3);
+
+  function round2(v) { return Math.round(v * 100) / 100; }
+});
+
+test('the reward-to-risk is unanswerable with no loss to divide by', () => {
+  // Not infinity, and not one: a ratio against nothing cannot be stated.
+  assert.equal(realisedRR({ avgWin: 60, avgLoss: null }), null);
+  assert.equal(realisedRR({ avgWin: null, avgLoss: 20 }), null);
+});
+
+test('a session is read against each centre own local clock', () => {
+  /* The overlaps are the more specific case, and the dead stretch between the
+     New York close and the Sydney open folds into Asian. Instants chosen in
+     UTC and asserted through the same four time zones the app uses. */
+  assert.equal(sessionAt(new Date('2026-09-03T13:00:00Z')), 'London+NY');  // 09:00 ET, 14:00 London
+  assert.equal(sessionAt(new Date('2026-09-03T08:00:00Z')), 'Asia+London'); // 09:00 London, 17:00 Tokyo
+  assert.equal(sessionAt(new Date('2026-09-03T11:00:00Z')), 'London');
+  assert.equal(sessionAt(new Date('2026-09-03T20:00:00Z')), 'New York');
+  assert.equal(sessionAt(new Date('2026-09-03T23:00:00Z')), 'Asian');
+});
+
+test('journalled means the setup and all three answers, never the P&L', () => {
+  const done = { setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: false };
+  assert.equal(isJournalled(jt(done)), true, 'an open position can be journalled');
+  assert.equal(isJournalled(jt({ ...done, followed_tp: null })), false, 'null is unanswered, not no');
+  assert.equal(isJournalled(jt({ ...done, setup: null })), false);
+});
+
+test('the summary states every figure with the population it was taken over', () => {
+  /* A RATE WITHOUT ITS DENOMINATOR is the number §8 warns about, so the
+     rendering carries the counts beside every share. Driven end to end rather
+     than asserted on the object, because what she READS is the decision. */
+  const out = statsList(journalStats([
+    jt({ id: 'PIDa', entry_time: '2026-09-03T13:00:00Z', setup: 'Break & Retest',
+         entry_price: 4400, exit_price: 4460, pnl: 60,
+         followed_rules: true, followed_sl: true, followed_tp: true }),
+    jt({ id: 'PIDb', entry_time: '2026-09-03T13:30:00Z', setup: 'Break & Retest',
+         entry_price: 4400, exit_price: 4380, pnl: -20 }),
+    jt({ id: 'PIDc', entry_time: '2026-09-03T23:00:00Z', setup: 'Support & Resistance' }),
+  ]), 30);
+
+  assert.match(out, /3 trades, 1 journalled/);
+  assert.match(out, /50% win rate — 1 win, 1 loss, 0 break-even, over 2 decided/);
+  assert.match(out, /Break-evens are IN that denominator/);
+  assert.match(out, /net \$40\.00/);
+  assert.match(out, /realised reward-to-risk 1:3 — realised, not planned/);
+  assert.match(out, /London\+NY: 2 trades/);
+  assert.match(out, /Asian: 1 trade,/, 'the undecided trade is still a trade in its session');
+  assert.match(out, /Break & Retest: 2 trades/);
+
+  // An empty window says so rather than rendering a page of dashes.
+  assert.match(statsList(journalStats([]), 7), /No trades in the last 7 days/);
 });

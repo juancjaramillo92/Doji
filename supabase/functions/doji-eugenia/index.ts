@@ -40,6 +40,11 @@ import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker,
   type TradeRow, type Standing,
 } from "./adherence.ts";
+// The app's own arithmetic over the journal — a win rate, the money split, the
+// realised reward-to-risk, the session and setup breakdowns. Pure and imported
+// for the reason adherence.ts is: it is the part that has to be testable, and
+// it is a copy of index.html that agree.test.mjs holds against it.
+import { journalStats, statsList } from "./journal.ts";
 // Everything shared lives in _shared/edge.ts — one definition each, for the
 // reason that file gives.
 import {
@@ -866,6 +871,65 @@ async function checkAdherence(days: unknown): Promise<string> {
   }
 }
 
+/* ─── The journal, summarised ──────────────────────────────────────────────
+   SHE HAD THE ROWS AND NOT THE ARITHMETIC. `get_trades` hands her up to four
+   hundred trades as JSON and the prompt hands her the rules for reading them —
+   a scratch is measured in price and not dollars, break-evens sit in the win
+   rate's denominator, the money split is on the sign while the averages are on
+   the label, reward-to-risk in the journal is realised and never planned. Four
+   definitions, applied by hand, on the way to a number he will act on.
+
+   That is the arrangement check_rules was written to end, and the argument does
+   not change because these are stats rather than rules: it is the one thing a
+   model is worst at, and a rate computed the wrong way looks exactly like one
+   computed the right way. The app has computed all of it since before she
+   existed and she could not see any of it.
+
+   THE ROWS STILL COME BACK FROM get_trades, and that is deliberate rather than
+   redundant. This answers "how has he been doing"; the rows answer "what
+   happened on the eleventh", and a summary cannot be interrogated. Same read,
+   same view, no new reach.
+   ───────────────────────────────────────────────────────────────────────── */
+const STATS_TOOL = {
+  name: "get_stats",
+  description:
+    "The journal summarised over the last N days — win rate, wins/losses/break-evens, " +
+    "gross, losses and net, average win and average loss, the realised " +
+    "reward-to-risk, and the same broken down by session and by setup. These are " +
+    "the figures his own journal app shows him, computed from the rows the same " +
+    "way, so they agree with what is on his screen. USE THIS RATHER THAN WORKING " +
+    "IT OUT of get_trades: a break-even is measured in price and sits in the win " +
+    "rate's denominator, the money split is on the sign of each P&L while the " +
+    "averages are on the result label, and getting any of that wrong produces a " +
+    "number that looks right. The reward-to-risk here is REALISED — average win " +
+    "over average loss — and is never what he planned. Call get_trades as well " +
+    "when he asks about a particular trade rather than about a stretch of them.",
+  input_schema: {
+    type: "object",
+    properties: {
+      days: { type: "integer", description: "How many days back to summarise, 1 to 365." },
+    },
+    required: ["days"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* NEVER THROWS, for the reason every other tool here does not, and it says what
+   it could not do rather than coming back empty — a summary that silently
+   returns nothing reads as a trader who has not traded. */
+async function readStats(days: unknown): Promise<string> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows: TradeRow[] = await res.json();
+    const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
+    return statsList(journalStats(rows), n);
+  } catch (err) {
+    console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
+    return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
+  }
+}
+
 /* ─── What lands today ─────────────────────────────────────────────────────
    She has searched for the day's calendar every morning, read it once and
    thrown it away — which cost two different things. A print at 08:30 is
@@ -1358,6 +1422,7 @@ const CHAT_TOOLS = [
   WEB_FETCH,
   MARKET_TOOL,
   TRADES_TOOL,
+  STATS_TOOL,
   CHECK_TOOL,
   NOTES_TOOL,
   SEARCH_TOOL,
@@ -1365,7 +1430,7 @@ const CHAT_TOOLS = [
   CALENDAR_TOOL,
   LOOP_TOOL,
 ];
-const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL];
+const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, CALENDAR_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 // The critic reads a draft and returns a draft. Giving it a tool would let it
@@ -1457,6 +1522,7 @@ async function serve(name: string, input: any): Promise<string> {
   switch (name) {
     case TRADES_TOOL.name:   return await readTrades(input.days);
     case CHECK_TOOL.name:    return await checkAdherence(input.days);
+    case STATS_TOOL.name:    return await readStats(input.days);
     case NOTES_TOOL.name:    return await writeNote(input.note, input.kind, input.supersedes);
     case SEARCH_TOOL.name:   return await searchMemory(input.query);
     case STRATEGY_TOOL.name: return readStrategy(input.section);
