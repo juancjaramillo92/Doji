@@ -162,6 +162,25 @@ pixels; say so on any visual change.
 - **A wrong direction, P&L or date cannot be fixed in `index.html`.** The app
   does not own those columns; the fault is upstream in the poller or the email
   path. Say so rather than looking for it in the app.
+- **`fill_time` HAS ONE WRITER AND IT IS THE EMAIL, WHICH IS NOT WHAT ANYTHING
+  READING IT ASSUMED.** The poller never sets it, on any row; what it records
+  when a position closes is `exit_price`, off the broker's own deals every two
+  minutes. So a close with no alert email behind it leaves `fill_time` null for
+  ever — and everything that read that column as "still open" said so for ever.
+  `positionsBlock` told him he had a buy open days after he closed it, citing
+  R-19 and R-15 at him about it; R-10 ran the phantom to `now` and failed every
+  trade taken after it; R-15 dropped those rows out of its population in
+  silence. Open is now BOTH columns null — two witnesses, either sufficient,
+  the shape `balance` and `direction` already use — and `isOpen` is exported
+  because the filter was the half no test could reach: `positionsList` is pure,
+  was driven from both sides for its whole life, and renders correctly whatever
+  it is handed. THE ROOT IS STILL THERE AND IS DELIBERATE FOR NOW: the poller
+  has `closedAt` in hand (it computes it for `balanceTarget`) and could write
+  `fill_time`, which would fix every consumer at once — but that makes a third
+  two-claimant column, and back-filling it would fire `trades_eugenia_closed`
+  once per historical row, which is a burst of "your position closed" messages
+  to him. Decide that before doing it.
+
 - **Two columns have two claimants, and their arbitration differs.** `balance`
   is settled by a filter inside the UPDATE (`where balance is null`); `direction`
   is last-write-wins, and is only safe because both sources read the side off the

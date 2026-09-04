@@ -48,7 +48,7 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList,
+  positionsList, isOpen,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
@@ -2023,6 +2023,62 @@ test('every position inside a longer hold is a breach, not just the first', () =
     'a breach he is not handed the id of is one he cannot check');
 });
 
+/* ─── One missing email used to fail every trade after it ────────────────────
+   R-10 ended an unclosed span at `now`, and `fill_time` is written by the email
+   path alone — the poller records a close as `exit_price` and never touches it.
+   So a close with no alert behind it ran to now for ever, and every trade taken
+   after it overlapped that phantom: one missing email, a cascade of R-10
+   failures, each naming a real row and each wrong.
+
+   An end nothing recorded is UNKNOWN, which is this file's whole argument about
+   unknown never being pass — and equally about it never being fail.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a close the email never stamped is undecidable, not a running position', () => {
+  const span = (id, from, to, extra = {}) =>
+    trade({ id, entry_time: from, fill_time: to, ...extra });
+  const now = Date.parse('2026-01-09T20:00:00Z');
+
+  // Closed on Monday per the broker's own deals; no email, so no fill_time.
+  const stale = span('PIDstale', '2026-01-05T10:00:00Z', null, { exit_price: 4402.7 });
+  const after = span('PIDafter', '2026-01-07T10:00:00Z', '2026-01-07T12:00:00Z');
+
+  const out = verdictOf([stale, after], 'R-10', now);
+  assert.equal(out.failed, 0,
+    'a position the poller closed on Monday cannot still be running on Friday');
+  assert.equal(out.unresolved, 1, 'its end is unrecorded, which is undecidable');
+  assert.ok(out.ids.includes('PIDstale'),
+    'the row nothing could decide is named, or the gap is invisible');
+  assert.equal(out.verdict, 'unknown', 'unknown is not a pass and is not a fail');
+
+  // A genuinely open position still runs to now, which is the case this rule
+  // exists for and the half a fix like this could quietly destroy.
+  const live = span('PIDlive', '2026-01-09T10:00:00Z', null);
+  const inside = span('PIDinside', '2026-01-09T11:00:00Z', '2026-01-09T12:00:00Z');
+  assert.equal(verdictOf([live, inside], 'R-10', now).verdict, 'fail');
+});
+
+test('R-15 counts a close it cannot time, rather than dropping it', () => {
+  /* The same missing column, in the rule that is entirely about WHEN a span
+     ended. It used to `continue` past a close with no fill_time, which takes
+     the row out of the population altogether — and a rate over the wrong
+     population is §8's opening sentence and this file's whole reason to exist.
+
+     A position still genuinely open is a different case: it has not closed, so
+     there is nothing for this rule to time, and it stays skipped. */
+  const t = (o) => trade({ id: 'PIDx', entry_time: '2026-01-08T10:00:00Z', ...o });
+
+  const dropped = verdictOf([t({ exit_price: 4402.7 })], 'R-15');
+  assert.equal(dropped.unresolved, 1,
+    'a close the email never stamped is undecidable here, not absent');
+  assert.ok(dropped.ids.includes('PIDx'));
+
+  // Still open — nothing has closed, so R-15 has nothing to measure and the
+  // population is genuinely empty rather than narrowed.
+  const live = verdictOf([t({})], 'R-15');
+  assert.equal(live.unresolved, 0);
+  assert.equal(live.passed, 0);
+});
+
 test('a clean handover is still clean, however many of them there are', () => {
   /* THE OTHER DIRECTION, because a fix that flags everything would pass the
      test above and destroy the rule. Three trades back to back, each opening
@@ -2869,6 +2925,48 @@ const OPEN = trade({
   id: 'PID9', direction: 'BUY', entry_time: '2026-09-03T13:14:00Z',
   entry_price: 4388.2, size_oz: 4, open_day: '2026-09-03',
   planned_sl: 4380, planned_tp: 4412,
+});
+
+/* ─── What counts as open, which was one column and had to be two ────────────
+   THE ROW SHE READ IT OFF HAS ONE WRITER AND IT IS THE EMAIL PATH. The poller
+   never sets `fill_time` — not on any row, not once — and what it does record
+   when a position closes is `exit_price`, folded from the broker's own deals
+   every two minutes.
+
+   So a close with no alert email behind it left `fill_time` null for ever, and
+   she told him he had a buy open days after it had gone, citing R-19 and R-15
+   at him about it. That is the worst failure available to this block: it is the
+   one place she speaks with his own rules behind her.
+
+   `positionsList` could never have caught it. It is pure, it was driven from
+   both sides for its whole life, and it renders exactly what it is handed —
+   the mistake was in deciding what to hand it, which is why the predicate is
+   exported now and driven here instead.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a position the poller closed is closed, whether or not the email landed', () => {
+  const open = trade({ id: 'PID9', entry_time: '2026-09-02T13:14:00Z' });
+  assert.equal(isOpen(open), true, 'neither witness has closed this one');
+
+  // The reported bug: closed on the broker's deals, no email, `fill_time` null.
+  assert.equal(isOpen({ ...open, exit_price: 4402.7 }), false,
+    'the poller folded a closing deal for this position — it is not open, and ' +
+    'saying it is cites his rules at him about a trade he does not have');
+
+  // And the other witness alone, which is the case the poller can get wrong:
+  // a row folded without its entry deal carries a null exit_price on a trade
+  // that has closed, and the email is what catches that one.
+  assert.equal(isOpen({ ...open, fill_time: '2026-09-02T18:00:00Z' }), false);
+  assert.equal(isOpen({ ...open, exit_price: 4402.7, fill_time: '2026-09-02T18:00:00Z' }), false);
+});
+
+test('a pre-sync row is not an open position, however long it sits there', () => {
+  /* Rows whose id does not start with PID pre-date the broker sync: no
+     entry_time, no exit_price, and — since nothing ever emailed about them —
+     no fill_time either. Every one of them read as open, permanently, in the
+     block that tells her what he is exposed to right now. dayStanding has
+     always filtered them; this never did. */
+  assert.equal(isOpen(trade({ id: '2025-11-03-a' })), false);
+  assert.equal(isOpen(trade({ id: 'PID1' })), true);
 });
 
 test('a flat day with nothing traded is no block at all', () => {

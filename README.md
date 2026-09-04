@@ -1471,7 +1471,35 @@ that would have stopped her writing it.
 
 `positionsBlock()` is that fact. One read with two filters, because each half
 misses the other: an overnight hold is not in today's rows and today's closed
-trades are not open. It renders the open positions — age, side, size, entry, and
+trades are not open.
+
+**A position is closed on either witness, and reading one column told him he was
+in a trade he had closed days earlier.** `fill_time` has exactly one writer and
+it is `doji-email-sync` — the poller never sets it, on any row. What the poller
+records when a position closes is `exit_price`, folded from the broker's own
+deals every two minutes. So a close with no alert email behind it — a manual
+close, R-15's Friday close-out, a parse that failed, an email that never came —
+left `fill_time` null for ever, and this block reported an open position for
+ever. It did it while citing R-19 and R-15 at him about a trade that no longer
+existed, which is the worst failure available here: this is the one block where
+she speaks with his own rules behind her.
+
+Open now means **neither** witness has closed it — `exit_price is null and
+fill_time is null` — the same two-claimant shape `balance` and `direction`
+already use, since a row the poller folded without its entry deal carries a null
+`exit_price` on a closed trade and the email catches that one. **And broker rows
+only:** pre-sync rows carry client ids and no `exit_price`, so every one of them
+read as permanently open. `isOpen` is exported and driven from both sides,
+because `positionsList` is pure, was always driven from both sides, and renders
+exactly what it is handed — the mistake was upstream of it, in deciding what to
+hand it.
+
+**The same column runs through two of the eight rules.** R-10 ended an unclosed
+span at *now*, so one missing email made every trade after it overlap a phantom —
+a cascade of failures each naming a real row and each wrong. A close with no time
+is now `unknown`, which is what an end nothing recorded actually is. R-15 used to
+`continue` past those, dropping them from its population silently, which is §8's
+opening sentence happening inside the file that exists to prevent it. It renders the open positions — age, side, size, entry, and
 the stop and target as first seen — the quarter-hourly mark **with its age**, and
 where the day stands against the 4% R-11 sets. **A position opened on an earlier
 day names that day**; it used to render a bare `open since 09:15 ET` under a
