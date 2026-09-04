@@ -1179,6 +1179,16 @@ and it let a $7 drift at 20:57 reach him as a sharp move. A quarter of a percent
 is an event in the thin hours as well as the busy ones, and it costs nothing on
 an established session — a $50 range already asks $17.50 of the share.
 
+**Both things the trade look may say are about today, and it checks.** The
+trigger fires on a transition rather than on a clock, so anything that stamps an
+old close — a `?force=1` repair, an email landing late, the poller's first
+`fill_time` backfill — used to fire it for a finished day. It reported the 11th
+and 19th of August in the present tense, three weeks on. `open_day` against
+today's New York date returns before either branch. An overnight hold closing
+this morning is filed under yesterday and is skipped with them, which is correct:
+R-11 forbids an entry *later* than the breaching loss, and a day that is over can
+have no later entry.
+
 **And a move a print explains is not this sense's to report.** The spine is
 already looking at anything high-impact that landed, so a jump at 08:30 on
 payrolls would otherwise reach him twice in ten minutes saying the same thing.

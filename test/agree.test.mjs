@@ -2724,6 +2724,41 @@ test('the three columns with two claimants are filtered inside the UPDATE', () =
   }
 });
 
+test('the trade look speaks only about the day it is happening on', () => {
+  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY and neither had anything
+     checking that the trade is. `aheadToday` reads the releases still to come
+     THIS day; R-11 says the day ends here, which is a sentence whose whole
+     content is that he should stop trading now.
+
+     The trigger fires on a transition, not on a clock, so the row it carries is
+     only today's by habit — and anything that stamps an old close fires it for
+     an old day. It took the poller's first backfill to show it: two messages
+     arrived saying "today's realised P&L is −61.78" and "the day sits at
+     −318.88", about the 11th and the 19th of August, in the present tense,
+     three weeks after those days ended.
+
+     Read as a guard BEFORE either branch, because it is a property of the event
+     rather than of what she would have said about it — and placed after the
+     branches it would be two guards, with the second one to be forgotten. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('async function postTradeEvent(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postTradeEvent()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /row\.open_day !== nyDate\(new Date\(\)\)/,
+    'the trade look no longer checks the trade is today, so any late stamp — a ' +
+    'forced repair, an email arriving days later — reports a finished day in ' +
+    'the present tense as though he could still act on it');
+
+  const guard = body.indexOf('row.open_day !== nyDate');
+  assert.ok(guard > -1 && guard < body.indexOf("event === 'opened'"),
+    'the day guard sits inside or after the branches rather than before them — ' +
+    'one of the two paths is then unguarded, and it is whichever one nobody ' +
+    'thought about second');
+});
+
 test('the close instant is written only where the deals say it closed', () => {
   /* THE SAME SET THE BALANCE WRITE TAKES, and it has to be: a fully closed
      position cannot end on an opening deal, so wherever there is an exit price

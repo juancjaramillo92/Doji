@@ -585,7 +585,20 @@ code you write near it:
   A TRIGGER ON `trades` TELLS HER A POSITION OPENED, and the two things she may
   say are both his own rules read back: R-14/R-19 on a print pending against an
   open position, R-11 on a fill that took the day past its limit. Never a
-  verdict. Both branches decide from data BEFORE any model call, so the common
+  verdict.
+
+  AND BOTH ARE ABOUT TODAY, WHICH NOTHING CHECKED. The trigger fires on a
+  transition rather than on a clock, so the row it carries is only today's by
+  habit — and anything stamping an old close fires it for an old day. The
+  poller's first `fill_time` backfill is how it surfaced: two messages saying
+  "today's realised P&L is −61.78" and "the day sits at −318.88", about the 11th
+  and 19th of August, in the present tense, three weeks late. `open_day !==
+  nyDate(now)` returns before either branch, because it is a property of the
+  EVENT rather than of what she would have said — placed after the branches it
+  is two guards and the second is the one that gets forgotten. An overnight hold
+  closing this morning is filed under yesterday and is skipped too, which is
+  right: R-11 forbids an entry LATER than the breaching loss, and a finished day
+  can have no later entry. Both branches decide from data BEFORE any model call, so the common
   case — nothing pending, no breach — costs nothing at all. The close trigger
   compares `old.fill_time is null and new.fill_time is distinct from null`;
   `<>` is NULL there and the one event it exists for would never fire, and
