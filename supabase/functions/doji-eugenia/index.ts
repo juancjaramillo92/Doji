@@ -1042,14 +1042,14 @@ export const ROLL_HOUR = 17;
 
 export function quoteWindow(now: Date): string {
   return nyClock(now).hour >= ROLL_HOUR
-    ? "The broker's session began at the 17:00 New York roll THIS EVENING, so " +
-      "the high, the low, the previous close and the move since it cover only " +
-      "the hours since that roll. They are NOT the calendar day, and what gold " +
-      "has done since midnight is not something this quote can tell you — do " +
-      "not describe any of it as the move on the day."
+    ? "The broker's session began at the 17:00 New York roll THIS EVENING. The " +
+      "high and the low are only the hours since that roll, and the move is " +
+      "measured from the close it rolled off — so none of it is the calendar " +
+      "day. This is NOT the move on the day and must not be called one; what " +
+      "gold has done since midnight is not something this quote can tell you."
     : "The broker's session began at the 17:00 New York roll YESTERDAY evening, " +
-      "so the move since that close is the overnight move and the high and low " +
-      "are the overnight range.";
+      "so the high and the low are the overnight range and the move since the " +
+      "previous close is the overnight move.";
 }
 
 /* ONE RENDERING OF A QUOTE, AND THE WINDOW IS PART OF IT RATHER THAN BESIDE IT.
@@ -2577,10 +2577,11 @@ async function critique(draft: string): Promise<string> {
 
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
-  /* THE SIX READS RUN AT ONCE. They are independent, they are all small, and
-     run one after another they were six round trips before the first token of a
-     briefing was asked for. Promise.all is the same argument the tool dispatch
-     now makes: a batch should cost its slowest member. */
+  /* EVERY READ THE BRIEFING NEEDS, AT ONCE. They are independent and they are
+     all small, and run one after another they were a round trip each before the
+     first token was asked for. Promise.all is the same argument the tool
+     dispatch makes: a batch should cost its slowest member — which here is the
+     price, since that one leaves the project for the broker. */
   const [price, notes, channels, trades, story, loops, calendar, desk] = await Promise.all([
     marketBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
     loopsBlock(), calendarBlock(), positionsBlock(),

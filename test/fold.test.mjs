@@ -2740,7 +2740,8 @@ test('after the roll the quote is not the day, and says that instead', () => {
   // figure inside it being called the move on the day.
   const said = quoteWindow(new Date('2026-09-04T00:57:00Z'));
   assert.match(said, /THIS EVENING/);
-  assert.match(said, /NOT the calendar day/);
+  assert.match(said, /none of it is the calendar day/);
+  assert.match(said, /NOT the move on the day/);
   assert.doesNotMatch(said, /overnight move/);
 });
 
