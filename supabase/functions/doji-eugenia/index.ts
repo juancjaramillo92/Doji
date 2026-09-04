@@ -3063,6 +3063,28 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
   // Soft-deleted, or not through the view. Nothing to say and nothing wrong.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
+  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY, and neither had anything
+     checking that the trade is. `aheadToday` reads the releases still to come
+     THIS day, and R-11 says the day ends here — a sentence whose whole content
+     is that he should stop trading now.
+
+     The trigger fires on a transition rather than on a clock, so the row it
+     carries is only today's by habit. Anything that stamps an old close fires
+     it for an old day: a `?force=1` repair, a broker email landing late, the
+     backfill that gave the poller the eight closes it had never recorded. That
+     backfill is how this surfaced — two messages arrived saying "today's
+     realised P&L is −61.78" and "the day sits at −318.88", about the 11th and
+     the 19th of August, in the present tense, three weeks late.
+
+     Filed under `open_day`, which is the day the position OPENED — so an
+     overnight hold closing this morning belongs to yesterday and is skipped
+     too. That is right rather than a gap: R-11 forbids an entry LATER than the
+     loss that breached, and a day that is over can have no later entry. There
+     is nothing to warn about and nothing he could do about it. */
+  if (row.open_day !== nyDate(new Date())) {
+    return json({ ok: true, trade: id, skipped: "not today" });
+  }
+
   let situation: string;
 
   if (event === 'opened') {
