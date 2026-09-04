@@ -38,6 +38,7 @@ import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/st
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { BE, SESSIONS, MARKETS } from '../supabase/functions/doji-eugenia/journal.ts';
 
 const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
 const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
@@ -2124,6 +2125,89 @@ test('the two unscheduled looks both build a term before they use one', () => {
   assert.match(section('MOVE'), /17:00 New York/,
     'the move look is no longer told where its session starts, and the evening ' +
     'is the only time it runs where that matters');
+});
+
+/* ─── The app's arithmetic, in a second runtime ──────────────────────────────
+   `journal.ts` is index.html's stats layer ported so she can reach it, and
+   there is no build step between them — so this is a copy, and a copy nothing
+   compares is the defect rather than the copy. Three constants and the shape of
+   the definitions are read out of BOTH files.
+
+   The break-even band is the one that matters most. It is ±$3 of the entry
+   PRICE, and the alternative that looks identical everywhere except on a large
+   position is ±$3 of the P&L. If these two files ever disagree about it, the
+   win rate she quotes and the win rate on his screen differ, and neither says
+   which is which.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('the journal stats agree with the app they were ported from', () => {
+  const app = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+
+  const appBE = app.match(/BE:\s*([\d.]+)/);
+  assert.ok(appBE, 'index.html no longer states CONFIG.BE, so nothing can be compared to it');
+  assert.equal(BE, Number(appBE[1]),
+    'the break-even band differs between the app and what she is told — the win ' +
+    'rate she quotes and the one on his screen would part with nothing saying which is right');
+
+  const appSessions = [...(app.match(/SESSIONS:\s*\[([^\]]*)\]/)?.[1] ?? '')
+    .matchAll(/'([^']+)'/g)].map(m => m[1]);
+  assert.deepEqual([...SESSIONS], appSessions,
+    'the session vocabulary differs — she would report a breakdown under names ' +
+    'that are not the ones he sees, or drop a session entirely');
+
+  /* AND THE HOURS BEHIND THEM, since the names agreeing is not the same as the
+     boundaries agreeing: a London close an hour out relabels every trade in the
+     overlap and nothing about the output looks wrong. */
+  for (const [name, m] of Object.entries(MARKETS)) {
+    const row = app.match(new RegExp(`${name}:\\s*\\{[^}]*tz:\\s*'([^']+)'[^}]*open:\\s*(\\d+)[^}]*close:\\s*(\\d+)`));
+    assert.ok(row, `index.html no longer defines the ${name} session hours`);
+    assert.deepEqual([m.tz, m.open, m.close], [row[1], Number(row[2]), Number(row[3])],
+      `the ${name} hours differ between the app and journal.ts`);
+  }
+
+  /* THE THREE SUBTLE DEFINITIONS, read as SHAPE rather than as text, because
+     the prose differs between a browser file and an Edge module while the rule
+     must not. Each is the half of a pair that looks identical in every ordinary
+     case and parts on one: a scratch measured in price rather than dollars, a
+     money split on the sign rather than the label, and averages on the label
+     rather than the sign. */
+  const mod = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/journal.ts', import.meta.url), 'utf8');
+
+  for (const [what, re] of [
+    ['the scratch band against the entry PRICE', /Math\.abs\(t\.exit_price - t\.entry_price\) <= BE/],
+    ['the money split on the SIGN of the P&L',    /if \(t\.pnl >= 0\) gross \+= t\.pnl; else loss -= t\.pnl;/],
+    ['the averages split on the RESULT LABEL',    /r === 'win'[\s\S]{0,60}r === 'loss'/],
+  ]) {
+    assert.match(mod, re, `journal.ts no longer computes ${what}`);
+  }
+
+  // And the app still computes them the same way, or the port has been left
+  // behind by the thing it was ported from.
+  assert.match(app, /Math\.abs\(t\.exit_price - t\.entry_price\) <= CONFIG\.BE/,
+    'index.html no longer measures a scratch in price — journal.ts is now a port of something else');
+  assert.match(app, /if \(t\.pnl >= 0\) gross \+= t\.pnl; else loss -= t\.pnl;/,
+    'index.html no longer splits money on the sign');
+});
+
+test('the stats tool is offered wherever the journal is reasoned about', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  /* A CONVERSATION AND THE NIGHTLY PASS, and the pass is the one that would be
+     missed. It is told to notice what he has started doing differently, which
+     is a claim about a stretch of trading — and it was given the week's rows to
+     make it from. The rows are the evidence; this is the arithmetic over them. */
+  for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS']) {
+    const list = src.match(new RegExp(`const ${set} = \\[([\\s\\S]*?)\\];`));
+    assert.ok(list, `doji-eugenia no longer declares ${set}`);
+    assert.match(list[1], /STATS_TOOL/,
+      `${set} does not offer get_stats, so she is back to computing a win rate ` +
+      `out of four hundred rows of JSON by hand`);
+  }
+
+  assert.match(src, /case STATS_TOOL\.name:\s*return await readStats\(input\.days\);/,
+    'get_stats is offered and not served — every call would come back as the ' +
+    'sentence serve() answers an unknown name with');
 });
 
 test('every column the price mark writes is a column the table has', () => {
