@@ -120,6 +120,8 @@ Every move gets a line, whether it was made or refused.
 | `journalStats` had both faults at once | M11 | measured: 411ms → 1.2ms over 400 rows, output deep-compared against the old module |
 | `sessionBars` filtered once per session | M11 | golden byte-identical; the sessionless row now has its own test |
 | No colour is written in the script | net | 3 planted defects, plus a comment that must NOT fail |
+| A door existed that the README did not name | net + doc | 2 planted defects, both directions |
+| Vendor coupling (9.3) | read: three libraries pinned, two hashed, the third's absence documented; the two font hosts were not written down and now are |
 
 ### Open
 
@@ -140,8 +142,8 @@ Three left, and none of them blocks a move:
 
 | Check | Gates |
 |---|---|
-| doc coverage, both directions | the documentation phase |
-| vendor coupling | nothing — an ops pass, do it when convenient |
+| doc coverage, code → doc | the maintenance doors are now held by a test; whether every feature has a paragraph is unrun |
+| doc coverage, doc → code | the symbol guard covers named symbols; whether every README paragraph still describes something real is unrun |
 | soft delete and undo (4.9) | DONE — see the ledger |
 
 **Phase 2 — archaeology.** The dead-code scans are built and both answer zero.
