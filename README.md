@@ -358,6 +358,18 @@ It also asserts the guarantee rather than only the lists: no broker column may
 appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
 rests on, tested rather than repeated.
 
+**And it is enforced in JavaScript, not in the database — deliberately.** The
+RLS policy on `trades` scopes rows to their owner and says nothing about
+columns, so a modified client signed in as the trader could write any column of
+its own rows. Column-level grants would close that, and the cost is a list of
+exactly which columns `authenticated` may write — `setup`, the three answers,
+`deleted`, `updated_at` — which is a fifth copy of the ownership boundary, in
+the one place nothing here can test, and getting it wrong silently breaks soft
+delete rather than failing loudly. The threat it would stop is a client that
+already holds the session token. So the boundary lives in one place in code,
+held by four tests, and this paragraph exists so that reads as a decision rather
+than as something nobody thought about.
+
 ---
 
 ## Operating
