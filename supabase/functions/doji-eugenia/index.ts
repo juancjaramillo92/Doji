@@ -2213,6 +2213,67 @@ async function thesisBlock(): Promise<string> {
   }
 }
 
+/* ─── Whether the journal is still being written ────────────────────────────
+   The poller and the email function are the two writers with no voice. Their
+   failures reach a console nobody reads, and the symptom of either dying is
+   trades that never arrive — which looks exactly like a week he did not trade.
+   `sync_health` is the heartbeat they leave; this is the one place it is read.
+
+   SHE SAYS IT ONLY WHEN IT IS TRUE, and staleness is the test rather than the
+   error. A writer that fails every run and one that stopped being invoked at
+   all produce the same silence, and only `last_ok` sees both. Six hours is
+   chosen against the poll's two-minute schedule and the fact that this reaches
+   him at 08:00: shorter and a quiet Sunday reads as a fault, longer and a
+   Monday outage reaches him on Tuesday.
+
+   It is a fact about his instruments, not a reading of the market, so it goes
+   in plainly and she is told to lead with it — a briefing about gold written on
+   top of a journal that stopped updating is worse than no briefing.
+   ─────────────────────────────────────────────────────────────────────────── */
+const STALE_HOURS = 6;
+
+const WRITERS: Record<string, string> = {
+  poller: "the broker sync",
+  email:  "the fill emails",
+};
+
+type Health = { id: string; last_ok: string | null; last_error: string | null };
+
+export function healthLine(rows: Health[], now = Date.now()): string {
+  const cold = rows.filter(r => {
+    const at = r.last_ok ? Date.parse(r.last_ok) : NaN;
+    return !Number.isFinite(at) || now - at > STALE_HOURS * 3600_000;
+  });
+  if (!cold.length) return "";
+
+  return "\nHis journal is not being written:\n" + cold.map(r => {
+    const name = WRITERS[r.id] ?? r.id;
+    const when = r.last_ok
+      ? `last completed a run at ${r.last_ok.slice(0, 16).replace("T", " ")} UTC`
+      : "has never completed a run";
+    // The error only where there is one — a writer that stopped being called
+    // has no error to show, and that is the more alarming of the two states.
+    return `· ${name} ${when}${r.last_error ? `; last error: ${r.last_error}` : ""}`;
+  }).join("\n") +
+  "\nSay this first, plainly. Trades may be missing from everything below.";
+}
+
+async function healthBlock(): Promise<string> {
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error&order=id.desc&limit=5`,
+      { headers: sbHeaders() });
+    // A database without 008 answers 404 here, and that is a supported state:
+    // the feature is inert until the file is applied rather than being a read
+    // that kills the briefing.
+    if (!res.ok) return "";
+    return healthLine(await res.json());
+  } catch (err) {
+    console.error("doji-eugenia: health unavailable —", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
+
 type Loop = { id: number; kind: string; body: string; opened_on: string };
 
 // Twenty of each kind would be a backlog rather than a set of open threads. Ten
@@ -2679,15 +2740,17 @@ async function postBriefing(due: Brief): Promise<Response> {
      first token was asked for. Promise.all is the same argument the tool
      dispatch makes: a batch should cost its slowest member — which here is the
      price, since that one leaves the project for the broker. */
-  const [price, notes, channels, trades, story, loops, calendar, desk] = await Promise.all([
+  const [price, notes, channels, trades, story, health, loops, calendar, desk] = await Promise.all([
     marketBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
-    loopsBlock(), calendarBlock(), positionsBlock(),
+    healthBlock(), loopsBlock(), calendarBlock(), positionsBlock(),
   ]);
 
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    + price + notes + channels + trades + story + loops + calendar + desk;
+    // `health` first: if the journal stopped being written, everything after it
+    // is computed over rows that may be missing, and she is told to lead with it.
+    + health + price + notes + channels + trades + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);

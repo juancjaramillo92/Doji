@@ -88,6 +88,41 @@ export const sbHeaders = (prefer?: string): Record<string, string> => {
   return headers;
 };
 
+/* ─── The heartbeat the two silent writers leave ───────────────────────────
+   The poller and the email function have no path to Telegram and no reader for
+   their logs, so the only evidence either is alive is the rows it writes — and
+   the absence of rows is indistinguishable from a quiet week. This is the
+   evidence, one row per writer in `sync_health`, moved on every completed run.
+
+   A HEARTBEAT RATHER THAN AN ALARM. A failure-triggered message cannot fire
+   when the failure is that nothing ran at all: an unscheduled cron job, a
+   renamed function, a deploy that dropped one. `last_ok` going stale answers
+   "running and failing" and "not running" with the same column.
+
+   IT SWALLOWS EVERYTHING, and that is the rule rather than defensive padding.
+   This is a monitor, and a monitor that can fail the work it monitors is worse
+   than none — so a database without 008 applied, a PATCH that 404s, or a
+   network that refuses all cost nothing and change nothing. The poll folds its
+   deals exactly as it did before.
+
+   `keepalive` because both callers reach this on their way out; without it the
+   PATCH can be cut off when the isolate is torn down after the response. */
+export async function heartbeat(who: "poller" | "email", failure?: unknown) {
+  const body = failure === undefined
+    ? { last_ok: new Date().toISOString() }
+    : {
+        last_error_at: new Date().toISOString(),
+        // The column takes 500; truncate here rather than let PostgREST refuse
+        // the row, since a refused heartbeat is a writer that reads as dead.
+        last_error: String(failure instanceof Error ? failure.message : failure).slice(0, 500),
+      };
+  try {
+    await fetch(`${SB_URL}/rest/v1/sync_health?id=eq.${who}`, {
+      method: "PATCH", headers: sbHeaders(), body: JSON.stringify(body), keepalive: true,
+    });
+  } catch { /* a monitor may not break the thing it monitors */ }
+}
+
 /* ─── Telegram ─────────────────────────────────────────────────────────────
    Two bots, two tokens, one wire. The token is an argument rather than a
    capture, so each bot binds its own in one line and every call site below it

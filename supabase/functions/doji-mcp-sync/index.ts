@@ -38,7 +38,7 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, marketOpen, nyClock, nyDate, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, sbHeaders, heartbeat, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -935,6 +935,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         err instanceof Error ? err.message : err);
     }
 
+    // A completed poll, recorded where something can read it. Every line above
+    // this one has already run, so the mark means the deals landed rather than
+    // that the function was reached.
+    await heartbeat("poller");
+
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
       deals: deals.length, positions: n, balance_for: target, planned, stamped,
@@ -944,6 +949,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     });
   } catch (err) {
     console.error("doji-mcp-sync:", err instanceof Error ? err.message : err);
+    // The console is the half nobody reads. This is the other half, and it is
+    // the only record of a poll that failed at 03:00.
+    await heartbeat("poller", err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });

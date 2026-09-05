@@ -848,6 +848,21 @@ and what could not be verified.
 
 ---
 
+## Her memory is backed up from outside the browser
+
+`scripts/backup-memory.mjs` is the only copy of the seven tables that have no
+other source. It is run weekly by `.github/workflows/backup-memory.yml` and can
+be run by hand for a durable copy; the README carries the mechanics. The part to
+be careful with is the PAGING: PostgREST caps a response at its own `max-rows`
+whatever is asked for, so one read of `eugenia_turns` returns a page and looks
+exactly like a complete archive — green job, well-formed file, plausible counts,
+discovered on the day someone restores from it. The walk stops on a short page
+rather than on a count it was told, `readAll` takes its `fetch` as an argument so
+that loop is driven from a test, and a refused read throws rather than backing up
+a blank.
+
+---
+
 ## The email path
 
 - **The Apps Script parses and forwards; it does not write.** `doji-email-sync`
@@ -965,6 +980,23 @@ and what could not be verified.
   extension and the trigram indexes. `agree.test.mjs` reads every re-runnable
   file — derived from whether it carries a bare `create table` — against every
   `drop` a later file makes.
+
+- **`008_sync_health.sql` is the only table here that is about the system rather
+  than the desk, and it must never be able to break what it watches.** The
+  poller and the email function have no path to Telegram, so `heartbeat()` in
+  `_shared/edge.ts` is the only evidence either is alive. It swallows
+  everything — a database without 008, a 404, a refused network — because a
+  monitor that can fail the work it monitors is worse than none, and the poll
+  folds its deals exactly as before.
+
+  IT IS A HEARTBEAT AND NOT AN ALARM, which is why `last_ok` moves on SUCCESS.
+  A failure-triggered message cannot fire when the failure is that nothing ran:
+  an unscheduled cron job, a renamed function, a deploy that dropped one. Those
+  are the failures worth catching and `last_ok` going cold is what sees them.
+  `healthLine` is exported and pure so both states can be driven from a test —
+  a writer failing, and a writer nobody is calling — and `agree.test.mjs` reads
+  both call sites in both functions, since a mark missing from the success path
+  makes a healthy writer read as dead.
 
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add

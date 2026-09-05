@@ -38,7 +38,8 @@
 // Deploy:  supabase functions deploy doji-email-sync --no-verify-jwt
 // Secrets: DOJI_EMAIL_SECRET, DOJI_USER_ID, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { env, secretMatches, json, sbHeaders, SB_URL, SB_KEY } from "../_shared/edge.ts";
+import { env, secretMatches, json, sbHeaders, heartbeat, SB_URL, SB_KEY }
+  from "../_shared/edge.ts";
 
 const EMAIL_SECRET = env("DOJI_EMAIL_SECRET");
 
@@ -188,10 +189,16 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   } catch (err) {
     // No response at all — DNS, a dropped connection. Always worth retrying.
     console.error("doji-email-sync:", err instanceof Error ? err.message : err);
+    await heartbeat("email", err);
     return json({ ok: false, error: "write unreachable" }, 500);
   }
 
-  if (res.ok) return json({ ok: true, id: fill.row.id });
+  if (res.ok) {
+    // A fill that landed. The Apps Script retries anything unlabelled, so this
+    // is the one place a run that WORKED leaves a trace.
+    await heartbeat("email");
+    return json({ ok: true, id: fill.row.id });
+  }
 
   // A body is not guaranteed, and "" tells the Apps Script log nothing.
   const detail = (await res.text()).slice(0, 300) || `HTTP ${res.status}`;
@@ -199,5 +206,6 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   const answer = answerFor(res.status);
   console.error(`doji-email-sync: ${answer === 400 ? "refused by PostgREST" : "write failed"}` +
                 ` (${res.status}) — ${detail}`);
+  await heartbeat("email", `HTTP ${res.status} — ${detail}`);
   return json({ ok: false, error: detail }, answer);
 });

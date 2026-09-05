@@ -1,0 +1,60 @@
+# Takes a copy of everything Eugenia knows about him that exists nowhere else.
+#
+# The app's weekly backup carries `trades`, which is the one table cTrader could
+# rebuild. Her notes, turns, channel map, thesis, loops and calendar have no
+# other source, and the app deliberately cannot read them — 003 denies the
+# publishable key her notes and turns, and that should stay true. So the copy is
+# taken with the secret key, from here.
+#
+# Weekly rather than daily: the nightly pass is what writes most of this, and a
+# week of it is a handful of notes. Sunday evening UTC, after the Friday close
+# and before the Sunday gold open, so it never runs against a table being
+# written by a briefing.
+name: backup memory
+
+on:
+  schedule:
+    - cron: '0 20 * * 0'
+  # The one that matters after a bad night: take a copy now, before repairing
+  # anything.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No install step: the script is one file and uses fetch. A backup that
+      # depends on a registry is a backup that fails the week the registry does.
+      - name: Read her memory
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SB_SECRET_KEY: ${{ secrets.SB_SECRET_KEY }}
+        run: node scripts/backup-memory.mjs > memory.json
+
+      # Fail loudly on an empty document rather than uploading it. A backup that
+      # ran, succeeded and holds nothing is worse than one that did not run: the
+      # green tick is what stops anyone looking.
+      - name: Refuse an empty backup
+        run: |
+          rows=$(node -e "const d=require('./memory.json');console.log(Object.values(d.tables).reduce((n,r)=>n+r.length,0))")
+          echo "rows captured: $rows"
+          test "$rows" -gt 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doji-memory-${{ github.run_id }}
+          path: memory.json
+          # The maximum a free account allows. Artifacts expire, so this is a
+          # rolling window rather than an archive — download one occasionally
+          # and keep it somewhere that does not.
+          retention-days: 90

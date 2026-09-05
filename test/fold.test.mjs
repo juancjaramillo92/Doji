@@ -48,7 +48,7 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList, isOpen,
+  positionsList, isOpen, healthLine,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -61,6 +61,7 @@ import {
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
+import { backup, readAll, TABLES } from '../scripts/backup-memory.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1359,6 +1360,122 @@ test('the window starts exactly the stated number of hours back', () => {
   const at = Date.UTC(2026, 7, 19, 12, 0);
   assert.match(dayQuery(24, at), /gte\.2026-08-18T12:00:00/);
   assert.match(dayQuery(1, at),  /gte\.2026-08-19T11:00:00/);
+});
+
+
+/* ─── The heartbeat the two silent writers leave ─────────────────────────────
+   The poller and the email function report failure to nobody: console.error and
+   a response pg_net discards. So the symptom of either dying is trades that
+   never arrive, and that is indistinguishable from a week he did not trade.
+
+   STALENESS IS THE TEST, NOT THE ERROR, and that is the whole design. A writer
+   failing every run and a writer that stopped being invoked at all — an
+   unscheduled cron job, a renamed function, a deploy that dropped one — produce
+   the same silence, and an alarm on failure cannot fire for the second. Only
+   last_ok going cold sees both.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const HEALTH_NOW = Date.UTC(2026, 7, 19, 12, 0);
+const ago = (h) => new Date(HEALTH_NOW - h * 3600_000).toISOString();
+
+test('a writer that has run recently is not mentioned at all', () => {
+  const line = healthLine([
+    { id: 'poller', last_ok: ago(0.1), last_error: null },
+    { id: 'email',  last_ok: ago(3),   last_error: null },
+  ], HEALTH_NOW);
+  assert.equal(line, '',
+    'a healthy pair still produced a line — this reaches him every morning, so ' +
+    'silence when nothing is wrong is what makes the line worth reading');
+});
+
+test('a writer gone quiet is named, with when it last completed a run', () => {
+  const line = healthLine([
+    { id: 'poller', last_ok: ago(9), last_error: null },
+    { id: 'email',  last_ok: ago(1), last_error: null },
+  ], HEALTH_NOW);
+  assert.match(line, /the broker sync/, 'the writer is named in words, not as an id');
+  assert.doesNotMatch(line, /the fill emails/, 'the healthy one was named too');
+  assert.match(line, /2026-08-19 03:00 UTC/, 'the time it went quiet has to be in it');
+  assert.match(line, /Say this first/,
+    'she is not told to lead with it, so a briefing about gold sits on top of a ' +
+    'journal that stopped updating');
+});
+
+test('a writer that has never run says so rather than showing a blank', () => {
+  // The state a database that never got 008 would show, and the state a cron
+  // job nobody scheduled shows forever. A blank date reads as a formatting bug.
+  const line = healthLine([{ id: 'poller', last_ok: null, last_error: null }], HEALTH_NOW);
+  assert.match(line, /has never completed a run/);
+});
+
+test('the last error travels with the writer, and only where there is one', () => {
+  const line = healthLine([
+    { id: 'email', last_ok: ago(30), last_error: 'HTTP 401 — bad key' },
+    { id: 'poller', last_ok: ago(40), last_error: null },
+  ], HEALTH_NOW);
+  assert.match(line, /last error: HTTP 401 — bad key/);
+  // The one with no error must not carry an empty "last error:" tail — a writer
+  // that stopped being CALLED has no error, and that is the louder of the two.
+  const pollerLine = line.split('\n').find(l => l.includes('the broker sync'));
+  assert.doesNotMatch(pollerLine, /last error/);
+});
+
+
+/* ─── The copy of her memory, and the loop that is the whole of it ───────────
+   The app's weekly backup carries `trades` — the one table cTrader could
+   rebuild. Her notes, turns, channel map, thesis, loops and calendar have no
+   other source, and the app cannot read them by design. This script is the only
+   copy, which makes its paging the load-bearing part: PostgREST caps a response
+   at its own max-rows whatever is asked for, so ONE read of eugenia_turns
+   returns a page and looks exactly like a complete archive.
+
+   That failure is invisible in every way that matters — the job is green, the
+   file is well-formed, the counts look plausible — and it is discovered on the
+   day someone restores from it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a table larger than one page is read to the end', async () => {
+  // 2,300 rows against a 1,000 page: three requests, the last one short.
+  const all = Array.from({ length: 2300 }, (_, i) => ({ id: i + 1 }));
+  const ranges = [];
+  const stub = async (url, opts) => {
+    const [from, to] = opts.headers.Range.split('-').map(Number);
+    ranges.push(opts.headers.Range);
+    return { ok: true, json: async () => all.slice(from, to + 1) };
+  };
+
+  const rows = await readAll('https://x', 'k', 'eugenia_turns', stub);
+  assert.equal(rows.length, 2300, 'the read stopped before the end of the table');
+  assert.deepEqual(rows.map(r => r.id), all.map(r => r.id), 'rows were lost or reordered');
+  assert.deepEqual(ranges, ['0-999', '1000-1999', '2000-2999'],
+    'the walk did not page the way it claims to');
+});
+
+test('a table that fits in one page costs one request', async () => {
+  let calls = 0;
+  const stub = async () => { calls++; return { ok: true, json: async () => [{ id: 1 }] }; };
+  assert.equal((await readAll('https://x', 'k', 'eugenia_notes', stub)).length, 1);
+  assert.equal(calls, 1, 'a short page is the end and must not be followed by another read');
+});
+
+test('a refused read throws rather than backing up a blank', async () => {
+  const stub = async () => ({ ok: false, status: 401, text: async () => 'bad key' });
+  await assert.rejects(() => readAll('https://x', 'k', 'eugenia_notes', stub), /401/,
+    'a refused read returned quietly, so the backup would hold an empty table ' +
+    'and the job would go green over it');
+});
+
+test('the backup names every table that has no other source', async () => {
+  const stub = async () => ({ ok: true, json: async () => [] });
+  const out = await backup('https://x', 'k', stub);
+  for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
+                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar']) {
+    assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
+  }
+  // The cost meter is deliberately out: every row is about a model call rather
+  // than about him, and it is by far the largest table.
+  assert.ok(!TABLES.includes('eugenia_runs'), 'the cost meter is in the backup');
+  assert.match(out.taken_at, /^\d{4}-\d\d-\d\dT/, 'the document does not say when it was taken');
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
