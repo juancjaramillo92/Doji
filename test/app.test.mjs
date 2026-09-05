@@ -10,8 +10,9 @@
    emitted markup; they cannot see pixels, so a renderer that produces correct
    HTML with broken CSS passes here. Supabase is a recording stand-in, so load
    and save are exercised but realtime and the auth paths are not. The xlsx
-   export needs SheetJS from a CDN and is not exercised. And the Apps Script has
-   no coverage at all, here or anywhere.
+   export is exercised against a recording SheetJS stub, so the rows it builds
+   are asserted and the bytes SheetJS writes from them are not. And the Apps
+   Script has no coverage at all, here or anywhere.
 
    One thing about the trade factory shapes every result test below: trade()
    defaults to entry 3400 and exit 3410, a $10 move. Under the price-based
@@ -23,10 +24,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, trade, journalled } from './boot.mjs';
 
-let app, seed, $, win, close, db, charts;
+let app, seed, $, win, close, db, charts, sheets;
 
 before(async () => {
-  ({ app, seed, $, win, close, db, charts } = await boot());
+  ({ app, seed, $, win, close, db, charts, sheets } = await boot());
 });
 after(() => close());
 
@@ -831,6 +832,66 @@ test('the discipline answers are read from the modal body, not the document', ()
     decoy.remove();
     app.Journal.close();
   }
+});
+
+
+/* ─── What the export actually carries ───────────────────────────────────────
+   The export was the last surface here reading these columns with nothing
+   watching it, and the reason was mechanical rather than deliberate: SheetJS
+   arrives from a CDN, so the whole of IO.journal() sat behind a fetch. It does
+   not any more — the harness puts a recording stand-in on window.XLSX, which is
+   the one condition loadXLSX() checks, so every line the app owns runs and the
+   rows it hands over are read back.
+
+   What this cannot see is SheetJS itself: the workbook is a stub, so a column
+   width or a sheet name would pass here and be wrong in the file. The numbers
+   are the part worth holding, and they are the part that is now held.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the export carries the figures the screen carries', async () => {
+  seed([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 57.1, setup: 'Break & Retest',
+                 entry_time: '2026-07-30T14:00:00Z' }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -22, setup: 'Support & Resistance',
+                 entry_time: '2026-07-29T09:00:00Z', followed_sl: false })
+  ]);
+  const before = sheets.length;
+  await app.IO.journal();
+  assert.equal(sheets.length, before + 1, 'the export built no sheet');
+
+  const rows = sheets[sheets.length - 1].rows;
+  assert.equal(rows.length, 2);
+
+  // Same P&L, same result label and same session the panel derives — read from
+  // the app rather than typed here, so this cannot drift into its own opinion
+  // of what a trade is.
+  for (const row of rows) {
+    const t = app.Data.byId.get(row.Date.includes('30') ? 'PID1' : 'PID2');
+    assert.equal(row['P&L ($)'], t.pnl);
+    assert.equal(row.Session, app.sessionOf(t));
+    assert.equal(row.Setup, t.setup);
+    assert.equal(row.Result,
+      { win: 'Win', loss: 'Loss', be: 'Break Even' }[app.resultOf(t)]);
+  }
+});
+
+test('the export says nothing where a question was never answered', () => {
+  // The sixth reader of the three-state boolean, and the one that leaves the
+  // app: a null written out as "No" is a rule breach in a file he may hand to
+  // someone else, with no way back to the fact that he simply never answered.
+  const cell = sheets[sheets.length - 1].rows.find(r => r.Setup === 'Break & Retest');
+  assert.equal(cell['Followed Rules'], 'Yes');
+
+  return (async () => {
+    seed([journalled({ id: 'PID3', open_day: '2026-07-30', pnl: 12,
+                       followed_rules: null, followed_sl: false })]);
+    await app.IO.journal();
+    const row = sheets[sheets.length - 1].rows[0];
+    assert.equal(row['Followed Rules'], '',
+      'an unanswered question left the app as an answer');
+    assert.equal(row['Followed Stop Loss'], 'No', 'a real NO must still say No');
+    assert.equal(row['Followed Take Profit'], 'Yes');
+  })();
 });
 
 /* ─── Sorting ────────────────────────────────────────────────────────────── */

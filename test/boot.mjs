@@ -142,6 +142,22 @@ export async function boot() {
   win.URL.createObjectURL = () => 'blob:doji-test';
   win.URL.revokeObjectURL = () => {};
 
+  /* SheetJS, recorded rather than fetched. loadXLSX() returns immediately when
+     window.XLSX is already present, so the export runs its own row-building
+     code — the column names, the formatters and the three-state answers — and
+     hands the finished rows to json_to_sheet, which is where they are caught.
+     Only the four entry points the export actually calls are here: a wider
+     stub would be describing SheetJS rather than the app. */
+  const sheets = [];
+  win.XLSX = {
+    utils: {
+      json_to_sheet: (rows) => { const ws = { rows }; sheets.push(ws); return ws; },
+      book_new: () => ({ SheetNames: [], Sheets: {} }),
+      book_append_sheet: (wb, ws, name) => { wb.SheetNames.push(name); wb.Sheets[name] = ws; }
+    },
+    write: () => new Uint8Array([0])
+  };
+
   const script = HTML.slice(HTML.lastIndexOf('<script>') + 8, HTML.lastIndexOf('</script>'));
   win.eval(script + `\nwindow.__app = { ${EXPOSED.join(', ')} };`);
 
@@ -169,7 +185,7 @@ export async function boot() {
   // the process alive. Closing the window is not optional housekeeping.
   const close = () => win.close();
 
-  return { dom, win, app, seed, charts, close, db: win.__db, $: id => win.document.getElementById(id) };
+  return { dom, win, app, seed, charts, sheets, close, db: win.__db, $: id => win.document.getElementById(id) };
 }
 
 // A trade in the shape the app actually receives one: broker columns from the
