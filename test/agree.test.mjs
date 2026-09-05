@@ -386,6 +386,72 @@ test('no broker column is reachable through either writer', async () => {
   } finally { close(); }
 });
 
+/* ─── The grant list is a fourth copy of what the app may write ──────────────
+   009 says the boundary to the database, and saying it added three more places
+   that state the same five column names: the `grant update (…)` itself and the
+   two arrays in verify.sql that check it. They have to agree with the app or the
+   file is wrong in one of two directions, and both are quiet.
+
+   Too NARROW and the journal cannot be filled in — a revoke lands, the grant
+   misses a column, and every save fails with a 403 that reads as the app being
+   broken rather than as this being mis-stated. Too WIDE and the file has done
+   nothing: one broker column in that list and `net_pnl` is writable from the
+   browser console again, with every test here still green.
+
+   FIVE, NOT FOUR, AND THE FIFTH IS THE INTERESTING ONE. `Data.OWNED` holds the
+   four journal answers. `deleted` is not one of them and is deliberately on the
+   never-reachable list two tests above — no tap and no save may ever name it —
+   but the app does write it, through `remove()` and `undo()`, which call
+   `update()` directly. So a grant list derived from `Data.OWNED` alone reads as
+   obviously right and takes delete and undo out the moment it is applied.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the columns 009 grants are exactly the columns the app writes', async () => {
+  const grants = readFileSync(new URL('../supabase/009_trades_grants.sql', import.meta.url), 'utf8');
+  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+  const stated = grants.match(/grant update \(([^)]*)\)\s*\n?\s*on public\.trades/);
+  assert.ok(stated, '009 no longer grants update on any column of trades');
+  const granted = stated[1].split(',').map(c => c.trim()).sort();
+
+  const { app, close } = await boot();
+  try {
+    const want = [...app.Data.OWNED, 'deleted'].sort();
+    assert.deepEqual(granted, want,
+      'the grant in 009 and what the app actually writes have parted — too narrow ' +
+      'and the journal cannot be saved, too wide and a broker column is writable ' +
+      'from the browser again');
+
+    // The app writes `deleted` outside OWNED, which is the whole reason the list
+    // is five. If that stopped being true the fifth grant would be dead.
+    const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    assert.match(src, /update\(\{ deleted: true \}\)/,
+      'nothing sets deleted any more, so 009 grants a column the app never writes');
+    assert.match(src, /update\(\{ deleted: false \}\)/, 'undo no longer clears deleted');
+  } finally { close(); }
+
+  /* verify.sql states the same five twice — once as the columns that must NOT be
+     writable (by exclusion) and once as the ones that must. Both are read here
+     rather than one, because the exclusion list is the half that silently stops
+     protecting anything: add a broker column to it and the check still says 0. */
+  for (const [what, re] of [
+    ['the exclusion list', /column_name not in\s*\n?\s*\(([^)]*)\)/],
+    ['the positive list',  /from unnest\(array\s*\n?\s*\[([^\]]*)\]\) col/],
+  ]) {
+    const m = verify.match(re);
+    assert.ok(m, `verify.sql no longer carries ${what} for the trades grant`);
+    const named = m[1].split(',').map(c => c.trim().replace(/^'|'$/g, '')).sort();
+    assert.deepEqual(named, granted,
+      `${what} in verify.sql names different columns from the grant in 009`);
+  }
+
+  // The revoke has to name PUBLIC as well as both roles. Revoking from one is
+  // not revoking from the others — the lesson `eugenia_search` cost 007.
+  assert.match(grants, /revoke insert, update, delete on public\.trades\s+from public, anon, authenticated;/,
+    '009 revokes from fewer than all three of PUBLIC, anon and authenticated, so ' +
+    'the privilege survives under whichever name was left out');
+});
+
 /* ─── Eugenia's note length ──────────────────────────────────────────────────
    The ceiling used to live in three places — the truncation, the constraint,
    and the sentence the tool description gives the model. Two of those are now

@@ -333,6 +333,7 @@ be single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
+| the **five columns the app may WRITE** | the `grant update (…)` in `009_trades_grants.sql`, and both lists in `verify.sql` — the exclusion and the positive one. Four of them are `Data.OWNED`; the fifth is `deleted`, which no tap or save may name but `remove()` and `undo()` write directly, so a grant list built from `Data.OWNED` alone reads as correct and takes soft delete out on the day it is applied |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its short/long P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, and the app's Long/Short label — narrowing the constraint refuses every SELL at PostgREST and the poller reports it to the console only |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes — her own turns are half of every pair, so a constraint that refuses `assistant` leaves a history of his messages alone |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
@@ -374,17 +375,34 @@ It also asserts the guarantee rather than only the lists: no broker column may
 appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
 rests on, tested rather than repeated.
 
-**And it is enforced in JavaScript, not in the database — deliberately.** The
-RLS policy on `trades` scopes rows to their owner and says nothing about
-columns, so a modified client signed in as the trader could write any column of
-its own rows. Column-level grants would close that, and the cost is a list of
-exactly which columns `authenticated` may write — `setup`, the three answers,
-`deleted`, `updated_at` — which is a fifth copy of the ownership boundary, in
-the one place nothing here can test, and getting it wrong silently breaks soft
-delete rather than failing loudly. The threat it would stop is a client that
-already holds the session token. So the boundary lives in one place in code,
-held by four tests, and this paragraph exists so that reads as a decision rather
-than as something nobody thought about.
+**And the database holds it too, since `009_trades_grants.sql`.** The RLS policy
+on `trades` scopes rows to their owner and says nothing about columns, so a
+client signed in as the trader could write any column of its own rows —
+`net_pnl`, `direction`, `fill_time`, every figure the app does not own and
+cannot repair. 009 revokes insert, update and delete on the table and grants
+back update on exactly five columns: `Data.OWNED`'s four, plus `deleted`.
+
+This paragraph used to argue the other way, and the argument is worth keeping
+because two thirds of it were dissolved rather than overruled. It said the grant
+list would be a fifth copy of the boundary *in the one place nothing here can
+test*, and that getting it wrong would *silently break soft delete rather than
+failing loudly*. Both are now false: `agree.test.mjs` reads the grant out of 009
+and both of `verify.sql`'s lists, holds all three against `Data.OWNED`, and goes
+red on a list that is too narrow, too wide, or drifting in either file. The
+missing-`deleted` case — the exact silent breakage that was predicted — is one
+of the five it is proved against.
+
+What was NOT dissolved is the value: the threat it stops is a client that
+already holds the session token, which is a narrow one. It is done because the
+cost fell away, not because the threat grew.
+
+`updated_at` is not in the grant, though the earlier version of this paragraph
+listed it. Column-level UPDATE is checked against the columns a statement names
+in its SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`, which
+needs no privilege of the caller's. That is the one claim here that no test in
+this repository can settle — `verify.sql` is what settles it, run against the
+live database after applying, and a save failing with a 403 is what a wrong
+answer would look like.
 
 ---
 
