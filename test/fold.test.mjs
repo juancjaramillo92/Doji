@@ -2261,10 +2261,45 @@ test('pre-sync rows are outside every population', () => {
   // §8's first filter. A client-id row has no prices and null timestamps, and
   // sweeping them in is how a hunt for broker-data problems fills with false
   // positives.
-  const old = { ...trade({ id: 'abc123', pnl: 100, entry_price: 4000, exit_price: 4012 }) };
-  for (const r of checkRules([old])) {
+  /* THE ROWS HAVE TO BE ABLE TO TRIP THE RULES, or this asserts nothing. An
+     earlier version passed one bare row — no entry_time, no open_day, no
+     fill_time — and every rule that needs one of those skipped it on that
+     ground rather than on its id. Removing isBroker from any single rule left
+     the test green, because the fixture could not reach the filter it was
+     written to check.
+
+     So these are real trades in every respect but their ids, and the second
+     half proves it: under broker ids the same rows produce verdicts. */
+  const rows = (id) => [
+    // A win that closed under $25 — R-01. Overlaps the next one — R-10.
+    trade({ id: `${id}a`, pnl: 100, entry_price: 4000, exit_price: 4012,
+            open_day: '2026-01-06', entry_time: '2026-01-06T10:00:00Z',
+            fill_time: '2026-01-06T15:00:00Z' }),
+    // A loss further than $20 from entry — R-02 — opened inside that span.
+    trade({ id: `${id}b`, pnl: -400, entry_price: 4000, exit_price: 3950,
+            open_day: '2026-01-06', entry_time: '2026-01-06T11:00:00Z',
+            fill_time: '2026-01-06T12:00:00Z' }),
+  ];
+
+  for (const r of checkRules(rows('abc'))) {
     assert.equal(r.verdict, 'unknown', `${r.rule} read a pre-sync row into its population`);
   }
+
+  // The anti-vacuity half: the identical rows under broker ids are seen.
+  const seen = checkRules(rows('PID')).filter(r => r.verdict !== 'unknown');
+  assert.ok(seen.length > 0,
+    'the fixture trips no rule even under a broker id, so the half above ' +
+    'proves nothing about the id filter');
+
+  /* AND THE ONE POPULATION checkRules DOES NOT REACH. dayStanding is what tells
+     her a day has passed its R-11 limit, and it takes the same filter for the
+     same reason — a client-id row carrying today's date would put money she
+     never lost today into the figure that stops him trading. */
+  assert.equal(dayStanding(rows('abc'), '2026-01-06'), null,
+    'a pre-sync row was counted into the day the loss limit is read over');
+  assert.ok(dayStanding(rows('PID'), '2026-01-06'),
+    'the same rows under a broker id must produce a standing, or the line ' +
+    'above is passing on the date rather than on the id');
 });
 
 test('the render names the failures and says how much was unknown', () => {
