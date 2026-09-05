@@ -127,6 +127,8 @@ Every move gets a line, whether it was made or refused.
 | The write-failure block, twice | M3 | golden byte-identical; helper proved red two ways |
 | The tool loop had 32 catch blocks and no execution test | net | every tool driven against four kinds of refusal; proved red on four handlers losing their catch |
 | Fourteen lines of the prompt were stated twice | M6 | removed; a guard on both prose files proved red on each |
+| The ten blocks had no execution test | net | driven against four refusals AND against success; proved red six ways |
+| Twenty reads of her tables, hand-written | M3 | −29 lines; a guard NAMES the three functions allowed to call fetch directly |
 
 ### Open
 
@@ -174,12 +176,17 @@ proved against a planted defect before its zero was believed:
 | per-call `Intl` construction | every runtime | fixed in the app and `journal.ts`; `checkRules` measured at 33ms over 400 rows and left |
 | CSS rules never emitted | the stylesheet | 0 |
 
-WHAT THE SWEEP DID NOT REACH is `doji-eugenia/index.ts`'s I/O layer: 35 throw
-sites and 32 catch blocks, in 3,863 lines whose read functions are neither
-exported nor executed by any test. The tool loop now has a net — every tool
-driven against four kinds of refusal — but the BLOCK readers that build her
-messages do not, and folding them without one would be a rewrite rather than a
-refactor. That is the next piece of work and it is a net before it is a fold.
+`doji-eugenia/index.ts` HAS NOW BEEN REACHED, net first and fold second. The
+twelve tools and the ten blocks are driven against four kinds of database
+refusal and against a database that answers; then twenty hand-written reads were
+folded into `readRows`, and a guard NAMES the three functions still allowed to
+call `fetch` directly — `readRows` itself, `fillEmbeddings`, which needs
+`content-range` off the response, and `healthBlock`, where a 404 is a supported
+state rather than a failure.
+
+The guard found six reads the fold had missed on its own: they threw the generic
+`HTTP ${status}` rather than the named form, so the grep that found the first
+fourteen never saw them.
 
 **Phase 4 is CLOSED and found nothing.** Fifty-eight top-level functions in the
 client, twenty-eight called exactly once — and every one of those is a render
