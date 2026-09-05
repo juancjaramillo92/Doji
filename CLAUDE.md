@@ -114,11 +114,13 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 444 tests, four suites
+npm test      # 448 tests, five suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
-needs. Four suites, and the script globs `test/*.test.mjs` one level, so a test
+needs, stated in `package.json`'s `engines` and ENFORCED by `engine-strict=true`
+in `.npmrc`: without that, `npm ci` installs on any version and the floor is a
+note. Five suites, and the script globs `test/*.test.mjs` one level, so a test
 in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
 of all four Edge Functions, of `_shared` and of `adherence.ts`; `app.test.mjs`
 boots `index.html` in jsdom with a recording Supabase stand-in that answers
@@ -127,10 +129,30 @@ vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
 Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
 suites.
 
+**`golden.test.mjs` is the fifth, and it asserts on what the other four do not
+name.** They test named things; a refactor breaks unnamed ones — an attribute
+order, a class that stopped being emitted, a label whose whitespace collapsed.
+It boots the real page against a fixed fixture set on a frozen clock
+(`boot({ now })`, frozen BEFORE the script runs, because `View.heatmap` is set
+from the clock at load) and compares every derived value and every panel's
+markup against `test/golden.json`. Regenerate deliberately and never to make a
+red run go away — `GOLDEN=write npm test`, in the same commit as the behaviour
+change, with the reason in the message. A golden file regenerated on failure
+costs what it always cost and proves nothing.
+
+Its fixtures earn their place by mutation rather than by looking realistic:
+three were added because a planted defect stayed green without them, and the
+one to keep in mind is the pair entered and closed in opposite orders — an
+ordering rule proved by rows that cannot disagree is the audit's own blind spot,
+and it recurred here.
+
 They do **not** cover pixels, realtime, auth or the xlsx export, and nothing
 here sees the live database: `verify.sql` is that check and a person runs it. So
 a good deal of what a change can break is only caught by reading. You cannot see
-pixels; say so on any visual change.
+pixels; say so on any visual change. The golden snapshot cannot see two of
+`esc`'s five replacements either, and for a structural reason rather than a
+fixable one: it captures `innerHTML`, which is the DOM re-serialised, so `"` and
+`'` come back literal in any text context. A direct test holds those.
 
 ---
 

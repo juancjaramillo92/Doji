@@ -31,13 +31,35 @@ const EXPOSED = [
   'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch'
 ];
 
-export async function boot() {
+export async function boot({ now } = {}) {
   const dom = new JSDOM(HTML, {
     url: 'https://doji.test/',
     runScripts: 'outside-only',
     pretendToBeVisual: true
   });
   const win = dom.window;
+
+  /* THE CLOCK IS FROZEN BEFORE THE SCRIPT RUNS, NOT AFTER, and the ordering is
+     the whole of it: the app reads the clock at LOAD time as well as at render
+     time. `View.heatmap` is set from `Dates.nyMonth()` while the script is
+     evaluating, so a clock frozen afterwards would leave the grid opened on
+     whatever month the machine happened to be in — and a golden file that moves
+     with the calendar is not a golden file, it is a diff nobody can read.
+
+     A subclass rather than a stub, because `Date` is called every other way in
+     this app too: `new Date(iso)`, `Date.UTC`, `Date.parse`. Only the no-arg
+     constructor and `now()` are answered; everything else is the real thing,
+     inherited. */
+  if (now != null) {
+    const Real = win.Date;
+    const fixed = typeof now === 'number' ? now : Real.parse(now);
+    if (!Number.isFinite(fixed)) throw new Error(`harness: cannot read now=${now}`);
+    class Frozen extends Real {
+      constructor(...a) { super(...(a.length ? a : [fixed])); }
+      static now() { return fixed; }
+    }
+    win.Date = Frozen;
+  }
 
   // Chart.js is optional by design — the app warns and degrades. Stubbing it
   // rather than omitting it keeps the wheel paths under test.
