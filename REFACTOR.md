@@ -123,6 +123,9 @@ Every move gets a line, whether it was made or refused.
 | A door existed that the README did not name | net + doc | 2 planted defects, both directions |
 | Vendor coupling (9.3) | read: three libraries pinned, two hashed, the third's absence documented; the two font hosts were not written down and now are |
 | `nyTime` named two different output shapes | M1 | output already pinned by a test asserting the card's line |
+| Three copies of the screen-reader-hiding rule | M12 | golden byte-identical; dead-rule scan still clean. PIXELS NOT VERIFIED |
+| The write-failure block, twice | M3 | golden byte-identical; helper proved red two ways |
+| The tool loop had 32 catch blocks and no execution test | net | every tool driven against four kinds of refusal; proved red on four handlers losing their catch |
 
 ### Open
 

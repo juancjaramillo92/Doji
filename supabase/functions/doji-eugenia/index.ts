@@ -1519,7 +1519,13 @@ const MAX_ROUNDS = 6;
    with a tool_result or the next request is a 400 — so a name no set serves
    gets a sentence saying so, which is also the only way that mistake would ever
    become visible rather than presenting as a turn that died. */
-async function serve(name: string, input: any): Promise<string> {
+/* Exported for the same reason `ask` below is: the rule this file repeats more
+   than any other — nothing served to the tool loop may throw — was asserted by
+   reading each handler's source and never by running one. A handler that gained
+   an uncaught path would read exactly like one that had not, and the briefing
+   it killed would be the first anyone heard of it. Driven against a database
+   that refuses, every tool has to come back with a sentence. */
+export async function serve(name: string, input: any): Promise<string> {
   switch (name) {
     case TRADES_TOOL.name:   return await readTrades(input.days);
     case CHECK_TOOL.name:    return await checkAdherence(input.days);

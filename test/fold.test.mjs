@@ -48,7 +48,7 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine,
+  positionsList, isOpen, healthLine, serve,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -3471,4 +3471,82 @@ test('a window where nothing fell back says nothing about it', () => {
   ]), 30);
   assert.doesNotMatch(out, /fell back/);
   assert.match(out, /net \$60\.00/, 'the total is still there');
+});
+
+/* ─── Nothing the tool loop serves may throw, driven rather than read ────────
+   This is the rule this file states more often than any other, and until now it
+   was held by reading each handler's source. Thirty-two catch blocks implement
+   it and not one of them had ever been executed by a test — so a handler that
+   gained an uncaught path would read exactly like one that had not, and the
+   briefing it killed would be the first anyone heard about it. That is the
+   shape `readTrades` already failed in once.
+
+   The database refuses in the four ways it actually refuses: a network that is
+   not there, a 500, a 404 — which is what an unapplied migration looks like —
+   and a 200 carrying something that is not JSON. Every tool the model can name
+   has to come back with a sentence in all four.
+
+   A user message missing the `tool_result` for a `tool_use` block is a 400, so
+   an empty answer is as fatal as a thrown one: the assertion is that something
+   was said, not merely that nothing exploded.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const TOOL_CALLS = [
+  ['get_trades',    { days: 7 }],
+  ['check_rules',   { days: 7 }],
+  ['get_stats',     { days: 7 }],
+  ['remember',      { note: 'a note', kind: 'fact' }],
+  ['search_memory', { query: 'anything' }],
+  ['get_strategy',  { section: '§4.1' }],
+  ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
+  ['get_market',    {}],
+  ['log_calendar',  { releases: [{ at: '2026-09-07T12:30:00Z', name: 'CPI', importance: 'high' }] }],
+  ['set_thesis',    { thesis: 'a reading' }],
+  ['open_loop',     { kind: 'question', body: 'a question' }],
+  ['close_loop',    { id: 1, resolution: 'answered' }],
+];
+
+const REFUSALS = {
+  'a network that is not there': () => { throw new TypeError('fetch failed'); },
+  'a 500':        () => new Response('upstream is unwell', { status: 500 }),
+  'a 404':        () => new Response('no such table',      { status: 404 }),
+  'JSON that is not': () => new Response('<html>a proxy page</html>',
+    { status: 200, headers: { 'content-type': 'application/json' } }),
+};
+
+// One test rather than four generated ones: the suite's own count is read off
+// `test(` declarations, and a test made in a loop is invisible to it — the
+// instruction would then state a number the suite does not run, which is the
+// exact drift that check exists to catch.
+test('every tool answers with a sentence however the database refuses', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  try {
+    for (const [how, refuse] of Object.entries(REFUSALS)) {
+      globalThis.fetch = async () => refuse();
+      for (const [name, input] of TOOL_CALLS) {
+        let answer;
+        await assert.doesNotReject(async () => { answer = await serve(name, input); },
+          `${name} threw when the database was ${how} — the tool loop dies with it ` +
+          `and the whole turn is lost, which is the failure readTrades had once`);
+        assert.equal(typeof answer, 'string',
+          `${name} answered with something that is not a string when the database was ${how}`);
+        assert.ok(answer.trim().length > 0,
+          `${name} answered with nothing when the database was ${how}. A user message ` +
+          `missing the tool_result for a tool_use block is a 400, so an empty answer ` +
+          `kills the turn as surely as a throw`);
+      }
+    }
+  } finally { globalThis.fetch = realFetch; console.error = realErr; }
+});
+
+test('a tool name the file has no handler for is answered, not thrown', async () => {
+  const realErr = console.error;
+  console.error = () => {};
+  try {
+    const answer = await serve('get_something_invented', {});
+    assert.match(answer, /no tool called/i,
+      'an unknown tool name must come back as a sentence — a mistyped name would ' +
+      'otherwise present as a dead turn rather than as a mistake');
+  } finally { console.error = realErr; }
 });
