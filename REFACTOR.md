@@ -162,13 +162,26 @@ step. The agreement test is the treatment and it exists.
 **Revisit if:** never, on current architecture.
 
 ### R-3 — deleting `MARKETS.sydney`
-**Why refused so far:** it IS dead — walked at fifteen-minute resolution across a
-year, Sydney is open without Tokyo at 5,112 instants and never once while London
-is open, so it cannot change what `sessionOf` returns. But `MARKETS` is held
-against `journal.ts` by an agreement test, so removing it is a cross-runtime
-change and belongs in the dead-code pass with everything else, not in the commit
-that discovered it.
-**Revisit if:** now — it is queued work, not a refusal.
+**Why refused:** it is dead by measurement — walked at fifteen-minute resolution
+across a year, Sydney is open without Tokyo at 5,112 instants and never once
+while London is open, so it cannot change what `sessionOf` returns. Deleting it
+was queued as ordinary dead-code work and is refused on looking at what it costs.
+
+Two reasons, and the second is the one that decides it.
+
+`isOpen(tokyo) || isOpen(sydney)` is a true statement about the world: it asks
+whether any Asian centre is open. Reducing it to Tokyo would make the code say
+something less true, adopted for no reason except an accident of four hour
+tables that DST moves twice a year.
+
+And the deletion takes a live sensor with it. The test asserting Sydney reaches
+nothing reads `MARKETS.sydney` to ask the question — remove the entry and the
+test goes with it, so the day London's open moves earlier or Sydney's close
+moves later, nothing says so. One line in two files is a poor price for the
+thing that would notice the domain shifting under the code.
+
+**Revisit if:** that test goes red, which is the event that makes the term live
+again — and then it is not dead code at all.
 
 ### R-4 — reordering the branches of `sessionOf`
 **Why refused:** unobservable. London, New York and an Asian centre are never
