@@ -663,3 +663,20 @@ select status_code, content, created
 from net._http_response
 order by created desc
 limit 10;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
+-- A SQL editor displays the result of the LAST statement, and this is it — so
+-- the fifty-seven checks that answer "does the database match the files" ran
+-- and were thrown away, and what is on screen instead is the last ten HTTP
+-- responses, which answer a different question entirely.
+--
+-- Go back to the top and run the summary block ALONE: select from
+-- `select check_name, actual, expected, ...` down to
+-- `) as t(check_name, actual, expected);`, and press Run. Read the `ok` column.
+--
+-- The summary is first rather than last on purpose and cannot simply be moved
+-- here: the listings between us can raise on a database missing an object, and
+-- anything that raises takes every statement after it. First, it always runs.
+-- The cost of that ordering is this note.
+-- ═══════════════════════════════════════════════════════════════════════════
