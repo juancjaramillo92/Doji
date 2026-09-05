@@ -2237,23 +2237,45 @@ const WRITERS: Record<string, string> = {
   email:  "the fill emails",
 };
 
-type Health = { id: string; last_ok: string | null; last_error: string | null };
+/* THE TWO WRITERS CANNOT BE JUDGED THE SAME WAY, and judging them the same way
+   is a monitor that cries wolf until it is ignored. The poller runs every two
+   minutes on a schedule, so its silence IS evidence — nothing ran. The email
+   function runs only when a fill arrives, so its silence is a quiet week, and a
+   staleness rule over it fires on almost every ordinary day.
+
+   So silence is read for the scheduled writer only. What is read for both is
+   the outcome of the LAST run: an error stamped after the most recent success
+   means the thing is failing now, whichever way it is triggered. */
+const SCHEDULED = new Set(["poller"]);
+
+type Health = {
+  id: string; last_ok: string | null; last_error: string | null; last_error_at: string | null;
+};
+
+const stamp = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
 export function healthLine(rows: Health[], now = Date.now()): string {
-  const cold = rows.filter(r => {
-    const at = r.last_ok ? Date.parse(r.last_ok) : NaN;
-    return !Number.isFinite(at) || now - at > STALE_HOURS * 3600_000;
-  });
-  if (!cold.length) return "";
+  const when = (s: string | null) => (s ? Date.parse(s) : NaN);
 
-  return "\nHis journal is not being written:\n" + cold.map(r => {
+  const bad = rows.filter(r => {
+    const ok = when(r.last_ok), failed = when(r.last_error_at);
+    // Its most recent outcome was a failure. `!(ok > failed)` rather than
+    // `ok < failed` so a writer that has never succeeded still counts.
+    if (Number.isFinite(failed) && !(ok > failed)) return true;
+    return SCHEDULED.has(r.id) &&
+      (!Number.isFinite(ok) || now - ok > STALE_HOURS * 3600_000);
+  });
+  if (!bad.length) return "";
+
+  return "\nHis journal is not being written:\n" + bad.map(r => {
     const name = WRITERS[r.id] ?? r.id;
-    const when = r.last_ok
-      ? `last completed a run at ${r.last_ok.slice(0, 16).replace("T", " ")} UTC`
-      : "has never completed a run";
-    // The error only where there is one — a writer that stopped being called
-    // has no error to show, and that is the more alarming of the two states.
-    return `· ${name} ${when}${r.last_error ? `; last error: ${r.last_error}` : ""}`;
+    const failing = r.last_error_at && !(when(r.last_ok) > when(r.last_error_at));
+    // Two different states and they read differently to him: a writer erroring
+    // is one he can see the reason for, a writer nobody is calling is not.
+    return failing
+      ? `· ${name} failed at ${stamp(r.last_error_at!)}: ${r.last_error ?? "no detail recorded"}`
+      : `· ${name} ${r.last_ok ? `last completed a run at ${stamp(r.last_ok)}`
+                               : "has never completed a run"}`;
   }).join("\n") +
   "\nSay this first, plainly. Trades may be missing from everything below.";
 }
@@ -2261,7 +2283,8 @@ export function healthLine(rows: Health[], now = Date.now()): string {
 async function healthBlock(): Promise<string> {
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error&order=id.desc&limit=5`,
+      `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error,last_error_at` +
+      `&order=id.desc&limit=5`,
       { headers: sbHeaders() });
     // A database without 008 answers 404 here, and that is a supported state:
     // the feature is inert until the file is applied rather than being a read

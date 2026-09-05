@@ -2075,6 +2075,24 @@ test('the two writers with no voice record both outcomes', () => {
       `${fn} never records a failure, so the only account of a run that failed ` +
       `at 03:00 is still a console nobody reads`);
 
+    /* AND EVERY PATH THAT COMPLETES MUST MARK, NOT ONLY THE LAST ONE. The
+       poller returns early when the market is closed, which is a completed run
+       by every measure the mark exists for — cron fired, the function is
+       deployed, its secrets loaded, it decided correctly. Unmarked, gold's
+       Friday-to-Sunday close freezes it for forty-eight hours against a
+       six-hour window and she reports the sync dead every Sunday evening.
+
+       A monitor that is wrong on an ordinary day gets ignored, and an ignored
+       monitor is worse than none. `healthLine` is pure and cannot see this —
+       it is handed rows — so the call site is read here instead. */
+    if (fn === 'doji-mcp-sync') {
+      const at = code.indexOf('skipped: "market closed"');
+      assert.ok(at > -1, 'doji-mcp-sync no longer skips a closed market');
+      assert.match(code.slice(Math.max(0, at - 600), at), /await heartbeat\("poller"\)/,
+        'the market-closed return does not mark a completed run, so the poller ' +
+        'reads as dead across every weekend');
+    }
+
     /* And it must be a name the table both ACCEPTS and SEEDS. Asked of the
        constraint rather than of the file, because the seed alone answers yes
        for a name the check would refuse — and both halves matter separately:
