@@ -451,6 +451,29 @@ select status_code, content, created
 from net._http_response order by created desc limit 10;
 ```
 
+### When a number looks wrong
+
+Every column has exactly one writer or a written arbitration rule, so the first
+question is always *who owns this*, and the second is *what does the repair
+overwrite*. Nothing here is guesswork: a wrong direction cannot be fixed in the
+app, because the app does not own the column.
+
+| The number | Who owns it | How to see the fault | The repair | What that repair also does |
+|---|---|---|---|---|
+| direction, entry time or price, exit price, size, commission, `computed_pnl`, filing day | the poller, alone | `?raw=1&hours=N` — what cTrader actually sent | `?force=1&hours=N` if the fold is wrong for a response that is right; a code change if the response itself is shaped differently | rewrites all ten of those columns for **every** position in the window, so any hand-correction inside it goes back |
+| `net_pnl` — the settled money figure | the email path, alone | the thread is unlabelled, so the next Apps Script run retries it | re-send the alert, or accept `computed_pnl` through `pnl` | nothing; the poller never writes this column |
+| a closed trade with `exit_price is null` | the poller, folded without its entry deal | that combination *is* the signature | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
+| `balance`, `planned_sl`, `planned_tp`, `fill_time` | two claimants, settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
+| setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
+| a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
+
+Two writers report failure to nobody. The poller and the email function have no
+path to Telegram: a 500, a refused write, or a cut deals page reaches
+`console.error` and stops there, and `pg_net` discards the response. So the
+absence of trades is the symptom, and the query above is where the answer is.
+Eugenia's scheduled half is the exception — it messages Telegram on failure and
+retries until the marker lands.
+
 ---
 
 ## Broker ingestion
