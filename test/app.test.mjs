@@ -413,6 +413,43 @@ test('an average is bucketed on the result label, never on the sign', () => {
   assert.equal(avgLoss, 30);
 });
 
+test('a bucket with nothing in it averages to nothing, never to zero', () => {
+  /* null and 0 are different claims — 0 says the average loss IS zero, which is
+     what a divide-by-zero produces once it has been coerced, and it is the
+     number the R:R bar then divides by. So the empty bucket is the case the
+     guard exists for, and it had never been driven. */
+  const px = (entry, exit, pnl) => trade({ entry_price: entry, exit_price: exit, pnl });
+  const range = (rows) => app.rangeStats(rows, '2000-01-01', '2100-01-01');
+
+  const noLosses = range([px(4500, 4560, 57), px(4500, 4540, 41)]);
+  assert.equal(noLosses.avgWin, 49);
+  assert.equal(noLosses.avgLoss, null, 'no losses yet is not an average loss of zero');
+
+  const noWins = range([px(4500, 4440, -30), px(4500, 4460, -20)]);
+  assert.equal(noWins.avgLoss, 25);
+  assert.equal(noWins.avgWin, null, 'no wins yet is not an average win of zero');
+
+  // A window of nothing but scratches decides neither bucket.
+  const allScratch = range([px(4500, 4502, 2), px(4500, 4498, -2)]);
+  assert.equal(allScratch.avgWin, null);
+  assert.equal(allScratch.avgLoss, null);
+});
+
+test('a run of wins with no loss behind it shows a ceiling, not a division', () => {
+  /* avgLoss is null there, and null coerces to 0 — so an unguarded ratio is
+     Infinity, which reaches the panel as "Infinity:1" and hands the segment
+     widths NaN. The cap is a ceiling and says so; what it must never be is a
+     computed value. */
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 57, entry_price: 4500, exit_price: 4560 }),
+    journalled({ id: 'PID2', open_day: '2026-07-30', pnl: 41, entry_price: 4500, exit_price: 4540 })
+  ]);
+  const rr = $('rr-bar-total').textContent;
+  assert.match(rr, /RR Ratio/);
+  assert.match(rr, /9\.99:1/, `the ratio was divided rather than capped: ${rr.trim()}`);
+  assert.doesNotMatch(rr, /Infinity|NaN/);
+});
+
 test('a range opens where the range before it closed', () => {
   /* The half-open bound is what makes that true: [start, end), so a trade
      filed ON the start day is inside the range rather than in its opening
