@@ -28,7 +28,11 @@ const EXPOSED = [
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'pctSplit', 'byKey', 'round2',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
-  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch'
+  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch',
+  // The undo window around a delete. Its rules are all about ORDER — stage
+  // finalising the previous one, a second undo being inert — and none of
+  // them is reachable through Data alone.
+  'PendingDelete'
 ];
 
 export async function boot({ now } = {}) {
@@ -121,7 +125,13 @@ export async function boot({ now } = {}) {
       eq: () => t, gte: () => t, lte: () => t, is: () => t, limit: () => t,
       then: (ok, no) => reply().then(ok, no),
       update(patch) { db.patches.push(patch); return t; },
-      single: () => Promise.resolve({ data: rows()[0] ?? null, error: null }),
+      // db.error honoured here as well as in maybeSingle. It was not, so any
+      // path ending in .single() — Data.save() and Data.restore() are both —
+      // had an unreachable failure branch: the stub answered success however
+      // the test was set up, and a test for the error path would have passed
+      // while proving the opposite of what it claimed.
+      single: () => Promise.resolve(
+        db.error ? { data: null, error: db.error } : { data: rows()[0] ?? null, error: null }),
       maybeSingle: () => Promise.resolve(
         db.error ? { data: null, error: db.error } : { data: rows()[0] ?? null, error: null }),
     };
