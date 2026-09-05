@@ -150,9 +150,10 @@ Three left, and none of them blocks a move:
 The prose pass has not run: a paragraph describing a removed thing is the same
 defect as a commented-out block.
 
-**Phase 3 — two duplication rows left.** The New York clock, in six files across
-four runtimes: audit which copies share a runtime, because only those are a real
-M4 and the rest keep their agreement test. Newest-first ordering, five reads.
+**Phase 3 — one duplication row left.** Newest-first ordering, five reads. The
+New York clock row is closed and is in the register as R-11: the count conflated
+five different questions, and the two that are genuinely one are already
+single-sourced.
 
 **Phases 4 to 7** — indirection, naming and section placement, comment register,
 Tier 3 structural moves. Not started.
@@ -224,6 +225,25 @@ is re-appliable. Tidying a drop backwards lets a re-run undo a later file.
 wanted a database — whether a BEFORE trigger's write needs a column grant — was
 answered on a throwaway Postgres and written down instead.
 **Revisit if:** a second and third such question appear.
+
+### R-11 — folding the New York clock into one definition
+**Why refused:** the nine copies are FIVE questions, not nine answers to one.
+
+The civil day is `nyDate` and the weekday-with-hour is `nyClock`; both live in
+`_shared/edge.ts` already and every Edge caller imports them. `nyWall` in
+`adherence.ts` is a superset — it needs minutes and the full date, which nothing
+else does, and its own comment says so where it is defined. `nyStamp`,
+`shortDay`, `nyTime` and `nyDayTime` are four DISPLAY shapes, not clocks. And
+`MARKETS.ny` is a pair of integers.
+
+So the fold is already done where it was possible, and what is left is not
+duplication. Moving `nyWall` into `_shared` to serve `nyClock` from one
+formatter would couple `adherence.ts` — deliberately pure, rows in and verdicts
+out — to a module whose top level reads the environment, in exchange for one
+formatter.
+
+**Revisit if:** a second caller ever needs wall-clock minutes, which is the
+condition `adherence.ts`'s own comment names.
 
 ### R-10 — regenerating `golden.json` to make a red run go away
 **Why refused:** a golden file regenerated on failure costs what it always cost,

@@ -158,8 +158,12 @@ comment.** Walked at fifteen-minute resolution across a year, London, New York
 and an Asian centre are never open together, so the order of the first two
 branches is unobservable; and Sydney is open without Tokyo at 5,112 instants but
 never while London is open, so `MARKETS.sydney` cannot change what `session()`
-returns — it is dead, and left in place because `MARKETS` is held against
-`journal.ts` and removing it is a cross-runtime change for the dead-code pass.
+returns. It STAYS, and not as pending work: `isOpen(tokyo) || isOpen(sydney)`
+asks whether any Asian centre is open, which is a true statement about the
+world, and reducing it to Tokyo would say something less true for no reason but
+an accident of four hour tables. The deletion would also take this test with
+it — it reads `MARKETS.sydney` to ask the question — and one line in two files
+is a poor price for the thing that would notice the domain shifting.
 Both are accidents of four hour-tables, not decisions, so the test exists to
 catch the day one of them wakes up in a commit about something else.
 
