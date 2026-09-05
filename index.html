@@ -2567,8 +2567,15 @@ function disciplineBar(label, followed, n) {
 // the setup columns are flex:1 with space-between and dropping one makes the
 // survivors stretch.
 function sessionBars(list) {
+  // Bucketed once rather than filtered per session. `sessionOf` is the
+  // expensive read here — four timezone lookups a trade — and asking it five
+  // times for every row is five times the work for one answer that cannot
+  // change between passes.
+  const bucket = new Map(CONFIG.SESSIONS.map(s => [s, []]));
+  for (const t of list) bucket.get(sessionOf(t))?.push(t);
+
   const rows = CONFIG.SESSIONS.map(s => {
-    const c = counts(list.filter(t => sessionOf(t) === s));
+    const c = counts(bucket.get(s));
     const decided = c.decided;
     const abbr = CONFIG.SESSION_ABBR[s];
     if (!decided) {

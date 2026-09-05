@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 464 tests, five suites
+npm test      # 465 tests, five suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`

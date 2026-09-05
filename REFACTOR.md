@@ -118,6 +118,7 @@ Every move gets a line, whether it was made or refused.
 | `verify.sql`'s footer counted wrong | net | 4 planted defects |
 | The clock built a formatter per call | M11 | measured: 460ms → 53ms per render at 400 trades, golden byte-identical |
 | `journalStats` had both faults at once | M11 | measured: 411ms → 1.2ms over 400 rows, output deep-compared against the old module |
+| `sessionBars` filtered once per session | M11 | golden byte-identical; the sessionless row now has its own test |
 
 ### Open
 
