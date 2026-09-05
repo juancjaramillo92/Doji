@@ -1939,6 +1939,59 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
    messages alone and she reads as though she had never answered.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── What Telegram is told to deliver ───────────────────────────────────────
+   `allowed_updates` is set once, by hand, outside this repository, and getting
+   it wrong fails in the way this system's registration mistakes always fail:
+   the update is simply never delivered. Eugenia needs both kinds — a message to
+   answer and a callback_query for the feedback keyboard under every briefing —
+   and her own dispatch says so in a comment beside the branch that handles them.
+
+   The setup runbook said `["message"]` alone, so a restore built from this file
+   would have come up with a briefing nobody could rate, the button spinning and
+   nothing reporting it. Two copies of one value, in a document and in a comment,
+   with the failure invisible from both.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the README registers each bot for the updates its code actually handles', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const wanted = {
+    'doji-eugenia': ['message', 'callback_query'],
+    'doji-gladys':  ['callback_query'],
+  };
+
+  for (const [fn, kinds] of Object.entries(wanted)) {
+    /* The registration block is the one that names the function's endpoint AND
+       the updates together — the endpoint alone appears in half a dozen other
+       sentences, and taking the first of those reads a paragraph about
+       something else and reports the registration missing. */
+    const line = [...readme.matchAll(new RegExp(`/functions/v1/${fn}`, 'g'))]
+      .map(m => readme.slice(m.index, m.index + 400)
+        .match(/allowed_updates\s*=\s*\[[^\]]*\]/))
+      .find(Boolean);
+    assert.ok(line,
+      `the README shows no allowed_updates beside any mention of ${fn}'s ` +
+      `endpoint — either the registration is gone or this reader is looking ` +
+      `in the wrong place`);
+
+    for (const kind of kinds) {
+      assert.ok(line[0].includes(kind),
+        `the README registers ${fn} without "${kind}" — that update is then ` +
+        `never delivered, and nothing anywhere reports it`);
+    }
+    /* And the code has to actually read every kind the README asks for — as a
+       PROPERTY of the update, not merely as a word somewhere in the file. A
+       bare word match passed for "poll", which appears in prose about the
+       poller; asking for `.poll` asks the question that was meant. */
+    const src = readFileSync(
+      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    for (const kind of [...line[0].matchAll(/"(\w+)"/g)].map(m => m[1])) {
+      assert.match(src, new RegExp(`\\.${kind}\\b`),
+        `the README registers ${fn} for "${kind}" and the function never reads ` +
+        `it off the update — Telegram would deliver it and nothing would act`);
+    }
+  }
+});
+
 /* ─── Every table stands behind RLS, and nothing was checking that ───────────
    The publishable key is in `index.html` and is meant to be. RLS is the only
    thing between it and every table in the schema — either a policy that scopes

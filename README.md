@@ -2971,7 +2971,10 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 11. For Eugenia: a second BotFather bot, `/start` it, and set
     `EUGENIA_BOT_TOKEN`, `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in
     Edge Function secrets. Point Telegram at `/functions/v1/doji-eugenia` with
-    that secret token and `allowed_updates=["message"]`. The API key comes from
+    that secret token and `allowed_updates=["message", "callback_query"]` —
+    both, because her briefings carry a feedback keyboard and a webhook
+    registered for messages alone never delivers the taps: the button spins and
+    nothing anywhere reports it. The API key comes from
     platform.claude.com — the same Anthropic account, billed as prepaid credits
     rather than a subscription. **Set a spend cap on that key**: it is the only
     place a bound on what she can cost is actually enforceable.
