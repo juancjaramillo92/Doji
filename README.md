@@ -397,12 +397,23 @@ already holds the session token, which is a narrow one. It is done because the
 cost fell away, not because the threat grew.
 
 `updated_at` is not in the grant, though the earlier version of this paragraph
-listed it. Column-level UPDATE is checked against the columns a statement names
+listed it. Column-level UPDATE is checked against the columns a statement NAMES
 in its SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`, which
-needs no privilege of the caller's. That is the one claim here that no test in
-this repository can settle — `verify.sql` is what settles it, run against the
-live database after applying, and a save failing with a 403 is what a wrong
-answer would look like.
+needs no privilege of the caller's.
+
+That was reasoning rather than a result, and it has since been run. On a
+throwaway Postgres 16 carrying this table, this trigger and 009's two statements
+verbatim, `set role authenticated` then a journal save SUCCEEDS and
+`updated_at` moves — with nothing granting that column to that role. The same
+save against `net_pnl` is refused, as are an insert and a hard delete, and the
+soft delete and its undo both pass. The refusals are what make the success worth
+having: a run where everything is permitted would prove only that the grants had
+not been applied.
+
+It is not in `npm test` and will not be. The suite installs jsdom and nothing
+else, and a database dependency would cost that for one assertion. What is on
+the live database is `verify.sql`'s business, and its three rows there answer the
+privileges rather than this — a privilege check is not a write.
 
 ---
 
