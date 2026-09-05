@@ -415,6 +415,24 @@ skipping on a phone does not consume the laptop's turn. A gesture-less download
 can be blocked silently with no API to detect it, so the toast asks you to verify
 rather than asserting success.
 
+**The backup is `trades` and nothing else, and the tables it leaves out are the
+ones that cannot be rebuilt.** Every broker column in `trades` exists in
+cTrader's history and a wide `?force=1` backfill reconstructs it; the journal
+columns and the soft-deleted rows are the part only this file holds, and those
+the backup does carry. Her memory is the other way round. `eugenia_notes`,
+`eugenia_turns`, `eugenia_channels`, `eugenia_thesis`, `eugenia_loops` and
+`eugenia_calendar` have no source anywhere else — the channel map is a year of
+teaching with a `moved_on` date per rung, and the calendar is the one dataset
+here that compounds — and no button in this app reaches them.
+
+That is not a bug in the backup. `003` denies the publishable key her notes and
+turns deliberately, and `005` grants the app a read on only three of her tables,
+so an in-app backup structurally cannot include them and should not be given the
+policy that would let it. It means the mechanism has to live at the database
+instead — Supabase's own backups, or a scheduled dump of the `eugenia_*`
+tables — and until one is turned on, losing the project loses everything she
+knows about him while the trades come back in full.
+
 **Signing out** is a double-click on the sync dot.
 
 **If a trade does not appear**, the cron reporting `succeeded` proves nothing —
