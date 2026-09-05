@@ -816,6 +816,16 @@ test('every workflow takes its Node version from the one file that states it', (
     'package.json no longer states a Node floor, so node-version-file resolves ' +
     'to nothing and every workflow below is reading an empty decision');
 
+  // engines on its own is a note npm prints past — proved by raising the floor
+  // to >=99 and watching `npm ci` install happily. engine-strict is what turns
+  // it into a gate, on a runner and on a laptop alike, which is also what makes
+  // a green CI run evidence that the Node installed is above the floor rather
+  // than evidence that the workflow parsed.
+  const npmrc = readFileSync(new URL('../.npmrc', import.meta.url), 'utf8');
+  assert.match(npmrc, /^engine-strict\s*=\s*true$/m,
+    '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
+    'and npm installs on any version without a word');
+
   for (const { path, text } of WORKFLOWS) {
     // Anchored to setup-node: a `node-version` under any other step is not this.
     assert.ok(/actions\/setup-node/.test(text), `${path} no longer sets Node up at all`);

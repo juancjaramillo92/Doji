@@ -3127,7 +3127,15 @@ npm ci               # once — jsdom, and nothing else
 npm test
 ```
 
-Node 22.22.2 or newer — stated in `package.json`'s `engines` as well as here.
+Node 22.22.2 or newer — stated in `package.json`'s `engines`, enforced by
+`engine-strict=true` in `.npmrc`, and repeated here. The enforcement is the half
+that was missing: `engines` on its own is a note npm prints past, so the floor
+held on every machine by luck rather than by a check, and the first sign of
+running below it would have been jsdom failing somewhere that looks unrelated.
+With the gate in place `npm ci` refuses outright — which also makes the CI run
+the proof that the runner installed a Node above the floor, rather than a green
+tick that says the workflow parsed.
+
 It is jsdom that sets that floor, not the app: `--experimental-strip-types` has
 worked since 22.6, and jsdom 30 declares `^22.22.2`. The number worth writing
 down is the one at which everything in the repository actually runs;
