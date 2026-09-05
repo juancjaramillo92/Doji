@@ -3027,7 +3027,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     wkN++;
     const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN, wkBe);
     const count = wkTrades ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
-    const abs   = Math.abs(round2(wkPnl)).toFixed(2);
+    const abs   = fmtMoney(wkPnl);
     // Separate spans so the phone stylesheet can drop the tail.
     const pnl   = wkPnlN ? `$${abs.slice(0, -3)}<span class="hm-cents">${abs.slice(-3)}</span>`
                 : wkTrades ? '—' : '';
@@ -3053,7 +3053,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     if (data.pending) cls += ' pending';
     if (iso === today) cls += ' today';
 
-    const pnlText   = data.pnlN ? '$' + Math.abs(data.pnl).toFixed(2) : n ? '—' : '';
+    const pnlText   = data.pnlN ? '$' + fmtMoney(data.pnl) : n ? '—' : '';
     const countText = n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
     // Focusable only when the cell opens something, or thirty-one tab stops sit
     // in front of the trade log.
@@ -3123,7 +3123,7 @@ function renderYearStrip(y, selMonth, totals) {
     const cls = ['hm-mo'];
     if (t.trades) cls.push(aggregateResult(t.net, t.pnlN, t.be));
     if (m === selMonth) cls.push('sel');
-    const pnl = t.pnlN ? '$' + Math.abs(t.net).toFixed(2) : (t.trades ? '—' : '');
+    const pnl = t.pnlN ? '$' + fmtMoney(t.net) : (t.trades ? '—' : '');
     return `
       <div class="${cls.join(' ')}" data-month="${m}" role="button" tabindex="0"
            aria-label="${CONFIG.MONTHS_ABBR[m]} ${y}">
