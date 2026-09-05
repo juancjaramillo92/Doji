@@ -2036,6 +2036,100 @@ test('the README registers each bot for the updates its code actually handles', 
   }
 });
 
+/* ─── verify.sql has to ask about everything the files declare ───────────────
+   The numbered files are a CLAIM about the database and verify.sql is the only
+   thing that tests it, so an object declared and never asked about is drift in
+   the part nobody checks. It was 25 of 39: eleven indexes and the three policies
+   the dashboard card reads were declared and never asked about, and RLS was
+   asserted for four of ten tables.
+
+   Every one of those fails silently by construction. A missing `*_app_read`
+   policy is not an error — RLS does exactly its job and the card shows nothing,
+   which looks like a quiet week. A missing index is not an error either: the
+   query returns the same rows off a sequential scan and gets slower every week.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// NUMBERED is already the numbered files as one string, read at the top of this
+// file for the same reason it is needed here.
+const VERIFY = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+test('verify.sql asks about every table, policy and index the files declare', () => {
+  const tables = [...NUMBERED.matchAll(/create table (?:if not exists )?public\.(\w+)/g)].map(m => m[1]);
+  const policies = [...NUMBERED.matchAll(/create policy (\w+) on/g)].map(m => m[1]);
+  const indexes = [...NUMBERED.matchAll(/create index (?:if not exists )?(\w+)/g)].map(m => m[1]);
+  assert.ok(tables.length >= 8 && indexes.length >= 8,
+    `read ${tables.length} tables and ${indexes.length} indexes — the reader has gone blind`);
+
+  for (const t of tables) {
+    assert.match(VERIFY, new RegExp(`RLS on ${t}\\b`),
+      `verify.sql never asks whether public.${t} has RLS on, and RLS is the ` +
+      `only thing between it and the publishable key`);
+  }
+  for (const p of policies) {
+    assert.ok(VERIFY.includes(p),
+      `verify.sql never asks for policy ${p} — without it RLS denies the app ` +
+      `and the card shows nothing, which looks exactly like a quiet week`);
+  }
+  for (const i of indexes) {
+    assert.ok(VERIFY.includes(i),
+      `verify.sql never asks for index ${i} — a missing index is not an error, ` +
+      `it is the same rows off a sequential scan, slower every week`);
+  }
+
+  /* AND THE EXPECTED STRING IS THE LIST ITSELF. The row names every index, so
+     the row is a second copy of what the SQL declares — held here rather than
+     left to be noticed when someone runs the file. */
+  const expected = [...new Set(indexes)].sort().join(',');
+  const stated = (VERIFY.match(/\('every declared index exists',[\s\S]*?\n   '([\s\S]*?)'\)/) || [])[1];
+  assert.ok(stated, "verify.sql has no 'every declared index exists' row");
+  assert.equal(stated.replace(/' \|\|\s*'/g, '').replace(/\s+/g, ''), expected,
+    'the index row and the create index statements name different sets');
+});
+
+/* ─── A summary row may come back false; it may never throw ──────────────────
+   An error in verify.sql is not a failed row, it is a file that STOPPED —
+   taking every check below it and reporting a correct database as a broken one.
+   That has happened once already, to a written-out function signature.
+
+   The shape that does it is a summary row reading a public table DIRECTLY:
+   Postgres parses the whole statement up front, so a table that is not there
+   raises 42P01 rather than answering. Three seed checks did exactly that. They
+   have to read the table — that is what a seed check is — so they read it
+   through `query_to_xml`, which takes its query as a string and is guarded by
+   `to_regclass`, and answer NULL when the table is absent.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no summary row reads a table in a way that would throw', () => {
+  const from = VERIFY.indexOf('from (values');
+  const to = VERIFY.indexOf(') as t(check_name, actual, expected);');
+  assert.ok(from > -1 && to > from, 'verify.sql no longer has one summary block');
+  const summary = VERIFY.slice(from, to);
+
+  /* Comments first, then string literals — in that order. A `--` comment in
+     this file routinely carries an apostrophe ("the poller's answer"), in a
+     dash comment and in a block comment alike, and a single unpaired quote
+     desynchronises literal matching for everything after it — which had this
+     reading `to_regclass('public.eugenia_channels')` as a live table read. */
+  const unquoted = summary
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--[^\n]*/g, '')
+    .replace(/'(?:[^']|'')*'/g, "''");
+  /* Any schema, not only `public`. `cron.job` is the same hazard wearing an
+     extension's name: on a database without pg_cron a direct read raises, and
+     "that never happens on Supabase" is how a row ends up runnable in exactly
+     one place. The catalogs — pg_class, pg_proc, pg_policy, pg_indexes,
+     information_schema — are always there and are what the rest of the file
+     asks. */
+  const direct = [...unquoted.matchAll(/from\s+(public|cron|net|vault)\.(\w+)/g)]
+    .map(m => `${m[1]}.${m[2]}`);
+  assert.deepEqual(direct, [],
+    `the summary reads ${direct[0]} directly — on a database missing it that is ` +
+    `a raise, and one raise takes all of the checks with it`);
+
+  // The catalogs are the safe way to ask, and to_regclass answers null.
+  assert.match(summary, /to_regclass/, 'the summary no longer asks by oid at all');
+});
+
 /* ─── Every table stands behind RLS, and nothing was checking that ───────────
    The publishable key is in `index.html` and is meant to be. RLS is the only
    thing between it and every table in the schema — either a policy that scopes

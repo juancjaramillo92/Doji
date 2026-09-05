@@ -56,8 +56,22 @@ from (values
   -- primary key — so a missing row is a 200 with an empty array and every
   -- rewrite is dropped. The function reports that back to her; nothing reaches
   -- him. Exactly the eugenia_channels seeding failure, in a second place.
+  -- READ THROUGH query_to_xml, NOT DIRECTLY, and this is the whole reason. A
+  -- plain `select count(*) from public.eugenia_thesis` is PARSED with the rest
+  -- of the statement, so on a database that never got 005 it does not report a
+  -- missing table — it raises 42P01 and takes all fifty-three checks above and
+  -- below it with it, and the run then reads as a broken database rather than
+  -- as a missing one. That is the same failure the dead `eugenia_search(text,
+  -- int)` signature caused, in a second shape. query_to_xml takes its query as
+  -- a STRING, so nothing is parsed until it runs, and the to_regclass guard
+  -- means it never runs when the table is absent: the row answers NULL, which
+  -- is false against its expected value. A seed check has to read the table —
+  -- that is what it is for — so this is how it reads it.
   ('the thesis row is seeded',
-   (select count(*)::text from public.eugenia_thesis where id = 'current'),
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from public.eugenia_thesis where id = ''current''',
+             false, true, '')))[1]::text
+     where to_regclass('public.eugenia_thesis') is not null),
    '1'),
 
   -- And the price mark, for the same reason and with the same failure: markPrice
@@ -65,7 +79,10 @@ from (values
   -- never advances, and the price sense answers "no mark yet" forever — which is
   -- also what it answers on a genuinely quiet market.
   ('the price mark row is seeded',
-   (select count(*)::text from public.eugenia_price where id = 'current'),
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from public.eugenia_price where id = ''current''',
+             false, true, '')))[1]::text
+     where to_regclass('public.eugenia_price') is not null),
    '1'),
 
   -- Without pg_trgm the `<%` operator does not exist, so eugenia_search fails
@@ -216,7 +233,10 @@ from (values
   -- channel he has genuinely never used looks like. Every night, reported to
   -- nobody.
   ('all five channels are seeded',
-   (select count(*)::text from public.eugenia_channels),
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from public.eugenia_channels',
+             false, true, '')))[1]::text
+     where to_regclass('public.eugenia_channels') is not null),
    '5'),
 
   -- Without this the view reads `trades` with its owner's rights, and what RLS
@@ -349,8 +369,18 @@ from (values
   -- four, so a correct database reported a mismatch and the row that exists to
   -- catch a missing job was the thing that looked broken. Count 004's
   -- cron.schedule calls when this changes.
+  --
+  -- Read through query_to_xml for the reason the seed checks are: `cron.job`
+  -- lives in an extension's schema, and on a database where pg_cron is not
+  -- installed a direct read raises rather than reporting. That is not the
+  -- target database — Supabase always has it — but a row that can only be run
+  -- somewhere is a row that cannot answer anywhere else, and this file's whole
+  -- job is to be runnable against a database that is wrong.
   ('five cron jobs, all active',
-   (select count(*)::text from cron.job where active),
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from cron.job where active',
+             false, true, '')))[1]::text
+     where to_regclass('cron.job') is not null),
    '5'),
 
   -- THE SECRET NAME, WHICH USED TO BE READ BY EYE AND IS THE FAILURE THIS
@@ -359,8 +389,10 @@ from (values
   -- give up without raising anything. Every calling job must name the lower-case
   -- one; purge-cron-history is a DELETE and presents no secret.
   ('all four calling jobs read the lower-case Vault secret',
-   (select count(*)::text from cron.job
-     where command like '%''doji_cron_secret''%'),
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from cron.job where command like ''%''''doji_cron_secret''''%''',
+             false, true, '')))[1]::text
+     where to_regclass('cron.job') is not null),
    '4'),
   -- The third caller, and the one that actually shipped with the upper-case
   -- spelling. It is a function body rather than a job, so it needs its own row.
@@ -375,7 +407,96 @@ from (values
    (select (pg_get_constraintdef(oid) like '%Break & Retest%'
         and pg_get_constraintdef(oid) like '%Support & Resistance%')::text
       from pg_constraint where conname = 'trades_setup_check'),
-   'true')
+   'true'),
+
+  -- ─── The six tables 005 adds ─────────────────────────────────────────────
+  -- Asked by NAME rather than as a count of tables with RLS on, because five is
+  -- still five when one is renamed and another added. Each is `to_regclass`, so
+  -- a table that is not there answers NULL and the row reads false rather than
+  -- taking the file down.
+  --
+  -- These carry no user_id and no policy scoped to one, so RLS is the whole of
+  -- the answer to the publishable key: on, it denies; off, the table simply
+  -- answers whoever opens the page.
+  ('RLS on eugenia_runs',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),
+   'true'),
+  ('RLS on eugenia_calendar',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_calendar')),
+   'true'),
+  ('RLS on eugenia_thesis',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_thesis')),
+   'true'),
+  ('RLS on eugenia_loops',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_loops')),
+   'true'),
+  ('RLS on eugenia_feedback',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_feedback')),
+   'true'),
+  ('RLS on eugenia_price',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_price')),
+   'true'),
+
+  -- ─── The three the dashboard card reads ──────────────────────────────────
+  -- RLS on with no policy denies outright, which is right for her notes and
+  -- wrong for these: the card reads them with the publishable key, so each one
+  -- needs its select policy BY NAME. Missing, RLS does its job and the card
+  -- silently shows nothing — a failure that looks exactly like a quiet week.
+  ('eugenia_calendar has its app read policy',
+   (select count(*)::text from pg_policy
+     where polrelid = to_regclass('public.eugenia_calendar')
+       and polname = 'eugenia_calendar_app_read'),
+   '1'),
+  ('eugenia_thesis has its app read policy',
+   (select count(*)::text from pg_policy
+     where polrelid = to_regclass('public.eugenia_thesis')
+       and polname = 'eugenia_thesis_app_read'),
+   '1'),
+  ('eugenia_loops has its app read policy',
+   (select count(*)::text from pg_policy
+     where polrelid = to_regclass('public.eugenia_loops')
+       and polname = 'eugenia_loops_app_read'),
+   '1'),
+
+  -- ─── The four indexes the search actually rides on ───────────────────────
+  -- Both arms of the hybrid degrade to a sequential scan over the archive
+  -- without these, and a sequential scan is CORRECT — it returns the same rows
+  -- and simply gets slower every week, which is the shape of failure nothing
+  -- ever reports. Named rather than counted, for the reason above.
+  ('both trigram indexes exist',
+   (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
+      from pg_indexes where schemaname = 'public'
+       and indexname in ('eugenia_notes_trgm', 'eugenia_turns_trgm')),
+   'eugenia_notes_trgm,eugenia_turns_trgm'),
+  ('both embedding indexes exist',
+   (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
+      from pg_indexes where schemaname = 'public'
+       and indexname in ('eugenia_notes_embedding', 'eugenia_turns_embedding')),
+   'eugenia_notes_embedding,eugenia_turns_embedding'),
+
+  -- ─── And every index the numbered files create ───────────────────────────
+  -- Named in full rather than counted, because fourteen is still fourteen when
+  -- one is renamed and another added — the same reason the trigger row below
+  -- lists its five. An index missing here is never an error: the query returns
+  -- the same rows off a sequential scan and simply gets slower as the table
+  -- grows, which is the one kind of fault that never announces itself.
+  --
+  -- agree.test.mjs builds this list out of the `create index` statements and
+  -- fails if it disagrees with the string below, so adding an index to the SQL
+  -- and not to this row is caught before anyone has to run the file.
+  ('every declared index exists',
+   (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
+      from pg_indexes where schemaname = 'public' and indexname in (
+        'eugenia_calendar_at','eugenia_calendar_due','eugenia_loops_open',
+        'eugenia_notes_embedding','eugenia_notes_kind_id_desc','eugenia_notes_search',
+        'eugenia_notes_trgm','eugenia_runs_at_desc','eugenia_runs_caller_at',
+        'eugenia_turns_embedding','eugenia_turns_id_desc','eugenia_turns_search',
+        'eugenia_turns_trgm','trades_user_open_day')),
+   'eugenia_calendar_at,eugenia_calendar_due,eugenia_loops_open,' ||
+   'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
+   'eugenia_notes_trgm,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
+   'eugenia_turns_embedding,eugenia_turns_id_desc,eugenia_turns_search,' ||
+   'eugenia_turns_trgm,trades_user_open_day')
 ) as t(check_name, actual, expected);
 
 -- ─── Tables and views ──────────────────────────────────────────────────────

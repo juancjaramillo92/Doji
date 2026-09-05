@@ -895,6 +895,28 @@ and what could not be verified.
   reads the file for both. The same care goes for any new row: it must be able
   to come back FALSE on a wrong database rather than throw.
 
+  THE SECOND SHAPE OF THAT IS A SUMMARY ROW READING A PUBLIC TABLE DIRECTLY, and
+  three seed checks did. Postgres parses the whole statement up front, so
+  `select count(*) from public.eugenia_thesis` does not report a missing table —
+  it raises 42P01 and takes all fifty-four checks with it. A `case` guard does
+  not help, because both branches are parsed. `query_to_xml` does: it takes its
+  query as a STRING, so nothing is parsed until it runs, and a `to_regclass`
+  guard beside it means it never runs when the table is absent. A seed check has
+  to read the table — that is what it is for — so that is how it reads it, and
+  `agree.test.mjs` asserts no summary row reads `public.` outside a quoted
+  query. It strips block comments AND dash comments before it looks: an
+  apostrophe in either desynchronises quote matching for everything after it,
+  and the check then reads a guarded string as live SQL.
+
+  AND WHAT IT ASKS ABOUT IS HELD AGAINST THE FILES. It asserted 25 of 39
+  declared objects — eleven indexes and the three policies the card reads were
+  never asked about, and RLS was asserted for four of ten tables. Each fails
+  silently by construction: a missing policy is RLS doing its job and a card
+  showing nothing, a missing index is the same rows off a sequential scan.
+  `agree.test.mjs` now reads every `create table`, `create policy` and `create
+  index` in the numbered SQL against this file, and holds the index row's list
+  against the statements themselves.
+
   AND A ROW THAT COUNTS GOES STALE WHERE A ROW THAT NAMES DOES NOT. Below that
   same dead line sat `three triggers on trades` — 001's touch and 002's two —
   which 005 made wrong by adding the event spine's two, so the first run it ever
