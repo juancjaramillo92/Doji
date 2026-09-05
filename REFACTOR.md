@@ -116,19 +116,22 @@ Every move gets a line, whether it was made or refused.
 | Soft delete and undo (audit 4.9) | net | 9 planted defects, one reachable only by driving the timer |
 | The journal/broker boundary in the database | Tier 3 | 6 planted defects; run against a real Postgres 16 |
 | `verify.sql`'s footer counted wrong | net | 4 planted defects |
+| The clock built a formatter per call | M11 | measured: 460ms → 53ms per render at 400 trades, golden byte-identical |
 
 ### Open
 
 **Phase 0.2 — pure-logic goldens.** `Dates.session` has one. `foldPosition`, the
 email parser and `adherence.ts` do not.
 
-**Phase 1C — six audit checks never run.** Each gates a later phase:
+**Phase 1C — audit checks.** Render complexity (7.7) has RUN: render is linear
+in trades, confirmed by measurement at 200 → 3200 rows, so there is no nested
+scan. It did surface the constant instead — see the ledger row above. Five left,
+each gating a later phase:
 
 | Check | Gates |
 |---|---|
 | primitive reuse | all client component work |
 | defensive padding | M8 anywhere |
-| render complexity | M11 anywhere |
 | empty states | any render restructure |
 | doc coverage, both directions | the documentation phase |
 | vendor coupling | nothing — do it when convenient |

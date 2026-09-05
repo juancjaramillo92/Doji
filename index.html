@@ -1874,10 +1874,17 @@ const Dates = {
   // the ?. and ?? everywhere else here. An engine below it IGNORES the option
   // and en-US falls back to h12, so hours arrive 1–12 and every session label
   // and every 17:00 boundary is wrong without saying so.
+  /* BUILDING one of these is what costs; formatting with it is cheap, and it
+     holds no state between calls. There are four timezones in MARKETS and this
+     was constructing a formatter per call — `sessionBars` alone asked for
+     sixteen thousand of them per render, which is most of what a render spent
+     its time on. Built on first use and kept. */
+  HOUR_FMT: {},
+
   hourIn(tz, date) {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' })
-      .formatToParts(date);
-    return +parts.find(p => p.type === 'hour').value;
+    const fmt = Dates.HOUR_FMT[tz] ??= new Intl.DateTimeFormat('en-US',
+      { timeZone: tz, hour: '2-digit', hourCycle: 'h23' });
+    return +fmt.formatToParts(date).find(p => p.type === 'hour').value;
   },
 
   isOpen(mkt, date) {
@@ -1902,8 +1909,10 @@ const Dates = {
 
   // DST-correct. The one place weekday and hour are read, so every boundary
   // below agrees by construction.
+  NY_FMT: null,
+
   nyParts(date) {
-    const fmt = new Intl.DateTimeFormat('en-US', {
+    const fmt = Dates.NY_FMT ??= new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/New_York', weekday: 'short',
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
