@@ -602,6 +602,10 @@ Reading the journal correctly:
   moved. Do not invert that.
 · null is unanswered and is NOT "no". Every fill arrives with all three null, so
   a blank never counts as a miss.
+· followed_sl and followed_tp are answered at OPEN, before either level is near,
+  so they record intent and bias upward: a stop he failed to move but never went
+  back to correct reads as compliance. Never present either as a measured rate
+  without saying it is self-reported at open.
 · Break-even is an exit within $3 of the entry PRICE, at any lot size — not a
   P&L band. Win and loss are the sign of pnl. Break-evens sit in the denominator
   of a win rate, so scratches drag it down rather than vanishing.

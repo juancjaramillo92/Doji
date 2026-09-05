@@ -886,6 +886,14 @@ made on the occasions it is needed — a missed edit reads as compliance, so tho
 two bars bias upward and nothing in the data shows it. It is the same shape as
 the `null`-is-not-`no` rule: an answer nobody gave must not be counted as one.
 
+It is said at all three places the columns are used, not only here. The trigger
+that asks the question carries it; `disciplineBars` carries it, because that is
+where the figure is produced and a schema comment is not in front of anyone
+reading a renderer; and Eugenia's prompt carries it, because she is served both
+columns through `eugenia_trades` and could otherwise report a stop-discipline
+rate as a measurement. `agree.test.mjs` reads the prompt for it — deleting the
+paragraph breaks nothing else, and the rate she gives still reads as a fact.
+
 **Two failure modes are coded for rather than discovered.** A double tap sends
 the identical update twice and the second `editMessageText` returns `400 message
 is not modified` — the correct outcome, reported as an error, and treated as

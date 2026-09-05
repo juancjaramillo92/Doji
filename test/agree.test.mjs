@@ -636,6 +636,29 @@ test('the prompt keeps his levels out of a message she starts', () => {
     'is the one thing the block was not built to enable');
 });
 
+test('she is told which two discipline columns lean, and where they lean', () => {
+  /* THE BIAS IS A PROPERTY OF THE COLUMN, NOT OF THE READING. followed_sl and
+     followed_tp are answered seconds after the fill, so they say what he meant
+     to do; they measure respect only where he goes back and corrects one, and a
+     correction he never made reads as compliance. Nothing on the row separates
+     the two.
+
+     It was stated at the trigger that asks the question and in the README's
+     account of it, and in neither place a reader of the FIGURE would look — so
+     she could report a stop-discipline rate off the view with no idea it leans,
+     which is the same failure as presenting a judgment rule's silence as a pass.
+     Read here because there is no structural half: delete the paragraph and
+     nothing breaks, and the number she gives still reads as a measurement. */
+  const said = SYSTEM.replace(/\s+/g, ' ');
+
+  assert.match(said, /answered at OPEN/,
+    'the prompt no longer says the two stop and target answers are given at ' +
+    'open, so she has no reason to doubt a rate computed from them');
+  assert.match(said, /bias(es)? upward|lean/,
+    'the prompt names when the answers are given but not which way that pushes ' +
+    'them, which is the half that changes what she may claim');
+});
+
 test('the nightly pass is told a demotion is his to declare', () => {
   /* The tool permits it and the prompt is what asks for it. Silence here is the
      shape this defect had for its whole life: a mechanism that exists, is
