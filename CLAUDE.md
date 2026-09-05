@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 448 tests, five suites
+npm test      # 449 tests, five suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -145,6 +145,23 @@ three were added because a planted defect stayed green without them, and the
 one to keep in mind is the pair entered and closed in opposite orders — an
 ordering rule proved by rows that cannot disagree is the audit's own blind spot,
 and it recurred here.
+
+It also SWEEPS `Dates.session` rather than sampling it, over six windows chosen
+around both US and both EU changeovers, and records the transitions. New York
+and London do not change on the same date, so for three weeks a year the
+London+NY overlap sits an hour off where it sits the rest of the time — and a
+spot check at 14:00 on a Tuesday in July gets the right answer under almost any
+mistake in those tables.
+
+**Two branches of `session()` decide nothing, and a test says so rather than a
+comment.** Walked at fifteen-minute resolution across a year, London, New York
+and an Asian centre are never open together, so the order of the first two
+branches is unobservable; and Sydney is open without Tokyo at 5,112 instants but
+never while London is open, so `MARKETS.sydney` cannot change what `session()`
+returns — it is dead, and left in place because `MARKETS` is held against
+`journal.ts` and removing it is a cross-runtime change for the dead-code pass.
+Both are accidents of four hour-tables, not decisions, so the test exists to
+catch the day one of them wakes up in a commit about something else.
 
 They do **not** cover pixels, realtime, auth or the xlsx export, and nothing
 here sees the live database: `verify.sql` is that check and a person runs it. So

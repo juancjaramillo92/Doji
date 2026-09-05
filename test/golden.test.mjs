@@ -272,6 +272,48 @@ const PANELS = [
   'setup-table', 'roll-forward', 'trade-table', 'tlog-pagination', 'watch-card',
 ];
 
+/* ─── The session map, swept rather than sampled ─────────────────────────────
+   `sessionOf` is four market windows and a precedence order, and every one of
+   those is a table of hours that DST moves twice a year — on different dates in
+   New York and London. The three weeks where the two are out of step are where
+   the London+NY overlap shifts by an hour, and they are the only place a wrong
+   boundary shows up as a wrong session rather than as nothing at all.
+
+   Spot-checked, that is invisible: a test that asks about 14:00 on a Tuesday in
+   July gets the same answer under almost any plausible mistake. So this walks
+   the clock and records the TRANSITIONS — the instant each session gives way to
+   the next — which is the whole content of the rule in a form a human can read
+   in a diff. The windows below are chosen, not arbitrary: both US changeovers,
+   both EU ones, and one ordinary week from each half of the year to prove the
+   steady state has not moved either.
+   ─────────────────────────────────────────────────────────────────────────── */
+const SWEEPS = [
+  ['us-spring',  '2026-03-07', 4],   // US forward 8 Mar; EU has not yet
+  ['eu-spring',  '2026-03-28', 4],   // EU forward 29 Mar; the two re-align
+  ['eu-autumn',  '2026-10-24', 4],   // EU back 25 Oct; out of step again
+  ['us-autumn',  '2026-10-31', 4],   // US back 1 Nov
+  ['winter',     '2026-01-19', 7],   // an ordinary week, both on standard time
+  ['summer',     '2026-07-13', 7],   // an ordinary week, both on summer time
+];
+
+function sweepSessions(app) {
+  const out = {};
+  for (const [name, from, days] of SWEEPS) {
+    const start = Date.parse(from + 'T00:00:00.000Z');
+    const marks = [];
+    let prev = null;
+    // Half-hourly: every boundary in MARKETS lands on an hour or a half, so a
+    // one-hour step can straddle a window that opens and shuts inside it.
+    for (let ms = start; ms < start + days * 864e5; ms += 18e5) {
+      const at = new Date(ms);
+      const sess = app.Dates.session(at);
+      if (sess !== prev) { marks.push([at.toISOString(), sess]); prev = sess; }
+    }
+    out[name] = marks;
+  }
+  return out;
+}
+
 function capture({ app, $, win, charts }) {
   const A = app;
   const live = A.Data.rows;
@@ -357,7 +399,8 @@ function capture({ app, $, win, charts }) {
      absent from the file and present in the capture, and would have compared
      unequal against the file for ever. */
   return JSON.parse(JSON.stringify(
-    { clock, derived, aggregates, indexes, panels, charts: drawn }));
+    { clock, derived, aggregates, sessions: sweepSessions(A), indexes, panels,
+      charts: drawn }));
 }
 
 test('the client renders the fixture set exactly as it is written down', async () => {
@@ -390,7 +433,7 @@ test('the client renders the fixture set exactly as it is written down', async (
 
     // Section by section, so a failure names the half that moved rather than
     // handing over a diff of the whole file.
-    for (const section of ['clock', 'derived', 'aggregates', 'indexes', 'charts']) {
+    for (const section of ['clock', 'derived', 'aggregates', 'sessions', 'indexes', 'charts']) {
       assert.deepEqual(shot[section], want[section],
         `the ${section} the client computes is not what golden.json records — ` +
         `if this was a refactor, it changed behaviour and is not a refactor`);
@@ -511,5 +554,60 @@ test('esc neutralises every character it claims to, in both contexts', async () 
     assert.equal(row.getAttribute('onclick'), null,
       'a quote in a trade id opened a second attribute — esc is not holding ' +
       'the attribute context');
+  } finally { h.close(); }
+});
+
+/* ─── Two things in `session()` decide nothing, and that is now checked ──────
+   A mutation sweep found both: swapping the precedence of `London+NY` and
+   `Asia+London`, and dropping Sydney out of the `asia` term, each left every
+   test in the repository green — the golden sweep above included.
+
+   Neither is a coverage hole. Walked at fifteen-minute resolution across all of
+   2026, `london && ny && asia` is true at ZERO instants, so the order of those
+   two branches cannot be observed; and Sydney is open while Tokyo is shut at
+   5,112 of them but never once while London is open, so the only branch `asia`
+   reaches — `london && asia` — has the same value with Sydney and without it.
+   `M.sydney` cannot change what `session()` returns.
+
+   THAT MAKES THE SYDNEY TERM DEAD, and it is recorded here rather than deleted:
+   `MARKETS` is held against journal.ts by agree.test.mjs, so removing it is a
+   cross-runtime change and belongs in the dead-code pass with the rest, not in
+   a commit about test coverage.
+
+   What this test is for is the other direction. Both properties are accidents
+   of four hour-tables that DST moves twice a year, not decisions anyone wrote
+   down — so widening a window by an hour could make the precedence order start
+   deciding real answers, silently, in a commit about something else. Then this
+   goes red and says which of the two woke up.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('the two branches of session() that decide nothing still decide nothing', async () => {
+  const h = await boot({ now: NOW });
+  try {
+    const D = h.app.Dates, M = D.MARKETS;
+    let triple = 0, sydneyMatters = 0, sydneyOpenAlone = 0, n = 0;
+
+    for (let ms = Date.parse('2026-01-01T00:00:00Z');
+             ms < Date.parse('2027-01-01T00:00:00Z'); ms += 9e5) {
+      const at = new Date(ms); n++;
+      const london = D.isOpen(M.london, at), ny = D.isOpen(M.ny, at);
+      const tokyo  = D.isOpen(M.tokyo, at),  syd = D.isOpen(M.sydney, at);
+      if (london && ny && (tokyo || syd)) triple++;
+      if (syd && !tokyo) { sydneyOpenAlone++; if (london) sydneyMatters++; }
+    }
+
+    // Without this the three below would all pass on a loop that never ran.
+    assert.equal(n, 35040, 'the year is not the year this was measured over');
+    assert.ok(sydneyOpenAlone > 4000,
+      `Sydney is open without Tokyo at only ${sydneyOpenAlone} instants — the ` +
+      `hours moved, so the two conclusions below are about a different table`);
+
+    assert.equal(triple, 0,
+      `London, New York and an Asian centre are now open together at ${triple} ` +
+      `instants, so the order of the first two branches of session() has started ` +
+      `deciding real answers — it never has before and nothing chose which wins`);
+    assert.equal(sydneyMatters, 0,
+      `Sydney now reaches the London+asia branch at ${sydneyMatters} instants, ` +
+      `so MARKETS.sydney has stopped being dead and session() means something ` +
+      `new — check that this is what was intended`);
   } finally { h.close(); }
 });
