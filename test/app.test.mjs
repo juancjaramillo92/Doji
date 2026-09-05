@@ -670,6 +670,36 @@ test('a full panel renders with no step failing', () => {
   assert.ok($('setup-table').innerHTML.length > 0);
 });
 
+test('a full render leaves every row exactly as it found it', () => {
+  /* No renderer mutates state, which is a rule this file states and nothing
+     checked. Freezing would not catch it: the app is a classic script in sloppy
+     mode, so a write to a frozen object fails silently rather than throwing —
+     the render would pass and the row would simply not have changed. So the
+     rows are compared before and after instead, which catches the write however
+     the engine treats it.
+
+     It matters most where it would be least visible. A renderer that sorted
+     Data.rows in place, or stamped a derived field onto a row to save
+     recomputing it, would leave every assertion in this file passing and change
+     what the NEXT render draws. */
+  /* Deliberately NEWEST first, so the order is one byKey would change. Given
+     the factory's default entry_time on every row the sort is stable and a
+     renderer sorting in place reorders nothing — a fixture that cannot show the
+     mutation asserts only that it did not happen to it. */
+  const rows = [
+    journalled({ id: 'PID3', open_day: '2026-07-30', pnl: 12, setup: 'Break & Retest',
+                 entry_time: '2026-07-30T16:00:00Z' }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -22, setup: 'Support & Resistance',
+                 entry_time: '2026-07-29T11:00:00Z', followed_sl: false }),
+    journalled({ id: 'PID1', open_day: '2026-07-28', pnl: 57.1, setup: 'Break & Retest',
+                 entry_time: '2026-07-28T09:00:00Z' }),
+  ];
+  const before = JSON.stringify(rows);
+  assert.deepEqual(renderClean(rows), [], 'a step failed, so this proves nothing');
+  assert.equal(JSON.stringify(rows), before,
+    'a render step wrote to the rows it was given');
+});
+
 test('the wheel row runs narrowest window to widest, left to right', () => {
   // CONFIG.PERIODS is the only definition of that row, so the list order and
   // the DOM order are the same fact — asserted together to keep them so.
