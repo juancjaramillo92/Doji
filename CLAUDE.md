@@ -932,8 +932,17 @@ and what could not be verified.
   Every statement is `if not exists`, `or replace` or `on conflict do nothing`,
   and a test asserts it — this is the file that will grow. Note also that
   `create or replace view` may only APPEND a column and `create or replace
-  function` may not change a return type: 005 replaces `eugenia_search` in place
-  for that reason, since dropping it would take the grants with it.
+  function` may not change a return type.
+
+  AND A RE-RUNNABLE FILE MAY NOT UNDO A LATER ONE. 005 held `eugenia_search`
+  in place for the return-type reason above, and kept holding it after 007
+  dropped that signature for the query vector — so re-applying 005 would have
+  recreated the two-argument overload 007 exists to remove, executable by
+  `anon` from the schema's default privileges, with the `revoke ... from
+  public` beside it touching neither. 007 owns the function; 005 keeps the
+  extension and the trigram indexes. `agree.test.mjs` reads every re-runnable
+  file — derived from whether it carries a bare `create table` — against every
+  `drop` a later file makes.
 
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add

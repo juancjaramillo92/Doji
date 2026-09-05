@@ -2440,12 +2440,20 @@ test('the app reads only the three tables it was given a policy for', () => {
 });
 
 test('the hybrid search still answers in the shape the function reads', () => {
-  /* THE RETURN TYPE IS LOAD-BEARING: `create or replace function` may not alter
-     one, so widening it needs a `drop function` — which takes the grants with
-     it. 005 replaces eugenia_search in place, and the columns searchList reads
-     have to survive that. */
-  const fn = SENSES_SQL.match(/create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
-  assert.ok(fn, '005 no longer replaces eugenia_search');
+  /* THE FUNCTION IS 007's, AND ONLY 007's. It was 005's until the query vector
+     needed a third argument — `create or replace function` cannot change an
+     argument list, so 007 drops and recreates. A definition left behind in 005
+     would not replace 007's, it would sit beside it as an overload, and 005 is
+     the file meant to be applied again.
+
+     The return type is still load-bearing for the same reason it always was:
+     widening it needs another drop, and the columns searchList reads have to
+     survive that. */
+  const fn = SEMANTIC_SQL.match(/create function public\.eugenia_search[\s\S]*?\$\$;/);
+  assert.ok(fn, '007 no longer defines eugenia_search');
+  assert.doesNotMatch(SENSES_SQL, /function public\.eugenia_search/,
+    '005 defines eugenia_search again — re-applying it would recreate the ' +
+    'two-argument overload 007 exists to drop, executable by anon');
   assert.match(fn[0], /returns table \(source text, id bigint, at timestamptz, retired boolean, body text\)/,
     'the hybrid search changed the return type, which create or replace cannot do');
 
@@ -2460,6 +2468,57 @@ test('the hybrid search still answers in the shape the function reads', () => {
   for (const idx of ['eugenia_notes_trgm', 'eugenia_turns_trgm']) {
     assert.match(SENSES_SQL, new RegExp(`create index if not exists ${idx}[\\s\\S]*?gin_trgm_ops`),
       `${idx} is missing, so <% falls back to a sequential scan of the archive`);
+  }
+});
+
+/* ─── A re-runnable file may not undo a later one ────────────────────────────
+   The numbered files are applied in order by hand, and two of them are meant to
+   be applied AGAIN as they grow. That only works while nothing in an earlier
+   file recreates something a later file has since dropped — and 005 did exactly
+   that for a release: it carried the two-argument `eugenia_search` that 007
+   drops to make room for the query vector.
+
+   Re-applying 005 on a database that has had 007 would have put the old
+   signature back beside the new one. Two things then go wrong at once, and 007's
+   own comment names both: a two-argument call matches both functions and
+   Postgres refuses it as ambiguous, and a bare `create` takes `execute` from the
+   schema's default privileges — which Supabase grants to `anon` and
+   `authenticated` BY NAME, so the `revoke ... from public` beside it does not
+   touch them. Her whole memory, reachable with the key that ships in the page.
+
+   Nothing failed. The file applies cleanly, the revoke it carries looks like the
+   guard, and the damage is a privilege nobody asked about.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no numbered file recreates an object a later one drops', () => {
+  const files = readdirSync(new URL('../supabase', import.meta.url))
+    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
+  assert.ok(files.length >= 6, `only ${files.length} numbered files found — the reader has gone blind`);
+
+  const text = (f) => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8');
+  const dropped = [];
+  for (const f of files) {
+    for (const [, kind, name] of text(f).matchAll(
+      /^drop (function|view|table|trigger) if exists (?:public\.)?([a-z0-9_]+)/gm)) {
+      dropped.push({ file: f, kind, name });
+    }
+  }
+  assert.ok(dropped.length >= 1, 'no drops read at all — the reader has gone blind');
+
+  /* ONLY THE FILES THAT CAN ACTUALLY BE APPLIED AGAIN. A file carrying a bare
+     `create table` refuses on its second run and stops there — 001 and 003 are
+     run-once by construction, which is why they may still hold the definitions
+     they had. Derived from the file rather than listed here, so a file that
+     becomes re-runnable comes under this rule the moment it does. */
+  const rerunnable = (f) => !/^create table (?!if not exists)/m.test(text(f));
+
+  for (const d of dropped) {
+    for (const f of files.filter(f => f < d.file && rerunnable(f))) {
+      assert.doesNotMatch(text(f), new RegExp(`create (or replace )?${d.kind} (public\\.)?${d.name}\\b`),
+        `${f} creates ${d.kind} ${d.name} and ${d.file} drops it — applying ${f} ` +
+        `again on a database that has had ${d.file} puts back the thing ${d.file} ` +
+        `was written to remove, and says nothing`);
+    }
   }
 });
 

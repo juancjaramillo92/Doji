@@ -2150,6 +2150,18 @@ or `on conflict do nothing` — which `003` deliberately is not, because this is
 the file that will grow. A test asserts that: a bare `create table` or
 `create index` in it would refuse on the second run.
 
+**Being re-runnable also means it may not undo a later file**, which is the half
+that has already been wrong once. 005 carried the two-argument `eugenia_search`
+until `007` dropped that signature to make room for the query vector, and
+re-applying 005 afterwards would have put the old function back *beside* the new
+one — an ambiguous two-argument call, and a bare `create` taking `execute` from
+the schema's default privileges, which Supabase grants to `anon` and
+`authenticated` by name. The `revoke ... from public` sitting under it does not
+touch either. Nothing would have failed; the file applies cleanly and the damage
+is a privilege nobody asked about. The function is 007's alone now, 005 keeps
+only the extension and the two trigram indexes it still owes it, and a test
+reads every re-runnable file against every `drop` a later one makes.
+
 Three things outside the SQL have to move with it, and none of them fails loudly:
 
 **The event spine needs its own cron job.** `004_cron.sql` gains a
