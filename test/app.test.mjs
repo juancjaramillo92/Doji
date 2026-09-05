@@ -931,6 +931,50 @@ test('the export says nothing where a question was never answered', () => {
   })();
 });
 
+/* ─── The snapshot, which is a full copy of the journal on the device ────────
+   It exists so the panel is drawn before the fetch answers, and it is written
+   in plaintext to localStorage. Two properties matter and neither was tested:
+   it is only ever written from what the database confirmed, and it is gone the
+   moment he signs out. Left behind, the next person to open the laptop gets the
+   login screen and the previous session's trade history one keypress apart —
+   and there is nothing to notice, because everything on screen looks right.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a confirmed load leaves a snapshot, and a failed one is drawn from it', async () => {
+  const key = app.CONFIG.SNAPSHOT;
+  win.localStorage.removeItem(key);
+
+  db.rows = [journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })];
+  db.error = null;
+  await app.Data.load();
+  assert.equal(app.Data.offline, false);
+  assert.deepEqual(JSON.parse(win.localStorage.getItem(key)).map(t => t.id), ['PID1'],
+    'a load the database confirmed left nothing to draw from next time');
+
+  // Now the database refuses. The rows must come back off the snapshot, and
+  // the dot must say so rather than showing a confident empty panel.
+  db.error = { message: 'network' };
+  await app.Data.load();
+  assert.equal(app.Data.offline, true);
+  // Spread first: Data.rows lives in the jsdom realm, and deepStrictEqual
+  // compares prototypes — the same idiom every array assertion here uses.
+  assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID1']);
+  assert.deepEqual(JSON.parse(win.localStorage.getItem(key)).map(t => t.id), ['PID1'],
+    'a failed load overwrote the snapshot with what it did not get');
+  db.error = null;
+});
+
+test('signing out takes the journal off the device', async () => {
+  const key = app.CONFIG.SNAPSHOT;
+  win.localStorage.setItem(key, JSON.stringify([{ id: 'PID1' }]));
+  // location.reload() is not implemented in jsdom and is the last thing signOut
+  // does; the clearing happens before it and is what this is about.
+  try { await app.Login.signOut(); } catch { /* the reload, not the clear */ }
+  assert.equal(win.localStorage.getItem(key), null,
+    'the snapshot survived sign-out — the next person sees the login screen ' +
+    'and the previous session\'s trades one keypress apart');
+});
+
 /* ─── Sorting ────────────────────────────────────────────────────────────── */
 
 test('the sort runs on the true execution instant, oldest first', () => {

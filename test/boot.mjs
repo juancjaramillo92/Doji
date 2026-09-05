@@ -112,6 +112,10 @@ export async function boot() {
     createClient: () => ({
       auth: {
         getSession: async () => ({ data: { session: null } }),
+        // Sign-out is a real path with a real consequence — it is what clears
+        // the offline snapshot off the device — so it is answered rather than
+        // stubbed away.
+        signOut: async () => ({ error: null }),
         getUser: async () => ({ data: { user: { id: 'u' } }, error: null }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
       },

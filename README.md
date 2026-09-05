@@ -435,7 +435,12 @@ instead — Supabase's own backups, or a scheduled dump of the `eugenia_*`
 tables — and until one is turned on, losing the project loses everything she
 knows about him while the trades come back in full.
 
-**Signing out** is a double-click on the sync dot.
+**Signing out** is a double-click on the sync dot, and it deletes the snapshot:
+a full copy of the journal sits in `localStorage` in plaintext, and left behind
+it puts the login screen and the previous session's trades one keypress apart on
+a shared machine. `app.test.mjs` drives that path — removing the delete goes
+red, as does a confirmed load that writes no snapshot or a failed one that
+ignores it.
 
 **If a trade does not appear**, the cron reporting `succeeded` proves nothing —
 `net.http_post` is asynchronous, so the SQL succeeded in *queuing* the request.
