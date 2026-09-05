@@ -54,6 +54,57 @@ test('any unanswered field leaves the trade pending', () => {
   assert.equal(app.isComplete(journalled({ followed_tp: null })), false);
 });
 
+/* THE SAME THREE-STATE, EVERYWHERE IT IS READ. `isComplete` is only one of six
+   consumers of these columns, and the other five each answer a different
+   question about the same null: what the bars count, what the log draws, what
+   the form pre-selects, what a save writes back, and what the export says. A
+   null read as a `no` in any one of them is the journal reporting a rule broken
+   that was never answered — and the bar is the worst of the six, because a
+   violation is exactly what the trader is looking for there. */
+
+test('an unanswered question is outside the compliance bar, not inside it as a no', () => {
+  // One answered YES and one never answered. The bar is 1 of 1, not 1 of 2:
+  // the second trade has nothing to say about the rule and must not be counted
+  // as having broken it.
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
+    journalled({ id: 'PID2', open_day: '2026-07-30', pnl: 40, followed_rules: null })
+  ]);
+  // The ratio is in the track's title; the percentage is what he reads.
+  const rules = $('disc-bars-total').querySelector('.period-disc-row');
+  assert.match(rules.textContent, /Rules/, 'the first bar is the rules bar');
+  assert.equal(rules.querySelector('.sess-wr-track').getAttribute('title'),
+    '1/1 followed',
+    'the unanswered rule was counted into the population it says nothing about');
+  assert.equal(rules.querySelector('.period-disc-pct').textContent, '100%',
+    'a question never answered is being reported as a rule broken');
+});
+
+test('the log draws an unanswered question as unanswered, never as a cross', () => {
+  renderClean([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40,
+    followed_rules: true, followed_sl: false, followed_tp: null })]);
+  const row = $('trade-table').querySelector('tr[data-trade="PID1"]');
+  assert.ok(row, 'the row is not in the log');
+  assert.equal(row.querySelectorAll('.rules-tick').length, 1, 'the YES');
+  assert.equal(row.querySelectorAll('.rules-cross').length, 1,
+    'the NO — and only the NO. A null drawn as a cross is a broken rule the ' +
+    'trader never reported');
+});
+
+test('a question left unanswered saves as unanswered, not as a no', () => {
+  // The form path, which is the one that writes. pickYN reads the radios; with
+  // neither pill selected there is no answer to read, and null is the only
+  // honest thing to send — `false` would put a rule breach in the database that
+  // nobody ever typed, and nothing downstream could tell it from a real one.
+  seed([trade({ id: 'PID1' })]);
+  app.Journal.open('PID1');
+  try {
+    assert.equal(app.pickYN('followed_rules'), null);
+    assert.equal(app.pickYN('followed_sl'), null);
+    assert.equal(app.pickYN('followed_tp'), null);
+  } finally { app.Journal.close(); }
+});
+
 test('an open position with no P&L can still be complete', () => {
   assert.equal(app.isComplete(journalled({ pnl: null, exit_price: null })), true);
 });
