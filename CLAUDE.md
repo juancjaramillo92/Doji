@@ -114,7 +114,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom, and nothing else
-npm test      # 435 tests, four suites
+npm test      # 438 tests, four suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -997,6 +997,19 @@ a blank.
   a writer failing, and a writer nobody is calling — and `agree.test.mjs` reads
   both call sites in both functions, since a mark missing from the success path
   makes a healthy writer read as dead.
+
+  THE TWO FALSE ALARMS ARE THE WHOLE RISK, and both are ordinary days rather
+  than edge cases. EVERY path that completes must mark: the poller's
+  market-closed skip is a completed run, and unmarked it freezes the mark across
+  gold's Friday-to-Sunday close — forty-eight hours against a six-hour window,
+  reported as a dead sync every Sunday evening. And the two writers may not be
+  judged the same way: the poller is scheduled, so silence is evidence; the
+  email function runs only when a fill arrives, so silence is a quiet week and a
+  staleness rule over it fires on almost every ordinary day. `SCHEDULED` is that
+  distinction, the outcome of the LAST run is what is read for both, and
+  `agree.test.mjs` reads the skip path for its mark because `healthLine` is pure
+  and cannot see a call site. A monitor that is wrong on an ordinary day gets
+  ignored, and an ignored monitor is worse than none.
 
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add

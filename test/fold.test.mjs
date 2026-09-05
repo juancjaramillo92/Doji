@@ -1380,18 +1380,56 @@ const ago = (h) => new Date(HEALTH_NOW - h * 3600_000).toISOString();
 
 test('a writer that has run recently is not mentioned at all', () => {
   const line = healthLine([
-    { id: 'poller', last_ok: ago(0.1), last_error: null },
-    { id: 'email',  last_ok: ago(3),   last_error: null },
+    { id: 'poller', last_ok: ago(0.1), last_error: null, last_error_at: null },
+    { id: 'email',  last_ok: ago(3),   last_error: null, last_error_at: null },
   ], HEALTH_NOW);
   assert.equal(line, '',
     'a healthy pair still produced a line — this reaches him every morning, so ' +
     'silence when nothing is wrong is what makes the line worth reading');
 });
 
+/* ─── THE TWO FALSE ALARMS, WHICH ARE THE WHOLE RISK HERE ────────────────────
+   A monitor that is wrong on ordinary days gets ignored, and an ignored monitor
+   is worse than none — it is the green tick that stops anyone looking. Both of
+   these fired on the first design and both are ordinary days.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a quiet weekend is not the poller dying', () => {
+  /* Gold closes Friday 17:00 New York and opens Sunday 17:00. The poller is
+     still invoked every two minutes across that and answers "market closed" —
+     which IS a completed run: cron fired, the function is deployed, its secrets
+     loaded, it decided correctly. It marks itself on that path for exactly this
+     reason. Without the mark, forty-eight hours pass against a six-hour window
+     and she reports the sync dead every Sunday evening. */
+  const line = healthLine(
+    [{ id: 'poller', last_ok: ago(0.05), last_error: null, last_error_at: null }],
+    HEALTH_NOW);
+  assert.equal(line, '', 'a weekend skip was read as a dead poller');
+});
+
+test('a week with no fills is not the email path dying', () => {
+  /* The email function runs only when a fill arrives, so silence is a quiet
+     week and nothing else. Judging it by staleness fires on almost every
+     ordinary day — which is the same defect as the weekend one and far more
+     frequent. Silence is evidence only for the writer that runs on a clock. */
+  const line = healthLine(
+    [{ id: 'email', last_ok: ago(200), last_error: null, last_error_at: null }],
+    HEALTH_NOW);
+  assert.equal(line, '',
+    'a week without trades was reported as the fill emails failing');
+
+  // But the poller going quiet for the same stretch is real, and is reported.
+  assert.match(
+    healthLine([{ id: 'poller', last_ok: ago(200), last_error: null, last_error_at: null }],
+               HEALTH_NOW),
+    /the broker sync last completed a run/,
+    'silence from the scheduled writer has to still be evidence');
+});
+
 test('a writer gone quiet is named, with when it last completed a run', () => {
   const line = healthLine([
-    { id: 'poller', last_ok: ago(9), last_error: null },
-    { id: 'email',  last_ok: ago(1), last_error: null },
+    { id: 'poller', last_ok: ago(9), last_error: null, last_error_at: null },
+    { id: 'email',  last_ok: ago(1), last_error: null, last_error_at: null },
   ], HEALTH_NOW);
   assert.match(line, /the broker sync/, 'the writer is named in words, not as an id');
   assert.doesNotMatch(line, /the fill emails/, 'the healthy one was named too');
@@ -1402,24 +1440,37 @@ test('a writer gone quiet is named, with when it last completed a run', () => {
 });
 
 test('a writer that has never run says so rather than showing a blank', () => {
-  // The state a database that never got 008 would show, and the state a cron
-  // job nobody scheduled shows forever. A blank date reads as a formatting bug.
-  const line = healthLine([{ id: 'poller', last_ok: null, last_error: null }], HEALTH_NOW);
+  const line = healthLine(
+    [{ id: 'poller', last_ok: null, last_error: null, last_error_at: null }], HEALTH_NOW);
   assert.match(line, /has never completed a run/);
 });
 
-test('the last error travels with the writer, and only where there is one', () => {
-  const line = healthLine([
-    { id: 'email', last_ok: ago(30), last_error: 'HTTP 401 — bad key' },
-    { id: 'poller', last_ok: ago(40), last_error: null },
-  ], HEALTH_NOW);
-  assert.match(line, /last error: HTTP 401 — bad key/);
-  // The one with no error must not carry an empty "last error:" tail — a writer
-  // that stopped being CALLED has no error, and that is the louder of the two.
-  const pollerLine = line.split('\n').find(l => l.includes('the broker sync'));
-  assert.doesNotMatch(pollerLine, /last error/);
+test('the last outcome decides, for the writer no clock can judge', () => {
+  /* The email path is reported on its OUTCOME rather than its silence, so a
+     failure has to surface however long ago the last fill was — and a success
+     after it has to clear. */
+  const failing = healthLine(
+    [{ id: 'email', last_ok: ago(30), last_error: 'HTTP 401 — bad key', last_error_at: ago(2) }],
+    HEALTH_NOW);
+  assert.match(failing, /the fill emails failed at/);
+  assert.match(failing, /HTTP 401 — bad key/, 'the reason has to travel with it');
+
+  const recovered = healthLine(
+    [{ id: 'email', last_ok: ago(1), last_error: 'HTTP 401 — bad key', last_error_at: ago(2) }],
+    HEALTH_NOW);
+  assert.equal(recovered, '',
+    'an error older than the last success is a fault already recovered from, ' +
+    'and reporting it every morning is how a real one stops being read');
 });
 
+test('a writer that has failed and never succeeded is reported', () => {
+  // `ok > failed` is NaN-false when last_ok is null, so this is the case that
+  // needs saying out loud rather than being left to the comparison.
+  const line = healthLine(
+    [{ id: 'email', last_ok: null, last_error: 'refused', last_error_at: ago(1) }],
+    HEALTH_NOW);
+  assert.match(line, /the fill emails failed at/);
+});
 
 /* ─── The copy of her memory, and the loop that is the whole of it ───────────
    The app's weekly backup carries `trades` — the one table cTrader could

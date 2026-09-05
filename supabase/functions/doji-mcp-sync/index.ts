@@ -672,6 +672,15 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     // suspicious row actually gets looked at. Neither writes, so the market
     // check has nothing to protect here.
     if (!force && !raw && !tools && !posns && !market && !marketRaw && !marketOpen()) {
+      // A SKIP IS A COMPLETED RUN, and the heartbeat has to say so or it lies
+      // every weekend. Gold closes Friday 17:00 New York and opens Sunday
+      // 17:00, so without this the mark freezes for forty-eight hours against a
+      // six-hour staleness window and she reports the sync dead every Sunday
+      // evening. What reaching this line proves is exactly what the mark is
+      // for: cron fired, the function is deployed, its secrets loaded, and it
+      // decided correctly. Whether the broker answers is the failure path's
+      // question, not this one's.
+      await heartbeat("poller");
       return json({ ok: true, skipped: "market closed" });
     }
 

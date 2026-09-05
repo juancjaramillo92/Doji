@@ -517,11 +517,26 @@ failures worth catching. `last_ok` going cold answers "running and failing" and
 "not running" with one column.
 
 `healthBlock()` reads it into the morning briefing, and she is told to lead with
-it: six hours without a completed run and the writer is named in words, with
-when it last ran and its last error where there is one. Six hours is chosen
-against the poll's two-minute schedule and the 08:00 delivery — shorter and a
-quiet Sunday reads as a fault, longer and a Monday outage reaches him on
-Tuesday.
+it. Six hours is chosen against the poll's two-minute schedule and the 08:00
+delivery — shorter and a brief outage reads as a fault, longer and a Monday
+outage reaches him on Tuesday.
+
+**The two writers are judged differently, and conflating them is a monitor that
+cries wolf until it is ignored.** The poller runs every two minutes on a
+schedule, so its silence *is* evidence — nothing ran. The email function runs
+only when a fill arrives, so its silence is a quiet week, and a staleness rule
+over it fires on almost every ordinary day. Silence is read for the scheduled
+writer alone; what is read for both is the outcome of the last run, so an error
+stamped after the most recent success means the thing is failing now, and a
+success after an error clears it.
+
+**A market-closed skip is a completed run and marks itself.** Gold closes Friday
+17:00 New York and opens Sunday 17:00, and the poller is still invoked every two
+minutes across that, answering `skipped: "market closed"`. That is everything the
+mark exists to prove: cron fired, the function is deployed, its secrets loaded,
+it decided correctly. Unmarked, forty-eight hours pass against a six-hour window
+and the sync reads as dead every Sunday evening. Whether the broker answers is
+the failure path's question, not this one's.
 
 **It is inert until `008` is applied.** Both writers swallow their own failure
 there, so a database that has not seen the file gets a 404 on the health write
