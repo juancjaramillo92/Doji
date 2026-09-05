@@ -927,6 +927,79 @@ test('the dead-rule scan can actually find a dead rule', () => {
     'would delete a rule that is in use');
 });
 
+/* ─── Every top-level declaration is reached from somewhere in the file ──────
+   The companion to the rule scan above, and it catches the likelier shape by
+   far: not a function somebody wrote and never called, but a live one whose
+   last CALLER was deleted. `render()` is a list of eight steps, and removing a
+   line from that list leaves the renderer it named intact, exported to the
+   harness, still passing its own tests, and reached by nothing on the page.
+
+   IT READS index.html ALONE, DELIBERATELY. A function the test harness still
+   names in `EXPOSED` but the app no longer calls is dead in the app, and a scan
+   that counted the harness would call it live and be wrong in the direction
+   that matters.
+
+   Known limitation, stated rather than worked around: string contents are not
+   stripped, so a declaration mentioned only inside a string literal reads as
+   referenced. Stripping them properly needs a JS parser — a template literal
+   holds real code inside `${}` — and no function in this file is named in a
+   string. Comments ARE stripped, which is the case that actually occurs.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+export function unreferenced(src) {
+  const js = src.slice(src.lastIndexOf('<script>') + 8, src.lastIndexOf('</script>'));
+  const bare = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+
+  const names = new Set();
+  for (const [, n] of bare.matchAll(/^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/gm)) names.add(n);
+  for (const [, n] of bare.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) names.add(n);
+
+  const dead = [];
+  for (const n of [...names].sort()) {
+    // Not preceded by a dot, or `Data.render` would count as a use of `render`.
+    const re = new RegExp(`(?<![\\w$.])${n.replace(/\$/g, '\\$')}(?![\\w$])`, 'g');
+    if ((bare.match(re) || []).length <= 1) dead.push(n);
+  }
+  return { dead, declared: names.size };
+}
+
+test('every top-level declaration in the client is referenced somewhere', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const got = unreferenced(src);
+
+  assert.ok(got.declared > 80,
+    `only ${got.declared} declarations found — the reader has gone blind`);
+  assert.deepEqual(got.dead, [],
+    `declared and reached by nothing:\n  ${got.dead.join('\n  ')}\n` +
+    `Delete it and everything it owned — the CONFIG entry, the CSS, the README ` +
+    `paragraph, the harness export and every call site, same pass.`);
+});
+
+test('the unreferenced-declaration scan can actually find one', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const at = (find, add) => src.replace(find, add + find);
+
+  assert.ok(unreferenced(at('function render() {', 'const dojiUnusedThing = 42;\n\n')).dead
+    .includes('dojiUnusedThing'), 'a declared-and-never-used const is not found');
+
+  assert.ok(unreferenced(at('function render() {', 'function dojiOrphanFn() { return 1; }\n\n')).dead
+    .includes('dojiOrphanFn'), 'a declared-and-never-called function is not found');
+
+  // Mentioned in a comment and nowhere else — the shape that hides dead code
+  // behind an explanation of what it used to do.
+  assert.ok(unreferenced(at('function render() {',
+    'function dojiGhostFn() { return 1; }\n// dojiGhostFn is named only here\n\n')).dead
+    .includes('dojiGhostFn'), 'a comment naming a function reads as calling it');
+
+  /* THE ONE THAT ACTUALLY HAPPENS: a live renderer whose only caller is dropped
+     out of render()'s step list. Nothing else in the suite notices — the
+     function still exists, still passes its own tests, and is still exported to
+     the harness; it is simply never reached from the page. */
+  assert.ok(unreferenced(src.replace('    () => renderSetups(rows),\n', '')).dead
+    .includes('renderSetups'),
+    'dropping a step from render() leaves its renderer unreferenced and unseen');
+});
+
 /* ─── The Node floor has one home, and CI has to read it from there ──────────
    `engines.node` states the floor and package.json is the only file allowed to.
    It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
