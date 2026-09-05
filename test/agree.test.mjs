@@ -1424,7 +1424,11 @@ const DELIBERATELY_ABSENT = new Set([
 test('the documents name only symbols the repository has', () => {
   const missing = [];
 
-  for (const doc of ['README.md', 'CLAUDE.md']) {
+  /* REFACTOR.md is read too. It is the working record of a long pass over this
+     code, and its whole value is that a cold session can trust it — a document
+     naming a helper that was renamed or a file that was deleted is worse than
+     no document, because it is read as current. */
+  for (const doc of ['README.md', 'CLAUDE.md', 'REFACTOR.md']) {
     const text = readFileSync(new URL(`../${doc}`, import.meta.url), 'utf8');
     const named = new Set();
 
@@ -1435,7 +1439,8 @@ test('the documents name only symbols the repository has', () => {
 
     // WITHOUT THIS THE LOOP BELOW PROVES NOTHING. A pattern that stopped
     // matching would report every document clean.
-    assert.ok(named.size > 40,
+    const floor = doc === 'REFACTOR.md' ? 10 : 40;
+    assert.ok(named.size > floor,
       `${doc}: only ${named.size} symbols found — the reader has gone blind`);
 
     for (const name of named) {
