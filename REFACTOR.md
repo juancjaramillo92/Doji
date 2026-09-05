@@ -162,6 +162,25 @@ shared ones already single-sourced, the other is five reads that differ in table
 select, filter and order column, already held together by a test that names none
 of them.
 
+**THE WHOLE REPO HAS NOW BEEN SWEPT, not just the client.** Every scanner was
+proved against a planted defect before its zero was believed:
+
+| Check | Scope | Result |
+|---|---|---|
+| declared and referenced nowhere | every `.ts`, `.mjs`, `.gs` | 0 — the two Apps Script hits are Run-menu entry points |
+| duplicated code blocks | every source file | 1 outside `doji-eugenia`, refused as R-13 |
+| duplicated PROSE | `prompt.ts`, `strategy.ts` | 1 — fourteen lines, removed, now guarded |
+| SQL objects nothing references | all nine numbered files | 0 |
+| per-call `Intl` construction | every runtime | fixed in the app and `journal.ts`; `checkRules` measured at 33ms over 400 rows and left |
+| CSS rules never emitted | the stylesheet | 0 |
+
+WHAT THE SWEEP DID NOT REACH is `doji-eugenia/index.ts`'s I/O layer: 35 throw
+sites and 32 catch blocks, in 3,863 lines whose read functions are neither
+exported nor executed by any test. The tool loop now has a net — every tool
+driven against four kinds of refusal — but the BLOCK readers that build her
+messages do not, and folding them without one would be a rewrite rather than a
+refactor. That is the next piece of work and it is a net before it is a fold.
+
 **Phase 4 is CLOSED and found nothing.** Fifty-eight top-level functions in the
 client, twenty-eight called exactly once — and every one of those is a render
 step, a shell builder or a named primitive, which is the architecture rather than
@@ -246,6 +265,13 @@ is re-appliable. Tidying a drop backwards lets a re-run undo a later file.
 wanted a database — whether a BEFORE trigger's write needs a column grant — was
 answered on a throwaway Postgres and written down instead.
 **Revisit if:** a second and third such question appear.
+
+### R-13 — folding Gladys's `readRow` and `patchRow`
+**Why refused:** they share four lines — the not-ok throw, the json, the empty
+check, the first row. A helper for it takes a `Response`, a verb and an id, and
+reads worse at both call sites than the four lines do. Two sites, fourteen lines
+apart, visible on one screen.
+**Revisit if:** a third caller appears, or the empty-row behaviour has to change.
 
 ### R-12 — one home for the newest-first reads
 **Why refused:** they are eight reads that differ in table, select list, filter
