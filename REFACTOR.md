@@ -126,6 +126,7 @@ Every move gets a line, whether it was made or refused.
 | Three copies of the screen-reader-hiding rule | M12 | golden byte-identical; dead-rule scan still clean. PIXELS NOT VERIFIED |
 | The write-failure block, twice | M3 | golden byte-identical; helper proved red two ways |
 | The tool loop had 32 catch blocks and no execution test | net | every tool driven against four kinds of refusal; proved red on four handlers losing their catch |
+| Fourteen lines of the prompt were stated twice | M6 | removed; a guard on both prose files proved red on each |
 
 ### Open
 

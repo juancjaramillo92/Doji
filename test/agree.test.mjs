@@ -1181,6 +1181,53 @@ test('every door a function opens is written down in the README', () => {
     `anyone reads the source to find out it is there.`);
 });
 
+/* ─── No paragraph is said to her twice ──────────────────────────────────────
+   `prompt.ts` and `strategy.ts` are the two files where prose IS the program,
+   and a duplicated passage there is worse than a duplicated function. It is
+   sent on every request; it is in the CACHED prefix, so it is paid for and
+   carried whether or not it is read; and the day someone sharpens one copy the
+   model is handed the sharpened instruction and the blunt one together, with
+   nothing anywhere reporting a contradiction.
+
+   Fourteen identical lines were sitting in `prompt.ts` — the whole passage
+   about every quote figure being measured from the 17:00 New York roll, stated
+   twice in a row. Nothing could have caught it: there is no compiler for prose,
+   the tests that read this file look for phrases rather than for repetition, and
+   a prompt reads perfectly well with a paragraph in it twice.
+
+   Six lines, because that is long enough that no two paragraphs arrive at it by
+   coincidence and short enough to catch a passage repeated in part.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no passage of the prompt or the strategy is stated twice', () => {
+  for (const file of ['prompt.ts', 'strategy.ts']) {
+    const text = readFileSync(
+      new URL(`../supabase/functions/doji-eugenia/${file}`, import.meta.url), 'utf8');
+
+    // Prose lines only: a repeated `\`\`\`` fence or a blank line is not a
+    // repeated passage, and the rules table legitimately repeats its shape.
+    const lines = text.split('\n')
+      .map((l, i) => [i + 1, l.trim()])
+      .filter(([, l]) => l.length > 40 && !l.startsWith('|') && !l.startsWith('```'));
+
+    assert.ok(lines.length > 100,
+      `${file}: only ${lines.length} prose lines found — the reader has gone blind`);
+
+    const N = 6, seen = new Map(), dup = [];
+    for (let i = 0; i + N <= lines.length; i++) {
+      // Contiguous in the file, or six lines gathered from across it are not a
+      // passage at all.
+      if (lines[i + N - 1][0] - lines[i][0] !== N - 1) continue;
+      const key = lines.slice(i, i + N).map(x => x[1]).join('\n');
+      const at = seen.get(key);
+      if (at) dup.push(`${file}: lines ${at} and ${lines[i][0]}`); else seen.set(key, lines[i][0]);
+    }
+    assert.deepEqual(dup, [],
+      `a passage is stated twice — it is sent on every request, it sits in the ` +
+      `cached prefix, and sharpening one copy leaves her holding both:\n  ${dup.join('\n  ')}`);
+  }
+});
+
 /* ─── The Node floor has one home, and CI has to read it from there ──────────
    `engines.node` states the floor and package.json is the only file allowed to.
    It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
