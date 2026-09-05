@@ -437,6 +437,28 @@ from (values
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_price')),
    'true'),
 
+  -- ─── 008, and the one table that is about the system rather than the desk ─
+  -- The heartbeat the poller and the email function leave. It holds no user_id
+  -- and gets no policy, so RLS denies the publishable key outright; only the two
+  -- writers and Eugenia, all holding the secret key, ever touch it.
+  ('RLS on sync_health',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.sync_health')),
+   'true'),
+  ('no policy on sync_health',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.sync_health')),
+   '0'),
+
+  -- Both writers seeded, for the reason the thesis and the price mark are: they
+  -- PATCH by primary key, so a missing row is a 200 with an empty array and
+  -- every heartbeat is dropped — leaving this table reading as two dead writers
+  -- when both are running perfectly.
+  ('both sync writers are seeded',
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from public.sync_health',
+             false, true, '')))[1]::text
+     where to_regclass('public.sync_health') is not null),
+   '2'),
+
   -- ─── The three the dashboard card reads ──────────────────────────────────
   -- RLS on with no policy denies outright, which is right for her notes and
   -- wrong for these: the card reads them with the publishable key, so each one

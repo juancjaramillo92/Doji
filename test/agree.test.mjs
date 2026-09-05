@@ -46,6 +46,7 @@ const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.m
 const SENSES_SQL = readFileSync(new URL('../supabase/005_eugenia_senses.sql', import.meta.url), 'utf8');
 const CRON_SQL = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8');
 const SEMANTIC_SQL = readFileSync(new URL('../supabase/007_semantic.sql', import.meta.url), 'utf8');
+const SCHEMA_008 = readFileSync(new URL('../supabase/008_sync_health.sql', import.meta.url), 'utf8');
 const EUGENIA_TS = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 const EUGENIA_PROMPT = readFileSync(
@@ -1806,7 +1807,12 @@ const reaches = (code, fn) => {
   // context — and stopping at the first meant the check answered "no" for a
   // call sitting in the second, which is a green test reporting the opposite of
   // the truth.
-  for (const all of code.matchAll(/const \[([^\]]+)\] = await Promise\.all\(\[([\s\S]*?)\]\)/g)) {
+  // Whitespace-tolerant around the `=`: a destructuring long enough to wrap is
+  // still the same call, and a reader that only matches one line answers "this
+  // path does not read his notes" about a path that does — a green suite
+  // reporting the opposite of the truth, in the other direction.
+  for (const all of code.matchAll(
+    /const \[([^\]]+)\]\s*=\s*await\s+Promise\.all\(\[([\s\S]*?)\]\)/g)) {
     const names = all[1].split(',').map(s => s.trim()).filter(Boolean);
     const items = all[2].split(',').map(s => s.trim());
     const at = items.findIndex(i => i.startsWith(`${fn}(`));
@@ -2033,6 +2039,54 @@ test('the README registers each bot for the updates its code actually handles', 
         `the README registers ${fn} for "${kind}" and the function never reads ` +
         `it off the update — Telegram would deliver it and nothing would act`);
     }
+  }
+});
+
+/* ─── Both silent writers leave a mark, on both paths ────────────────────────
+   The poller and the email function are the two writers with no voice: their
+   failures reach console.error and a response pg_net discards. `sync_health` is
+   the only evidence either is alive, and it is worth exactly as much as its
+   call sites — a heartbeat missing from the success path makes a healthy writer
+   read as dead, and one missing from the failure path is the original problem
+   with a table beside it.
+
+   Read structurally because nothing in this suite can drive an Edge handler,
+   and because both calls sit at the very end of long functions where a later
+   edit walks past them. Neither shows up as a failure if it goes: the poll
+   still folds its deals, and the row simply stops moving.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the two writers with no voice record both outcomes', () => {
+  const accepted = checkValues(SCHEMA_008, 'sync_health_id_check');
+  assert.ok(accepted?.length === 2,
+    `008 constrains sync_health.id to ${accepted?.length ?? 0} names, not two`);
+
+  for (const [fn, who] of [['doji-mcp-sync', 'poller'], ['doji-email-sync', 'email']]) {
+    const src = readFileSync(
+      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    // Comments stripped: the name in prose about the call is not the call.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+      .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+    assert.match(code, new RegExp(`await heartbeat\\("${who}"\\)`),
+      `${fn} never records a completed run, so a writer that is working reads ` +
+      `as one that stopped — which is the exact state this table exists to name`);
+    assert.match(code, new RegExp(`await heartbeat\\("${who}",`),
+      `${fn} never records a failure, so the only account of a run that failed ` +
+      `at 03:00 is still a console nobody reads`);
+
+    /* And it must be a name the table both ACCEPTS and SEEDS. Asked of the
+       constraint rather than of the file, because the seed alone answers yes
+       for a name the check would refuse — and both halves matter separately:
+       an unaccepted name is a 400 the writer swallows, an unseeded one is a
+       PATCH by primary key landing on nothing, which is a 200 with an empty
+       body. Either way the row never moves and the writer reads as dead. */
+    assert.ok(accepted.includes(who),
+      `sync_health_id_check refuses '${who}', so every heartbeat ${fn} sends is ` +
+      `a 400 it swallows — indistinguishable from one that never fired`);
+    assert.match(SCHEMA_008, new RegExp(`values[\\s\\S]*?'${who}'`),
+      `008 never seeds '${who}', and these writers PATCH by primary key — a ` +
+      `missing row is a 200 with an empty array and the mark is dropped`);
   }
 });
 

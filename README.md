@@ -335,6 +335,7 @@ be single-sourced at run time:
 | the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
+| the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
 | the **columns of `eugenia_runs`** | the table, and the object literals `recordRun` is called with — a key with no column is a row PostgREST refuses whole, so the meter goes quiet |
 | **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the eight predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
@@ -442,10 +443,33 @@ here that compounds — and no button in this app reaches them.
 That is not a bug in the backup. `003` denies the publishable key her notes and
 turns deliberately, and `005` grants the app a read on only three of her tables,
 so an in-app backup structurally cannot include them and should not be given the
-policy that would let it. It means the mechanism has to live at the database
-instead — Supabase's own backups, or a scheduled dump of the `eugenia_*`
-tables — and until one is turned on, losing the project loses everything she
-knows about him while the trades come back in full.
+policy that would let it. The copy has to be taken with the secret key, from
+outside the browser.
+
+**`scripts/backup-memory.mjs` is that copy, and `.github/workflows/backup-memory.yml`
+runs it every Sunday evening.** It reads the seven tables that have no other
+source — the channel map, the notes, the turns, the thesis, the open loops, the
+calendar and the feedback — and writes one JSON document as a build artifact.
+`eugenia_runs` is deliberately out: it is the cost meter, by far the largest
+table, and every row in it is a fact about a model call rather than about him.
+
+It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets, and nothing
+else — one file, no install step, because a backup that depends on a registry is
+a backup that fails the week the registry does. **The paging is the load-bearing
+part.** PostgREST caps a response at its own `max-rows` whatever is asked for, so
+a single read of `eugenia_turns` returns a page and looks exactly like a complete
+archive: green job, well-formed file, plausible counts, discovered on the day
+someone restores from it. The walk stops on a short page rather than on a count
+it was told, and the job refuses to upload a document holding zero rows.
+
+**Artifacts expire after ninety days**, which is the maximum a free account
+allows, so this is a rolling window rather than an archive. Download one
+occasionally and keep it somewhere that does not expire, or run the script by
+hand for a durable copy:
+
+```sh
+SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
+```
 
 **Signing out** is a double-click on the sync dot, and it deletes the snapshot:
 a full copy of the journal sits in `localStorage` in plaintext, and left behind
@@ -479,12 +503,34 @@ app, because the app does not own the column.
 | setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
 | a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
 
-Two writers report failure to nobody. The poller and the email function have no
-path to Telegram: a 500, a refused write, or a cut deals page reaches
-`console.error` and stops there, and `pg_net` discards the response. So the
-absence of trades is the symptom, and the query above is where the answer is.
-Eugenia's scheduled half is the exception — it messages Telegram on failure and
-retries until the marker lands.
+**The two writers with no voice leave a heartbeat instead.** The poller and the
+email function have no path to Telegram: a 500, a refused write, or a cut deals
+page reaches `console.error` and stops there, and `pg_net` discards the
+response. So `008_sync_health.sql` holds one row each, and both writers move
+`last_ok` on every completed run and record `last_error` on every failure.
+
+It is a heartbeat rather than an alarm, and that is the whole design. An alarm
+fires when a run fails, which means it cannot fire when the run stops happening
+at all — an unscheduled cron job, a renamed function, a deploy that dropped one.
+Those are silent under any failure-triggered scheme and they are exactly the
+failures worth catching. `last_ok` going cold answers "running and failing" and
+"not running" with one column.
+
+`healthBlock()` reads it into the morning briefing, and she is told to lead with
+it: six hours without a completed run and the writer is named in words, with
+when it last ran and its last error where there is one. Six hours is chosen
+against the poll's two-minute schedule and the 08:00 delivery — shorter and a
+quiet Sunday reads as a fault, longer and a Monday outage reaches him on
+Tuesday.
+
+**It is inert until `008` is applied.** Both writers swallow their own failure
+there, so a database that has not seen the file gets a 404 on the health write
+and keeps folding deals exactly as before, and her read answers nothing. A
+monitoring table that can take down the thing it monitors is worse than no
+table.
+
+Eugenia's scheduled half was always the exception — it messages Telegram on
+failure and retries until the marker lands.
 
 ---
 
