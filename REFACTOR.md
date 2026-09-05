@@ -119,24 +119,30 @@ Every move gets a line, whether it was made or refused.
 | The clock built a formatter per call | M11 | measured: 460ms → 53ms per render at 400 trades, golden byte-identical |
 | `journalStats` had both faults at once | M11 | measured: 411ms → 1.2ms over 400 rows, output deep-compared against the old module |
 | `sessionBars` filtered once per session | M11 | golden byte-identical; the sessionless row now has its own test |
+| No colour is written in the script | net | 3 planted defects, plus a comment that must NOT fail |
 
 ### Open
 
 **Phase 0.2 — pure-logic goldens.** `Dates.session` has one. `foldPosition`, the
 email parser and `adherence.ts` do not.
 
-**Phase 1C — audit checks.** Render complexity (7.7) has RUN: render is linear
-in trades, confirmed by measurement at 200 → 3200 rows, so there is no nested
-scan. It did surface the constant instead — see the ledger row above. Five left,
-each gating a later phase:
+**Phase 1C — five of the eight have now run, and all five are clean.**
+
+| Check | Result |
+|---|---|
+| render complexity (7.7) | linear in trades, measured 200 → 3200 rows. No nested scan — it surfaced the CONSTANT instead, three ledger rows above |
+| defensive padding (7.9) | fourteen `try`/`catch`, every one at a boundary — browser storage, network, the database — or render's documented per-step isolation. No guard on a column the schema says cannot be null |
+| empty states (7.6) | no trades at all, and one trade with no P&L and no journal: no render errors, nothing printing NaN or undefined, the dash where it belongs |
+| primitive reuse (7.3) | two `new Chart` sites, both legitimate — `mountDonut` and the equity line. Zero literal colours in the script; the rule now has a test |
+| CSS rules (7.2) | zero dead, after the scan was wrong twice |
+
+Three left, and none of them blocks a move:
 
 | Check | Gates |
 |---|---|
-| primitive reuse | all client component work |
-| defensive padding | M8 anywhere |
-| empty states | any render restructure |
 | doc coverage, both directions | the documentation phase |
-| vendor coupling | nothing — do it when convenient |
+| vendor coupling | nothing — an ops pass, do it when convenient |
+| soft delete and undo (4.9) | DONE — see the ledger |
 
 **Phase 2 — archaeology.** The dead-code scans are built and both answer zero.
 The prose pass has not run: a paragraph describing a removed thing is the same
