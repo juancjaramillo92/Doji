@@ -122,6 +122,7 @@ Every move gets a line, whether it was made or refused.
 | No colour is written in the script | net | 3 planted defects, plus a comment that must NOT fail |
 | A door existed that the README did not name | net + doc | 2 planted defects, both directions |
 | Vendor coupling (9.3) | read: three libraries pinned, two hashed, the third's absence documented; the two font hosts were not written down and now are |
+| `nyTime` named two different output shapes | M1 | output already pinned by a test asserting the card's line |
 
 ### Open
 
@@ -150,9 +151,26 @@ Three left, and none of them blocks a move:
 The prose pass has not run: a paragraph describing a removed thing is the same
 defect as a commented-out block.
 
-**Phase 3 — two duplication rows left.** The New York clock, in six files across
-four runtimes: audit which copies share a runtime, because only those are a real
-M4 and the rest keep their agreement test. Newest-first ordering, five reads.
+**Phase 3 is CLOSED.** Money formatting and the em dash were folded; the New
+York clock and newest-first ordering are refusals, R-11 and R-12. Both were
+counted as duplication and are not: one is five different questions with the two
+shared ones already single-sourced, the other is five reads that differ in table,
+select, filter and order column, already held together by a test that names none
+of them.
+
+**Phase 4 is CLOSED and found nothing.** Fifty-eight top-level functions in the
+client, twenty-eight called exactly once — and every one of those is a render
+step, a shell builder or a named primitive, which is the architecture rather than
+indirection. One short single-use helper, `modalOpen`, and it is a named
+predicate over three modal ids that reads better than what it replaces. Zero
+destructured-object parameters in the client and zero in the Edge functions; the
+only one in the repository is `boot({ now })` in the harness, which has many
+callers and one optional named argument.
+
+**Phase 5's load-order half needs no scanner.** A top-level reference to
+something declared below it throws while the script evaluates, and two hundred
+tests evaluate that script through `boot()`. The rule is enforced by every one
+of them.
 
 **Phases 4 to 7** — indirection, naming and section placement, comment register,
 Tier 3 structural moves. Not started.
@@ -224,6 +242,41 @@ is re-appliable. Tidying a drop backwards lets a re-run undo a later file.
 wanted a database — whether a BEFORE trigger's write needs a column grant — was
 answered on a throwaway Postgres and written down instead.
 **Revisit if:** a second and third such question appear.
+
+### R-12 — one home for the newest-first reads
+**Why refused:** they are eight reads that differ in table, select list, filter
+(`superseded_by=is.null`, `embedding=is.null`, `closed_on=is.null`) and order
+column (`id.desc`, `entry_time.desc`, `open_day.desc,entry_time.desc`). A helper
+covering that is an options object over every part of a URL, which is the
+abstraction the standard of work forbids twice over.
+
+What the row was actually worried about is already treated. The guard finds
+every `rest/v1/…?select=` in the file rather than naming its subjects, and
+asserts each carries a limit and none orders `id.asc` under one — proved by
+planting a new read of each shape and watching both go red. A read added
+tomorrow is covered without anyone remembering to add it.
+
+**Revisit if:** the reads ever converge on one shape, which would mean the
+filters had gone.
+
+### R-11 — folding the New York clock into one definition
+**Why refused:** the nine copies are FIVE questions, not nine answers to one.
+
+The civil day is `nyDate` and the weekday-with-hour is `nyClock`; both live in
+`_shared/edge.ts` already and every Edge caller imports them. `nyWall` in
+`adherence.ts` is a superset — it needs minutes and the full date, which nothing
+else does, and its own comment says so where it is defined. `nyStamp`,
+`shortDay`, `nyTime` and `nyDayTime` are four DISPLAY shapes, not clocks. And
+`MARKETS.ny` is a pair of integers.
+
+So the fold is already done where it was possible, and what is left is not
+duplication. Moving `nyWall` into `_shared` to serve `nyClock` from one
+formatter would couple `adherence.ts` — deliberately pure, rows in and verdicts
+out — to a module whose top level reads the environment, in exchange for one
+formatter.
+
+**Revisit if:** a second caller ever needs wall-clock minutes, which is the
+condition `adherence.ts`'s own comment names.
 
 ### R-10 — regenerating `golden.json` to make a red run go away
 **Why refused:** a golden file regenerated on failure costs what it always cost,

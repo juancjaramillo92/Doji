@@ -193,7 +193,13 @@ const mark = (v: boolean | null) => v === null ? '—' : v ? '✓' : '✗';
 // hourCycle, not hour12: the latter leaves the cycle to the locale and can
 // resolve to h24, so a fill just after midnight ET would read "24:05". Same
 // reason nyClock and Eugenia's nyStamp state it.
-const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+//
+// NAMED FOR CARRYING THE DAY, because the app and Eugenia each have an `nyTime`
+// and both return a bare HH:MM. A card can arrive about a fill from earlier, so
+// this one needs the date — and a name shared with those two would invite the
+// exact edit the first paragraph exists to prevent: the card losing its day,
+// with nothing failing and the message still reading like a working time.
+const nyDayTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York',
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(new Date(iso));
@@ -247,7 +253,7 @@ export function renderMessage(row: Row, expanded: boolean) {
     text: [
       'Hola Jefe, new fill below',
       '',
-      `${row.direction} ${price} · ${nyTime(row.entry_time)} ET`,
+      `${row.direction} ${price} · ${nyDayTime(row.entry_time)} ET`,
       '',
       `Setup: ${row.setup ?? '—'}`,
       `Rules: ${mark(row.followed_rules)}`,
