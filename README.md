@@ -318,6 +318,8 @@ be single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
+| the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its short/long P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, and the app's Long/Short label — narrowing the constraint refuses every SELL at PostgREST and the poller reports it to the console only |
+| the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes — her own turns are half of every pair, so a constraint that refuses `assistant` leaves a history of his messages alone |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` — which is one constant interpolated into both the cached prefix and §0, so the rungs are a copy and the table is not |

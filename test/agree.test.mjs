@@ -1910,7 +1910,11 @@ const checkValues = (sql, constraint) => {
   const at = sql.indexOf(constraint);
   if (at < 0) return null;
   const clause = sql.slice(at, sql.indexOf('))', at));
-  return [...clause.matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
+  // Case-insensitive: every vocabulary here was lower-case until `direction`,
+  // whose values are the broker's own BUY and SELL. A lower-case class returned
+  // an empty list for it rather than failing, which is the shape of blindness
+  // this file exists to avoid — so the callers below assert on what came back.
+  return [...clause.matchAll(/'([A-Za-z_]+)'/g)].map(m => m[1]).sort();
 };
 
 test('the kinds a loop may have are the kinds the table accepts', () => {
@@ -1919,6 +1923,66 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
   assert.deepEqual([...LOOP_KINDS].sort(), declared,
     'index.ts offers a loop kind the table refuses, or the reverse — the first ' +
     'is a 400 she reports to nobody, the second is a value nothing can write');
+});
+
+/* ─── The two vocabularies the writers depend on and nothing compared ────────
+   Both are enumerated in a check constraint, and both have copies in code that
+   the constraint would silently invalidate. They fail in the direction that is
+   hardest to see: NARROWING the constraint does not break a test or a build, it
+   makes every write carrying the dropped value fail at PostgREST — and the two
+   writers that would hit it report to a console this repository says twice that
+   nobody reads.
+
+   `direction` drops half the journal: every SELL rejected, the poller logging
+   and carrying on, the app showing only longs. `role` drops half of every
+   conversation: her own turns refused, so the history window fills with his
+   messages alone and she reads as though she had never answered.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the sides a trade may have are the sides every writer writes', () => {
+  const declared = checkValues(SCHEMA, 'trades_direction_check');
+  assert.ok(declared, '001 no longer constrains trades.direction');
+  assert.deepEqual(declared, ['BUY', 'SELL']);
+
+  // Every file that names a side, and each must name only sides the table takes.
+  const writers = [
+    'supabase/functions/doji-mcp-sync/index.ts',
+    'supabase/functions/doji-email-sync/index.ts',
+    'doji_gmail_sync.gs',
+    'index.html',
+  ];
+  for (const path of writers) {
+    const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+    const named = [...new Set([...text.matchAll(/["'](BUY|SELL)["']/g)].map(m => m[1]))];
+    assert.ok(named.length,
+      `${path} names no side at all — it used to, so either it stopped writing ` +
+      `direction or this reader has gone blind`);
+    for (const side of named) {
+      assert.ok(declared.includes(side),
+        `${path} writes direction ${side} and trades_direction_check refuses it`);
+    }
+  }
+});
+
+test('the roles a turn may have are the roles she actually writes', () => {
+  const declared = checkValues(EUGENIA_SQL, 'eugenia_turns_role_check');
+  assert.ok(declared, '003 no longer constrains eugenia_turns.role');
+
+  const named = [...new Set([...EUGENIA_TS.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
+  assert.ok(named.length >= 2,
+    `only ${named.length} roles written in doji-eugenia — the reader has gone blind`);
+  for (const role of named) {
+    assert.ok(declared.includes(role),
+      `doji-eugenia writes role '${role}' and eugenia_turns_role_check refuses ` +
+      `it, so that half of every exchange is a 400 and her history keeps only ` +
+      `the other half`);
+  }
+  // And the other way: a rung in the constraint nothing writes is a value that
+  // can never appear, which is how a vocabulary rots without failing.
+  for (const role of declared) {
+    assert.ok(named.includes(role),
+      `eugenia_turns.role accepts '${role}' and nothing in doji-eugenia writes it`);
+  }
 });
 
 test('the importance a release may carry is the one the table accepts', () => {
