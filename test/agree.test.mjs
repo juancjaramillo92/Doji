@@ -897,6 +897,39 @@ test('a function refuses to run without every secret it reads', () => {
 });
 
 
+/* ─── The one door, and the property no assertion about its answer can see ───
+   secretMatches is why _shared/edge.ts exists at all: four functions authorise
+   their callers with it, and a copy quietly rewritten to `presented === expected`
+   returns the identical answer to every behavioural test anyone would think to
+   write, while comparing byte by byte and stopping at the first difference —
+   which hands an attacker the expected secret's length, then its leading bytes,
+   one timed request at a time.
+
+   So the guarantee is structural or it is nothing. Both halves are read: the
+   loop that visits every byte of the longer input, and the absence of a direct
+   comparison of the two secrets, which is the shape the rewrite would take.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the secret comparison cannot stop early, whatever its answer', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/_shared/edge.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('export function secretMatches(');
+  assert.ok(at > -1, '_shared/edge.ts no longer has secretMatches()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /for \([^)]*Math\.max\(a\.length, b\.length\)/,
+    'secretMatches no longer walks the longer of the two inputs — a loop that ' +
+    'stops at the shorter one returns after the bytes it was given, and the ' +
+    'time it takes is the length it was comparing against');
+  assert.match(body, /diff \|=/,
+    'secretMatches no longer accumulates the difference, so it can leave the ' +
+    'loop as soon as one byte disagrees — which is the leak itself');
+  assert.doesNotMatch(body, /\b(presented|a)\s*[!=]==\s*(expected|b)\b/,
+    'secretMatches compares the two secrets directly somewhere in its body — ' +
+    'that is the rewrite this test exists to catch, and it passes every test ' +
+    'written about what the function ANSWERS');
+});
+
 /* ─── Every function says the same thing about its own gateway ──────────────
    verify_jwt = false is stated twice on purpose — once per function in
    config.toml, once as --no-verify-jwt on the deploy command — because each
