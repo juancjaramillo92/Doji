@@ -56,9 +56,17 @@ export const SESSIONS =
 // hourCycle rather than hour12, for the reason every other clock in this repo
 // states it: hour12:false leaves the cycle to the locale and can resolve to
 // h24, and an hour of 24 fails every `h >= open` it meets.
-const hourIn = (tz: string, at: Date): number => +new Intl.DateTimeFormat('en-US', {
-  timeZone: tz, hour: '2-digit', hourCycle: 'h23',
-}).format(at);
+/* HELD, not rebuilt. Constructing an Intl.DateTimeFormat is the expensive part
+   of using one; formatting with it is cheap and it carries no state between
+   calls. `sessionAt` asks for up to four hours per trade, so a formatter per
+   call is thousands of constructions per `get_stats` — the same defect the app
+   carried, fixed the same way. */
+const HOUR_FMT: Record<string, Intl.DateTimeFormat> = {};
+
+const hourIn = (tz: string, at: Date): number => +(HOUR_FMT[tz] ??=
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: '2-digit', hourCycle: 'h23',
+  })).format(at);
 
 const isOpen = (m: { tz: string; open: number; close: number }, at: Date): boolean => {
   const h = hourIn(m.tz, at);
@@ -222,9 +230,13 @@ export function journalStats(rows: TradeRow[]): Stats {
     // Ordered by the app's own list rather than by whatever the rows produced,
     // so a session with no trades is absent and the rest read in the order he
     // sees them on screen.
-    bySession: SESSIONS
-      .map(s => sliceBy(rows, sessionOf).find(x => x.key === s))
-      .filter((x): x is Slice => !!x),
+    // ONE call, ordered afterwards. `sliceBy` buckets in a single pass for the
+    // reason its own comment gives, and calling it inside the map defeated
+    // exactly that — five passes over every row, four fifths of each thrown
+    // away, with the helper doing the right thing throughout.
+    bySession: (bySession => SESSIONS
+      .map(s => bySession.find(x => x.key === s))
+      .filter((x): x is Slice => !!x))(sliceBy(rows, sessionOf)),
     bySetup: sliceBy(rows, t => t.setup),
   };
 }

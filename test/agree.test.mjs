@@ -1102,6 +1102,43 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
     `paragraph read by someone who has just lost their result is wrong about it`);
 });
 
+/* ─── No colour is written in the script, only read from a token ─────────────
+   The palette is tokenised in CSS, and the rule that nothing in the script
+   writes a colour is what keeps light and dark honest: a hex typed into a chart
+   config is invisible to the stylesheet, so it survives a theme change, a
+   palette revision and every review that reads the CSS to see what a colour is.
+
+   Chart.js cannot read a CSS variable, which is exactly why `cssToken()` exists
+   and why the temptation is real — the fix for "the chart needs a colour" looks
+   like typing one. Every value it needs is resolved through `cssToken()` into a
+   module constant instead.
+
+   The rule was stated in CLAUDE.md and enforced by nothing. Comments are
+   stripped first: a comment naming a token's value is documentation, not a
+   colour being written, and failing on one would push the next author to delete
+   the explanation rather than the literal.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the client writes no colour of its own, and reads them all through cssToken', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const js = src.slice(src.lastIndexOf('<script>') + 8, src.lastIndexOf('</script>'));
+  assert.ok(js.length > 50_000, `only ${js.length} chars of script found — the reader has gone blind`);
+
+  const bare = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  const written = [...bare.matchAll(/#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)/g)]
+    .map(m => m[0]);
+
+  assert.deepEqual(written, [],
+    `the script writes ${written.length} colour(s) of its own — ${written.join(', ')}. ` +
+    `Chart.js cannot read a CSS variable, which is what cssToken() is for: put the ` +
+    `value in the stylesheet as a token and resolve it into a module constant.`);
+
+  // And the other half of the rule: the tokens ARE resolved rather than the
+  // constants having been quietly filled in some other way.
+  assert.ok((js.match(/cssToken\(/g) || []).length >= 8,
+    'cssToken has almost no call sites left — the palette is being reached some other way');
+});
+
 /* ─── The Node floor has one home, and CI has to read it from there ──────────
    `engines.node` states the floor and package.json is the only file allowed to.
    It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
@@ -1424,7 +1461,11 @@ const DELIBERATELY_ABSENT = new Set([
 test('the documents name only symbols the repository has', () => {
   const missing = [];
 
-  for (const doc of ['README.md', 'CLAUDE.md']) {
+  /* REFACTOR.md is read too. It is the working record of a long pass over this
+     code, and its whole value is that a cold session can trust it — a document
+     naming a helper that was renamed or a file that was deleted is worse than
+     no document, because it is read as current. */
+  for (const doc of ['README.md', 'CLAUDE.md', 'REFACTOR.md']) {
     const text = readFileSync(new URL(`../${doc}`, import.meta.url), 'utf8');
     const named = new Set();
 
@@ -1435,7 +1476,8 @@ test('the documents name only symbols the repository has', () => {
 
     // WITHOUT THIS THE LOOP BELOW PROVES NOTHING. A pattern that stopped
     // matching would report every document clean.
-    assert.ok(named.size > 40,
+    const floor = doc === 'REFACTOR.md' ? 10 : 40;
+    assert.ok(named.size > floor,
       `${doc}: only ${named.size} symbols found — the reader has gone blind`);
 
     for (const name of named) {

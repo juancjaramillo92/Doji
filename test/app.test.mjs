@@ -1373,3 +1373,29 @@ test('a refused delete leaves nothing staged, so undo cannot offer a lie', async
     'restore a trade that was never deleted');
   db.error = null;
 });
+
+/* ─── A trade in no session at all ───────────────────────────────────────────
+   `sessionOf` returns null for a row carrying neither an entry nor a fill
+   instant, and `sessionBars` buckets by that answer. The old shape filtered per
+   session, so a null simply matched nothing; the bucketed one has to say so
+   deliberately, and a missing `?.` there is a TypeError that takes the whole
+   setups panel down through render()'s catch — an empty column, no error on
+   screen, and a trade silently absent from the counts either way.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a trade with no session is in no bar, and does not take the panel down', () => {
+  const orphan = trade({
+    id: 'PIDX', entry_time: null, fill_time: null, open_day: '2026-07-28',
+    pnl: 12, net_pnl: 12, setup: 'Break & Retest',
+    followed_rules: true, followed_sl: true, followed_tp: true });
+
+  assert.equal(app.sessionOf(orphan), null, 'the fixture is no longer sessionless');
+
+  const html = app.sessionBars([orphan, journalled({ id: 'PID1', pnl: 10, net_pnl: 10 })]);
+
+  // Every bar states its population in a title. The orphan belongs to none of
+  // them, so the five together must account for the OTHER trade and no more.
+  const counted = [...html.matchAll(/\((\d+) trades?\)/g)]
+    .reduce((n, m) => n + Number(m[1]), 0);
+  assert.equal(counted, 1,
+    'the sessionless trade was bucketed into a session, or counted twice');
+});
