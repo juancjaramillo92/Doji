@@ -636,6 +636,29 @@ test('the prompt keeps his levels out of a message she starts', () => {
     'is the one thing the block was not built to enable');
 });
 
+test('she is told which two discipline columns lean, and where they lean', () => {
+  /* THE BIAS IS A PROPERTY OF THE COLUMN, NOT OF THE READING. followed_sl and
+     followed_tp are answered seconds after the fill, so they say what he meant
+     to do; they measure respect only where he goes back and corrects one, and a
+     correction he never made reads as compliance. Nothing on the row separates
+     the two.
+
+     It was stated at the trigger that asks the question and in the README's
+     account of it, and in neither place a reader of the FIGURE would look — so
+     she could report a stop-discipline rate off the view with no idea it leans,
+     which is the same failure as presenting a judgment rule's silence as a pass.
+     Read here because there is no structural half: delete the paragraph and
+     nothing breaks, and the number she gives still reads as a measurement. */
+  const said = SYSTEM.replace(/\s+/g, ' ');
+
+  assert.match(said, /answered at OPEN/,
+    'the prompt no longer says the two stop and target answers are given at ' +
+    'open, so she has no reason to doubt a rate computed from them');
+  assert.match(said, /bias(es)? upward|lean/,
+    'the prompt names when the answers are given but not which way that pushes ' +
+    'them, which is the half that changes what she may claim');
+});
+
 test('the nightly pass is told a demotion is his to declare', () => {
   /* The tool permits it and the prompt is what asks for it. Silence here is the
      shape this defect had for its whole life: a mechanism that exists, is
@@ -897,6 +920,39 @@ test('a function refuses to run without every secret it reads', () => {
 });
 
 
+/* ─── The one door, and the property no assertion about its answer can see ───
+   secretMatches is why _shared/edge.ts exists at all: four functions authorise
+   their callers with it, and a copy quietly rewritten to `presented === expected`
+   returns the identical answer to every behavioural test anyone would think to
+   write, while comparing byte by byte and stopping at the first difference —
+   which hands an attacker the expected secret's length, then its leading bytes,
+   one timed request at a time.
+
+   So the guarantee is structural or it is nothing. Both halves are read: the
+   loop that visits every byte of the longer input, and the absence of a direct
+   comparison of the two secrets, which is the shape the rewrite would take.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the secret comparison cannot stop early, whatever its answer', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/_shared/edge.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('export function secretMatches(');
+  assert.ok(at > -1, '_shared/edge.ts no longer has secretMatches()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /for \([^)]*Math\.max\(a\.length, b\.length\)/,
+    'secretMatches no longer walks the longer of the two inputs — a loop that ' +
+    'stops at the shorter one returns after the bytes it was given, and the ' +
+    'time it takes is the length it was comparing against');
+  assert.match(body, /diff \|=/,
+    'secretMatches no longer accumulates the difference, so it can leave the ' +
+    'loop as soon as one byte disagrees — which is the leak itself');
+  assert.doesNotMatch(body, /\b(presented|a)\s*[!=]==\s*(expected|b)\b/,
+    'secretMatches compares the two secrets directly somewhere in its body — ' +
+    'that is the rewrite this test exists to catch, and it passes every test ' +
+    'written about what the function ANSWERS');
+});
+
 /* ─── Every function says the same thing about its own gateway ──────────────
    verify_jwt = false is stated twice on purpose — once per function in
    config.toml, once as --no-verify-jwt on the deploy command — because each
@@ -1046,6 +1102,67 @@ test('the documents name only symbols the repository has', () => {
   assert.deepEqual(missing, [],
     'the documents name things the repository does not have');
 });
+
+/* ─── One hour cycle, across four runtimes ──────────────────────────────────
+   Nine formatters in this repository ask for an hour, and every one of them
+   has to say WHICH cycle it wants. `hour12: false` does not: it leaves the
+   choice to the locale, which is free to resolve to h24 and render midnight as
+   hour 24 rather than hour 0.
+
+   Where the hour is only tested against a market's opening range that is
+   harmless — 24 fails `h < close` exactly as 0 fails `h >= open` — and both
+   `hourIn` ports say so. It is the clocks that compare the hour against a
+   BOUNDARY that break: `Dates.nyParts` feeds `weekStart` and `lastClose`,
+   where `hour < 17` decides which week a Sunday belongs to, and `nyWall` in
+   adherence.ts feeds `Date.UTC(..., w.hour, w.min)`, where an hour of 24 rolls
+   the instant into the next day and moves the measured offset with it.
+
+   So the cycle is read off every formatter that asks for an hour, rather than
+   off the two that would visibly break. The alternative is nine copies of one
+   decision with nothing comparing them, which is what this file exists for.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// The argument list of each `new Intl.DateTimeFormat(...)`, taken by balancing
+// the parentheses rather than by a pattern: the options are an object literal
+// and several of them run over more than one line.
+const formatters = (text) => {
+  const out = [];
+  for (const m of text.matchAll(/Intl\.DateTimeFormat\(/g)) {
+    let i = m.index + m[0].length, depth = 1;
+    while (i < text.length && depth) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') depth--;
+      i++;
+    }
+    out.push(text.slice(m.index, i));
+  }
+  return out;
+};
+
+test('every clock in the repository states the same hour cycle', () => {
+  let asked = 0;
+  for (const path of TRACKED) {
+    if (!/\.(html|ts|mjs|gs)$/.test(path) || path.startsWith('test/')) continue;
+    const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+    for (const args of formatters(text)) {
+      assert.doesNotMatch(args, /hour12/,
+        `${path} builds a formatter with hour12 — that leaves the cycle to the ` +
+        `locale, and a locale resolving to h24 renders midnight as hour 24`);
+      if (!/\bhour:/.test(args)) continue;
+      asked++;
+      assert.match(args, /hourCycle:\s*['"]h23['"]/,
+        `${path} asks a formatter for an hour without stating hourCycle h23 — ` +
+        `midnight can arrive as 24, and every boundary this repo compares an ` +
+        `hour against is written for 0`);
+    }
+  }
+  // The reader has to have found the clocks it is judging: a pattern that
+  // stopped matching would report agreement across nothing at all.
+  assert.ok(asked >= 8,
+    `only ${asked} formatters ask for an hour — the reader has gone blind`);
+});
+
 
 
 /* ─── Every way she speaks to him reads what he has told her ────────────────
@@ -1409,6 +1526,50 @@ test('R-08 cites a section that actually holds its steps', () => {
     `§${cited[1]} lists ${steps.length} numbered steps, not the four R-08 requires`);
 });
 
+/* ─── Every section she is told to read is one she can be handed ─────────────
+   The strategy is the one document she may not edit, and `get_strategy` is what
+   stops her inventing what it says. A citation that does not resolve turns that
+   tool into the opposite: `readStrategy` answers a missing section with a
+   sentence naming what the document DOES hold, so she reports her own strategy
+   as silent on something it covers.
+
+   The dotted case is worse and is why the resolution is checked rather than
+   the key. §4.1 and §4.2 are prose inside §4, so `readStrategy` falls back one
+   level to the parent — which means a mistyped §4.9 comes back as §4, a real
+   body, indistinguishable from a citation that worked. So a dotted citation has
+   to name a heading actually present in what came back.
+
+   One citation was checked before this — R-08's, from the rules table. Every
+   other one, including the ones in the prompt she carries on every turn, was
+   not. ─────────────────────────────────────────────────────────────────────── */
+
+test('every section the prompts cite is one get_strategy can serve', () => {
+  const sources = { SYSTEM, CONSOLIDATE, ALWAYS };
+  let checked = 0;
+
+  for (const [name, text] of Object.entries(sources)) {
+    for (const [, key] of text.matchAll(/§(\d+(?:\.\d+)?)/g)) {
+      checked++;
+      const body = readStrategy(key);
+      assert.doesNotMatch(body, /^The strategy has no section/,
+        `${name} cites §${key} and get_strategy cannot serve it — she would be ` +
+        `told her own document is silent on something she was sent to read`);
+
+      // The dotted half. A subsection resolves through the parent, so the body
+      // coming back proves nothing unless the heading is actually in it.
+      if (key.includes('.')) {
+        assert.match(body, new RegExp(`§?${key.replace('.', '\\.')}`),
+          `${name} cites §${key}, and what came back is the whole of §` +
+          `${key.split('.')[0]} with no §${key} in it — the parent fallback ` +
+          `answering a citation that does not exist, which reads exactly like ` +
+          `one that does`);
+      }
+    }
+  }
+  assert.ok(checked >= 5,
+    `only ${checked} citations found across the prompts — the reader has gone blind`);
+});
+
 test('the two reward-to-risk numbers are kept apart', () => {
   /* 1:1.5 is a condition at ENTRY — step 4 refuses the trade below it. A
      realised 1:1.25 is what a $30 target shortened on an open trade leaves
@@ -1547,9 +1708,17 @@ test('every row-returning read of her own tables carries a limit', () => {
      limit routinely sits in a different literal from the select and a pattern
      that stops at the first backtick cannot see it. And a path is a READ only if
      it names `select=` — a PATCH against one primary key is a REST path against
-     a growing table too, and needs no limit at all. */
+     a growing table too, and needs no limit at all.
+
+     THE TABLE IS WHATEVER STANDS BEFORE THE `?`, rather than a list of the
+     names this file happens to use today. An earlier version named them, and
+     `fillEmbeddings` — which reads `rest/v1/${table}` because it sweeps two
+     tables through one function — was invisible to it: the one read this
+     guard could not see was the sweep whose backlog was once drained from the
+     wrong end. A reader that names its subjects goes blind the moment one of
+     them is spelled differently, and says nothing when it does. */
   const joined = src.replace(/`\s*\+\s*`/g, '');
-  const reads = [...joined.matchAll(/rest\/v1\/(eugenia_\w+|trades)\?(select=[^`]*)/g)];
+  const reads = [...joined.matchAll(/rest\/v1\/([^?`]+)\?(select=[^`]*)/g)];
   assert.ok(reads.length >= 3,
     `only ${reads.length} reads found — the reader has gone blind`);
 
@@ -1557,6 +1726,21 @@ test('every row-returning read of her own tables carries a limit', () => {
     assert.match(query, /limit=/,
       `the read of ${table} has no limit — an unusual day puts the whole window ` +
       `into a model call with nothing to stop it`);
+
+    /* AND A LIMIT TAKES AN END, WHICH IS THE HALF THAT HAS ALREADY BITTEN
+       TWICE. `id` is the only monotonic key any of these tables has, so a read
+       ordered by it is asking for the newest rows or the oldest, and the two
+       are indistinguishable from outside: the same rows come back either way
+       on a quiet day, and the wrong end only shows on the day there is more
+       than a window's worth. The pass once kept the FIRST two hundred turns of
+       a day and dropped the evening, where a late instruction lives, and
+       `fillEmbeddings` drained its backlog from the wrong end. Ordering by a
+       clock is a different question and is left alone — the event spine reads
+       `at.asc` on purpose, because the next release is the earliest one. */
+    assert.doesNotMatch(query, /order=id\.asc/,
+      `the read of ${table} orders id.asc under a limit, so it keeps the OLDEST ` +
+      `rows in the window and silently drops everything since — which is what ` +
+      `the nightly pass and the embedding backlog each did once`);
   }
 });
 
@@ -1770,7 +1954,11 @@ const checkValues = (sql, constraint) => {
   const at = sql.indexOf(constraint);
   if (at < 0) return null;
   const clause = sql.slice(at, sql.indexOf('))', at));
-  return [...clause.matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
+  // Case-insensitive: every vocabulary here was lower-case until `direction`,
+  // whose values are the broker's own BUY and SELL. A lower-case class returned
+  // an empty list for it rather than failing, which is the shape of blindness
+  // this file exists to avoid — so the callers below assert on what came back.
+  return [...clause.matchAll(/'([A-Za-z_]+)'/g)].map(m => m[1]).sort();
 };
 
 test('the kinds a loop may have are the kinds the table accepts', () => {
@@ -1779,6 +1967,150 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
   assert.deepEqual([...LOOP_KINDS].sort(), declared,
     'index.ts offers a loop kind the table refuses, or the reverse — the first ' +
     'is a 400 she reports to nobody, the second is a value nothing can write');
+});
+
+/* ─── The two vocabularies the writers depend on and nothing compared ────────
+   Both are enumerated in a check constraint, and both have copies in code that
+   the constraint would silently invalidate. They fail in the direction that is
+   hardest to see: NARROWING the constraint does not break a test or a build, it
+   makes every write carrying the dropped value fail at PostgREST — and the two
+   writers that would hit it report to a console this repository says twice that
+   nobody reads.
+
+   `direction` drops half the journal: every SELL rejected, the poller logging
+   and carrying on, the app showing only longs. `role` drops half of every
+   conversation: her own turns refused, so the history window fills with his
+   messages alone and she reads as though she had never answered.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── What Telegram is told to deliver ───────────────────────────────────────
+   `allowed_updates` is set once, by hand, outside this repository, and getting
+   it wrong fails in the way this system's registration mistakes always fail:
+   the update is simply never delivered. Eugenia needs both kinds — a message to
+   answer and a callback_query for the feedback keyboard under every briefing —
+   and her own dispatch says so in a comment beside the branch that handles them.
+
+   The setup runbook said `["message"]` alone, so a restore built from this file
+   would have come up with a briefing nobody could rate, the button spinning and
+   nothing reporting it. Two copies of one value, in a document and in a comment,
+   with the failure invisible from both.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the README registers each bot for the updates its code actually handles', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const wanted = {
+    'doji-eugenia': ['message', 'callback_query'],
+    'doji-gladys':  ['callback_query'],
+  };
+
+  for (const [fn, kinds] of Object.entries(wanted)) {
+    /* The registration block is the one that names the function's endpoint AND
+       the updates together — the endpoint alone appears in half a dozen other
+       sentences, and taking the first of those reads a paragraph about
+       something else and reports the registration missing. */
+    const line = [...readme.matchAll(new RegExp(`/functions/v1/${fn}`, 'g'))]
+      .map(m => readme.slice(m.index, m.index + 400)
+        .match(/allowed_updates\s*=\s*\[[^\]]*\]/))
+      .find(Boolean);
+    assert.ok(line,
+      `the README shows no allowed_updates beside any mention of ${fn}'s ` +
+      `endpoint — either the registration is gone or this reader is looking ` +
+      `in the wrong place`);
+
+    for (const kind of kinds) {
+      assert.ok(line[0].includes(kind),
+        `the README registers ${fn} without "${kind}" — that update is then ` +
+        `never delivered, and nothing anywhere reports it`);
+    }
+    /* And the code has to actually read every kind the README asks for — as a
+       PROPERTY of the update, not merely as a word somewhere in the file. A
+       bare word match passed for "poll", which appears in prose about the
+       poller; asking for `.poll` asks the question that was meant. */
+    const src = readFileSync(
+      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    for (const kind of [...line[0].matchAll(/"(\w+)"/g)].map(m => m[1])) {
+      assert.match(src, new RegExp(`\\.${kind}\\b`),
+        `the README registers ${fn} for "${kind}" and the function never reads ` +
+        `it off the update — Telegram would deliver it and nothing would act`);
+    }
+  }
+});
+
+/* ─── Every table stands behind RLS, and nothing was checking that ───────────
+   The publishable key is in `index.html` and is meant to be. RLS is the only
+   thing between it and every table in the schema — either a policy that scopes
+   the rows, or, for the tables 003 keeps from the app entirely, RLS on with no
+   policy at all, which denies that key outright.
+
+   A table created without `enable row level security` is readable by anyone who
+   opens the page. Nothing failed, nothing logged, and the table simply answers.
+   Read out of the SQL rather than listed here, so table eleven is covered on the
+   day it is written rather than on the day someone remembers this test.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every table the numbered files create has row level security on', () => {
+  const files = readdirSync(new URL('../supabase', import.meta.url))
+    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
+  const sql = files
+    .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')).join('\n');
+
+  const created = [...sql.matchAll(/create table (?:if not exists )?public\.(\w+)/g)]
+    .map(m => m[1]);
+  assert.ok(created.length >= 8,
+    `only ${created.length} tables read out of the numbered SQL — the reader has gone blind`);
+
+  for (const t of created) {
+    assert.match(sql, new RegExp(`alter table public\\.${t} enable row level security`),
+      `public.${t} is created and never has RLS turned on, so the publishable ` +
+      `key in index.html can read it — and a table that simply answers looks ` +
+      `exactly like one that is meant to`);
+  }
+});
+
+test('the sides a trade may have are the sides every writer writes', () => {
+  const declared = checkValues(SCHEMA, 'trades_direction_check');
+  assert.ok(declared, '001 no longer constrains trades.direction');
+  assert.deepEqual(declared, ['BUY', 'SELL']);
+
+  // Every file that names a side, and each must name only sides the table takes.
+  const writers = [
+    'supabase/functions/doji-mcp-sync/index.ts',
+    'supabase/functions/doji-email-sync/index.ts',
+    'doji_gmail_sync.gs',
+    'index.html',
+  ];
+  for (const path of writers) {
+    const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+    const named = [...new Set([...text.matchAll(/["'](BUY|SELL)["']/g)].map(m => m[1]))];
+    assert.ok(named.length,
+      `${path} names no side at all — it used to, so either it stopped writing ` +
+      `direction or this reader has gone blind`);
+    for (const side of named) {
+      assert.ok(declared.includes(side),
+        `${path} writes direction ${side} and trades_direction_check refuses it`);
+    }
+  }
+});
+
+test('the roles a turn may have are the roles she actually writes', () => {
+  const declared = checkValues(EUGENIA_SQL, 'eugenia_turns_role_check');
+  assert.ok(declared, '003 no longer constrains eugenia_turns.role');
+
+  const named = [...new Set([...EUGENIA_TS.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
+  assert.ok(named.length >= 2,
+    `only ${named.length} roles written in doji-eugenia — the reader has gone blind`);
+  for (const role of named) {
+    assert.ok(declared.includes(role),
+      `doji-eugenia writes role '${role}' and eugenia_turns_role_check refuses ` +
+      `it, so that half of every exchange is a 400 and her history keeps only ` +
+      `the other half`);
+  }
+  // And the other way: a rung in the constraint nothing writes is a value that
+  // can never appear, which is how a vocabulary rots without failing.
+  for (const role of declared) {
+    assert.ok(named.includes(role),
+      `eugenia_turns.role accepts '${role}' and nothing in doji-eugenia writes it`);
+  }
 });
 
 test('the importance a release may carry is the one the table accepts', () => {
@@ -2300,12 +2632,20 @@ test('the app reads only the three tables it was given a policy for', () => {
 });
 
 test('the hybrid search still answers in the shape the function reads', () => {
-  /* THE RETURN TYPE IS LOAD-BEARING: `create or replace function` may not alter
-     one, so widening it needs a `drop function` — which takes the grants with
-     it. 005 replaces eugenia_search in place, and the columns searchList reads
-     have to survive that. */
-  const fn = SENSES_SQL.match(/create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
-  assert.ok(fn, '005 no longer replaces eugenia_search');
+  /* THE FUNCTION IS 007's, AND ONLY 007's. It was 005's until the query vector
+     needed a third argument — `create or replace function` cannot change an
+     argument list, so 007 drops and recreates. A definition left behind in 005
+     would not replace 007's, it would sit beside it as an overload, and 005 is
+     the file meant to be applied again.
+
+     The return type is still load-bearing for the same reason it always was:
+     widening it needs another drop, and the columns searchList reads have to
+     survive that. */
+  const fn = SEMANTIC_SQL.match(/create function public\.eugenia_search[\s\S]*?\$\$;/);
+  assert.ok(fn, '007 no longer defines eugenia_search');
+  assert.doesNotMatch(SENSES_SQL, /function public\.eugenia_search/,
+    '005 defines eugenia_search again — re-applying it would recreate the ' +
+    'two-argument overload 007 exists to drop, executable by anon');
   assert.match(fn[0], /returns table \(source text, id bigint, at timestamptz, retired boolean, body text\)/,
     'the hybrid search changed the return type, which create or replace cannot do');
 
@@ -2320,6 +2660,57 @@ test('the hybrid search still answers in the shape the function reads', () => {
   for (const idx of ['eugenia_notes_trgm', 'eugenia_turns_trgm']) {
     assert.match(SENSES_SQL, new RegExp(`create index if not exists ${idx}[\\s\\S]*?gin_trgm_ops`),
       `${idx} is missing, so <% falls back to a sequential scan of the archive`);
+  }
+});
+
+/* ─── A re-runnable file may not undo a later one ────────────────────────────
+   The numbered files are applied in order by hand, and two of them are meant to
+   be applied AGAIN as they grow. That only works while nothing in an earlier
+   file recreates something a later file has since dropped — and 005 did exactly
+   that for a release: it carried the two-argument `eugenia_search` that 007
+   drops to make room for the query vector.
+
+   Re-applying 005 on a database that has had 007 would have put the old
+   signature back beside the new one. Two things then go wrong at once, and 007's
+   own comment names both: a two-argument call matches both functions and
+   Postgres refuses it as ambiguous, and a bare `create` takes `execute` from the
+   schema's default privileges — which Supabase grants to `anon` and
+   `authenticated` BY NAME, so the `revoke ... from public` beside it does not
+   touch them. Her whole memory, reachable with the key that ships in the page.
+
+   Nothing failed. The file applies cleanly, the revoke it carries looks like the
+   guard, and the damage is a privilege nobody asked about.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no numbered file recreates an object a later one drops', () => {
+  const files = readdirSync(new URL('../supabase', import.meta.url))
+    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
+  assert.ok(files.length >= 6, `only ${files.length} numbered files found — the reader has gone blind`);
+
+  const text = (f) => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8');
+  const dropped = [];
+  for (const f of files) {
+    for (const [, kind, name] of text(f).matchAll(
+      /^drop (function|view|table|trigger) if exists (?:public\.)?([a-z0-9_]+)/gm)) {
+      dropped.push({ file: f, kind, name });
+    }
+  }
+  assert.ok(dropped.length >= 1, 'no drops read at all — the reader has gone blind');
+
+  /* ONLY THE FILES THAT CAN ACTUALLY BE APPLIED AGAIN. A file carrying a bare
+     `create table` refuses on its second run and stops there — 001 and 003 are
+     run-once by construction, which is why they may still hold the definitions
+     they had. Derived from the file rather than listed here, so a file that
+     becomes re-runnable comes under this rule the moment it does. */
+  const rerunnable = (f) => !/^create table (?!if not exists)/m.test(text(f));
+
+  for (const d of dropped) {
+    for (const f of files.filter(f => f < d.file && rerunnable(f))) {
+      assert.doesNotMatch(text(f), new RegExp(`create (or replace )?${d.kind} (public\\.)?${d.name}\\b`),
+        `${f} creates ${d.kind} ${d.name} and ${d.file} drops it — applying ${f} ` +
+        `again on a database that has had ${d.file} puts back the thing ${d.file} ` +
+        `was written to remove, and says nothing`);
+    }
   }
 });
 

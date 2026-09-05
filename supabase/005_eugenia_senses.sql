@@ -325,61 +325,15 @@ create index if not exists eugenia_notes_trgm
 create index if not exists eugenia_turns_trgm
   on public.eugenia_turns using gin (content gin_trgm_ops);
 
--- THE RETURN TYPE IS UNCHANGED, AND THAT IS LOAD-BEARING. `create or replace
--- function` may not alter a return type; widening it needs a `drop function`,
--- which takes the grants at the bottom of 003 with it. So the hybrid rides
--- inside the existing five columns exactly as `role` rides inside `source`.
---
--- RANKED IN TWO KEYS RATHER THAN ONE FUSED SCORE. ts_rank lands around 0.0-0.1
--- and word_similarity spans 0-1, so adding or maxing them requires a scale
--- factor invented to make the arithmetic come out — a fudge that decides
--- rankings while looking like a formula. Instead: an exact word match outranks
--- a near one, and within each group the stronger score wins. That is a rule a
--- person can predict, and it cannot silently invert when a constant drifts.
---
--- `lexical` is not returned; it only orders. Every row that comes back is a hit
--- either way, and telling her which mechanism found it would be telling her
--- about the plumbing.
-create or replace function public.eugenia_search(q text, lim int default 12)
-returns table (source text, id bigint, at timestamptz, retired boolean, body text)
-language sql
-stable
-as $$
-  select source, id, at, retired, body
-  from (
-    select 'note' as source, n.id, n.created_at as at,
-           n.superseded_by is not null as retired, n.note as body,
-           n.search @@ websearch_to_tsquery('english', q) as lexical,
-           greatest(
-             ts_rank(n.search, websearch_to_tsquery('english', q)),
-             word_similarity(q, n.note)
-           ) as rank
-      from public.eugenia_notes n
-     where n.search @@ websearch_to_tsquery('english', q)
-        -- The operator rather than the function, so the trigram index is used:
-        -- `q <% target` is word_similarity above pg_trgm.word_similarity_threshold.
-        or q <% n.note
-    union all
-    select case when t.role = 'user' then 'him' else 'you' end,
-           t.id, t.created_at, false, t.content,
-           t.search @@ websearch_to_tsquery('english', q),
-           greatest(
-             ts_rank(t.search, websearch_to_tsquery('english', q)),
-             word_similarity(q, t.content)
-           )
-      from public.eugenia_turns t
-     where t.search @@ websearch_to_tsquery('english', q)
-        or q <% t.content
-  ) hits
-  order by lexical desc, rank desc, at desc
-  limit greatest(1, least(coalesce(lim, 25), 25));
-$$;
-
--- Restated because `create or replace` above does not disturb them, and because
--- a reader arriving at this file should not have to open 003 to learn that her
--- memory is not a public endpoint.
-revoke execute on function public.eugenia_search(text, int) from public;
-grant execute on function public.eugenia_search(text, int) to service_role;
+-- THE FUNCTION ITSELF LIVES IN 007, and the two indexes above are what this
+-- file still owes it. 007 had to DROP the two-argument search to add the query
+-- vector — `create or replace function` cannot change an argument list — so a
+-- definition here would not replace 007's, it would sit beside it: a
+-- two-argument call matches both and Postgres refuses it as ambiguous, and a
+-- bare `create` carries `execute` to `anon` and `authenticated` from the
+-- schema's default privileges, which is a public entry point to her memory.
+-- This file is meant to be applied again as it grows, so anything it recreates
+-- has to be something 007 has not since taken over.
 
 -- ─── The trade she finds out about in two minutes ──────────────────────────
 -- THE SECOND HALF OF THE EVENT SPINE, AND THE ONE WITH A LIVE FEED ALREADY.

@@ -10,8 +10,9 @@
    emitted markup; they cannot see pixels, so a renderer that produces correct
    HTML with broken CSS passes here. Supabase is a recording stand-in, so load
    and save are exercised but realtime and the auth paths are not. The xlsx
-   export needs SheetJS from a CDN and is not exercised. And the Apps Script has
-   no coverage at all, here or anywhere.
+   export is exercised against a recording SheetJS stub, so the rows it builds
+   are asserted and the bytes SheetJS writes from them are not. And the Apps
+   Script has no coverage at all, here or anywhere.
 
    One thing about the trade factory shapes every result test below: trade()
    defaults to entry 3400 and exit 3410, a $10 move. Under the price-based
@@ -23,10 +24,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, trade, journalled } from './boot.mjs';
 
-let app, seed, $, win, close, db, charts;
+let app, seed, $, win, close, db, charts, sheets;
 
 before(async () => {
-  ({ app, seed, $, win, close, db, charts } = await boot());
+  ({ app, seed, $, win, close, db, charts, sheets } = await boot());
 });
 after(() => close());
 
@@ -52,6 +53,57 @@ test('any unanswered field leaves the trade pending', () => {
   assert.equal(app.isComplete(journalled({ followed_rules: null })), false);
   assert.equal(app.isComplete(journalled({ followed_sl: null })), false);
   assert.equal(app.isComplete(journalled({ followed_tp: null })), false);
+});
+
+/* THE SAME THREE-STATE, EVERYWHERE IT IS READ. `isComplete` is only one of six
+   consumers of these columns, and the other five each answer a different
+   question about the same null: what the bars count, what the log draws, what
+   the form pre-selects, what a save writes back, and what the export says. A
+   null read as a `no` in any one of them is the journal reporting a rule broken
+   that was never answered — and the bar is the worst of the six, because a
+   violation is exactly what the trader is looking for there. */
+
+test('an unanswered question is outside the compliance bar, not inside it as a no', () => {
+  // One answered YES and one never answered. The bar is 1 of 1, not 1 of 2:
+  // the second trade has nothing to say about the rule and must not be counted
+  // as having broken it.
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
+    journalled({ id: 'PID2', open_day: '2026-07-30', pnl: 40, followed_rules: null })
+  ]);
+  // The ratio is in the track's title; the percentage is what he reads.
+  const rules = $('disc-bars-total').querySelector('.period-disc-row');
+  assert.match(rules.textContent, /Rules/, 'the first bar is the rules bar');
+  assert.equal(rules.querySelector('.sess-wr-track').getAttribute('title'),
+    '1/1 followed',
+    'the unanswered rule was counted into the population it says nothing about');
+  assert.equal(rules.querySelector('.period-disc-pct').textContent, '100%',
+    'a question never answered is being reported as a rule broken');
+});
+
+test('the log draws an unanswered question as unanswered, never as a cross', () => {
+  renderClean([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40,
+    followed_rules: true, followed_sl: false, followed_tp: null })]);
+  const row = $('trade-table').querySelector('tr[data-trade="PID1"]');
+  assert.ok(row, 'the row is not in the log');
+  assert.equal(row.querySelectorAll('.rules-tick').length, 1, 'the YES');
+  assert.equal(row.querySelectorAll('.rules-cross').length, 1,
+    'the NO — and only the NO. A null drawn as a cross is a broken rule the ' +
+    'trader never reported');
+});
+
+test('a question left unanswered saves as unanswered, not as a no', () => {
+  // The form path, which is the one that writes. pickYN reads the radios; with
+  // neither pill selected there is no answer to read, and null is the only
+  // honest thing to send — `false` would put a rule breach in the database that
+  // nobody ever typed, and nothing downstream could tell it from a real one.
+  seed([trade({ id: 'PID1' })]);
+  app.Journal.open('PID1');
+  try {
+    assert.equal(app.pickYN('followed_rules'), null);
+    assert.equal(app.pickYN('followed_sl'), null);
+    assert.equal(app.pickYN('followed_tp'), null);
+  } finally { app.Journal.close(); }
 });
 
 test('an open position with no P&L can still be complete', () => {
@@ -361,6 +413,43 @@ test('an average is bucketed on the result label, never on the sign', () => {
   assert.equal(avgLoss, 30);
 });
 
+test('a bucket with nothing in it averages to nothing, never to zero', () => {
+  /* null and 0 are different claims — 0 says the average loss IS zero, which is
+     what a divide-by-zero produces once it has been coerced, and it is the
+     number the R:R bar then divides by. So the empty bucket is the case the
+     guard exists for, and it had never been driven. */
+  const px = (entry, exit, pnl) => trade({ entry_price: entry, exit_price: exit, pnl });
+  const range = (rows) => app.rangeStats(rows, '2000-01-01', '2100-01-01');
+
+  const noLosses = range([px(4500, 4560, 57), px(4500, 4540, 41)]);
+  assert.equal(noLosses.avgWin, 49);
+  assert.equal(noLosses.avgLoss, null, 'no losses yet is not an average loss of zero');
+
+  const noWins = range([px(4500, 4440, -30), px(4500, 4460, -20)]);
+  assert.equal(noWins.avgLoss, 25);
+  assert.equal(noWins.avgWin, null, 'no wins yet is not an average win of zero');
+
+  // A window of nothing but scratches decides neither bucket.
+  const allScratch = range([px(4500, 4502, 2), px(4500, 4498, -2)]);
+  assert.equal(allScratch.avgWin, null);
+  assert.equal(allScratch.avgLoss, null);
+});
+
+test('a run of wins with no loss behind it shows a ceiling, not a division', () => {
+  /* avgLoss is null there, and null coerces to 0 — so an unguarded ratio is
+     Infinity, which reaches the panel as "Infinity:1" and hands the segment
+     widths NaN. The cap is a ceiling and says so; what it must never be is a
+     computed value. */
+  renderClean([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 57, entry_price: 4500, exit_price: 4560 }),
+    journalled({ id: 'PID2', open_day: '2026-07-30', pnl: 41, entry_price: 4500, exit_price: 4540 })
+  ]);
+  const rr = $('rr-bar-total').textContent;
+  assert.match(rr, /RR Ratio/);
+  assert.match(rr, /9\.99:1/, `the ratio was divided rather than capped: ${rr.trim()}`);
+  assert.doesNotMatch(rr, /Infinity|NaN/);
+});
+
 test('a range opens where the range before it closed', () => {
   /* The half-open bound is what makes that true: [start, end), so a trade
      filed ON the start day is inside the range rather than in its opening
@@ -406,6 +495,12 @@ test('the week opens at the Sunday 17:00 New York gold open', () => {
   // and the Sunday open is when the week gets reviewed, and a calendar anchor
   // would blank every figure at exactly that moment.
   assert.equal(wk('2026-08-16T20:00:00Z'), '2026-08-09');
+  // The same Sunday at 00:30 ET, which is the hour the CYCLE decides. `hour <
+  // 17` is written for a midnight that arrives as 0; a formatter left to pick
+  // its own cycle can hand back 24, and 24 is not less than 17 — so this one
+  // instant would file the small hours of Sunday under the week that has not
+  // opened yet, and every figure on screen would jump a week for an hour.
+  assert.equal(wk('2026-08-16T04:30:00Z'), '2026-08-09');
   // 21:00 UTC is 17:00 ET exactly: the new week starts on the minute.
   assert.equal(wk('2026-08-16T21:00:00Z'), '2026-08-16');
   // And every day after it belongs to that Sunday.
@@ -573,6 +668,36 @@ test('a full panel renders with no step failing', () => {
   assert.deepEqual(failures, []);
   assert.ok($('trade-table').innerHTML.length > 0);
   assert.ok($('setup-table').innerHTML.length > 0);
+});
+
+test('a full render leaves every row exactly as it found it', () => {
+  /* No renderer mutates state, which is a rule this file states and nothing
+     checked. Freezing would not catch it: the app is a classic script in sloppy
+     mode, so a write to a frozen object fails silently rather than throwing —
+     the render would pass and the row would simply not have changed. So the
+     rows are compared before and after instead, which catches the write however
+     the engine treats it.
+
+     It matters most where it would be least visible. A renderer that sorted
+     Data.rows in place, or stamped a derived field onto a row to save
+     recomputing it, would leave every assertion in this file passing and change
+     what the NEXT render draws. */
+  /* Deliberately NEWEST first, so the order is one byKey would change. Given
+     the factory's default entry_time on every row the sort is stable and a
+     renderer sorting in place reorders nothing — a fixture that cannot show the
+     mutation asserts only that it did not happen to it. */
+  const rows = [
+    journalled({ id: 'PID3', open_day: '2026-07-30', pnl: 12, setup: 'Break & Retest',
+                 entry_time: '2026-07-30T16:00:00Z' }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -22, setup: 'Support & Resistance',
+                 entry_time: '2026-07-29T11:00:00Z', followed_sl: false }),
+    journalled({ id: 'PID1', open_day: '2026-07-28', pnl: 57.1, setup: 'Break & Retest',
+                 entry_time: '2026-07-28T09:00:00Z' }),
+  ];
+  const before = JSON.stringify(rows);
+  assert.deepEqual(renderClean(rows), [], 'a step failed, so this proves nothing');
+  assert.equal(JSON.stringify(rows), before,
+    'a render step wrote to the rows it was given');
 });
 
 test('the wheel row runs narrowest window to widest, left to right', () => {
@@ -774,6 +899,110 @@ test('the discipline answers are read from the modal body, not the document', ()
     decoy.remove();
     app.Journal.close();
   }
+});
+
+
+/* ─── What the export actually carries ───────────────────────────────────────
+   The export was the last surface here reading these columns with nothing
+   watching it, and the reason was mechanical rather than deliberate: SheetJS
+   arrives from a CDN, so the whole of IO.journal() sat behind a fetch. It does
+   not any more — the harness puts a recording stand-in on window.XLSX, which is
+   the one condition loadXLSX() checks, so every line the app owns runs and the
+   rows it hands over are read back.
+
+   What this cannot see is SheetJS itself: the workbook is a stub, so a column
+   width or a sheet name would pass here and be wrong in the file. The numbers
+   are the part worth holding, and they are the part that is now held.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the export carries the figures the screen carries', async () => {
+  seed([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 57.1, setup: 'Break & Retest',
+                 entry_time: '2026-07-30T14:00:00Z' }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -22, setup: 'Support & Resistance',
+                 entry_time: '2026-07-29T09:00:00Z', followed_sl: false })
+  ]);
+  const before = sheets.length;
+  await app.IO.journal();
+  assert.equal(sheets.length, before + 1, 'the export built no sheet');
+
+  const rows = sheets[sheets.length - 1].rows;
+  assert.equal(rows.length, 2);
+
+  // Same P&L, same result label and same session the panel derives — read from
+  // the app rather than typed here, so this cannot drift into its own opinion
+  // of what a trade is.
+  for (const row of rows) {
+    const t = app.Data.byId.get(row.Date.includes('30') ? 'PID1' : 'PID2');
+    assert.equal(row['P&L ($)'], t.pnl);
+    assert.equal(row.Session, app.sessionOf(t));
+    assert.equal(row.Setup, t.setup);
+    assert.equal(row.Result,
+      { win: 'Win', loss: 'Loss', be: 'Break Even' }[app.resultOf(t)]);
+  }
+});
+
+test('the export says nothing where a question was never answered', () => {
+  // The sixth reader of the three-state boolean, and the one that leaves the
+  // app: a null written out as "No" is a rule breach in a file he may hand to
+  // someone else, with no way back to the fact that he simply never answered.
+  const cell = sheets[sheets.length - 1].rows.find(r => r.Setup === 'Break & Retest');
+  assert.equal(cell['Followed Rules'], 'Yes');
+
+  return (async () => {
+    seed([journalled({ id: 'PID3', open_day: '2026-07-30', pnl: 12,
+                       followed_rules: null, followed_sl: false })]);
+    await app.IO.journal();
+    const row = sheets[sheets.length - 1].rows[0];
+    assert.equal(row['Followed Rules'], '',
+      'an unanswered question left the app as an answer');
+    assert.equal(row['Followed Stop Loss'], 'No', 'a real NO must still say No');
+    assert.equal(row['Followed Take Profit'], 'Yes');
+  })();
+});
+
+/* ─── The snapshot, which is a full copy of the journal on the device ────────
+   It exists so the panel is drawn before the fetch answers, and it is written
+   in plaintext to localStorage. Two properties matter and neither was tested:
+   it is only ever written from what the database confirmed, and it is gone the
+   moment he signs out. Left behind, the next person to open the laptop gets the
+   login screen and the previous session's trade history one keypress apart —
+   and there is nothing to notice, because everything on screen looks right.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a confirmed load leaves a snapshot, and a failed one is drawn from it', async () => {
+  const key = app.CONFIG.SNAPSHOT;
+  win.localStorage.removeItem(key);
+
+  db.rows = [journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })];
+  db.error = null;
+  await app.Data.load();
+  assert.equal(app.Data.offline, false);
+  assert.deepEqual(JSON.parse(win.localStorage.getItem(key)).map(t => t.id), ['PID1'],
+    'a load the database confirmed left nothing to draw from next time');
+
+  // Now the database refuses. The rows must come back off the snapshot, and
+  // the dot must say so rather than showing a confident empty panel.
+  db.error = { message: 'network' };
+  await app.Data.load();
+  assert.equal(app.Data.offline, true);
+  // Spread first: Data.rows lives in the jsdom realm, and deepStrictEqual
+  // compares prototypes — the same idiom every array assertion here uses.
+  assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID1']);
+  assert.deepEqual(JSON.parse(win.localStorage.getItem(key)).map(t => t.id), ['PID1'],
+    'a failed load overwrote the snapshot with what it did not get');
+  db.error = null;
+});
+
+test('signing out takes the journal off the device', async () => {
+  const key = app.CONFIG.SNAPSHOT;
+  win.localStorage.setItem(key, JSON.stringify([{ id: 'PID1' }]));
+  // location.reload() is not implemented in jsdom and is the last thing signOut
+  // does; the clearing happens before it and is what this is about.
+  try { await app.Login.signOut(); } catch { /* the reload, not the clear */ }
+  assert.equal(win.localStorage.getItem(key), null,
+    'the snapshot survived sign-out — the next person sees the login screen ' +
+    'and the previous session\'s trades one keypress apart');
 });
 
 /* ─── Sorting ────────────────────────────────────────────────────────────── */

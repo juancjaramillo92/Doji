@@ -318,6 +318,8 @@ be single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
+| the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its short/long P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, and the app's Long/Short label — narrowing the constraint refuses every SELL at PostgREST and the poller reports it to the console only |
+| the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes — her own turns are half of every pair, so a constraint that refuses `assistant` leaves a history of his messages alone |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` — which is one constant interpolated into both the cached prefix and §0, so the rungs are a copy and the table is not |
@@ -327,6 +329,7 @@ be single-sourced at run time:
 | each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search — a disagreement is a 400 on every write, reported to a console nobody reads |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port of all six so she can reach them — the break-even band, the session names and all four sets of market hours are read out of both files, and so is the SHAPE of the three definitions that look identical in every ordinary case and part on one |
+| the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, and one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys` and two in `doji-eugenia` — every one stating `hourCycle: 'h23'`, because `hour12: false` leaves the choice to the locale and a locale resolving to h24 renders midnight as hour 24. Harmless in the two `hourIn` ports, where 24 fails `h < close` as 0 fails `h >= open`; wrong in `nyParts` and `nyWall`, which compare the hour against 17 and feed it to `Date.UTC` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, which closes Friday and opens Sunday on it, and `ROLL_HOUR` in `index.ts`, which decides whether a quote is describing the night or the evening — one boundary, and a disagreement is a window labelled wrong for an hour a day |
 | the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
 | the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
@@ -414,7 +417,30 @@ skipping on a phone does not consume the laptop's turn. A gesture-less download
 can be blocked silently with no API to detect it, so the toast asks you to verify
 rather than asserting success.
 
-**Signing out** is a double-click on the sync dot.
+**The backup is `trades` and nothing else, and the tables it leaves out are the
+ones that cannot be rebuilt.** Every broker column in `trades` exists in
+cTrader's history and a wide `?force=1` backfill reconstructs it; the journal
+columns and the soft-deleted rows are the part only this file holds, and those
+the backup does carry. Her memory is the other way round. `eugenia_notes`,
+`eugenia_turns`, `eugenia_channels`, `eugenia_thesis`, `eugenia_loops` and
+`eugenia_calendar` have no source anywhere else — the channel map is a year of
+teaching with a `moved_on` date per rung, and the calendar is the one dataset
+here that compounds — and no button in this app reaches them.
+
+That is not a bug in the backup. `003` denies the publishable key her notes and
+turns deliberately, and `005` grants the app a read on only three of her tables,
+so an in-app backup structurally cannot include them and should not be given the
+policy that would let it. It means the mechanism has to live at the database
+instead — Supabase's own backups, or a scheduled dump of the `eugenia_*`
+tables — and until one is turned on, losing the project loses everything she
+knows about him while the trades come back in full.
+
+**Signing out** is a double-click on the sync dot, and it deletes the snapshot:
+a full copy of the journal sits in `localStorage` in plaintext, and left behind
+it puts the login screen and the previous session's trades one keypress apart on
+a shared machine. `app.test.mjs` drives that path — removing the delete goes
+red, as does a confirmed load that writes no snapshot or a failed one that
+ignores it.
 
 **If a trade does not appear**, the cron reporting `succeeded` proves nothing —
 `net.http_post` is asynchronous, so the SQL succeeded in *queuing* the request.
@@ -424,6 +450,29 @@ The function's own answer is here:
 select status_code, content, created
 from net._http_response order by created desc limit 10;
 ```
+
+### When a number looks wrong
+
+Every column has exactly one writer or a written arbitration rule, so the first
+question is always *who owns this*, and the second is *what does the repair
+overwrite*. Nothing here is guesswork: a wrong direction cannot be fixed in the
+app, because the app does not own the column.
+
+| The number | Who owns it | How to see the fault | The repair | What that repair also does |
+|---|---|---|---|---|
+| direction, entry time or price, exit price, size, commission, `computed_pnl`, filing day | the poller, alone | `?raw=1&hours=N` — what cTrader actually sent | `?force=1&hours=N` if the fold is wrong for a response that is right; a code change if the response itself is shaped differently | rewrites all ten of those columns for **every** position in the window, so any hand-correction inside it goes back |
+| `net_pnl` — the settled money figure | the email path, alone | the thread is unlabelled, so the next Apps Script run retries it | re-send the alert, or accept `computed_pnl` through `pnl` | nothing; the poller never writes this column |
+| a closed trade with `exit_price is null` | the poller, folded without its entry deal | that combination *is* the signature | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
+| `balance`, `planned_sl`, `planned_tp`, `fill_time` | two claimants, settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
+| setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
+| a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
+
+Two writers report failure to nobody. The poller and the email function have no
+path to Telegram: a 500, a refused write, or a cut deals page reaches
+`console.error` and stops there, and `pg_net` discards the response. So the
+absence of trades is the symptom, and the query above is where the answer is.
+Eugenia's scheduled half is the exception — it messages Telegram on failure and
+retries until the marker lands.
 
 ---
 
@@ -502,7 +551,22 @@ folded from a partial history.
 direction or a missing entry price is either a fold this function got wrong or a
 response cTrader shaped differently, and the two repairs are opposite — a
 `?force=1&hours=N` backfill for the first, a code change for the second. Nothing
-else in the system can tell them apart. The flag writes nothing, makes the same
+else in the system can tell them apart.
+
+**A forced backfill overwrites a hand-corrected row, and that is the one thing
+to know before running one.** Every broker column is rewritten from the deals as
+they fold today, so a row edited in the dashboard to fix a direction or a price
+goes back to what the fold produces — silently, and for every position the
+window reaches, not only the one being repaired. The journal columns are never
+touched, `net_pnl` is not among the columns the fold writes at all, and the
+arbitrated columns keep their `is null` filters — so the money figure the email
+owns, `balance`, `planned_sl`, `planned_tp` and `fill_time` all survive it. The
+ten the fold does write are `direction`, `entry_time`, `entry_price`,
+`exit_price`, `size_oz`, `commission`, `computed_pnl` and `open_day`, and those
+do not.
+Widen `hours` to the smallest window that covers the row you mean, and expect a
+correction older than that window to stand only until the next backfill reaches
+back past it. The flag writes nothing, makes the same
 `get_deals` call the poll was about to make, and returns the body as text: the
 SSE framing and the double-encoded payload are half of what is being looked at,
 so parsing them away would hide the layer the question is usually about.
@@ -885,6 +949,14 @@ made on the occasions it is needed — a missed edit reads as compliance, so tho
 two bars bias upward and nothing in the data shows it. It is the same shape as
 the `null`-is-not-`no` rule: an answer nobody gave must not be counted as one.
 
+It is said at all three places the columns are used, not only here. The trigger
+that asks the question carries it; `disciplineBars` carries it, because that is
+where the figure is produced and a schema comment is not in front of anyone
+reading a renderer; and Eugenia's prompt carries it, because she is served both
+columns through `eugenia_trades` and could otherwise report a stop-discipline
+rate as a measurement. `agree.test.mjs` reads the prompt for it — deleting the
+paragraph breaks nothing else, and the rate she gives still reads as a fact.
+
 **Two failure modes are coded for rather than discovered.** A double tap sends
 the identical update twice and the second `editMessageText` returns `400 message
 is not modified` — the correct outcome, reported as an error, and treated as
@@ -941,7 +1013,11 @@ more than a real day, so it bites only on a backfill or a very long day — and
 `order=id.asc&limit=200` read the *first* two hundred, which is a pass that
 distils the morning and drops the evening, where a late instruction lives. The
 select runs newest-first and is reversed for reading, exactly as `recent()` does.
-The two are indistinguishable from outside, which is why nothing caught it.
+The two are indistinguishable from outside, which is why nothing caught it — so
+`agree.test.mjs` now refuses `order=id.asc` under a limit on *every* read of her
+own tables rather than on the two that have already gone wrong. Ordering by a
+clock is left alone: the event spine reads `at.asc` because the next release is
+the earliest one.
 
 **Its default is almost nothing.** Most days deserve no note — a conversation
 about today's data leaves nothing durable, and that is the normal outcome. The
@@ -2137,6 +2213,18 @@ or `on conflict do nothing` — which `003` deliberately is not, because this is
 the file that will grow. A test asserts that: a bare `create table` or
 `create index` in it would refuse on the second run.
 
+**Being re-runnable also means it may not undo a later file**, which is the half
+that has already been wrong once. 005 carried the two-argument `eugenia_search`
+until `007` dropped that signature to make room for the query vector, and
+re-applying 005 afterwards would have put the old function back *beside* the new
+one — an ambiguous two-argument call, and a bare `create` taking `execute` from
+the schema's default privileges, which Supabase grants to `anon` and
+`authenticated` by name. The `revoke ... from public` sitting under it does not
+touch either. Nothing would have failed; the file applies cleanly and the damage
+is a privilege nobody asked about. The function is 007's alone now, 005 keeps
+only the extension and the two trigram indexes it still owes it, and a test
+reads every re-runnable file against every `drop` a later one makes.
+
 Three things outside the SQL have to move with it, and none of them fails loudly:
 
 **The event spine needs its own cron job.** `004_cron.sql` gains a
@@ -2257,7 +2345,9 @@ every hour for the one night a year it had something to do.
 **It drains newest first, which is the same decision the day's window got wrong.**
 The sweep took `id.asc`, and since the backlog empties either way that looked
 like a choice with no consequence — exactly how `order=id.asc&limit=200` looked
-on the nightly turns. The consequence is *when*: at fifty rows a night, a vendor
+on the nightly turns. It was also the one read the bounded-read test could not
+see, because it reads `rest/v1/${table}` for two tables through one function and
+that test named its subjects; it matches whatever stands before the `?` now. The consequence is *when*: at fifty rows a night, a vendor
 outage that left a fortnight without vectors became searchable oldest-first, so
 last month's archive came back before last week's conversation and the rows he is
 likeliest to ask about arrived last.
@@ -2597,7 +2687,9 @@ shared" but **"are there two copies nothing can compare"**, and `secretMatches`
 is why: the function exists to be *constant-time*, so a copy quietly rewritten
 to `presented === expected` returns the same answer to every assertion anyone
 would write while leaking the secret through timing. A behavioural test cannot
-see that; one definition has nothing to drift.
+see that, so `agree.test.mjs` reads the body instead — the loop over the longer
+of the two inputs, and the absence of any direct comparison of the two secrets.
+One definition has nothing to drift, and now the definition itself is held.
 
 The rest met the same test and were extracted late. `sbHeaders` and the Telegram
 call were **byte-identical** in both bots. The two New York clocks differed only
@@ -2902,7 +2994,10 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 11. For Eugenia: a second BotFather bot, `/start` it, and set
     `EUGENIA_BOT_TOKEN`, `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` in
     Edge Function secrets. Point Telegram at `/functions/v1/doji-eugenia` with
-    that secret token and `allowed_updates=["message"]`. The API key comes from
+    that secret token and `allowed_updates=["message", "callback_query"]` —
+    both, because her briefings carry a feedback keyboard and a webhook
+    registered for messages alone never delivers the taps: the button spins and
+    nothing anywhere reports it. The API key comes from
     platform.claude.com — the same Anthropic account, billed as prepaid credits
     rather than a subscription. **Set a spend cap on that key**: it is the only
     place a bound on what she can cost is actually enforceable.
@@ -2956,9 +3051,9 @@ not run.
 | File | Covers |
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped` and `apologyFor` |
-| `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
+| `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
@@ -2968,7 +3063,10 @@ markup, so it cannot see pixels — a renderer that emits correct HTML with brok
 CSS passes. The Supabase client is a recording stand-in, so `load` and `save`
 are exercised but realtime and the auth paths are not. `mcpInit`, `mcpCall` and
 `upsert` reach the network on their first line and are not exported. The xlsx
-export needs SheetJS from a CDN and is not exercised.
+export runs against a recording SheetJS stand-in — `loadXLSX()` returns at once
+when `window.XLSX` is already there, so every line the app owns is exercised and
+the rows it hands over are asserted; what SheetJS then writes from them, and the
+column widths and sheet name it is given, are not.
 
 **The Apps Script is covered where it decides something, and the rest is
 named.**
@@ -3147,9 +3245,12 @@ opening line came from prose rather than from the instrument.
 
 **The session seam.** Fills the poller never reached have no `entry_time`, so
 their session derives from close time rather than entry time. Flag it whenever
-session data is read for a pattern spanning that boundary. A `?force=1` run with
-a wide lookback repairs them for good — nothing is stored, so backfilling the
-entry time is the whole fix.
+session data is read for a pattern spanning that boundary. `get_stats` is the
+one read that does exactly that, so it counts the seam rows and says so above
+the split, on the same terms as the settled-versus-folded count above it — only
+where there is one, and with the reason travelling beside the number. A
+`?force=1` run with a wide lookback repairs them for good — nothing is stored,
+so backfilling the entry time is the whole fix.
 
 **R:R is realised, not planned.** Average win over average loss from closed P&L,
 drawn once per window — month, week and all time — above that window's wheel, so

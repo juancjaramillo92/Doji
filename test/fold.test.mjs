@@ -2261,10 +2261,45 @@ test('pre-sync rows are outside every population', () => {
   // §8's first filter. A client-id row has no prices and null timestamps, and
   // sweeping them in is how a hunt for broker-data problems fills with false
   // positives.
-  const old = { ...trade({ id: 'abc123', pnl: 100, entry_price: 4000, exit_price: 4012 }) };
-  for (const r of checkRules([old])) {
+  /* THE ROWS HAVE TO BE ABLE TO TRIP THE RULES, or this asserts nothing. An
+     earlier version passed one bare row — no entry_time, no open_day, no
+     fill_time — and every rule that needs one of those skipped it on that
+     ground rather than on its id. Removing isBroker from any single rule left
+     the test green, because the fixture could not reach the filter it was
+     written to check.
+
+     So these are real trades in every respect but their ids, and the second
+     half proves it: under broker ids the same rows produce verdicts. */
+  const rows = (id) => [
+    // A win that closed under $25 — R-01. Overlaps the next one — R-10.
+    trade({ id: `${id}a`, pnl: 100, entry_price: 4000, exit_price: 4012,
+            open_day: '2026-01-06', entry_time: '2026-01-06T10:00:00Z',
+            fill_time: '2026-01-06T15:00:00Z' }),
+    // A loss further than $20 from entry — R-02 — opened inside that span.
+    trade({ id: `${id}b`, pnl: -400, entry_price: 4000, exit_price: 3950,
+            open_day: '2026-01-06', entry_time: '2026-01-06T11:00:00Z',
+            fill_time: '2026-01-06T12:00:00Z' }),
+  ];
+
+  for (const r of checkRules(rows('abc'))) {
     assert.equal(r.verdict, 'unknown', `${r.rule} read a pre-sync row into its population`);
   }
+
+  // The anti-vacuity half: the identical rows under broker ids are seen.
+  const seen = checkRules(rows('PID')).filter(r => r.verdict !== 'unknown');
+  assert.ok(seen.length > 0,
+    'the fixture trips no rule even under a broker id, so the half above ' +
+    'proves nothing about the id filter');
+
+  /* AND THE ONE POPULATION checkRules DOES NOT REACH. dayStanding is what tells
+     her a day has passed its R-11 limit, and it takes the same filter for the
+     same reason — a client-id row carrying today's date would put money she
+     never lost today into the figure that stops him trading. */
+  assert.equal(dayStanding(rows('abc'), '2026-01-06'), null,
+    'a pre-sync row was counted into the day the loss limit is read over');
+  assert.ok(dayStanding(rows('PID'), '2026-01-06'),
+    'the same rows under a broker id must produce a standing, or the line ' +
+    'above is passing on the date rather than on the id');
 });
 
 test('the render names the failures and says how much was unknown', () => {
@@ -3218,6 +3253,45 @@ test('a total says how much of it is settled and how much is the fold', () => {
 
   // An open trade is in neither: it has no P&L to be settled or folded.
   assert.equal(journalStats([settled, jt({ id: 'PIDc' })]).fellBack, 0);
+});
+
+/* ─── The second fallback under the same summary ─────────────────────────────
+   The session breakdown reads `sessionOf`, which takes the ENTRY instant and
+   drops to the closing fill when a row has no entry_time — an email-only fill
+   the poller never reached. That is the seam the README names, and a hold
+   carried across a session boundary is filed under the wrong one by it.
+
+   Reading the rows she can see which are which; a total cannot, which is
+   exactly the argument that put `fellBack` above. So the count travels with
+   the split, on the same terms: only where there is one.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('the session split says how much of it came from the close', () => {
+  const entered = jt({ id: 'PIDa', entry_time: '2026-07-30T14:00:00Z',
+                       fill_time: '2026-07-30T14:30:00Z', pnl: 60, net_pnl: 60 });
+  // No entry_time at all: the email path's row, whose session can only come
+  // from when it closed.
+  const seam = jt({ id: 'PIDb', entry_time: null,
+                    fill_time: '2026-07-30T02:00:00Z', pnl: 30, net_pnl: 30 });
+
+  const s = journalStats([entered, seam]);
+  assert.equal(s.seam, 1);
+  assert.equal(s.bySession.length > 0, true, 'the split has to exist to be qualified');
+
+  const out = statsList(s, 30);
+  assert.match(out, /1 of these have no entry_time/);
+  assert.match(out, /from the closing fill rather than the entry/,
+    'the reason it matters has to travel with the count, as it does for the P&L');
+
+  // An open position has an entry and no fill: it is not a seam row.
+  assert.equal(journalStats([entered, jt({ id: 'PIDc', fill_time: null })]).seam, 0);
+});
+
+test('a window with no seam row says nothing about the seam', () => {
+  const s = journalStats([jt({ id: 'PIDa', entry_time: '2026-07-30T14:00:00Z',
+                               fill_time: '2026-07-30T14:30:00Z', pnl: 60, net_pnl: 60 })]);
+  assert.equal(s.seam, 0);
+  assert.doesNotMatch(statsList(s, 30), /no entry_time/,
+    'a line saying nothing fell back is noise on every ordinary window');
 });
 
 test('a window where nothing fell back says nothing about it', () => {
