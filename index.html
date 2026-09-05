@@ -549,12 +549,14 @@ nav {
   background:var(--mt); opacity:.35; margin-right:4px;
   transition:background .2s, opacity .2s;
 }
-/* Screen-reader-only. Same clip-path pattern as the journal's pill inputs. */
-.sr-only {
+/* HIDDEN FROM EYES AND NOT FROM ANYTHING ELSE, stated once. Every element here
+   is a 1px clipped box that a screen reader still reaches — the sync dot's
+   label, and the journal's radios, which must keep their place in the tab order
+   and the accessibility tree. `display:none` would take all three out of both. */
+.sr-only, .sync-dot-label, .jf-pill-radio {
   position:absolute; width:1px; height:1px;
   overflow:hidden; clip-path:inset(50%); white-space:nowrap;
 }
-.sync-dot-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .sync-dot.busy  { background:var(--p);    opacity:.9; animation:brokerPulse 1.4s ease-in-out infinite; }
 .sync-dot.ok    { background:var(--win);  opacity:.55; }
 /* Amber, not red: a cached copy is a state to notice, not a failure. The
@@ -1044,13 +1046,9 @@ td.c   { text-align:center; }
 .journal-q-label {
   color:var(--mt2); margin-bottom:12px; display:block;
 }
-/* Not display:none, which takes the input out of the tab order AND the
-   accessibility tree and leaves every answer mouse-only. The label carries the
-   whole appearance. */
-.jf-pill-radio {
-  position:absolute; width:1px; height:1px;
-  overflow:hidden; clip-path:inset(50%); white-space:nowrap;
-}
+/* The label carries the whole appearance — the input itself is hidden by
+   `.sr-only` above rather than by display:none, which would leave every answer
+   mouse-only. */
 /* :focus-visible, not :focus — a mouse click never triggers it. */
 .jf-pill-radio:focus-visible + .jf-pill-lbl {
   outline:2px solid var(--p); outline-offset:2px;
