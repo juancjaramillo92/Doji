@@ -3167,9 +3167,12 @@ opening line came from prose rather than from the instrument.
 
 **The session seam.** Fills the poller never reached have no `entry_time`, so
 their session derives from close time rather than entry time. Flag it whenever
-session data is read for a pattern spanning that boundary. A `?force=1` run with
-a wide lookback repairs them for good — nothing is stored, so backfilling the
-entry time is the whole fix.
+session data is read for a pattern spanning that boundary. `get_stats` is the
+one read that does exactly that, so it counts the seam rows and says so above
+the split, on the same terms as the settled-versus-folded count above it — only
+where there is one, and with the reason travelling beside the number. A
+`?force=1` run with a wide lookback repairs them for good — nothing is stored,
+so backfilling the entry time is the whole fix.
 
 **R:R is realised, not planned.** Average win over average loss from closed P&L,
 drawn once per window — month, week and all time — above that window's wheel, so

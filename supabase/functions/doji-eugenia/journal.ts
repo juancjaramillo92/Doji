@@ -196,6 +196,9 @@ export interface Stats {
   // how many fell back to the fold.
   settled: number;
   fellBack: number;
+  // And of the rows the session breakdown is taken over, how many got their
+  // session from the CLOSING fill because the poller never reached them.
+  seam: number;
   bySession: Slice[];
   bySetup: Slice[];
 }
@@ -212,6 +215,7 @@ export function journalStats(rows: TradeRow[]): Stats {
     rr: realisedRR(avg),
     settled: priced.filter(t => t.net_pnl != null).length,
     fellBack: priced.filter(t => t.net_pnl == null).length,
+    seam: rows.filter(t => t.entry_time == null && t.fill_time != null).length,
     // Ordered by the app's own list rather than by whatever the rows produced,
     // so a session with no trades is absent and the rest read in the order he
     // sees them on screen.
@@ -253,6 +257,16 @@ export function statsList(s: Stats, days: number): string {
       : '',
     `· average win ${usd(s.averages.avgWin)}, average loss ${usd(s.averages.avgLoss)}, ` +
       `realised reward-to-risk ${s.rr === null ? '—' : `1:${s.rr}`} — realised, not planned`,
+    // THE SESSION SEAM, on the same terms as the P&L fallback above and for the
+    // same reason: the breakdown below is the one read that spans it. A row the
+    // poller never reached has no entry_time, so its session comes from when it
+    // CLOSED rather than from when it opened — which can be a different session
+    // entirely on anything held across one. Only where there is one.
+    s.seam && s.bySession.length
+      ? `· ${s.seam} of these have no entry_time, so their session below is taken ` +
+        `from the closing fill rather than the entry. Say so before reading a ` +
+        `pattern off the session split.`
+      : '',
     s.bySession.length ? `\nBy session:\n${s.bySession.map(line).join('\n')}` : '',
     s.bySetup.length ? `\nBy setup:\n${s.bySetup.map(line).join('\n')}` : '',
   ].filter(Boolean).join('\n');

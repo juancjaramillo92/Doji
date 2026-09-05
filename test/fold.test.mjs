@@ -3220,6 +3220,45 @@ test('a total says how much of it is settled and how much is the fold', () => {
   assert.equal(journalStats([settled, jt({ id: 'PIDc' })]).fellBack, 0);
 });
 
+/* ─── The second fallback under the same summary ─────────────────────────────
+   The session breakdown reads `sessionOf`, which takes the ENTRY instant and
+   drops to the closing fill when a row has no entry_time — an email-only fill
+   the poller never reached. That is the seam the README names, and a hold
+   carried across a session boundary is filed under the wrong one by it.
+
+   Reading the rows she can see which are which; a total cannot, which is
+   exactly the argument that put `fellBack` above. So the count travels with
+   the split, on the same terms: only where there is one.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('the session split says how much of it came from the close', () => {
+  const entered = jt({ id: 'PIDa', entry_time: '2026-07-30T14:00:00Z',
+                       fill_time: '2026-07-30T14:30:00Z', pnl: 60, net_pnl: 60 });
+  // No entry_time at all: the email path's row, whose session can only come
+  // from when it closed.
+  const seam = jt({ id: 'PIDb', entry_time: null,
+                    fill_time: '2026-07-30T02:00:00Z', pnl: 30, net_pnl: 30 });
+
+  const s = journalStats([entered, seam]);
+  assert.equal(s.seam, 1);
+  assert.equal(s.bySession.length > 0, true, 'the split has to exist to be qualified');
+
+  const out = statsList(s, 30);
+  assert.match(out, /1 of these have no entry_time/);
+  assert.match(out, /from the closing fill rather than the entry/,
+    'the reason it matters has to travel with the count, as it does for the P&L');
+
+  // An open position has an entry and no fill: it is not a seam row.
+  assert.equal(journalStats([entered, jt({ id: 'PIDc', fill_time: null })]).seam, 0);
+});
+
+test('a window with no seam row says nothing about the seam', () => {
+  const s = journalStats([jt({ id: 'PIDa', entry_time: '2026-07-30T14:00:00Z',
+                               fill_time: '2026-07-30T14:30:00Z', pnl: 60, net_pnl: 60 })]);
+  assert.equal(s.seam, 0);
+  assert.doesNotMatch(statsList(s, 30), /no entry_time/,
+    'a line saying nothing fell back is noise on every ordinary window');
+});
+
 test('a window where nothing fell back says nothing about it', () => {
   /* Noise on every ordinary window otherwise — swap accrues only across the
      17:00 roll, so the common case is that every row is settled or intraday
