@@ -2745,6 +2745,13 @@ test('the journal stats agree with the app they were ported from', () => {
     ['the scratch band against the entry PRICE', /Math\.abs\(t\.exit_price - t\.entry_price\) <= BE/],
     ['the money split on the SIGN of the P&L',    /if \(t\.pnl >= 0\) gross \+= t\.pnl; else loss -= t\.pnl;/],
     ['the averages split on the RESULT LABEL',    /r === 'win'[\s\S]{0,60}r === 'loss'/],
+    /* THE FOURTH, and the one a band cannot state. A trade can move sixty
+       dollars of price and come back to exactly nothing once commission is in,
+       so the price band cannot reach it — and it is a break-even at any lot
+       size, which is the property the band is measured in price to protect.
+       Both files must say so or the same trade is a break-even in the app and a
+       loss to her, on the same row. */
+    ['exactly nothing made as a BREAK-EVEN', /scratch \|\| t\.pnl === 0 \? 'be'/],
   ]) {
     assert.match(mod, re, `journal.ts no longer computes ${what}`);
   }
@@ -2755,6 +2762,9 @@ test('the journal stats agree with the app they were ported from', () => {
     'index.html no longer measures a scratch in price — journal.ts is now a port of something else');
   assert.match(app, /if \(t\.pnl >= 0\) gross \+= t\.pnl; else loss -= t\.pnl;/,
     'index.html no longer splits money on the sign');
+  assert.match(app, /scratch \|\| t\.pnl === 0 \? 'be'/,
+    'index.html no longer calls a P&L of exactly zero a break-even, so her port ' +
+    'and the screen disagree about the same trade');
 });
 
 test('the stats tool is offered wherever the journal is reasoned about', () => {
