@@ -792,6 +792,141 @@ test('every function a caller names is a function that exists', () => {
   }
 });
 
+/* ─── Every CSS rule is reachable, and the scan that says so was proved first ─
+   The audit scanned CONFIG keys, declarations and `id` attributes; it never
+   scanned CSS RULES, so a selector whose class stopped being emitted has been
+   invisible for the life of the file. It fails in the quietest way available —
+   the rule stays, costs nothing, matches nothing, and reads as styling for
+   something that exists.
+
+   THE FIRST VERSION OF THIS REPORTED A CLEAN FILE AND WAS BROKEN, which is the
+   fourth time that has happened here and the reason the proof is written down.
+   Two ways it went blind:
+
+     · Substring matching. `.win` is "found" inside `window`, and the audit's own
+       scan had `"poll"` matching a paragraph about the poller. Names are matched
+       as whole tokens now, bounded by anything that is not a name character.
+
+     · A prefix sitting before a quote counted as dynamic construction. Every
+       class in the file sits before a quote somewhere, so `.watch-movedx` —
+       planted by renaming a live rule — "matched" `class="watch-moved">` and was
+       waved through as built at runtime. A name assembled at runtime appears as
+       a literal prefix that ENDS where the variable begins: `'sess-wr-' + key`
+       or `` `sess-wr-${key}` ``. So the prefix must be quote-terminated or
+       followed by `${`, and must end at a dash.
+
+   Proved against three planted defects — an invented rule, a live rule renamed
+   in the stylesheet only, and a rule mentioned nowhere but a comment — and
+   against a fourth that must NOT be flagged, an invented `.sess-wr-*` that a
+   real prefix reaches. Comments are stripped from the searched text for the
+   same reason the third case exists.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Exported shape rather than inline, so the proof above can be re-run against a
+// planted defect without editing the assertion it is proving.
+export function deadRules(src) {
+  const a = src.indexOf('<style>') + 7, b = src.indexOf('</style>');
+  const css = src.slice(a, b);
+
+  // Prose is where a scan like this goes blind in both directions.
+  const rest = (src.slice(0, a) + src.slice(b))
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+
+  // Selectors only: walk the brace depth rather than regex the whole sheet, so
+  // a declaration value containing a brace or a dot cannot be read as one.
+  const selectors = [];
+  let depth = 0, buf = '';
+  for (const ch of css.replace(/\/\*[\s\S]*?\*\//g, '')) {
+    if (ch === '{') { if (depth === 0) selectors.push(buf); buf = ''; depth++; }
+    else if (ch === '}') { depth--; if (depth === 0) buf = ''; }
+    else if (depth === 0) buf += ch;
+  }
+
+  const classes = new Set(), ids = new Set();
+  for (const sel of selectors) {
+    for (const [, c] of sel.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) classes.add(c);
+    for (const [, i] of sel.matchAll(/#(-?[A-Za-z_][\w-]*)/g)) ids.add(i);
+  }
+
+  const esc0 = (n) => n.replace(/[-]/g, '\\-');
+  const seen = (n) => new RegExp(`(?<![\\w-])${esc0(n)}(?![\\w-])`).test(rest);
+  const built = (n) => {
+    for (let i = n.length - 1; i >= 4; i--) {
+      const pre = n.slice(0, i);
+      if (!pre.endsWith('-')) continue;
+      const q = esc0(pre);
+      if (new RegExp(`['"\`]${q}['"\`]`).test(rest)) return pre;
+      if (new RegExp(`['"\`]${q}\\$\\{`).test(rest)) return pre;
+    }
+    return null;
+  };
+
+  const dead = [];
+  for (const c of [...classes].sort()) if (!seen(c) && !built(c)) dead.push('.' + c);
+  for (const i of [...ids].sort())     if (!seen(i) && !built(i)) dead.push('#' + i);
+  return { dead, classes: classes.size, ids: ids.size, selectors: selectors.length };
+}
+
+test('every CSS rule in the client is reachable from the markup or the script', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const got = deadRules(src);
+
+  // WITHOUT THESE THE ASSERTION BELOW PASSES ON A PARSER THAT FOUND NOTHING,
+  // which is how a scan reports a clean file three times running and is wrong
+  // every time.
+  assert.ok(got.selectors > 250,
+    `only ${got.selectors} selectors parsed — the brace walk has stopped working`);
+  assert.ok(got.classes > 150,
+    `only ${got.classes} classes found — the selector reader has gone blind`);
+
+  assert.deepEqual(got.dead, [],
+    `these selectors are styled and never emitted:\n  ${got.dead.join('\n  ')}\n` +
+    `Delete the rule and everything else the thing owned — the CONFIG entry, the ` +
+    `id attribute, the README paragraph and every call site, same pass.`);
+});
+
+test('the dead-rule scan can actually find a dead rule', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const plant = (css, js = '') =>
+    src.replace('</style>', `${css}\n</style>`).replace('const $ = id =>', `${js}\nconst $ = id =>`);
+
+  // An invented rule nothing anywhere mentions.
+  assert.deepEqual(deadRules(plant('.doji-zzz-orphan{color:red}')).dead, ['.doji-zzz-orphan'],
+    'the scan cannot see a selector that is styled and never emitted');
+
+  // A LIVE rule renamed in the stylesheet only — the shape a rename actually
+  // leaves, and the one the first version of this scan waved through.
+  const i = src.indexOf('<style>'), j = src.indexOf('</style>');
+  const renamed = src.slice(0, i) + src.slice(i, j).replace(/\.watch-moved/g, '.watch-movedx') + src.slice(j);
+  assert.deepEqual(deadRules(renamed).dead, ['.watch-movedx'],
+    'a rule renamed in the stylesheet alone is not reported, so no rename is');
+
+  // Mentioned in a comment and nowhere else. The audit had "poll" matching prose
+  // about the poller; this is that failure with the sign flipped.
+  assert.deepEqual(
+    deadRules(plant('.doji-ghost-rule{color:red}', '// doji-ghost-rule lives only here')).dead,
+    ['.doji-ghost-rule'],
+    'a comment mentioning a class is being read as the class being used');
+
+  /* A NAME THAT IS A SUBSTRING OF A LIVE ONE, which is the case the other three
+     cannot separate. `.hm` appears inside `hm-profit` on the page and never once
+     as a class of its own, so a scan matching substrings calls it reachable and
+     a scan matching tokens calls it dead. Without this the whole proof passes on
+     `rest.includes(name)` — the loosest possible reader — and the audit's `poll`
+     failure would be reproduced here with nothing saying so. */
+  assert.deepEqual(deadRules(plant('.hm{color:red}')).dead, ['.hm'],
+    'a class that only ever appears as part of a longer name is being read as ' +
+    'used — the scan is matching substrings rather than whole tokens');
+
+  // AND THE OTHER DIRECTION, which is what stops this scan deleting live code:
+  // a name a real prefix builds must not be reported however invented it looks.
+  assert.deepEqual(deadRules(plant('.sess-wr-invented{color:red}')).dead, [],
+    'a class a runtime prefix reaches is reported dead — following this scan ' +
+    'would delete a rule that is in use');
+});
+
 /* ─── The Node floor has one home, and CI has to read it from there ──────────
    `engines.node` states the floor and package.json is the only file allowed to.
    It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
