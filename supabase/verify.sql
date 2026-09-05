@@ -142,6 +142,46 @@ from (values
          or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
    '0'),
 
+  /* ─── The journal/broker boundary, asked of the database ─────────────────
+     Until 009 this was a `for` loop in index.html. The policy on `trades`
+     decides which ROWS a session may write and says nothing about which
+     COLUMNS, so the publishable key could set `net_pnl` or `direction` on any
+     row it owns and Postgres would take it.
+
+     Asked as three rows rather than one, because they fail differently and a
+     single count could not say which. The first is the guarantee: not one
+     broker column is writable. The second is that the app still WORKS — a
+     revoke with the grant missing or mistyped leaves a journal nobody can fill
+     in, and that failure reads as the app being broken rather than as this file
+     being wrong. The third is the pair of verbs the app has never used.
+
+     has_column_privilege for the same reason has_function_privilege is used
+     above: it answers for the ROLE however the privilege arrived, by name or
+     through PUBLIC. */
+  ('no broker column of trades is writable by the publishable key',
+   (select count(*)::text from information_schema.columns c
+     where c.table_schema = 'public' and c.table_name = 'trades'
+       and c.column_name not in
+           ('setup','followed_rules','followed_sl','followed_tp','deleted')
+       and (has_column_privilege('anon', 'public.trades', c.column_name, 'UPDATE')
+         or has_column_privilege('authenticated', 'public.trades', c.column_name, 'UPDATE'))),
+   '0'),
+
+  ('the five columns the app owns are still writable by it',
+   (select count(*)::text from unnest(array
+           ['setup','followed_rules','followed_sl','followed_tp','deleted']) col
+     where has_column_privilege('authenticated', 'public.trades', col, 'UPDATE')),
+   '5'),
+
+  -- Every row here arrives from the poller or the email function, both of which
+  -- hold the secret key. The app has never created a trade, and a removal is the
+  -- `deleted` flag rather than a row leaving the table.
+  ('the publishable key can neither insert nor delete a trade',
+   (select count(*)::text from unnest(array['INSERT','DELETE']) priv
+     where has_table_privilege('anon', 'public.trades', priv)
+        or has_table_privilege('authenticated', 'public.trades', priv)),
+   '0'),
+
   -- The app's card reads three of her tables and nothing else. No policy is an
   -- empty list rather than an error, so the card hides itself and the reason is
   -- unknowable from the browser.

@@ -386,6 +386,72 @@ test('no broker column is reachable through either writer', async () => {
   } finally { close(); }
 });
 
+/* ─── The grant list is a fourth copy of what the app may write ──────────────
+   009 says the boundary to the database, and saying it added three more places
+   that state the same five column names: the `grant update (…)` itself and the
+   two arrays in verify.sql that check it. They have to agree with the app or the
+   file is wrong in one of two directions, and both are quiet.
+
+   Too NARROW and the journal cannot be filled in — a revoke lands, the grant
+   misses a column, and every save fails with a 403 that reads as the app being
+   broken rather than as this being mis-stated. Too WIDE and the file has done
+   nothing: one broker column in that list and `net_pnl` is writable from the
+   browser console again, with every test here still green.
+
+   FIVE, NOT FOUR, AND THE FIFTH IS THE INTERESTING ONE. `Data.OWNED` holds the
+   four journal answers. `deleted` is not one of them and is deliberately on the
+   never-reachable list two tests above — no tap and no save may ever name it —
+   but the app does write it, through `remove()` and `undo()`, which call
+   `update()` directly. So a grant list derived from `Data.OWNED` alone reads as
+   obviously right and takes delete and undo out the moment it is applied.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the columns 009 grants are exactly the columns the app writes', async () => {
+  const grants = readFileSync(new URL('../supabase/009_trades_grants.sql', import.meta.url), 'utf8');
+  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+  const stated = grants.match(/grant update \(([^)]*)\)\s*\n?\s*on public\.trades/);
+  assert.ok(stated, '009 no longer grants update on any column of trades');
+  const granted = stated[1].split(',').map(c => c.trim()).sort();
+
+  const { app, close } = await boot();
+  try {
+    const want = [...app.Data.OWNED, 'deleted'].sort();
+    assert.deepEqual(granted, want,
+      'the grant in 009 and what the app actually writes have parted — too narrow ' +
+      'and the journal cannot be saved, too wide and a broker column is writable ' +
+      'from the browser again');
+
+    // The app writes `deleted` outside OWNED, which is the whole reason the list
+    // is five. If that stopped being true the fifth grant would be dead.
+    const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    assert.match(src, /update\(\{ deleted: true \}\)/,
+      'nothing sets deleted any more, so 009 grants a column the app never writes');
+    assert.match(src, /update\(\{ deleted: false \}\)/, 'undo no longer clears deleted');
+  } finally { close(); }
+
+  /* verify.sql states the same five twice — once as the columns that must NOT be
+     writable (by exclusion) and once as the ones that must. Both are read here
+     rather than one, because the exclusion list is the half that silently stops
+     protecting anything: add a broker column to it and the check still says 0. */
+  for (const [what, re] of [
+    ['the exclusion list', /column_name not in\s*\n?\s*\(([^)]*)\)/],
+    ['the positive list',  /from unnest\(array\s*\n?\s*\[([^\]]*)\]\) col/],
+  ]) {
+    const m = verify.match(re);
+    assert.ok(m, `verify.sql no longer carries ${what} for the trades grant`);
+    const named = m[1].split(',').map(c => c.trim().replace(/^'|'$/g, '')).sort();
+    assert.deepEqual(named, granted,
+      `${what} in verify.sql names different columns from the grant in 009`);
+  }
+
+  // The revoke has to name PUBLIC as well as both roles. Revoking from one is
+  // not revoking from the others — the lesson `eugenia_search` cost 007.
+  assert.match(grants, /revoke insert, update, delete on public\.trades\s+from public, anon, authenticated;/,
+    '009 revokes from fewer than all three of PUBLIC, anon and authenticated, so ' +
+    'the privilege survives under whichever name was left out');
+});
+
 /* ─── Eugenia's note length ──────────────────────────────────────────────────
    The ceiling used to live in three places — the truncation, the constraint,
    and the sentence the tool description gives the model. Two of those are now
@@ -789,6 +855,259 @@ test('every function a caller names is a function that exists', () => {
     for (const { fn } of urls) {
       assert.ok(DEPLOYED.includes(fn), `${path} calls /functions/v1/${fn}, which is not deployed`);
     }
+  }
+});
+
+/* ─── Every CSS rule is reachable, and the scan that says so was proved first ─
+   The audit scanned CONFIG keys, declarations and `id` attributes; it never
+   scanned CSS RULES, so a selector whose class stopped being emitted has been
+   invisible for the life of the file. It fails in the quietest way available —
+   the rule stays, costs nothing, matches nothing, and reads as styling for
+   something that exists.
+
+   THE FIRST VERSION OF THIS REPORTED A CLEAN FILE AND WAS BROKEN, which is the
+   fourth time that has happened here and the reason the proof is written down.
+   Two ways it went blind:
+
+     · Substring matching. `.win` is "found" inside `window`, and the audit's own
+       scan had `"poll"` matching a paragraph about the poller. Names are matched
+       as whole tokens now, bounded by anything that is not a name character.
+
+     · A prefix sitting before a quote counted as dynamic construction. Every
+       class in the file sits before a quote somewhere, so `.watch-movedx` —
+       planted by renaming a live rule — "matched" `class="watch-moved">` and was
+       waved through as built at runtime. A name assembled at runtime appears as
+       a literal prefix that ENDS where the variable begins: `'sess-wr-' + key`
+       or `` `sess-wr-${key}` ``. So the prefix must be quote-terminated or
+       followed by `${`, and must end at a dash.
+
+   Proved against three planted defects — an invented rule, a live rule renamed
+   in the stylesheet only, and a rule mentioned nowhere but a comment — and
+   against a fourth that must NOT be flagged, an invented `.sess-wr-*` that a
+   real prefix reaches. Comments are stripped from the searched text for the
+   same reason the third case exists.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Exported shape rather than inline, so the proof above can be re-run against a
+// planted defect without editing the assertion it is proving.
+export function deadRules(src) {
+  const a = src.indexOf('<style>') + 7, b = src.indexOf('</style>');
+  const css = src.slice(a, b);
+
+  // Prose is where a scan like this goes blind in both directions.
+  const rest = (src.slice(0, a) + src.slice(b))
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+
+  // Selectors only: walk the brace depth rather than regex the whole sheet, so
+  // a declaration value containing a brace or a dot cannot be read as one.
+  const selectors = [];
+  let depth = 0, buf = '';
+  for (const ch of css.replace(/\/\*[\s\S]*?\*\//g, '')) {
+    if (ch === '{') { if (depth === 0) selectors.push(buf); buf = ''; depth++; }
+    else if (ch === '}') { depth--; if (depth === 0) buf = ''; }
+    else if (depth === 0) buf += ch;
+  }
+
+  const classes = new Set(), ids = new Set();
+  for (const sel of selectors) {
+    for (const [, c] of sel.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) classes.add(c);
+    for (const [, i] of sel.matchAll(/#(-?[A-Za-z_][\w-]*)/g)) ids.add(i);
+  }
+
+  const esc0 = (n) => n.replace(/[-]/g, '\\-');
+  const seen = (n) => new RegExp(`(?<![\\w-])${esc0(n)}(?![\\w-])`).test(rest);
+  const built = (n) => {
+    for (let i = n.length - 1; i >= 4; i--) {
+      const pre = n.slice(0, i);
+      if (!pre.endsWith('-')) continue;
+      const q = esc0(pre);
+      if (new RegExp(`['"\`]${q}['"\`]`).test(rest)) return pre;
+      if (new RegExp(`['"\`]${q}\\$\\{`).test(rest)) return pre;
+    }
+    return null;
+  };
+
+  const dead = [];
+  for (const c of [...classes].sort()) if (!seen(c) && !built(c)) dead.push('.' + c);
+  for (const i of [...ids].sort())     if (!seen(i) && !built(i)) dead.push('#' + i);
+  return { dead, classes: classes.size, ids: ids.size, selectors: selectors.length };
+}
+
+test('every CSS rule in the client is reachable from the markup or the script', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const got = deadRules(src);
+
+  // WITHOUT THESE THE ASSERTION BELOW PASSES ON A PARSER THAT FOUND NOTHING,
+  // which is how a scan reports a clean file three times running and is wrong
+  // every time.
+  assert.ok(got.selectors > 250,
+    `only ${got.selectors} selectors parsed — the brace walk has stopped working`);
+  assert.ok(got.classes > 150,
+    `only ${got.classes} classes found — the selector reader has gone blind`);
+
+  assert.deepEqual(got.dead, [],
+    `these selectors are styled and never emitted:\n  ${got.dead.join('\n  ')}\n` +
+    `Delete the rule and everything else the thing owned — the CONFIG entry, the ` +
+    `id attribute, the README paragraph and every call site, same pass.`);
+});
+
+test('the dead-rule scan can actually find a dead rule', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const plant = (css, js = '') =>
+    src.replace('</style>', `${css}\n</style>`).replace('const $ = id =>', `${js}\nconst $ = id =>`);
+
+  // An invented rule nothing anywhere mentions.
+  assert.deepEqual(deadRules(plant('.doji-zzz-orphan{color:red}')).dead, ['.doji-zzz-orphan'],
+    'the scan cannot see a selector that is styled and never emitted');
+
+  // A LIVE rule renamed in the stylesheet only — the shape a rename actually
+  // leaves, and the one the first version of this scan waved through.
+  const i = src.indexOf('<style>'), j = src.indexOf('</style>');
+  const renamed = src.slice(0, i) + src.slice(i, j).replace(/\.watch-moved/g, '.watch-movedx') + src.slice(j);
+  assert.deepEqual(deadRules(renamed).dead, ['.watch-movedx'],
+    'a rule renamed in the stylesheet alone is not reported, so no rename is');
+
+  // Mentioned in a comment and nowhere else. The audit had "poll" matching prose
+  // about the poller; this is that failure with the sign flipped.
+  assert.deepEqual(
+    deadRules(plant('.doji-ghost-rule{color:red}', '// doji-ghost-rule lives only here')).dead,
+    ['.doji-ghost-rule'],
+    'a comment mentioning a class is being read as the class being used');
+
+  /* A NAME THAT IS A SUBSTRING OF A LIVE ONE, which is the case the other three
+     cannot separate. `.hm` appears inside `hm-profit` on the page and never once
+     as a class of its own, so a scan matching substrings calls it reachable and
+     a scan matching tokens calls it dead. Without this the whole proof passes on
+     `rest.includes(name)` — the loosest possible reader — and the audit's `poll`
+     failure would be reproduced here with nothing saying so. */
+  assert.deepEqual(deadRules(plant('.hm{color:red}')).dead, ['.hm'],
+    'a class that only ever appears as part of a longer name is being read as ' +
+    'used — the scan is matching substrings rather than whole tokens');
+
+  // AND THE OTHER DIRECTION, which is what stops this scan deleting live code:
+  // a name a real prefix builds must not be reported however invented it looks.
+  assert.deepEqual(deadRules(plant('.sess-wr-invented{color:red}')).dead, [],
+    'a class a runtime prefix reaches is reported dead — following this scan ' +
+    'would delete a rule that is in use');
+});
+
+/* ─── Every top-level declaration is reached from somewhere in the file ──────
+   The companion to the rule scan above, and it catches the likelier shape by
+   far: not a function somebody wrote and never called, but a live one whose
+   last CALLER was deleted. `render()` is a list of eight steps, and removing a
+   line from that list leaves the renderer it named intact, exported to the
+   harness, still passing its own tests, and reached by nothing on the page.
+
+   IT READS index.html ALONE, DELIBERATELY. A function the test harness still
+   names in `EXPOSED` but the app no longer calls is dead in the app, and a scan
+   that counted the harness would call it live and be wrong in the direction
+   that matters.
+
+   Known limitation, stated rather than worked around: string contents are not
+   stripped, so a declaration mentioned only inside a string literal reads as
+   referenced. Stripping them properly needs a JS parser — a template literal
+   holds real code inside `${}` — and no function in this file is named in a
+   string. Comments ARE stripped, which is the case that actually occurs.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+export function unreferenced(src) {
+  const js = src.slice(src.lastIndexOf('<script>') + 8, src.lastIndexOf('</script>'));
+  const bare = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+
+  const names = new Set();
+  for (const [, n] of bare.matchAll(/^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/gm)) names.add(n);
+  for (const [, n] of bare.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) names.add(n);
+
+  const dead = [];
+  for (const n of [...names].sort()) {
+    // Not preceded by a dot, or `Data.render` would count as a use of `render`.
+    const re = new RegExp(`(?<![\\w$.])${n.replace(/\$/g, '\\$')}(?![\\w$])`, 'g');
+    if ((bare.match(re) || []).length <= 1) dead.push(n);
+  }
+  return { dead, declared: names.size };
+}
+
+test('every top-level declaration in the client is referenced somewhere', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const got = unreferenced(src);
+
+  assert.ok(got.declared > 80,
+    `only ${got.declared} declarations found — the reader has gone blind`);
+  assert.deepEqual(got.dead, [],
+    `declared and reached by nothing:\n  ${got.dead.join('\n  ')}\n` +
+    `Delete it and everything it owned — the CONFIG entry, the CSS, the README ` +
+    `paragraph, the harness export and every call site, same pass.`);
+});
+
+test('the unreferenced-declaration scan can actually find one', () => {
+  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const at = (find, add) => src.replace(find, add + find);
+
+  assert.ok(unreferenced(at('function render() {', 'const dojiUnusedThing = 42;\n\n')).dead
+    .includes('dojiUnusedThing'), 'a declared-and-never-used const is not found');
+
+  assert.ok(unreferenced(at('function render() {', 'function dojiOrphanFn() { return 1; }\n\n')).dead
+    .includes('dojiOrphanFn'), 'a declared-and-never-called function is not found');
+
+  // Mentioned in a comment and nowhere else — the shape that hides dead code
+  // behind an explanation of what it used to do.
+  assert.ok(unreferenced(at('function render() {',
+    'function dojiGhostFn() { return 1; }\n// dojiGhostFn is named only here\n\n')).dead
+    .includes('dojiGhostFn'), 'a comment naming a function reads as calling it');
+
+  /* THE ONE THAT ACTUALLY HAPPENS: a live renderer whose only caller is dropped
+     out of render()'s step list. Nothing else in the suite notices — the
+     function still exists, still passes its own tests, and is still exported to
+     the harness; it is simply never reached from the page. */
+  assert.ok(unreferenced(src.replace('    () => renderSetups(rows),\n', '')).dead
+    .includes('renderSetups'),
+    'dropping a step from render() leaves its renderer unreferenced and unseen');
+});
+
+/* ─── The Node floor has one home, and CI has to read it from there ──────────
+   `engines.node` states the floor and package.json is the only file allowed to.
+   It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
+   needs, and jsdom is a dependency that moves — so the floor moves with it.
+
+   A workflow pinning `node-version: 22` is a second copy of that decision that
+   nothing compares. It resolves to the newest 22.x, which is why it has always
+   been above the floor and why the disagreement is invisible: the day the floor
+   goes past the newest 22.x, three workflows install a Node the suite is not
+   claimed to run on and go green doing it. setup-node resolves the range in
+   engines.node itself, so the copy is avoidable rather than unavoidable — which
+   is why this asserts one home instead of holding two together.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const WORKFLOWS = ['.github/workflows/test.yml',
+                   '.github/workflows/deploy-functions.yml',
+                   '.github/workflows/backup-memory.yml'].map(read);
+
+test('every workflow takes its Node version from the one file that states it', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(pkg.engines?.node ?? '', /^>=\d+\.\d+\.\d+$/,
+    'package.json no longer states a Node floor, so node-version-file resolves ' +
+    'to nothing and every workflow below is reading an empty decision');
+
+  // engines on its own is a note npm prints past — proved by raising the floor
+  // to >=99 and watching `npm ci` install happily. engine-strict is what turns
+  // it into a gate, on a runner and on a laptop alike, which is also what makes
+  // a green CI run evidence that the Node installed is above the floor rather
+  // than evidence that the workflow parsed.
+  const npmrc = readFileSync(new URL('../.npmrc', import.meta.url), 'utf8');
+  assert.match(npmrc, /^engine-strict\s*=\s*true$/m,
+    '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
+    'and npm installs on any version without a word');
+
+  for (const { path, text } of WORKFLOWS) {
+    // Anchored to setup-node: a `node-version` under any other step is not this.
+    assert.ok(/actions\/setup-node/.test(text), `${path} no longer sets Node up at all`);
+    assert.match(text, /node-version-file: package\.json/,
+      `${path} does not read the floor from package.json`);
+    assert.doesNotMatch(text, /^\s*node-version:/m,
+      `${path} pins a Node version of its own, which is a second home for a ` +
+      `floor that only package.json is allowed to state`);
   }
 });
 
@@ -1785,6 +2104,38 @@ test('the column, the filter and the tool parameter all exist together', () => {
   // The index has to match the read or it stops being used for it.
   assert.match(EUGENIA_SQL, /create index eugenia_notes_kind_id_desc[\s\S]*?where superseded_by is null/,
     'the notes index no longer matches the read it exists for');
+});
+
+/* ─── The same filter again, on the write, where it answers a different question
+   The read's `superseded_by=is.null` decides what she is HANDED. This one
+   decides what a retirement may TOUCH, and only the read has ever been held to
+   it. Without it the PATCH matches an already-retired note and re-points it at
+   the new row: the trail stops being a chain and becomes a star, the note that
+   originally corrected it is orphaned, and every row involved still reads as
+   healthy. It is also the branch that decides whether she tells him the
+   retirement missed — an unfiltered PATCH always matches, so the honest
+   "note N is not there to retire" could never once be said. */
+
+test('the supersede write may only retire a note that is still live', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function writeNote(');
+  assert.ok(at > -1, 'doji-eugenia no longer has writeNote()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  const retire = body.slice(body.indexOf('if (retiring) {'));
+  assert.ok(retire.length && retire.length < body.length,
+    'writeNote no longer has a retirement branch to check');
+
+  assert.match(retire, /eugenia_notes\?id=eq\.\$\{old\}&superseded_by=is\.null/,
+    'the supersede PATCH no longer filters on superseded_by=is.null, so a note ' +
+    'that was already retired is re-pointed at the new row and the note that ' +
+    'first corrected it is orphaned — with nothing erroring');
+  assert.match(retire, /method: "PATCH", headers: sbHeaders\("return=representation"\)/,
+    'the supersede PATCH stopped asking for the row back, so a filtered-to-nothing ' +
+    'retirement is a 200 with an empty body and reads as done');
+  assert.match(retire, /\.length === 0/,
+    'nothing checks that the retirement matched a row, so she reports a ' +
+    'contradiction retired while it is still handed to her every turn');
 });
 
 /* ─── A block reaches the message, however it was awaited ────────────────────

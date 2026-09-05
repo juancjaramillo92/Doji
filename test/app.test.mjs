@@ -1193,3 +1193,183 @@ test('the card reads her three tables and never her notes', async () => {
   assert.ok(!touched.has('eugenia_notes'), 'the card reads her notes');
   assert.ok(!touched.has('eugenia_turns'), 'the card reads her conversation');
 });
+
+/* ─── Soft delete and the window that takes it back ──────────────────────────
+   Audit 4.9, which had never run. The code turns out to be right; nothing was
+   checking it, and it is the one path in the app that can lose a trade.
+
+   The delete is soft because it has to be: the poller re-upserts every position
+   inside its window, so a hard delete comes back within two minutes. That makes
+   `deleted` a column the app writes and `Data.OWNED` does not name — `remove()`
+   and `restore()` call `update()` directly rather than going through `save()` —
+   which is worth knowing before anyone builds a column list out of `OWNED` and
+   wonders why delete stopped working.
+
+   Two row sets move, and they move differently. `rows` is what renders and the
+   row leaves it; `all` is what the backup exports and the row STAYS, flagged.
+   Getting that backwards exports a deleted trade as live, or loses it from the
+   backup entirely, and neither shows on screen.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const staged = async (rows) => {
+  db.error = null;
+  db.rows = rows;
+  await app.Data.load();
+  db.patches.length = 0;
+};
+
+test('a delete leaves the rendered rows and stays in the backup, flagged', async () => {
+  await staged([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10 })
+  ]);
+
+  assert.equal(await app.Data.remove('PID1'), true);
+
+  assert.deepEqual(db.patches.map(p => ({ ...p })), [{ deleted: true }],
+    'the delete sent something other than the soft-delete flag');
+  assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID2'],
+    'the deleted trade still renders');
+  assert.equal(app.Data.all.length, 2, 'the deleted trade left the backup');
+  assert.equal(app.Data.all.find(t => t.id === 'PID1').deleted, true,
+    'the backup copy is not flagged, so a restore point exports it as live');
+  // Re-indexed on the way out, or every render still reads it through byId.
+  assert.equal(app.Data.byId.has('PID1'), false, 'the index still holds the row');
+});
+
+test('a failed delete changes nothing locally', async () => {
+  await staged([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })]);
+  db.error = { message: 'nope' };
+
+  assert.equal(await app.Data.remove('PID1'), false);
+
+  /* THE ORDER IS THE POINT. The write is awaited and checked before anything
+     local moves, so a refused delete leaves the trade on screen rather than
+     hiding a row the database still has — which would read as deleted until the
+     next refresh brought it back. */
+  assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID1'],
+    'the row was hidden locally despite the write failing');
+  assert.equal(app.Data.all.find(t => t.id === 'PID1').deleted, false);
+  assert.equal($('sync-dot').className, 'sync-dot error');
+  db.error = null;
+});
+
+test('a restore puts the trade back in both row sets', async () => {
+  await staged([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40, deleted: true })]);
+  // load() hides it, which is the state a restore actually starts from.
+  assert.equal(app.Data.rows.length, 0);
+
+  db.rows = [journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40, deleted: false })];
+  assert.equal(await app.Data.restore('PID1'), true);
+
+  assert.deepEqual(db.patches.map(p => ({ ...p })), [{ deleted: false }]);
+  assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID1'], 'the trade did not come back');
+  assert.equal(app.Data.all.find(t => t.id === 'PID1').deleted, false,
+    'the backup copy is still flagged deleted after a restore');
+  assert.ok(app.Data.byId.has('PID1'), 'the restored row was not re-indexed');
+});
+
+test('a failed restore is reported rather than assumed', async () => {
+  await staged([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40, deleted: true })]);
+  db.error = { message: 'nope' };
+  assert.equal(await app.Data.restore('PID1'), false,
+    'a refused restore answered true, so the trade reads as recovered');
+  db.error = null;
+});
+
+/* ─── The undo window, whose rules are all about ORDER ───────────────────────
+   None of these is reachable through `Data` alone, and each one is a way a
+   trade goes missing quietly rather than loudly.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('staging a second delete finalises the first, so nothing sits in limbo', async () => {
+  await staged([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10 })
+  ]);
+
+  await app.PendingDelete.stage('PID1');
+  assert.equal(app.PendingDelete.id, 'PID1');
+  await app.PendingDelete.stage('PID2');
+  assert.equal(app.PendingDelete.id, 'PID2', 'the second delete did not take over');
+
+  // Undo now recovers the SECOND, and the first is permanent — which is what
+  // "only the most recent is recoverable" has to mean for the offer to be true.
+  db.rows = [journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10, deleted: false })];
+  await app.PendingDelete.undo();
+  assert.ok(app.Data.byId.has('PID2'), 'undo restored something other than the last delete');
+  assert.equal(app.Data.byId.has('PID1'), false, 'the finalised delete came back');
+});
+
+/* THE STALE TIMER, which is the one rule here no assertion about `id` can
+   reach. `stage()` opens with `commit()`, and dropping that line leaves
+   `PendingDelete.id` looking perfectly correct — the new id is assigned two
+   lines later either way. What it actually loses is the PREVIOUS delete's
+   timer, which stays armed and fires `commit()` partway through the new undo
+   window, closing it early. The trade is gone and the Undo button silently
+   stops working, seconds after being offered.
+
+   Waiting UNDO_MS out is not a test, so the window's own timer calls are
+   recorded instead: `setTimeout` here resolves to `window.setTimeout` at call
+   time, so wrapping it catches the real sequence rather than a stand-in. */
+test('staging a delete disarms the previous timer, not just the previous id', async () => {
+  await staged([
+    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
+    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10 })
+  ]);
+
+  const cleared = [];
+  const realClear = win.clearTimeout;
+  win.clearTimeout = (t) => { cleared.push(t); return realClear(t); };
+  try {
+    await app.PendingDelete.stage('PID1');
+    // Its own timer, read off the object rather than counted: `notifyUndo` arms
+    // one too, with the same CONFIG.UNDO_MS delay, so neither the count nor the
+    // delay can tell the two apart.
+    const first = app.PendingDelete.timer;
+    assert.ok(first, 'staging a delete did not arm an undo timer at all');
+
+    await app.PendingDelete.stage('PID2');
+    assert.notEqual(app.PendingDelete.timer, first, 'the second delete reused the first timer');
+    assert.ok(cleared.includes(first),
+      'the first delete\'s timer is still armed after a second was staged — it ' +
+      'will fire inside the new undo window and close it early, so the Undo ' +
+      'button stops working seconds after being offered');
+  } finally {
+    win.clearTimeout = realClear;
+    app.PendingDelete.commit();
+  }
+});
+
+test('a second undo is inert rather than restoring the wrong trade', async () => {
+  await staged([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })]);
+  await app.PendingDelete.stage('PID1');
+
+  db.rows = [journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40, deleted: false })];
+  await app.PendingDelete.undo();
+  assert.equal(app.PendingDelete.id, null);
+
+  // The id is cleared whatever happens, so this must write nothing at all.
+  db.patches.length = 0;
+  await app.PendingDelete.undo();
+  assert.deepEqual(db.patches.map(p => ({ ...p })), [], 'a second undo wrote to the database');
+});
+
+test('staging an id the app does not hold does nothing at all', async () => {
+  await staged([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })]);
+  await app.PendingDelete.stage('NOPE');
+  assert.deepEqual(db.patches.map(p => ({ ...p })), [], 'an unknown id was deleted from the database');
+  assert.equal(app.PendingDelete.id, null);
+  assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID1']);
+});
+
+test('a refused delete leaves nothing staged, so undo cannot offer a lie', async () => {
+  await staged([journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })]);
+  db.error = { message: 'nope' };
+
+  await app.PendingDelete.stage('PID1');
+  assert.equal(app.PendingDelete.id, null,
+    'a delete that failed still armed the undo window, which would then try to ' +
+    'restore a trade that was never deleted');
+  db.error = null;
+});

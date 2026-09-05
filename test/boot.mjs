@@ -28,16 +28,42 @@ const EXPOSED = [
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'pctSplit', 'byKey', 'round2',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
-  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch'
+  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch',
+  // The undo window around a delete. Its rules are all about ORDER — stage
+  // finalising the previous one, a second undo being inert — and none of
+  // them is reachable through Data alone.
+  'PendingDelete'
 ];
 
-export async function boot() {
+export async function boot({ now } = {}) {
   const dom = new JSDOM(HTML, {
     url: 'https://doji.test/',
     runScripts: 'outside-only',
     pretendToBeVisual: true
   });
   const win = dom.window;
+
+  /* THE CLOCK IS FROZEN BEFORE THE SCRIPT RUNS, NOT AFTER, and the ordering is
+     the whole of it: the app reads the clock at LOAD time as well as at render
+     time. `View.heatmap` is set from `Dates.nyMonth()` while the script is
+     evaluating, so a clock frozen afterwards would leave the grid opened on
+     whatever month the machine happened to be in — and a golden file that moves
+     with the calendar is not a golden file, it is a diff nobody can read.
+
+     A subclass rather than a stub, because `Date` is called every other way in
+     this app too: `new Date(iso)`, `Date.UTC`, `Date.parse`. Only the no-arg
+     constructor and `now()` are answered; everything else is the real thing,
+     inherited. */
+  if (now != null) {
+    const Real = win.Date;
+    const fixed = typeof now === 'number' ? now : Real.parse(now);
+    if (!Number.isFinite(fixed)) throw new Error(`harness: cannot read now=${now}`);
+    class Frozen extends Real {
+      constructor(...a) { super(...(a.length ? a : [fixed])); }
+      static now() { return fixed; }
+    }
+    win.Date = Frozen;
+  }
 
   // Chart.js is optional by design — the app warns and degrades. Stubbing it
   // rather than omitting it keeps the wheel paths under test.
@@ -99,7 +125,13 @@ export async function boot() {
       eq: () => t, gte: () => t, lte: () => t, is: () => t, limit: () => t,
       then: (ok, no) => reply().then(ok, no),
       update(patch) { db.patches.push(patch); return t; },
-      single: () => Promise.resolve({ data: rows()[0] ?? null, error: null }),
+      // db.error honoured here as well as in maybeSingle. It was not, so any
+      // path ending in .single() — Data.save() and Data.restore() are both —
+      // had an unreachable failure branch: the stub answered success however
+      // the test was set up, and a test for the error path would have passed
+      // while proving the opposite of what it claimed.
+      single: () => Promise.resolve(
+        db.error ? { data: null, error: db.error } : { data: rows()[0] ?? null, error: null }),
       maybeSingle: () => Promise.resolve(
         db.error ? { data: null, error: db.error } : { data: rows()[0] ?? null, error: null }),
     };

@@ -1936,7 +1936,7 @@ const Dates = {
   // Parsed at local noon so the string cannot shift a day in either direction
   // on the way to the formatter.
   fmt(day, opts) {
-    if (!day) return '—';
+    if (!day) return DASH;
     return new Date(day + 'T12:00:00')
       .toLocaleDateString('en-GB', opts || { day:'2-digit', month:'short', year:'2-digit' });
   },
@@ -2463,7 +2463,7 @@ function mountDonut(id, counts) {
 // emitted once by the shell and refilled per render — which is what keeps the
 // canvas beside it stable and lets mountDonut reuse its Chart.
 function pctStrip(pct) {
-  const v = i => pct ? pct[i] + '%' : '—';
+  const v = i => pct ? pct[i] + '%' : DASH;
   return `<span class="pm-lbl">Win Rate</span><span class="pm-val win">${v(0)}</span>`
        + `<span class="pm-lbl">Loss Rate</span><span class="pm-val loss">${v(1)}</span>`
        + `<span class="pm-lbl">BE Rate</span><span class="pm-val">${v(2)}</span>`;
@@ -2505,7 +2505,7 @@ function wheelBlock(key, stripHTML, stripCls) {
 // the arcs are drawn from — while the strip beside it carries rates.
 function paintWheel(key, c) {
   const set = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
-  set('hub-'   + key, c.decided || '—');
+  set('hub-'   + key, c.decided || DASH);
   set('cnt-w-' + key, c.win  + ' W');
   set('cnt-l-' + key, c.loss + ' L');
   set('cnt-b-' + key, c.be   + ' B');
@@ -2605,6 +2605,17 @@ function rollCell([text, sign]) {
 // and its colour cannot come from two different numbers.
 const fmtMoney = v => Math.abs(round2(v)).toFixed(2);
 
+// The other direction: a figure that carries its own sign, for the two places a
+// P&L is read as a number in a list rather than as a coloured total. A leading
+// `+` only above zero — a negative already prints one and a flat trade is not a
+// gain — which is why this cannot be `fmtMoney` with a sign glued on.
+//
+// NO `round2` HERE, deliberately, where fmtMoney has one. These read `t.pnl`
+// straight off the row rather than a total this file computed, and rounding a
+// column the app does not own would make it print something the database does
+// not say. The two rules are not the same rule and are not being merged.
+const fmtSigned = v => (v > 0 ? '+' : '') + v.toFixed(2);
+
 function setFigure(id, text, sign) {
   const el = $(id);
   if (!el) return;
@@ -2618,7 +2629,7 @@ const setupAbbr = s => String(s).trim().split(/\s+/)
 
 // A pair everywhere a setup appears, so the phone stylesheet swaps which span
 // is visible and the two cannot drift.
-const setupCell = s => !s ? '—'
+const setupCell = s => !s ? DASH
   : `<span class="setup-full">${esc(s)}</span><span class="setup-abbr">${esc(setupAbbr(s))}</span>`;
 
 // Oldest first. Ties return 0 rather than falling through to "greater": two
@@ -2699,7 +2710,7 @@ function renderPnLCard(rows) {
 
   const balance = latestBefore(rows, 'balance');
   const oz      = latestBefore(rows, 'size_oz');
-  $('pnl-balance-number').textContent = balance == null ? '—' : balance.toFixed(2);
+  $('pnl-balance-number').textContent = balance == null ? DASH : balance.toFixed(2);
   /* PRECEDENCE, AND IT IS NOT ARBITRARY. The awaiting notice explains the dash
      directly above it; the sizing line is an unrelated fact that would leave
      that dash unexplained. A caption belongs to the figure it sits under, so
@@ -2711,16 +2722,16 @@ function renderPnLCard(rows) {
     : `${(oz / 100).toFixed(2)} lots — sizing for ${Math.round(oz * 500)}`;
   $('pnl-net-count').textContent      = m.n || '';
 
-  setFigure('pnl-net-number',   m.n ? fmtMoney(m.net)   : '—', m.net);
-  setFigure('pnl-gross-profit', m.n ? fmtMoney(m.gross) : '—', m.gross);
-  setFigure('pnl-gross-loss',   m.n ? fmtMoney(m.loss)  : '—', -m.loss);
+  setFigure('pnl-net-number',   m.n ? fmtMoney(m.net)   : DASH, m.net);
+  setFigure('pnl-gross-profit', m.n ? fmtMoney(m.gross) : DASH, m.gross);
+  setFigure('pnl-gross-loss',   m.n ? fmtMoney(m.loss)  : DASH, -m.loss);
 
   for (const [id, v] of [['pnl-week-prev', weekWas], ['pnl-week-cur', week],
                          ['pnl-month-prev', monthWas], ['pnl-month-cur', month]]) {
     const el = $(id);
     if (!el) continue;
     const amt = round2(v);
-    el.textContent = m.n ? fmtMoney(amt) : '—';
+    el.textContent = m.n ? fmtMoney(amt) : DASH;
     el.classList.remove('win','loss');
     if (m.n && amt) el.classList.add(amt > 0 ? 'win' : 'loss');
   }
@@ -2846,10 +2857,10 @@ function renderPeriods(rows) {
     // The hub is not the money rows' count: a trade logged without a figure is
     // a slice on the wheel but not a dollar below.
     const m = money(list);
-    setFigure('pm-wr-' + key, pct ? pct[0] + '%' : '—', pct ? 1 : 0);
-    setFigure('pm-p-'  + key, m.n ? fmtMoney(m.gross) : '—', m.gross);
-    setFigure('pm-l-'  + key, m.n ? fmtMoney(m.loss)  : '—', -m.loss);
-    setFigure('pm-n-'  + key, m.n ? fmtMoney(m.net)   : '—', m.net);
+    setFigure('pm-wr-' + key, pct ? pct[0] + '%' : DASH, pct ? 1 : 0);
+    setFigure('pm-p-'  + key, m.n ? fmtMoney(m.gross) : DASH, m.gross);
+    setFigure('pm-l-'  + key, m.n ? fmtMoney(m.loss)  : DASH, -m.loss);
+    setFigure('pm-n-'  + key, m.n ? fmtMoney(m.net)   : DASH, m.net);
 
     const rr = $('rr-bar-' + key);
     if (rr) rr.innerHTML = rrBar(list);
@@ -2910,7 +2921,7 @@ function rrBar(list) {
       </div>`;
 
   if (avgWin === null && avgLoss === null) {
-    return `<div class="period-disc-row"><div class="bar-empty"></div>${head('—')}</div>`;
+    return `<div class="period-disc-row"><div class="bar-empty"></div>${head(DASH)}</div>`;
   }
 
   // No losses means no ratio, only a direction. The figure caps rather than
@@ -3027,10 +3038,10 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     wkN++;
     const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN, wkBe);
     const count = wkTrades ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
-    const abs   = Math.abs(round2(wkPnl)).toFixed(2);
+    const abs   = fmtMoney(wkPnl);
     // Separate spans so the phone stylesheet can drop the tail.
     const pnl   = wkPnlN ? `$${abs.slice(0, -3)}<span class="hm-cents">${abs.slice(-3)}</span>`
-                : wkTrades ? '—' : '';
+                : wkTrades ? DASH : '';
     html += `
       <div class="heatmap-week ${cls}">
         <div class="heatmap-week-lbl">W${wkN}</div>
@@ -3053,7 +3064,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     if (data.pending) cls += ' pending';
     if (iso === today) cls += ' today';
 
-    const pnlText   = data.pnlN ? '$' + Math.abs(data.pnl).toFixed(2) : n ? '—' : '';
+    const pnlText   = data.pnlN ? '$' + fmtMoney(data.pnl) : n ? DASH : '';
     const countText = n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
     // Focusable only when the cell opens something, or thirty-one tab stops sit
     // in front of the trade log.
@@ -3110,10 +3121,10 @@ function renderHeatmap() {
   }
 
   const m = totals[cur.m];
-  setFigure('hm-profit', m.pnlN ? fmtMoney(m.gross) : '—', m.gross);
-  setFigure('hm-loss',   m.pnlN ? fmtMoney(m.loss)  : '—', -m.loss);
-  setFigure('hm-net',    m.pnlN ? fmtMoney(m.net)   : '—', m.net);
-  setFigure('hm-trades', m.trades ? String(m.trades) : '—', 0);
+  setFigure('hm-profit', m.pnlN ? fmtMoney(m.gross) : DASH, m.gross);
+  setFigure('hm-loss',   m.pnlN ? fmtMoney(m.loss)  : DASH, -m.loss);
+  setFigure('hm-net',    m.pnlN ? fmtMoney(m.net)   : DASH, m.net);
+  setFigure('hm-trades', m.trades ? String(m.trades) : DASH, 0);
 }
 
 function renderYearStrip(y, selMonth, totals) {
@@ -3123,7 +3134,7 @@ function renderYearStrip(y, selMonth, totals) {
     const cls = ['hm-mo'];
     if (t.trades) cls.push(aggregateResult(t.net, t.pnlN, t.be));
     if (m === selMonth) cls.push('sel');
-    const pnl = t.pnlN ? '$' + Math.abs(t.net).toFixed(2) : (t.trades ? '—' : '');
+    const pnl = t.pnlN ? '$' + fmtMoney(t.net) : (t.trades ? DASH : '');
     return `
       <div class="${cls.join(' ')}" data-month="${m}" role="button" tabindex="0"
            aria-label="${CONFIG.MONTHS_ABBR[m]} ${y}">
@@ -3403,18 +3414,18 @@ function renderTable(rows) {
   const slice = sorted.slice(page0 * CONFIG.PER_PAGE, (page0 + 1) * CONFIG.PER_PAGE);
 
   const tick = v => v === true ? '<span class="rules-tick">✓</span>'
-                  : v === false ? '<span class="rules-cross">✕</span>' : '—';
+                  : v === false ? '<span class="rules-cross">✕</span>' : DASH;
 
   const body = slice.map(t => {
     const r      = resultOf(t);
-    const pnlTxt = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
+    const pnlTxt = t.pnl == null ? DASH : fmtSigned(t.pnl);
     const clock  = t.entry_time ? Dates.nyTime(t.entry_time) : '';
     const sess   = sessionOf(t);
     // The row opens the entry, so it says so and answers the keyboard.
     return `<tr data-trade="${esc(t.id)}" role="button" tabindex="0"${isComplete(t) ? '' : ' class="broker-pending"'}>
       <td>${Dates.fmt(dayOf(t))}${clock ? `<span class="tlog-time">${clock} ET</span>` : ''}</td>
-      <td><span class="dir-pill">${esc(t.direction || '—')}</span></td>
-      <td>${esc(sess ? CONFIG.SESSION_ABBR[sess] : '—')}</td>
+      <td><span class="dir-pill">${esc(t.direction || DASH)}</span></td>
+      <td>${esc(sess ? CONFIG.SESSION_ABBR[sess] : DASH)}</td>
       <td>${setupCell(t.setup)}</td>
       <td class="${r === 'win' ? 'win' : r === 'loss' ? 'loss' : ''}">${pnlTxt}</td>
       <td class="c">${tick(t.followed_rules)}</td>
@@ -3547,19 +3558,19 @@ function openDay(day) {
   const res = aggregateResult(m.net, m.n, counts(list).be);
   const dateStr = Dates.fmt(day, { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
   $('day-modal-title').innerHTML = `${dateStr} &nbsp;·&nbsp; ${list.length} trades`
-    + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${(m.net > 0 ? '+' : '') + m.net.toFixed(2)}</span>` : '');
+    + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${fmtSigned(m.net)}</span>` : '');
 
   host.innerHTML = [...list].sort((a, b) => byKey(b, a)).map(t => {
     const r = resultOf(t);
-    const pnl = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
+    const pnl = t.pnl == null ? DASH : fmtSigned(t.pnl);
     const sess = sessionOf(t);
-    const dir = t.direction === 'BUY' ? 'Long' : t.direction === 'SELL' ? 'Short' : '—';
+    const dir = t.direction === 'BUY' ? 'Long' : t.direction === 'SELL' ? 'Short' : DASH;
     return `<div class="day-trade-row" data-trade="${esc(t.id)}" role="button" tabindex="0">
       <div class="day-trade-left">
         <span class="dir-pill">${dir}</span>
         <div class="day-trade-meta">
           <span class="day-trade-setup">${setupCell(t.setup)}</span>
-          <span class="day-trade-sub">${esc(sess ? CONFIG.SESSION_ABBR[sess] : '—')}</span>
+          <span class="day-trade-sub">${esc(sess ? CONFIG.SESSION_ABBR[sess] : DASH)}</span>
         </div>
       </div>
       <span class="day-trade-pnl ${r === 'win' ? 'win' : r === 'loss' ? 'loss' : ''}">${pnl}</span>
