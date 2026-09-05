@@ -1495,7 +1495,7 @@ test('a table larger than one page is read to the end', async () => {
     return { ok: true, json: async () => all.slice(from, to + 1) };
   };
 
-  const rows = await readAll('https://x', 'k', 'eugenia_turns', stub);
+  const rows = await readAll('https://x', 'k', 'eugenia_turns', 'id', stub);
   assert.equal(rows.length, 2300, 'the read stopped before the end of the table');
   assert.deepEqual(rows.map(r => r.id), all.map(r => r.id), 'rows were lost or reordered');
   assert.deepEqual(ranges, ['0-999', '1000-1999', '2000-2999'],
@@ -1505,13 +1505,13 @@ test('a table larger than one page is read to the end', async () => {
 test('a table that fits in one page costs one request', async () => {
   let calls = 0;
   const stub = async () => { calls++; return { ok: true, json: async () => [{ id: 1 }] }; };
-  assert.equal((await readAll('https://x', 'k', 'eugenia_notes', stub)).length, 1);
+  assert.equal((await readAll('https://x', 'k', 'eugenia_notes', 'id', stub)).length, 1);
   assert.equal(calls, 1, 'a short page is the end and must not be followed by another read');
 });
 
 test('a refused read throws rather than backing up a blank', async () => {
   const stub = async () => ({ ok: false, status: 401, text: async () => 'bad key' });
-  await assert.rejects(() => readAll('https://x', 'k', 'eugenia_notes', stub), /401/,
+  await assert.rejects(() => readAll('https://x', 'k', 'eugenia_notes', 'id', stub), /401/,
     'a refused read returned quietly, so the backup would hold an empty table ' +
     'and the job would go green over it');
 });
@@ -1525,7 +1525,7 @@ test('the backup names every table that has no other source', async () => {
   }
   // The cost meter is deliberately out: every row is about a model call rather
   // than about him, and it is by far the largest table.
-  assert.ok(!TABLES.includes('eugenia_runs'), 'the cost meter is in the backup');
+  assert.ok(!TABLES.some(([t]) => t === 'eugenia_runs'), 'the cost meter is in the backup');
   assert.match(out.taken_at, /^\d{4}-\d\d-\d\dT/, 'the document does not say when it was taken');
 });
 

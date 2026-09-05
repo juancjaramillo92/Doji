@@ -27,17 +27,29 @@
    Run:  SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
    ═══════════════════════════════════════════════════════════════════════════ */
 
-// Ordered as they are restored: the tables a later row can reference come
-// first, so a restore run top to bottom never lands a note whose supersedes
-// target is not there yet.
+/* Each table with the column it is READ BY, which is its primary key. Paging by
+   Range needs a stable order or a row can be served on two pages or on neither,
+   and the key is the only column every row here is guaranteed to have and to
+   have uniquely.
+
+   IT IS NOT ALWAYS `id`. `eugenia_channels` is keyed by `channel`, because the
+   five rungs are the rows and a surrogate key would let a sixth 'macro' exist
+   beside the first. Ordering it by `id` is a 400 from PostgREST — the whole
+   backup, refused — and nothing in this repository could see that until it ran,
+   because a stubbed fetch answers whatever it is asked. `agree.test.mjs` reads
+   each key below against that table's own `create table` now.
+
+   Ordered as they are restored: the tables a later row can reference come
+   first, so a restore run top to bottom never lands a note whose supersedes
+   target is not there yet. */
 export const TABLES = [
-  'eugenia_channels',
-  'eugenia_notes',
-  'eugenia_turns',
-  'eugenia_thesis',
-  'eugenia_loops',
-  'eugenia_calendar',
-  'eugenia_feedback',
+  ['eugenia_channels', 'channel'],
+  ['eugenia_notes',    'id'],
+  ['eugenia_turns',    'id'],
+  ['eugenia_thesis',   'id'],
+  ['eugenia_loops',    'id'],
+  ['eugenia_calendar', 'id'],
+  ['eugenia_feedback', 'id'],
 ];
 
 const PAGE = 1000;
@@ -45,10 +57,10 @@ const PAGE = 1000;
 /* One table, in full. `fetchImpl` is an argument so the test can drive the
    paging without a network — the loop is the part worth holding, since a
    backup that stops after one page is the failure this file exists to avoid. */
-export async function readAll(url, key, table, fetchImpl = fetch) {
+export async function readAll(url, key, table, orderBy, fetchImpl = fetch) {
   const rows = [];
   for (let from = 0; ; from += PAGE) {
-    const res = await fetchImpl(`${url}/rest/v1/${table}?select=*&order=id.asc`, {
+    const res = await fetchImpl(`${url}/rest/v1/${table}?select=*&order=${orderBy}.asc`, {
       headers: {
         apikey: key,
         // Range rather than limit/offset: PostgREST answers it with a
@@ -71,7 +83,9 @@ export async function readAll(url, key, table, fetchImpl = fetch) {
 
 export async function backup(url, key, fetchImpl = fetch) {
   const out = { taken_at: new Date().toISOString(), tables: {} };
-  for (const table of TABLES) out.tables[table] = await readAll(url, key, table, fetchImpl);
+  for (const [table, orderBy] of TABLES) {
+    out.tables[table] = await readAll(url, key, table, orderBy, fetchImpl);
+  }
   return out;
 }
 
