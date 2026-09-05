@@ -503,7 +503,22 @@ folded from a partial history.
 direction or a missing entry price is either a fold this function got wrong or a
 response cTrader shaped differently, and the two repairs are opposite — a
 `?force=1&hours=N` backfill for the first, a code change for the second. Nothing
-else in the system can tell them apart. The flag writes nothing, makes the same
+else in the system can tell them apart.
+
+**A forced backfill overwrites a hand-corrected row, and that is the one thing
+to know before running one.** Every broker column is rewritten from the deals as
+they fold today, so a row edited in the dashboard to fix a direction or a price
+goes back to what the fold produces — silently, and for every position the
+window reaches, not only the one being repaired. The journal columns are never
+touched, `net_pnl` is not among the columns the fold writes at all, and the
+arbitrated columns keep their `is null` filters — so the money figure the email
+owns, `balance`, `planned_sl`, `planned_tp` and `fill_time` all survive it. The
+ten the fold does write are `direction`, `entry_time`, `entry_price`,
+`exit_price`, `size_oz`, `commission`, `computed_pnl` and `open_day`, and those
+do not.
+Widen `hours` to the smallest window that covers the row you mean, and expect a
+correction older than that window to stand only until the next backfill reaches
+back past it. The flag writes nothing, makes the same
 `get_deals` call the poll was about to make, and returns the body as text: the
 SSE framing and the double-encoded payload are half of what is being looked at,
 so parsing them away would hide the layer the question is usually about.
