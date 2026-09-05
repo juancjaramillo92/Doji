@@ -2605,6 +2605,17 @@ function rollCell([text, sign]) {
 // and its colour cannot come from two different numbers.
 const fmtMoney = v => Math.abs(round2(v)).toFixed(2);
 
+// The other direction: a figure that carries its own sign, for the two places a
+// P&L is read as a number in a list rather than as a coloured total. A leading
+// `+` only above zero — a negative already prints one and a flat trade is not a
+// gain — which is why this cannot be `fmtMoney` with a sign glued on.
+//
+// NO `round2` HERE, deliberately, where fmtMoney has one. These read `t.pnl`
+// straight off the row rather than a total this file computed, and rounding a
+// column the app does not own would make it print something the database does
+// not say. The two rules are not the same rule and are not being merged.
+const fmtSigned = v => (v > 0 ? '+' : '') + v.toFixed(2);
+
 function setFigure(id, text, sign) {
   const el = $(id);
   if (!el) return;
@@ -3407,7 +3418,7 @@ function renderTable(rows) {
 
   const body = slice.map(t => {
     const r      = resultOf(t);
-    const pnlTxt = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
+    const pnlTxt = t.pnl == null ? '—' : fmtSigned(t.pnl);
     const clock  = t.entry_time ? Dates.nyTime(t.entry_time) : '';
     const sess   = sessionOf(t);
     // The row opens the entry, so it says so and answers the keyboard.
@@ -3547,11 +3558,11 @@ function openDay(day) {
   const res = aggregateResult(m.net, m.n, counts(list).be);
   const dateStr = Dates.fmt(day, { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
   $('day-modal-title').innerHTML = `${dateStr} &nbsp;·&nbsp; ${list.length} trades`
-    + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${(m.net > 0 ? '+' : '') + m.net.toFixed(2)}</span>` : '');
+    + (m.n ? ` &nbsp;·&nbsp; <span class="${res === 'be' ? '' : res}">${fmtSigned(m.net)}</span>` : '');
 
   host.innerHTML = [...list].sort((a, b) => byKey(b, a)).map(t => {
     const r = resultOf(t);
-    const pnl = t.pnl == null ? '—' : (t.pnl > 0 ? '+' : '') + t.pnl.toFixed(2);
+    const pnl = t.pnl == null ? '—' : fmtSigned(t.pnl);
     const sess = sessionOf(t);
     const dir = t.direction === 'BUY' ? 'Long' : t.direction === 'SELL' ? 'Short' : '—';
     return `<div class="day-trade-row" data-trade="${esc(t.id)}" role="button" tabindex="0">
