@@ -2143,6 +2143,41 @@ test('the test count the instructions state is the count the suite runs', () => 
     `sitting in a subfolder where it silently does not run at all`);
 });
 
+/* ─── The backup reads each table by a column that table actually has ────────
+   Paging by Range needs a stable order, so every read carries one — and the
+   order column has to exist. `eugenia_channels` is keyed by `channel` rather
+   than `id`, because the five rungs ARE the rows; ordering it by `id` is a 400
+   from PostgREST and the whole backup is refused.
+
+   NOTHING IN THIS SUITE COULD SEE THAT, and the reason is worth keeping. The
+   paging tests drive `readAll` against a stubbed fetch, and a stub answers
+   whatever it is asked — so the loop was proved and the QUERY was never
+   checked against a real schema. It failed on its first live run. This is the
+   half a stub cannot cover: the column names, read out of the SQL that creates
+   the table.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every table the backup reads is ordered by a column it has', async () => {
+  const { TABLES } = await import('../scripts/backup-memory.mjs');
+  assert.ok(TABLES.length >= 6, `only ${TABLES.length} tables in the backup`);
+
+  for (const [table, orderBy] of TABLES) {
+    const created = NUMBERED.match(
+      new RegExp(`create table (?:if not exists )?public\\.${table}\\s*\\(([\\s\\S]*?)\\n\\s*\\);`));
+    assert.ok(created, `${table} is in the backup and no numbered file creates it`);
+
+    // The column as DECLARED — a name in a constraint or a comment is not one.
+    const columns = created[1].split('\n')
+      .map(l => l.trim().match(/^([a-z_]+)\s+(text|bigserial|bigint|int|numeric|boolean|timestamptz|vector)/))
+      .filter(Boolean).map(m => m[1]);
+    assert.ok(columns.length >= 2,
+      `read ${columns.length} columns out of ${table} — the reader has gone blind`);
+    assert.ok(columns.includes(orderBy),
+      `the backup orders ${table} by '${orderBy}' and that column is not on it — ` +
+      `PostgREST answers 400 and the entire backup is refused, on every run`);
+  }
+});
+
 /* ─── verify.sql has to ask about everything the files declare ───────────────
    The numbered files are a CLAIM about the database and verify.sql is the only
    thing that tests it, so an object declared and never asked about is drift in
