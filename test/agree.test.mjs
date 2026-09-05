@@ -1066,6 +1066,42 @@ test('the unreferenced-declaration scan can actually find one', () => {
     'dropping a step from render() leaves its renderer unreferenced and unseen');
 });
 
+/* ─── verify.sql's footer counts its own checks ──────────────────────────────
+   The footer is the paragraph a person reads at the moment they are already
+   lost: they ran the whole file, the editor showed them the last statement, and
+   the checks they came for scrolled past unseen. It tells them how many were
+   thrown away — and it said fifty-seven while the summary held sixty, which is
+   the file describing itself wrongly in the one place that is read under
+   confusion.
+
+   The number is a digit rather than a word so it can be compared. This
+   repository has been bitten by a stale count twice already; CLAUDE.md's
+   preference for a name or a `string_agg` over a count does not help here,
+   because the thing being stated IS a quantity. So it is counted instead.
+
+   The rows are matched on their shape in the VALUES list — `('check name',` at
+   two spaces of indent — and the count is bounded below as well as compared, so
+   a pattern that stopped matching reports a broken reader rather than agreeing
+   with a footer that says zero.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('verify.sql says how many checks it runs, and runs that many', () => {
+  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+  const from = sql.indexOf('select check_name, actual, expected');
+  const to   = sql.indexOf(') as t(check_name, actual, expected);', from);
+  assert.ok(from > -1 && to > from, 'the summary block is no longer where the footer sends people');
+
+  const rows = (sql.slice(from, to).match(/^  \('/gm) || []).length;
+  assert.ok(rows > 40, `only ${rows} checks parsed out of the summary — the reader has gone blind`);
+
+  const stated = sql.slice(to).match(/the (\d+) checks that answer/);
+  assert.ok(stated, 'the footer no longer states how many checks were thrown away');
+  assert.equal(Number(stated[1]), rows,
+    `the footer says ${stated[1]} checks and the summary holds ${rows} — the one ` +
+    `paragraph read by someone who has just lost their result is wrong about it`);
+});
+
 /* ─── The Node floor has one home, and CI has to read it from there ──────────
    `engines.node` states the floor and package.json is the only file allowed to.
    It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
