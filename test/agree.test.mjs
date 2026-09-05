@@ -1526,6 +1526,50 @@ test('R-08 cites a section that actually holds its steps', () => {
     `§${cited[1]} lists ${steps.length} numbered steps, not the four R-08 requires`);
 });
 
+/* ─── Every section she is told to read is one she can be handed ─────────────
+   The strategy is the one document she may not edit, and `get_strategy` is what
+   stops her inventing what it says. A citation that does not resolve turns that
+   tool into the opposite: `readStrategy` answers a missing section with a
+   sentence naming what the document DOES hold, so she reports her own strategy
+   as silent on something it covers.
+
+   The dotted case is worse and is why the resolution is checked rather than
+   the key. §4.1 and §4.2 are prose inside §4, so `readStrategy` falls back one
+   level to the parent — which means a mistyped §4.9 comes back as §4, a real
+   body, indistinguishable from a citation that worked. So a dotted citation has
+   to name a heading actually present in what came back.
+
+   One citation was checked before this — R-08's, from the rules table. Every
+   other one, including the ones in the prompt she carries on every turn, was
+   not. ─────────────────────────────────────────────────────────────────────── */
+
+test('every section the prompts cite is one get_strategy can serve', () => {
+  const sources = { SYSTEM, CONSOLIDATE, ALWAYS };
+  let checked = 0;
+
+  for (const [name, text] of Object.entries(sources)) {
+    for (const [, key] of text.matchAll(/§(\d+(?:\.\d+)?)/g)) {
+      checked++;
+      const body = readStrategy(key);
+      assert.doesNotMatch(body, /^The strategy has no section/,
+        `${name} cites §${key} and get_strategy cannot serve it — she would be ` +
+        `told her own document is silent on something she was sent to read`);
+
+      // The dotted half. A subsection resolves through the parent, so the body
+      // coming back proves nothing unless the heading is actually in it.
+      if (key.includes('.')) {
+        assert.match(body, new RegExp(`§?${key.replace('.', '\\.')}`),
+          `${name} cites §${key}, and what came back is the whole of §` +
+          `${key.split('.')[0]} with no §${key} in it — the parent fallback ` +
+          `answering a citation that does not exist, which reads exactly like ` +
+          `one that does`);
+      }
+    }
+  }
+  assert.ok(checked >= 5,
+    `only ${checked} citations found across the prompts — the reader has gone blind`);
+});
+
 test('the two reward-to-risk numbers are kept apart', () => {
   /* 1:1.5 is a condition at ENTRY — step 4 refuses the trade below it. A
      realised 1:1.25 is what a $30 target shortened on an open trade leaves
