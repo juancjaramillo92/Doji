@@ -455,7 +455,18 @@ table, and every row in it is a fact about a model call rather than about him.
 
 It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets, and nothing
 else — one file, no install step, because a backup that depends on a registry is
-a backup that fails the week the registry does. **The paging is the load-bearing
+a backup that fails the week the registry does.
+
+**Give it its own `sb_secret_` key rather than the one the functions hold.** Both
+bypass RLS identically, so this is about blast radius rather than capability:
+this is the second secret in the system to live outside the trader's own
+infrastructure, in GitHub's, and the argument is the one `DOJI_EMAIL_SECRET`
+already makes. Leaked, a key used only here is revoked on its own and the
+poller, Gladys and Eugenia keep running; the shared one has to be rotated
+everywhere, under pressure. Supabase allows several named secret keys for
+exactly this — name it for what it does. It can still read every table,
+`trades` included: a key that could not would also be denied her notes, which
+is the whole point of the backup. **The paging is the load-bearing
 part.** PostgREST caps a response at its own `max-rows` whatever is asked for, so
 a single read of `eugenia_turns` returns a page and looks exactly like a complete
 archive: green job, well-formed file, plausible counts, discovered on the day
@@ -477,6 +488,16 @@ it puts the login screen and the previous session's trades one keypress apart on
 a shared machine. `app.test.mjs` drives that path — removing the delete goes
 red, as does a confirmed load that writes no snapshot or a failed one that
 ignores it.
+
+**Running `verify.sql` means running its summary block on its own.** A SQL
+editor shows the result of the last statement only, and the last statement in
+that file is the ten most recent HTTP responses — so pasting the whole file in
+and pressing Run displays those and silently discards the fifty-seven checks
+that answer whether the database matches the numbered files. Select from
+`select check_name, actual, expected, ...` down to `) as t(check_name, actual,
+expected);` and run that alone. The summary sits first rather than last because
+a listing below it can raise on a database missing an object, and anything that
+raises takes every statement after it with it.
 
 **If a trade does not appear**, the cron reporting `succeeded` proves nothing —
 `net.http_post` is asynchronous, so the SQL succeeded in *queuing* the request.
