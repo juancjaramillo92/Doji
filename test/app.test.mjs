@@ -406,6 +406,12 @@ test('the week opens at the Sunday 17:00 New York gold open', () => {
   // and the Sunday open is when the week gets reviewed, and a calendar anchor
   // would blank every figure at exactly that moment.
   assert.equal(wk('2026-08-16T20:00:00Z'), '2026-08-09');
+  // The same Sunday at 00:30 ET, which is the hour the CYCLE decides. `hour <
+  // 17` is written for a midnight that arrives as 0; a formatter left to pick
+  // its own cycle can hand back 24, and 24 is not less than 17 — so this one
+  // instant would file the small hours of Sunday under the week that has not
+  // opened yet, and every figure on screen would jump a week for an hour.
+  assert.equal(wk('2026-08-16T04:30:00Z'), '2026-08-09');
   // 21:00 UTC is 17:00 ET exactly: the new week starts on the minute.
   assert.equal(wk('2026-08-16T21:00:00Z'), '2026-08-16');
   // And every day after it belongs to that Sunday.

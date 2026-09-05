@@ -1080,6 +1080,67 @@ test('the documents name only symbols the repository has', () => {
     'the documents name things the repository does not have');
 });
 
+/* ─── One hour cycle, across four runtimes ──────────────────────────────────
+   Nine formatters in this repository ask for an hour, and every one of them
+   has to say WHICH cycle it wants. `hour12: false` does not: it leaves the
+   choice to the locale, which is free to resolve to h24 and render midnight as
+   hour 24 rather than hour 0.
+
+   Where the hour is only tested against a market's opening range that is
+   harmless — 24 fails `h < close` exactly as 0 fails `h >= open` — and both
+   `hourIn` ports say so. It is the clocks that compare the hour against a
+   BOUNDARY that break: `Dates.nyParts` feeds `weekStart` and `lastClose`,
+   where `hour < 17` decides which week a Sunday belongs to, and `nyWall` in
+   adherence.ts feeds `Date.UTC(..., w.hour, w.min)`, where an hour of 24 rolls
+   the instant into the next day and moves the measured offset with it.
+
+   So the cycle is read off every formatter that asks for an hour, rather than
+   off the two that would visibly break. The alternative is nine copies of one
+   decision with nothing comparing them, which is what this file exists for.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// The argument list of each `new Intl.DateTimeFormat(...)`, taken by balancing
+// the parentheses rather than by a pattern: the options are an object literal
+// and several of them run over more than one line.
+const formatters = (text) => {
+  const out = [];
+  for (const m of text.matchAll(/Intl\.DateTimeFormat\(/g)) {
+    let i = m.index + m[0].length, depth = 1;
+    while (i < text.length && depth) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') depth--;
+      i++;
+    }
+    out.push(text.slice(m.index, i));
+  }
+  return out;
+};
+
+test('every clock in the repository states the same hour cycle', () => {
+  let asked = 0;
+  for (const path of TRACKED) {
+    if (!/\.(html|ts|mjs|gs)$/.test(path) || path.startsWith('test/')) continue;
+    const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+    for (const args of formatters(text)) {
+      assert.doesNotMatch(args, /hour12/,
+        `${path} builds a formatter with hour12 — that leaves the cycle to the ` +
+        `locale, and a locale resolving to h24 renders midnight as hour 24`);
+      if (!/\bhour:/.test(args)) continue;
+      asked++;
+      assert.match(args, /hourCycle:\s*['"]h23['"]/,
+        `${path} asks a formatter for an hour without stating hourCycle h23 — ` +
+        `midnight can arrive as 24, and every boundary this repo compares an ` +
+        `hour against is written for 0`);
+    }
+  }
+  // The reader has to have found the clocks it is judging: a pattern that
+  // stopped matching would report agreement across nothing at all.
+  assert.ok(asked >= 8,
+    `only ${asked} formatters ask for an hour — the reader has gone blind`);
+});
+
+
 
 /* ─── Every way she speaks to him reads what he has told her ────────────────
    His notes are the only channel he has for correcting her — there is no
