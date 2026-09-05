@@ -1139,6 +1139,48 @@ test('the client writes no colour of its own, and reads them all through cssToke
     'cssToken has almost no call sites left — the palette is being reached some other way');
 });
 
+/* ─── Every maintenance door is named in the README ──────────────────────────
+   The doors are `?force=1`, `?raw=1`, `?consolidate=1` and the rest: query
+   parameters that exist so a person can exercise a path by hand when something
+   has gone wrong. A door nobody can find is a door that does not exist — it is
+   reached at exactly the moment nobody is going to read the source to discover
+   it.
+
+   `?pulse=1` was that door. The pulse itself has a section of its own; the way
+   to fire one by hand appeared nowhere, while every sibling door was written
+   down. Worse, the table stating WHAT A HOLDER OF THE CRON SECRET CAN CAUSE
+   named two of the six on `doji-eugenia` and omitted `?consolidate=1`, which
+   runs the nightly pass and WRITES her memory. That table exists because "the
+   worst case is nothing" was once the sentence that stopped anyone checking the
+   worst case.
+
+   Matched on the door name rather than on prose about the feature: the pulse
+   was discussed at length in a section that never says how to fire one.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every door a function opens is written down in the README', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+  const doors = new Set();
+  for (const fn of DEPLOYED) {
+    const src = readFileSync(
+      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    for (const [, d] of src.matchAll(/searchParams\.get\("([a-zA-Z]+)"\)/g)) doors.add(d);
+  }
+
+  // A pattern that stopped matching would report every function doorless.
+  assert.ok(doors.size >= 8,
+    `only ${doors.size} doors found across the functions — the reader has gone blind`);
+
+  const missing = [...doors].sort().filter(d =>
+    !new RegExp(`\\?${d}=|\`${d}\``).test(readme));
+
+  assert.deepEqual(missing, [],
+    `these doors exist and the README does not name them: ${missing.map(d => '?' + d).join(', ')}. ` +
+    `A door is reached at the moment something has gone wrong, which is not when ` +
+    `anyone reads the source to find out it is there.`);
+});
+
 /* ─── The Node floor has one home, and CI has to read it from there ──────────
    `engines.node` states the floor and package.json is the only file allowed to.
    It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
