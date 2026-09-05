@@ -1161,7 +1161,7 @@ async function readMarket(): Promise<string> {
 
    NEVER THROWS, and it has no catch: marketQuote already swallows its own
    failure and answers null, so the sentence below is the whole handling. */
-async function marketBlock(): Promise<string> {
+export async function marketBlock(): Promise<string> {
   const quote = await marketQuote();
   return "\n\n" + (quote ? quoteLine(quote, new Date()) : NO_PRICE);
 }
@@ -2031,7 +2031,7 @@ export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
    The two kinds are labelled differently on purpose. What she noticed is
    context; what he told her is not, and a list that ran them together would
    invite her to weigh an instruction against her own observation. */
-async function notesBlock(): Promise<string> {
+export async function notesBlock(): Promise<string> {
   try {
     const [told, noticed] = await Promise.all([
       readNotes('instruction'), readNotes('fact'),
@@ -2160,7 +2160,7 @@ async function readChannels(): Promise<Channel[]> {
 
 /* Optional the same way notesBlock is: a database blip costs her the map, not
    the briefing. */
-async function channelsBlock(): Promise<string> {
+export async function channelsBlock(): Promise<string> {
   try {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
   } catch (err) {
@@ -2173,7 +2173,7 @@ async function channelsBlock(): Promise<string> {
 // Seven days, handed over unasked, so "you have not traded since Tuesday" costs
 // no tool round. Same read as get_trades through the same read-only view — she
 // gains no reach here, only the saved trip.
-async function tradesBlock(): Promise<string> {
+export async function tradesBlock(): Promise<string> {
   return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
@@ -2210,7 +2210,7 @@ export function thesisLine(row: Thesis | null): string {
   return `\n\nThe story you have been carrying${since}:\n${row.thesis}`;
 }
 
-async function thesisBlock(): Promise<string> {
+export async function thesisBlock(): Promise<string> {
   try {
     return thesisLine(await readThesis());
   } catch (err) {
@@ -2286,7 +2286,7 @@ export function healthLine(rows: Health[], now = Date.now()): string {
   "\nSay this first, plainly. Trades may be missing from everything below.";
 }
 
-async function healthBlock(): Promise<string> {
+export async function healthBlock(): Promise<string> {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error,last_error_at` +
@@ -2332,7 +2332,7 @@ export function loopsList(rows: Loop[]): string {
        + (asked.length ? `\n\nWhat you asked him and he has not answered:\n${list(asked)}` : "");
 }
 
-async function loopsBlock(): Promise<string> {
+export async function loopsBlock(): Promise<string> {
   try {
     return loopsList(await readLoops());
   } catch (err) {
@@ -2390,7 +2390,7 @@ export function calendarList(rows: Release[]): string {
   return `\n\nThe calendar around now, as you filed it:\n${lines.join("\n")}`;
 }
 
-async function calendarBlock(): Promise<string> {
+export async function calendarBlock(): Promise<string> {
   try {
     return calendarList(await readCalendar());
   } catch (err) {
@@ -2529,7 +2529,7 @@ export function positionsList(
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
 
-async function positionsBlock(): Promise<string> {
+export async function positionsBlock(): Promise<string> {
   try {
     const day = nyDate(new Date());
     const rows = await readDesk(day);
@@ -2915,7 +2915,7 @@ async function consolidatedToday(): Promise<boolean> {
 /* What he made of the briefings, which until now nothing could say. Two days,
    because the pass runs nightly and a tap can arrive late; more than that and
    she would be reading last week's verdict into tonight's decision. */
-async function feedbackBlock(): Promise<string> {
+export async function feedbackBlock(): Promise<string> {
   try {
     const from = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
     const res = await fetch(
