@@ -2090,6 +2090,41 @@ test('the two writers with no voice record both outcomes', () => {
   }
 });
 
+/* ─── The number in the instructions is a number, and numbers go stale ───────
+   CLAUDE.md tells a new reader what `npm test` should print. It said 402 for
+   long enough to be wrong by thirty-two, which is the same failure this file
+   exists for in its smallest form: a copy nothing compares, in the one document
+   somebody reads before touching anything.
+
+   It is derivable, so it is derived. The runner reports one line per top-level
+   `test(` call, and that is what is counted here — a suite added in a fifth file
+   is picked up without touching this test, and a count typed into the document
+   and not updated fails on the next run rather than in six months.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the test count the instructions state is the count the suite runs', () => {
+  const files = readdirSync(new URL('../test', import.meta.url))
+    .filter(f => f.endsWith('.test.mjs')).sort();
+  assert.ok(files.length >= 4, `only ${files.length} suites found — the reader has gone blind`);
+
+  const total = files.reduce((n, f) => n +
+    (readFileSync(new URL(`../test/${f}`, import.meta.url), 'utf8')
+      .match(/^test\(/gm) || []).length, 0);
+  assert.ok(total > 100, `counted ${total} tests — the pattern has stopped matching`);
+
+  const doc = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');
+  const stated = doc.match(/npm test\s+# (\d+) tests, (\w+) suites/);
+  assert.ok(stated, 'CLAUDE.md no longer states what npm test prints');
+  assert.equal(Number(stated[1]), total,
+    `CLAUDE.md says ${stated[1]} tests and the suite runs ${total}`);
+
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  assert.equal(stated[2], WORDS[files.length],
+    `CLAUDE.md says ${stated[2]} suites and test/ holds ${files.length} — the ` +
+    `script globs one level, so a fifth suite is either running unmentioned or ` +
+    `sitting in a subfolder where it silently does not run at all`);
+});
+
 /* ─── verify.sql has to ask about everything the files declare ───────────────
    The numbered files are a CLAIM about the database and verify.sql is the only
    thing that tests it, so an object declared and never asked about is drift in
