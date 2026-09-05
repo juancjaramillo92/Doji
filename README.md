@@ -17,7 +17,17 @@ dependencies to install.
 
 Three libraries load from a CDN. Chart.js and the Supabase client are blocking
 scripts in the page; SheetJS is fetched on the first export, because it is the
-largest of the three and is needed only there.
+largest of the three and is needed only there. All three come from jsDelivr,
+pinned to an exact version — Chart.js and SheetJS with an SRI hash beside the
+pin, the Supabase client deliberately without one, for the reason given where
+the tag is.
+
+**Two typefaces load from Google Fonts** — Hanken Grotesk for the interface and
+JetBrains Mono for every figure — which is the fourth and fifth external host
+the page reaches, and the only ones that are not a library. Both `--ui` and
+`--mono` carry a full system fallback stack, so a network that blocks Google
+Fonts costs the typeface and nothing else: the app opens, draws and saves
+exactly as before, in the platform's own faces.
 
 You need a connection to sign in and to save. Without one the journal still
 opens and draws from a cached copy of the last successful read; saving is
