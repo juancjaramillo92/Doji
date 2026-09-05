@@ -8,7 +8,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # The floor lives in package.json's engines.node and nowhere else.
+          # A bare `node-version: 22` is a second home for it that no tool
+          # compares: it resolves to the newest 22.x, which is above the floor
+          # today and says nothing about the day the floor moves past it —
+          # jsdom's requirement is what set it, and jsdom is a dependency that
+          # moves. setup-node reads engines.node and resolves the range itself.
+          node-version-file: package.json
       # ci, not install: it installs the lockfile exactly and fails if that
       # disagrees with package.json. A green run has to mean the tree someone
       # else gets, or "the suite passes" is a claim about one machine.

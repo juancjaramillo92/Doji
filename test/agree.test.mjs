@@ -792,6 +792,41 @@ test('every function a caller names is a function that exists', () => {
   }
 });
 
+/* ─── The Node floor has one home, and CI has to read it from there ──────────
+   `engines.node` states the floor and package.json is the only file allowed to.
+   It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
+   needs, and jsdom is a dependency that moves — so the floor moves with it.
+
+   A workflow pinning `node-version: 22` is a second copy of that decision that
+   nothing compares. It resolves to the newest 22.x, which is why it has always
+   been above the floor and why the disagreement is invisible: the day the floor
+   goes past the newest 22.x, three workflows install a Node the suite is not
+   claimed to run on and go green doing it. setup-node resolves the range in
+   engines.node itself, so the copy is avoidable rather than unavoidable — which
+   is why this asserts one home instead of holding two together.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const WORKFLOWS = ['.github/workflows/test.yml',
+                   '.github/workflows/deploy-functions.yml',
+                   '.github/workflows/backup-memory.yml'].map(read);
+
+test('every workflow takes its Node version from the one file that states it', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(pkg.engines?.node ?? '', /^>=\d+\.\d+\.\d+$/,
+    'package.json no longer states a Node floor, so node-version-file resolves ' +
+    'to nothing and every workflow below is reading an empty decision');
+
+  for (const { path, text } of WORKFLOWS) {
+    // Anchored to setup-node: a `node-version` under any other step is not this.
+    assert.ok(/actions\/setup-node/.test(text), `${path} no longer sets Node up at all`);
+    assert.match(text, /node-version-file: package\.json/,
+      `${path} does not read the floor from package.json`);
+    assert.doesNotMatch(text, /^\s*node-version:/m,
+      `${path} pins a Node version of its own, which is a second home for a ` +
+      `floor that only package.json is allowed to state`);
+  }
+});
+
 /* The project ref is not a secret, and it is not a URL everywhere it appears:
    config.toml carries it as project_id and the deploy workflow as
    --project-ref. So all three shapes are matched, and each is anchored to the
