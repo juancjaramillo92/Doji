@@ -1580,9 +1580,17 @@ test('every row-returning read of her own tables carries a limit', () => {
      limit routinely sits in a different literal from the select and a pattern
      that stops at the first backtick cannot see it. And a path is a READ only if
      it names `select=` — a PATCH against one primary key is a REST path against
-     a growing table too, and needs no limit at all. */
+     a growing table too, and needs no limit at all.
+
+     THE TABLE IS WHATEVER STANDS BEFORE THE `?`, rather than a list of the
+     names this file happens to use today. An earlier version named them, and
+     `fillEmbeddings` — which reads `rest/v1/${table}` because it sweeps two
+     tables through one function — was invisible to it: the one read this
+     guard could not see was the sweep whose backlog was once drained from the
+     wrong end. A reader that names its subjects goes blind the moment one of
+     them is spelled differently, and says nothing when it does. */
   const joined = src.replace(/`\s*\+\s*`/g, '');
-  const reads = [...joined.matchAll(/rest\/v1\/(eugenia_\w+|trades)\?(select=[^`]*)/g)];
+  const reads = [...joined.matchAll(/rest\/v1\/([^?`]+)\?(select=[^`]*)/g)];
   assert.ok(reads.length >= 3,
     `only ${reads.length} reads found — the reader has gone blind`);
 
@@ -1590,6 +1598,21 @@ test('every row-returning read of her own tables carries a limit', () => {
     assert.match(query, /limit=/,
       `the read of ${table} has no limit — an unusual day puts the whole window ` +
       `into a model call with nothing to stop it`);
+
+    /* AND A LIMIT TAKES AN END, WHICH IS THE HALF THAT HAS ALREADY BITTEN
+       TWICE. `id` is the only monotonic key any of these tables has, so a read
+       ordered by it is asking for the newest rows or the oldest, and the two
+       are indistinguishable from outside: the same rows come back either way
+       on a quiet day, and the wrong end only shows on the day there is more
+       than a window's worth. The pass once kept the FIRST two hundred turns of
+       a day and dropped the evening, where a late instruction lives, and
+       `fillEmbeddings` drained its backlog from the wrong end. Ordering by a
+       clock is a different question and is left alone — the event spine reads
+       `at.asc` on purpose, because the next release is the earliest one. */
+    assert.doesNotMatch(query, /order=id\.asc/,
+      `the read of ${table} orders id.asc under a limit, so it keeps the OLDEST ` +
+      `rows in the window and silently drops everything since — which is what ` +
+      `the nightly pass and the embedding backlog each did once`);
   }
 });
 

@@ -941,7 +941,11 @@ more than a real day, so it bites only on a backfill or a very long day — and
 `order=id.asc&limit=200` read the *first* two hundred, which is a pass that
 distils the morning and drops the evening, where a late instruction lives. The
 select runs newest-first and is reversed for reading, exactly as `recent()` does.
-The two are indistinguishable from outside, which is why nothing caught it.
+The two are indistinguishable from outside, which is why nothing caught it — so
+`agree.test.mjs` now refuses `order=id.asc` under a limit on *every* read of her
+own tables rather than on the two that have already gone wrong. Ordering by a
+clock is left alone: the event spine reads `at.asc` because the next release is
+the earliest one.
 
 **Its default is almost nothing.** Most days deserve no note — a conversation
 about today's data leaves nothing durable, and that is the normal outcome. The
@@ -2257,7 +2261,9 @@ every hour for the one night a year it had something to do.
 **It drains newest first, which is the same decision the day's window got wrong.**
 The sweep took `id.asc`, and since the backlog empties either way that looked
 like a choice with no consequence — exactly how `order=id.asc&limit=200` looked
-on the nightly turns. The consequence is *when*: at fifty rows a night, a vendor
+on the nightly turns. It was also the one read the bounded-read test could not
+see, because it reads `rest/v1/${table}` for two tables through one function and
+that test named its subjects; it matches whatever stands before the `?` now. The consequence is *when*: at fifty rows a night, a vendor
 outage that left a fortnight without vectors became searchable oldest-first, so
 last month's archive came back before last week's conversation and the rows he is
 likeliest to ask about arrived last.
