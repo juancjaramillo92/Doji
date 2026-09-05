@@ -1787,6 +1787,38 @@ test('the column, the filter and the tool parameter all exist together', () => {
     'the notes index no longer matches the read it exists for');
 });
 
+/* ─── The same filter again, on the write, where it answers a different question
+   The read's `superseded_by=is.null` decides what she is HANDED. This one
+   decides what a retirement may TOUCH, and only the read has ever been held to
+   it. Without it the PATCH matches an already-retired note and re-points it at
+   the new row: the trail stops being a chain and becomes a star, the note that
+   originally corrected it is orphaned, and every row involved still reads as
+   healthy. It is also the branch that decides whether she tells him the
+   retirement missed — an unfiltered PATCH always matches, so the honest
+   "note N is not there to retire" could never once be said. */
+
+test('the supersede write may only retire a note that is still live', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function writeNote(');
+  assert.ok(at > -1, 'doji-eugenia no longer has writeNote()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  const retire = body.slice(body.indexOf('if (retiring) {'));
+  assert.ok(retire.length && retire.length < body.length,
+    'writeNote no longer has a retirement branch to check');
+
+  assert.match(retire, /eugenia_notes\?id=eq\.\$\{old\}&superseded_by=is\.null/,
+    'the supersede PATCH no longer filters on superseded_by=is.null, so a note ' +
+    'that was already retired is re-pointed at the new row and the note that ' +
+    'first corrected it is orphaned — with nothing erroring');
+  assert.match(retire, /method: "PATCH", headers: sbHeaders\("return=representation"\)/,
+    'the supersede PATCH stopped asking for the row back, so a filtered-to-nothing ' +
+    'retirement is a 200 with an empty body and reads as done');
+  assert.match(retire, /\.length === 0/,
+    'nothing checks that the retirement matched a row, so she reports a ' +
+    'contradiction retired while it is still handed to her every turn');
+});
+
 /* ─── A block reaches the message, however it was awaited ────────────────────
    These calls used to be `await notesBlock()` spliced straight into the string
    being built, and a regex for that exact shape was the whole check. They are
