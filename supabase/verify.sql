@@ -422,10 +422,13 @@ where schemaname = 'public'
 order by tablename, indexname;
 
 -- ─── Row level security ────────────────────────────────────────────────────
--- All three tables must show rowsecurity = true. `trades` has one policy for
--- all four verbs; the two eugenia_ tables must have NO policy at all, which is
--- what denies the publishable key outright — RLS enabled with a policy nobody
--- noticed would turn either into an open log.
+-- EVERY table listed must show rowsecurity = true, however many there are — the
+-- count belongs to the schema and not to this comment, which said "all three"
+-- for as long as there were ten. `trades` has one policy for all four verbs;
+-- 005 gives the three the dashboard card reads a select-only policy each; and
+-- her notes, turns and channels must have NO policy at all, which is what
+-- denies the publishable key outright. RLS enabled with a policy nobody noticed
+-- would turn any of those three into an open log.
 select c.relname as table_name, c.relrowsecurity as rls_enabled,
        coalesce(p.polname, '(no policy — correct for eugenia_*)') as policy,
        case when p.polname is null then null else pg_get_expr(p.polqual, p.polrelid) end as using_clause

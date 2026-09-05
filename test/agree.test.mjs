@@ -1939,6 +1939,37 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
    messages alone and she reads as though she had never answered.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── Every table stands behind RLS, and nothing was checking that ───────────
+   The publishable key is in `index.html` and is meant to be. RLS is the only
+   thing between it and every table in the schema — either a policy that scopes
+   the rows, or, for the tables 003 keeps from the app entirely, RLS on with no
+   policy at all, which denies that key outright.
+
+   A table created without `enable row level security` is readable by anyone who
+   opens the page. Nothing failed, nothing logged, and the table simply answers.
+   Read out of the SQL rather than listed here, so table eleven is covered on the
+   day it is written rather than on the day someone remembers this test.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every table the numbered files create has row level security on', () => {
+  const files = readdirSync(new URL('../supabase', import.meta.url))
+    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
+  const sql = files
+    .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')).join('\n');
+
+  const created = [...sql.matchAll(/create table (?:if not exists )?public\.(\w+)/g)]
+    .map(m => m[1]);
+  assert.ok(created.length >= 8,
+    `only ${created.length} tables read out of the numbered SQL — the reader has gone blind`);
+
+  for (const t of created) {
+    assert.match(sql, new RegExp(`alter table public\\.${t} enable row level security`),
+      `public.${t} is created and never has RLS turned on, so the publishable ` +
+      `key in index.html can read it — and a table that simply answers looks ` +
+      `exactly like one that is meant to`);
+  }
+});
+
 test('the sides a trade may have are the sides every writer writes', () => {
   const declared = checkValues(SCHEMA, 'trades_direction_check');
   assert.ok(declared, '001 no longer constrains trades.direction');
