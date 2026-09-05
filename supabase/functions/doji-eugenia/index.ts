@@ -619,13 +619,28 @@ const NOTES = 20;
    The id comes back too, because a note she cannot name is a note she cannot
    retire. It costs a few characters per line and it is what makes `supersedes`
    callable at all. */
-async function readNotes(kind: string): Promise<Note[]> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
-    `&superseded_by=is.null&order=id.desc&limit=${NOTES}`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Notes read failed (HTTP ${res.status})`);
+/* EVERY READ OF HER TABLES IS THE SAME THREE STEPS — ask, refuse to go on with
+   a bad status, parse — and the only thing that ever varied was the noun in the
+   error. Fourteen copies of that is fourteen chances for one to omit the status
+   check, and the one that omits it does not fail loudly: PostgREST answers a
+   missing table with a 404 carrying a JSON body, so `await res.json()` succeeds
+   and the caller is handed an object where it expected rows. An unapplied
+   migration then reads as a block with nothing to say.
+
+   `fillEmbeddings` is deliberately NOT folded in. It needs `content-range` off
+   the response to know how much backlog is left, and a helper returning only
+   the rows would have to hand the response back to give it that — which is the
+   wrapper this exists to avoid. */
+async function readRows<T>(what: string, url: string): Promise<T[]> {
+  const res = await fetch(url, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`${what} read failed (HTTP ${res.status})`);
   return await res.json();
+}
+
+async function readNotes(kind: string): Promise<Note[]> {
+  return readRows<Note>('Notes',
+    `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
+    `&superseded_by=is.null&order=id.desc&limit=${NOTES}`);
 }
 
 type Note = { id: number; note: string };
@@ -807,9 +822,7 @@ export function tradesQuery(days: unknown, now = Date.now()): string {
    to have read it. */
 async function readTrades(days: unknown): Promise<string> {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows = await res.json();
+    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
     return rows.length ? JSON.stringify(rows) : "No trades in that window.";
   } catch (err) {
     console.error("doji-eugenia: trades read failed —", err instanceof Error ? err.message : err);
@@ -860,9 +873,7 @@ const CHECK_TOOL = {
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows: TradeRow[] = await res.json();
+    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
     if (!rows.length) return "No trades in that window, so there is nothing to check.";
     return adherenceList(checkRules(rows));
   } catch (err) {
@@ -920,9 +931,7 @@ const STATS_TOOL = {
    returns nothing reads as a trader who has not traded. */
 async function readStats(days: unknown): Promise<string> {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/${tradesQuery(days)}`, { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows: TradeRow[] = await res.json();
+    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
     const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
     return statsList(journalStats(rows), n);
   } catch (err) {
@@ -1161,7 +1170,7 @@ async function readMarket(): Promise<string> {
 
    NEVER THROWS, and it has no catch: marketQuote already swallows its own
    failure and answers null, so the sentence below is the whole handling. */
-async function marketBlock(): Promise<string> {
+export async function marketBlock(): Promise<string> {
   const quote = await marketQuote();
   return "\n\n" + (quote ? quoteLine(quote, new Date()) : NO_PRICE);
 }
@@ -1519,7 +1528,13 @@ const MAX_ROUNDS = 6;
    with a tool_result or the next request is a 400 — so a name no set serves
    gets a sentence saying so, which is also the only way that mistake would ever
    become visible rather than presenting as a turn that died. */
-async function serve(name: string, input: any): Promise<string> {
+/* Exported for the same reason `ask` below is: the rule this file repeats more
+   than any other — nothing served to the tool loop may throw — was asserted by
+   reading each handler's source and never by running one. A handler that gained
+   an uncaught path would read exactly like one that had not, and the briefing
+   it killed would be the first anyone heard of it. Driven against a database
+   that refuses, every tool has to come back with a sentence. */
+export async function serve(name: string, input: any): Promise<string> {
   switch (name) {
     case TRADES_TOOL.name:   return await readTrades(input.days);
     case CHECK_TOOL.name:    return await checkAdherence(input.days);
@@ -1747,11 +1762,9 @@ export function openOnUser(turns: Turn[]): Turn[] {
 }
 
 async function recent(): Promise<Turn[]> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`History read failed (HTTP ${res.status})`);
-  return openOnUser(dateTurns((await res.json()).reverse()));
+  const rows = await readRows<Turn>('History',
+    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`);
+  return openOnUser(dateTurns(rows.reverse()));
 }
 
 /* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
@@ -2025,7 +2038,7 @@ export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
    The two kinds are labelled differently on purpose. What she noticed is
    context; what he told her is not, and a list that ran them together would
    invite her to weigh an instruction against her own observation. */
-async function notesBlock(): Promise<string> {
+export async function notesBlock(): Promise<string> {
   try {
     const [told, noticed] = await Promise.all([
       readNotes('instruction'), readNotes('fact'),
@@ -2138,7 +2151,7 @@ export function channelsList(rows: Channel[]): string {
    her about him, `notesList` speaks to him about himself, and neither is the
    place for a query. */
 async function readChannels(): Promise<Channel[]> {
-  const res = await fetch(
+  return readRows<Channel>('Channels',
     // Bounded by the list that defines it rather than by a literal: the table
     // cannot hold a sixth row — the primary key sits on a five-value check —
     // so this is the one read here whose limit can never bite. It is written
@@ -2146,15 +2159,12 @@ async function readChannels(): Promise<Channel[]> {
     // and the read that was allowed to be the exception was the one that got
     // missed.
     `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence,moved_on` +
-    `&limit=${CHANNELS.length}`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Channels read failed (HTTP ${res.status})`);
-  return await res.json();
+    `&limit=${CHANNELS.length}`);
 }
 
 /* Optional the same way notesBlock is: a database blip costs her the map, not
    the briefing. */
-async function channelsBlock(): Promise<string> {
+export async function channelsBlock(): Promise<string> {
   try {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
   } catch (err) {
@@ -2167,7 +2177,7 @@ async function channelsBlock(): Promise<string> {
 // Seven days, handed over unasked, so "you have not traded since Tuesday" costs
 // no tool round. Same read as get_trades through the same read-only view — she
 // gains no reach here, only the saved trip.
-async function tradesBlock(): Promise<string> {
+export async function tradesBlock(): Promise<string> {
   return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
@@ -2185,11 +2195,8 @@ async function tradesBlock(): Promise<string> {
 type Thesis = { thesis: string; moved_on: string | null };
 
 async function readThesis(): Promise<Thesis | null> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_thesis?select=thesis,moved_on&id=eq.current&limit=1`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Thesis read failed (HTTP ${res.status})`);
-  const [row] = await res.json();
+  const [row] = await readRows<Thesis>('Thesis',
+    `${SB_URL}/rest/v1/eugenia_thesis?select=thesis,moved_on&id=eq.current&limit=1`);
   return row ?? null;
 }
 
@@ -2204,7 +2211,7 @@ export function thesisLine(row: Thesis | null): string {
   return `\n\nThe story you have been carrying${since}:\n${row.thesis}`;
 }
 
-async function thesisBlock(): Promise<string> {
+export async function thesisBlock(): Promise<string> {
   try {
     return thesisLine(await readThesis());
   } catch (err) {
@@ -2280,7 +2287,7 @@ export function healthLine(rows: Health[], now = Date.now()): string {
   "\nSay this first, plainly. Trades may be missing from everything below.";
 }
 
-async function healthBlock(): Promise<string> {
+export async function healthBlock(): Promise<string> {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error,last_error_at` +
@@ -2305,12 +2312,9 @@ type Loop = { id: number; kind: string; body: string; opened_on: string };
 const LOOPS = 10;
 
 async function readLoops(): Promise<Loop[]> {
-  const res = await fetch(
+  return readRows<Loop>('Loops',
     `${SB_URL}/rest/v1/eugenia_loops?select=id,kind,body,opened_on` +
-    `&closed_on=is.null&order=id.desc&limit=${LOOPS}`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Loops read failed (HTTP ${res.status})`);
-  return await res.json();
+    `&closed_on=is.null&order=id.desc&limit=${LOOPS}`);
 }
 
 /* Pure, so a test can read the shape, and the id is carried for the reason a
@@ -2326,7 +2330,7 @@ export function loopsList(rows: Loop[]): string {
        + (asked.length ? `\n\nWhat you asked him and he has not answered:\n${list(asked)}` : "");
 }
 
-async function loopsBlock(): Promise<string> {
+export async function loopsBlock(): Promise<string> {
   try {
     return loopsList(await readLoops());
   } catch (err) {
@@ -2351,12 +2355,9 @@ const CAL_BACK = 12, CAL_AHEAD = 24;
 async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();
   const to   = new Date(now + CAL_AHEAD * 3600_000).toISOString();
-  const res = await fetch(
+  return readRows<Release>('Calendar',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
-    `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=40`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Calendar read failed (HTTP ${res.status})`);
-  return await res.json();
+    `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=40`);
 }
 
 // Times in ET because that is the clock the prompt asks her to speak in, and
@@ -2384,7 +2385,7 @@ export function calendarList(rows: Release[]): string {
   return `\n\nThe calendar around now, as you filed it:\n${lines.join("\n")}`;
 }
 
-async function calendarBlock(): Promise<string> {
+export async function calendarBlock(): Promise<string> {
   try {
     return calendarList(await readCalendar());
   } catch (err) {
@@ -2419,13 +2420,10 @@ async function calendarBlock(): Promise<string> {
    naming the columns again would be a fourth copy of it that nothing compares.
    ───────────────────────────────────────────────────────────────────────── */
 async function readDesk(day: string): Promise<TradeRow[]> {
-  const res = await fetch(
+  return readRows<TradeRow>('Desk',
     `${SB_URL}/rest/v1/eugenia_trades?select=*` +
     `&or=(open_day.gte.${day},and(exit_price.is.null,fill_time.is.null))` +
-    `&order=entry_time.desc&limit=50`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Desk read failed (HTTP ${res.status})`);
-  return await res.json();
+    `&order=entry_time.desc&limit=50`);
 }
 
 /* THE MARK CARRIES ITS AGE AND NO UNREALISED FIGURE IS COMPUTED, which is one
@@ -2523,7 +2521,7 @@ export function positionsList(
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
 
-async function positionsBlock(): Promise<string> {
+export async function positionsBlock(): Promise<string> {
   try {
     const day = nyDate(new Date());
     const rows = await readDesk(day);
@@ -2671,9 +2669,8 @@ export function briefedQuery(): string {
    than skipping one. */
 async function briefedToday(): Promise<boolean> {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/${briefedQuery()}`, { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const [latest] = await res.json();
+    const [latest] = await readRows<{ created_at: string }>('Briefing marker',
+      `${SB_URL}/rest/v1/${briefedQuery()}`);
     return !!latest && nyDate(new Date(latest.created_at)) === nyDate(new Date());
   } catch (err) {
     console.error("doji-eugenia: could not check for today's briefing —",
@@ -2874,8 +2871,7 @@ export function dayQuery(hours: number, now = Date.now()): string {
 }
 
 async function turnsSince(hours: number): Promise<Turn[]> {
-  const res = await fetch(`${SB_URL}/rest/v1/${dayQuery(hours)}`, { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Day read failed (HTTP ${res.status})`);
+  const rows = await readRows<Turn>('Day', `${SB_URL}/rest/v1/${dayQuery(hours)}`);
   // Reversed back into the order it is read in: the pass is handed the day
   // oldest first, and only the SELECT needed to run the other way round.
   return dateTurns((await res.json()).reverse());
@@ -2893,11 +2889,9 @@ async function turnsSince(hours: number): Promise<Turn[]> {
    loses that day's distillation and never the day. */
 async function consolidatedToday(): Promise<boolean> {
   try {
-    const res = await fetch(
+    const [latest] = await readRows<{ at: string }>('Consolidation marker',
       `${SB_URL}/rest/v1/eugenia_runs?select=at&caller=eq.consolidation&ok=is.true` +
-      `&order=id.desc&limit=1`, { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const [latest] = await res.json();
+      `&order=id.desc&limit=1`);
     return !!latest && nyDate(new Date(latest.at)) === nyDate(new Date());
   } catch (err) {
     console.error("doji-eugenia: could not check for tonight's pass —",
@@ -2909,14 +2903,12 @@ async function consolidatedToday(): Promise<boolean> {
 /* What he made of the briefings, which until now nothing could say. Two days,
    because the pass runs nightly and a tap can arrive late; more than that and
    she would be reading last week's verdict into tonight's decision. */
-async function feedbackBlock(): Promise<string> {
+export async function feedbackBlock(): Promise<string> {
   try {
     const from = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
-    const res = await fetch(
+    const rows = await readRows<{ on_day: string; verdict: string }>('Feedback',
       `${SB_URL}/rest/v1/eugenia_feedback?select=on_day,verdict&on_day=gte.${from}` +
-      `&order=on_day.desc&limit=5`, { headers: sbHeaders() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows: { on_day: string; verdict: string }[] = await res.json();
+      `&order=on_day.desc&limit=5`);
     if (!rows.length) return "";
     const said = rows.map(r => `· ${civilDay(r.on_day)}: he marked it ${r.verdict === 'good' ? 'useful' : 'off'}`);
     return `\n\nWhat he made of the recent briefings:\n${said.join("\n")}\n` +
@@ -3050,13 +3042,11 @@ const RELEASE_STALE_H = 6;
 
 async function pendingRelease(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - RELEASE_STALE_H * 3600_000).toISOString();
-  const res = await fetch(
+  const [row] = await readRows<Release>('Release',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
     `&importance=eq.high&looked_at=is.null` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
-    `&order=at.asc&limit=1`, { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Release read failed (HTTP ${res.status})`);
-  const [row] = await res.json();
+    `&order=at.asc&limit=1`);
   return row ?? null;
 }
 
@@ -3133,20 +3123,15 @@ const PENDING_AHEAD_H = 8;
 
 async function aheadToday(now = Date.now()): Promise<Release[]> {
   const to = new Date(now + PENDING_AHEAD_H * 3600_000).toISOString();
-  const res = await fetch(
+  return readRows<Release>('Calendar',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
     `&importance=eq.high&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
-    `&order=at.asc&limit=5`, { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Calendar read failed (HTTP ${res.status})`);
-  return await res.json();
+    `&order=at.asc&limit=5`);
 }
 
 async function postTradeEvent(id: string, event: string): Promise<Response> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Trade read failed (HTTP ${res.status})`);
-  const [row] = await res.json() as TradeRow[];
+  const [row] = await readRows<TradeRow>('Trade',
+    `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
   // Soft-deleted, or not through the view. Nothing to say and nothing wrong.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
@@ -3188,11 +3173,8 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
     // the same view get_trades uses, so this gains her no reach.
     const day = row.open_day;
     if (!day) return json({ ok: true, skipped: "no filing day" });
-    const all = await fetch(
-      `${SB_URL}/rest/v1/eugenia_trades?open_day=eq.${day}&limit=50`,
-      { headers: sbHeaders() });
-    if (!all.ok) throw new Error(`Day read failed (HTTP ${all.status})`);
-    const standing = dayStanding(await all.json() as TradeRow[], day);
+    const standing = dayStanding(await readRows<TradeRow>('Day',
+      `${SB_URL}/rest/v1/eugenia_trades?open_day=eq.${day}&limit=50`), day);
     if (!standing || !standing.breached) {
       return json({ ok: true, trade: id, said: "day is inside its limit" });
     }
@@ -3335,11 +3317,8 @@ export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
 }
 
 async function readMark(): Promise<Mark | null> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`,
-    { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Mark read failed (HTTP ${res.status})`);
-  const [row] = await res.json();
+  const [row] = await readRows<Mark>('Mark',
+    `${SB_URL}/rest/v1/eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`);
   return row ?? null;
 }
 
@@ -3364,12 +3343,10 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
 // gets about this move.
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
-  const res = await fetch(
+  const [row] = await readRows<Release>('Calendar',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
     `&importance=eq.high&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
-    `&order=at.desc&limit=1`, { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Calendar read failed (HTTP ${res.status})`);
-  const [row] = await res.json();
+    `&order=at.desc&limit=1`);
   return row ?? null;
 }
 

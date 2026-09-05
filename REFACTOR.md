@@ -123,6 +123,12 @@ Every move gets a line, whether it was made or refused.
 | A door existed that the README did not name | net + doc | 2 planted defects, both directions |
 | Vendor coupling (9.3) | read: three libraries pinned, two hashed, the third's absence documented; the two font hosts were not written down and now are |
 | `nyTime` named two different output shapes | M1 | output already pinned by a test asserting the card's line |
+| Three copies of the screen-reader-hiding rule | M12 | golden byte-identical; dead-rule scan still clean. PIXELS NOT VERIFIED |
+| The write-failure block, twice | M3 | golden byte-identical; helper proved red two ways |
+| The tool loop had 32 catch blocks and no execution test | net | every tool driven against four kinds of refusal; proved red on four handlers losing their catch |
+| Fourteen lines of the prompt were stated twice | M6 | removed; a guard on both prose files proved red on each |
+| The ten blocks had no execution test | net | driven against four refusals AND against success; proved red six ways |
+| Twenty reads of her tables, hand-written | M3 | −29 lines; a guard NAMES the three functions allowed to call fetch directly |
 
 ### Open
 
@@ -157,6 +163,30 @@ counted as duplication and are not: one is five different questions with the two
 shared ones already single-sourced, the other is five reads that differ in table,
 select, filter and order column, already held together by a test that names none
 of them.
+
+**THE WHOLE REPO HAS NOW BEEN SWEPT, not just the client.** Every scanner was
+proved against a planted defect before its zero was believed:
+
+| Check | Scope | Result |
+|---|---|---|
+| declared and referenced nowhere | every `.ts`, `.mjs`, `.gs` | 0 — the two Apps Script hits are Run-menu entry points |
+| duplicated code blocks | every source file | 1 outside `doji-eugenia`, refused as R-13 |
+| duplicated PROSE | `prompt.ts`, `strategy.ts` | 1 — fourteen lines, removed, now guarded |
+| SQL objects nothing references | all nine numbered files | 0 |
+| per-call `Intl` construction | every runtime | fixed in the app and `journal.ts`; `checkRules` measured at 33ms over 400 rows and left |
+| CSS rules never emitted | the stylesheet | 0 |
+
+`doji-eugenia/index.ts` HAS NOW BEEN REACHED, net first and fold second. The
+twelve tools and the ten blocks are driven against four kinds of database
+refusal and against a database that answers; then twenty hand-written reads were
+folded into `readRows`, and a guard NAMES the three functions still allowed to
+call `fetch` directly — `readRows` itself, `fillEmbeddings`, which needs
+`content-range` off the response, and `healthBlock`, where a 404 is a supported
+state rather than a failure.
+
+The guard found six reads the fold had missed on its own: they threw the generic
+`HTTP ${status}` rather than the named form, so the grep that found the first
+fourteen never saw them.
 
 **Phase 4 is CLOSED and found nothing.** Fifty-eight top-level functions in the
 client, twenty-eight called exactly once — and every one of those is a render
@@ -242,6 +272,13 @@ is re-appliable. Tidying a drop backwards lets a re-run undo a later file.
 wanted a database — whether a BEFORE trigger's write needs a column grant — was
 answered on a throwaway Postgres and written down instead.
 **Revisit if:** a second and third such question appear.
+
+### R-13 — folding Gladys's `readRow` and `patchRow`
+**Why refused:** they share four lines — the not-ok throw, the json, the empty
+check, the first row. A helper for it takes a `Response`, a verb and an id, and
+reads worse at both call sites than the four lines do. Two sites, fourteen lines
+apart, visible on one screen.
+**Revisit if:** a third caller appears, or the empty-row behaviour has to change.
 
 ### R-12 — one home for the newest-first reads
 **Why refused:** they are eight reads that differ in table, select list, filter

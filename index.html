@@ -549,12 +549,14 @@ nav {
   background:var(--mt); opacity:.35; margin-right:4px;
   transition:background .2s, opacity .2s;
 }
-/* Screen-reader-only. Same clip-path pattern as the journal's pill inputs. */
-.sr-only {
+/* HIDDEN FROM EYES AND NOT FROM ANYTHING ELSE, stated once. Every element here
+   is a 1px clipped box that a screen reader still reaches — the sync dot's
+   label, and the journal's radios, which must keep their place in the tab order
+   and the accessibility tree. `display:none` would take all three out of both. */
+.sr-only, .sync-dot-label, .jf-pill-radio {
   position:absolute; width:1px; height:1px;
   overflow:hidden; clip-path:inset(50%); white-space:nowrap;
 }
-.sync-dot-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .sync-dot.busy  { background:var(--p);    opacity:.9; animation:brokerPulse 1.4s ease-in-out infinite; }
 .sync-dot.ok    { background:var(--win);  opacity:.55; }
 /* Amber, not red: a cached copy is a state to notice, not a failure. The
@@ -1044,13 +1046,9 @@ td.c   { text-align:center; }
 .journal-q-label {
   color:var(--mt2); margin-bottom:12px; display:block;
 }
-/* Not display:none, which takes the input out of the tab order AND the
-   accessibility tree and leaves every answer mouse-only. The label carries the
-   whole appearance. */
-.jf-pill-radio {
-  position:absolute; width:1px; height:1px;
-  overflow:hidden; clip-path:inset(50%); white-space:nowrap;
-}
+/* The label carries the whole appearance — the input itself is hidden by
+   `.sr-only` above rather than by display:none, which would leave every answer
+   mouse-only. */
 /* :focus-visible, not :focus — a mouse click never triggers it. */
 .jf-pill-radio:focus-visible + .jf-pill-lbl {
   outline:2px solid var(--p); outline-offset:2px;
@@ -2250,6 +2248,17 @@ const Data = {
 
   day(iso) { return this.byDay.get(iso) || EMPTY_DAY; },
 
+  /* WHAT A REFUSED WRITE DOES, once. Logged for the console, said to him, and
+     the dot goes red — three things that have to happen together and had to be
+     remembered together in two places. The caller returns this directly, so a
+     failed write reads as one line where it happens. */
+  failed(verb, told, err) {
+    console.error(`Doji: ${verb} failed`, err);
+    notify(told, true);
+    setSyncStatus('error');
+    return false;
+  },
+
   // Applied locally first so the UI responds immediately, then reconciled — the
   // returned row is authoritative, including the generated pnl.
   async save(id, fields) {
@@ -2260,12 +2269,7 @@ const Data = {
     setSyncStatus('busy');
     const { data, error } = await this.sb
       .from('trades').update(patch).eq('id', id).select().single();
-    if (error) {
-      console.error('Doji: save failed', error);
-      notify('Save failed — nothing was changed.', true);
-      setSyncStatus('error');
-      return false;
-    }
+    if (error) return this.failed('save', 'Save failed — nothing was changed.', error);
     this.replace(data);
     setSyncStatus('ok');
     return true;
@@ -2278,12 +2282,7 @@ const Data = {
     if (this.offline) { notify('Offline — changes are not saved.', true); return false; }
     setSyncStatus('busy');
     const { error } = await this.sb.from('trades').update({ deleted: true }).eq('id', id);
-    if (error) {
-      console.error('Doji: delete failed', error);
-      notify('Delete failed.', true);
-      setSyncStatus('error');
-      return false;
-    }
+    if (error) return this.failed('delete', 'Delete failed.', error);
     this.rows = this.rows.filter(t => t.id !== id);
     this.mark(id, true);
     this.index();

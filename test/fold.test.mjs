@@ -48,7 +48,9 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine,
+  positionsList, isOpen, healthLine, serve,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
+  healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -3471,4 +3473,162 @@ test('a window where nothing fell back says nothing about it', () => {
   ]), 30);
   assert.doesNotMatch(out, /fell back/);
   assert.match(out, /net \$60\.00/, 'the total is still there');
+});
+
+/* ─── Nothing the tool loop serves may throw, driven rather than read ────────
+   This is the rule this file states more often than any other, and until now it
+   was held by reading each handler's source. Thirty-two catch blocks implement
+   it and not one of them had ever been executed by a test — so a handler that
+   gained an uncaught path would read exactly like one that had not, and the
+   briefing it killed would be the first anyone heard about it. That is the
+   shape `readTrades` already failed in once.
+
+   The database refuses in the four ways it actually refuses: a network that is
+   not there, a 500, a 404 — which is what an unapplied migration looks like —
+   and a 200 carrying something that is not JSON. Every tool the model can name
+   has to come back with a sentence in all four.
+
+   A user message missing the `tool_result` for a `tool_use` block is a 400, so
+   an empty answer is as fatal as a thrown one: the assertion is that something
+   was said, not merely that nothing exploded.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const TOOL_CALLS = [
+  ['get_trades',    { days: 7 }],
+  ['check_rules',   { days: 7 }],
+  ['get_stats',     { days: 7 }],
+  ['remember',      { note: 'a note', kind: 'fact' }],
+  ['search_memory', { query: 'anything' }],
+  ['get_strategy',  { section: '§4.1' }],
+  ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
+  ['get_market',    {}],
+  ['log_calendar',  { releases: [{ at: '2026-09-07T12:30:00Z', name: 'CPI', importance: 'high' }] }],
+  ['set_thesis',    { thesis: 'a reading' }],
+  ['open_loop',     { kind: 'question', body: 'a question' }],
+  ['close_loop',    { id: 1, resolution: 'answered' }],
+];
+
+const REFUSALS = {
+  'a network that is not there': () => { throw new TypeError('fetch failed'); },
+  'a 500':        () => new Response('upstream is unwell', { status: 500 }),
+  'a 404':        () => new Response('no such table',      { status: 404 }),
+  'JSON that is not': () => new Response('<html>a proxy page</html>',
+    { status: 200, headers: { 'content-type': 'application/json' } }),
+};
+
+// One test rather than four generated ones: the suite's own count is read off
+// `test(` declarations, and a test made in a loop is invisible to it — the
+// instruction would then state a number the suite does not run, which is the
+// exact drift that check exists to catch.
+test('every tool answers with a sentence however the database refuses', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  try {
+    for (const [how, refuse] of Object.entries(REFUSALS)) {
+      globalThis.fetch = async () => refuse();
+      for (const [name, input] of TOOL_CALLS) {
+        let answer;
+        await assert.doesNotReject(async () => { answer = await serve(name, input); },
+          `${name} threw when the database was ${how} — the tool loop dies with it ` +
+          `and the whole turn is lost, which is the failure readTrades had once`);
+        assert.equal(typeof answer, 'string',
+          `${name} answered with something that is not a string when the database was ${how}`);
+        assert.ok(answer.trim().length > 0,
+          `${name} answered with nothing when the database was ${how}. A user message ` +
+          `missing the tool_result for a tool_use block is a 400, so an empty answer ` +
+          `kills the turn as surely as a throw`);
+      }
+    }
+  } finally { globalThis.fetch = realFetch; console.error = realErr; }
+});
+
+test('a tool name the file has no handler for is answered, not thrown', async () => {
+  const realErr = console.error;
+  console.error = () => {};
+  try {
+    const answer = await serve('get_something_invented', {});
+    assert.match(answer, /no tool called/i,
+      'an unknown tool name must come back as a sentence — a mistyped name would ' +
+      'otherwise present as a dead turn rather than as a mistake');
+  } finally { console.error = realErr; }
+});
+
+/* ─── A block that cannot read degrades; it does not take the message with it ─
+   The ten blocks are what she is HANDED — his notes, where he stands, his open
+   position, the day's calendar. Each is built from a database read, and the
+   contract is that a read which fails costs that block and nothing else: the
+   briefing still goes, one paragraph shorter.
+
+   It was enforced by ten separate try/catch blocks and read out of the source by
+   nobody. A block that gained an uncaught path would look exactly like one that
+   had not, and the first anyone would know is a briefing that never arrived —
+   which is the failure `readTrades` had, from a call site whose sibling was
+   caught and hid it.
+
+   `notesBlock` is the one to watch. `notesBlock()` is load-bearing on all seven
+   paths, and an instruction he gave — "stop mentioning the ten-year" — lives
+   only in a note. If it throws, every one of those messages dies; if it
+   degrades, she carries on having forgotten one thing. The second is bad and
+   the first is worse.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const BLOCKS = {
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
+  healthBlock, loopsBlock, calendarBlock, positionsBlock,
+};
+
+test('every block degrades to nothing when its read fails, and never throws', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  try {
+    for (const [how, refuse] of Object.entries(REFUSALS)) {
+      globalThis.fetch = async () => refuse();
+      for (const [name, block] of Object.entries(BLOCKS)) {
+        let out;
+        await assert.doesNotReject(async () => { out = await block(); },
+          `${name} threw when the database was ${how} — that is not one paragraph ` +
+          `missing from the briefing, it is the whole briefing`);
+        assert.equal(typeof out, 'string',
+          `${name} answered with something that is not a string when the database was ${how}`);
+      }
+    }
+  } finally { globalThis.fetch = realFetch; console.error = realErr; }
+});
+
+/* AND THE OTHER HALF, which no assertion about throwing can reach: a block that
+   swallowed its failure AND its content would be silent in exactly the same way
+   as one that had nothing to say. So the same blocks are driven against a
+   database that ANSWERS, and each has to come back with something. Without this,
+   a block rewritten to `return ""` at the top would pass every assertion above. */
+test('every block says something when its read succeeds', async () => {
+  const rows = {
+    eugenia_notes:    [{ id: 1, note: 'he asked for shorter mornings' }],
+    eugenia_channels: [{ channel: 'rates', state: 'explained', moved_on: '2026-07-01' }],
+    eugenia_thesis:   [{ thesis: 'gold heavy above 3450', moved_on: '2026-07-30' }],
+    eugenia_loops:    [{ id: 1, kind: 'question', body: 'does he size up after two losses',
+                         opened_on: '2026-07-28' }],
+    eugenia_calendar: [{ id: 1, at: '2026-07-30T12:30:00Z', name: 'CPI', importance: 'high' }],
+    eugenia_trades:   [{ id: 'PID1', open_day: '2026-07-30', direction: 'BUY',
+                         entry_time: '2026-07-30T14:00:00Z', fill_time: null, entry_price: 3400,
+                         exit_price: null, pnl: null, net_pnl: null, size_oz: 2, setup: null,
+                         followed_rules: null, followed_sl: null, followed_tp: null,
+                         planned_sl: 3380, planned_tp: 3450 }],
+    doji_sync_health: [{ who: 'poller', last_ok: new Date().toISOString(), last_run: new Date().toISOString(), ok: true }],
+  };
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  globalThis.fetch = async (url) => {
+    const table = String(url).match(/rest\/v1\/(\w+)/)?.[1];
+    return new Response(JSON.stringify(rows[table] ?? []), {
+      status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'loopsBlock', 'calendarBlock']) {
+      const out = await BLOCKS[name]();
+      assert.ok(out.trim().length > 0,
+        `${name} read its rows and said nothing — a block that returns "" on success ` +
+        `is indistinguishable from one whose read failed, and passes every test that ` +
+        `only asks whether it threw`);
+    }
+  } finally { globalThis.fetch = realFetch; console.error = realErr; }
 });
