@@ -284,6 +284,13 @@ the win-rate **denominator**, so scratches drag it down rather than vanishing.
 `null` when there is no P&L yet — a trade can be journalled before it closes, and
 a missing figure is not a break-even.
 
+**A P&L of exactly zero is a break-even too, and the price band cannot say so.**
+A trade can move sixty dollars and come back to nothing once commission is in:
+the price went somewhere, the account did not. That is a break-even at any lot
+size — which is the very property the band is measured in price to protect, and
+zero is the value that needs no scaling. It is a *point* and not a second band,
+so the cent either side is still decided on its sign.
+
 The pre-sync rows carry no prices, so the rule cannot be evaluated for them and
 the same $3 is read against their P&L instead — the only measure they have ever
 had. An open position has an entry price and no exit, which is the same case.
@@ -291,9 +298,17 @@ had. An open position has an entry price and no exit, which is the same case.
 **An aggregate result** — the colour of a calendar day, a week cell or a month
 tile — **inherits rather than re-bands.** Several trades share no single entry
 and exit, so there is no price distance to measure across them: a cell is a
-scratch only when *every* decided trade inside it was one, and otherwise takes
-the sign of its total. There is deliberately no separate dead band for cells; a
-day that nets a few dollars off two real losses is two real losses.
+scratch when *every* decided trade inside it was one, **or when the trades
+inside it cancelled out exactly**, and otherwise takes the sign of its total.
+
+A total of exactly zero has no sign, so the sign rule cannot answer it, and a
+day that ends precisely where it started went nowhere — which is what
+break-even means. One real win and one real loss of the same size is a
+break-even day, not a red one. There is still deliberately no separate dead band
+for cells: zero is a point, so a day that nets a few dollars off two real losses
+is two real losses, exactly as before. The two levels agree by construction —
+without that, a day holding a single trade that netted zero would read
+break-even on the calendar and a loss in the log, on one screen.
 
 **The filing day** — `open_day` when the poller supplied one, otherwise the New
 York civil day of the closing fill.

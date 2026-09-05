@@ -2003,17 +2003,29 @@ const resultOf = t => {
   const scratch = t.entry_price != null && t.exit_price != null
     ? Math.abs(t.exit_price - t.entry_price) <= CONFIG.BE
     : Math.abs(t.pnl) <= CONFIG.BE;
-  return scratch ? 'be' : t.pnl > 0 ? 'win' : 'loss';
+  // EXACTLY NOTHING MADE IS A BREAK-EVEN WHATEVER THE PRICE DID, and it is the
+  // one case the price rule cannot reach: a trade can move sixty dollars and
+  // still come back to zero once commission is in. The band is measured in
+  // price because a band does not scale — $3 of P&L is $3 of gold at 0.01 lots
+  // and three cents at 1.00 — and zero is the value that needs no scaling. It
+  // is a point rather than a band, so this adds no dead zone to either rule.
+  return scratch || t.pnl === 0 ? 'be' : t.pnl > 0 ? 'win' : 'loss';
 };
 
 // The same verdict over a SUM — a calendar day, a week cell, a month tile.
 // Several trades have no single entry and exit between them, so a cell cannot
-// measure price distance and inherits instead: it is a scratch only when every
-// decided trade inside it was one. `n` counts trades in the aggregate that
-// actually carry a P&L, `be` how many of those were scratches; zero decided
-// means there is nothing to judge and the cell takes no result colour.
+// measure price distance and inherits instead: it is a scratch when every
+// decided trade inside it was one, OR when the trades inside it cancelled out
+// exactly. `n` counts trades in the aggregate that actually carry a P&L, `be`
+// how many of those were scratches; zero decided means there is nothing to
+// judge and the cell takes no result colour.
+//
+// A total of exactly zero has no sign, so the sign rule below cannot answer it
+// — and a day that ends precisely where it started went nowhere, which is what
+// break-even means. Still no dead band: exactly zero is a point, so a day that
+// nets a few dollars off two real losses is two real losses, as it always was.
 const aggregateResult = (pnl, n, be) =>
-  !n ? '' : be === n ? 'be' : pnl > 0 ? 'win' : 'loss';
+  !n ? '' : be === n || pnl === 0 ? 'be' : pnl > 0 ? 'win' : 'loss';
 
 // open_day when the poller supplied one, the New York civil day of the closing
 // fill otherwise. Nothing else has a claim.

@@ -93,7 +93,10 @@ export function resultOf(t: TradeRow): Result | null {
   const scratch = t.entry_price != null && t.exit_price != null
     ? Math.abs(t.exit_price - t.entry_price) <= BE
     : Math.abs(t.pnl) <= BE;
-  return scratch ? 'be' : t.pnl > 0 ? 'win' : 'loss';
+  // Exactly nothing made is a break-even whatever the price did — the one case
+  // the price band cannot reach, and the value that needs no scaling. The app
+  // says the same, in the same shape.
+  return scratch || t.pnl === 0 ? 'be' : t.pnl > 0 ? 'win' : 'loss';
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;

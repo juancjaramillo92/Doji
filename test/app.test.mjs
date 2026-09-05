@@ -106,6 +106,58 @@ test('a question left unanswered saves as unanswered, not as a no', () => {
   } finally { app.Journal.close(); }
 });
 
+/* ─── A day that ended where it started ──────────────────────────────────────
+   Exactly zero has no sign, so the sign rule cannot answer it, and it used to
+   fall through to `loss`: one real win and one real loss cancelling out was a
+   red day. It went nowhere, which is what break-even means.
+
+   It is a POINT and not a band, so nothing else moves — a day netting a few
+   dollars off two real losses is still two real losses, and there is still no
+   dead zone for cells.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a day that nets exactly nothing is a break-even day', () => {
+  // Two real trades, neither a scratch: $60 of price each way.
+  assert.equal(app.aggregateResult(0, 2, 0), 'be');
+  // And the neighbouring cents are untouched — this is a point, not a band.
+  assert.equal(app.aggregateResult(0.01, 2, 0), 'win');
+  assert.equal(app.aggregateResult(-0.01, 2, 0), 'loss');
+  // A day with nothing decided still takes no colour at all.
+  assert.equal(app.aggregateResult(0, 0, 0), '');
+});
+
+test('a trade that made exactly nothing is a break-even trade', () => {
+  /* THE TWO LEVELS HAVE TO AGREE OR ONE TRADE GETS TWO VERDICTS. A day holding
+     a single trade that netted zero would otherwise read BE on the calendar and
+     Loss in the log — the same trade, contradicting itself on one screen.
+
+     The price band cannot reach this case: a trade can move sixty dollars and
+     come back to zero once commission is in. The band is in price because a
+     band does not scale; zero is the value that needs no scaling. */
+  const px = (entry, exit, pnl) => trade({ entry_price: entry, exit_price: exit, pnl });
+  assert.equal(app.resultOf(px(4400, 4460, 0)), 'be',
+    'a trade that made nothing was called a loss');
+  // The cent either side is still decided on its sign.
+  assert.equal(app.resultOf(px(4400, 4460, 0.01)), 'win');
+  assert.equal(app.resultOf(px(4400, 4460, -0.01)), 'loss');
+  // And no P&L at all is still undecided rather than break-even.
+  assert.equal(app.resultOf(px(4400, 4460, null)), null);
+
+  // The day agrees with the trade it holds.
+  const t = px(4400, 4460, 0);
+  assert.equal(app.aggregateResult(0, 1, app.resultOf(t) === 'be' ? 1 : 0), 'be');
+});
+
+test('a zero-net day sits in the win-rate denominator like any break-even', () => {
+  // It is a decided day made of decided trades — nothing here becomes invisible.
+  const px = (entry, exit, pnl) => trade({ entry_price: entry, exit_price: exit, pnl });
+  const c = app.counts([px(4400, 4460, 50), px(4400, 4340, -50)]);
+  assert.equal(c.decided, 2);
+  assert.equal(c.win, 1);
+  assert.equal(c.loss, 1);
+  assert.equal(c.be, 0, 'the two trades are still a real win and a real loss');
+});
+
 test('an open position with no P&L can still be complete', () => {
   assert.equal(app.isComplete(journalled({ pnl: null, exit_price: null })), true);
 });
