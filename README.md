@@ -50,6 +50,9 @@ default or duplicated something already in the head. Left alone deliberately.
 ## Layout
 
 ```
+README.md                               the contract: what the app does and why
+CLAUDE.md                               how to work on it; the README outranks it
+REFACTOR.md                             what one long pass changed, and refused
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
@@ -61,6 +64,8 @@ supabase/004_cron.sql                   every scheduled job
 supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her senses
 supabase/006_plan.sql                   where a trade was aimed, off the open position
 supabase/007_semantic.sql               her memory searchable by meaning
+supabase/008_sync_health.sql            the heartbeat the two silent writers mark
+supabase/009_trades_grants.sql          which columns the app may write
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -69,11 +74,16 @@ supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/adherence.ts             the eight rules a journal row can answer
 doji_gmail_sync.gs                      Apps Script: broker email parser
+scripts/backup-memory.mjs               the paged read behind the weekly copy
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
+.github/workflows/backup-memory.yml     the weekly copy of her seven tables
+.github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
+.npmrc                                  engine-strict: the Node floor made a gate
+.gitignore                              node_modules, and nothing else
 ```
 
 ---
@@ -3268,12 +3278,30 @@ globs `test/*.test.mjs` — one level, deliberately, since `boot.mjs` is a harne
 and not a suite. A test added in a subfolder would not match and would silently
 not run.
 
+**Every `uses:` in those three workflows names a commit, never a tag.** A tag is
+mutable and the account that owns it can repoint it between one run and the
+next, which is the whole of the supply-chain attack on a CI job: the code you
+audited is not the code that runs. `supabase/setup-cli@v1` was not even a tag
+but a *branch* — a ref expected to move in the ordinary course of someone
+else's work — sitting in the job that holds `SUPABASE_ACCESS_TOKEN`. The
+credentials are step-scoped, so none of these actions reads a secret directly;
+what they are handed is the toolchain, and `setup-node` provides the `node` that
+reads `SB_SECRET_KEY` a step later. A commit SHA is content-addressed and cannot
+be moved.
+
+The cost of pinning is a SHA nobody maintains, so `.github/dependabot.yml`
+maintains it: a monthly pull request bumps both the SHA and the `# v7.0.1`
+comment beside it, and CI runs on the branch before you read it. That comment is
+the only reason the line is legible, and `agree.test.mjs` asserts the SHA half —
+a tag reintroduced by hand fails the suite rather than sitting there looking
+tidy.
+
 | File | Covers |
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; the nightly sweep and the channel census against `recordRun`, both outcomes each, since a meter that records only its successes reports a vendor refusing every night as a table with nothing in it; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; the nightly sweep and the channel census against `recordRun`, both outcomes each, since a meter that records only its successes reports a vendor refusing every night as a table with nothing in it; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does; and every `uses:` across the three workflows, which must name a commit rather than a tag anyone could repoint |
 | `test/types.test.mjs` | the two questions a compiler settles and nothing else here can: no Edge Function uses a name declared nowhere, and none declares a name nothing uses. Deliberately not a whole typecheck — under Node's lib a `Uint8Array` is not a `BlobPart`, which is true here and false on Deno, and without `--strict` a discriminated union stops narrowing; both are facts about the invocation rather than the code. The two questions it does ask are pure scope facts and cannot go red for either reason. A file naming something that does not exist goes into the same program on every run, so a clean answer is only reported once the reader has been seen to produce a dirty one |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |

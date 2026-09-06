@@ -1346,6 +1346,42 @@ test('every workflow takes its Node version from the one file that states it', (
   }
 });
 
+/* ─── A tag is a name its owner can move; a commit is the code you read ──────
+   Every `uses:` here is a 40-character commit, and the rule is worth a test
+   because the mutable form is the one a person types from memory. `@v7` is
+   shorter, it is what every README shows, and it re-fetches whatever that tag
+   points at on every run — so the audit of an action and the run of it are two
+   different trees, silently.
+
+   supabase/setup-cli@v1 was the case that made this real: not a tag but a
+   BRANCH, which is a ref expected to move in the ordinary course of somebody
+   else's work, in the job that holds SUPABASE_ACCESS_TOKEN. Nothing here reads
+   a secret it is not handed — both credentials are scoped to their own step —
+   so what an earlier action reaches is the toolchain rather than the
+   environment: setup-node provides the `node` that reads SB_SECRET_KEY one step
+   later, setup-cli the `supabase` the deploy hands its token to.
+
+   The trailing `# v7.0.1` is what keeps the line legible and is deliberately
+   NOT asserted: Dependabot writes it beside the SHA it bumps, and a test on a
+   comment would fail on the formatting of a machine-written line rather than on
+   anything true. The SHA is the half that carries the guarantee.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every action a workflow runs is named by commit, not by a movable tag', () => {
+  const used = WORKFLOWS.flatMap(({ path, text }) =>
+    [...text.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)].map(m => ({ path, ref: m[1] })));
+
+  assert.ok(used.length >= 8,
+    `only ${used.length} uses: lines found across the workflows — the reader has gone blind`);
+
+  const tagged = used.filter(u => !/@[0-9a-f]{40}$/.test(u.ref));
+  assert.deepEqual(tagged, [],
+    `${tagged.map(u => `${u.path} runs ${u.ref}`).join('; ')} — a tag or branch ` +
+    `is a name its owner can repoint between one run and the next. Pin the ` +
+    `commit and put the version in a trailing comment; dependabot.yml keeps it ` +
+    `current.`);
+});
+
 /* The project ref is not a secret, and it is not a URL everywhere it appears:
    config.toml carries it as project_id and the deploy workflow as
    --project-ref. So all three shapes are matched, and each is anchored to the
@@ -1666,6 +1702,60 @@ test('the documents name only symbols the repository has', () => {
 
   assert.deepEqual(missing, [],
     'the documents name things the repository does not have');
+});
+
+
+/* ─── The Layout block is a copy of the tree, and nothing compared it ───────
+   README.md opens with a listing of every file and what it is for. It is the
+   first thing a cold session reads and the only place the repository is
+   described as a whole, and it had drifted the way an unchecked copy always
+   does: 008, 009, the backup script, all three documents and both dotfiles
+   were tracked and unlisted. The block still read as complete, because a map
+   cannot show what it left out.
+
+   BOTH DIRECTIONS, because they fail differently. A file missing from the
+   block is invisible to a reader who trusts it — which is what the block is
+   for. An entry naming a file that is gone sends them looking for something
+   deleted. Neither is reachable by the symbol test above: these entries are
+   not in backticks, and the one that is a bare `test/` is not a symbol.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* An entry is a path, then whitespace, then prose. An INDENTED one is a detail
+   under the directory line above it — `doji-eugenia/adherence.ts` beneath
+   `supabase/functions/doji-eugenia/` — so it is a partial path already covered
+   by its parent, and is checked for existence rather than used as coverage. */
+const layoutBlock = () => {
+  const found = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
+    .match(/\n## Layout\n+```\n([\s\S]*?)\n```\n/);
+  assert.ok(found, 'README.md has no Layout block');
+
+  const top = [], nested = [];
+  for (const line of found[1].split('\n')) {
+    if (!line.trim()) continue;
+    (/^\s/.test(line) ? nested : top).push(line.trim().split(/\s/)[0]);
+  }
+  return { top, nested };
+};
+
+const covers = (entry, file) =>
+  entry === file || (entry.endsWith('/') && file.startsWith(entry));
+
+test('the Layout block names every file the repository tracks', () => {
+  const { top, nested } = layoutBlock();
+
+  // WITHOUT THIS THE COMPARISONS BELOW PROVE NOTHING. A block that stopped
+  // parsing reports every file missing, which is loud — but the fence moving
+  // to a heading this pattern does not match reports nothing at all.
+  assert.ok(top.length > 20, `only ${top.length} Layout entries parsed`);
+
+  assert.deepEqual(TRACKED.filter(f => !top.some(e => covers(e, f))), [],
+    'tracked files the Layout block does not name');
+
+  assert.deepEqual(top.filter(e => !TRACKED.some(f => covers(e, f))), [],
+    'Layout entries naming nothing the repository tracks');
+
+  assert.deepEqual(nested.filter(e => !TRACKED.some(f => f.endsWith('/' + e))), [],
+    'indented Layout entries naming no such file');
 });
 
 /* ─── One hour cycle, across four runtimes ──────────────────────────────────

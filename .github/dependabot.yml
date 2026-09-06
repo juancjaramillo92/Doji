@@ -1,0 +1,38 @@
+# Two ecosystems, and they do not carry the same weight.
+#
+# The Actions half is the one that matters, and not because the secrets are
+# loose. SB_SECRET_KEY and SUPABASE_ACCESS_TOKEN are each scoped to the single
+# step that needs them, so nothing else reads either directly. What an earlier
+# action is handed instead is the toolchain: setup-node puts the `node` that
+# runs scripts/backup-memory.mjs on PATH, and setup-cli installs the `supabase`
+# the deploy step then hands its token to. A compromised action does not have
+# to see a secret to reach one.
+#
+# Which is why the eight `uses:` lines are commit SHAs rather than tags. A tag
+# is mutable, and its owner can repoint it at any commit between one run and
+# the next — supabase/setup-cli@v1 was not even a tag but a BRANCH, the one ref
+# in the three files expected to move in the ordinary course of someone else's
+# work. The trailing comment names the release so the line still reads. What
+# keeps the SHA from going stale is this file: an unmaintained pin is the whole
+# reason people skip pinning, and the bump PR is the half that answers it.
+#
+# The npm half is two dev dependencies that never ship: index.html has no build
+# step and its three libraries come from CDNs the graph cannot see. What it
+# buys is not a CVE watch. test.yml is `on: [push]` and so runs on the bump
+# branch, so the release that changes what a compiler or a DOM says lands as a
+# red suite on a pull request rather than on the afternoon the lock is
+# refreshed for something else — jsdom moving innerHTML serialisation under
+# golden.test.mjs, tsc changing its diagnostics under types.test.mjs. NEVER
+# answer the first with GOLDEN=write: the snapshot going red on a DOM change
+# is the snapshot doing its job.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly

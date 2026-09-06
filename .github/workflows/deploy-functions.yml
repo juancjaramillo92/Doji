@@ -43,10 +43,10 @@ jobs:
     steps:
       # persist-credentials: false, so the checkout token is not left in
       # .git/config for the third-party steps that run after it.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # The floor lives in package.json's engines.node and nowhere else.
           # A bare `node-version: 22` is a second home for it that no tool
@@ -70,7 +70,7 @@ jobs:
       # version drifting out of step with the API is the likelier failure — and
       # it is Supabase's own tool authenticating to Supabase with a token that
       # is already theirs.
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
 
