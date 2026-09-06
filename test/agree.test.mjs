@@ -1095,11 +1095,27 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
   const rows = (sql.slice(from, to).match(/^  \('/gm) || []).length;
   assert.ok(rows > 40, `only ${rows} checks parsed out of the summary — the reader has gone blind`);
 
-  const stated = sql.slice(to).match(/the (\d+) checks that answer/);
+  // The footer is the banner-delimited note at the END of the file, not
+  // everything after the summary — between them sit the listings, the cron
+  // schedules and the embedding counts, all of them full of numbers.
+  const banner = sql.lastIndexOf('-- ═══');
+  const footer = sql.slice(sql.lastIndexOf('-- ═══', banner - 1));
+  const stated = footer.match(/the (\d+) checks that answer/);
   assert.ok(stated, 'the footer no longer states how many checks were thrown away');
   assert.equal(Number(stated[1]), rows,
     `the footer says ${stated[1]} checks and the summary holds ${rows} — the one ` +
     `paragraph read by someone who has just lost their result is wrong about it`);
+
+  // AND ONCE. A second copy of the count is a second thing to update, held
+  // together by nothing — the first stayed right while the sentence explaining
+  // WHY it is a digit carried the previous release's number, in the same
+  // paragraph, four lines below it. Any two-digit number in the footer that is
+  // not the stated count is that copy coming back.
+  const others = (footer.match(/\b\d{2,}\b/g) || [])
+    .filter(n => n !== stated[1] && n !== '10');
+  assert.deepEqual(others, [],
+    `the footer states a second number (${others.join(', ')}) beside its count of ` +
+    `${stated[1]} — one paragraph, one copy, or the spare one goes stale unwatched`);
 });
 
 /* ─── No colour is written in the script, only read from a token ─────────────
