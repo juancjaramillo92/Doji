@@ -8,6 +8,14 @@
 # the deploy step then hands its token to. A compromised action does not have
 # to see a secret to reach one.
 #
+# Which is why the eight `uses:` lines are commit SHAs rather than tags. A tag
+# is mutable, and its owner can repoint it at any commit between one run and
+# the next — supabase/setup-cli@v1 was not even a tag but a BRANCH, the one ref
+# in the three files expected to move in the ordinary course of someone else's
+# work. The trailing comment names the release so the line still reads. What
+# keeps the SHA from going stale is this file: an unmaintained pin is the whole
+# reason people skip pinning, and the bump PR is the half that answers it.
+#
 # The npm half is one dev dependency that never ships: index.html has no build
 # step and its three libraries come from CDNs the graph cannot see. What it
 # buys is not a CVE watch. test.yml is `on: [push]` and so runs on the bump
