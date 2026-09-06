@@ -966,8 +966,8 @@ a blank.
   THE SECOND SHAPE OF THAT IS A SUMMARY ROW READING A PUBLIC TABLE DIRECTLY, and
   three seed checks did. Postgres parses the whole statement up front, so
   `select count(*) from public.eugenia_thesis` does not report a missing table —
-  it raises 42P01 and takes all fifty-four checks with it. A `case` guard does
-  not help, because both branches are parsed. `query_to_xml` does: it takes its
+  it raises 42P01 and takes every check in the summary with it. A `case` guard
+  does not help, because both branches are parsed. `query_to_xml` does: it takes its
   query as a STRING, so nothing is parsed until it runs, and a `to_regclass`
   guard beside it means it never runs when the table is absent. A seed check has
   to read the table — that is what it is for — so that is how it reads it, and

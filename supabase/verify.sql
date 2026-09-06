@@ -59,9 +59,9 @@ from (values
   -- READ THROUGH query_to_xml, NOT DIRECTLY, and this is the whole reason. A
   -- plain `select count(*) from public.eugenia_thesis` is PARSED with the rest
   -- of the statement, so on a database that never got 005 it does not report a
-  -- missing table — it raises 42P01 and takes all fifty-three checks above and
-  -- below it with it, and the run then reads as a broken database rather than
-  -- as a missing one. That is the same failure the dead `eugenia_search(text,
+  -- missing table — it raises 42P01 and takes every check above and below it
+  -- with it, and the run then reads as a broken database rather than as a
+  -- missing one. That is the same failure the dead `eugenia_search(text,
   -- int)` signature caused, in a second shape. query_to_xml takes its query as
   -- a STRING, so nothing is parsed until it runs, and the to_regclass guard
   -- means it never runs when the table is absent: the row answers NULL, which
@@ -221,6 +221,31 @@ from (values
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_trades' and column_name = 'size_oz'),
    '1'),
+
+  -- AND net_pnl, WHICH §8 TELLS HER TO SUM AND `pnl` CANNOT ANSWER FOR. `pnl`
+  -- is `coalesce(net_pnl, computed_pnl)`, so on a fill whose alert email never
+  -- landed it is the folded figure and carries no swap — and this account holds
+  -- through the 17:00 rollover. Served `pnl` alone she follows the monthly
+  -- instruction against a column that is not there and produces a total short
+  -- by an unknown amount, on rows she cannot identify. The view statement is
+  -- `or replace` and APPENDS, so this reads 0 on any database where it has not
+  -- been re-applied since — which is the whole reason it is asked here rather
+  -- than trusted from the file.
+  ('eugenia_trades exposes net_pnl',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_trades' and column_name = 'net_pnl'),
+   '1'),
+
+  -- And still hides the four it is meant to. §8 tells her each is absent and
+  -- why, and every one of those reasons is a rule: costs are already inside
+  -- both P&L figures, balance is the wrong denominator, computed_pnl is the
+  -- unsettled number. A column appearing here turns its paragraph into a wrong
+  -- fact about her own document.
+  ('eugenia_trades hides user_id, balance, commission, computed_pnl',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_trades'
+       and column_name in ('user_id','balance','commission','computed_pnl')),
+   '0'),
 
   -- 006. The plan write is a PATCH filtered on `planned_sl=is.null`, so without
   -- the columns it is a 400 the poller swallows to keep the deals landing —
@@ -717,7 +742,7 @@ limit 10;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
 -- A SQL editor displays the result of the LAST statement, and this is it — so
--- the 61 checks that answer "does the database match the files" ran and were
+-- the 63 checks that answer "does the database match the files" ran and were
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --
