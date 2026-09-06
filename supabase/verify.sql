@@ -721,10 +721,11 @@ limit 10;
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --
--- That 60 is a digit rather than a word because it is COUNTED by a test. It
--- read fifty-seven for two releases while the summary held more, which is this
--- file describing itself wrongly in the one paragraph a person reads when they
--- are already lost.
+-- That number is stated ONCE and as a digit, because a test counts the summary
+-- rows and compares it. Written twice it is two copies with nothing holding
+-- them together, and the second goes stale on the release that adds a check —
+-- which is this file describing itself wrongly in the one paragraph a person
+-- reads when they are already lost.
 --
 -- Go back to the top and run the summary block ALONE: select from
 -- `select check_name, actual, expected, ...` down to
