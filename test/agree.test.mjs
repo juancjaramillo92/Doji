@@ -1613,11 +1613,16 @@ const looksLikeCode = (name) =>
                    both documents prescribe for verify.sql and neither file
                    uses — because the row that needed it was deleted rather
                    than rewritten. Naming the safe form is the point; calling
-                   it would mean keeping the copy that went stale */
+                   it would mean keeping the copy that went stale
+     BlobPart      a type in Node's own lib, and the example both documents
+                   give for why types.test.mjs is not a whole typecheck: under
+                   that lib a Uint8Array is not one, which is true here and
+                   false on Deno. The claim is only checkable if it names the
+                   type, and the type is real somewhere this repository is not */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
   'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
-  'get_version', 'MN_1', 'insufficient_quota', 'to_regprocedure',
+  'get_version', 'MN_1', 'insufficient_quota', 'to_regprocedure', 'BlobPart',
 ]);
 
 test('the documents name only symbols the repository has', () => {

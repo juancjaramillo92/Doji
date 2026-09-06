@@ -38,7 +38,7 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, marketOpen, nyClock, nyDate, sbHeaders, heartbeat, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";

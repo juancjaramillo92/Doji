@@ -1762,7 +1762,7 @@ export function openOnUser(turns: Turn[]): Turn[] {
 }
 
 async function recent(): Promise<Turn[]> {
-  const rows = await readRows<Turn>('History',
+  const rows = await readRows<Turn & { created_at: string }>('History',
     `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`);
   return openOnUser(dateTurns(rows.reverse()));
 }
@@ -2871,10 +2871,11 @@ export function dayQuery(hours: number, now = Date.now()): string {
 }
 
 async function turnsSince(hours: number): Promise<Turn[]> {
-  const rows = await readRows<Turn>('Day', `${SB_URL}/rest/v1/${dayQuery(hours)}`);
+  const rows = await readRows<Turn & { created_at: string }>('Day',
+    `${SB_URL}/rest/v1/${dayQuery(hours)}`);
   // Reversed back into the order it is read in: the pass is handed the day
   // oldest first, and only the SELECT needed to run the other way round.
-  return dateTurns((await res.json()).reverse());
+  return dateTurns(rows.reverse());
 }
 
 /* WHETHER TONIGHT'S PASS HAS ALREADY RUN, read off eugenia_runs rather than off
