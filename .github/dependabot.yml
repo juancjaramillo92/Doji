@@ -1,0 +1,28 @@
+# Two ecosystems, and they do not carry the same weight.
+#
+# The Actions half is the one that matters. backup-memory.yml hands a job
+# SB_SECRET_KEY — the key 003 deliberately withholds from the publishable one,
+# because it reads her notes and turns — and deploy-functions.yml hands one
+# SUPABASE_ACCESS_TOKEN. Every step in those jobs runs where those are in
+# reach, checkout and setup-node included, so a third-party action is the
+# shortest path to both.
+#
+# The npm half is one dev dependency that never ships: index.html has no build
+# step and its three libraries come from CDNs the graph cannot see. What it
+# buys is not a CVE watch. test.yml is `on: [push]` and so runs on the bump
+# branch, which means a jsdom release that moves innerHTML serialisation lands
+# as a red golden.test.mjs on a pull request rather than on the afternoon the
+# lock is refreshed for something else. NEVER answer that red with
+# GOLDEN=write — the snapshot going red on a DOM change is the snapshot doing
+# its job.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
