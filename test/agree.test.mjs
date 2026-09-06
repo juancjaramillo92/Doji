@@ -1943,6 +1943,69 @@ test('the version the document states is the version she is handed', () => {
    net._http_response.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── The force door asks the day, and asking it is the half a test can miss ──
+   `briefKind` is pure and driven from both sides in fold.test.mjs — and every
+   one of those assertions passed while `?force=1` still read the constant it
+   replaced, because a test that calls a function directly cannot discover that
+   nothing else calls it. That is this repository's oldest defect wearing a new
+   hat, and it was found by putting the constant back and watching the suite
+   stay green.
+
+   The door exists for the hour a briefing did NOT arrive. Reading
+   `briefDue(now) ?? 'weekday'` it could not produce a Sunday briefing outside
+   the single hour one was already due — so on the one evening a week it is
+   needed most it sent Buenos dias and a weekday shape into a market that had
+   just opened.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a forced briefing asks what the day takes, not a literal', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function postScheduled(');
+  const body = src.slice(at, src.indexOf('\n}\n', at))
+    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  assert.match(body, /postBriefing\(briefDue\(now\) \?\? briefKind\(now\)\)/,
+    'the force door no longer falls back through briefKind — a literal there is ' +
+    'correct on six days a week, which is exactly why nobody notices the seventh');
+});
+
+/* ─── A job that dies before its first model call leaves a row ───────────────
+   `ask()` records a failed turn, so eugenia_runs could answer "how often does a
+   model call die" — and could say nothing whatever about a job that died BEFORE
+   reaching one. Two consolidations threw in `turnsSince`, one line into
+   postConsolidation, apologised to him on two consecutive nights, and left the
+   table with no row on either: read afterwards it showed a system that had
+   simply had nothing to do.
+
+   AND THE ROW HAS TO GO DOWN BEFORE THE MESSAGE. The apology is sent with
+   `.catch(() => {})` — deliberately, since a throw there would replace one
+   silent failure with two — so a Telegram that is refusing takes the only
+   notice with it and leaves nothing anywhere. Ordered this way the row survives
+   that case, which is the one where he has no other way of finding out.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a scheduled job that dies records it, and records it before it apologises', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function postScheduled(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
+  const body = src.slice(at, src.indexOf('\n}\n', at))
+    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  const row = body.indexOf('recordRun(');
+  const msg = body.indexOf('tg("sendMessage"');
+  assert.ok(row > -1,
+    'a scheduled job can die with nothing but an apology behind it, so the one ' +
+    'table that survives says the job never ran at all');
+  assert.ok(msg > -1, 'postScheduled no longer tells him a job died');
+  assert.ok(row < msg,
+    'the row is written after the apology, so the case it exists for — a ' +
+    'Telegram that is refusing — is still the case that leaves no trace');
+});
+
 test('every answer dueNow can give is dispatched by postScheduled', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');

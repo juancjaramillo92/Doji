@@ -97,11 +97,36 @@ export function pulseDue(now: Date): boolean {
 
 /* Weekday 09:00, 10:00 and 11:00 New York — the hours where a briefing is still
    a briefing rather than a bulletin about a morning that has gone. Nothing
-   fires unless the 08:00 one failed, which briefedToday() decides. */
-export function retryDue(now: Date): boolean {
+   fires unless the 08:00 one failed, which briefedToday() decides.
+
+   AND SUNDAY HAD NO SECOND CHANCE AT ALL, WHICH IS THE WRONG WAY ROUND. It is
+   the only briefing of the week that cannot be retried and the one whose
+   absence takes longest to notice — a missing weekday morning is missing again
+   tomorrow, a missing Sunday open is missing for seven days. The same three
+   hours after its own briefing, which keeps it an evening about a week that is
+   opening rather than a note about one already under way, and leaves the 22:00
+   pass two hours clear. The week-walk over dueNow is what holds that spacing.
+
+   IT RETURNS WHICH BRIEFING RATHER THAN WHETHER ONE IS DUE, because a retry has
+   to send the same shape the failed one would have. dueNow named 'weekday'
+   itself, which was true only for as long as this window was weekdays-only —
+   a literal that answers correctly by accident of another function's range is
+   the shape that breaks the first time that range moves. */
+export function retryDue(now: Date): Brief | null {
   const { wd, hour } = nyClock(now);
-  return wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11;
+  if (wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11) return 'weekday';
+  if (wd === 0 && hour >= 18 && hour <= 20) return 'sunday';
+  return null;
 }
+
+/* WHICH BRIEFING THIS DAY TAKES, which is a different question from which one
+   this HOUR owes and was being answered with a constant. `?force=1` read
+   `briefDue(now) ?? 'weekday'`, so the door that exists for the hour a briefing
+   did NOT arrive could not produce a Sunday one outside the single hour it was
+   already due — forcing it on a Sunday evening sent Buenos dias and a weekday
+   shape into a market that had just opened for the week. */
+export const briefKind = (now: Date): Brief =>
+  nyClock(now).wd === 0 ? 'sunday' : 'weekday';
 
 /* SLEEP, ROUGHLY. Twenty-two hundred New York, every day including the weekend —
    a Saturday conversation is worth keeping as much as a Tuesday one.
@@ -150,7 +175,8 @@ export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
     Brief | 'pulse' | 'consolidate' | null {
   const brief = briefDue(now);
   if (brief) return brief;
-  if (retryDue(now) && !briefed) return 'weekday';
+  const retry = retryDue(now);
+  if (retry && !briefed) return retry;
   // ONE CLAUSE FOR BOTH NIGHTLY HOURS, and the gate is what makes 23:00 a retry
   // rather than a second pass: a night that already distilled itself does
   // nothing at 23:00, and a night that failed at 22:00 gets one more go while
@@ -2621,7 +2647,7 @@ async function postScheduled(url: URL): Promise<Response> {
 
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
-      return await postBriefing(briefDue(now) ?? 'weekday');
+      return await postBriefing(briefDue(now) ?? briefKind(now));
     }
 
     // Which hours turn on this is dueNow's rule and is stated there once; a
@@ -2644,7 +2670,21 @@ async function postScheduled(url: URL): Promise<Response> {
        and net._http_response is pruned within hours — so a briefing that died
        at 08:00 was invisible by lunchtime and the way it surfaced was him
        noticing nothing had arrived. Silence is the worst thing this system can
-       do, and it had three separate ways of doing it. */
+       do, and it had three separate ways of doing it.
+
+       AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
+       the half that can fail. ask() records a failed turn, so eugenia_runs
+       could answer "how often does a model call die" — and could say nothing at
+       all about a job that died BEFORE reaching one. Two consolidations died in
+       `turnsSince`, one line into postConsolidation, apologised to him twice and
+       left the table with no row on either night: read afterwards it showed a
+       system that had simply had nothing to do. The apology below is swallowed
+       on failure, deliberately, so a Telegram that is refusing takes the notice
+       with it and leaves nothing anywhere; this is what survives that. `job` is
+       the apology's own vocabulary rather than ask()'s labels, and suffixed so
+       the two can never be confused in a table read months later. */
+    await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
+
     await tg("sendMessage", {
       chat_id: CHAT_ID,
       text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,

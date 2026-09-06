@@ -38,7 +38,7 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import {
-  briefDue, pulseDue, retryDue, dueNow, isSilent, briefingMarker, briefedQuery,
+  briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
@@ -1022,8 +1022,16 @@ test('a week of failed briefings owes the retry hours, and the pulse gives way',
   const day = (d) => [`2026-08-${d}T02:00 consolidate`,
                       `2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
                       `2026-08-${d}T14:00 weekday`, `2026-08-${d}T15:00 weekday`];
+  /* AND SUNDAY RETRIES AS ITSELF. 22:00, 23:00 and 00:00 UTC are 18:00, 19:00
+     and 20:00 in New York — the same three hours after its own briefing that a
+     weekday gets, and it must come back 'sunday' rather than 'weekday' or the
+     retry sends Buenos dias at the week's open. The last of them is 00:00 UTC
+     on the Monday, which is still Sunday evening in New York; it is the hour a
+     walk restarting each UTC day never reaches, and the reason this one runs
+     168 consecutive hours. Two clear of the 02:00 pass. */
   assert.deepEqual(timetable(false), [
     '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
+    '2026-08-16T22:00 sunday', '2026-08-16T23:00 sunday', '2026-08-17T00:00 sunday',
     ...day('17'), ...day('18'), ...day('19'), ...day('20'), ...day('21'),
     '2026-08-22T02:00 consolidate',
   ]);
@@ -1068,22 +1076,62 @@ test('a sentence that merely opens with the word is news, and is sent', () => {
 test('the retry window is the three weekday hours after the briefing', () => {
   // August: New York is EDT (UTC-4), so 13:00–15:00 UTC is 09:00–11:00 ET.
   for (const h of [13, 14, 15]) {
-    assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, h))), true, `${h}:00 UTC`);
+    assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, h))), 'weekday', `${h}:00 UTC`);
   }
   // 08:00 is the briefing's own hour, and noon is too late to be a morning.
-  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, 12))), false);
-  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, 16))), false);
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, 12))), null);
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 19, 16))), null);
 });
 
 test('the retry window holds its New York hours in winter too', () => {
   // January: EST (UTC-5), so 09:00 ET is 14:00 UTC and 08:00 ET is 13:00.
-  assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 14))), true);
-  assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 13))), false);
+  assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 14))), 'weekday');
+  assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 13))), null);
 });
 
-test('the weekend never retries', () => {
-  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 22, 14))), false);   // Saturday
-  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 23, 14))), false);   // Sunday
+/* ─── Sunday's own three hours, which it did not have ────────────────────────
+   The Sunday open is the one briefing of the week that could not be retried,
+   and the one whose absence takes seven days to come round again — so it was
+   both the least recoverable and the least noticeable. It went missing on the
+   first Sunday the branch existed for and there was no second chance in the
+   timetable at all.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('Sunday retries in the three hours after its open, as itself', () => {
+  // Sun 23 Aug 2026, EDT: 17:00 ET is 21:00 UTC, so 22:00–00:00 UTC is 18:00–20:00.
+  for (const [h, d] of [[22, 23], [23, 23], [0, 24]]) {
+    assert.equal(retryDue(new Date(Date.UTC(2026, 7, d, h))), 'sunday',
+      `${h}:00 UTC on the ${d}th — a retry that answers 'weekday' sends Buenos ` +
+      `dias and a weekday shape into a market that has just opened for the week`);
+  }
+  // 17:00 ET is the briefing's own hour, and 21:00 is late enough that the week
+  // is under way — it also leaves the 22:00 pass two hours clear.
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 23, 21))), null);
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 24, 1))), null);
+});
+
+test('Saturday never retries, and the weekday window does not reach Sunday', () => {
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 22, 14))), null);   // Saturday
+  // 10:00 ET on a Sunday: inside the WEEKDAY window's hours and not its days.
+  assert.equal(retryDue(new Date(Date.UTC(2026, 7, 23, 14))), null);
+});
+
+/* ─── Which briefing a forced call sends ─────────────────────────────────────
+   `?force=1` exists for the hour a briefing did NOT arrive, and it read
+   `briefDue(now) ?? 'weekday'` — so outside the single hour a Sunday briefing
+   is due, the door for recovering one could not produce one. The fallback is a
+   question about the DAY, and it was being answered with a constant.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a forced briefing takes the shape of the day, not a constant', () => {
+  // Sunday evening, hours after the open — the exact case the door exists for.
+  assert.equal(briefKind(new Date(Date.UTC(2026, 7, 24, 1))), 'sunday');   // 21:00 ET Sun
+  assert.equal(briefKind(new Date(Date.UTC(2026, 7, 23, 21))), 'sunday');  // 17:00 ET Sun
+  // And Sunday BEFORE the open is still Sunday: a forced call at noon is for
+  // the evening that has not happened, not for a Monday morning.
+  assert.equal(briefKind(new Date(Date.UTC(2026, 7, 23, 16))), 'sunday');  // 12:00 ET Sun
+  assert.equal(briefKind(new Date(Date.UTC(2026, 7, 19, 16))), 'weekday');
+  assert.equal(briefKind(new Date(Date.UTC(2026, 7, 22, 16))), 'weekday'); // Saturday
 });
 
 test('the retry asks the database for exactly what a briefing stores', () => {
