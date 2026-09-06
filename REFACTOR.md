@@ -150,12 +150,13 @@ Three left, and none of them blocks a move:
 | Check | Gates |
 |---|---|
 | doc coverage, code → doc | the maintenance doors are now held by a test; whether every feature has a paragraph is unrun |
-| doc coverage, doc → code | the symbol guard covers named symbols; whether every README paragraph still describes something real is unrun |
+| doc coverage, doc → code | RUN. Four stale claims, every one a COUNT — `CLAUDE.md`'s seven facts against a table of twenty-seven, the README's three calling cron jobs against four, and a Vault-spelling paragraph naming two trigger functions where `verify.sql` asked about one. That last was a check the database had never been asked; it is row 61 now. Two enumerations inside `verify.sql` went with them, neither able to fail loudly. Two claims came back CLEAN and were counted wrong by a first scan before reading settled them: the nine hour-formatters, and `backup-memory.mjs`'s seven tables |
 | soft delete and undo (4.9) | DONE — see the ledger |
 
 **Phase 2 — archaeology.** The dead-code scans are built and both answer zero.
-The prose pass has not run: a paragraph describing a removed thing is the same
-defect as a commented-out block.
+The prose pass found one: the rough-edges entry announcing the old tables were
+dropped, which is a tombstone for a resolved item and had been wrong about what
+introspection returns since 005. A resolved rough edge is removed, not kept.
 
 **Phase 3 is CLOSED.** Money formatting and the em dash were folded; the New
 York clock and newest-first ordering are refusals, R-11 and R-12. Both were
