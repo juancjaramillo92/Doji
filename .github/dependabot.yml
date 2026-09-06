@@ -1,11 +1,12 @@
 # Two ecosystems, and they do not carry the same weight.
 #
-# The Actions half is the one that matters. backup-memory.yml hands a job
-# SB_SECRET_KEY — the key 003 deliberately withholds from the publishable one,
-# because it reads her notes and turns — and deploy-functions.yml hands one
-# SUPABASE_ACCESS_TOKEN. Every step in those jobs runs where those are in
-# reach, checkout and setup-node included, so a third-party action is the
-# shortest path to both.
+# The Actions half is the one that matters, and not because the secrets are
+# loose. SB_SECRET_KEY and SUPABASE_ACCESS_TOKEN are each scoped to the single
+# step that needs them, so nothing else reads either directly. What an earlier
+# action is handed instead is the toolchain: setup-node puts the `node` that
+# runs scripts/backup-memory.mjs on PATH, and setup-cli installs the `supabase`
+# the deploy step then hands its token to. A compromised action does not have
+# to see a secret to reach one.
 #
 # The npm half is one dev dependency that never ships: index.html has no build
 # step and its three libraries come from CDNs the graph cannot see. What it
