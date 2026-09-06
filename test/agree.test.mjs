@@ -1346,6 +1346,42 @@ test('every workflow takes its Node version from the one file that states it', (
   }
 });
 
+/* ─── A tag is a name its owner can move; a commit is the code you read ──────
+   Every `uses:` here is a 40-character commit, and the rule is worth a test
+   because the mutable form is the one a person types from memory. `@v7` is
+   shorter, it is what every README shows, and it re-fetches whatever that tag
+   points at on every run — so the audit of an action and the run of it are two
+   different trees, silently.
+
+   supabase/setup-cli@v1 was the case that made this real: not a tag but a
+   BRANCH, which is a ref expected to move in the ordinary course of somebody
+   else's work, in the job that holds SUPABASE_ACCESS_TOKEN. Nothing here reads
+   a secret it is not handed — both credentials are scoped to their own step —
+   so what an earlier action reaches is the toolchain rather than the
+   environment: setup-node provides the `node` that reads SB_SECRET_KEY one step
+   later, setup-cli the `supabase` the deploy hands its token to.
+
+   The trailing `# v7.0.1` is what keeps the line legible and is deliberately
+   NOT asserted: Dependabot writes it beside the SHA it bumps, and a test on a
+   comment would fail on the formatting of a machine-written line rather than on
+   anything true. The SHA is the half that carries the guarantee.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every action a workflow runs is named by commit, not by a movable tag', () => {
+  const used = WORKFLOWS.flatMap(({ path, text }) =>
+    [...text.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)].map(m => ({ path, ref: m[1] })));
+
+  assert.ok(used.length >= 8,
+    `only ${used.length} uses: lines found across the workflows — the reader has gone blind`);
+
+  const tagged = used.filter(u => !/@[0-9a-f]{40}$/.test(u.ref));
+  assert.deepEqual(tagged, [],
+    `${tagged.map(u => `${u.path} runs ${u.ref}`).join('; ')} — a tag or branch ` +
+    `is a name its owner can repoint between one run and the next. Pin the ` +
+    `commit and put the version in a trailing comment; dependabot.yml keeps it ` +
+    `current.`);
+});
+
 /* The project ref is not a secret, and it is not a URL everywhere it appears:
    config.toml carries it as project_id and the deploy workflow as
    --project-ref. So all three shapes are matched, and each is anchored to the

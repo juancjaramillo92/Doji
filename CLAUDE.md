@@ -92,8 +92,16 @@ Every change is:
   purpose. Mechanics in the README's Deployment section.
 - **Dependency-free.** No new libraries in the app. Three CDN scripts only
   (Chart.js and Supabase client are blocking tags; SheetJS is fetched on first
-  export by `loadXLSX()`). `jsdom` is a dev dependency and never ships. A fourth
-  needs a real argument.
+  export by `loadXLSX()`). `jsdom` and `typescript` are dev dependencies and
+  neither ships. A fourth needs a real argument.
+- **A workflow names a commit, never a tag.** A tag is mutable and its owner can
+  repoint it between one run and the next; `supabase/setup-cli@v1` was a
+  *branch*, in the job that holds `SUPABASE_ACCESS_TOKEN`. Nothing here reads a
+  secret it is not given — the credentials are step-scoped — so the reach is the
+  toolchain rather than the environment: `setup-node` provides the `node` that
+  reads `SB_SECRET_KEY` a step later. `.github/dependabot.yml` is the other half,
+  because an unmaintained pin is why people skip pinning; it bumps the SHA and
+  the `# v7.0.1` beside it together. `agree.test.mjs` holds the SHAs.
 
 ---
 
@@ -124,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 479 tests, six suites
+npm test      # 480 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
