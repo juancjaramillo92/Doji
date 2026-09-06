@@ -1704,6 +1704,60 @@ test('the documents name only symbols the repository has', () => {
     'the documents name things the repository does not have');
 });
 
+
+/* ─── The Layout block is a copy of the tree, and nothing compared it ───────
+   README.md opens with a listing of every file and what it is for. It is the
+   first thing a cold session reads and the only place the repository is
+   described as a whole, and it had drifted the way an unchecked copy always
+   does: 008, 009, the backup script, all three documents and both dotfiles
+   were tracked and unlisted. The block still read as complete, because a map
+   cannot show what it left out.
+
+   BOTH DIRECTIONS, because they fail differently. A file missing from the
+   block is invisible to a reader who trusts it — which is what the block is
+   for. An entry naming a file that is gone sends them looking for something
+   deleted. Neither is reachable by the symbol test above: these entries are
+   not in backticks, and the one that is a bare `test/` is not a symbol.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* An entry is a path, then whitespace, then prose. An INDENTED one is a detail
+   under the directory line above it — `doji-eugenia/adherence.ts` beneath
+   `supabase/functions/doji-eugenia/` — so it is a partial path already covered
+   by its parent, and is checked for existence rather than used as coverage. */
+const layoutBlock = () => {
+  const found = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
+    .match(/\n## Layout\n+```\n([\s\S]*?)\n```\n/);
+  assert.ok(found, 'README.md has no Layout block');
+
+  const top = [], nested = [];
+  for (const line of found[1].split('\n')) {
+    if (!line.trim()) continue;
+    (/^\s/.test(line) ? nested : top).push(line.trim().split(/\s/)[0]);
+  }
+  return { top, nested };
+};
+
+const covers = (entry, file) =>
+  entry === file || (entry.endsWith('/') && file.startsWith(entry));
+
+test('the Layout block names every file the repository tracks', () => {
+  const { top, nested } = layoutBlock();
+
+  // WITHOUT THIS THE COMPARISONS BELOW PROVE NOTHING. A block that stopped
+  // parsing reports every file missing, which is loud — but the fence moving
+  // to a heading this pattern does not match reports nothing at all.
+  assert.ok(top.length > 20, `only ${top.length} Layout entries parsed`);
+
+  assert.deepEqual(TRACKED.filter(f => !top.some(e => covers(e, f))), [],
+    'tracked files the Layout block does not name');
+
+  assert.deepEqual(top.filter(e => !TRACKED.some(f => covers(e, f))), [],
+    'Layout entries naming nothing the repository tracks');
+
+  assert.deepEqual(nested.filter(e => !TRACKED.some(f => f.endsWith('/' + e))), [],
+    'indented Layout entries naming no such file');
+});
+
 /* ─── One hour cycle, across four runtimes ──────────────────────────────────
    Nine formatters in this repository ask for an hour, and every one of them
    has to say WHICH cycle it wants. `hour12: false` does not: it leaves the

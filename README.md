@@ -50,6 +50,9 @@ default or duplicated something already in the head. Left alone deliberately.
 ## Layout
 
 ```
+README.md                               the contract: what the app does and why
+CLAUDE.md                               how to work on it; the README outranks it
+REFACTOR.md                             what one long pass changed, and refused
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
@@ -61,6 +64,8 @@ supabase/004_cron.sql                   every scheduled job
 supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her senses
 supabase/006_plan.sql                   where a trade was aimed, off the open position
 supabase/007_semantic.sql               her memory searchable by meaning
+supabase/008_sync_health.sql            the heartbeat the two silent writers mark
+supabase/009_trades_grants.sql          which columns the app may write
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -69,6 +74,7 @@ supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/adherence.ts             the eight rules a journal row can answer
 doji_gmail_sync.gs                      Apps Script: broker email parser
+scripts/backup-memory.mjs               the paged read behind the weekly copy
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
@@ -76,6 +82,8 @@ test/                                   node:test suites — see Tests
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
+.npmrc                                  engine-strict: the Node floor made a gate
+.gitignore                              node_modules, and nothing else
 ```
 
 ---
