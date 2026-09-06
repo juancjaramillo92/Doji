@@ -2273,8 +2273,9 @@ not traded since Friday — a false statement about his own week, in her voice,
 with nothing anywhere reporting that the read never happened. An empty answer is
 only an answer when something was actually read.
 
-**A failed briefing tries again**, at 09:00, 10:00 and 11:00 ET, and stops the
-moment one has landed. `briefedToday()` reads the marker `postBriefing` stores
+**A failed briefing tries again**, at 09:00, 10:00 and 11:00 ET — and on a
+Sunday at 18:00, 19:00 and 20:00, the same three hours after its own 17:00 open —
+and stops the moment one has landed. `briefedToday()` reads the marker `postBriefing` stores
 — written *before* the send, so it exists whenever a briefing was generated. The
 generation is the expensive half, and a marker written after it would let a
 failed insert produce four briefings and four bills. A read failure counts as
@@ -2293,6 +2294,29 @@ the marker itself cannot be crowded out by whatever was said around it.
 At 10:00 the retry window and the pulse overlap, and `dueNow()` gives that hour
 to the retry — on a day the briefing failed, a second look at a morning he was
 never told about is not what is wanted.
+
+**Sunday had no second chance at all until it needed one**, which was the wrong
+way round twice over: it is the only briefing of the week that could not be
+retried, and the one whose absence takes seven days to come round again rather
+than one. It went missing on the first Sunday the branch existed for. The three
+hours are chosen the same way the weekday ones are — late enough to still be an
+evening about a week that is opening, and two clear of the 22:00 pass.
+
+`retryDue` answers **which** briefing rather than whether one is due, because a
+retry has to send the shape the failed one would have. `dueNow` named `'weekday'`
+itself, which was correct only for as long as the window was weekdays-only: a
+literal that is right by accident of another function's range breaks the first
+time that range moves, and this is the commit that moved it.
+
+**`?force=1` falls back to the day, not to a constant.** It reads
+`briefDue(now) ?? briefKind(now)`, and it used to read `?? 'weekday'` — so the
+door that exists for the hour a briefing did *not* arrive could not produce a
+Sunday one outside the single hour it was already due. Forced on a Sunday
+evening it sent *Buenos dias* and a weekday shape into a market that had just
+opened for the week. `briefKind` is pure and driven from both sides by a test,
+and every one of those assertions passed while the constant was still there —
+so `agree.test.mjs` reads `postScheduled` for the call as well, which is the
+half that was missing.
 
 **And the apology names the job that actually died.** Every scheduled failure said
 *"No briefing, jefe"* — including a pulse, the nightly pass, a release look and a
@@ -2344,6 +2368,17 @@ lexical one keeps returning results. The channel census writes
 exactly like one that had no reason to move — and a rung is read by comparing
 nights, which a line discarded within hours can never be. `caller` is free text
 precisely so neither of these needed a migration.
+
+**And a job that dies before its first model call now leaves a row too.** `ask()`
+records a failed turn, so the table could answer *how often does a model call
+die* — and could say nothing whatever about a job that never reached one. Two
+consolidations threw in `turnsSince`, one line into `postConsolidation`,
+apologised on two consecutive nights, and left no row on either: read afterwards
+the table showed a system that had simply had nothing to do. `postScheduled`'s
+catch writes `caller: '<job> job'` — the apology's own vocabulary, suffixed so it
+can never be confused with an `ask()` label — **before** it sends the apology,
+because the apology is sent with `.catch(() => {})` and a Telegram that is
+refusing would otherwise take the only notice with it.
 
 It never throws and never blocks the answer. A briefing that was written, paid
 for and delivered must not be lost because an instrumentation insert failed — or
@@ -3235,7 +3270,7 @@ not run.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; the nightly sweep and the channel census against `recordRun`, both outcomes each, since a meter that records only its successes reports a vendor refusing every night as a table with nothing in it; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does |

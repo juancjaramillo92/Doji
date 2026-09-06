@@ -124,7 +124,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 479 tests, six suites
+npm test      # 483 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -781,6 +781,23 @@ compounds.
   pass records itself, which is what makes 23:00 a retry rather than a second
   pass.
 
+  `retryDue` ANSWERS WHICH BRIEFING, NOT WHETHER ONE IS DUE, and the Sunday open
+  has its own three hours (18:00–20:00) as of the first Sunday it ever went
+  missing. It had none: the one briefing of the week that could not be retried
+  was also the one whose absence takes seven days to come round rather than one.
+  `dueNow` used to name `'weekday'` itself, correct only while the window was
+  weekdays-only — **a literal that is right by accident of another function's
+  range is the shape to look for**, and it is the second time that shape has
+  been found here. `briefKind` is the same repair on the `?force=1` door, which
+  read `?? 'weekday'` and so could not produce a Sunday briefing outside the one
+  hour it was already due.
+
+  AND THE PURE HALF PASSING PROVES NOTHING ABOUT THE CALL. `briefKind` is driven
+  from both sides in `fold.test.mjs`, and every one of those assertions was green
+  while `postScheduled` still read the constant — found by putting the constant
+  back and watching the suite stay green. `agree.test.mjs` reads the call site,
+  which is the half that was missing.
+
   The two data-driven schedules are deliberately not in `dueNow`: each is decided
   by a table rather than by the clock. Each has its own door and its own
   quarter-hourly job, and THE FLAG IS THE COPY THAT MATTERS — renaming one fails
@@ -838,6 +855,17 @@ compounds.
   needed a migration, and `agree.test.mjs` reads both call sites in both
   functions because `sweepLine` is pure and cannot see whether anyone wrote its
   answer down.
+
+  AND A JOB THAT DIES BEFORE ITS FIRST MODEL CALL LEAVES A ROW TOO. `ask()`
+  records a failed turn, so the table could answer *how often does a model call
+  die* and could say NOTHING about a job that never reached one — two
+  consolidations threw in `turnsSince` one line into `postConsolidation`,
+  apologised on two consecutive nights, and left no row on either, so the table
+  read as a system with nothing to do. `postScheduled`'s catch writes
+  `caller: '<job> job'` — the apology's vocabulary, suffixed so it cannot be
+  confused with an `ask()` label — BEFORE the apology, because that send carries
+  `.catch(() => {})` and a Telegram that is refusing would otherwise take the
+  only notice with it. `agree.test.mjs` reads the order, not just the call.
 
   `sweepLine` PARTS THREE REPAIRS AND THE THIRD IS THE FALSE ALARM. A refusing
   vendor throws and arrives as its own message; an unset key does NOT throw —
