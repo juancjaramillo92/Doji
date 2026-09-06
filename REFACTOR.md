@@ -212,89 +212,33 @@ Tier 3 structural moves. Not started.
 Every move considered and NOT made, so a tempting one is not re-proposed every
 few months and eventually waved through on a tired afternoon.
 
-### R-1 — splitting `index.html` into modules
-**Why refused:** requires a build step. No build step, no bundler, one flat
-namespace is a stated design decision.
-**Revisit if:** the trader decides to take a build step, recorded as a decision.
+Nine of them are already refused by a rule `CLAUDE.md` states, and are named
+here rather than argued: the reason belongs in the document every session reads,
+once. Two of the nine WERE argued here as well, in the same words — R-3 and
+R-10 — and a reader of either file had no way to know the other existed. The
+prose guard cannot see that shape: it reads within a file, by exact line, and
+this was an argument restated across two.
 
-### R-2 — single-sourcing the setup vocabulary
-**Why refused:** three copies across three runtimes; impossible without a build
-step. The agreement test is the treatment and it exists.
-**Revisit if:** never, on current architecture.
+| Move | Refused by, in `CLAUDE.md` |
+|---|---|
+| R-1 — splitting `index.html` into modules | no build step, no bundler, one flat namespace |
+| R-2 — single-sourcing the setup vocabulary | where a copy is unavoidable, a test holds the copies together |
+| R-3 — deleting `MARKETS.sydney` | the two branches of `session()` that decide nothing, and why the entry stays |
+| R-4 — reordering the branches of `sessionOf` | the same paragraph: the order of the first two is unobservable |
+| R-5 — collapsing the poller's two windows | which positions get written and which deals get read are different questions |
+| R-6 — making the offline snapshot writable | the snapshot is a read cache and can never be anything else |
+| R-7 — deciding a Telegram redraw from the keyboard | never read whether a message should settle off its keyboard |
+| R-8 — moving a `drop` into an earlier numbered SQL file | a re-runnable file may not undo a later one |
+| R-10 — regenerating `golden.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 
-### R-3 — deleting `MARKETS.sydney`
-**Why refused:** it is dead by measurement — walked at fifteen-minute resolution
-across a year, Sydney is open without Tokyo at 5,112 instants and never once
-while London is open, so it cannot change what `sessionOf` returns. Deleting it
-was queued as ordinary dead-code work and is refused on looking at what it costs.
-
-Two reasons, and the second is the one that decides it.
-
-`isOpen(tokyo) || isOpen(sydney)` is a true statement about the world: it asks
-whether any Asian centre is open. Reducing it to Tokyo would make the code say
-something less true, adopted for no reason except an accident of four hour
-tables that DST moves twice a year.
-
-And the deletion takes a live sensor with it. The test asserting Sydney reaches
-nothing reads `MARKETS.sydney` to ask the question — remove the entry and the
-test goes with it, so the day London's open moves earlier or Sydney's close
-moves later, nothing says so. One line in two files is a poor price for the
-thing that would notice the domain shifting under the code.
-
-**Revisit if:** that test goes red, which is the event that makes the term live
-again — and then it is not dead code at all.
-
-### R-4 — reordering the branches of `sessionOf`
-**Why refused:** unobservable. London, New York and an Asian centre are never
-open together, so the order of the first two branches decides nothing. A move
-that changes nothing is not worth the diff, and a test now pins the property so
-the day it stops being true is not silent.
-**Revisit if:** that test goes red.
-
-### R-5 — collapsing the poller's two windows
-**Why refused:** which positions get written and which deals get read are
-different questions. Collapsing them restores the re-fold corruption.
-
-### R-6 — making the offline snapshot writable
-**Why refused:** it is a read cache, painted before the token check and the fetch
-answer. Writing it back makes a stale render authoritative.
-
-### R-7 — deciding a Telegram redraw from the keyboard
-**Why refused:** an open form and one reopened with `[Edit]` draw the same four
-rows. Only the row as it stood before the tap tells them apart.
-
-### R-8 — moving a `drop` into an earlier numbered SQL file
-**Why refused:** a file carrying a bare `create table` is run-once; one without
-is re-appliable. Tidying a drop backwards lets a re-run undo a later file.
+The four below are refused by something no other document holds, so they carry
+their reasoning here.
 
 ### R-9 — a database test in `npm test`
 **Why refused:** `npm ci` installs jsdom and nothing else. The one assertion that
 wanted a database — whether a BEFORE trigger's write needs a column grant — was
 answered on a throwaway Postgres and written down instead.
 **Revisit if:** a second and third such question appear.
-
-### R-13 — folding Gladys's `readRow` and `patchRow`
-**Why refused:** they share four lines — the not-ok throw, the json, the empty
-check, the first row. A helper for it takes a `Response`, a verb and an id, and
-reads worse at both call sites than the four lines do. Two sites, fourteen lines
-apart, visible on one screen.
-**Revisit if:** a third caller appears, or the empty-row behaviour has to change.
-
-### R-12 — one home for the newest-first reads
-**Why refused:** they are eight reads that differ in table, select list, filter
-(`superseded_by=is.null`, `embedding=is.null`, `closed_on=is.null`) and order
-column (`id.desc`, `entry_time.desc`, `open_day.desc,entry_time.desc`). A helper
-covering that is an options object over every part of a URL, which is the
-abstraction the standard of work forbids twice over.
-
-What the row was actually worried about is already treated. The guard finds
-every `rest/v1/…?select=` in the file rather than naming its subjects, and
-asserts each carries a limit and none orders `id.asc` under one — proved by
-planting a new read of each shape and watching both go red. A read added
-tomorrow is covered without anyone remembering to add it.
-
-**Revisit if:** the reads ever converge on one shape, which would mean the
-filters had gone.
 
 ### R-11 — folding the New York clock into one definition
 **Why refused:** the nine copies are FIVE questions, not nine answers to one.
@@ -315,10 +259,28 @@ formatter.
 **Revisit if:** a second caller ever needs wall-clock minutes, which is the
 condition `adherence.ts`'s own comment names.
 
-### R-10 — regenerating `golden.json` to make a red run go away
-**Why refused:** a golden file regenerated on failure costs what it always cost,
-reports green, and proves nothing. Regeneration is `GOLDEN=write npm test`, in
-the same commit as the behaviour change, with the reason in the message.
+### R-12 — one home for the newest-first reads
+**Why refused:** they are eight reads that differ in table, select list, filter
+(`superseded_by=is.null`, `embedding=is.null`, `closed_on=is.null`) and order
+column (`id.desc`, `entry_time.desc`, `open_day.desc,entry_time.desc`). A helper
+covering that is an options object over every part of a URL, which is the
+abstraction the standard of work forbids twice over.
+
+What the row was actually worried about is already treated. The guard finds
+every `rest/v1/…?select=` in the file rather than naming its subjects, and
+asserts each carries a limit and none orders `id.asc` under one — proved by
+planting a new read of each shape and watching both go red. A read added
+tomorrow is covered without anyone remembering to add it.
+
+**Revisit if:** the reads ever converge on one shape, which would mean the
+filters had gone.
+
+### R-13 — folding Gladys's `readRow` and `patchRow`
+**Why refused:** they share four lines — the not-ok throw, the json, the empty
+check, the first row. A helper for it takes a `Response`, a verb and an id, and
+reads worse at both call sites than the four lines do. Two sites, fourteen lines
+apart, visible on one screen.
+**Revisit if:** a third caller appears, or the empty-row behaviour has to change.
 
 ---
 

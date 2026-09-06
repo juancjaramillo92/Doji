@@ -6,6 +6,13 @@ and you say so. The README is the contract for how the app behaves; this file is
 how to work on it, and it holds only what the README does not — every
 description of behaviour lives there, once.
 
+`REFACTOR.md` is the third document and the only one that is a record rather
+than a rule: what one long pass over this code changed, what it left open, and
+in §6 every move considered and REFUSED. Read that register before proposing a
+simplification — most of what looks like duplication here has already been
+looked at, and the register is what stops a refused move being re-proposed every
+few months and waved through on a tired afternoon.
+
 Doji is a personal XAUUSD trading journal: one `index.html` of ~4,000 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
 table — the app, and three Edge Functions: `doji-mcp-sync` (the cTrader poller),
