@@ -434,11 +434,19 @@ from (values
              false, true, '')))[1]::text
      where to_regclass('cron.job') is not null),
    '4'),
-  -- The third caller, and the one that actually shipped with the upper-case
-  -- spelling. It is a function body rather than a job, so it needs its own row.
+  -- The two callers that are function bodies rather than jobs, so neither can
+  -- be counted with them. Gladys's is the one that actually shipped with the
+  -- upper-case spelling; the event spine's presents the same secret and had
+  -- never been asked. An absent function yields no row and answers null here,
+  -- which is a FALSE result rather than a raise.
   ('the Telegram trigger function reads the lower-case Vault secret',
    (select (prosrc like '%''doji_cron_secret''%')::text
       from pg_proc where proname = 'trades_telegram'),
+   'true'),
+
+  ('the event-spine trigger function reads the lower-case Vault secret',
+   (select (prosrc like '%''doji_cron_secret''%')::text
+      from pg_proc where proname = 'trades_eugenia_on_event'),
    'true'),
 
   -- One of the three places the setups vocabulary lives. test/agree.test.mjs
@@ -562,9 +570,12 @@ from (values
 ) as t(check_name, actual, expected);
 
 -- ─── Tables and views ──────────────────────────────────────────────────────
--- Expect exactly: trades, eugenia_turns, eugenia_notes, and the eugenia_trades
--- VIEW. `records`, `broker_fills` and `app_state` were dropped; anything else
--- appearing here is something nothing in this repository knows about.
+-- Every object the numbered files declare, and nothing else. The summary above
+-- holds the list itself, asserted against those files — this is the eye pass
+-- beside it, so anything appearing here that the summary did not name is
+-- something nothing in this repository knows about. It does not enumerate:
+-- a list written out here goes stale on the file that adds a table, and reads
+-- as a correct database gone wrong.
 select table_name, table_type
 from information_schema.tables
 where table_schema = 'public'
@@ -578,7 +589,6 @@ select table_name, ordinal_position, column_name, data_type,
        is_nullable, column_default, is_generated
 from information_schema.columns
 where table_schema = 'public'
-  and table_name in ('trades', 'eugenia_turns', 'eugenia_notes')
 order by table_name, ordinal_position;
 
 -- ─── Constraints ───────────────────────────────────────────────────────────
@@ -707,7 +717,7 @@ limit 10;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
 -- A SQL editor displays the result of the LAST statement, and this is it — so
--- the 60 checks that answer "does the database match the files" ran and were
+-- the 61 checks that answer "does the database match the files" ran and were
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --

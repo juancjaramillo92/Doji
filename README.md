@@ -3415,7 +3415,7 @@ account. The planned floor is **not recoverable from the data** — the broker
 reports only the *final* stop, so a stop moved to break-even has overwritten the
 original risk. Never infer what the planned R:R was; ask.
 
-**The three calling pg_cron jobs hold no database power**, and that is a claim
+**The four calling pg_cron jobs hold no database power**, and that is a claim
 about the database rather than about the secret. None can read or write a table:
 each presents the cron secret, read from Vault at call time, and the
 service-role key lives in the functions' own secrets and never appears in a job.
@@ -3452,10 +3452,9 @@ places rather than three, with no Vault spelling to get wrong.
 One value, two stores, two spellings, and it is worth knowing before you touch
 either: the Edge Functions read the cron secret from their own secrets as
 **`DOJI_CRON_SECRET`**, while the database reads it from Vault as
-**`doji_cron_secret`**. The three calling jobs and both triggers all read the
-lower-case Vault name, and `verify.sql` asserts all three. That trigger shipped reading the upper-case one, found nothing, and
-went quiet without failing anything.
-
-**Resolved — the old tables are gone.** `records`, `broker_fills` and
-`app_state` were dropped; introspection now returns `trades`, Eugenia's two
-tables and her view. That was the last step of the migration.
+**`doji_cron_secret`**. The four calling jobs read the lower-case Vault name,
+and so do the two trigger functions that present it — `trades_telegram` and
+`trades_eugenia_on_event`. `verify.sql` asks the database for all six: one row
+counting the jobs, and one per function body, because a function is not a job
+and cannot be counted with them. Gladys's trigger shipped reading the
+upper-case one, found nothing, and went quiet without failing anything.

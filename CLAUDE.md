@@ -67,9 +67,12 @@ Every change is:
   second way in a second spot — and that includes prose: a fact stated in the
   README does not get restated here.
 - **Where a copy is unavoidable, a test holds the copies together.** Four
-  runtimes and no build step mean seven facts genuinely live in more than one
-  file — the README's *Facts that live in more than one file* names them, and
-  `test/agree.test.mjs` reads every copy of each and fails when they disagree.
+  runtimes and no build step mean a set of facts genuinely lives in more than
+  one file. The README's *Facts that live in more than one file* names them,
+  and it is the count as well as the list — a number repeated here goes stale
+  on the release that adds a row, in a file nothing compares against that
+  table. `test/agree.test.mjs` reads every copy of each and fails when they
+  disagree.
   Adding a copy of anything means adding it there too, and to that table: a copy
   nothing can compare is the actual defect, not the copy itself.
 - **Load-order safe.** Nothing references anything defined below it at load time.
