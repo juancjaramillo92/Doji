@@ -16,14 +16,15 @@
 # keeps the SHA from going stale is this file: an unmaintained pin is the whole
 # reason people skip pinning, and the bump PR is the half that answers it.
 #
-# The npm half is one dev dependency that never ships: index.html has no build
+# The npm half is two dev dependencies that never ship: index.html has no build
 # step and its three libraries come from CDNs the graph cannot see. What it
 # buys is not a CVE watch. test.yml is `on: [push]` and so runs on the bump
-# branch, which means a jsdom release that moves innerHTML serialisation lands
-# as a red golden.test.mjs on a pull request rather than on the afternoon the
-# lock is refreshed for something else. NEVER answer that red with
-# GOLDEN=write — the snapshot going red on a DOM change is the snapshot doing
-# its job.
+# branch, so the release that changes what a compiler or a DOM says lands as a
+# red suite on a pull request rather than on the afternoon the lock is
+# refreshed for something else — jsdom moving innerHTML serialisation under
+# golden.test.mjs, tsc changing its diagnostics under types.test.mjs. NEVER
+# answer the first with GOLDEN=write: the snapshot going red on a DOM change
+# is the snapshot doing its job.
 version: 2
 updates:
   - package-ecosystem: github-actions
