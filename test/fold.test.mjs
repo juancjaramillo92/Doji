@@ -48,7 +48,7 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine, serve,
+  positionsList, isOpen, healthLine, sweepLine, serve,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -1984,6 +1984,52 @@ test('the stamp is the New York wall clock, not UTC', () => {
 test('the stamp follows New York through the daylight-saving change', () => {
   assert.match(nowBlock(new Date('2026-01-15T14:00:00Z')), /at 09:00/);   // EST, UTC-5
   assert.match(nowBlock(new Date('2026-07-15T14:00:00Z')), /at 10:00/);   // EDT, UTC-4
+});
+
+/* ─── Whether the semantic half of her memory is still being filled ─────────
+   A row whose `embedding` is null does not appear in a nearest-neighbour query
+   at all — no error, no log — so a vendor that has stopped answering costs her
+   half of `search_memory` while the lexical arm carries on returning results.
+   The nightly sweep is the only thing that would know, and until now it said so
+   to a console.
+
+   THREE OUTCOMES AND THE LINE HAS TO PART THEM, because they are three
+   different repairs. A vendor that refuses throws and arrives as its own
+   message, so what is left here is the pair of counts — and `embed()` returns
+   null on an unset key ALONE, every other failure throwing, which is what makes
+   "nothing filled with a backlog waiting" an exact statement rather than a
+   guess.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a night that filled rows says so and accuses nobody', () => {
+  const line = sweepLine({ filled: 3, left: 0 }, { filled: 50, left: 128 });
+  assert.equal(line, 'notes 3 filled, 0 left · turns 50 filled, 128 left');
+  assert.doesNotMatch(line, /EMBED_KEY/,
+    'a working sweep reported a missing key — the backlog is draining, which is ' +
+    'the one thing that proves the vendor answered');
+});
+
+test('nothing filled against a backlog names the key', () => {
+  // The signature of an unset EMBED_KEY: embed() returns null, the rows are
+  // read and left exactly where they were, and this repeats every night.
+  const line = sweepLine({ filled: 0, left: 12 }, { filled: 0, left: 340 });
+  assert.match(line, /nothing filled against a backlog, so EMBED_KEY is unset/);
+  assert.match(line, /notes 0 filled, 12 left/,
+    'the counts went missing behind the diagnosis — 352 rows unsearchable and ' +
+    '2 are different sizes of problem');
+});
+
+test('a fully swept archive is not a missing key', () => {
+  /* THE FALSE ALARM, and it is the ordinary night rather than the edge case.
+     Once the backlog is drained every sweep answers `0 filled, 0 left` for the
+     rest of the deployment. A line that read that as a missing key would fire
+     every night forever, which is how a meter stops being read at all. */
+  assert.equal(sweepLine({ filled: 0, left: 0 }, { filled: 0, left: 0 }),
+    'notes 0 filled, 0 left · turns 0 filled, 0 left');
+
+  // And the half-quiet night: notes all done, turns still draining.
+  assert.doesNotMatch(sweepLine({ filled: 0, left: 0 }, { filled: 50, left: 20 }),
+    /EMBED_KEY/, 'a table with nothing waiting dragged a working sweep down');
 });
 
 test('the stamp tells her to trust it over the conversation', () => {
