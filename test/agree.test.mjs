@@ -1970,17 +1970,68 @@ test('the nightly pass reports the map it may just have moved', () => {
   const at = src.indexOf('async function postConsolidation(');
   const code = src.slice(at, src.indexOf('\n}', at))
     .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
-  assert.match(code, /await\s+logChannels\(\)/,
+  assert.match(code, /await\s+recordChannels\(\)/,
     'nothing records where the channels stand, so the only claim this design ' +
     'rests on is the only one with no meter on it');
 
-  const fn = src.indexOf('async function logChannels(');
-  assert.ok(fn > -1, 'doji-eugenia no longer has logChannels()');
+  const fn = src.indexOf('async function recordChannels(');
+  assert.ok(fn > -1, 'doji-eugenia no longer has recordChannels()');
   const body = src.slice(fn, src.indexOf('\n}', fn));
   // It runs after the pass has already written memory, so a throw here would
   // turn a good night into a 500.
   assert.match(body, /catch\s*\(/,
-    'logChannels can throw, and it runs after the work it reports on is done');
+    'recordChannels can throw, and it runs after the work it reports on is done');
+});
+
+/* ─── The two meters that were still going to a console ─────────────────────
+   `eugenia_runs` exists because nobody reads Edge logs — that is the whole
+   argument, made in the file, in the README and in 005. Two figures were
+   written after that argument was settled and did not get it applied to them:
+   what the nightly embedding sweep filled, and where the five channels stand.
+
+   Both fail in the same shape and it is the shape this table was built for. A
+   dead embedding vendor takes the semantic arm of `eugenia_search` out and
+   leaves the lexical one answering, so the search still works and nothing
+   anywhere says half of it stopped; a ladder that has quietly stopped moving
+   looks exactly like one that had no reason to move. Neither is an error, so
+   neither reaches him, and both went to a line discarded within hours.
+
+   READ STRUCTURALLY, because nothing in this suite drives an Edge handler and
+   because `sweepLine` is pure — it is handed two counts and cannot see whether
+   anybody wrote them down. BOTH OUTCOMES, for the reason the heartbeat test
+   gives above: a meter that records only its successes reports a vendor that
+   has been refusing every night for a fortnight as a table with nothing in it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the sweep and the census both reach the table, however they end', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  for (const [fn, caller, what] of [
+    ['async function postConsolidation(', 'embeddings',
+     'a vendor that has stopped answering, which takes half of search_memory ' +
+     'with it and reports nothing'],
+    ['async function recordChannels(', 'channels',
+     'the only meter on the one claim this whole design rests on'],
+  ]) {
+    const at = src.indexOf(fn);
+    assert.ok(at > -1, `doji-eugenia no longer has ${fn}`);
+    const body = strip(src.slice(at, src.indexOf('\n}', at)));
+
+    for (const [ok, half] of [['true', 'success'], ['false', 'failure']]) {
+      assert.match(body, new RegExp(`recordRun\\(\\{[^}]*caller: '${caller}'[^}]*ok: ${ok}`),
+        `${caller} records no ${half}, so the row cannot answer for ${what}`);
+    }
+  }
+
+  // The sweep's own line is what separates an unset key from a vendor that
+  // refused, and it is only in the row if the row carries it.
+  const at = src.indexOf('async function postConsolidation(');
+  assert.match(strip(src.slice(at, src.indexOf('\n}', at))), /detail: swept/,
+    'the sweep records that it ran and not what it found, which is the ' +
+    'question it exists to answer');
 });
 
 test('the search tool names the function the database actually defines', () => {

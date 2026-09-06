@@ -1691,9 +1691,11 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
    because an instrumentation insert failed, and it must not be lost because the
    005 migration has not been applied yet either.
 
-   Written by ask() alone. Nothing reads it back into her context — this is for
-   him and for whoever is debugging, which is why it carries no note and no
-   opinion, only figures. */
+   WHAT EARNS A ROW IS AN ABSENCE NOBODY WOULD NOTICE, which is why ask() is no
+   longer its only writer: a delivered briefing, a nightly sweep and the channel
+   census all produce a number whose only other home is a console. Nothing reads
+   any of it back into her context — this is for him and for whoever is
+   debugging, which is why it carries no note and no opinion, only figures. */
 async function recordRun(row: Record<string, unknown>): Promise<void> {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_runs`, {
@@ -1782,6 +1784,27 @@ async function remember(turns: Turn[]) {
   if (!res.ok) throw new Error(`History write failed (HTTP ${res.status})`);
 }
 
+export interface Sweep { filled: number; left: number }
+
+/* WHAT A NIGHT OF SWEEPING CAME TO, IN THE ONE FORM THAT SEPARATES THREE
+   REPAIRS. A vendor that refuses throws, so it reaches the row as a message and
+   names itself. What is left is a pair of counts, and the pair that matters is
+   nothing filled with a backlog still waiting: `embed()` returns null on an
+   unset key ALONE — every other way of failing throws — so that combination is
+   an exact statement about the key rather than a guess about the vendor.
+
+   The quiet night has to read as quiet. An archive fully embedded answers
+   `0 filled, 0 left`, and a line that called that a missing key would fire
+   every night for the life of the deployment, which is how a monitor stops
+   being read. */
+export function sweepLine(notes: Sweep, turns: Sweep): string {
+  const counts = (s: Sweep) => `${s.filled} filled, ${s.left} left`;
+  const line = `notes ${counts(notes)} · turns ${counts(turns)}`;
+  return notes.filled + turns.filled === 0 && notes.left + turns.left > 0
+    ? `${line} — nothing filled against a backlog, so EMBED_KEY is unset`
+    : line;
+}
+
 /* ─── What the vendor missed ───────────────────────────────────────────────
    A null embedding is every row written before 007 ran, plus any row whose
    vendor call failed. Both are invisible from the outside: the row is there,
@@ -1807,7 +1830,7 @@ async function remember(turns: Turn[]) {
    about are the last to arrive. Ordering by id.desc drains the same rows in the
    order they are worth having.
    ───────────────────────────────────────────────────────────────────────── */
-async function fillEmbeddings(table: string, column: string): Promise<{ filled: number; left: number }> {
+async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   const res = await fetch(
     `${SB_URL}/rest/v1/${table}?select=id,${column}&embedding=is.null&order=id.desc&limit=${EMBED_BATCH}`,
     { headers: sbHeaders("count=exact") });
@@ -2953,7 +2976,7 @@ async function postConsolidation(): Promise<Response> {
   const said = await ask([{ role: 'user', content: asked }], 'high', 'consolidation',
                          CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
-  await logChannels();
+  await recordChannels();
 
   /* AND THE SWEEP, WHICH IS BOOKKEEPING RATHER THAN PART OF THE PASS. It runs
      here because this job already runs nightly and already reads the day, so it
@@ -2963,10 +2986,13 @@ async function postConsolidation(): Promise<Response> {
   try {
     const notes = await fillEmbeddings('eugenia_notes', 'note');
     const turns = await fillEmbeddings('eugenia_turns', 'content');
-    console.log("doji-eugenia: embeddings swept —", JSON.stringify({ notes, turns }));
+    const swept = sweepLine(notes, turns);
+    console.log("doji-eugenia: embeddings swept —", swept);
+    await recordRun({ caller: 'embeddings', ok: true, detail: swept });
   } catch (err) {
-    console.error("doji-eugenia: embedding sweep failed —",
-                  err instanceof Error ? err.message : err);
+    const why = err instanceof Error ? err.message : String(err);
+    console.error("doji-eugenia: embedding sweep failed —", why);
+    await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
   }
 
   return json({ ok: true, consolidated: day.length });
@@ -2984,18 +3010,25 @@ async function postConsolidation(): Promise<Response> {
    instrument for it. Nothing ever read that instrument back. A ladder that has
    stopped moving looks exactly like one that never had to, and the nightly pass
    is the only thing that can move a rung — so this is the line that says
-   whether it does, printed at the one moment a rung could just have changed.
+   whether it does, taken at the one moment a rung could just have changed.
 
-   Never throws: the pass has done its work by the time this runs, and a log
-   line must not turn a good night into a 500. */
-async function logChannels() {
+   AND IT WENT TO A CONSOLE, WHICH IS THE FAILURE eugenia_runs EXISTS FOR. The
+   argument that moved every cost figure off console.log applies here twice
+   over: a ladder is read by comparing nights, and a line that is discarded
+   within hours cannot be compared with anything. A row per night is the series.
+
+   Never throws: the pass has done its work by the time this runs, and a meter
+   must not turn a good night into a 500. */
+async function recordChannels() {
   try {
     const rungs = channelsList(await readChannels())
       .split('\n').map(l => l.replace(/^· /, '')).join(' · ');
     console.log(`doji-eugenia: channels — ${rungs}`);
+    await recordRun({ caller: 'channels', ok: true, detail: rungs });
   } catch (err) {
-    console.error("doji-eugenia: channels unavailable —",
-      err instanceof Error ? err.message : err);
+    const why = err instanceof Error ? err.message : String(err);
+    console.error("doji-eugenia: channels unavailable —", why);
+    await recordRun({ caller: 'channels', ok: false, detail: why.slice(0, 500) });
   }
 }
 

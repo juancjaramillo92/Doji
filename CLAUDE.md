@@ -124,7 +124,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 475 tests, six suites
+npm test      # 479 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -811,9 +811,10 @@ compounds.
   transcript that on most days never mentions a trade — so `tradesBlock()` goes in
   — and told to prefer superseding while holding twenty notes out of an archive it
   could not look at — so `SEARCH_TOOL` is in `CONSOLIDATE_TOOLS`. Never web
-  search: a bookkeeping pass has nothing to research. It also logs where the five
-  channels stand, which is the only meter on the one claim this whole design rests
-  on.
+  search: a bookkeeping pass has nothing to research. It also RECORDS where the
+  five channels stand, which is the only meter on the one claim this whole design
+  rests on — and a rung is read by comparing nights, which a console line
+  discarded within hours can never be.
 
 - **`eugenia_runs` is where the meters survive.** Everything this file argues
   about `pg_net` — that nobody reads Edge logs — applied to every cost and quality
@@ -822,6 +823,28 @@ compounds.
   row that never existed. It never throws and never blocks an answer. It is also
   what `consolidatedToday()` reads, which is how the nightly pass gets the retry
   the briefing has always had.
+
+  TWO FIGURES WERE WRITTEN AFTER THAT ARGUMENT WAS SETTLED AND DID NOT GET IT
+  APPLIED TO THEM, and both fail in the shape this table exists for: no error,
+  nothing reaching him, the system healthy throughout. The nightly embedding
+  sweep (`caller: 'embeddings'`) — a vendor that stopped answering takes the
+  semantic arm of `eugenia_search` out while the lexical one keeps returning
+  results, so half of `search_memory` can be gone for a fortnight with only a
+  `console.error` behind it. The channel census (`caller: 'channels'`) — a ladder
+  that stopped moving looks exactly like one with no reason to move. **BOTH
+  OUTCOMES, ALWAYS**: a meter that records only its successes reports a vendor
+  refusing every night as a table with nothing in it, which is the heartbeat's
+  lesson arriving a second time. `caller` is free text precisely so neither
+  needed a migration, and `agree.test.mjs` reads both call sites in both
+  functions because `sweepLine` is pure and cannot see whether anyone wrote its
+  answer down.
+
+  `sweepLine` PARTS THREE REPAIRS AND THE THIRD IS THE FALSE ALARM. A refusing
+  vendor throws and arrives as its own message; an unset key does NOT throw —
+  `embed()` returns null and the rows stay where they were — so *nothing filled
+  against a backlog* is an exact statement about the key rather than a guess.
+  A drained archive answers `0 filled, 0 left` and must accuse nobody, or the
+  line fires every night for the life of the deployment and stops being read.
 
 - **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
   no tools. `keepDraft` is the guard: a revision that comes back empty, apologetic
