@@ -123,14 +123,14 @@ sequence end to end over one that asserts on a function in isolation.
 ## Tests — one command, and run it
 
 ```sh
-npm ci        # once — jsdom, and nothing else
-npm test      # 473 tests, five suites
+npm ci        # once — jsdom and typescript, and nothing else
+npm test      # 475 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
 needs, stated in `package.json`'s `engines` and ENFORCED by `engine-strict=true`
 in `.npmrc`: without that, `npm ci` installs on any version and the floor is a
-note. Five suites, and the script globs `test/*.test.mjs` one level, so a test
+note. Six suites, and the script globs `test/*.test.mjs` one level, so a test
 in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
 of all four Edge Functions, of `_shared` and of `adherence.ts`; `app.test.mjs`
 boots `index.html` in jsdom with a recording Supabase stand-in that answers
@@ -138,6 +138,22 @@ per-table, so a query for her calendar cannot be served the trades; `agree.test.
 vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
 Google globals stubbed. `boot.mjs` and `gs.mjs` are the two harnesses, not
 suites.
+
+**`types.test.mjs` is the sixth, and it exists because a green suite is not
+evidence about a line no test reaches.** The consolidation shipped calling
+`res.json()` after the read it wrapped had moved into `readRows` — a free
+variable, in a function that is neither exported nor pure, so nothing here could
+be driven at it and 473 tests and a green deploy said fine. It runs `tsc` over
+the Edge Functions and keeps only the codes that are pure SCOPE facts: a name
+used that is declared nowhere, and a name declared that nothing uses. Not a
+whole typecheck, deliberately — under Node's lib a `Uint8Array` is not a
+`BlobPart`, and without `--strict` a discriminated union stops narrowing, so
+most of what a full run reports is a fact about the invocation. **The two
+questions it asks cannot go red for that reason, which is the whole basis for trusting a zero
+from it** — and it does not rely on that trust either: a file naming something
+that does not exist is compiled alongside the real ones on every run, and the
+assertion is that THAT was found and nothing else. `typescript` is a dev
+dependency, never a build step, and never runs over `index.html`.
 
 **`golden.test.mjs` is the fifth, and it asserts on what the other four do not
 name.** They test named things; a refactor breaks unnamed ones — an attribute

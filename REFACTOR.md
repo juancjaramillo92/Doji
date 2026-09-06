@@ -41,6 +41,7 @@ touches it:
 | the xlsx export's own output | one manual export |
 | retrieval quality | a golden set that does not exist |
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
+| an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | a red-team set that does not exist |
 
 ---
@@ -128,7 +129,7 @@ Every move gets a line, whether it was made or refused.
 | The tool loop had 32 catch blocks and no execution test | net | every tool driven against four kinds of refusal; proved red on four handlers losing their catch |
 | Fourteen lines of the prompt were stated twice | M6 | removed; a guard on both prose files proved red on each |
 | The ten blocks had no execution test | net | driven against four refusals AND against success; proved red six ways |
-| Twenty reads of her tables, hand-written | M3 | −29 lines; a guard NAMES the three functions allowed to call fetch directly |
+| Twenty reads of her tables, hand-written | M3 | −29 lines; a guard NAMES the three functions allowed to call fetch directly. **AND IT SHIPPED ONE BROKEN READ** — see §7 |
 
 ### Open
 
@@ -297,3 +298,22 @@ Its twin, for this pass:
 
 **A refactor you cannot prove changed nothing is a rewrite you have not admitted
 to.**
+
+And the sharpest instance of the rule this pass has produced, which arrived
+after it: folding twenty hand-written reads into `readRows` left `turnsSince`
+calling `res.json()` on a `res` that no longer existed. The suite went green,
+the deploy went green, the change was read — and the nightly pass then died with
+`res is not defined` at 22:00 and again on the 23:00 retry, which is the whole
+of her memory not growing for a day, reported to him twice by her own apology.
+
+**Every one of those three green signals was about something else.** The tests
+drive what is exported and pure, and `turnsSince` is neither; the deploy bundles
+without typechecking; and a reader comparing twenty near-identical call sites is
+the exact task a reader is worst at. The defect was not subtle — it was one word
+that no longer referred to anything, which is a question a parser settles in
+under a second and which nothing in this repository had ever asked.
+
+So the twin has a corollary. **A refactor's blind spot is not the hard cases; it
+is the cases nothing executes.** Twenty call sites, nineteen driven by something
+somewhere, and the one that was not is the one that broke. `types.test.mjs` asks
+the parser now — narrowly, and proving on every run that it can still answer.

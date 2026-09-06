@@ -72,7 +72,7 @@ doji_gmail_sync.gs                      Apps Script: broker email parser
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-package.json                            one dev dependency and the test script
+package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
 ```
 
@@ -3162,7 +3162,7 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 ## Tests
 
 ```sh
-npm ci               # once — jsdom, and nothing else
+npm ci               # once — jsdom and typescript, and nothing else
 npm test
 ```
 
@@ -3181,9 +3181,13 @@ down is the one at which everything in the repository actually runs;
 `--experimental-strip-types` is what lets the suite import the Edge Function's
 `.ts` directly, which is why the script exists rather than a bare `node --test`.
 It is a no-op from Node 22.18, where type stripping is on by default, and stays
-for the versions below that. `jsdom` is the only dependency in the repository
-and it is a dev dependency — the application itself still installs nothing and
-still has no build step.
+for the versions below that. `jsdom` and `typescript` are the only two
+dependencies in the repository and both are dev dependencies — the application
+itself still installs nothing and still has no build step. **`typescript` is
+never a build step and never runs over the app.** It reads the Edge Functions
+and answers two questions no test in here can — a name used that is declared
+nowhere, and a name declared that nothing uses. `test/types.test.mjs` says why
+it asks only those two.
 
 **The `no-cache` header names both paths.** `/` and `/index.html` are the same
 document, and only the second is ever typed — the home-screen shortcut and every
@@ -3210,6 +3214,7 @@ not run.
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does |
+| `test/types.test.mjs` | the two questions a compiler settles and nothing else here can: no Edge Function uses a name declared nowhere, and none declares a name nothing uses. Deliberately not a whole typecheck — under Node's lib a `Uint8Array` is not a `BlobPart`, which is true here and false on Deno, and without `--strict` a discriminated union stops narrowing; both are facts about the invocation rather than the code. The two questions it does ask are pure scope facts and cannot go red for either reason. A file naming something that does not exist goes into the same program on every run, so a clean answer is only reported once the reader has been seen to produce a dirty one |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
