@@ -2328,6 +2328,26 @@ and every one of those assertions passed while the constant was still there —
 so `agree.test.mjs` reads `postScheduled` for the call as well, which is the
 half that was missing.
 
+**Everything a cron secret reaches answers before it works, and there are two
+limits behind that.** The worker's wall clock is 150s on the Free plan and 400s
+on paid — that is what killed the first Sunday briefing, at 145.4 seconds of
+drafting, four and a half short of done. The **request idle timeout is 150s on
+every plan**: send the caller nothing for that long and the request is closed
+under you. So the same briefing, completing and delivering perfectly, still
+handed pg_net a `504 IDLE_TIMEOUT`.
+
+That is not cosmetic. `net._http_response` is the only record of a dispatch, and
+in it a good briefing and a call that never ran are the same row — so a watcher
+built on that table would report every working briefing as a failure, which is
+exactly the ordinary-day false alarm that gets a monitor ignored. Answering
+first makes a non-2xx there mean what it says, and the body names the job
+(`accepted: "pulse=1"`) because the table carries no URL.
+
+`?embed=1` is the only door that still waits, and the entitlement is derived
+rather than typed: its answer *is* its interface — you call it until it reports
+`left: 0` — and it is the one flag no cron job dispatches. `agree.test.mjs`
+holds that against `004_cron.sql`, so giving it a schedule fails the suite.
+
 **And the apology names the job that actually died.** Every scheduled failure said
 *"No briefing, jefe"* — including a pulse, the nightly pass, a release look and a
 trade event. So a consolidation that died at 22:00 reported itself to him as a
@@ -2341,8 +2361,9 @@ a word per job, and a test asserts no two of them are the same sentence.
 `ask()` logs one line per turn — the caller, the rounds it took, the effort, the
 tokens in and out, how many were served from cache, and how many web searches
 were billed. `postBriefing` adds the briefing's length in characters, and
-`?force=1` returns it as `chars` so a manual run shows it without opening the
-logs.
+the `<brief> briefing delivered` row carries it, which is where a manual run
+reads it now: `?force=1` answers before it works, like everything else a cron
+secret reaches, so its body says `accepted` rather than `chars`.
 
 None of this changes what she does. It exists because nothing else can see any
 of it: the spend cap on the Anthropic key is a ceiling rather than a meter, web

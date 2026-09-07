@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 486 tests, six suites
+npm test      # 487 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -909,10 +909,31 @@ compounds.
   cron half messages Telegram on failure and retries at 09:00–11:00 ET until
   `briefedToday()` sees the marker. Do not quietly remove either half.
 
-- **Her Telegram half must answer before it works, never after.** Telegram gives a
-  webhook about a minute and then redelivers — which would run a whole briefing
-  twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is what makes
-  the 200 immediate. The cron half has no such limit: pg_net never retries.
+- **BOTH HALVES ANSWER BEFORE THEY WORK, FOR TWO UNRELATED REASONS.** Telegram
+  gives a webhook about a minute and then redelivers — which would run a whole
+  briefing twice and bill for both. `background()` + `EdgeRuntime.waitUntil` is
+  what makes the 200 immediate.
+
+  THE CRON HALF WAS EXEMPT ON THE GROUND THAT pg_net NEVER RETRIES, WHICH IS
+  TRUE AND WAS NOT THE ONLY QUESTION. There are two limits and paying moves only
+  one: the worker's WALL CLOCK is 150s free and 400s paid — that is what killed
+  the Sunday briefing at 145.4s of drafting, four and a half seconds short of
+  finishing — and the REQUEST IDLE TIMEOUT is 150s on every plan. Send the caller
+  nothing for that long and the request is closed under you, so a briefing that
+  now completes and delivers perfectly still hands pg_net a 504.
+
+  That 504 is why this matters rather than being cosmetic. `net._http_response`
+  is the only place a dispatch is recorded, and there a good briefing and a call
+  that never ran are the same row — so any watcher built on it reports every
+  working briefing as a failure, which is the ordinary-day false alarm `008`
+  says gets a monitor ignored. Answering first makes a non-2xx there mean what
+  it says. **`?embed=1` IS THE ONE EXCEPTION AND IT IS DERIVED RATHER THAN
+  TYPED**: its answer IS its interface, since it is called until it reports
+  `left: 0`, and it is the only flag no cron job dispatches — which is the same
+  fact from the other side, and is what `agree.test.mjs` asserts it against.
+
+  The body NAMES the job (`accepted: "pulse=1"`), because `net._http_response`
+  carries no URL and the flag is otherwise unrecoverable from the row.
 
 ### The model call
 
