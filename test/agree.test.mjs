@@ -3337,6 +3337,69 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
 });
 
+/* ─── The watcher's own report can be lost, and it plans for that ───────────
+   THE FIRST MESSAGE IT EVER SENT DID NOT ARRIVE. pg_net reported `timed_out`
+   with the whole twenty-second budget spent in the TCP/SSL handshake and zero
+   milliseconds in the request — the connection to Telegram never opened. The
+   function had already settled the rows, because pg_net is ASYNCHRONOUS and it
+   could not learn otherwise inside the same call.
+
+   So a real outage would have been reported exactly once, into a dropped
+   connection, and never mentioned again: the silence this table exists to end,
+   reproduced inside the thing built to end it. Third time that shape has been
+   found here.
+
+   `reported_by` is the repair. A failure is marked with the request id of the
+   message that named it and is NOT settled; the next sweep looks that id up and
+   settles on a 2xx, or clears the mark and says it again on anything else.
+
+   Held structurally because nothing in this suite runs Postgres. The behaviour
+   itself was driven on a real server — reported, lost, said again, lost again,
+   said again, and retired past three hours — and each guard here was proved by
+   removing it and watching that sequence change.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a failure is settled when its report lands, not when it is sent', () => {
+  const sql = readFileSync(new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')
+    .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+
+  assert.match(sql, /alter table public\.dispatch add column if not exists reported_by bigint;/,
+    '009 is re-runnable, so a database that already has the table gets nothing ' +
+    'from the create — the column needs its own idempotent statement');
+
+  // Confirm and release, and both must exist: only one of them and a report
+  // either finishes rows it never delivered or never finishes them at all.
+  /* Anchored on the closing paren, not just the substring: `between 200 and 299
+     and false` contains the condition and never fires, and a loose match said
+     that was fine. */
+  assert.match(sql, /set settled = true[\s\S]{0,300}?r\.id = d\.reported_by[\s\S]{0,120}?status_code between 200 and 299\);/,
+    'nothing settles a row on a DELIVERED report, so the mark is set and never cleared');
+  assert.match(sql, /set reported_by = null[\s\S]{0,300}?r\.timed_out/,
+    'a report that timed out never releases the rows it named — which is the ' +
+    'exact failure this was written for, and it would be permanent');
+
+  // A row still waiting on a report must not be re-judged into a second message.
+  assert.match(sql, /d\.reported_by is null\s*\n\s*and d\.at <= now_/,
+    'dispatch_failures does not exclude rows already reported, so the same ' +
+    'outage arrives every ten minutes until it resolves');
+
+  /* AND THE SETTLE MUST SKIP WHAT WAS JUST SAID. Without this a sweep that
+     could NOT send — a Vault name misspelled, which is the failure this
+     repository has had twice — settles the outage anyway, and repairing the
+     name delivers nothing because there is nothing left to say. Driven both
+     ways on a real server: unsettled while the name is wrong, delivered on the
+     sweep after it is fixed. */
+  assert.match(sql, /where not settled and reported_by is null[\s\S]{0,200}?id not in \(select id from _said\)/,
+    'the settle does not exclude the rows just named, so a report that could ' +
+    'not be sent finishes them silently');
+
+  // Retried every ten minutes, then given up on — a row that can never be
+  // adjudicated would otherwise be re-reported for the life of the deployment.
+  assert.match(sql, /set settled = true\s*\n\s*where not settled and at <= now_ - interval '3 hours'/,
+    'nothing retires a row past the window where pg_net still has its response, ' +
+    'so an unresolvable failure is announced every ten minutes forever');
+});
+
 /* ─── Every pg_net dispatch is recorded, and none can break its own caller ───
    A 546 comes back BEFORE the worker exists, so the function writes no row,
    sends no apology and appears in no log of its own. `net._http_response` is

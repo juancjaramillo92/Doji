@@ -650,6 +650,22 @@ call is not called dead; three hours at the far end, because pg_net's own
 pruning makes every older row read as *no answer* — which on the one day the
 watcher itself stopped would bring back a hundred invented failures.
 
+**And the report itself can be lost — the first one ever sent was.** pg_net came
+back `timed_out`, the whole twenty-second budget spent in the TCP/SSL handshake
+and nothing at all in the request: the connection to Telegram never opened. The
+rows had already been settled, because pg_net is asynchronous and the function
+cannot learn otherwise inside the same call. A real outage would have been
+reported once, into a dropped connection, and never mentioned again.
+
+So `reported_by` carries the request id of the message that named a row, and the
+row is not settled until that message is known to have arrived. The next sweep
+settles on a `2xx` and clears the mark on anything else, so it is said again. A
+sweep that could not send at all — a Vault name misspelled, which this project
+has had happen twice — settles nothing, so repairing the name still delivers the
+outage. Past three hours it gives up, because a row that can never be
+adjudicated would be announced every ten minutes for the life of the
+deployment.
+
 **The two writers are judged differently, and conflating them is a monitor that
 cries wolf until it is ignored.** The poller runs every two minutes on a
 schedule, so its silence *is* evidence — nothing ran. The email function runs

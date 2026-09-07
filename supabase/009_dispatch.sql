@@ -48,8 +48,23 @@ create table if not exists public.dispatch (
   -- Judged and dealt with. Set for good runs and bad alike, so the table does
   -- not grow an unbounded tail of rows nobody will ever look at again, and so
   -- a failure is reported exactly once.
-  settled boolean not null default false
+  settled boolean not null default false,
+
+  -- THE REQUEST ID OF THE MESSAGE THAT NAMED THIS ROW, and a failure is not
+  -- settled until that message is known to have ARRIVED. pg_net is
+  -- asynchronous, so dispatch_watch cannot learn synchronously whether its own
+  -- report went out — and the first one it ever sent did not: the TLS handshake
+  -- to Telegram consumed a whole 20-second budget and the connection never
+  -- opened. Settling on SEND rather than on delivery means a real outage is
+  -- reported once, into a dropped connection, and never mentioned again. That
+  -- is the exact silence this table exists to end, reproduced inside the thing
+  -- built to end it.
+  reported_by bigint
 );
+
+-- The table is `if not exists`, so a database that already has it does not get
+-- the column from the statement above. This file is one that will grow.
+alter table public.dispatch add column if not exists reported_by bigint;
 
 -- The only read is "unsettled, oldest first", and the only other is a count
 -- per job over the last hour. A partial index on the first keeps the watcher's
@@ -93,6 +108,9 @@ as $$
     from public.dispatch d
     left join net._http_response r on r.id = d.id
    where not d.settled
+     -- A report naming this row is in flight. Saying it again on the next
+     -- sweep would be the same outage arriving every ten minutes.
+     and d.reported_by is null
      and d.at <= now_ - interval '15 minutes'
      and d.at >  now_ - interval '3 hours'
      and (r.id is null
@@ -153,20 +171,35 @@ declare
   n     int;
   token text;
   chat  text;
+  req   bigint;
 begin
-  -- Named once and read twice below, so the report and the settle cannot
-  -- disagree about which rows they are about.
-  create temporary table if not exists _judged
-    (id bigint, job text, at timestamptz, why text) on commit drop;
-  delete from _judged;
-  insert into _judged select * from public.dispatch_failures(now_);
+  /* ── FIRST, WHAT HAPPENED TO THE LAST REPORT ──────────────────────────────
+     Nothing else may be decided until this is, because a row still waiting on
+     a report is neither settled nor sayable. A message that ARRIVED finishes
+     its rows; one that timed out, was refused, or never opened a connection
+     releases them to be said again on this sweep. */
+  update public.dispatch d set settled = true
+   where not d.settled and d.reported_by is not null
+     and exists (select 1 from net._http_response r
+                  where r.id = d.reported_by
+                    and r.status_code between 200 and 299);
 
-  select string_agg(format('· %s at %s — %s', f.job,
-                           to_char(f.at at time zone 'America/New_York', 'HH24:MI'),
-                           f.why), E'\n' order by f.at),
-         count(*)
-    into told, n
-    from _judged f
+  update public.dispatch d set reported_by = null
+   where not d.settled and d.reported_by is not null
+     and exists (select 1 from net._http_response r
+                  where r.id = d.reported_by
+                    and (r.timed_out or r.status_code is null
+                         or r.status_code not between 200 and 299));
+
+  -- Named once and read three times below, so the message, the mark and the
+  -- settle cannot disagree about which rows they are about.
+  create temporary table if not exists _said (id bigint, line text) on commit drop;
+  delete from _said;
+
+  insert into _said
+  select f.id, format('· %s at %s — %s', f.job,
+                      to_char(f.at at time zone 'America/New_York', 'HH24:MI'), f.why)
+    from public.dispatch_failures(now_) f
    where not public.dispatch_repeats(f.job)
       or (select count(*) from public.dispatch d
            left join net._http_response r on r.id = d.id
@@ -174,33 +207,52 @@ begin
             and d.at > now_ - interval '1 hour'
             and (r.id is null or r.status_code not between 200 and 299)) >= 3;
 
+  select string_agg(line, E'\n' order by id), count(*) into told, n from _said;
+
   if n > 0 then
     select decrypted_secret into token from vault.decrypted_secrets
      where name = 'eugenia_bot_token';
     select decrypted_secret into chat  from vault.decrypted_secrets
      where name = 'telegram_chat_id';
 
-    -- A missing secret must not stop the settle below: unsettled rows would be
-    -- re-judged every ten minutes forever, and the repair for a missing Vault
-    -- name is not a table that grows while nobody is told either way.
     if token is not null and chat is not null then
-      perform net.http_post(
+      req := net.http_post(
         url     := 'https://api.telegram.org/bot' || token || '/sendMessage',
         headers := jsonb_build_object('Content-Type', 'application/json'),
         body    := jsonb_build_object(
                      'chat_id', chat,
                      'text', 'Something scheduled never ran, jefe.' || E'\n\n' || told),
         timeout_milliseconds := 20000);
+
+      /* MARKED, NOT SETTLED. The next sweep looks this id up and decides; until
+         then these rows are out of the way without being finished with. */
+      update public.dispatch set reported_by = req
+       where id in (select id from _said);
     else
+      -- Left unsettled deliberately: a missing Vault name is repaired, and the
+      -- outage is then still there to be told about.
       raise warning 'dispatch_watch: eugenia_bot_token or telegram_chat_id is not in Vault';
     end if;
   end if;
 
-  -- Every row old enough to judge, not only the failures: a run that answered
-  -- 200 is finished with, and one too old to have a response left is a fact
-  -- nobody can recover.
+  /* ── THEN EVERYTHING THAT NEEDS NO MESSAGE ────────────────────────────────
+     A run that answered 2xx is finished with. A failure that was suppressed as
+     one lost poll is finished with too — the threshold counts rows rather than
+     unsettled ones, so settling it cannot hide the third failure in an hour. */
   update public.dispatch set settled = true
-   where not settled and at <= now_ - interval '15 minutes';
+   where not settled and reported_by is null
+     and at <= now_ - interval '15 minutes'
+     and id not in (select id from _said);
+
+  /* ── AND GIVING UP IS EXPLICIT ────────────────────────────────────────────
+     Past three hours nothing can be adjudicated: pg_net has pruned the
+     response, so a failure looks the same as a success and a report that never
+     landed looks the same as one that did. Retried every ten minutes until
+     here, then retired — because a row that can never resolve would otherwise
+     be re-reported for the life of the deployment, and the message that cries
+     every ten minutes is the one nobody reads. */
+  update public.dispatch set settled = true
+   where not settled and at <= now_ - interval '3 hours';
 
   return coalesce(n, 0);
 end;
