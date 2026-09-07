@@ -65,6 +65,7 @@ supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her sens
 supabase/006_plan.sql                   where a trade was aimed, off the open position
 supabase/007_semantic.sql               her memory searchable by meaning
 supabase/008_sync_health.sql            the heartbeat the two silent writers mark
+supabase/009_dispatch.sql               what pg_net sent, and what came back
 supabase/009_trades_grants.sql          which columns the app may write
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -605,6 +606,49 @@ failures worth catching. `last_ok` going cold answers "running and failing" and
 it. Six hours is chosen against the poll's two-minute schedule and the 08:00
 delivery — shorter and a brief outage reads as a fault, longer and a Monday
 outage reaches him on Tuesday.
+
+**And the heartbeat cannot see a call that never ran, which is what
+`009_dispatch.sql` is for.** `heartbeat()` is written by a function that
+executed. When Supabase refuses a worker it answers `546 WORKER_RESOURCE_LIMIT`
+*before* the function exists — so nothing marks, nothing throws, no apology is
+sent, and the function's own log has no entry at all. The only witness is a row
+in `net._http_response`, which pg_net prunes within hours and nobody reads. A
+Sunday briefing went missing for two hours that way, and was found by hand.
+
+**`net.http_post` returns the request id and all six callers threw it away.**
+That id is the only link to the response row, and that row carries **no url** —
+so what a failed request was *for* cannot be recovered afterwards. The ledger
+captures it at the moment of the call: one row per dispatch, the job named, and
+`agree.test.mjs` counts `net.http_post` calls against ledger rows so a seventh
+site cannot be added unwatched.
+
+**The watcher lives in Postgres, and that is the point rather than a
+convenience.** The thing that fails is the Edge Function; a monitor that
+reported a refused worker by asking that same function to send a message would
+share its subject's failure mode. `dispatch_watch` runs every ten minutes and
+posts to Telegram directly, reading `eugenia_bot_token` and `telegram_chat_id`
+from Vault — the third and fourth names in this system that are one value under
+two spellings, and `verify.sql` asks whether both resolve.
+
+**A single lost poll is an ordinary day and is not reported.** The poller runs
+720 times daily with the next one two minutes away, so naming every refused
+worker would put three or four messages a day in front of him about a sync that
+healed before he read them. `dispatch_repeats` is the same split `healthLine`
+makes below, arriving for a second reason: a job that comes round on its own is
+evidence only in *quantity* — three failures in an hour — and a job that does
+not is evidence alone. The hourly job carries the briefing and the nightly pass;
+the trade event has no retry anywhere in this system; Gladys's has none either.
+
+**The ledger may not break the trigger it sits in.** Both trigger sites post
+into a variable first and record it behind `exception when others then null`,
+because they fire inside the UPDATE that set the column — a raise there would
+fail the journal write itself. It was proved by renaming the table away and
+watching the trade still write and all four messages still dispatch.
+
+**The judging window has both ends.** Fifteen minutes at the near end, so a slow
+call is not called dead; three hours at the far end, because pg_net's own
+pruning makes every older row read as *no answer* — which on the one day the
+watcher itself stopped would bring back a hundred invented failures.
 
 **The two writers are judged differently, and conflating them is a monitor that
 cries wolf until it is ignored.** The poller runs every two minutes on a
@@ -3334,7 +3378,7 @@ tidy.
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
-| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; the nightly sweep and the channel census against `recordRun`, both outcomes each, since a meter that records only its successes reports a vendor refusing every night as a table with nothing in it; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does; and every `uses:` across the three workflows, which must name a commit rather than a tag anyone could repoint |
+| `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; every `net.http_post` in the numbered SQL against 009's ledger and its job constraint, so a dispatch site cannot be added unwatched, and both trigger sites for the exception guard that keeps a ledger failure from failing the journal write it fires inside; the nightly sweep and the channel census against `recordRun`, both outcomes each, since a meter that records only its successes reports a vendor refusing every night as a table with nothing in it; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does; and every `uses:` across the three workflows, which must name a commit rather than a tag anyone could repoint |
 | `test/types.test.mjs` | the two questions a compiler settles and nothing else here can: no Edge Function uses a name declared nowhere, and none declares a name nothing uses. Deliberately not a whole typecheck — under Node's lib a `Uint8Array` is not a `BlobPart`, which is true here and false on Deno, and without `--strict` a discriminated union stops narrowing; both are facts about the invocation rather than the code. The two questions it does ask are pure scope facts and cannot go red for either reason. A file naming something that does not exist goes into the same program on every run, so a clean answer is only reported once the reader has been seen to produce a dirty one |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants built in its shape, and `syncPepperstone`'s three outcomes — which label a thread ends up with |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |

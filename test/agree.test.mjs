@@ -3337,6 +3337,81 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
 });
 
+/* ─── Every pg_net dispatch is recorded, and none can break its own caller ───
+   A 546 comes back BEFORE the worker exists, so the function writes no row,
+   sends no apology and appears in no log of its own. `net._http_response` is
+   the only witness, it carries no url, and pg_net prunes it within hours — so
+   what a failed request was FOR is unrecoverable unless the request id is
+   captured at the moment it is made. 009's ledger is that capture, and a
+   dispatch site added without it is a job that can vanish silently, which is
+   the whole thing this was built to stop.
+
+   THE JOB NAMES ARE HELD AGAINST THE CHECK CONSTRAINT rather than a literal
+   here, so the six exist in one place and a seventh has to be declared before
+   it can be used.
+
+   AND THE TWO TRIGGER SITES MUST NOT BE ABLE TO BREAK THEIR OWN WRITE. They
+   fire inside the UPDATE that set the column, so anything raised in them takes
+   that write with it — a tap answering a journal question would fail because a
+   monitor could not record that a message had been sent. The post happens
+   first, into a variable; the ledger insert is best-effort behind an exception
+   block. Same trade 008 makes, same words.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every pg_net dispatch records a job the ledger declares', () => {
+  const files = readdirSync(new URL('../supabase', import.meta.url))
+    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
+
+  const declared = new Set(
+    [...readFileSync(new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')
+      .match(/dispatch_job_check check \(job in \(([\s\S]*?)\)\)/)[1]
+      .matchAll(/'([a-z-]+)'/g)].map(m => m[1]));
+  assert.ok(declared.size >= 5,
+    `009 declares ${declared.size} jobs — the reader has gone blind`);
+
+  const used = [];
+  let posts = 0;
+  for (const f of files) {
+    // 009 posts to Telegram itself; that is the report, not a dispatch, and it
+    // is the one call that must NOT be in the ledger it would be reporting on.
+    if (f.startsWith('009')) continue;
+    const sql = readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')
+      .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+    posts += (sql.match(/net\.http_post\(/g) || []).length;
+    /* The job is the LAST argument of either shape — `), 'poller';` closing the
+       select, or `values (req, 'gladys')` in a trigger. Matched that way rather
+       than as the first quoted word after the insert, which is 'x-doji-key' in
+       the headers and was what the first draft of this test read. */
+    for (const m of sql.matchAll(
+        /insert into public\.dispatch[\s\S]{0,900}?(?:\),|values \(req,)\s*'([a-z-]+)'\s*[;)]/g)) {
+      used.push([f, m[1]]);
+    }
+  }
+
+  assert.equal(used.length, posts,
+    `${posts} calls to net.http_post and ${used.length} of them reach the ledger — ` +
+    `the difference is a job that can be refused a worker with nothing anywhere ` +
+    `to say it ever existed`);
+  assert.ok(posts >= 6, `only ${posts} dispatch sites found — the reader has gone blind`);
+
+  for (const [f, job] of used) {
+    assert.ok(declared.has(job),
+      `${f} records dispatches as '${job}', which 009's check constraint does not ` +
+      `allow — every row it writes will be rejected and the job goes unwatched`);
+  }
+});
+
+test('a trigger that cannot record its dispatch still makes it', () => {
+  for (const [f, sql] of [['002_gladys.sql', GLADYS_SQL], ['005_eugenia_senses.sql', SENSES_SQL]]) {
+    assert.match(sql, /req := net\.http_post\(/,
+      `${f} inlines net.http_post into the ledger insert, so a ledger that ` +
+      `refuses the row takes the message with it`);
+    assert.match(sql, /insert into public\.dispatch \(id, job\) values \(req, '[a-z-]+'\);\s*\n\s*exception when others then null;/,
+      `${f} records its dispatch unguarded — this fires inside the UPDATE that ` +
+      `set the column, so a raise here fails the journal write itself`);
+  }
+});
+
 /* ─── Everything a cron job dispatches answers before it works ───────────────
    TWO LIMITS, AND PAYING MOVES ONLY ONE. The worker's wall clock is 150s free
    and 400s paid; that is what killed the Sunday briefing at 145.4s of drafting,

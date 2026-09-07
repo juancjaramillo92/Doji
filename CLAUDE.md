@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 487 tests, six suites
+npm test      # 489 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1173,6 +1173,42 @@ a blank.
   and cannot see a call site. A monitor that is wrong on an ordinary day gets
   ignored, and an ignored monitor is worse than none.
 
+- **`009_dispatch.sql` watches the half `008` cannot see, and it lives in
+  Postgres because the thing it watches is the Edge Function.** A 546 comes back
+  BEFORE the worker exists: no `eugenia_runs` row, no apology, nothing in the
+  function's own log, and the only witness is a row in `net._http_response` that
+  pg_net prunes within hours. That is how a Sunday briefing went missing for two
+  hours until a person noticed. `heartbeat()` cannot catch it — it is written by
+  a function that RAN — and a watcher that reported a refused worker by asking
+  that same function to send a message would share the failure mode of its
+  subject. So this one posts to Telegram directly.
+
+  `net.http_post` RETURNS the request id and all six callers threw it away. That
+  id is the only link to the response row, which carries NO URL — so what a
+  failed request was for is unrecoverable without capturing it. The ledger is
+  that capture, and `agree.test.mjs` counts `net.http_post` calls against ledger
+  rows so a seventh site cannot be added unwatched.
+
+  **A SINGLE LOST POLL IS AN ORDINARY DAY AND MUST NOT BE REPORTED.** The poller
+  runs 720 times a day with the next one two minutes away; naming every refused
+  worker would put three or four messages a day in front of him about a sync
+  that healed before he read them, which is how a monitor teaches someone to
+  swipe it away. `dispatch_repeats` is the same split `healthLine`'s `SCHEDULED`
+  makes, arriving for a second reason — a job that comes round on its own is
+  evidence only in QUANTITY (three in an hour), and a job that does not is
+  evidence alone. The hourly job, the trade event and Gladys are one-shot.
+
+  **THE LEDGER MAY NOT BREAK THE TRIGGER IT SITS IN.** Both trigger sites post
+  into a variable FIRST and record it behind `exception when others then null`,
+  because they fire inside the UPDATE that set the column — a raise there fails
+  the journal write itself. Proved by renaming the table away and watching the
+  trade still write and all four messages still dispatch.
+
+  The window has BOTH ends. Judged at fifteen minutes so a slow call is not
+  called dead, and not at all past three hours, because pg_net's own pruning
+  makes every old row read as `no answer` — which on the day the watcher itself
+  stopped would come back as a hundred invented failures.
+
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file.
@@ -1189,8 +1225,9 @@ a blank.
 
 ## Two names that are one value
 
-Both have already caused a silent failure, and both fail the same way — the
-wrong spelling reads as empty and something else happens quietly:
+Four pairs now. The first two have already caused a silent failure, and every
+one of them fails the same way — the wrong spelling reads as empty and something
+else happens quietly:
 
 - **`doji_cron_secret`** in Vault, **`DOJI_CRON_SECRET`** in Edge secrets.
   Postgres compares the Vault name case-sensitively. Gladys's trigger shipped
@@ -1201,6 +1238,14 @@ wrong spelling reads as empty and something else happens quietly:
   for months while the legacy service_role JWT quietly served every request
   through a fallback.
 
-Before adding a third: `verify.sql` catches a database-side mismatch, and a 503
+- **`eugenia_bot_token`** and **`telegram_chat_id`** in Vault, `EUGENIA_BOT_TOKEN`
+  and `TELEGRAM_CHAT_ID` in Edge secrets. `dispatch_watch` reads the Vault pair
+  to message him directly, which is what keeps the watchdog off the function it
+  watches. A wrong spelling here yields null, the watcher falls through to a
+  `raise warning` nobody sees and settles the rows anyway — silent for exactly
+  the same reason a healthy system is. `verify.sql` asks whether both resolve,
+  which is the check this section demands before a name like these is added.
+
+`verify.sql` catches a database-side mismatch, and a 503
 at boot catches a secrets-side one. Neither catches a name that is merely
 *wrong*, so check a new one against the surface that stores it.

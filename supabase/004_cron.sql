@@ -50,6 +50,7 @@ select cron.schedule(
   'doji-mcp-sync',
   '*/2 * * * *',
   $$
+    insert into public.dispatch (id, job)
     select net.http_post(
       url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-mcp-sync',
       headers := jsonb_build_object(
@@ -60,7 +61,7 @@ select cron.schedule(
       -- get_balance can outrun pg_net's default, and a request cut off mid-flight
       -- is a poll that wrote nothing. Gladys's trigger sets the same bound.
       timeout_milliseconds := 20000
-    );
+    ), 'poller';
   $$
 );
 
@@ -78,6 +79,7 @@ select cron.schedule(
   'doji-eugenia',
   '0 * * * *',
   $$
+    insert into public.dispatch (id, job)
     select net.http_post(
       url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia',
       headers := jsonb_build_object(
@@ -88,7 +90,7 @@ select cron.schedule(
       -- 20s would cut it off mid-thought; pg_net is fire-and-forget, so this
       -- bound only has to outlast the work.
       timeout_milliseconds := 300000
-    );
+    ), 'eugenia';
   $$
 );
 
@@ -115,6 +117,7 @@ select cron.schedule(
   'doji-eugenia-spine',
   '5,20,35,50 * * * *',
   $$
+    insert into public.dispatch (id, job)
     select net.http_post(
       url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?release=1',
       headers := jsonb_build_object(
@@ -123,7 +126,7 @@ select cron.schedule(
                                     where name = 'doji_cron_secret')),
       -- A look is a search and a short generation, nowhere near a briefing.
       timeout_milliseconds := 120000
-    );
+    ), 'eugenia-spine';
   $$
 );
 
@@ -149,6 +152,7 @@ select cron.schedule(
   'doji-eugenia-price',
   '12,27,42,57 * * * *',
   $$
+    insert into public.dispatch (id, job)
     select net.http_post(
       url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?move=1',
       headers := jsonb_build_object(
@@ -158,7 +162,7 @@ select cron.schedule(
       -- A quote through the poller, then at most one search and a short
       -- generation. The spine's bound, for the same shape of work.
       timeout_milliseconds := 120000
-    );
+    ), 'eugenia-price';
   $$
 );
 
@@ -168,8 +172,38 @@ select cron.schedule(
 -- asks of it — and it is not where a failure is diagnosed anyway, because it
 -- records that the SQL ran, not what the function answered. net._http_response
 -- is the one that carries the answer, and Supabase prunes that itself.
+-- ─── The watcher over everything above ─────────────────────────────────────
+-- EVERY JOB IN THIS FILE CAN BE REFUSED A WORKER AND NOTHING WOULD SAY SO. A
+-- 546 comes back before the function exists, so it writes no row, sends no
+-- apology and appears in no log of its own; pg_net records it in
+-- `net._http_response` and prunes it within hours. That is how a Sunday
+-- briefing went missing for two hours before a person noticed.
+--
+-- TEN MINUTES rather than the hour, because the thing it reports is a message
+-- that did not arrive and the value of knowing decays fast. 009's window judges
+-- at fifteen, so a dispatch is adjudicated on the second sweep after it and
+-- never on the first — which is what keeps a slow-but-fine call from being
+-- called a failure.
+--
+-- It writes no dispatch row of its own. A watcher that watched itself would
+-- either report its own success forever or report nothing when it stopped, and
+-- the thing that notices THIS job dying is the same thing that notices any of
+-- the rest: a message that should have come and did not.
+select cron.schedule(
+  'doji-dispatch-watch',
+  '*/10 * * * *',
+  $$ select public.dispatch_watch() $$
+);
+
+-- Two archives, one job. `dispatch` gains a row per poll — seven hundred and
+-- twenty a day from the poller alone — so settled rows past a month go the same
+-- way cron's own history does. Failures are settled too, so a month is what is
+-- readable after the fact rather than forever.
 select cron.schedule(
   'purge-cron-history',
   '0 3 * * *',
-  $$ delete from cron.job_run_details where end_time < now() - interval '7 days' $$
+  $$
+    delete from cron.job_run_details where end_time < now() - interval '7 days';
+    delete from public.dispatch where settled and at < now() - interval '30 days';
+  $$
 );
