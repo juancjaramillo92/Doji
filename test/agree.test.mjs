@@ -2187,6 +2187,53 @@ test('the sweep and the census both reach the table, however they end', () => {
     'question it exists to answer');
 });
 
+/* ─── Both meters run on the nights nothing else does ────────────────────────
+   They were added behind postConsolidation's early return, so on a day nobody
+   spoke — two of the last four — neither happened at all. A dead embedding
+   vendor could survive every quiet night with the meter that exists to catch
+   it reporting nothing, and the channel census, which CLAUDE.md calls the only
+   meter on the one claim this design rests on, had the same hole.
+
+   ASSERTED AS ONE EXIT RATHER THAN AS A BRANCH SHAPE. What actually went wrong
+   is that a `return` sat between the read and the meters, and any second
+   `return` in this function puts it back — whatever the surrounding code looks
+   like by then. The census cannot be hoisted to the top instead: it is taken
+   after the pass because the pass is the only thing that can move a rung.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the nightly meters sit past every branch, not behind an early return', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function postConsolidation(');
+  const body = src.slice(at, src.indexOf('\n}\n', at))
+    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  // Every `return`, not only the ones that open a line: `if (!day.length) return …`
+  // is the same defect and was the shape that got past a line-anchored count.
+  const returns = (body.match(/\breturn\b/g) || []).length;
+  assert.equal(returns, 1,
+    `postConsolidation has ${returns} returns — a quiet night takes the short ` +
+    `one, and every meter written after it is skipped on exactly the nights ` +
+    `there is nothing else to notice`);
+
+  // And they really are after it: the last return is the last thing here.
+  const census = body.indexOf('recordChannels()');
+  const sweep  = body.indexOf('fillEmbeddings(');
+  const exit   = body.search(/\breturn\b/);
+  assert.ok(census > -1 && sweep > -1, 'postConsolidation no longer runs both meters');
+  assert.ok(census < exit && sweep < exit,
+    'a meter sits after the only return, so it never runs at all');
+
+  /* AND THE CENSUS STAYS AFTER THE PASS. Hoisting it above the model call would
+     also make it run on a quiet night, and would record the rungs as they stood
+     BEFORE the only thing in this system that can move one. The rung would then
+     always be one night stale, which is invisible in the column it exists for. */
+  assert.ok(body.indexOf('await ask(') < census,
+    'the census is taken before the pass, so it reports the ladder as it was ' +
+    'about to stop being');
+});
+
 test('the search tool names the function the database actually defines', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');

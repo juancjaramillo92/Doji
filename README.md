@@ -2379,6 +2379,18 @@ exactly like one that had no reason to move — and a rung is read by comparing
 nights, which a line discarded within hours can never be. `caller` is free text
 precisely so neither of these needed a migration.
 
+**Both of these shipped behind an early return**, which is the failure they
+exist to end arriving inside the fix for it. `postConsolidation` returns at once
+on a day nobody spoke, and the two meters sat after that return — so on exactly
+the nights when nothing else happens, neither ran. Quiet nights are ordinary:
+two of the four before this was found were `nothing said`, and a dead embedding
+vendor could have survived all of them with the meter reporting nothing at all.
+The quiet day is a branch now and the meters sit past it. What the test asserts
+is that `postConsolidation` has exactly **one** `return` — the branch shape will
+change, and a second return is what puts the hole back. The census may not be
+hoisted to the top instead: it is taken after the pass because the pass is the
+only thing that can move a rung.
+
 **And a job that dies before its first model call now leaves a row too.** `ask()`
 records a failed turn, so the table could answer *how often does a model call
 die* — and could say nothing whatever about a job that never reached one. Two
