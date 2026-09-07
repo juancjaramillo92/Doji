@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 489 tests, six suites
+npm test      # 490 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1208,6 +1208,21 @@ a blank.
   called dead, and not at all past three hours, because pg_net's own pruning
   makes every old row read as `no answer` — which on the day the watcher itself
   stopped would come back as a hundred invented failures.
+
+  **AND ITS OWN REPORT CAN BE LOST, WHICH THE FIRST ONE EVER SENT WAS.** pg_net
+  answered `timed_out` with the whole twenty-second budget spent in the TCP/SSL
+  handshake and zero milliseconds in the request — the connection to Telegram
+  never opened. The function had already settled the rows, because pg_net is
+  ASYNCHRONOUS and it cannot learn otherwise inside the same call. So a real
+  outage would have been reported once, into a dropped connection, and never
+  mentioned again: the silence this table exists to end, arriving inside the
+  thing built to end it, which is the third time that shape has been found.
+  `reported_by` holds the request id of the message that named a row; the next
+  sweep settles on a 2xx and clears the mark on anything else, so it is said
+  again. A sweep that could NOT send — a Vault name misspelled — settles
+  nothing, or repairing the name would deliver an outage nobody is still
+  recording. Past three hours it gives up, because a row that can never be
+  adjudicated would otherwise be announced every ten minutes forever.
 
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
