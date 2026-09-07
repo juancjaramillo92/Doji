@@ -3918,10 +3918,40 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
          throws there — and that throw would be every scheduled run. */
       const raw = (await req.text()).trim();
       const sent = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
+      const url  = new URL(req.url);
+
+      /* THE ONE DOOR WHOSE ANSWER IS THE INTERFACE, so it alone still works
+         before it replies. `?embed=1` is called until it answers `left: 0`;
+         handed a 200 up front it would be a loop with nothing to read. It is
+         also the only flag NO cron job calls, which is the same fact from the
+         other side and is what agree.test.mjs holds this against. */
+      if (url.searchParams.get("embed") === "1") return await postScheduled(url);
+
+      /* EVERYTHING SCHEDULED ANSWERS BEFORE IT WORKS, and the reason is a
+         SECOND limit that Pro does not move. The worker's wall clock is 150s
+         free and 400s paid — that one killed the Sunday briefing at 145.4s of
+         drafting, four and a half seconds short. The request idle timeout is
+         150s on EVERY plan: send the caller nothing for that long and the
+         request is closed under you. So a briefing that now completes still
+         hands pg_net a 504, having delivered perfectly.
+
+         That 504 is not cosmetic. It is indistinguishable, in the only table
+         that records dispatches, from a call that never ran — and a monitor
+         that cannot tell a working briefing from a dead one is worse than
+         none. Answering first makes a non-2xx there mean what it says.
+
+         The Telegram half does this to beat a redelivery, which is why the
+         cron half was exempt; this is a different reason arriving at the same
+         shape. `background()` is unchanged and already guards the work.
+
+         The body NAMES the job, because `net._http_response` carries no URL
+         and the flag is otherwise unrecoverable from the row. */
       if (sent?.trade) {
-        return await postTradeEvent(String(sent.trade), String(sent.event ?? 'opened'));
+        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened')));
+        return json({ ok: true, accepted: "trade event" });
       }
-      return await postScheduled(new URL(req.url));
+      background(postScheduled(url));
+      return json({ ok: true, accepted: url.search.slice(1) || "hourly" });
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {

@@ -3337,6 +3337,70 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
 });
 
+/* ─── Everything a cron job dispatches answers before it works ───────────────
+   TWO LIMITS, AND PAYING MOVES ONLY ONE. The worker's wall clock is 150s free
+   and 400s paid; that is what killed the Sunday briefing at 145.4s of drafting,
+   four and a half seconds short of finishing. The REQUEST idle timeout is 150s
+   on every plan — send the caller nothing for that long and the request is
+   closed under you — so the same briefing, now completing and delivering
+   perfectly, still hands pg_net a 504.
+
+   That 504 is the thing this test exists for. In `net._http_response`, the only
+   place a dispatch is recorded, it is indistinguishable from a call that never
+   ran at all. A watcher built on that table would report every good briefing as
+   a failure, which is the ordinary-day false alarm that gets a monitor ignored.
+   Answering first is what makes a non-2xx there mean what it says.
+
+   `?embed=1` is the single exception and it is the one flag NO cron job calls —
+   which is how this is asserted, against 004 rather than against a literal.
+   Its answer IS its interface: it is called until it reports `left: 0`.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a cron-dispatched call answers first, and only the backfill door waits', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('secretMatches(fromCron, CRON_SECRET)');
+  assert.ok(at > -1, 'doji-eugenia no longer authorises a cron caller');
+  const branch = src.slice(at, src.indexOf('\n    return json({ ok: false, error: "unauthorized"', at))
+    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  for (const fn of ['postScheduled', 'postTradeEvent']) {
+    assert.match(branch, new RegExp(`background\\(${fn}\\(`),
+      `${fn} is awaited rather than backgrounded, so any run past 150 seconds ` +
+      `answers pg_net with a 504 that reads exactly like a call that never ran`);
+  }
+
+  // The trade event has no door and no reader, so it has no reason to wait.
+  assert.doesNotMatch(branch, /return await postTradeEvent\(/,
+    'the trade event is awaited — a fill that takes a model call would 504, ' +
+    'and it is the one message with no retry anywhere behind it');
+
+  // postScheduled keeps exactly one synchronous call site, and the next
+  // assertion is what says which one it is allowed to be.
+  const sync = (branch.match(/return await postScheduled\(/g) || []).length;
+  assert.equal(sync, 1,
+    `postScheduled is awaited at ${sync} call sites — one is the backfill door ` +
+    `and any other is a scheduled job that can still collect a 504`);
+
+  /* THE EXCEPTION IS DERIVED, NOT TYPED. Any flag a cron job dispatches must go
+     the answer-first way; `embed` is the only one no job calls, which is what
+     entitles it to wait. Add a cron job for it and this fails, which is the
+     point — the door would then be able to 504 like the rest. */
+  const dispatched = new Set(
+    [...CRON_SQL.matchAll(/functions\/v1\/[\w-]+\?(\w+)=\w+/g)].map(m => m[1]));
+  const waits = [...branch.matchAll(/get\("(\w+)"\) === "1"\) return await/g)].map(m => m[1]);
+
+  assert.deepEqual(waits, ['embed'],
+    `the doors that wait for their work are ${JSON.stringify(waits)} — only the ` +
+    `backfill earns that, because only its answer is what the caller came for`);
+  for (const flag of waits) {
+    assert.ok(!dispatched.has(flag),
+      `?${flag}=1 waits for its work AND has a cron job in 004 — that job will ` +
+      `collect a 504 on every run long enough to matter`);
+  }
+});
+
 test('a vendor that refuses costs the vector, never the note or the turn', () => {
   /* embed() THROWS ON PURPOSE, so that `?embed=1` — a door run by hand and read
      for its answer — reports WHY nothing was filled rather than `ok: true,
