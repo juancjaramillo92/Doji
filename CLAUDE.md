@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 485 tests, six suites
+npm test      # 486 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -863,6 +863,19 @@ compounds.
   needed a migration, and `agree.test.mjs` reads both call sites in both
   functions because `sweepLine` is pure and cannot see whether anyone wrote its
   answer down.
+
+  AND BOTH SHIPPED BEHIND AN EARLY RETURN, WHICH IS THE FAILURE THEY EXIST TO
+  END ARRIVING INSIDE THE FIX FOR IT. `postConsolidation` returns at once on a
+  day nobody spoke, and the two meters sat after that return — so on exactly the
+  nights when nothing else happens, neither ran. Quiet nights are ordinary: two
+  of the four before this was found were `nothing said`, and a dead embedding
+  vendor could have survived all of them with the meter reporting nothing at
+  all. The quiet day is a BRANCH now and the meters sit past it, and what
+  `agree.test.mjs` asserts is that `postConsolidation` has exactly ONE `return`:
+  the branch shape will change, a second return is what puts the hole back. The
+  census may NOT be hoisted to the top to solve it — it is taken after the pass
+  because the pass is the only thing that can move a rung, and a test holds that
+  ordering too.
 
   AND A JOB THAT DIES BEFORE ITS FIRST MODEL CALL LEAVES A ROW TOO. `ask()`
   records a failed turn, so the table could answer *how often does a model call

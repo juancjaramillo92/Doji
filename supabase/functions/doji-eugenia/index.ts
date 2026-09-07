@@ -2985,14 +2985,25 @@ export async function feedbackBlock(): Promise<string> {
 
 async function postConsolidation(): Promise<Response> {
   const day = await turnsSince(CONSOLIDATE_HOURS);
-  // A day nobody spoke on has nothing to distil, and a call that says so costs
-  // a model round to be told what an empty array already said. Recorded all the
-  // same: a quiet day is a pass that ran and decided nothing, and without the
-  // row the 23:00 retry would run it again to reach the same conclusion.
-  if (!day.length) {
-    await recordRun({ caller: 'consolidation', ok: true, detail: 'nothing said' });
-    return json({ ok: true, skipped: "nothing said" });
-  }
+
+  /* A day nobody spoke on has nothing to distil, and a call that says so costs
+     a model round to be told what an empty array already said. Recorded all the
+     same: a quiet day is a pass that ran and decided nothing, and without the
+     row the 23:00 retry would run it again to reach the same conclusion.
+
+     IT IS A BRANCH RATHER THAN AN EARLY RETURN, AND THAT IS THE WHOLE POINT OF
+     THE SHAPE. The two meters below are about the SYSTEM rather than about the
+     day — whether the embedding vendor still answers, and where the five
+     channels stand — and behind an early return they were skipped on exactly
+     the nights nothing else happened. Quiet nights are ordinary: two of the
+     last four were `nothing said`. So a dead vendor could have survived every
+     one of them with the meter reporting nothing at all, which is the failure
+     that meter was added to end.
+
+     The census cannot simply move to the top instead: it is taken AFTER the
+     pass because the pass is the only thing that can move a rung, and read
+     before it would record the state the pass was about to change. */
+  if (day.length) {
 
   /* THE WEEK GOES IN TOO, and without it the pass was asked to notice something
      it could not see. What earns a note includes "he has started doing
@@ -3016,13 +3027,18 @@ async function postConsolidation(): Promise<Response> {
   const said = await ask([{ role: 'user', content: asked }], 'high', 'consolidation',
                          CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
+
+  } else {
+    await recordRun({ caller: 'consolidation', ok: true, detail: 'nothing said' });
+  }
+
   await recordChannels();
 
   /* AND THE SWEEP, WHICH IS BOOKKEEPING RATHER THAN PART OF THE PASS. It runs
-     here because this job already runs nightly and already reads the day, so it
-     needs no schedule of its own — and it runs AFTER, wrapped, because a vendor
-     that is down must not report itself to him as a pass that failed. The rows
-     it misses are still waiting tomorrow. */
+     here because this job already runs nightly, so it needs no schedule of its
+     own — and it runs AFTER, wrapped, because a vendor that is down must not
+     report itself to him as a pass that failed. The rows it misses are still
+     waiting tomorrow. */
   try {
     const notes = await fillEmbeddings('eugenia_notes', 'note');
     const turns = await fillEmbeddings('eugenia_turns', 'content');
@@ -3035,7 +3051,11 @@ async function postConsolidation(): Promise<Response> {
     await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
   }
 
-  return json({ ok: true, consolidated: day.length });
+  /* ONE EXIT, and it is what the test asserts rather than the branch shape: a
+     second `return` in this function is how the meters got skipped the first
+     time, and it would be again. */
+  return day.length ? json({ ok: true, consolidated: day.length })
+                    : json({ ok: true, skipped: "nothing said" });
 }
 
 /* THE ONE CLAIM IN THIS SYSTEM THAT HAD NO METER.
