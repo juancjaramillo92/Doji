@@ -363,6 +363,7 @@ set search_path = public
 as $$
 declare
   kind text;
+  req  bigint;
 begin
   -- OPENED is an insert the poller made; CLOSED is fill_time arriving. Both are
   -- facts about the broker's side, and neither can be produced by the app or by
@@ -373,7 +374,7 @@ begin
     kind := 'closed';
   end if;
 
-  perform net.http_post(
+  req := net.http_post(
     url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia',
     headers := jsonb_build_object(
                  'Content-Type', 'application/json',
@@ -385,6 +386,18 @@ begin
     -- fire-and-forget either way; the bound only has to outlast the work.
     timeout_milliseconds := 60000
   );
+
+  /* THE LEDGER MUST NOT BE ABLE TO BREAK THE TRIGGER. This fires inside the
+     UPDATE that set the column off, so anything raised here takes the write
+     with it — a tap answering a journal question would fail because a monitor
+     could not record that a message had been sent. That is the trade 008 makes
+     for the same reason and in the same words: a monitor that can fail the work
+     it monitors is worse than none. The message has already been dispatched by
+     the line above; what is at risk is only knowing whether it arrived. */
+  begin
+    insert into public.dispatch (id, job) values (req, 'trade-event');
+  exception when others then null;
+  end;
   return null;
 end;
 $$;

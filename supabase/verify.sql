@@ -430,7 +430,7 @@ from (values
      where pubname = 'supabase_realtime' and tablename = 'trades'),
    '1'),
 
-  -- FIVE, AND THIS ROW HAS BEEN WRONG BEFORE. It said three while 004 defined
+  -- SIX, AND THIS ROW HAS BEEN WRONG BEFORE. It said three while 004 defined
   -- four, so a correct database reported a mismatch and the row that exists to
   -- catch a missing job was the thing that looked broken. Count 004's
   -- cron.schedule calls when this changes.
@@ -441,12 +441,12 @@ from (values
   -- target database — Supabase always has it — but a row that can only be run
   -- somewhere is a row that cannot answer anywhere else, and this file's whole
   -- job is to be runnable against a database that is wrong.
-  ('five cron jobs, all active',
+  ('six cron jobs, all active',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from cron.job where active',
              false, true, '')))[1]::text
      where to_regclass('cron.job') is not null),
-   '5'),
+   '6'),
 
   -- THE SECRET NAME, WHICH USED TO BE READ BY EYE AND IS THE FAILURE THIS
   -- SYSTEM HAS HAD TWICE. Postgres compares the Vault name case-sensitively, so
@@ -503,6 +503,35 @@ from (values
   ('RLS on eugenia_loops',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_loops')),
    'true'),
+  -- ─── 009, the dispatch ledger ───────────────────────────────────────────
+  -- RLS IS THE WHOLE OF WHAT KEEPS THIS TABLE OFF THE PUBLISHABLE KEY, and it
+  -- carries no policy on purpose: nothing in the browser has any business
+  -- reading which scheduled calls failed.
+  ('RLS on dispatch',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.dispatch')),
+   'true'),
+
+  -- THE TWO VAULT NAMES THE WATCHER READS, and they are the third and fourth
+  -- pair in this system that is one value under two spellings. Postgres
+  -- compares the Vault name case-sensitively, so the upper-case Edge spelling
+  -- matches nothing here, yields null, and makes dispatch_watch fall through to
+  -- its warning while settling the rows anyway — a watcher that is silent for
+  -- the same reason a healthy system is. This row is what asks.
+  ('the watcher can read eugenia_bot_token from Vault',
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from vault.decrypted_secrets'
+             || ' where name = ''eugenia_bot_token''',
+             false, true, '')))[1]::text
+     where to_regclass('vault.decrypted_secrets') is not null),
+   '1'),
+  ('the watcher can read telegram_chat_id from Vault',
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from vault.decrypted_secrets'
+             || ' where name = ''telegram_chat_id''',
+             false, true, '')))[1]::text
+     where to_regclass('vault.decrypted_secrets') is not null),
+   '1'),
+
   ('RLS on eugenia_feedback',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_feedback')),
    'true'),
@@ -582,11 +611,13 @@ from (values
   ('every declared index exists',
    (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
       from pg_indexes where schemaname = 'public' and indexname in (
+        'dispatch_job_at','dispatch_unsettled',
         'eugenia_calendar_at','eugenia_calendar_due','eugenia_loops_open',
         'eugenia_notes_embedding','eugenia_notes_kind_id_desc','eugenia_notes_search',
         'eugenia_notes_trgm','eugenia_runs_at_desc','eugenia_runs_caller_at',
         'eugenia_turns_embedding','eugenia_turns_id_desc','eugenia_turns_search',
         'eugenia_turns_trgm','trades_user_open_day')),
+   'dispatch_job_at,dispatch_unsettled,' ||
    'eugenia_calendar_at,eugenia_calendar_due,eugenia_loops_open,' ||
    'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
    'eugenia_notes_trgm,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
@@ -742,7 +773,7 @@ limit 10;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
 -- A SQL editor displays the result of the LAST statement, and this is it — so
--- the 63 checks that answer "does the database match the files" ran and were
+-- the 66 checks that answer "does the database match the files" ran and were
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --

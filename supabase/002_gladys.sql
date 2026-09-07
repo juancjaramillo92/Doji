@@ -37,6 +37,7 @@ as $$
 declare
   secret  text;
   payload jsonb;
+  req     bigint;
 begin
   -- Lower case, and read from the poller's own cron job rather than guessed:
   -- 004_cron.sql reads exactly this name. Postgres compares it case-sensitively
@@ -85,7 +86,7 @@ begin
         'followed_tp',    old.followed_tp));
   end if;
 
-  perform net.http_post(
+  req := net.http_post(
     url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-gladys',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-doji-key', secret),
     body    := payload,
@@ -94,6 +95,18 @@ begin
     -- mid-flight is a message that never arrives.
     timeout_milliseconds := 20000
   );
+
+  /* THE LEDGER MUST NOT BE ABLE TO BREAK THE TRIGGER. This fires inside the
+     UPDATE that set the column off, so anything raised here takes the write
+     with it — a tap answering a journal question would fail because a monitor
+     could not record that a message had been sent. That is the trade 008 makes
+     for the same reason and in the same words: a monitor that can fail the work
+     it monitors is worse than none. The message has already been dispatched by
+     the line above; what is at risk is only knowing whether it arrived. */
+  begin
+    insert into public.dispatch (id, job) values (req, 'gladys');
+  exception when others then null;
+  end;
   return null;
 end $$;
 
