@@ -2783,9 +2783,24 @@ export const feedbackKeyboard = (day: string) => ({
    characters by hand.
 
    So it is read once more before it is sent, against the rules it was written
-   to — the length, the first sentence being true only today, a term redefined
-   after it was already explained, a chain missing a link. One extra round at
+   to — the length, the first sentence being true only today, a term built at a
+   rung that no longer needs it, a chain missing a link. One extra round at
    medium effort on one artifact a day.
+
+   IT IS HANDED HIS NOTES AND THE MAP, AND IT WAS ASKED TO ENFORCE THEM WITHOUT
+   THEM. Its last check is whether the briefing obeys his standing instructions,
+   which are in notes it was never given, and its second was whether a term had
+   already been explained — a fact about last week that a reader of one message
+   cannot possibly hold. Both read as working rules and neither could fire: the
+   first was skipped, and the second was answered from the only evidence in the
+   room, which is the mechanism sitting in the paragraph being judged. So the
+   pass that runs LAST cut the build-up the writer had just been told to put in,
+   every morning, and what he read was the term bare — the exact failure the
+   ladder exists to prevent, arriving after the ladder had been obeyed.
+
+   Both blocks are already awaited in postBriefing, so this costs no read and no
+   round trip. `agree.test.mjs` holds the call site, because a critic missing
+   them still returns a briefing and the briefing still looks right.
 
    IT CANNOT MAKE THINGS WORSE, AND THAT IS ENFORCED RATHER THAN TRUSTED. A
    critic that returns nothing, returns an apology, or returns something twice
@@ -2800,10 +2815,11 @@ export function keepDraft(draft: string, revised: string): boolean {
   return t.length < CRITIC_FLOOR || t.length > draft.length * 2;
 }
 
-async function critique(draft: string): Promise<string> {
+async function critique(draft: string, notes: string, channels: string): Promise<string> {
   try {
-    const revised = await ask([{ role: 'user', content: `${CRITIC}\n\n${draft}` }],
-                              'medium', 'critic', CRITIC_TOOLS);
+    const revised = await ask(
+      [{ role: 'user', content: `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}` }],
+      'medium', 'critic', CRITIC_TOOLS);
     if (keepDraft(draft, revised)) {
       console.log(`doji-eugenia: critic rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
       return draft;
@@ -2837,7 +2853,7 @@ async function postBriefing(due: Brief): Promise<Response> {
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
-  const brief = await critique(draft);
+  const brief = await critique(draft, notes, channels);
 
   /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT, and it matters more
      now that the cap is off. The prompt holds the market half near nine hundred

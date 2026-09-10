@@ -1581,10 +1581,19 @@ is not hypothetical: unmeasured, it grew by a sixth and the way anyone found out
 was by counting the characters by hand.
 
 So it is read once more before it goes, at `medium` effort with no tools, against
-the rules it was written to — is the first sentence only true today, was a term
-redefined after it was already explained, is the chain missing a link, is there a
-forward call in it, is it inside the budget, does it obey his standing
+the rules it was written to — is the first sentence only true today, is a term
+built at a rung that no longer needs building, is the chain missing a link, is
+there a forward call in it, is it inside the budget, does it obey his standing
 instructions. It returns the briefing, not notes about it.
+
+**It is handed his notes and the channel map, because two of those checks read
+them.** The last one names his standing instructions, which live in notes; the
+second names the ladder. Given neither, the first check is skipped and the second
+is answered from the only evidence in the room — the mechanism sitting in the
+paragraph being judged — so a build-up the map had just required came out as a
+redefinition, last, every morning. What arrived was the term bare: shorter,
+fluent, correct, and with the teaching removed. Both blocks are already read for
+the briefing itself, so the second pass costs nothing extra.
 
 **It cannot make things worse, and that is enforced rather than trusted.** A
 revision that comes back empty, apologetic, or twice the length is a critic that

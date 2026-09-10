@@ -2791,6 +2791,61 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
   }
 });
 
+/* ─── The pass that runs last reads what the writer was told ────────────────
+   The critic is the only thing that touches the briefing after it is written,
+   and two of its five checks are about him rather than about the prose: whether
+   the briefing obeys his standing instructions, and whether a term is being
+   built at a rung that no longer needs it. Both were asked of a message that
+   carried the rules and the draft and nothing else.
+
+   Neither fails loudly, and the second fails UPWARD, which is why it survived.
+   Asked whether a term had already been explained, a reader holding one message
+   answers from the only evidence in the room — the mechanism sitting in the
+   paragraph being judged — so the build-up the map had just required was cut as
+   a redefinition, last, every morning. The briefing that arrives is shorter,
+   fluent and correct, and every rule about what she may SAY still passes. The
+   only thing missing is the teaching, which is the one thing it is for.
+
+   So the assertion is the call site rather than the prompt: the prose can say
+   the notes are above it, and a call that stops passing them changes nothing
+   anyone can see.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the critic is handed his notes and the map it is asked to enforce', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('async function critique(');
+  assert.ok(at > -1, 'doji-eugenia no longer has critique()');
+  const body = src.slice(at, src.indexOf('\n}', at))
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+  // In the message, not merely in the signature: a parameter the content string
+  // never interpolates is a critic reading the rules with none of the inputs.
+  const content = body.match(/content:\s*`([\s\S]*?)`/);
+  assert.ok(content, 'critique() no longer builds its message from a template literal');
+  for (const block of ['notes', 'channels']) {
+    assert.match(content[1], new RegExp(`\\$\\{${block}\\}`),
+      `the critic's message no longer carries ${block} — it is asked to judge the ` +
+      `briefing against his instructions and the ladder while holding neither, and ` +
+      `it answers anyway`);
+  }
+
+  /* AND THE DRAFT STAYS LAST. The prompt names it at the end of the message and
+     the blocks are prose that reads exactly like a briefing; put the draft first
+     and "return the briefing itself and nothing else" points at his notes. */
+  assert.ok(content[1].indexOf('${draft}') > content[1].indexOf('${channels}'),
+    'the draft is no longer the last thing in the critic message — the prompt says ' +
+    'it is at the end, and the blocks above it read like prose it could return');
+
+  // And postBriefing hands over the two it has already awaited, rather than the
+  // critic opening two reads of its own on the far side of a briefing.
+  const brief = src.slice(src.indexOf('async function postBriefing('));
+  assert.match(brief.slice(0, brief.indexOf('\n}')), /critique\(draft,\s*notes,\s*channels\)/,
+    'postBriefing no longer passes the notes and the map it already holds into ' +
+    'critique() — the critic is back to judging his instructions without them');
+});
+
 /* ─── The senses, and the copies they add ────────────────────────────────────
    005 brings five tables, a trigger and a hybrid search, and with them a fresh
    crop of vocabularies stated in two places: a `kind` the tool offers and the

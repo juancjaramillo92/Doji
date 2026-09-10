@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 490 tests, six suites
+npm test      # 491 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -899,6 +899,22 @@ compounds.
   no tools. `keepDraft` is the guard: a revision that comes back empty, apologetic
   or twice the length is a critic that failed, and the draft goes instead. A critic
   that could make the briefing worse would be worse than none.
+
+  A RULE IT RESTATES MUST BE HANDED THE INPUTS THAT RULE READS, and two of its
+  five were not. It is asked whether the briefing obeys his standing
+  instructions — which are notes it was never given — and it was asked whether a
+  term had already been explained, which is a fact about last week that a reader
+  of one message cannot hold. The first check was simply skipped. The second
+  fails UPWARD, which is why it survived: answered from the only evidence in the
+  room, the mechanism sitting in the paragraph being judged reads as a
+  redefinition, so the pass that runs LAST cut the build-up `PITCH` had just
+  required, every morning, and what reached him was the term bare. Shorter,
+  fluent, correct, and with the teaching taken out of it — the ladder's own
+  failure arriving after the ladder had been obeyed. It is handed `notesBlock()`
+  and `channelsBlock()` now, both already awaited in `postBriefing`, and the
+  redefinition check is written against the rung instead of against a memory.
+  `agree.test.mjs` reads the call site, since a critic holding neither still
+  returns a briefing that looks right.
 
 - **The apology names the job.** Every scheduled failure used to say "No
   briefing", including the nightly pass, whose real symptom is that her memory
