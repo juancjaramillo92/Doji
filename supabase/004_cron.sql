@@ -1,10 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — everything that runs on a timer
 -- ───────────────────────────────────────────────────────────────────────────
--- Five jobs: the poller every two minutes, Eugenia every hour, her two
--- quarter-hourly senses — the event spine and the price mark — and a nightly
--- sweep of pg_cron's own history. One file, because "what fires on its own in
--- this system" should be one place to look rather than one file per feature.
+-- Seven jobs: the poller every two minutes, Eugenia every hour, her two
+-- quarter-hourly senses — the event spine and the price mark — the two watchers
+-- over what was dispatched and what it cost, and a nightly sweep of pg_cron's
+-- own history. One file, because "what fires on its own in this system" should
+-- be one place to look rather than one file per feature.
 --
 -- THE POLLER'S JOB WAS NOT IN THIS REPOSITORY UNTIL NOW, and it is the most
 -- load-bearing scheduled thing here — every trade arrives through it. Its
@@ -193,6 +194,29 @@ select cron.schedule(
   'doji-dispatch-watch',
   '*/10 * * * *',
   $$ select public.dispatch_watch() $$
+);
+
+-- ─── The watcher over the clock the workers run on ─────────────────────────
+-- THE HALF NEITHER 008 NOR 009 CAN SEE. Both ask whether something ran; this
+-- asks how much of its budget it spent, and it is the only one of the three
+-- that can speak before the failure rather than after it. Once a briefing
+-- crosses the 400s wall clock the worker is destroyed mid-draft: pg_net already
+-- has its 200, `ask()` never reaches its catch, no apology is sent, and all
+-- three retries redo the same too-long work. There is nothing left to report
+-- with, which is why the warning has to come while there is still room.
+--
+-- HOURLY, AND THE HOUR IS IRRELEVANT. 010 speaks at most once per New York
+-- civil day and works that date out itself, so this needs no UTC expression and
+-- is not wrong for half the year. Offset off :00 because that is when the
+-- briefing is dispatched, which is the heaviest moment of the hour and the one
+-- thing it is watching.
+--
+-- It writes no dispatch row, for the reason doji-dispatch-watch does not: a
+-- watcher in the ledger would be judged by the sweep it is part of.
+select cron.schedule(
+  'doji-pace-watch',
+  '37 * * * *',
+  $$ select public.pace_watch() $$
 );
 
 -- Two archives, one job. `dispatch` gains a row per poll — seven hundred and

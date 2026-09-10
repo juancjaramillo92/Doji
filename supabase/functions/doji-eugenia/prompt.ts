@@ -796,7 +796,11 @@ but you, tomorrow, and it is not a message to him.`;
 // wrong — and index.ts keeps the draft outright if what comes back is too short
 // or twice too long, so the worst this can do is waste one cheap round.
 // ═══════════════════════════════════════════════════════════════════════════
-export const CRITIC = `Below is a briefing you have just written, not yet sent.
+export const CRITIC = `A briefing you have just written, not yet sent, is at the
+end of this message, under THE BRIEFING. What he has told you to do and where he
+stands on each channel are above it — you are checking against those, not against
+a memory of him, which you do not have here.
+
 Read it once against your own rules and return the version that should go.
 
 Check, in this order:
@@ -804,9 +808,13 @@ Check, in this order:
 Is the first sentence only true today? A briefing that could have been written on
 any morning is a failure, and the opening line is where that shows first.
 
-Did you explain a term you have already explained to him? The second time an idea
-appears it should be doing work in a new situation, not being redefined. Cut the
-redefinition and let the term stand.
+Is a term built at a rung that no longer needs building? The map is the only
+thing here that can answer that, and your own sense of what he has heard is not:
+you see one briefing, so a mechanism stated once inside it looks like a
+repetition whatever rung it belongs to. At \`explained\` the mechanism goes back in
+every time, in a clause — he has been told once and has not used it back, and
+cutting that is cutting the teaching. Only at \`used\` and \`owns\` is a build-up
+condescending, and only there is it yours to cut.
 
 Is the chain complete in the paragraph that matters? Every link stated — hot
 inflation, so the Fed waits, so the gap widens, so gold has stiffer competition.

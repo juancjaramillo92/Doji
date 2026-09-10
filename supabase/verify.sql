@@ -430,10 +430,11 @@ from (values
      where pubname = 'supabase_realtime' and tablename = 'trades'),
    '1'),
 
-  -- SIX, AND THIS ROW HAS BEEN WRONG BEFORE. It said three while 004 defined
+  -- SEVEN, AND THIS ROW HAS BEEN WRONG BEFORE. It said three while 004 defined
   -- four, so a correct database reported a mismatch and the row that exists to
-  -- catch a missing job was the thing that looked broken. Count 004's
-  -- cron.schedule calls when this changes.
+  -- catch a missing job was the thing that looked broken. It is no longer
+  -- counted by hand: agree.test.mjs reads 004's cron.schedule calls and holds
+  -- this number against them, which is what stops the repeat.
   --
   -- Read through query_to_xml for the reason the seed checks are: `cron.job`
   -- lives in an extension's schema, and on a database where pg_cron is not
@@ -441,18 +442,19 @@ from (values
   -- target database — Supabase always has it — but a row that can only be run
   -- somewhere is a row that cannot answer anywhere else, and this file's whole
   -- job is to be runnable against a database that is wrong.
-  ('six cron jobs, all active',
+  ('seven cron jobs, all active',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from cron.job where active',
              false, true, '')))[1]::text
      where to_regclass('cron.job') is not null),
-   '6'),
+   '7'),
 
   -- THE SECRET NAME, WHICH USED TO BE READ BY EYE AND IS THE FAILURE THIS
   -- SYSTEM HAS HAD TWICE. Postgres compares the Vault name case-sensitively, so
   -- the upper-case spelling matches nothing, yields null and makes the caller
   -- give up without raising anything. Every calling job must name the lower-case
-  -- one; purge-cron-history is a DELETE and presents no secret.
+  -- one. The other three reach nothing outside this database and present none:
+  -- purge-cron-history is a DELETE, and the two watchers are function calls.
   ('all four calling jobs read the lower-case Vault secret',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from cron.job where command like ''%''''doji_cron_secret''''%''',
@@ -530,6 +532,26 @@ from (values
              || ' where name = ''telegram_chat_id''',
              false, true, '')))[1]::text
      where to_regclass('vault.decrypted_secrets') is not null),
+   '1'),
+
+  /* ─── 010, the watcher over the clock ────────────────────────────────────
+     A CRON JOB CALLING A FUNCTION THAT IS NOT THERE FAILS IN THE ONE PLACE
+     NOBODY READS. The schedule exists, the count above is right, and every
+     firing raises into cron.job_run_details — which this file's own
+     housekeeping prunes weekly and nothing ever looks at. So the pair of
+     watchers is asked for by name: 009 applied without 010 is a database that
+     passes every other row here while the newest monitor has never once run.
+
+     Asked out of pg_proc rather than by signature, for the reason the whole of
+     this file is: a written-out signature that stops resolving raises 42883 and
+     takes every check below it down with it. */
+  ('dispatch_watch exists for its cron job',
+   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'dispatch_watch'),
+   '1'),
+  ('pace_watch exists for its cron job',
+   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'pace_watch'),
    '1'),
 
   ('RLS on eugenia_feedback',
@@ -773,7 +795,7 @@ limit 10;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
 -- A SQL editor displays the result of the LAST statement, and this is it — so
--- the 66 checks that answer "does the database match the files" ran and were
+-- the 68 checks that answer "does the database match the files" ran and were
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --
