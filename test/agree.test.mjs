@@ -3490,12 +3490,19 @@ test('every pg_net dispatch records a job the ledger declares', () => {
   const used = [];
   let posts = 0;
   for (const f of files) {
-    // 009 posts to Telegram itself; that is the report, not a dispatch, and it
-    // is the one call that must NOT be in the ledger it would be reporting on.
-    if (f.startsWith('009')) continue;
     const sql = readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')
       .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
-    posts += (sql.match(/net\.http_post\(/g) || []).length;
+    /* A POST ADDRESSED TO TELEGRAM IS A REPORT, NOT A DISPATCH, and it is the
+       one call that must NOT reach the ledger it is reporting on: a watcher
+       that recorded its own message would be judged by the next sweep and end
+       up reporting itself. Parted by where the call GOES rather than by which
+       file it is in — the exemption was `f.startsWith('009')`, which is a
+       statement about a filename, and 010's watcher would have had to be named
+       here to stay honest. The url is the first argument, so it is inside the
+       call rather than merely near it. */
+    for (const tail of sql.split('net.http_post(').slice(1)) {
+      if (!/api\.telegram\.org/.test(tail.slice(0, 300))) posts += 1;
+    }
     /* The job is the LAST argument of either shape — `), 'poller';` closing the
        select, or `values (req, 'gladys')` in a trigger. Matched that way rather
        than as the first quoted word after the insert, which is 'x-doji-key' in
@@ -3528,6 +3535,139 @@ test('a trigger that cannot record its dispatch still makes it', () => {
       `${f} records its dispatch unguarded — this fires inside the UPDATE that ` +
       `set the column, so a raise here fails the journal write itself`);
   }
+});
+
+/* ─── The clock the workers run on, and the three copies that watch it ───────
+   010 is the only monitor here that can speak BEFORE the failure, and it has to
+   be, because after the failure there is nothing left to speak with: a briefing
+   killed at the wall clock hands pg_net its 200 before it dies, so 009's ledger
+   records a healthy dispatch, `ask()` never reaches its catch, no apology is
+   sent, and all three retries redo the same too-long work. Three monitors, all
+   green, and nothing reaches him.
+
+   Everything below is a copy that nothing else compares. The caller it looks
+   for is written in TypeScript and read in SQL; the number of cron jobs is
+   declared in 004 and asserted in verify.sql; the ceiling is quoted back to him
+   in the message it decides. Each fails silently on its own — a watcher looking
+   for a caller nobody writes reports a briefing missing every single day, which
+   is the false alarm that gets a monitor muted in a week.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const PACE_SQL = readFileSync(new URL('../supabase/010_pace.sql', import.meta.url), 'utf8');
+
+test('the row 010 looks for is the row postBriefing writes', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  // The two kinds, off the type rather than off a literal here.
+  const kinds = [...src.match(/export type Brief = ([^;]+);/)[1]
+    .matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
+  assert.deepEqual(kinds, ['sunday', 'weekday'],
+    `Brief now names ${kinds.join(', ')} — 010 asks for a briefing per kind and ` +
+    `would stop asking about one of them`);
+
+  // And the suffix, which is half of the caller and the half a rename touches.
+  assert.match(src, /caller: `\$\{due\} briefing delivered`/,
+    'postBriefing no longer writes `<kind> briefing delivered` — 010 reads that ' +
+    'caller to decide whether a briefing reached him, so it would report every ' +
+    'day as a day nothing arrived');
+  assert.match(PACE_SQL, /owed \|\| ' briefing delivered'/,
+    '010 no longer builds the caller it looks for out of the kind and that ' +
+    'suffix — the two halves of this name are in two languages with no build ' +
+    'step between them');
+
+  /* THE KINDS 010 CAN PUT IN FRONT OF THAT SUFFIX, held against the type. A
+     third Brief that 010 never assigns to `owed` is a briefing whose absence
+     is unwatched, and it looks exactly like one that never fails. */
+  const owed = [...PACE_SQL.match(/owed := case([\s\S]*?)end;/)[1]
+    .matchAll(/then '(\w+)'/g)].map(m => m[1]).sort();
+  assert.deepEqual(owed, kinds,
+    `010 judges the absence of ${owed.join(', ')} where Brief names ` +
+    `${kinds.join(', ')} — the difference is a briefing that can go missing unwatched`);
+});
+
+test('010 states its ceiling once and quotes that one', () => {
+  const ms = Number(PACE_SQL.match(/ceiling_ms constant int := (\d+);/)[1]);
+  assert.ok(ms > 0, '010 no longer declares ceiling_ms — the reader has gone blind');
+
+  /* THE MESSAGE MAY NOT SPELL THE NUMBER OUT AGAIN. It is quoted back to him in
+     the sentence the threshold decides, and written twice the threshold moves
+     while the sentence keeps naming the old one — a warning that is arithmetic
+     about one ceiling and prose about another. */
+  const body = PACE_SQL.slice(PACE_SQL.indexOf('lines := lines || format(\n      \'Longest'));
+  assert.ok(!new RegExp(`\\b${ms / 1000}s\\b`).test(body.slice(0, 600)),
+    `010's message writes ${ms / 1000}s as a literal beside a ceiling it already ` +
+    `holds in ceiling_ms — move the threshold and the sentence still names the old one`);
+  assert.match(PACE_SQL, /ceiling_ms \/ 1000/,
+    '010 no longer interpolates ceiling_ms into what it tells him');
+
+  // And the share is a share, not a second ceiling.
+  assert.match(PACE_SQL, /speak_at\s+constant int := ceiling_ms \*/,
+    '010 no longer derives its threshold from the ceiling — the two would drift, ' +
+    'and a threshold above the ceiling is a watcher that can never speak');
+
+  /* AND THE PROSE HOLDS THE SAME NUMBER. It is a fact about the platform rather
+     than about this repository, stated in the file that explains why the cron
+     half answers before it works — so a plan change moves both or neither. */
+  const claude = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');
+  assert.ok(claude.includes(`${ms / 1000}s paid`),
+    `CLAUDE.md does not name ${ms / 1000}s as the paid wall clock that 010 watches ` +
+    `— one of the two has been changed without the other`);
+});
+
+test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
+  const cron = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8')
+    .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+  const scheduled = (cron.match(/cron\.schedule\(/g) || []).length;
+  assert.ok(scheduled >= 5, `read ${scheduled} schedules out of 004 — the reader has gone blind`);
+
+  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const stated = Number(verify.match(
+    /\('\w+ cron jobs, all active',[\s\S]*?'(\d+)'\),/)[1]);
+
+  /* THIS ROW HAS BEEN WRONG BEFORE and its own comment says so: it read three
+     while 004 defined four, so the check that exists to catch a missing job was
+     itself what looked broken on a correct database. It was fixed by hand and
+     left to be counted by hand again, which is the same defect with a longer
+     fuse. */
+  assert.equal(stated, scheduled,
+    `verify.sql expects ${stated} cron jobs and 004 schedules ${scheduled} — run ` +
+    `against a correct database this row reports a fault, and a job dropped from ` +
+    `004 would slip past it`);
+
+  // And the job it schedules has to name a function 010 actually creates.
+  const called = [...cron.matchAll(/select public\.(\w+)\(\)/g)].map(m => m[1]);
+  for (const fn of called) {
+    assert.ok(new RegExp(`create or replace function public\\.${fn}\\(`)
+                .test(PACE_SQL + readFileSync(
+                  new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')),
+      `004 schedules public.${fn}(), which no numbered file creates — every ` +
+      `firing raises into cron.job_run_details, which this file's own ` +
+      `housekeeping prunes and nobody reads`);
+  }
+});
+
+test('010 marks the day said only where the message was actually sent', () => {
+  const body = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_watch('));
+
+  /* THE ROW IS THE GUARD, which is what makes this ordering load-bearing rather
+     than tidy. `pace_watch` speaks at most once a New York day and decides that
+     by looking for its own row — so a row written after a send that could not
+     be made marks the day as said and swallows the warning for good. Repairing
+     a misspelled Vault name would then deliver silence, which is 009's lesson
+     arriving here: found by running it with the name wrong, since nothing else
+     exercises that half. */
+  const post = body.indexOf('net.http_post(');
+  const mark = body.indexOf("values ('pace', false");
+  const warn = body.indexOf('raise warning');
+  assert.ok(post > -1 && mark > -1 && warn > -1,
+    'pace_watch no longer has all three of a post, a said-row and a warning');
+  assert.ok(post < mark,
+    'pace_watch records the day as said before it has posted — a Vault name that ' +
+    'does not resolve would mark the day and swallow the warning for good');
+  assert.ok(mark < warn,
+    'the said-row has moved past the branch that could not send — it would be ' +
+    'written on a failed send, which is the same silence from the other side');
 });
 
 /* ─── Everything a cron job dispatches answers before it works ───────────────

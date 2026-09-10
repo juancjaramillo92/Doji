@@ -67,6 +67,7 @@ supabase/007_semantic.sql               her memory searchable by meaning
 supabase/008_sync_health.sql            the heartbeat the two silent writers mark
 supabase/009_dispatch.sql               what pg_net sent, and what came back
 supabase/009_trades_grants.sql          which columns the app may write
+supabase/010_pace.sql                   how much of its clock a briefing spends
 supabase/verify.sql                     read-only: does the database match these?
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -375,6 +376,9 @@ be single-sourced at run time:
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
 | the **columns of `eugenia_runs`** | the table, and the object literals `recordRun` is called with — a key with no column is a row PostgREST refuses whole, so the meter goes quiet |
 | **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the eight predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
+| the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union it interpolates, and `010`'s `owed \|\| ' briefing delivered'` — the two halves are in two languages with no build step between them, and a watcher looking for a caller nobody writes reports a briefing missing every single day |
+| the **number of scheduled jobs** | the `cron.schedule` calls in `004` and the count `verify.sql` asserts — a row that has been wrong once already, reporting a correct database as broken |
+| the **paid worker wall clock** | `ceiling_ms` in `010`, which is also what its message quotes back, and the sentence in `CLAUDE.md` explaining why the cron half answers before it works — a fact about the plan rather than about this repository, so it moves in both places or neither |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
 | the **project ref** | every `net.http_post` URL in the SQL, plus `index.html`, `config.toml`, the deploy workflow and the Apps Script — the middle two name it without a URL |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -665,6 +669,54 @@ has had happen twice — settles nothing, so repairing the name still delivers t
 outage. Past three hours it gives up, because a row that can never be
 adjudicated would be announced every ten minutes for the life of the
 deployment.
+
+**And neither of those can see how much of its budget a run spent, which is
+`010_pace.sql`.** Both ask whether something ran. This asks how close it came to
+not being allowed to finish, and it is the only one of the three that can speak
+*before* the failure rather than after it — because after it there is nothing
+left to speak with. Since the cron half began answering before it works, a
+briefing killed at the 400s wall clock has already handed pg_net a `200`: the
+ledger records a healthy dispatch, `ask()` never reaches its catch so no failure
+row is written, `postScheduled`'s apology never runs, and the 09:00, 10:00 and
+11:00 retries redo the same too-long work and die the same way. Three monitors,
+all green, and nothing reaches him — the Sunday `009` was built after, arriving
+again through the door that was opened to fix it.
+
+`eugenia_runs.ms` has been written on every model call since `005` and read by
+nobody. Three unattended days put the briefing at 170.6s, 162.3s and 238.7s:
+sixty per cent of the ceiling on an ordinary Wednesday, swinging two to one on
+work that looks identical from outside.
+
+**It watches from both sides, and the threshold is argued from the spread rather
+than chosen.** `pace_line` speaks when the longest run of the last seven days
+passes three quarters of the ceiling — 300s. The briefing's own swing between
+its fastest and slowest ordinary morning is 77s, so an ordinary heavy day cannot
+reach it, and the 100s still left when it fires is more than one whole swing:
+early enough to act on rather than a description of something already dying. The
+window is seven days because the week has to contain a Sunday briefing, the
+longest and rarest of them.
+
+`ms` is a lower bound on the wall clock and never an overstatement — a row
+measures one model call, or everything `postBriefing` did, while the worker's
+clock started earlier and stops later — so reading the largest row rather than
+reassembling an invocation (there is no invocation id to reassemble one with)
+costs lateness and never a false alarm.
+
+**The second half is the absence, and it is what actually closes the hole.** A
+briefing this day owed, past the last hour it could still have arrived — noon on
+a weekday, 21:00 on a Sunday, both a full ceiling past the final retry — with no
+`<kind> briefing delivered` row saying it did. Asked any earlier it reports a
+briefing that is still being written, which is the ordinary-day false alarm that
+gets a monitor muted in a week.
+
+**It speaks at most once a New York day, and the row it writes is the guard.**
+Which is what makes one ordering load-bearing: a row written after a send that
+could *not* be made would mark the day as said and swallow the warning for good,
+so repairing a misspelled Vault name would deliver silence. The row goes down
+only where the post was made, and the next hour tries again. A quiet day still
+leaves one row saying `clear` — both outcomes, always, because a meter that
+records only its firings reports a watcher nobody is calling as a system with
+nothing to report.
 
 **The two writers are judged differently, and conflating them is a monitor that
 cries wolf until it is ignored.** The poller runs every two minutes on a
@@ -3055,7 +3107,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `007_semantic.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `010_pace.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -3065,7 +3117,7 @@ it from here.
 **Applying by hand means the files are a claim, so `supabase/verify.sql` is how
 the claim gets tested.** It writes nothing: it reads back the columns, the
 constraints, the indexes, the policies, the grants on Eugenia's view, the
-triggers, the realtime publication, all three cron jobs and the last ten function
+triggers, the realtime publication, every cron job and the last ten function
 responses, to be compared against 001–007 by eye. Run it after any manual change
 and before believing anything here about the database. A CI job cannot stand in
 for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
@@ -3324,9 +3376,17 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
 12. Run `supabase/003_eugenia.sql`, then `supabase/004_cron.sql`, then
     `supabase/005_eugenia_senses.sql`, `supabase/006_plan.sql` and
     `supabase/007_semantic.sql`. The hourly job drives both the briefing and the
-    pulse; the function decides which, or neither. 005, 006 and 007 are the
-    three that are safe to re-run in full.
-13. Run `supabase/verify.sql` and read it against 001–007. Nothing is set up
+    pulse; the function decides which, or neither. 005, 006 and 007 are safe to
+    re-run in full.
+13. Run `supabase/008_sync_health.sql`, `supabase/009_trades_grants.sql`,
+    `supabase/009_dispatch.sql` and `supabase/010_pace.sql` — the three monitors
+    and the column grant. Each is safe to re-run. **010 needs the two Vault
+    names 009 reads**, `eugenia_bot_token` and `telegram_chat_id`, since both
+    watchers post to Telegram themselves rather than through the function they
+    are watching; store them lower-case, the way step 5's cron secret is.
+    Re-run `supabase/004_cron.sql` afterwards if the two watchers' jobs are not
+    already scheduled — it upserts on the job name.
+14. Run `supabase/verify.sql` and read it against 001–010. Nothing is set up
     until that agrees.
 
 ---

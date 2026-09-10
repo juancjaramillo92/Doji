@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 491 tests, six suites
+npm test      # 495 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1240,9 +1240,45 @@ a blank.
   recording. Past three hours it gives up, because a row that can never be
   adjudicated would otherwise be announced every ten minutes forever.
 
+- **`010_pace.sql` is the only monitor here that speaks BEFORE the failure, and
+  it has to be, because afterwards there is nothing left to speak with.** Since
+  the cron half began answering before it works, a briefing killed at the 400s
+  wall clock has already handed pg_net a 200: 009's ledger records a healthy
+  dispatch, `ask()` never reaches its catch so no failure row is written,
+  `postScheduled`'s apology never runs, and all three retries redo the same
+  too-long work. Three monitors, all green, nothing reaching him — the Sunday
+  009 was built after, arriving back through the door opened to fix it.
+
+  `eugenia_runs.ms` had been written on every model call since 005 and read by
+  nobody. `pace_line` is exported for `healthLine`'s reason and takes its clock
+  the way `dispatch_failures` does. It reads the LARGEST row of the last seven
+  days rather than reassembling an invocation, because there is no invocation
+  id and `ms` is a lower bound on the wall clock either way — the cost is
+  lateness, never a false alarm. `ceiling_ms` is stated once and the message
+  quotes it: a ceiling written twice is a threshold that moves while the
+  sentence beside it keeps naming the old one.
+
+  THE SECOND HALF IS THE ABSENCE AND IT IS WHAT CLOSES THE HOLE. Noon on a
+  weekday, 21:00 on a Sunday — both a full ceiling past the last retry, because
+  asked any earlier it reports a briefing still being written. The caller it
+  looks for is `postBriefing`'s, in two languages with no build step between
+  them, so a rename would report a briefing missing every single day.
+
+  AND THE ROW IT WRITES IS THE GUARD, which is what makes one ordering
+  load-bearing. It speaks at most once a New York day and decides that by
+  finding its own row, so a row written after a send that could NOT be made
+  marks the day as said and swallows the warning for good — repairing a
+  misspelled Vault name would then deliver silence, which is 009's lesson
+  arriving here and was found by running it with the name wrong. Written only
+  where the post was made. A quiet day still leaves a `clear` row: both
+  outcomes, always.
+
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
-  a new scheduled job there, never in a feature's own file.
+  a new scheduled job there, never in a feature's own file. `verify.sql` counts
+  the jobs and `agree.test.mjs` holds that count against this file — the row had
+  already been wrong once, reporting a correct database as broken, and was
+  repaired by hand and left to be counted by hand again.
 - **A caller's URL is checked in the repository and in the database, and they
   are different checks.** `agree.test.mjs` reads every `/functions/v1/<name>` in
   the SQL and the Apps Script and fails if one names a function that is not
