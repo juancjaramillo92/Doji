@@ -2028,6 +2028,60 @@ test('every answer dueNow can give is dispatched by postScheduled', () => {
   }
 });
 
+/* ─── The critic is forbidden its tools rather than denied them ──────────────
+   It used to be handed an empty array, which reads as the stricter thing and is
+   not: the ARRAY is where the cache key starts, so an empty one is a different
+   key from byte zero, and the critic re-bought the whole prefix the briefing had
+   paid for thirty seconds earlier at the hour-long write price, to read it once.
+   Sharing the array and sending `tool_choice: none` is the same guarantee — no
+   tool_use block can come back — for a read instead of a write.
+
+   BOTH HALVES FAIL IN SILENCE AND IN OPPOSITE DIRECTIONS. Put the empty array
+   back and everything still works and costs more, with no sign anywhere. Drop
+   MUTE and the critic can go and check something mid-revision, which is a second
+   briefing at a second price and reads as a slow morning.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the critic shares the briefing\'s tools and may not call one', () => {
+  assert.match(EUGENIA_TS, /const CRITIC_TOOLS = CHAT_TOOLS;/,
+    'CRITIC_TOOLS is no longer the briefing\'s own array, so the critic writes a ' +
+    'second cache entry of its own and reads it exactly once');
+  assert.match(EUGENIA_TS, /const MUTE = \{ type: "none" \};/,
+    'MUTE is gone — the critic now holds eleven callable tools');
+
+  // THE CALL SITE IS THE HALF THAT CANNOT BE READ OFF THE CONSTANTS. Both
+  // defined and neither passed is a critic with the briefing's whole toolbox.
+  const critique = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function critique('));
+  assert.match(critique.slice(0, 600), /'critic', CRITIC_TOOLS, MUTE\)/,
+    'critique() no longer mutes the critic, so the one call with no business ' +
+    'reaching the web is the one that can');
+
+  /* AND NOTHING ELSE MAY SEND IT, matching the READ rather than the mention —
+     the comment above CRITIC_TOOLS explaining what it buys names it too. A
+     second caller passing it is a job whose tools have gone quiet: it still
+     answers, and every tool it needed returns nothing. */
+  const code = EUGENIA_TS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.equal([...code.matchAll(/\bMUTE\b/g)].length, 2,
+    'MUTE is passed by something other than the critic, whose tools are now mute too');
+});
+
+/* ─── A fetched page has two bounds and only one was written ──────────────────
+   `max_uses` caps how many pages she may open and says nothing about how large
+   one may be, so a single long thread could put more into the turn than the rest
+   of the briefing and — before the loop's own breakpoint — be re-sent on every
+   round after it. Dropping this bound breaks nothing and is invisible: the
+   briefing still arrives, reads well, and costs several times what it did.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('web fetch is bounded by size as well as by count', () => {
+  const block = EUGENIA_TS.match(/const WEB_FETCH\s*=\s*\{([\s\S]*?)\};/);
+  assert.ok(block, 'doji-eugenia no longer defines WEB_FETCH');
+  assert.match(block[1], /max_uses:\s*\d+/, 'web fetch is unbounded in count');
+  assert.match(block[1], /max_content_tokens:\s*\d+/,
+    'web fetch is unbounded in size — one long page can cost more than the ' +
+    'briefing it was read for, and nothing reports it');
+});
+
 /* ─── Every tool sent is a tool served ───────────────────────────────────────
    The tools array in call() and the branches in ask() are two lists of the same
    names, and they fail in opposite directions. A tool sent but not served makes
@@ -3353,6 +3407,20 @@ test('every column the cost meter writes is a column the table has', () => {
         `recordRun writes "${k}" and eugenia_runs has no such column — PostgREST ` +
         `refuses the whole row, so the meter goes quiet and only the console says so`);
     }
+  }
+
+  /* AND THE CHECK THAT WOULD CATCH THAT ON A LIVE DATABASE NAMES THEM A THIRD
+     TIME. A verify.sql row asking after a column 005 does not declare comes back
+     false on a correct database, which is the failure mode that gets a checker
+     stopped being run. */
+  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const asked = verify.match(
+    /table_name = 'eugenia_runs'\s*\n\s*and column_name in \(([^)]*)\)/);
+  assert.ok(asked, 'verify.sql no longer asks whether eugenia_runs has its later columns');
+  for (const name of asked[1].match(/'(\w+)'/g).map(q => q.slice(1, -1))) {
+    assert.ok(columns.has(name),
+      `verify.sql asks eugenia_runs for "${name}", which 005 does not declare — ` +
+      `the row reports false against a database that is in fact correct`);
   }
 });
 

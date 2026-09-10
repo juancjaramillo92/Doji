@@ -1439,7 +1439,15 @@ type Effort = 'medium' | 'high';
    second execution environment is what confuses the model about which one it
    is in. */
 const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 12 };
-const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6 };
+/* BOTH ENDS BOUNDED, AND ONLY ONE OF THEM WAS. `max_uses` says how many pages
+   she may open and said nothing about how big one may be — so a single forum
+   thread or documentation page could put more into the turn than the rest of
+   the briefing put together, and every later round in the loop carries it
+   again. Ten thousand tokens is longer than any article she has a reason to
+   read and shorter than the pathological case, which is the only shape of
+   page this bounds. */
+const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6,
+                     max_content_tokens: 10000 };
 
 /* FIVE SETS, BECAUSE FIVE JOBS ARE NOT THE SAME CONVERSATION, and a tool set is
    a list of what may be OFFERED rather than of what can be executed — every one
@@ -1469,16 +1477,27 @@ const CHAT_TOOLS = [
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, CALENDAR_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
-// The critic reads a draft and returns a draft. Giving it a tool would let it
-// go and check something, which is a second briefing at a second price.
-const CRITIC_TOOLS: unknown[] = [];
+/* THE CRITIC IS OFFERED THE BRIEFING'S OWN TOOLS AND FORBIDDEN TO USE THEM,
+   which is the same guarantee by a cheaper route. It still may not go and check
+   something — `MUTE` is `tool_choice: none` and no `tool_use` block can come
+   back — but the ARRAY is what the cache key is built from, and an empty one is
+   a different key from byte zero. So the critic used to re-buy the whole
+   twelve-thousand-token prefix the briefing had paid for thirty seconds
+   earlier, at the 1h write price, and read it exactly once. Sharing the array
+   turns that write into a read.
+
+   `tool_choice` is the one request field that changes without invalidating the
+   tools and system caches, which is what makes this work at all. */
+const CRITIC_TOOLS = CHAT_TOOLS;
+const MUTE = { type: "none" };
 
 /* NAMED, BECAUSE TWO THINGS NOW READ IT. The request asks for this model and
    ask() compares what answered against it. A second literal would report a
    fallback on every call from the day someone edited one of the two. */
 const MODEL = "claude-opus-5";
 
-async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
+async function call(messages: any[], effort: Effort, tools: unknown[],
+                    container?: string, choice?: unknown) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1529,6 +1548,8 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       fallbacks: "default",
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
+      // Only the critic sends one, and what it buys is above CRITIC_TOOLS.
+      ...(choice ? { tool_choice: choice } : {}),
     }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -1590,7 +1611,8 @@ export async function serve(name: string, input: any): Promise<string> {
    that the line is ever printed, which is the half that has been wrong here
    before. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
-                          tools: unknown[] = CHAT_TOOLS): Promise<string> {
+                          tools: unknown[] = CHAT_TOOLS,
+                          choice?: unknown): Promise<string> {
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -1599,6 +1621,20 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   // Summed across the rounds rather than logged per round, because the unit
   // worth knowing is what one briefing cost, not what one leg of it did.
   let inTok = 0, outTok = 0, cached = 0, searches = 0;
+  /* WHAT THE CACHE COSTS, WHICH NOTHING HERE COULD SEE. A cache READ is a tenth
+     of the input price and was counted from the first day; a cache WRITE is
+     1.25× at five minutes and 2× at an hour, and was counted nowhere — so the
+     one figure that decides whether the `ttl` above earns its doubled price
+     was the one figure the meter beside it did not collect. Two columns rather
+     than one because the two TTLs bill differently and a sum of them cannot be
+     turned back into money.
+
+     The five-minute figure is taken as the REMAINDER rather than read: only two
+     TTLs exist, so it is exact — and if the vendor ever stops breaking the
+     total down, an hour reads zero and everything lands here, which looks
+     wrong. Read directly, both would read zero, which looks like a cache
+     costing nothing. */
+  let wrote1h = 0, wrote5m = 0;
   /* EMPTY UNLESS `fallbacks` ACTUALLY FIRED, which is the whole reason to keep
      it. A decline re-runs the request on another model inside the same call and
      that is what rescues the briefing — but it also means the briefing he read
@@ -1614,11 +1650,14 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   // turn that died in round three should say three.
   const started = Date.now();
   let rounds = 0;
+  // The tool_result block currently carrying the loop's breakpoint, so the next
+  // round can take the mark off it before marking its own.
+  let marked: any;
 
   try {
   for (let round = 0; round < MAX_ROUNDS; round++) {
     rounds = round + 1;
-    const body = await call(convo, effort, tools, container);
+    const body = await call(convo, effort, tools, container, choice);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
@@ -1626,6 +1665,10 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     outTok   += used.output_tokens ?? 0;
     cached   += used.cache_read_input_tokens ?? 0;
     searches += used.server_tool_use?.web_search_requests ?? 0;
+    const madeCache = used.cache_creation_input_tokens ?? 0;
+    const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+    wrote1h  += hour;
+    wrote5m  += madeCache - hour;
     if (body.model && body.model !== MODEL) fellBack = body.model;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
@@ -1663,6 +1706,29 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       // turn. web_search and web_fetch run on Anthropic's side and never arrive
       // here at all.
       if (!results.length) throw new Error("tool_use with no tool call in it");
+
+      /* AND THE ROUND THAT FOLLOWS READS ALL OF THIS BACK INSTEAD OF BUYING IT
+         AGAIN. Only the system block carried a breakpoint, so everything after
+         it — twelve turns of history, the day's blocks, and every tool result
+         and web page collected so far — was re-sent at full price on every
+         round of the loop. A briefing that reads the journal and writes a note
+         paid for its own search results three times.
+
+         THE MARKER MOVES RATHER THAN ACCUMULATES, and that is not tidiness: a
+         request may carry four breakpoints, the system block holds one, and
+         this loop runs six rounds. Left behind on each round the fifth request
+         is a 400. Stripping the old one costs nothing — a block already written
+         to the cache stays readable whether or not it still carries the mark.
+
+         FIVE MINUTES, DELIBERATELY, WHERE THE PREFIX ASKS FOR AN HOUR. Rounds
+         are seconds apart and nothing reads this after the turn ends, so the
+         hour's doubled write price would buy a lifetime no one uses. The longer
+         TTL has to come first in the request, and it does: system renders ahead
+         of messages. */
+      if (marked) delete marked.cache_control;
+      marked = results[results.length - 1];
+      marked.cache_control = { type: "ephemeral" };
+
       convo.push({ role: "user", content: results });
       continue;
     }
@@ -1685,10 +1751,12 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        Only on the way out; the catch below records the turns that never got
        here, which are the ones a cost line could never see at all. */
     console.log(`doji-eugenia: ${label} — ${round + 1} round(s), ${effort} effort, ` +
-                `${inTok} in (${cached} cached), ${outTok} out, ${searches} search(es)` +
+                `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
+                `${outTok} out, ${searches} search(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
     await recordRun({
       caller: label, effort, rounds: round + 1, in_tokens: inTok, cached,
+      wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: true,
     });
@@ -1703,6 +1771,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        Recorded and rethrown: the caller's own handling is unchanged. */
     await recordRun({
       caller: label, effort, rounds: rounds || null, in_tokens: inTok, cached,
+      wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: false,
       detail: (err instanceof Error ? err.message : String(err)).slice(0, 500),
@@ -2819,7 +2888,7 @@ async function critique(draft: string, notes: string, channels: string): Promise
   try {
     const revised = await ask(
       [{ role: 'user', content: `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}` }],
-      'medium', 'critic', CRITIC_TOOLS);
+      'medium', 'critic', CRITIC_TOOLS, MUTE);
     if (keepDraft(draft, revised)) {
       console.log(`doji-eugenia: critic rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
       return draft;

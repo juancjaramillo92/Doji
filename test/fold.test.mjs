@@ -1900,6 +1900,111 @@ test('an empty window still says it is empty, because that is an answer', async 
   assert.match(answered, /No trades in that window/);
 });
 
+/* ─── What the cache costs, and what stops it being bought twice ─────────────
+   TWO THINGS SHIP TOGETHER HERE BECAUSE THEY ARE THE SAME OMISSION. Only the
+   system block carried a breakpoint, so a tool round re-sent the whole
+   conversation at full price; and a cache WRITE — 1.25× at five minutes, 2× at
+   an hour — was counted nowhere, so the meter that exists to say what a turn
+   cost could not see either fact.
+
+   DRIVEN THROUGH ask(), for the reason every other test in this section is:
+   what was at risk was never the arithmetic. A breakpoint that is computed and
+   never attached to a request, and a usage field read into a variable nothing
+   prints, both pass any assertion made on the value alone.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// The same two-round shape as above, with the request bodies kept.
+async function bodiesOf(responses) {
+  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
+  const sent = [], lines = [];
+  let n = 0;
+  globalThis.fetch = async (url, init) =>
+    String(url).startsWith('/rest/')
+      ? { ok: true, status: 200, json: async () => [] }
+      : (sent.push(JSON.parse(init.body)), responses[n++]);
+  console.log = (line) => lines.push(line);
+  console.error = () => {};
+  try {
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+    console.error = realErr;
+  }
+  return { sent, lines };
+}
+
+// Every cache_control marker sitting in a request's messages, ignoring the
+// system block — which has carried one since the strategy moved into it.
+const marks = (body) => body.messages.flatMap(m =>
+  (Array.isArray(m.content) ? m.content : []).filter(b => b.cache_control));
+
+test('the first request marks nothing, because there is nothing yet to re-read', async () => {
+  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
+                                   answers('claude-opus-5')]);
+  assert.equal(marks(sent[0]).length, 0,
+    'a breakpoint on the opening message is a write nothing will ever read back');
+});
+
+test('the round after a tool call reads the last one back instead of buying it', async () => {
+  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
+                                   answers('claude-opus-5')]);
+  const [mark] = marks(sent[1]);
+  assert.ok(mark, 'the tool results carry no breakpoint — every round re-sends ' +
+                  'the whole conversation at full price, which is what this fixes');
+  assert.equal(mark.type, 'tool_result',
+    'the mark is not on the tool results, so it is not where the conversation grew');
+  // FIVE MINUTES, NOT THE PREFIX'S HOUR: rounds are seconds apart and nothing
+  // reads this after the turn, so an hour would pay 2× for a lifetime unused.
+  assert.deepEqual(mark.cache_control, { type: 'ephemeral' });
+});
+
+test('the mark moves rather than accumulating, which is what keeps it under four', async () => {
+  /* A REQUEST MAY CARRY FOUR BREAKPOINTS, THE SYSTEM BLOCK HOLDS ONE, AND THIS
+     LOOP RUNS SIX ROUNDS. Left behind on each round the fifth request is a 400
+     — and a briefing that 400s on its fifth round is a briefing that dies on
+     exactly the mornings it had the most to read. Two tool rounds is enough to
+     tell a mark that moved from one that stayed. */
+  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
+                                   asksForStrategy('claude-opus-5'),
+                                   answers('claude-opus-5')]);
+  assert.equal(marks(sent[2]).length, 1,
+    `the third request carries ${marks(sent[2]).length} breakpoints — they are ` +
+    `accumulating, and the fifth round will be refused`);
+});
+
+test('a cache write is counted, and the two prices are counted apart', async () => {
+  /* THE FIGURE THAT DECIDES THE ttl AND WAS THE ONE THE METER DID NOT COLLECT.
+     A read is a tenth of the input price and was always counted; a write is
+     1.25× or 2× depending on the lifetime asked for, so a single total cannot
+     be turned back into money. */
+  const { lines } = await bodiesOf([served('claude-opus-5', {
+    stop_reason: 'end_turn',
+    content: [{ type: 'text', text: 'an answer' }],
+    usage: {
+      input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 400,
+      cache_creation_input_tokens: 1300,
+      cache_creation: { ephemeral_1h_input_tokens: 1000,
+                        ephemeral_5m_input_tokens: 300 },
+    },
+  })]);
+  assert.match(lines[0], /400 cached, 1000\+300 written/);
+});
+
+test('a vendor that stops splitting the total reads as wrong, never as free', async () => {
+  /* THE FIVE-MINUTE FIGURE IS THE REMAINDER RATHER THAN A READ, and this is the
+     whole reason. Read directly, a response with no `cache_creation` breakdown
+     would report both TTLs at zero — a cache costing nothing, which is what a
+     working one is supposed to look like. As a remainder it lands somewhere
+     visible instead. */
+  const { lines } = await bodiesOf([served('claude-opus-5', {
+    stop_reason: 'end_turn',
+    content: [{ type: 'text', text: 'an answer' }],
+    usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 1300 },
+  })]);
+  assert.match(lines[0], /0\+1300 written/);
+});
+
 /* ─── The email boundary ─────────────────────────────────────────────────────
    doji-email-sync is the only function here that reads a request body, so it is
    the only one with a shape to check. What it must guarantee is what the Apps

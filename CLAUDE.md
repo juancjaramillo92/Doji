@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 495 tests, six suites
+npm test      # 502 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -447,8 +447,18 @@ compounds.
   THE PREFIX STATES `ttl: "1h"`, because the default window is five minutes and
   her callers are hours apart. An hour catches the replies a briefing draws
   through the morning and the 09:00 retry; nothing catches 08:00 to 22:00.
-  `cached` in `ask()`'s log line is the number that settles it rather than
-  arguing it.
+
+  AND THAT ARGUMENT LEFT OUT THE PRICE OF THE HOUR, WHICH IS THE HALF THAT
+  DECIDES IT. A read is a tenth of the input rate; a WRITE is 1.25× at five
+  minutes and 2× at an hour — so the longer window moves the break-even from two
+  requests on a prefix to three, and a caller that makes one request and is not
+  followed inside the hour pays double for a lifetime nothing uses. The tool
+  ARRAY is part of the cache key, so the tool sets are that many separate
+  prefixes, each written at that rate and none readable by another. `cached` was
+  the only figure `ask()` collected and it can only ever report the good news:
+  `wrote_1h` and `wrote_5m` are the other side, kept apart because their rates
+  differ and their sum is not money. Do not move the window off an argument —
+  the rows exist now, so read them.
 
   She has no write path to it, deliberately: a document that decides whether he
   followed his rules cannot be edited by the thing checking them. The numbering
@@ -845,7 +855,12 @@ compounds.
   about `pg_net` — that nobody reads Edge logs — applied to every cost and quality
   figure `ask()` was printing. One row per model call, plus one per delivered
   briefing carrying its length, plus a row for the turns that FAILED, which is the
-  row that never existed. It never throws and never blocks an answer. It is also
+  row that never existed.
+
+  A METER THAT RECORDS ONLY THE CHEAP SIDE OF A PRICE IS THE SAME OMISSION AGAIN.
+  `cached` counts reads, at a tenth of the input rate — the number that can only
+  ever look good — while the write beside it, at 1.25× or 2×, was counted
+  nowhere. Ask it of any figure here: what is this the cheap half OF? It never throws and never blocks an answer. It is also
   what `consolidatedToday()` reads, which is how the nightly pass gets the retry
   the briefing has always had.
 
@@ -896,7 +911,12 @@ compounds.
   line fires every night for the life of the deployment and stops being read.
 
 - **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
-  no tools. `keepDraft` is the guard: a revision that comes back empty, apologetic
+  and unable to call a tool — which is `tool_choice: none` over the briefing's
+  OWN array rather than an empty one, because the array is where the cache key
+  starts and an empty one made the critic re-buy the prefix the briefing had paid
+  for thirty seconds earlier. Same guarantee, a read instead of a write; and
+  `tool_choice` is the one field that changes without invalidating that cache.
+  `keepDraft` is the guard: a revision that comes back empty, apologetic
   or twice the length is a critic that failed, and the draft goes instead. A critic
   that could make the briefing worse would be worse than none.
 

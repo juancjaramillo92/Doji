@@ -69,6 +69,19 @@ create table if not exists public.eugenia_runs (
   out_tokens int,
   searches   int,
 
+  -- WHAT THE CACHE COST TO FILL, which is the one price this table was built
+  -- without. `cached` is a read at a tenth of the input rate and was here from
+  -- the start; a WRITE is 1.25× at five minutes and 2× at an hour, so the
+  -- question the `ttl` in call() is answered with — does the longer lifetime
+  -- earn its doubled price — could not be asked of the meter sitting beside it.
+  --
+  -- TWO COLUMNS BECAUSE THE TWO RATES ARE DIFFERENT and their sum is not money.
+  -- The prefix asks for an hour; the loop's own breakpoint and web search's
+  -- automatic one are both five minutes, so a single figure would mix a price
+  -- with a different price and answer nothing.
+  wrote_1h   int,
+  wrote_5m   int,
+
   -- The briefing's length, which is the one quality target that lives in the
   -- prompt rather than anywhere a test can reach. Null for callers that do not
   -- produce a briefing.
@@ -83,6 +96,14 @@ create table if not exists public.eugenia_runs (
   ok         boolean not null default true,
   detail     text
 );
+
+-- THE TABLE PREDATES THESE TWO, so the create above is not what puts them on a
+-- database that already has one. Idempotent like everything else in this file,
+-- and null on every row written before it ran — which is a real state and not a
+-- gap: those turns were billed for the writes, nothing counted them, and a zero
+-- would say the cache was free rather than unmeasured.
+alter table public.eugenia_runs add column if not exists wrote_1h int;
+alter table public.eugenia_runs add column if not exists wrote_5m int;
 
 -- The only reads are "recently" and "this caller recently".
 create index if not exists eugenia_runs_at_desc on public.eugenia_runs (at desc);

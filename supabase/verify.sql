@@ -493,6 +493,16 @@ from (values
   -- These carry no user_id and no policy scoped to one, so RLS is the whole of
   -- the answer to the publishable key: on, it denies; off, the table simply
   -- answers whoever opens the page.
+  -- 005's two later columns. recordRun posts every key in one object, so a
+  -- database missing these refuses the WHOLE row — the cost meter goes quiet
+  -- for every caller at once and only an Edge console line says so, which is
+  -- the shape of failure this table was added to end.
+  ('eugenia_runs counts what the cache cost to fill',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_runs'
+       and column_name in ('wrote_1h','wrote_5m')),
+   '2'),
+
   ('RLS on eugenia_runs',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),
    'true'),
@@ -795,7 +805,7 @@ limit 10;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
 -- A SQL editor displays the result of the LAST statement, and this is it — so
--- the 68 checks that answer "does the database match the files" ran and were
+-- the 69 checks that answer "does the database match the files" ran and were
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --

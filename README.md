@@ -374,7 +374,7 @@ be single-sourced at run time:
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
-| the **columns of `eugenia_runs`** | the table, and the object literals `recordRun` is called with — a key with no column is a row PostgREST refuses whole, so the meter goes quiet |
+| the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the two `verify.sql` names in the row that asks whether a database has the cache-write columns — a key with no column is a row PostgREST refuses whole, so the meter goes quiet for every caller at once |
 | **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the eight predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union it interpolates, and `010`'s `owed \|\| ' briefing delivered'` — the two halves are in two languages with no build step between them, and a watcher looking for a caller nobody writes reports a briefing missing every single day |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `004` and the count `verify.sql` asserts — a row that has been wrong once already, reporting a correct database as broken |
@@ -1632,8 +1632,8 @@ lives in prose on the far side of a model call where no test can reach it. That
 is not hypothetical: unmeasured, it grew by a sixth and the way anyone found out
 was by counting the characters by hand.
 
-So it is read once more before it goes, at `medium` effort with no tools, against
-the rules it was written to — is the first sentence only true today, is a term
+So it is read once more before it goes, at `medium` effort and unable to call a
+tool, against the rules it was written to — is the first sentence only true today, is a term
 built at a rung that no longer needs building, is the chain missing a link, is
 there a forward call in it, is it inside the budget, does it obey his standing
 instructions. It returns the briefing, not notes about it.
@@ -2850,15 +2850,48 @@ of which a large share is web search at $10 per 1,000 searches rather than
 tokens. Questions are a few cents each. The model is the strongest one; at this
 volume the searches dominate, so a weaker model would save little.
 
-**What the prompt cache actually buys, said plainly.** Her system prefix is about
-5,300 tokens and it is cached — but the default window is five minutes and her
-callers are hours apart, so for most of this system's life the cache paid only
-for the rounds *within* one turn: a briefing that reads the journal and writes a
-note is three requests carrying that prefix. The window is now stated as an hour,
-which also catches the replies a briefing draws through the morning and the 09:00
-retry after an 08:00 failure. It does not catch 08:00 → 10:00, and nothing
-sensible would. `cache_read_input_tokens` is in `ask()`'s log line, and is the
-number that says whether any of this is true rather than argued.
+**What the prompt cache actually buys, said plainly.** Her system prefix is
+cached — but the default window is five minutes and her callers are hours apart,
+so for most of this system's life the cache paid only for the rounds *within* one
+turn: a briefing that reads the journal and writes a note is three requests
+carrying that prefix. The window is now stated as an hour, which also catches the
+replies a briefing draws through the morning and the 09:00 retry after an 08:00
+failure. It does not catch 08:00 → 10:00, and nothing sensible would.
+
+**And the hour has a price the argument above never named.** A cache READ is a
+tenth of the input rate; a cache WRITE is 1.25× at five minutes and **2× at an
+hour**. So the longer window does not simply buy more — it moves the break-even
+from two requests on a prefix to three, and a caller that makes one request and
+is not followed within the hour pays double for a lifetime nothing uses. That
+matters more than it looks, because *the tool array is part of the cache key*:
+five tool sets are five separate prefixes, none readable by another, each written
+at that doubled rate.
+
+`ask()` records both halves now — `cached` for the reads, `wrote_1h` and
+`wrote_5m` for the writes, kept apart because their rates differ and a sum of
+them cannot be turned back into money. Until those two columns existed the one
+figure that decides the `ttl` was the one figure the meter beside it did not
+collect, and the paragraph above was an argument with nothing under it. Give it a
+week of rows before changing the window.
+
+**Inside a turn the conversation is cached too, at five minutes.** Only the
+system block carried a breakpoint, so each round of the tool loop re-sent
+everything after it at full price — the history, the day's blocks, every tool
+result and every fetched page. The loop marks the newest `tool_result` block, and
+the mark *moves* rather than accumulating: a request may carry four breakpoints,
+the system block holds one, and the loop runs six rounds. Five minutes rather
+than an hour because rounds are seconds apart and nothing reads this once the
+turn ends — and the longer TTL has to come first in the request, which it does,
+since `system` renders ahead of `messages`.
+
+**The critic shares the briefing's tool array rather than being handed an empty
+one.** An empty array reads as the stricter thing and is not: it is a different
+cache key from byte zero, so the critic re-bought the whole prefix the briefing
+had paid for thirty seconds earlier and read it exactly once. It is sent the same
+array with `tool_choice: none`, which is the same guarantee — no `tool_use` block
+can come back — for a read instead of a write. `tool_choice` is the one request
+field that changes without invalidating the tools and system caches, which is
+what makes this possible at all.
 
 ### What she is watching, on the dashboard
 
@@ -3650,7 +3683,10 @@ which is the `opus` question settled by the only thing that could settle it.
 
 **`web_fetch` grounds a number on a page that has to stay fetchable.** The four
 sources are named in the prompt because the tool only fetches URLs already in the
-conversation. A page that moves or starts refusing bots degrades to search, which
+conversation. It is bounded at both ends — `max_uses` for how many pages and
+`max_content_tokens` for how large one may be. Only the first was written for a
+while, and one long thread can put more into a turn than the rest of the briefing
+put together, re-sent on every round after it. A page that moves or starts refusing bots degrades to search, which
 is what she did before — quietly, and with no signal that the number in the
 opening line came from prose rather than from the instrument.
 
