@@ -1654,11 +1654,16 @@ const looksLikeCode = (name) =>
                    give for why types.test.mjs is not a whole typecheck: under
                    that lib a Uint8Array is not one, which is true here and
                    false on Deno. The claim is only checkable if it names the
-                   type, and the type is real somewhere this repository is not */
+                   type, and the type is real somewhere this repository is not
+     tool_choice   the request field R-15 is about, and the one this file must
+                   not send — REFACTOR.md names it because an entry refusing a
+                   move cannot describe the move without naming it, and the
+                   test beside CRITIC_TOOLS asserts the code has none */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
   'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
   'get_version', 'MN_1', 'insufficient_quota', 'to_regprocedure', 'BlobPart',
+  'tool_choice',
 ]);
 
 test('the documents name only symbols the repository has', () => {
@@ -2028,41 +2033,26 @@ test('every answer dueNow can give is dispatched by postScheduled', () => {
   }
 });
 
-/* ─── The critic is forbidden its tools rather than denied them ──────────────
-   It used to be handed an empty array, which reads as the stricter thing and is
-   not: the ARRAY is where the cache key starts, so an empty one is a different
-   key from byte zero, and the critic re-bought the whole prefix the briefing had
-   paid for thirty seconds earlier at the hour-long write price, to read it once.
-   Sharing the array and sending `tool_choice: none` is the same guarantee — no
-   tool_use block can come back — for a read instead of a write.
-
-   BOTH HALVES FAIL IN SILENCE AND IN OPPOSITE DIRECTIONS. Put the empty array
-   back and everything still works and costs more, with no sign anywhere. Drop
-   MUTE and the critic can go and check something mid-revision, which is a second
-   briefing at a second price and reads as a slow morning.
+/* ─── The critic is given no tool, and not for the obvious reason ────────────
+   An empty array is the cheaper write as well as the stricter one, which is not
+   what it looks like: sharing the briefing's array to ride its cache was tried
+   and measured, and the critic wrote its own prefix anyway because the two also
+   differ in effort. Dropping this back to `CHAT_TOOLS` would be a quiet 23,309
+   tokens a morning at the 1h write rate, buying a read that does not happen.
+   REFACTOR.md R-15 carries the figures.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the critic shares the briefing\'s tools and may not call one', () => {
-  assert.match(EUGENIA_TS, /const CRITIC_TOOLS = CHAT_TOOLS;/,
-    'CRITIC_TOOLS is no longer the briefing\'s own array, so the critic writes a ' +
-    'second cache entry of its own and reads it exactly once');
-  assert.match(EUGENIA_TS, /const MUTE = \{ type: "none" \};/,
-    'MUTE is gone — the critic now holds eleven callable tools');
+test('the critic is offered no tool at all', () => {
+  assert.match(EUGENIA_TS, /const CRITIC_TOOLS: unknown\[\] = \[\];/,
+    'CRITIC_TOOLS is no longer empty — either the critic can now go and check ' +
+    'something mid-revision, or it is writing a prefix it will not read');
 
-  // THE CALL SITE IS THE HALF THAT CANNOT BE READ OFF THE CONSTANTS. Both
-  // defined and neither passed is a critic with the briefing's whole toolbox.
-  const critique = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function critique('));
-  assert.match(critique.slice(0, 600), /'critic', CRITIC_TOOLS, MUTE\)/,
-    'critique() no longer mutes the critic, so the one call with no business ' +
-    'reaching the web is the one that can');
-
-  /* AND NOTHING ELSE MAY SEND IT, matching the READ rather than the mention —
-     the comment above CRITIC_TOOLS explaining what it buys names it too. A
-     second caller passing it is a job whose tools have gone quiet: it still
-     answers, and every tool it needed returns nothing. */
+  // AND NOTHING SENDS tool_choice, which is the half a constant cannot show.
+  // The parameter was removed with the caller; a new one would mean the move
+  // R-15 refused has been made again under another name.
   const code = EUGENIA_TS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  assert.equal([...code.matchAll(/\bMUTE\b/g)].length, 2,
-    'MUTE is passed by something other than the critic, whose tools are now mute too');
+  assert.doesNotMatch(code, /tool_choice/,
+    'something sends tool_choice again — see REFACTOR.md R-15 before keeping it');
 });
 
 /* ─── A fetched page has two bounds and only one was written ──────────────────

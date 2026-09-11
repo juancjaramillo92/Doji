@@ -233,8 +233,53 @@ this was an argument restated across two.
 | R-8 — moving a `drop` into an earlier numbered SQL file | a re-runnable file may not undo a later one |
 | R-10 — regenerating `golden.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 
-The four below are refused by something no other document holds, so they carry
+The five below are refused by something no other document holds, so they carry
 their reasoning here.
+
+### R-15 — giving the critic the briefing's tool array so it rides its cache
+**Why refused:** it was tried, shipped, and measured, and it does not work. This
+is the only entry here that was made before it was refused, which is the whole
+reason it is written down: the argument for it is correct in every part except
+the one that decides it, and it will read as free money to the next person.
+
+The argument: a cache entry is keyed from the exact bytes of `tools` then
+`system`, so an EMPTY array is a different key from byte zero — which means the
+critic, running seconds after the briefing over the same system prompt, buys its
+own copy of a prefix that is already in the cache. Send it the same array with
+`tool_choice: none` and it cannot call anything, the guarantee is unchanged, and
+the write becomes a read. `tool_choice` is documented as one of the few request
+fields that changes without invalidating the tools and system caches.
+
+All of that is true. What it leaves out is that the two calls differ in
+**effort** — the briefing runs `high` and the critic `medium` — and an effort
+change invalidates the tools and system caches on models that render the
+thinking configuration ahead of them. So the prefix was never shareable, for a
+reason that has nothing to do with the array.
+
+The first morning it ran:
+
+| caller | rounds | in | cached | wrote_1h |
+|---|---|---|---|---|
+| weekday briefing | 3 | 4,789 | 138,401 | 23,309 |
+| critic | 1 | 2,471 | **0** | **23,309** |
+
+Zero read, an entry written of exactly the briefing's size, seconds apart. And
+the change had made it slightly WORSE than the empty array it replaced: eleven
+tool schemas the critic cannot call, in a prefix it pays 2× to write.
+
+That the same morning's release looks read theirs four times over
+(`wrote_1h` 21,466 then 0, 0, 0, 0) is what rules out a broken cache and leaves
+effort holding the bag.
+
+**Revisit if:** the critic's effort is ever raised to the briefing's — then the
+prefix is genuinely shared and the array is worth revisiting in the same pass.
+Not before, and never on the argument alone: the numbers above took one morning
+to collect and the argument took a fortnight to look wrong.
+
+**And the shape to carry away:** the request field that broke this was not the
+one the change touched. A cache key spans every field that renders ahead of the
+breakpoint, so "what else differs between these two calls" is the question, not
+"what did I change".
 
 ### R-9 — a database test in `npm test`
 **Why refused:** `npm ci` installs jsdom and nothing else. The one assertion that

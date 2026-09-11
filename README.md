@@ -1632,8 +1632,8 @@ lives in prose on the far side of a model call where no test can reach it. That
 is not hypothetical: unmeasured, it grew by a sixth and the way anyone found out
 was by counting the characters by hand.
 
-So it is read once more before it goes, at `medium` effort and unable to call a
-tool, against the rules it was written to — is the first sentence only true today, is a term
+So it is read once more before it goes, at `medium` effort with no tools, against
+the rules it was written to — is the first sentence only true today, is a term
 built at a rung that no longer needs building, is the chain missing a link, is
 there a forward call in it, is it inside the budget, does it obey his standing
 instructions. It returns the briefing, not notes about it.
@@ -2850,8 +2850,11 @@ of which a large share is web search at $10 per 1,000 searches rather than
 tokens. Questions are a few cents each. The model is the strongest one; at this
 volume the searches dominate, so a weaker model would save little.
 
-**What the prompt cache actually buys, said plainly.** Her system prefix is
-cached — but the default window is five minutes and her callers are hours apart,
+**What the prompt cache actually buys, said plainly.** Her cached prefix is
+23,309 tokens with the chat tool set and 16,477 with the nightly pass's — read
+off `eugenia_runs.wrote_1h`, which records the size of the entry each caller
+writes, rather than estimated. It is cached — but the default window is five
+minutes and her callers are hours apart,
 so for most of this system's life the cache paid only for the rounds *within* one
 turn: a briefing that reads the journal and writes a note is three requests
 carrying that prefix. The window is now stated as an hour, which also catches the
@@ -2884,14 +2887,14 @@ than an hour because rounds are seconds apart and nothing reads this once the
 turn ends — and the longer TTL has to come first in the request, which it does,
 since `system` renders ahead of `messages`.
 
-**The critic shares the briefing's tool array rather than being handed an empty
-one.** An empty array reads as the stricter thing and is not: it is a different
-cache key from byte zero, so the critic re-bought the whole prefix the briefing
-had paid for thirty seconds earlier and read it exactly once. It is sent the same
-array with `tool_choice: none`, which is the same guarantee — no `tool_use` block
-can come back — for a read instead of a write. `tool_choice` is the one request
-field that changes without invalidating the tools and system caches, which is
-what makes this possible at all.
+**The critic is handed an empty tool array, and that is the cheaper option as
+well as the stricter one.** Sharing the briefing's array so the critic could read
+its prefix instead of writing one was tried, shipped and measured: it wrote
+23,309 tokens and read none, seconds behind a briefing that had just written
+exactly that. The array is where the cache key starts, and the two calls also
+differ in EFFORT — `high` against `medium` — which invalidates the tools and
+system caches by itself. An empty array is the smaller write of the two. The
+figures and what would have to change first are in `REFACTOR.md` R-15.
 
 ### What she is watching, on the dashboard
 

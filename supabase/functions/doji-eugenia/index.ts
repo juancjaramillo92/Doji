@@ -1477,27 +1477,24 @@ const CHAT_TOOLS = [
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, CALENDAR_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
-/* THE CRITIC IS OFFERED THE BRIEFING'S OWN TOOLS AND FORBIDDEN TO USE THEM,
-   which is the same guarantee by a cheaper route. It still may not go and check
-   something — `MUTE` is `tool_choice: none` and no `tool_use` block can come
-   back — but the ARRAY is what the cache key is built from, and an empty one is
-   a different key from byte zero. So the critic used to re-buy the whole
-   twelve-thousand-token prefix the briefing had paid for thirty seconds
-   earlier, at the 1h write price, and read it exactly once. Sharing the array
-   turns that write into a read.
+/* The critic reads a draft and returns a draft. Giving it a tool would let it
+   go and check something, which is a second briefing at a second price.
 
-   `tool_choice` is the one request field that changes without invalidating the
-   tools and system caches, which is what makes this work at all. */
-const CRITIC_TOOLS = CHAT_TOOLS;
-const MUTE = { type: "none" };
+   AND IT MAY NOT SHARE THE BRIEFING'S ARRAY TO RIDE ITS CACHE, which looks like
+   free money and is not: the tools array is where the cache key starts, so this
+   one writes its own prefix — but the two also differ in EFFORT, and an effort
+   change invalidates the tools and system caches on top of that. Measured, the
+   morning after it was tried: the critic wrote 23,309 tokens and read zero,
+   seconds behind a briefing that had just written an entry of exactly that
+   size. An empty array is the smaller write of the two. REFACTOR.md R-15. */
+const CRITIC_TOOLS: unknown[] = [];
 
 /* NAMED, BECAUSE TWO THINGS NOW READ IT. The request asks for this model and
    ask() compares what answered against it. A second literal would report a
    fallback on every call from the day someone edited one of the two. */
 const MODEL = "claude-opus-5";
 
-async function call(messages: any[], effort: Effort, tools: unknown[],
-                    container?: string, choice?: unknown) {
+async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1548,8 +1545,6 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       fallbacks: "default",
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
-      // Only the critic sends one, and what it buys is above CRITIC_TOOLS.
-      ...(choice ? { tool_choice: choice } : {}),
     }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -1611,8 +1606,7 @@ export async function serve(name: string, input: any): Promise<string> {
    that the line is ever printed, which is the half that has been wrong here
    before. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
-                          tools: unknown[] = CHAT_TOOLS,
-                          choice?: unknown): Promise<string> {
+                          tools: unknown[] = CHAT_TOOLS): Promise<string> {
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -1657,7 +1651,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   try {
   for (let round = 0; round < MAX_ROUNDS; round++) {
     rounds = round + 1;
-    const body = await call(convo, effort, tools, container, choice);
+    const body = await call(convo, effort, tools, container);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
@@ -2888,7 +2882,7 @@ async function critique(draft: string, notes: string, channels: string): Promise
   try {
     const revised = await ask(
       [{ role: 'user', content: `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}` }],
-      'medium', 'critic', CRITIC_TOOLS, MUTE);
+      'medium', 'critic', CRITIC_TOOLS);
     if (keepDraft(draft, revised)) {
       console.log(`doji-eugenia: critic rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
       return draft;

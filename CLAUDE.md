@@ -911,11 +911,13 @@ compounds.
   line fires every night for the life of the deployment and stops being read.
 
 - **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
-  and unable to call a tool — which is `tool_choice: none` over the briefing's
-  OWN array rather than an empty one, because the array is where the cache key
-  starts and an empty one made the critic re-buy the prefix the briefing had paid
-  for thirty seconds earlier. Same guarantee, a read instead of a write; and
-  `tool_choice` is the one field that changes without invalidating that cache.
+  no tools — and the empty array is the CHEAPER of the two as well as the
+  stricter, which is the opposite of how it reads. Sharing the briefing's array
+  so the critic could ride its cache was tried and measured and did not work:
+  the tools array is where the cache key starts, and the two ALSO differ in
+  effort, which invalidates the tools and system caches on top of that. The
+  morning it shipped, the critic wrote 23,309 tokens and read none, seconds
+  behind a briefing that had just written that exact figure. `REFACTOR.md` R-15.
   `keepDraft` is the guard: a revision that comes back empty, apologetic
   or twice the length is a critic that failed, and the draft goes instead. A critic
   that could make the briefing worse would be worse than none.
