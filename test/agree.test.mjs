@@ -3322,9 +3322,76 @@ test('the importance a release may carry is the one the table accepts', () => {
   assert.match(spine, /importance=eq\.high/,
     'the release spine no longer filters on importance, so every medium and low ' +
     'entry filed all week would wake her');
-  assert.match(spine, /looked_at=is\.null/,
-    'the release spine no longer filters on looked_at, so one print is looked at ' +
-    'every quarter of an hour until it ages out — each one a billed model call');
+  /* AND THE MARK IS SELECTED RATHER THAN FILTERED ON, which is the one place
+     this reads as a deletion and is not. The query cannot filter it away: the
+     question is whether ANYTHING at that release time has been looked at, and a
+     `looked_at=is.null` filter hides exactly the mark that answers it — which
+     is how one print became five looks. The guarantee moved into dueRelease and
+     is driven from both sides in fold.test.mjs; what has to be true here is
+     that the column still comes back at all. */
+  assert.match(spine, /select=[^&`]*looked_at/,
+    'pendingRelease no longer reads looked_at, so dueRelease cannot see the mark ' +
+    'and every print is looked at every quarter of an hour until it ages out');
+  assert.doesNotMatch(spine, /looked_at=is\.null/,
+    'the filter is back, so the duplicates are handed over one at a time again — ' +
+    'which is the five-looks-per-print this replaced');
+});
+
+/* ─── The pure half settles nothing about the call ───────────────────────────
+   `dueRelease` is driven from both sides in fold.test.mjs and every one of those
+   assertions stays green while postRelease marks only the row its message
+   happens to name — which leaves the other four standing unlooked, and the next
+   quarter-hour hands back the same print. That is the loop this was built to
+   close, surviving inside the fix for it, and it is the third time this shape
+   has been found here.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every row at the release time is marked, not the one the message names', () => {
+  const at = EUGENIA_TS.indexOf('async function postRelease(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postRelease()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+
+  assert.match(body, /markLooked\(due\.map\(r => r\.id\)\)/,
+    'postRelease marks something other than the whole group, so the duplicates ' +
+    'it just decided to skip come back unlooked at the next quarter hour');
+
+  // AND THE MARK GOES DOWN BEFORE THE LOOK, which is what makes it once-only at
+  // all: a look that generates and then fails to write would otherwise repeat
+  // every fifteen minutes, each one billed.
+  assert.ok(body.indexOf('markLooked') < body.indexOf('await ask('),
+    'the mark now lands after the model call, so a look that dies repeats');
+});
+
+/* ─── A command nothing routes is a command that does not exist ──────────────
+   `parseChannel` is pure and driven from both sides in fold.test.mjs, and every
+   one of those assertions stays green with the branch deleted from
+   handleMessage — the command then falls through to the catch-all that ignores
+   anything starting with a slash, and he gets no reply at all. Same shape as
+   briefKind's: the pure half proves the parse, never the call.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the rung he sets himself is routed, and routed before the slash catch-all', () => {
+  const at = EUGENIA_TS.indexOf('async function handleMessage(');
+  assert.ok(at > -1, 'doji-eugenia no longer has handleMessage()');
+  const body = EUGENIA_TS.slice(at);
+
+  const routed = body.indexOf('parseChannel(text)');
+  assert.ok(routed > -1,
+    'handleMessage no longer reads parseChannel, so /channel falls through to the ' +
+    'catch-all and he is answered with silence');
+
+  const catchAll = body.indexOf("text.startsWith('/')");
+  assert.ok(catchAll > -1, "the slash catch-all has moved — this check is asserting nothing");
+  assert.ok(routed < catchAll,
+    '/channel is read after the catch-all that ignores every slash command, so it ' +
+    'can never run');
+
+  /* AND IT GOES THROUGH setChannel RATHER THAN WRITING ITS OWN PATCH, which is
+     what keeps the one-way door on the bottom rung and the unseeded-table check
+     in one place. A second writer here is a second copy of both. */
+  assert.match(body.slice(routed, routed + 400), /await setChannel\(/,
+    '/channel writes the ladder itself, so the guard on the bottom rung and the ' +
+    'check for an unseeded table are now stated in one place and enforced in another');
 });
 
 test('the verdicts a tap can carry are the verdicts the table accepts', () => {

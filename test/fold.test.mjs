@@ -48,7 +48,7 @@ import {
   foldVectors, EMBED_DIMS,
   speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine, sweepLine, serve,
+  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -2003,6 +2003,114 @@ test('a vendor that stops splitting the total reads as wrong, never as free', as
     usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 1300 },
   })]);
   assert.match(lines[0], /0\+1300 written/);
+});
+
+/* ─── The rung he can move himself ───────────────────────────────────────────
+   The ladder climbs on him using a term back, judged at the nightly pass — so a
+   reader who takes the briefing and rarely answers it never leaves `explained`,
+   the rung that says restate the mechanism every time. This is him saying where
+   he is, which is the standing a demotion already had.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a channel and a rung come back as the ids the table holds', () => {
+  assert.deepEqual(parseChannel('/channel dollar used'), { channel: 'dollar', state: 'used' });
+});
+
+test('the spoken name works, because that is the one he is shown', () => {
+  // /notes prints the names; the table holds the ids. A command that only took
+  // the id would be a dial he cannot find the label for.
+  const [id, name] = CHANNELS.find(([, n]) => n.split(' ').length > 2);
+  assert.deepEqual(parseChannel(`/channel ${name} owns`), { channel: id, state: 'owns' });
+});
+
+test('the rung is the last word, not the second', () => {
+  /* THE SHAPE THAT BREAKS ON THE REAL NAMES. Three of the five are several
+     words long, so reading the rung out of position two makes most of the map
+     unnameable — and it fails as "no such channel", which reads like the
+     command working on a name he got wrong. */
+  const multi = CHANNELS.filter(([, n]) => n.includes(' '));
+  assert.ok(multi.length >= 3, 'the names are no longer multi-word — this test is asserting nothing');
+  for (const [id, name] of multi) {
+    assert.deepEqual(parseChannel(`/channel ${name} used`), { channel: id, state: 'used' });
+  }
+});
+
+test('a rung that is not a rung is said back, never guessed at', () => {
+  const said = parseChannel('/channel dollar mastered');
+  assert.equal(typeof said, 'string');
+  assert.match(said, /not a rung/);
+  for (const rung of CHANNEL_STATES) assert.ok(said.includes(rung), `${rung} is not offered back`);
+});
+
+test('a channel she does not have lists the ones she does', () => {
+  const said = parseChannel('/channel bitcoin used');
+  assert.equal(typeof said, 'string');
+  for (const [id] of CHANNELS) assert.ok(said.includes(id), `${id} is missing from the list`);
+});
+
+test('the bare command says how to use it rather than doing nothing', () => {
+  assert.match(parseChannel('/channel'), /channel/);
+  assert.match(parseChannel('/channel   '), /channel/);
+});
+
+test('every other message is not this command', () => {
+  // It runs on every inbound message, so anything it claims by accident is a
+  // reply he never gets.
+  for (const other of ['/notes', '/start', 'channel dollar used', 'what is the dollar doing',
+                       'the channel is open', '']) {
+    assert.equal(parseChannel(other), null, `"${other}" was taken for a channel command`);
+  }
+});
+
+/* ─── One look per release time, because one print is not one row ────────────
+   The unique key is (at, name) and the name is free text she writes, so `PPI`,
+   `US PPI` and `US PPI (August)` are three rows and one print. Each one marked
+   high fired its own look, its own model call and its own message — and the
+   release look holds log_calendar, so filing the actual under a slightly
+   different name MINTED THE NEXT ONE. The two apologies that started this were
+   duplicate looks arriving at the same number with better information.
+
+   The fixture is the real morning, names and timestamps as the table holds
+   them: five high rows for one CPI at 12:30 on 11 September.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const CPI_MORNING = [
+  { id: 1, at: '2026-09-11T12:30:00+00', name: 'August CPI',        importance: 'high', looked_at: null },
+  { id: 2, at: '2026-09-11T12:30:00+00', name: 'core CPI',          importance: 'high', looked_at: null },
+  { id: 3, at: '2026-09-11T12:30:00+00', name: 'headline CPI',      importance: 'high', looked_at: null },
+  { id: 4, at: '2026-09-11T12:30:00+00', name: 'US CPI (August)',   importance: 'high', looked_at: null },
+  { id: 5, at: '2026-09-11T12:30:00+00', name: 'US CPI (core CPI)', importance: 'high', looked_at: null },
+  { id: 6, at: '2026-09-11T14:00:00+00', name: 'Michigan sentiment', importance: 'high', looked_at: null },
+];
+
+test('one print under five names is one look, not five', () => {
+  const due = dueRelease(CPI_MORNING);
+  assert.equal(due.length, 5, 'the group is not the whole release time');
+  assert.deepEqual([...new Set(due.map(r => r.at))], ['2026-09-11T12:30:00+00'],
+    'the group spans two release times, so one message would cover two prints');
+});
+
+test('a release time with any mark on it is finished, whatever else stands there', () => {
+  /* THE HALF THAT BREAKS THE LOOP. A row minted at 08:35 by the look itself is
+     unlooked and shares the release time — under the old question it was the
+     next quarter-hour's second message about the same number. */
+  const minted = [...CPI_MORNING.slice(0, 2).map(r => ({ ...r, looked_at: '2026-09-11T12:35:00+00' })),
+                  ...CPI_MORNING.slice(2)];
+  const due = dueRelease(minted);
+  assert.deepEqual(due.map(r => r.name), ['Michigan sentiment'],
+    'a looked-at release time came back again, so the duplicates still speak');
+});
+
+test('the earliest unlooked release time is the one taken', () => {
+  // Rows arrive `at.asc` but the decision must not depend on that: a group is
+  // chosen by its time, and the query's ordering is not the guarantee.
+  const shuffled = [...CPI_MORNING].reverse();
+  assert.equal(dueRelease(shuffled)[0].at, '2026-09-11T12:30:00+00');
+});
+
+test('nothing standing unlooked is no look at all', () => {
+  assert.deepEqual(dueRelease([]), []);
+  assert.deepEqual(dueRelease(CPI_MORNING.map(r => ({ ...r, looked_at: 'x' }))), []);
 });
 
 /* ─── A figure she does not send must not erase the one already there ────────

@@ -2275,6 +2275,53 @@ const civilDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
    nobody: a rung set in March looked exactly like one set last night, which is
    the difference between a channel he owns and a channel that has gone quiet.
    Rendering it is the entire fix, and it costs one clause. */
+/* ─── The one rung he can move himself ───────────────────────────────────────
+   THE LADDER COULD ONLY EVER CLIMB ON EVIDENCE HE DOES NOT PRODUCE. A rung
+   moves at the nightly pass, and it moves on him using a term back — so a
+   reader who takes the briefing and rarely answers it sits at `explained` for
+   ever, which is the rung that says restate the mechanism every time you use
+   the word. Weeks of it read as her being unable to stop over-explaining; what
+   it actually was is a census with no way up.
+
+   That stays true of HER reading of him — one exchange is not evidence, and
+   `set_channel` stays out of CHAT_TOOLS. This is not her reading of him. It is
+   him saying where he is, which is the same standing a demotion already has and
+   the only testimony on this subject that was never in doubt.
+
+   Exported and pure because the parse is the whole of it: a command that
+   accepts a rung nothing offers, or silently matches the wrong channel, is a
+   map that quietly stops describing him.
+   ─────────────────────────────────────────────────────────────────────────── */
+export function parseChannel(text: string): { channel: string; state: string } | string | null {
+  const words = text.trim().split(/\s+/);
+  if (words[0].toLowerCase() !== '/channel') return null;
+  const said = words.slice(1).join(' ').trim();
+  if (!said) {
+    return `Say which and where, jefe — /channel <${CHANNELS.map(([c]) => c).join('|')}> ` +
+           `<${CHANNEL_STATES.slice(1).join('|')}>.`;
+  }
+
+  /* THE RUNG IS THE LAST WORD AND THE CHANNEL IS THE REST, because three of the
+     five spoken names are several words and one of them ends in a rung-shaped
+     word. Splitting the other way round made "what central banks are buying"
+     unnameable. */
+  const to = words[words.length - 1].toLowerCase();
+  const wanted = words.slice(1, -1).join(' ').toLowerCase();
+  if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
+    return `"${to}" is not a rung. They are ${CHANNEL_STATES.join(", ")}.`;
+  }
+
+  // Matched against the id AND the spoken name, since the map he reads in
+  // /notes prints the names and the ids are what the table holds.
+  const hit = CHANNELS.find(([id, name]) =>
+    id.toLowerCase() === wanted || name.toLowerCase() === wanted);
+  if (!hit) {
+    return `I do not have a channel called "${wanted}". They are:\n` +
+           CHANNELS.map(([id, name]) => `· ${id} — ${name}`).join("\n");
+  }
+  return { channel: hit[0], state: to };
+}
+
 export function channelsList(rows: Channel[]): string {
   const byId = new Map(rows.map(r => [r.channel, r]));
   return CHANNELS.map(([id, name]) => {
@@ -2481,6 +2528,7 @@ export async function loopsBlock(): Promise<string> {
 type Release = {
   id: number; at: string; name: string; importance: string;
   consensus: string | null; prior: string | null; actual: string | null; note: string | null;
+  looked_at?: string | null;
 };
 
 /* A ROLLING WINDOW RATHER THAN A CIVIL DAY, and it is the simpler correct
@@ -3240,14 +3288,58 @@ async function postPulse(): Promise<Response> {
 // of unlooked releases would all arrive at once.
 const RELEASE_STALE_H = 6;
 
-async function pendingRelease(now = Date.now()): Promise<Release | null> {
+// A bound rather than a working limit, like every other read of a growing table
+// here. Six hours of high-impact prints is a handful; forty is far more than a
+// heavy morning files even when it files the same release five times.
+const RELEASE_ROWS = 40;
+
+/* ONE LOOK PER RELEASE TIME, WHICH IS NOT WHAT ONE ROW PER LOOK GAVE.
+
+   The unique key is (at, name) and the name is free text the model writes, so
+   `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
+   print to a person. Every one of them marked `high` fired its own look, its
+   own model call and its own message — five for a single CPI on 11 September,
+   at 12:35, 12:50, 13:05, 13:20 and 13:35.
+
+   AND IT FED ITSELF, which is why it could not settle. The release look also
+   holds log_calendar; filing the actual under a name a shade different from the
+   one it was handed INSERTS rather than updates, and that new row is then
+   unlooked and fires in its turn. What reached him as two apologies in two days
+   was never her catching an error — it was a duplicate look arriving at the
+   same print with better information and reconciling against the message still
+   sitting in the conversation window. The loop ended only because
+   RELEASE_STALE_H ran out.
+
+   So the question this asks is about the TIME rather than the row: the earliest
+   release time nothing has looked at yet, and then every high row standing at
+   it. A row minted at 08:35 under a new name shares 12:30 with rows already
+   marked, so it cannot open a second look — and where two genuinely different
+   numbers land together, one message covers both, which is how a person reads
+   "the 8:30 data" anyway.
+
+   Exported and pure because the decision is the whole of it, and a query that
+   returns the right rows proves nothing about which of them get looked at. */
+export function dueRelease(rows: Release[]): Release[] {
+  const byTime = new Map<string, Release[]>();
+  for (const r of rows) (byTime.get(r.at) ?? byTime.set(r.at, []).get(r.at)!).push(r);
+  for (const [, group] of [...byTime].sort(([a], [b]) => a < b ? -1 : 1)) {
+    if (!group.some(r => r.looked_at)) return group;
+  }
+  return [];
+}
+
+async function pendingRelease(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - RELEASE_STALE_H * 3600_000).toISOString();
-  const [row] = await readRows<Release>('Release',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
-    `&importance=eq.high&looked_at=is.null` +
+  /* `looked_at` is READ rather than filtered on, because the question is
+     whether anything at this time has been looked at — a filter would hide the
+     mark that makes the rest of the group skippable and hand back the
+     duplicates one at a time, which is the behaviour this replaced. */
+  const rows = await readRows<Release>('Release',
+    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at` +
+    `&importance=eq.high` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
-    `&order=at.asc&limit=1`);
-  return row ?? null;
+    `&order=at.asc&limit=${RELEASE_ROWS}`);
+  return dueRelease(rows);
 }
 
 /* MARKED BEFORE THE LOOK, NOT AFTER, and it is the briefing marker's argument
@@ -3255,19 +3347,22 @@ async function pendingRelease(now = Date.now()): Promise<Release | null> {
    release pending — so the next quarter-hour runs it again, and the one after
    that, each one a model call with web search behind it. Marked first, a
    failure costs one look. Losing a look is cheaper than looping on one. */
-async function markLooked(id: number): Promise<void> {
-  const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=eq.${id}`, {
+// EVERY ROW AT THAT TIME, not the one the message happens to name: the others
+// are the same print under another spelling, and one left unmarked is the next
+// hour's duplicate look.
+async function markLooked(ids: number[]): Promise<void> {
+  const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=in.(${ids.join(',')})`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
     body: JSON.stringify({ looked_at: new Date().toISOString() }),
   });
-  if (!res.ok) throw new Error(`Could not mark release ${id} looked at (HTTP ${res.status})`);
+  if (!res.ok) throw new Error(`Could not mark ${ids.length} release(s) looked at (HTTP ${res.status})`);
 }
 
 async function postRelease(): Promise<Response> {
   const due = await pendingRelease();
-  if (!due) return json({ ok: true, skipped: "nothing has landed unlooked" });
+  if (!due.length) return json({ ok: true, skipped: "nothing has landed unlooked" });
 
-  await markLooked(due.id);
+  await markLooked(due.map(r => r.id));
 
   // THE MAP, because the prompt now asks it to build a term he has never had
   // built and cannot know which those are without it. Asking her to teach from
@@ -3276,23 +3371,30 @@ async function postRelease(): Promise<Response> {
   const [notes, channels, story, loops, desk] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(),
   ]);
+  /* ONE TIME, AND EVERY ROW STANDING AT IT. Where the same print was filed
+     under several names the lines repeat with different figures against them,
+     and saying so is better than picking one: she is being told what the
+     calendar holds, not being handed a fact. */
+  const landed = due.map(r =>
+    `· ${r.name}` +
+    (r.consensus ? `, ${r.consensus} expected` : "") +
+    (r.prior ? `, after ${r.prior}` : "")).join("\n");
   const asked = RELEASE +
-    `\n\nWhat landed: ${nyTime(due.at)} ET ${due.name}` +
-    (due.consensus ? `, ${due.consensus} expected` : "") +
-    (due.prior ? `, after ${due.prior}` : "") + "." +
+    `\n\nWhat landed at ${nyTime(due[0].at)} ET:\n${landed}` +
     notes + channels + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'release look', RELEASE_TOOLS);
 
-  if (isSilent(said)) return json({ ok: true, release: due.name, said: "quiet" });
+  const named = due.map(r => r.name).join(", ");
+  if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
   await say(said);
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
-  await remember([{ role: 'user', content: `[${due.name} landed]` },
+  await remember([{ role: 'user', content: `[${named} landed]` },
                   { role: 'assistant', content: said }]);
-  return json({ ok: true, release: due.name, said: "sent" });
+  return json({ ok: true, release: named, said: "sent" });
 }
 
 /* ─── The trade she hears about in two minutes ─────────────────────────────
@@ -3900,6 +4002,18 @@ async function handleMessage(update: any): Promise<void> {
           err instanceof Error ? err.message : err);
         await say("I cannot read my notes just now, jefe.");
       }
+      return;
+    }
+    /* HIS HALF OF THE LADDER, answered from the database like /notes and for the
+       same reason: a rung is a fact, and a model asked to set one could
+       paraphrase which. `setChannel` is reused rather than rewritten, so the
+       one-way door on the bottom rung and the unseeded-table check hold here
+       exactly as they do for the nightly pass. */
+    const wanted = parseChannel(text);
+    if (wanted !== null) {
+      await say(typeof wanted === 'string'
+        ? wanted
+        : await setChannel(wanted.channel, wanted.state, 'he said so'));
       return;
     }
     // Any other slash command is addressed to Telegram, not to her, and /start

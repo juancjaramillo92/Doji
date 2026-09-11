@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 506 tests, six suites
+npm test      # 519 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -571,6 +571,16 @@ compounds.
   repetition. Both reads sit AFTER its early returns, so an ordinary fill still
   costs nothing.
 
+- **`/channel` is the one rung he can move himself, and it had to exist.** The
+  ladder climbs on him using a term back, judged at the nightly pass — so a
+  reader who takes the briefing and rarely answers it never leaves `explained`,
+  which is the rung that mandates restating the mechanism every time. The census
+  had no way up. `parseChannel` is exported and pure (the rung is the LAST word:
+  three of the five spoken names are several words long), and the write goes
+  through `setChannel` so the `unseen` guard and the unseeded-table check are not
+  copied. Her own reading of him is unchanged — `set_channel` stays out of
+  `CHAT_TOOLS`.
+
 - **`/notes` is his audit, and the whole of it is addressed to him.** Answered
   from the database rather than by the model, so nothing can paraphrase or drop a
   row — and `notesList` renders the channel map itself rather than appending
@@ -712,6 +722,18 @@ compounds.
   and is not yet `looked_at`. That column is stamped BEFORE the look, for the
   reason the briefing marker is: a look that generates and fails to write would
   repeat every fifteen minutes, each one billed.
+
+  ONE LOOK PER RELEASE TIME, NOT PER ROW, AND THE DIFFERENCE IS A FEEDBACK
+  LOOP. The key is `(at, name)` and the name is free text, so one print arrives
+  as four or five rows; each high one fired its own look, and the release look
+  holds `log_calendar`, so filing the actual under a slightly different name
+  INSERTED a row that was then unlooked and fired in its turn. Five messages for
+  one CPI, and the two apologies that surfaced it were duplicate looks
+  reconciling against the conversation window rather than her catching an error.
+  `dueRelease` is pure and takes the earliest release time with no mark on it;
+  `pendingRelease` therefore READS `looked_at` rather than filtering on it, and
+  `markLooked` takes every id in the group — that call site is the half no pure
+  test can reach, so `agree.test.mjs` reads it.
 
   `log_calendar` IS THE SECOND BOUNDARY HERE THAT UPSERTS, and it now follows
   the rule `emailRow` already states: an absent key and a null key mean opposite

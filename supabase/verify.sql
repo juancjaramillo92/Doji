@@ -503,6 +503,21 @@ from (values
        and column_name in ('wrote_1h','wrote_5m')),
    '2'),
 
+  -- The calendar's two writers are the briefing and the release look, hours
+  -- apart on the same row, so without this nothing can say which of two
+  -- disagreeing figures is the later one -- and the table exists to be read
+  -- back months from now.
+  ('the calendar records when it was last written',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_calendar'
+       and column_name = 'updated_at'),
+   '1'),
+  ('and a trigger moves it',
+   (select count(*)::text from pg_trigger
+     where tgrelid = to_regclass('public.eugenia_calendar')
+       and tgname = 'eugenia_calendar_touch_updated_at' and not tgisinternal),
+   '1'),
+
   ('RLS on eugenia_runs',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),
    'true'),
@@ -644,13 +659,13 @@ from (values
    (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
       from pg_indexes where schemaname = 'public' and indexname in (
         'dispatch_job_at','dispatch_unsettled',
-        'eugenia_calendar_at','eugenia_calendar_due','eugenia_loops_open',
+        'eugenia_calendar_at','eugenia_loops_open',
         'eugenia_notes_embedding','eugenia_notes_kind_id_desc','eugenia_notes_search',
         'eugenia_notes_trgm','eugenia_runs_at_desc','eugenia_runs_caller_at',
         'eugenia_turns_embedding','eugenia_turns_id_desc','eugenia_turns_search',
         'eugenia_turns_trgm','trades_user_open_day')),
    'dispatch_job_at,dispatch_unsettled,' ||
-   'eugenia_calendar_at,eugenia_calendar_due,eugenia_loops_open,' ||
+   'eugenia_calendar_at,eugenia_loops_open,' ||
    'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
    'eugenia_notes_trgm,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
    'eugenia_turns_embedding,eugenia_turns_id_desc,eugenia_turns_search,' ||
@@ -805,7 +820,7 @@ limit 10;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- IF THE GRID ABOVE IS THE ONLY ONE YOU CAN SEE, YOU RAN THE WHOLE FILE.
 -- A SQL editor displays the result of the LAST statement, and this is it — so
--- the 69 checks that answer "does the database match the files" ran and were
+-- the 71 checks that answer "does the database match the files" ran and were
 -- thrown away, and what is on screen instead is the last ten HTTP responses,
 -- which answer a different question entirely.
 --

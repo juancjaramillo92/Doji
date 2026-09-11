@@ -172,15 +172,34 @@ create table if not exists public.eugenia_calendar (
 
   created_at timestamptz not null default now(),
 
+  -- WHICH OF TWO CONTRADICTORY ROWS IS THE LATER ONE, which nothing could
+  -- answer. One release is filed in the morning and written again when it
+  -- prints, so the same row has two ages -- and when duplicates under different
+  -- names disagreed about what a number printed at, `created_at` said only when
+  -- each was first seen. A table built to compound has to be adjudicable.
+  updated_at timestamptz not null default now(),
+
   -- One row per release per moment. The poller's upsert shape, for the same
   -- reason: she re-reads the calendar every morning and must update rather than
   -- duplicate what she already filed.
   constraint eugenia_calendar_unique unique (at, name)
 );
 
--- The spine's read: high-impact, already landed, not yet looked at.
-create index if not exists eugenia_calendar_due
-  on public.eugenia_calendar (at) where looked_at is null;
+-- The column above has a default for the INSERT; this is what moves it on every
+-- UPDATE, including the PATCH that stamps looked_at. Named and shaped after
+-- `trades_touch`, which does the same job for the same reason in 001.
+alter table public.eugenia_calendar add column if not exists updated_at timestamptz not null default now();
+
+create or replace function public.eugenia_calendar_touch()
+returns trigger
+language plpgsql
+as $$ begin new.updated_at := now(); return new; end $$;
+
+drop trigger if exists eugenia_calendar_touch_updated_at on public.eugenia_calendar;
+create trigger eugenia_calendar_touch_updated_at
+  before update on public.eugenia_calendar
+  for each row execute function public.eugenia_calendar_touch();
+
 -- The briefing's read, and the app card's: today, in order.
 create index if not exists eugenia_calendar_at on public.eugenia_calendar (at desc);
 

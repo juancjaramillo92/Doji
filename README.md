@@ -1451,9 +1451,24 @@ genuinely happened was the moment she was least likely to speak.
 **She files the calendar she reads.** `log_calendar` records what is scheduled —
 the time in UTC, the name, the consensus, the prior — and the briefing calls it
 every morning before writing a word. A **quarter-hourly job** then asks one
-question: has anything marked `high` landed and not yet been looked at? If so she
-searches for what it printed, files the actual, and decides whether it is worth
-saying. `looked_at` is what makes that once-only; it is stamped **before** the
+question: **which release time has landed and not yet been looked at?** If there
+is one she searches for what those printed, files the actuals, and decides
+whether it is worth saying.
+
+**The question is about the time rather than the row, because one print is not
+one row.** The unique key is `(at, name)` and the name is free text she writes,
+so `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
+number to a person — and each one marked `high` used to fire its own look, its
+own model call and its own message. Five for a single CPI on 11 September. It
+also fed itself: the release look holds `log_calendar` too, so filing the actual
+under a name a shade different from the one it was handed **inserted** rather
+than updated, and that new row was then unlooked and fired in its turn. What
+arrived as two apologies in two days was never her catching an error — it was a
+duplicate look reaching the same print with better information and reconciling
+against the message still sitting in the conversation window. `dueRelease` takes
+the earliest release time nothing has looked at and every high row standing at
+it; a row minted at 08:35 shares that time and cannot open a second look, and
+where two genuinely different numbers land together one message covers both. `looked_at` is what makes that once-only; it is stamped **before** the
 look for the reason the briefing marker is, since a look that generates and fails
 to write would otherwise repeat every fifteen minutes, each one a billed call.
 
@@ -1471,6 +1486,12 @@ one actual is one.
 It is a second schedule rather than a faster one, because the four hourly
 predicates all test `hour ===` and a `*/15` job would have run four briefings
 every morning. `?release=1` is its door and the way to exercise a look by hand.
+
+**And the row records when it was last written.** Two writers hours apart on one
+row means `created_at` says only when each was first seen — so when duplicates
+disagreed about what a number printed at, nothing could say which figure was the
+later one. `updated_at` moves on every UPDATE through a trigger, the same shape
+`trades` has used since `001`.
 
 **Its default is silence**, on the pulse's reasoning exactly: a number landing
 where everyone expected it is not news. `isSilent` is shared with it rather than
@@ -2153,6 +2174,23 @@ appended after it: the block the briefing uses is written for her and opens
 *Where he stands on each channel*, so the one message in the system addressed to
 him used to switch into the third person about him halfway down. Rendering the
 whole audit in one place fixes that and makes it one pure function.
+
+**And `/channel` is the half of that map he can move himself.**
+`/channel <channel> <rung>` — either the id or the spoken name the listing
+prints, and the rung as the last word, because three of the five names are
+several words long. It reuses `setChannel`, so the one-way door on `unseen` and
+the check for an unseeded table hold exactly as they do for the nightly pass.
+
+It exists because **the ladder could only ever climb on evidence he does not
+produce.** A rung moves at the nightly pass and it moves on him using a term
+back, so a reader who takes the briefing and rarely answers it sits at
+`explained` for ever — and `explained` is the rung that says restate the
+mechanism in a clause every time the word is used. Weeks of that read as her
+being unable to stop over-explaining; what it actually was is a census with no
+way up. That stays true of *her* reading of him — one exchange is not evidence,
+and `set_channel` is still out of `CHAT_TOOLS`. This is not her reading of him:
+it is him saying where he is, which is the standing a demotion already had and
+the only testimony on the subject that was never in doubt.
 
 It also means a failed channel read now costs the whole `/notes` reply rather
 than being swallowed, which is the opposite of the rule the briefing's blocks
