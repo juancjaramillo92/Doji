@@ -980,6 +980,29 @@ async function readStats(days: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 const CALENDAR_MAX = 12;
 
+/* A ROLLING WINDOW RATHER THAN A CIVIL DAY, and it is the simpler correct
+   answer as well as the cheaper one. What a briefing wants is "what just landed
+   and what is coming", which straddles midnight in exactly the way a civil-day
+   filter handles worst — the Sunday 17:00 briefing is about a week that has not
+   started yet. Twelve hours back and a day forward covers both without any
+   boundary arithmetic to get wrong.
+
+   AND IT BOUNDS THE WRITE AS WELL AS THE READ NOW, which is what stops the
+   duplicates rather than stopping them speaking. She was filing releases four
+   and five days out — and the block she is handed reaches a day, so she could
+   not see what she had already filed for those mornings. `on_conflict` merges
+   on an exact (at, name) match and nothing reproduces its own wording across
+   five days, so one CPI arrived as `August CPI`, `core CPI`,
+   `US CPI (core CPI)`, `US CPI (August)` and `headline CPI`: five rows laid
+   down by four different turns, each blind to the last.
+
+   Nothing reads past this window either — `readCalendar` stops at a day,
+   `aheadToday` at eight hours, `pendingRelease` looks only backwards — so a row
+   beyond it has no consumer and exists purely to become a duplicate. She may
+   file what she can see, which is also what `log_calendar` already tells her to
+   file: what is scheduled TODAY. */
+const CAL_BACK = 12, CAL_AHEAD = 24;
+
 const CALENDAR_TOOL = {
   name: "log_calendar",
   description:
@@ -1026,9 +1049,19 @@ async function logCalendar(releases: unknown): Promise<string> {
   const list = Array.isArray(releases) ? releases.slice(0, CALENDAR_MAX) : [];
   if (!list.length) return "Nothing to record.";
 
+  const now = Date.now();
+  let unseen = 0;
+
   const rows = list.map((r: any) => {
     const at = new Date(String(r?.at ?? ""));
     if (isNaN(+at) || !String(r?.name ?? "").trim()) return null;
+    // Outside what she is handed, so she cannot check it against what is
+    // already there — see the window above. Counted rather than dropped in
+    // silence: a bound she cannot see is a bound she files against for ever.
+    if (+at < now - CAL_BACK * 3600_000 || +at > now + CAL_AHEAD * 3600_000) {
+      unseen++;
+      return null;
+    }
     const importance = ['high', 'medium', 'low'].includes(String(r?.importance)) ? String(r.importance) : 'high';
     const text = (v: unknown) => {
       const s = String(v ?? "").trim();
@@ -1054,7 +1087,15 @@ async function logCalendar(releases: unknown): Promise<string> {
     };
   }).filter(Boolean);
 
-  if (!rows.length) return "None of those had a readable time, so nothing was recorded.";
+  const beyond = unseen
+    ? ` ${unseen} ${unseen === 1 ? 'was' : 'were'} outside the day this calendar covers` +
+      ` and ${unseen === 1 ? 'was' : 'were'} not recorded — file those on the morning they land.`
+    : "";
+  if (!rows.length) {
+    return unseen
+      ? `Nothing recorded.${beyond}`
+      : "None of those had a readable time, so nothing was recorded.";
+  }
 
   /* AND THE ROWS GO UP IN GROUPS THAT CARRY THE SAME KEYS, which is what makes
      the omission above reach the database at all: PostgREST refuses a bulk
@@ -1076,7 +1117,7 @@ async function logCalendar(releases: unknown): Promise<string> {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     }
-    return `Recorded ${rows.length}.`;
+    return `Recorded ${rows.length}.${beyond}`;
   } catch (err) {
     console.error("doji-eugenia: calendar not written —", err instanceof Error ? err.message : err);
     return "That did not save. Carry on and do not mention it.";
@@ -2531,13 +2572,6 @@ type Release = {
   looked_at?: string | null;
 };
 
-/* A ROLLING WINDOW RATHER THAN A CIVIL DAY, and it is the simpler correct
-   answer as well as the cheaper one. What a briefing wants is "what just landed
-   and what is coming", which straddles midnight in exactly the way a civil-day
-   filter handles worst — the Sunday 17:00 briefing is about a week that has not
-   started yet. Twelve hours back and a day forward covers both without any
-   boundary arithmetic to get wrong. */
-const CAL_BACK = 12, CAL_AHEAD = 24;
 
 async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();

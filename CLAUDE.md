@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 519 tests, six suites
+npm test      # 521 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -734,6 +734,14 @@ compounds.
   `pendingRelease` therefore READS `looked_at` rather than filtering on it, and
   `markLooked` takes every id in the group — that call site is the half no pure
   test can reach, so `agree.test.mjs` reads it.
+
+  AND THE WRITE IS BOUNDED BY THE WINDOW SHE IS HANDED, `CAL_BACK`/`CAL_AHEAD`,
+  which is where the duplicates actually came from. She filed four and five days
+  ahead against a block that reaches one day, so every morning re-filed the same
+  release under wording it could not see and had no way to match. Nothing reads
+  past that window, so those rows had no consumer at all. The count of what was
+  refused goes back in the tool's answer: a bound she cannot see is one she
+  files against for ever.
 
   `log_calendar` IS THE SECOND BOUNDARY HERE THAT UPSERTS, and it now follows
   the rule `emailRow` already states: an absent key and a null key mean opposite

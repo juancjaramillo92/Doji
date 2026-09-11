@@ -1487,6 +1487,18 @@ It is a second schedule rather than a faster one, because the four hourly
 predicates all test `hour ===` and a `*/15` job would have run four briefings
 every morning. `?release=1` is its door and the way to exercise a look by hand.
 
+**And she may only file what she can see**, which is what stops the duplicates
+rather than stopping them speaking. She was filing releases four and five days
+out, while the calendar block she is handed reaches one day — so she could not
+check a new entry against what was already there, and `on_conflict` merges only
+on an exact `(at, name)` match. One CPI arrived as `August CPI`, `core CPI`,
+`US CPI (core CPI)`, `US CPI (August)` and `headline CPI`: five rows laid down
+by four different turns across five days, each blind to the last. Nothing reads
+past that window either — the block stops at a day, the pending look at eight
+hours — so a row beyond it had no consumer at all and existed only to become a
+duplicate. `log_calendar` refuses one now and says how many it refused, because
+a bound she cannot see is a bound she files against for ever.
+
 **And the row records when it was last written.** Two writers hours apart on one
 row means `created_at` says only when each was first seen — so when duplicates
 disagreed about what a number printed at, nothing could say which figure was the

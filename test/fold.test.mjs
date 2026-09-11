@@ -2146,6 +2146,35 @@ async function calendarWrites(releases) {
 const LANDED = { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high',
                  actual: '+0.4% m/m', note: 'headline in line' };
 
+test('a release beyond the day she is handed is not filed', async () => {
+  /* THE DUPLICATES CAME FROM HERE, and from four different turns rather than
+     from the release look: `August CPI` was laid down on the Sunday, `core CPI`
+     half an hour later, `US CPI (core CPI)` on the Monday, `US CPI (August)` on
+     the Thursday — five days of filing the same Friday morning, each turn blind
+     to the last because the block she is handed reaches one day and
+     `on_conflict` merges only on an exact name.
+
+     Nothing reads past the window either, so the row had no consumer at all. */
+  const far = new Date(Date.now() + 5 * 86_400_000).toISOString();
+  const { sent, said } = await calendarWrites([
+    { at: far, name: 'FOMC decision', importance: 'high' },
+  ]);
+  assert.equal(sent.length, 0, 'a release five days out was written, so it will be filed again tomorrow');
+  assert.match(said, /not recorded/, 'the drop is silent, so she files against the bound for ever');
+});
+
+test('and the day she is handed is filed', async () => {
+  // The bound must not swallow the ordinary case: a briefing files this morning
+  // and tomorrow's open, and the release look comes back minutes after a print.
+  for (const [when, label] of [[6 * 3600_000, 'this evening'],
+                               [20 * 3600_000, "tomorrow's open"],
+                               [-600_000, 'the print ten minutes ago']]) {
+    const at = new Date(Date.now() + when).toISOString();
+    const { sent } = await calendarWrites([{ at, name: 'CPI', importance: 'high' }]);
+    assert.equal(sent.length, 1, `${label} was refused`);
+  }
+});
+
 test('the release look fills in the actual and names no other column', async () => {
   const { sent } = await calendarWrites([LANDED]);
   assert.equal(sent.length, 1);
