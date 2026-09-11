@@ -1457,6 +1457,17 @@ saying. `looked_at` is what makes that once-only; it is stamped **before** the
 look for the reason the briefing marker is, since a look that generates and fails
 to write would otherwise repeat every fifteen minutes, each one a billed call.
 
+**The same row is written twice, so a figure she does not send must not erase
+the one already there.** The briefing files what is coming and the release look
+comes back with what it printed — and `merge-duplicates` updates exactly the
+columns the payload names, so a second write carrying `consensus: null` erased
+the very figure the actual exists to be compared against, on every release, with
+nothing failing and the row still well formed. Only the figures she actually
+sends are written. Rows go up grouped by the columns they carry, because
+PostgREST refuses a bulk insert whose objects do not all name the same ones — a
+briefing filing a mixed calendar is two or three requests, a release look filling
+one actual is one.
+
 It is a second schedule rather than a faster one, because the four hourly
 predicates all test `hour ===` and a `*/15` job would have run four briefings
 every morning. `?release=1` is its door and the way to exercise a look by hand.

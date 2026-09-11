@@ -1034,21 +1034,48 @@ async function logCalendar(releases: unknown): Promise<string> {
       const s = String(v ?? "").trim();
       return s ? s.slice(0, NOTE_MAX) : null;
     };
+    /* ONLY THE FIGURES SHE ACTUALLY SENT, and under `merge-duplicates` that is
+       the difference between filling a row in and emptying it. This is the
+       second write that matters: the briefing files what is coming and the
+       release look comes back for the same row with the actual — and it is not
+       asked to repeat the consensus, because it already has it. Sent as an
+       explicit null, that second write ERASED the consensus and the prior it
+       exists to be compared against, on every release, with nothing failing.
+       `emailRow` states the rule this was missing: an absent key and a null key
+       mean opposite things here. */
+    const given: Record<string, string> = {};
+    for (const k of ['consensus', 'prior', 'actual', 'note'] as const) {
+      const v = text(r?.[k]);
+      if (v) given[k] = v;
+    }
     return {
       at: at.toISOString(), name: String(r.name).trim().slice(0, NOTE_MAX), importance,
-      consensus: text(r?.consensus), prior: text(r?.prior),
-      actual: text(r?.actual), note: text(r?.note), source: 'briefing',
+      ...given, source: 'briefing',
     };
   }).filter(Boolean);
 
   if (!rows.length) return "None of those had a readable time, so nothing was recorded.";
 
+  /* AND THE ROWS GO UP IN GROUPS THAT CARRY THE SAME KEYS, which is what makes
+     the omission above reach the database at all: PostgREST refuses a bulk
+     insert whose objects do not all name the same columns. A briefing filing
+     twelve releases sends two or three requests; a release look filling one
+     actual sends one. Grouping is also the safe shape if that rule ever
+     relaxes — a lenient server writes exactly the same rows. */
+  const groups = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const shape = Object.keys(row!).sort().join(",");
+    (groups.get(shape) ?? groups.set(shape, []).get(shape)!).push(row);
+  }
+
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?on_conflict=at,name`, {
-      method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
-      body: JSON.stringify(rows),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    for (const batch of groups.values()) {
+      const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?on_conflict=at,name`, {
+        method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
+        body: JSON.stringify(batch),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    }
     return `Recorded ${rows.length}.`;
   } catch (err) {
     console.error("doji-eugenia: calendar not written —", err instanceof Error ? err.message : err);

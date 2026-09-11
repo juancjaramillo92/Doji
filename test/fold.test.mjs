@@ -2005,6 +2005,86 @@ test('a vendor that stops splitting the total reads as wrong, never as free', as
   assert.match(lines[0], /0\+1300 written/);
 });
 
+/* ─── A figure she does not send must not erase the one already there ────────
+   THE SAME ROW IS WRITTEN TWICE BY DESIGN — the briefing files what is coming,
+   the release look comes back with what it printed — and `merge-duplicates`
+   updates exactly the columns the payload names. Sent as an explicit null, the
+   second write erased the consensus and the prior that the whole table exists
+   to compare an actual against, on every release, with nothing failing and the
+   row still looking well formed.
+
+   `emailRow` states the rule this was missing, in a comment, about the other
+   boundary in this repository that upserts: an absent key and a null key mean
+   opposite things here.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Every body logCalendar posted, parsed. SB_URL is "" under Node.
+async function calendarWrites(releases) {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), rows: JSON.parse(init.body) });
+    return { ok: true, status: 201, json: async () => [] };
+  };
+  console.error = () => {};
+  try {
+    return { said: await serve('log_calendar', { releases }), sent };
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+}
+
+const LANDED = { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high',
+                 actual: '+0.4% m/m', note: 'headline in line' };
+
+test('the release look fills in the actual and names no other column', async () => {
+  const { sent } = await calendarWrites([LANDED]);
+  assert.equal(sent.length, 1);
+  const [row] = sent[0].rows;
+  assert.equal(row.actual, '+0.4% m/m');
+  // THE WHOLE POINT. Present-and-null is an erasure; absent is "leave it".
+  assert.ok(!('consensus' in row),
+    'the row names consensus, so this write nulls the figure the briefing filed ' +
+    'and the actual has nothing left to be compared against');
+  assert.ok(!('prior' in row), 'the row names prior, which this write does not know');
+});
+
+test('a figure she did send is still written', async () => {
+  // The omission must not become a silent refusal to record anything optional.
+  const { sent } = await calendarWrites([{ ...LANDED, consensus: '+0.4% expected' }]);
+  assert.equal(sent[0].rows[0].consensus, '+0.4% expected');
+});
+
+test('rows carrying different columns go up as separate requests', async () => {
+  /* PostgREST refuses a bulk insert whose objects do not all name the same
+     columns, so without this the omission above turns a briefing into a 400 —
+     which logCalendar swallows into "that did not save", and the day's calendar
+     silently stops being filed. A briefing files a mix on any ordinary day. */
+  const { sent, said } = await calendarWrites([
+    { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high', consensus: '3.4% y/y' },
+    { at: '2026-09-11T14:00:00Z', name: 'Michigan sentiment', importance: 'medium' },
+    { at: '2026-09-11T12:30:00Z', name: 'claims', importance: 'medium', prior: '206k' },
+  ]);
+  assert.equal(sent.length, 3, 'rows with three different column sets went up together');
+  for (const { rows } of sent) {
+    const shapes = new Set(rows.map(r => Object.keys(r).sort().join(',')));
+    assert.equal(shapes.size, 1, 'a request mixes column sets and PostgREST will refuse it');
+  }
+  assert.match(said, /Recorded 3\./, 'the count reports the rows, not the requests');
+});
+
+test('rows carrying the same columns still share one request', async () => {
+  // The grouping is not one request per row: a briefing filing a uniform
+  // calendar should still cost a single write.
+  const { sent } = await calendarWrites([
+    { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high', consensus: 'a' },
+    { at: '2026-09-11T14:00:00Z', name: 'Michigan', importance: 'high', consensus: 'b' },
+  ]);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].rows.length, 2);
+});
+
 /* ─── The email boundary ─────────────────────────────────────────────────────
    doji-email-sync is the only function here that reads a request body, so it is
    the only one with a shape to check. What it must guarantee is what the Apps

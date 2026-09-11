@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 502 tests, six suites
+npm test      # 506 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -711,7 +711,15 @@ compounds.
   anything `high` that has landed
   and is not yet `looked_at`. That column is stamped BEFORE the look, for the
   reason the briefing marker is: a look that generates and fails to write would
-  repeat every fifteen minutes, each one billed. It is a second job rather than a
+  repeat every fifteen minutes, each one billed.
+
+  `log_calendar` IS THE SECOND BOUNDARY HERE THAT UPSERTS, and it now follows
+  the rule `emailRow` already states: an absent key and a null key mean opposite
+  things under `merge-duplicates`. One row, two writers, the briefing filing the
+  consensus and the release look coming back with the actual — sending every
+  column each time erased the comparison the table exists for, invisibly. Only
+  what she sent is written, and rows go up grouped by the columns they carry
+  because PostgREST refuses a bulk insert that mixes them. It is a second job rather than a
   faster one because every hourly predicate tests `hour ===` — a `*/15` on the
   existing job runs four briefings a morning.
 
