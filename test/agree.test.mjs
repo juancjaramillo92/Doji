@@ -3421,6 +3421,47 @@ test('one chain per briefing is stated to the writer and to the critic', () => {
     'chain actually lived');
 });
 
+/* ─── A thread that cannot close fills the list that holds the ones that can ──
+   `readLoops` takes the newest ten and the window was already full: six watches
+   and four questions. The eleventh loop she opens pushes the oldest out of what
+   she is HANDED while leaving it open in the table, so it can never be closed
+   by anyone who cannot see it — the same limit-at-the-right-end shape as the
+   nightly pass's, arriving where the assumption underneath it was that threads
+   close at all.
+
+   Two kinds could not. A move filed as unexplained when nothing had moved, now
+   fixed at the gate; and a question he does not answer, which closes only on an
+   answer. The pass was told to write a NOTE about the second and not to close
+   it — so it wrote one, correctly, and nothing acted on it. Both halves below
+   fail in silence: drop either and she keeps asking, the list keeps filling,
+   and no error is raised anywhere.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a question he has not answered in a week is closed, not kept', () => {
+  assert.match(EUGENIA_PROMPT, /A QUESTION IS THE ONE EXCEPTION, AND A WEEK IS ITS ANSWER/,
+    'the nightly pass no longer closes a question he has not answered, so every ' +
+    'one of them stays open for the life of the deployment');
+
+  // AND THE WATCH IS NOT SWEPT UP WITH IT. Age proves nothing about an odd
+  // reaction — it may still explain itself — so the exception has to stay an
+  // exception rather than becoming "close anything old".
+  assert.match(EUGENIA_PROMPT, /A thread that is merely old stays open/,
+    'the pass may now close a watch for being old, which is the follow-through ' +
+    'this whole mechanism exists for, quietly stopping');
+});
+
+test('the briefing reads the open questions before asking another', () => {
+  assert.match(EUGENIA_PROMPT, /AND THE OPEN THREADS SAY WHETHER TO ASK AT ALL/,
+    'nothing connects what he has not answered to whether she asks again — she ' +
+    'is handed the evidence every morning and has no rule that reads it');
+
+  // The slot has always permitted silence; what was missing is the evidence
+  // for choosing it. Both halves are needed, so both are read.
+  assert.match(EUGENIA_PROMPT, /A single question to him, or nothing at all/,
+    'the question slot no longer permits silence, so the rule above has nothing ' +
+    'to resolve to');
+});
+
 test('the verdicts a tap can carry are the verdicts the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_feedback_verdict_check');
   assert.ok(declared, '005 no longer constrains eugenia_feedback.verdict');

@@ -1630,6 +1630,28 @@ unexplained move must be told as an unexplained move — what it did, and that s
 cannot yet see why — rather than as a cause she reached for. That is what
 `open_loop` is for.
 
+**A thread that cannot close fills the list that holds the ones that can.**
+`readLoops` takes the newest ten, and the window filled: six watches and four
+questions. The eleventh loop pushes the oldest out of what she is *handed* while
+leaving it open in the table — so it can never be closed by anyone who cannot
+see it. That limit takes the newest rows, which is the right end; what the rule
+assumed underneath it is that threads close at all.
+
+Two kinds could not. A move filed as unexplained when nothing had actually
+moved, which the gate above now prevents. And a question he does not answer,
+which closed only on an answer: the nightly pass was told to write a *note*
+about a week-old question rather than close it, so it wrote one — *"he engages
+by instruction, not by reply"* — and nothing acted on it. **A question he has not
+answered in a week he has answered.** It closes now, with a line saying so, and
+the note is still written. A watch is untouched by that: age proves nothing
+about an odd reaction, which may still explain itself.
+
+And the briefing reads the same list before asking again. The question slot has
+always permitted silence — *"a single question to him, or nothing at all"* — but
+nothing connected that to the evidence she is handed every morning. Two or more
+questions standing unanswered means the slot is not working on him, whatever it
+is worth in principle, and the right number that morning is none.
+
 **And it teaches, which for a long time it was the only unscheduled look that
 did not.** The print look builds a mechanism he has never had built before saying
 what a number changed; this one only reported. But what moves gold runs through a

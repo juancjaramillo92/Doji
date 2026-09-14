@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 525 tests, six suites
+npm test      # 527 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -581,6 +581,21 @@ compounds.
   have named, so without the window the sharpest thing she sends arrives as a
   repetition. Both reads sit AFTER its early returns, so an ordinary fill still
   costs nothing.
+
+- **A LOOP THAT CANNOT CLOSE IS THE ONE THAT FILLS THE WINDOW.** `readLoops`
+  takes the newest ten and the list was already at ten, so the next loop opened
+  pushes the oldest out of what she is HANDED while leaving it open in the
+  table — unreachable by the only thing that could close it. The limit is at the
+  right end; what it assumed is that threads close at all. Two kinds did not: an
+  unexplained move that was noise, fixed at the gate above, and a question he
+  never answers. The pass was told to write a NOTE about a week-old question
+  instead of closing it, so it wrote one and nothing read it — the observation
+  complete and the behaviour missing. A question unanswered for a week IS
+  answered; it closes, the note is still written, and a WATCH is untouched
+  because age proves nothing about an odd reaction. The briefing reads the same
+  list before asking again: the slot always permitted silence and nothing
+  connected that to the evidence. `agree.test.mjs` reads all four halves, since
+  dropping any of them raises nothing and simply refills the list.
 
 - **`/channel` is the one rung he can move himself, and it had to exist.** The
   ladder climbs on him using a term back, judged at the nightly pass — so a
