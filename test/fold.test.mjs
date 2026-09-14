@@ -2143,8 +2143,12 @@ async function calendarWrites(releases) {
   }
 }
 
-const LANDED = { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high',
-                 actual: '+0.4% m/m', note: 'headline in line' };
+// RELATIVE, BECAUSE THE RULE IT IS TESTED AGAINST READS THE CLOCK. Pinned to a
+// date, this fixture passed for two days and then aged out of the window
+// log_calendar now enforces — a test that starts failing on a Tuesday for a
+// reason that has nothing to do with the code.
+const LANDED = { at: new Date(Date.now() - 600_000).toISOString(), name: 'CPI',
+                 importance: 'high', actual: '+0.4% m/m', note: 'headline in line' };
 
 test('a release beyond the day she is handed is not filed', async () => {
   /* THE DUPLICATES CAME FROM HERE, and from four different turns rather than
@@ -2198,10 +2202,12 @@ test('rows carrying different columns go up as separate requests', async () => {
      columns, so without this the omission above turns a briefing into a 400 —
      which logCalendar swallows into "that did not save", and the day's calendar
      silently stops being filed. A briefing files a mix on any ordinary day. */
+  const soon = new Date(Date.now() + 3600_000).toISOString();
+  const later = new Date(Date.now() + 5 * 3600_000).toISOString();
   const { sent, said } = await calendarWrites([
-    { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high', consensus: '3.4% y/y' },
-    { at: '2026-09-11T14:00:00Z', name: 'Michigan sentiment', importance: 'medium' },
-    { at: '2026-09-11T12:30:00Z', name: 'claims', importance: 'medium', prior: '206k' },
+    { at: soon,  name: 'CPI', importance: 'high', consensus: '3.4% y/y' },
+    { at: later, name: 'Michigan sentiment', importance: 'medium' },
+    { at: soon,  name: 'claims', importance: 'medium', prior: '206k' },
   ]);
   assert.equal(sent.length, 3, 'rows with three different column sets went up together');
   for (const { rows } of sent) {
@@ -2215,8 +2221,8 @@ test('rows carrying the same columns still share one request', async () => {
   // The grouping is not one request per row: a briefing filing a uniform
   // calendar should still cost a single write.
   const { sent } = await calendarWrites([
-    { at: '2026-09-11T12:30:00Z', name: 'CPI', importance: 'high', consensus: 'a' },
-    { at: '2026-09-11T14:00:00Z', name: 'Michigan', importance: 'high', consensus: 'b' },
+    { at: new Date(Date.now() + 3600_000).toISOString(), name: 'CPI', importance: 'high', consensus: 'a' },
+    { at: new Date(Date.now() + 5 * 3600_000).toISOString(), name: 'Michigan', importance: 'high', consensus: 'b' },
   ]);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].rows.length, 2);
@@ -3306,12 +3312,20 @@ test('the floor is a share of the price, so it cannot go stale as gold moves', (
      never — and never looks exactly like a quiet market. */
   const small = { ...MARK, bid: QUOTE.bid - QUOTE.bid * MOVE_FLOOR * 0.9 };
   assert.equal(moveWorth(QUOTE, small, LOOKED).worth, false);
-  assert.match(moveWorth(QUOTE, small, LOOKED).why, /floor/);
 
-  // The same absolute move at a much lower price does clear it, which is the
-  // whole point of expressing it as a share.
-  const cheap = { ...QUOTE, bid: 2000, high: 2000, low: 2000 };
-  assert.equal(moveWorth(cheap, { ...MARK, bid: 2000 - QUOTE.bid * MOVE_FLOOR * 0.9 }, LOOKED).worth, true);
+  /* AND THE GUARANTEE SURVIVED THE GATES BEING RECOMPOSED, which is the half
+     worth asserting rather than the rejection: the floor now bounds the BAR
+     instead of standing beside it, so nothing under this share of the price can
+     ever be reported — the bar is never below it. Asserted over a sweep rather
+     than at one price, because a single quote cannot tell a floor that scales
+     from one that happens to be right at 4,400. */
+  for (const price of [1800, 2000, 3000, 4400, 6000]) {
+    const range = price * 0.01;                        // a full, ordinary session
+    const spot = { ...QUOTE, bid: price, high: price, low: price - range };
+    const just = price * MOVE_FLOOR * 0.99;
+    assert.equal(moveWorth(spot, { ...MARK, bid: price - just }, LOOKED).worth, false,
+      `a move of ${just.toFixed(2)} was reported at ${price}, under the floor`);
+  }
 });
 
 test('a move small against the day range is the day, not an event', () => {
@@ -3329,56 +3343,86 @@ test('a move small against the day range is the day, not an event', () => {
   assert.ok(12.5 < (QUOTE.high - QUOTE.low) * MOVE_SHARE);
 });
 
-/* ─── The evening roll, which is where both gates were weakest ───────────────
-   THE ONE MESSAGE THIS SENSE HAS ACTUALLY SENT WRONG, replayed from what he was
-   shown. At 20:57 New York it said gold was "up $12 on the day and $7 of that
-   in the last quarter hour", on a day that had opened near 4,440 and was up
-   more than $40.
+/* ─── The evening roll, which is where the gates were weakest ────────────────
+   THE SESSION RESTARTS AT 17:00 NEW YORK, so for hours every evening the range
+   is small because the session is YOUNG rather than because the market is
+   quiet. The two gates used to stand side by side, so a range near zero made
+   the share stop binding and left the floor as the whole test — a bar written
+   for a full day's trading, carried alone through the thinnest hours.
 
-   Both halves of that come from the same fact and it is the one nothing in the
-   code had written down: the broker's session rolls at 17:00 New York, so at
-   20:57 every figure in the quote was under four hours old. The $12 was the
-   move since that roll, read off `change` and reported as the day. And the $7
-   cleared the share gate only because the range it is taken against had
-   restarted with the session — $7 of a $20 evening range passes a test written
-   for $7 of a $39 day.
+   THE PREVIOUS PASS SAW THAT AND CHOSE THE WRONG OF TWO OPTIONS. It reasoned
+   that the share could not be fixed from here, since nothing this system reads
+   spans the calendar day, so the floor had to be set to an amount that is an
+   event in the thin hours. There was a third option it did not consider:
+   refuse to judge. A session with no range yet is one the share cannot be
+   applied to, and silence is a better answer than a lower standard.
 
-   The share cannot be fixed from here; nothing this system reads spans the
-   calendar day. The floor can, and this is the case that says what it has to
-   be: an amount that is an event in the thin hours, since the thin hours are
-   exactly when the share has stopped binding and the floor is alone. */
+   What it cost meanwhile is on his `/notes` — $13 just after the Sunday roll on
+   6 September and $17 just after the next one on the 13th, both filed as
+   unexplained and neither ever closed, because there was nothing to explain.
+   The one real find in that run, $33 at 11:12 on a Wednesday, cleared both
+   gates on its own. A sense that manufactures a loop it cannot close is worse
+   than a quiet one: the loop then rides into every briefing after it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// The session as she described it at 20:57: 4,485 the top, and a range that
+// began at the 17:00 roll rather than at the day's low near 4,440.
+const EVENING = { ...QUOTE, bid: 4485, high: 4485, low: 4467, prev_close: 4473,
+                  change: 12, change_pct: 0.27 };
+
 test('the $7 evening drift that reached him does not clear the gates now', () => {
-  // The session as she described it: 4,485 the top, and a range that began at
-  // the 17:00 roll rather than at the day's low near 4,440.
-  const evening = {
-    ...QUOTE, bid: 4485, high: 4485, low: 4467, prev_close: 4473,
-    change: 12, change_pct: 0.27,
-  };
-  const before = { ...MARK, bid: 4478 };
-
-  const out = moveWorth(evening, before, LOOKED);
+  const out = moveWorth(EVENING, { ...MARK, bid: 4478 }, LOOKED);
   assert.equal(out.worth, false, 'a $7 drift in thin evening trade is not a sharp move');
-  assert.match(out.why, /floor/);
+  assert.match(out.why, /no session range/);
 
-  // And the share is shown to be no help here, which is the finding rather than
-  // an aside: $7 of a $20 range passes it. The floor is the only gate left
-  // standing between the roll and a rebuilt range, which is why it carries the
-  // whole test for seven hours of every weekday.
-  assert.ok(7 >= (evening.high - evening.low) * MOVE_SHARE,
-    'the share still admits this — the floor is what now rejects it');
-
-  // The gate is not simply shut: a move that is genuinely sharp for the hour
-  // still gets through, or this would be a sense that fires on nothing.
-  assert.equal(moveWorth(evening, { ...MARK, bid: 4470 }, LOOKED).worth, true);
+  // THE SHARE ADMITS IT, which is the finding rather than an aside: $7 of an
+  // $18 range passes a test written for $14 of a $39 one. What rejects it is
+  // that the $18 range is too narrow to be a bar at all.
+  assert.ok(7 >= (EVENING.high - EVENING.low) * MOVE_SHARE,
+    'the share no longer admits this, so it is not the case this test was built on');
 });
 
-test('a quote with no range is decided by the floor alone', () => {
-  /* foldSpot FALLS BACK TO THE BID for a quote carrying no high or low, which
-     makes the range zero — and a share of zero is zero, so every move would
-     clear it. The floor is what still has to be satisfied. */
+test('the two drops that became loops nobody could close are silent now', () => {
+  /* THE ACTUAL MESSAGES, from the open threads in his own audit. Both cleared
+     the old floor by a couple of dollars with nothing behind it. */
+  for (const [size, when] of [[13, 'Sun 6 Sept, 21:00 ET'], [17, 'Sun 13 Sept, after the roll']]) {
+    const out = moveWorth(EVENING, { ...MARK, bid: EVENING.bid - size }, LOOKED);
+    assert.equal(out.worth, false, `the $${size} drop of ${when} still reaches him`);
+    assert.ok(size > EVENING.bid * MOVE_FLOOR,
+      `$${size} is under the floor, so this proves nothing about the composition`);
+  }
+});
+
+test('and the evening is not simply shut: a move that builds its own range speaks', () => {
+  /* THE COST OF THE CHANGE, STATED RATHER THAN HIDDEN. The bar is higher after
+     the roll than it is at noon — which is the intent, since a young session is
+     one she cannot judge against. A real move is not silenced by it, because a
+     real move IS the range: a $35 fall takes the low with it. */
+  const violent = { ...EVENING, low: 4450 };
+  const out = moveWorth(violent, { ...MARK, bid: 4485 + 35 }, LOOKED);
+  assert.equal(out.worth, true, 'a $35 evening move is silenced, which is too far');
+  assert.equal(out.move, -35);
+});
+
+test('the mid-session drop that was a real find still is', () => {
+  // $33 at 11:12 on 9 September, on a session that had travelled a full day.
+  // It cleared both gates before and has to clear both now, or the change has
+  // bought quiet by turning the sense off.
+  const midday = { ...QUOTE, bid: 4419.82, high: 4452, low: 4413 };
+  const out = moveWorth(midday, { ...MARK, bid: 4419.82 + 33 }, LOOKED);
+  assert.equal(out.worth, true);
+  assert.equal(out.move, -33);
+});
+
+test('a quote carrying no range is not judged at all', () => {
+  /* foldSpot FALLS BACK TO THE BID for a quote with no high or low, which makes
+     the range zero. That used to leave the floor deciding alone; it now lands
+     where every other rangeless session lands — there is nothing to judge
+     against, so she says nothing. */
   const flat = { ...QUOTE, high: QUOTE.bid, low: QUOTE.bid };
-  assert.equal(moveWorth(flat, MARK, LOOKED).worth, true);
-  assert.equal(moveWorth(flat, { ...MARK, bid: QUOTE.bid - 0.5 }, LOOKED).worth, false);
+  const out = moveWorth(flat, MARK, LOOKED);
+  assert.equal(out.worth, false);
+  assert.match(out.why, /no session range/);
 });
 
 test('a fall is a move, and it is reported as one', () => {

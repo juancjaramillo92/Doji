@@ -3638,16 +3638,36 @@ export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
 
   const move = Math.round((spot.bid - mark.bid) * 100) / 100;
   const size = Math.abs(move);
-  if (size < spot.bid * MOVE_FLOOR) return { worth: false, why: "inside the floor" };
 
-  // high and low fall back to the bid on a quote that carries neither, which
-  // makes the range zero — and no size is below zero, so the share simply stops
-  // binding and the floor above is the whole test. A guard for that case would
-  // read as though it changed the answer.
-  const range = spot.high - spot.low;
-  if (size < range * MOVE_SHARE) {
-    return { worth: false, why: "small against the day's range" };
+  /* THE BAR IS THE SESSION'S RANGE, AND THE FLOOR NOW SAYS WHEN THAT BAR IS TOO
+     LOW TO MEAN ANYTHING. The two gates used to stand side by side, so a range
+     near zero made the share stop binding and left the floor as the whole test.
+
+     That is not a rare state, and the comment here used to describe it as one.
+     The broker's session restarts at the 17:00 New York roll, so for hours
+     every evening the range is small because the session is YOUNG rather than
+     because the market is quiet — and a thin-liquidity wobble cleared a bar
+     built for a full day's trading.
+
+     It cost three open loops in a week: $13 just after the Sunday roll, $17
+     just after the next one, both filed as unexplained and neither ever closed,
+     because there was nothing to explain. The one real find in that run, $33 at
+     11:12 on a Wednesday, cleared both gates on its own. A sense that
+     manufactures a loop it can never close is worse than a quiet one — the loop
+     then rides into every briefing after it.
+
+     So the floor is applied to the BAR rather than beside it: a session that has
+     not built a range worth judging against is one she cannot judge, and silence
+     is the honest answer rather than a lower standard. A move under MOVE_FLOOR
+     of the price is still never reported, since the bar is never below it —
+     what changed is the composition, not either number. A quote carrying no
+     high or low makes the range zero and lands here too, which is the same
+     statement: nothing to judge against. */
+  const bar = (spot.high - spot.low) * MOVE_SHARE;
+  if (bar < spot.bid * MOVE_FLOOR) {
+    return { worth: false, why: "no session range to judge against yet" };
   }
+  if (size < bar) return { worth: false, why: "small against the day's range" };
 
   return { worth: true, move };
 }

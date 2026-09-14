@@ -3394,6 +3394,33 @@ test('the rung he sets himself is routed, and routed before the slash catch-all'
     'check for an unseeded table are now stated in one place and enforced in another');
 });
 
+/* ─── A rule the critic also holds has to move in both places ────────────────
+   The critic runs LAST and returns the version that goes. A rule loosened in
+   the briefing prompt and left standing in `CRITIC` is a rule the critic puts
+   back, every morning, on the pass nothing downstream can see — which is how
+   the build-up `PITCH` required was being cut after `PITCH` had been obeyed.
+
+   One chain per briefing is the newest such pair. It exists because nine
+   subjects each carrying a mechanism is the shape he asked twice to be rid of,
+   in notes that were stored, read, and outranked by a rule with no carve-out.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('one chain per briefing is stated to the writer and to the critic', () => {
+  assert.match(EUGENIA_PROMPT, /ONE CHAIN IN A BRIEFING, NOT ONE PER EVENT/,
+    'the briefing prompt no longer bounds how many mechanisms a briefing carries, ' +
+    'so it goes back to a survey with a clause of chain on every event');
+  assert.match(EUGENIA_PROMPT, /IS THERE MORE THAN ONE CHAIN IN IT\?/,
+    'the critic no longer checks it — so the writer may obey the rule and the ' +
+    'pass that runs last has no reason to keep that version');
+
+  /* AND THE SLOT THAT CARRIED THE SECOND CHAIN SAYS SO ITSELF. "Name it and
+     move on" was already there and was not enough: it describes the length of
+     the paragraph and not what may be inside it. */
+  assert.match(EUGENIA_PROMPT, /NAMED AND NOTHING MORE/,
+    'the round-up slot no longer forbids mechanism, which is where the second ' +
+    'chain actually lived');
+});
+
 test('the verdicts a tap can carry are the verdicts the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_feedback_verdict_check');
   assert.ok(declared, '005 no longer constrains eugenia_feedback.verdict');

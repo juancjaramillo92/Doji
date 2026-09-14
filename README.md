@@ -1505,6 +1505,15 @@ disagreed about what a number printed at, nothing could say which figure was the
 later one. `updated_at` moves on every UPDATE through a trigger, the same shape
 `trades` has used since `001`.
 
+**One chain per briefing, not one per event.** Every scheduled thing that
+matters still gets named — he needs the week — but only one of them gets its
+mechanism walked. Nine subjects each carrying a clause of chain is not a
+thorough briefing, it is a survey, and it drifts there precisely because every
+clause looks justified on its own. The round-up slot now says so itself: named
+and nothing more, no mechanism at all. `CRITIC` holds the same rule, because the
+critic runs last and a rule loosened in one place and left standing in the other
+is a rule the critic puts back every morning.
+
 **Its default is silence**, on the pulse's reasoning exactly: a number landing
 where everyone expected it is not news. `isSilent` is shared with it rather than
 written twice.
@@ -1553,22 +1562,43 @@ relative twice over, and the two halves bind at opposite ends of the day:
 
 | Gate | Value | What it is for |
 |---|---|---|
-| `MOVE_SHARE` | 0.35 of the session range so far | binds on an established session, where an ordinary swing clears any fixed floor |
-| `MOVE_FLOOR` | 0.0025 of the price | binds wherever the range is too young or too quiet to be a measure — which is every weekday evening, not just the hour after the Sunday open |
+| `MOVE_SHARE` | 0.35 of the session range so far | the bar itself — what the move is measured against |
+| `MOVE_FLOOR` | 0.0025 of the price | the smallest bar worth applying; below it the session has no range to judge against and she says nothing |
 | `MARK_STALE_MIN` | 40 minutes | two missed runs and the gap is no longer a quarter of an hour — $15 in fifteen minutes is an event, $15 across an hour is a session |
 | `MOVE_QUIET_H` | 2 hours | one message about one move; a market that trends all afternoon is one story, and this is the only thing between it and eight messages before lunch |
 
 **The share is measured against the BROKER'S session, and that session restarts
-every weekday at 17:00.** The pair above was built believing the share was the
-real test and the floor was for the ragged hour after the Sunday open — one edge
-case, once a week. It is not: from the roll until the range has been rebuilt the
-share is taken against a few hours of thin evening trade, stops binding, and the
-floor carries the whole test for a third of the week. A tenth of a percent was
-written to be generous because something above it was expected to be working;
-alone it is $4.49 on gold at 4,485, which gold covers on an ordinary afternoon,
-and it let a $7 drift at 20:57 reach him as a sharp move. A quarter of a percent
-is an event in the thin hours as well as the busy ones, and it costs nothing on
-an established session — a $50 range already asks $17.50 of the share.
+every weekday at 17:00.** From the roll until the range has been rebuilt, the
+share is taken against a few hours of thin evening trade — so the range is small
+because the session is *young*, not because the market is quiet.
+
+**The two gates used to stand side by side, and that is what broke it.** A range
+near zero made the share stop binding, leaving the floor as the whole test for a
+third of the week: a bar written for a full day's trading, carried alone through
+the thinnest hours. An earlier pass saw this and reasoned that the share could
+not be fixed from here, since nothing this system reads spans the calendar day,
+so the floor had to be raised until it was an event in the thin hours too. That
+was the wrong of two options, and there was a third: **refuse to judge.** A
+session with no range yet is one the share cannot be applied to, and silence is
+a better answer than a lower standard.
+
+So the floor bounds the **bar** rather than standing beside it. If
+`range × MOVE_SHARE` is under `price × MOVE_FLOOR`, the session is too young and
+she says nothing. A move under a quarter percent of the price is still never
+reported, since the bar is never below it — what changed is the composition
+rather than either number.
+
+What the old shape cost is in his own `/notes`: a $13 drop just after the Sunday
+roll on 6 September and a $17 one just after the next roll on the 13th, both
+filed as unexplained open threads and neither ever closed, because there was
+nothing to explain. The one real find in that run — $33 at 11:12 on a
+Wednesday — cleared both gates on its own and still does. **A sense that
+manufactures a loop it cannot close is worse than a quiet one**, because the
+loop then rides into every briefing after it.
+
+The evening bar is now *higher* than the midday one, which is the intent rather
+than a side effect. A real evening move is not silenced by it, because a real
+move is the range: a $35 fall takes the low with it and clears its own bar.
 
 **Both things the trade look may say are about today, and it checks.** The
 trigger fires on a transition rather than on a clock, so anything that stamps an

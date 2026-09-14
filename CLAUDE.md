@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 521 tests, six suites
+npm test      # 525 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -402,6 +402,17 @@ code you write near it:
 - **The briefing is prose and must stay prose.** Numbered sections with headings
   are a report however plain the words inside them. Do not reintroduce
   scaffolding to "organise" it.
+- **ONE CHAIN PER BRIEFING, AND IT IS A BREADTH RULE RATHER THAN A LENGTH ONE.**
+  Every scheduled thing that matters still gets named — he needs the week — but
+  only one gets its mechanism walked. Nine subjects each carrying a clause of
+  chain is a survey, and it drifts there because every clause looks justified on
+  its own. It took two stored instruction notes failing to land to find it: the
+  notes were read every turn and outranked by `cut words and never events`, which
+  had no carve-out for them. The round-up slot now forbids mechanism outright,
+  and `CRITIC` holds the same rule — `agree.test.mjs` reads both, because the
+  critic runs last and a rule loosened in one place is a rule it puts back every
+  morning.
+
 - **LENGTH IS NOT A RULE, AND THE CRITIC HOLDS A SECOND COPY OF EVERY RULE IT
   RESTATES.** A flat ceiling for the whole briefing was what decided she could
   not teach: with channels at `unseen`, where §0 says build the term before using
@@ -783,11 +794,21 @@ compounds.
   Both gates are relative — a share of the session's range, and a share of the
   price — because a fixed dollar threshold means two different things to gold at
   4,400 and at 2,000, and the year nobody revises it the sense fires constantly or
-  never; never looks exactly like a quiet market. THE SHARE IS TAKEN AGAINST THE
-  BROKER'S SESSION AND THAT SESSION RESTARTS AT 17:00 NEW YORK, which the pair was
-  built not knowing: the floor was written for the ragged hour after the Sunday
-  open and is in fact alone for seven hours of every weekday while the evening
-  range rebuilds.
+  never; never looks exactly like a quiet market.
+
+  THE FLOOR BOUNDS THE BAR RATHER THAN STANDING BESIDE IT, AND THAT COMPOSITION
+  IS THE WHOLE FIX. The share is taken against the BROKER'S session, which
+  restarts at 17:00 New York — so for hours every evening the range is small
+  because the session is YOUNG rather than because the market is quiet, the share
+  stops binding, and the floor used to carry the whole test alone. An earlier
+  pass saw that and chose the wrong of two options: it raised the floor until it
+  was an event in the thin hours, having reasoned the share was unfixable here
+  since nothing spans the calendar day. The third option is to REFUSE TO JUDGE —
+  a session with no range yet cannot be measured against, and silence beats a
+  lower standard. It cost three open loops in a week, two of which ($13 and $17,
+  both just after a roll) could never be closed because nothing had happened. A
+  SENSE THAT MANUFACTURES A LOOP IT CANNOT CLOSE IS WORSE THAN A QUIET ONE: the
+  loop rides into every briefing after it.
 
   `MARK_STALE_MIN` stops a move measured across an outage counting as a
   quarter-hour move, and `looked_at` is the one column written conditionally:
