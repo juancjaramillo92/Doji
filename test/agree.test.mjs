@@ -3450,16 +3450,43 @@ test('a question he has not answered in a week is closed, not kept', () => {
     'this whole mechanism exists for, quietly stopping');
 });
 
-test('the briefing reads the open questions before asking another', () => {
-  assert.match(EUGENIA_PROMPT, /AND THE OPEN THREADS SAY WHETHER TO ASK AT ALL/,
-    'nothing connects what he has not answered to whether she asks again — she ' +
-    'is handed the evidence every morning and has no rule that reads it');
+/* ─── The briefing asks him nothing, and a reply still may ──────────────────
+   THE SLOT WAS MEASURING NOTHING. It existed to learn what he actually holds,
+   and over eleven days it produced four questions and four open threads and no
+   answers — he reads on a phone and answers by instruction, which is a channel
+   that works, rather than by reply.
 
-  // The slot has always permitted silence; what was missing is the evidence
-  // for choosing it. Both halves are needed, so both are read.
-  assert.match(EUGENIA_PROMPT, /A single question to him, or nothing at all/,
-    'the question slot no longer permits silence, so the rule above has nothing ' +
-    'to resolve to');
+   THE SCOPE IS THE HALF THAT MATTERS HERE. Cutting questions everywhere would
+   take the trade conversation with it, where asking one thing and waiting is
+   the whole method and where he IS answering. So this is read as a pair: the
+   briefing is silent, and the reply path keeps its questions.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the briefing closes without a question to him', () => {
+  assert.match(EUGENIA_PROMPT, /NO CLOSING QUESTION\./,
+    'the briefing may end with a question again — four went unanswered in eleven ' +
+    'days and each one is an open thread that can only close by being given up on');
+
+  // AND THE RULES THAT ONLY MADE SENSE WHILE IT ASKED ARE GONE WITH IT. A rule
+  // about re-asking, in a file where nothing asks, is the dead branch this
+  // repository refuses — and the one a later reader restores the slot from.
+  assert.doesNotMatch(EUGENIA_PROMPT, /you may ask it once more, differently/,
+    'the re-asking rule survived the slot it belonged to');
+  assert.doesNotMatch(EUGENIA_PROMPT, /at most one of each in a\s+briefing/,
+    'open_loop still promises a question loop the briefing can no longer open');
+});
+
+test('and a reply may still ask, because that is a conversation he is in', () => {
+  /* THE CAPABILITY THIS WAS NOT ALLOWED TO COST. He answers when he is the one
+     who started talking — most of all about a trade, where the method is one
+     question and then silence. A change that took that too would be quieter and
+     worse. */
+  assert.match(EUGENIA_PROMPT, /When he mentions how he felt, slow down\. One question at a time/,
+    'the trade conversation lost its questions, which is where he does answer');
+  assert.match(EUGENIA_PROMPT, /Never infer what he planned\. Ask\./,
+    'she now guesses a plan rather than asking for it');
+  assert.match(EUGENIA_PROMPT, /THIS IS THE BRIEFING AND NOTHING ELSE/,
+    'nothing scopes the silence to the briefing, so it reads as a ban on asking');
 });
 
 test('the verdicts a tap can carry are the verdicts the table accepts', () => {

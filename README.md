@@ -1646,11 +1646,17 @@ answered in a week he has answered.** It closes now, with a line saying so, and
 the note is still written. A watch is untouched by that: age proves nothing
 about an odd reaction, which may still explain itself.
 
-And the briefing reads the same list before asking again. The question slot has
-always permitted silence — *"a single question to him, or nothing at all"* — but
-nothing connected that to the evidence she is handed every morning. Two or more
-questions standing unanswered means the slot is not working on him, whatever it
-is worth in principle, and the right number that morning is none.
+**And the briefing has stopped asking altogether.** The slot existed to learn
+what he actually holds, and over eleven days it produced four questions, four
+open threads and no answers — a slot whose only output is an open thread is not
+measuring anything. He reads the briefing on a phone and engages by *instruction*
+rather than by reply, which is a channel that works and needs no slot.
+
+The scope is the half that matters. Cutting questions everywhere would take the
+trade conversation with it — where asking one thing and waiting is the whole
+method, and where he does answer, because he started the exchange. So the
+briefing is silent and the reply path is untouched, and `agree.test.mjs` reads
+both halves: a briefing that asks again, and a reply that has stopped.
 
 **And it teaches, which for a long time it was the only unscheduled look that
 did not.** The print look builds a mechanism he has never had built before saying

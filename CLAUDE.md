@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 527 tests, six suites
+npm test      # 528 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -593,9 +593,19 @@ compounds.
   complete and the behaviour missing. A question unanswered for a week IS
   answered; it closes, the note is still written, and a WATCH is untouched
   because age proves nothing about an odd reaction. The briefing reads the same
-  list before asking again: the slot always permitted silence and nothing
-  connected that to the evidence. `agree.test.mjs` reads all four halves, since
-  dropping any of them raises nothing and simply refills the list.
+  list before asking again — and then stopped asking at all.
+
+- **THE BRIEFING ASKS HIM NOTHING, AND THE REPLY PATH IS UNTOUCHED.** The slot
+  was there to learn what he holds and over eleven days produced four questions,
+  four open threads and no answers: a slot whose only output is an open thread
+  measures nothing. The rules that only made sense while it asked went with it —
+  the re-asking rule, and `open_loop`'s question half — because a rule about
+  re-asking in a file where nothing asks is the dead branch that a later reader
+  restores the slot from. SCOPE IS THE HALF THAT MATTERS: cutting questions
+  everywhere would take the trade conversation, where one question and then
+  silence is the method and where he DOES answer, having started it.
+  `agree.test.mjs` reads both directions — a briefing that asks again, and a
+  reply that has stopped.
 
 - **`/channel` is the one rung he can move himself, and it had to exist.** The
   ladder climbs on him using a term back, judged at the nightly pass — so a
