@@ -2963,38 +2963,61 @@ seconds and cannot be extended — one call at the start left a thirty-second
 answer looking like a dead bot for twenty-five of them. It makes nothing faster;
 it makes the wait legible.
 
-**What she costs.** Roughly $0.20 a briefing and rather less for a pulse that
-finds nothing — call it $10 a month for six briefings and five pulses a week —
-of which a large share is web search at $10 per 1,000 searches rather than
-tokens. Questions are a few cents each. The model is the strongest one; at this
-volume the searches dominate, so a weaker model would save little.
+**What she costs.** That figure is now measurable and was not when it was first
+written: cache writes alone ran 620,460 tokens in the week of 2026-09-10, which
+is about $6 before a single search, a read or an output token — so the "$10 a
+month" this paragraph used to state was an estimate the meter has since
+contradicted. `eugenia_runs` carries every model call and is what the number
+should be re-derived from. A large share is still web search at $10 per 1,000
+searches rather than tokens; the model is the strongest one, and at this volume
+the searches dominate, so a weaker model would save little.
 
 **What the prompt cache actually buys, said plainly.** Her cached prefix is
 23,309 tokens with the chat tool set and 16,477 with the nightly pass's — read
 off `eugenia_runs.wrote_1h`, which records the size of the entry each caller
-writes, rather than estimated. It is cached — but the default window is five
-minutes and her callers are hours apart,
-so for most of this system's life the cache paid only for the rounds *within* one
-turn: a briefing that reads the journal and writes a note is three requests
-carrying that prefix. The window is now stated as an hour, which also catches the
-replies a briefing draws through the morning and the 09:00 retry after an 08:00
-failure. It does not catch 08:00 → 10:00, and nothing sensible would.
+writes, rather than estimated. The default window is five minutes, and what that
+buys is the rounds *within* one turn: a briefing that reads the journal and
+writes a note is three requests carrying that prefix, seconds apart, and a read
+refreshes the five minutes, so a long turn keeps its entry alive to the end.
 
-**And the hour has a price the argument above never named.** A cache READ is a
-tenth of the input rate; a cache WRITE is 1.25× at five minutes and **2× at an
-hour**. So the longer window does not simply buy more — it moves the break-even
-from two requests on a prefix to three, and a caller that makes one request and
-is not followed within the hour pays double for a lifetime nothing uses. That
-matters more than it looks, because *the tool array is part of the cache key*:
-five tool sets are five separate prefixes, none readable by another, each written
-at that doubled rate.
+**The hour has a price, and a week of rows decided who pays it.** A cache READ
+is a tenth of the input rate; a cache WRITE is 1.25× at five minutes and **2× at
+an hour**. So the longer window does not simply buy more — it moves the
+break-even from two requests on a prefix to three, and a caller that makes one
+request and is not followed within the hour pays double for a lifetime nothing
+uses. That matters more than it looks, because *the tool array is part of the
+cache key*: five tool sets are five separate prefixes, none readable by another.
+Which makes *is a second turn likely inside the hour?* a question about the
+**array** rather than about the caller — and the answer came back in one shape:
 
-`ask()` records both halves now — `cached` for the reads, `wrote_1h` and
-`wrote_5m` for the writes, kept apart because their rates differ and a sum of
-them cannot be turned back into money. Until those two columns existed the one
-figure that decides the `ttl` was the one figure the meter beside it did not
-collect, and the paragraph above was an argument with nothing under it. Give it a
-week of rows before changing the window.
+| caller | turns | prefixes written | inherited one |
+|---|---|---|---|
+| release look | 14 | 5 | **9** |
+| weekday briefing | 5 | 5 | 0 |
+| pulse | 5 | 5 | 0 |
+| critic | 6 | 6 | 0 |
+| consolidation | 6 | 5 | 0 |
+| move look | 2 | 2 | 0 |
+| reply | 1 | 1 | 0 |
+| Sunday briefing | 1 | 1 | 0 |
+
+Consolidation's sixth turn is neither: it is the row `ask()` writes for a turn
+that failed before the model answered, and reading it as an inherited prefix is
+the mistake this table is laid out to prevent.
+
+Only `RELEASE_TOOLS` earns the hour, and for a reason in the schedule rather than
+in the prompt: its job runs quarter-hourly, so a morning carrying several release
+times clusters the looks inside one window. The briefing is 08:00 and the pulse
+is 10:00 — two hours apart — so the hour those were paying 2× for could never
+have been read by anything. The window is derived from the tool array now: `1h`
+for `RELEASE_TOOLS`, `5m` for the rest, which is 512,059 tokens a week moving
+off the doubled rate.
+
+`ask()` records both halves — `cached` for the reads, `wrote_1h` and `wrote_5m`
+for the writes, kept apart because their rates differ and a sum of them cannot be
+turned back into money. Until those two columns existed the one figure that
+decides the window was the one figure the meter beside it did not collect, and
+the argument for the hour had nothing under it.
 
 **Inside a turn the conversation is cached too, at five minutes.** Only the
 system block carried a breakpoint, so each round of the tool loop re-sent

@@ -1583,20 +1583,27 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       /* Cached: both are long, fixed, and sent on every turn — which is exactly
          why the strategy rides here rather than in the message.
 
-         AN HOUR, STATED, BECAUSE THE DEFAULT IS FIVE MINUTES AND HER CALLERS
-         ARE HOURS APART. What the cache actually buys is worth saying plainly
-         rather than assuming: the rounds WITHIN one turn, always — a briefing
-         that reads the journal and writes a note is three requests carrying
-         this prefix — and across turns only inside the window. Five minutes
-         caught almost nothing across turns; an hour catches the morning's
-         replies after a briefing, and the 09:00 retry after an 08:00 failure.
-         It does not catch 08:00 → 10:00, and nothing sensible would.
+         THE WINDOW IS A PROPERTY OF THE TOOL ARRAY RATHER THAN OF THE CALLER,
+         because the array is where the cache key starts: the tool sets are that
+         many separate prefixes and none of them is readable by another. So *is
+         a second turn likely inside the hour* is a question asked per ARRAY,
+         and a week of `wrote_1h` answered it in one shape. Every caller's turns
+         equalled its prefix writes but one: the release look made fourteen and
+         wrote five, because its job runs quarter-hourly and a morning with
+         several release times clusters the looks inside one window. The
+         briefing is 08:00 and the pulse is 10:00 — two hours apart — so the
+         hour those were paying 2× for could never have been read by anything.
 
-         Not a beta: `ttl` is a plain field on cache_control. The meter is the
-         log line at the bottom of ask() — `cached` is the number that says
-         whether any of this is true, and it is the reason it is printed. */
+         Five minutes loses nothing there. What the cache has always actually
+         bought here is the rounds WITHIN one turn — a briefing that reads the
+         journal and writes a note is three requests carrying this prefix,
+         seconds apart — and a read refreshes the five minutes, so a long turn
+         keeps its entry alive to the end.
+
+         Not a beta: `ttl` is a plain field on cache_control. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
-                 cache_control: { type: "ephemeral", ttl: "1h" } }],
+                 cache_control: { type: "ephemeral",
+                                  ttl: tools === RELEASE_TOOLS ? "1h" : "5m" } }],
       messages,
       // web_search runs on Anthropic's side and needs no loop here; the rest
       // are ours and are executed below.

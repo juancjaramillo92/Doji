@@ -1855,15 +1855,16 @@ test('the strategy rides on the cached system prompt, not on a message', () => {
     'the strategy is no longer part of the cached system prompt — either she has ' +
     'stopped being given it at all, or it is being paid for on every message');
 
-  /* AND THE WINDOW IS STATED, because the default is five minutes and her
-     callers are hours apart. Without a ttl the cache pays only for the rounds
-     within one turn and the comment above it claims more than that — the
-     briefing at 08:00 and the replies it draws through the morning share
-     nothing. Dropping the ttl is silent: the request still succeeds, and the
-     only sign is the `cached` figure in ask()'s log line. */
-  assert.match(src, /cache_control:\s*\{\s*type:\s*"ephemeral",\s*ttl:\s*"1h"\s*\}/,
-    'the cached prefix no longer states a ttl, so it falls back to five minutes ' +
-    'and almost nothing hits across turns');
+  /* AND THE WINDOW IS DERIVED FROM THE TOOL ARRAY, which is where the cache key
+     starts. A week of `wrote_1h` settled which array earns the hour: the release
+     look made fourteen turns and wrote five prefixes, its quarter-hourly job
+     clustering several looks into one morning, and every other caller wrote its
+     own on every single turn. A literal here is the shape that goes stale —
+     it reads as a decision and is a default, and the wrong one costs 2× the
+     input rate for a lifetime nothing reads. README.md carries the rows. */
+  assert.match(src, /ttl:\s*tools === RELEASE_TOOLS \? "1h" : "5m"/,
+    'the cached prefix states one window for every caller again — the hour is ' +
+    'only earned by RELEASE_TOOLS, see the measurement in README.md');
 });
 
 test('what is summarised into every turn can also be read in full', () => {
