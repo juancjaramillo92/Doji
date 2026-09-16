@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 539 tests, six suites
+npm test      # 544 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -399,9 +399,14 @@ code you write near it:
   and deliberate: *what the market is pricing* and *what would surprise it* are
   facts about today and are hers to say; what price will do never is. Widening
   that is a product decision, not a prompt tweak.
-- **The briefing is prose and must stay prose.** Numbered sections with headings
-  are a report however plain the words inside them. Do not reintroduce
-  scaffolding to "organise" it.
+- **The briefing is prose and must stay prose, with ONE relaxation that is his
+  and is written down.** Numbered sections with headings are a report however
+  plain the words inside them, and reintroducing scaffolding to "organise" the
+  prose is still the move to refuse. The CALENDAR slot is the exception: a bold
+  day label and one line per item, because he read a draft of it beside the prose
+  and the list was the half that was instantly readable. It holds times and names
+  — `NAMED AND NOTHING MORE` — and no mechanism, which is the rule the reshape
+  had to carry across and nearly did not.
 - **ONE CHAIN PER BRIEFING, AND IT IS A BREADTH RULE RATHER THAN A LENGTH ONE.**
   Every scheduled thing that matters still gets named — he needs the week — but
   only one gets its mechanism walked. Nine subjects each carrying a clause of
@@ -413,16 +418,45 @@ code you write near it:
   critic runs last and a rule loosened in one place is a rule it puts back every
   morning.
 
-- **LENGTH IS NOT A RULE, AND THE CRITIC HOLDS A SECOND COPY OF EVERY RULE IT
-  RESTATES.** A flat ceiling for the whole briefing was what decided she could
-  not teach: with channels at `unseen`, where §0 says build the term before using
-  it, there is room for four paragraphs of market OR three plus a build-up, and
-  one ceiling chose the first every morning. Four thousand characters is the only
-  bound and it is Telegram's. What replaced the ceiling is a test on the writing —
-  every sentence worth reading, the market half being where that fails first.
-  `CRITIC` restates several of the prompt's rules, so changing one there and not
-  here has the critic undo it; that is the shape to check whenever a prompt rule
-  moves.
+- **LENGTH IS A RULE AGAIN, AND IT IS ONLY SAFE BECAUSE OF WHAT SITS BESIDE IT.**
+  A flat ceiling was tried and it decided she could not teach: with channels at
+  `unseen`, where §0 says build the term before using it, there is room for four
+  paragraphs of market OR three plus a build-up, and one ceiling chose the first
+  every morning. **A ceiling on its own is what failed, not a ceiling** — asked
+  to be shorter with nothing saying WHAT to lose, she cuts the teaching block,
+  because it is the longest thing on the page. So 250–300 words, 400 at the
+  outside, and beside it a fixed ORDER of what comes out: numbers he cannot act
+  on, then levels he can read off his own screen, then any market sentence that
+  could have been written on any morning. Never the teaching block, never an
+  event. Still over means the briefing is about too many things. Four thousand
+  characters remains the separate mechanical bound and it is Telegram's.
+  `agree.test.mjs` reads BOTH halves for the count AND for the protection,
+  because a copy holding the count alone reproduces exactly the failure the
+  count was removed for the first time.
+
+- **WHAT WAS MISSING WAS A BOUND ON A SENTENCE, NOT ON A WORD.** Everything here
+  governed word CHOICE — plain words first, `the gap between rates and inflation`
+  before `real yields` — and nothing governed how many ideas one sentence could
+  carry. So a briefing built entirely of plain words still read as hard, and no
+  rule was being broken. One idea per sentence, twenty words, no em-dash aside,
+  no stacked subordinate clause; no punchline, because a line that is satisfying
+  to read and takes a second to decode is a line he reads twice and will not; and
+  no COINED SHORTHAND, since a name she invents and then reuses arrives as a term
+  he was taught and never was. Four to six numbers, and a number that cannot be
+  said to MEAN something is one of the ones to cut.
+
+- **ONE CHAIN IS EXEMPT FROM THE RUNG AND IT IS THE ONE UNDER EVERYTHING.** Gold
+  pays no interest, so it competes with what a bond pays once inflation is taken
+  out rather than with the headline rate. `PITCH` says `owns` gets a term bare,
+  which is right for every term but this one: it sits under nearly every briefing
+  written, and a reader who has lost it has lost all of them. Stated in both
+  copies, because the critic is the half that decides a mechanism it can see
+  inside one briefing is a repetition — that is the failure that cut the build-up
+  `PITCH` had just required, and it would cut this the same way.
+
+- **`CRITIC` restates several of the prompt's rules**, so changing one there and
+  not here has the critic undo it; it runs LAST. That is the shape to check
+  whenever a prompt rule moves, and `agree.test.mjs` holds each pair together.
 - **THE PROMPT STATES NO PREFERENCE OF HIS, AND THAT IS STRICTER THAN SOURCING
   ONE HONESTLY.** It held a taste he had never expressed, in the file that decides
   how she talks to the person it is about — so it reached him as her quoting

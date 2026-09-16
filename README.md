@@ -1349,39 +1349,74 @@ is the same trade `marketOpen()` makes for the poller. A test walks every hour
 of a week and asserts the two never both fire, because one call cannot owe two
 answers.
 
-### The briefing is prose, not a report
+### The briefing is prose, with one list in it
 
-Four or five short paragraphs of someone talking: where gold is, the one thing
-that matters today and the chain of why, everything else in a sentence, one
-genuinely odd fact, and a single question or nothing.
+Five slots. What happened, in two or three sentences with the conclusion first;
+**why that matters for gold**, walked link by link, one sentence per step; the
+calendar; one context line; one thing worth noticing.
+
+**The calendar is the one place the prose rule is deliberately relaxed** — a bold
+day label and one line per item, times in ET, one fact each. It reads better than
+the prose around it did, which is the whole argument for it. The relaxation is
+narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
+no mechanism goes in it. That slot is where a second chain hides.
 
 It used to be seven numbered sections with impact emoji, and plain-Englishing
 the words inside them did not help — **seven numbered sections with headings
 *are* a report**, whatever the vocabulary. The scaffolding was doing the
 talking.
 
-**Length is not a rule at all, and that is a correction.** It was a flat nine
-hundred to fourteen hundred characters for the whole briefing, and with four
-of the five channels sitting at `unseen` — where §0 says *build it before using
-it* — that number was the thing deciding she could not. A briefing has room for
-four paragraphs of market or three plus a term built from the ground up, and a
-single ceiling silently chose the first every morning.
+**Length is a rule again, and what makes it safe is what sits beside it.** It was
+once a flat nine hundred to fourteen hundred characters, and with four of the
+five channels at `unseen` — where §0 says *build it before using it* — that
+number was the thing deciding she could not. A briefing has room for four
+paragraphs of market or three plus a term built from the ground up, and a single
+ceiling silently chose the first every morning.
 
-The only bound left is four thousand characters, which is not an aesthetic — it
-is where Telegram stops delivering one message. What replaced the ceiling is a
-test on the writing rather than on the size: **every sentence has to be worth
-reading**, and the market half is where that fails first, since a line restating
-the number above it or a caveat protecting the analyst still reads like content.
-The paragraph that teaches takes the links the chain needs and the build-up the
-rung asks for on top of them — which on most mornings is a clause restating the
-mechanism, since most channels sit at `explained` rather than at either end.
+The lesson was not *no ceiling*. It was that **a ceiling with nothing saying what
+to lose cuts the teaching block**, because the teaching block is the longest
+thing on the page. So the budget is 250–300 words, 400 at the outside, and beside
+it a fixed order of what comes out: numbers he cannot act on, then levels he can
+read off his own screen, then any sentence in the market read that could have
+been written on any morning. **Never the teaching block and never an event.**
+Still over means the briefing is about too many things, and the answer is to
+decide which one rather than to shave the chain. Four thousand characters remains
+the separate mechanical bound — it is where Telegram stops delivering one
+message.
 
-Running long is still cut by dropping words, never events, and never a link out
-of a chain.
+`agree.test.mjs` reads both the writer's copy and the critic's for the count
+**and** for the protection, because a copy holding the count alone is exactly the
+arrangement that stopped her teaching the first time.
 
-The vocabulary rule is now "plain words first": *the gap between rates and
-inflation* before *real yields*, and the short name only once the long one has
-been said. The ideas stay exactly as sophisticated; only the words come down.
+**And what was missing was a bound on a sentence, not on a word.** Every rule
+here governed vocabulary — *the gap between rates and inflation* before *real
+yields*, the short name only once the long one has been said — and nothing
+governed how many ideas one sentence could carry. So a briefing built entirely of
+plain words still read as hard, and no rule was being broken. The rules now:
+
+- **One idea per sentence.** Two `because` clauses or two `and` clauses make two
+  sentences. Twenty words is the ceiling.
+- **No em-dash aside, no stacked subordinate clause.** Short beats elegant.
+- **No punchlines.** A line that is satisfying to read and takes a second to
+  decode is a line he reads twice, and he will not read it twice.
+- **No coined shorthand.** A name she invents — *the leftover*, *the door it came
+  through* — and then reuses arrives as a term he was taught and never was. Real
+  names he will meet elsewhere are the opposite case and stay: dot plot, retail
+  sales, jobless claims, the ten-year, each given its own sentence the first time
+  it appears.
+- **Four to six numbers in the whole briefing**, and a number that cannot be said
+  to *mean* something is one of the ones to cut. Fourteen true figures is a page
+  he skims; four he remembers by lunch.
+
+**One chain is exempt from the rung, and it is the one under everything else.**
+Gold pays no interest, so it competes with what a bond pays once inflation is
+taken out rather than with the headline rate. `PITCH` says a channel at `owns`
+gets its term bare, which is right for every term but this one: it sits under
+nearly every briefing written, and a reader who has lost it has lost all of them.
+Both the writer and the critic are told the map does not apply to it — the critic
+especially, since it is the half that decides a mechanism it can see inside one
+briefing is a repetition, which is the failure that once cut the build-up `PITCH`
+had just required.
 
 **She teaches, and that is a rule about depth rather than length.** He is
 learning macro deliberately, so the paragraph on the day's one thing states its

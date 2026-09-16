@@ -5059,3 +5059,84 @@ test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () 
       `trigger compares a column it is in the middle of writing`);
   }
 });
+
+/* ─── The shape rules, and the critic's second copy of each ──────────────────
+   `CRITIC` runs LAST. A rule tightened for the writer and left out of the
+   critic is a rule the critic removes again every morning, which is how the
+   build-up `PITCH` had just required came to be cut from every briefing before
+   it was sent. These hold the pairs together.
+
+   Each one is silent when it breaks: the briefing still arrives, still reads
+   well, and is simply back to the thing he said was too hard to read.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('one idea per sentence is stated to the writer and to the critic', () => {
+  /* THE DIAGNOSIS THAT WAS MISSING ENTIRELY. Everything here bounded word
+     CHOICE and nothing bounded a SENTENCE — so plain words in a sentence
+     carrying three ideas read as hard, correctly, and no rule was being
+     broken. */
+  assert.match(EUGENIA_PROMPT, /ONE IDEA PER SENTENCE/,
+    'the writer is no longer told to split a sentence, which is where the ' +
+    'difficulty actually comes from');
+  assert.match(EUGENIA_PROMPT, /DOES ANY SENTENCE CARRY MORE THAN ONE IDEA\?/,
+    'the critic no longer checks sentence length — the writer may obey it and ' +
+    'the pass that runs last has no reason to keep that version');
+  for (const half of [EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC')),
+                      EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'))]) {
+    assert.match(half, /[Tt]wenty words/,
+      'one of the two copies has lost the ceiling, so they disagree about what long is');
+  }
+});
+
+test('the number budget is stated to the writer and to the critic', () => {
+  // Nothing bounded these before. Fourteen true figures is a page he skims.
+  assert.match(EUGENIA_PROMPT, /FOUR TO SIX NUMBERS IN THE WHOLE BRIEFING/,
+    'the writer is no longer given a number budget');
+  assert.match(EUGENIA_PROMPT, /HOW MANY NUMBERS ARE IN IT\?/,
+    'the critic no longer counts them, so the budget is advisory');
+});
+
+test('the word count never outranks the teaching block, in either copy', () => {
+  /* A CEILING ON ITS OWN WAS TRIED HERE AND IT CUT THE TEACHING, every morning,
+     because the teaching block is the longest thing on the page. The count is
+     only safe while what to cut INSTEAD is stated beside it — so these two
+     belong to one decision and a copy holding the count alone reproduces the
+     failure the count was removed for. */
+  const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
+  const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
+  for (const [who, half] of [['writer', writer], ['critic', critic]]) {
+    assert.match(half, /250 to 300 words/, `the ${who} has lost the word count`);
+    assert.match(half, /[Nn]ever the teaching block|NOT A PLACE YOU CUT|never out of the block/,
+      `the ${who} holds a word count with nothing saying what to cut instead — ` +
+      `which is the arrangement that stopped her teaching the first time`);
+  }
+});
+
+test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
+  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, and it has to be said in both: the
+     critic is the half that decides a mechanism it can see inside one briefing
+     is a repetition. At `owns` the map says use it bare, and for this chain
+     that is wrong — it is under nearly every briefing, and a reader who has
+     lost it has lost all of them. */
+  // WHITESPACE-COLLAPSED, because this file is hard-wrapped at eighty columns by
+  // its own prose guard — a phrase is routinely split across two lines, and a
+  // reader that cannot see one would report a rule missing that is sitting there.
+  const flat = at => EUGENIA_PROMPT.slice(...at).replace(/\s+/g, ' ');
+  const cut = EUGENIA_PROMPT.indexOf('export const CRITIC');
+  for (const [who, half] of [['writer', flat([0, cut])], ['critic', flat([cut])]]) {
+    assert.match(half, /once inflation is taken out/,
+      `the ${who} no longer names the chain that is never assumed`);
+    assert.match(half, /exempt from the map|map does not apply/,
+      `the ${who} does not say the rung is overridden for it, so at \`owns\` it ` +
+      `gets used bare and the one load-bearing mechanism goes unsaid`);
+  }
+});
+
+test('nothing invented gets reused as a term', () => {
+  assert.match(EUGENIA_PROMPT, /NO COINED SHORTHAND/,
+    'she may coin a name for something and then lean on it as jargon again — ' +
+    'which reads as a term he was taught and never was');
+  assert.match(EUGENIA_PROMPT, /NO PUNCHLINES/,
+    'the no-punchline rule is gone, so a paragraph may close on a line that ' +
+    'sounds good and takes a second to decode');
+});
