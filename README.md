@@ -2963,14 +2963,28 @@ seconds and cannot be extended — one call at the start left a thirty-second
 answer looking like a dead bot for twenty-five of them. It makes nothing faster;
 it makes the wait legible.
 
-**What she costs.** That figure is now measurable and was not when it was first
-written: cache writes alone ran 620,460 tokens in the week of 2026-09-10, which
-is about $6 before a single search, a read or an output token — so the "$10 a
-month" this paragraph used to state was an estimate the meter has since
-contradicted. `eugenia_runs` carries every model call and is what the number
-should be re-derived from. A large share is still web search at $10 per 1,000
-searches rather than tokens; the model is the strongest one, and at this volume
-the searches dominate, so a weaker model would save little.
+**What she costs, measured rather than estimated.** `eugenia_runs` carries every
+model call, and the week of 2026-09-10 came to **$16.68, about $72 a month** —
+not the $10 this paragraph used to claim from an estimate, and not spent where it
+claimed either:
+
+| | tokens | rate | |
+|---|---|---|---|
+| cache writes, 1h | 620,460 | 2× | **$6.20** |
+| cache reads | 6,267,957 | 0.1× | $3.13 |
+| cache writes, 5m | 435,375 | 1.25× | $2.72 |
+| output | 94,956 | $25/M | $2.37 |
+| web search | 123 searches | $10/1,000 | $1.23 |
+| fresh input | 202,653 | $5/M | $1.01 |
+
+**The cache is the bill.** Writes alone are 58% of the token spend and the
+largest line on the table — larger than everything she says. Search is 7%, where
+this paragraph used to say the searches dominate and a weaker model would
+therefore save little; that was wrong in both halves. Deriving the window from
+the tool array takes the 1h line to about $1.08 and moves the rest onto the 5m
+rate, roughly $64 a month. The next lever after that is the prefix itself: 23,309
+tokens written 32 times a week is what the top two rows are made of, and it is a
+question about what she is told rather than about how it is cached.
 
 **What the prompt cache actually buys, said plainly.** Her cached prefix is
 23,309 tokens with the chat tool set and 16,477 with the nightly pass's — read
