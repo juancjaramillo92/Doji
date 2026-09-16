@@ -69,6 +69,7 @@ supabase/009_dispatch.sql               what pg_net sent, and what came back
 supabase/009_trades_grants.sql          which columns the app may write
 supabase/010_pace.sql                   how much of its clock a briefing spends
 supabase/verify.sql                     read-only: does the database match these?
+supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-email-sync/     Edge Function: the email fill's write
@@ -558,15 +559,34 @@ a shared machine. `app.test.mjs` drives that path — removing the delete goes
 red, as does a confirmed load that writes no snapshot or a failed one that
 ignores it.
 
-**Running `verify.sql` means running its summary block on its own.** A SQL
-editor shows the result of the last statement only, and the last statement in
-that file is the ten most recent HTTP responses — so pasting the whole file in
-and pressing Run displays those and silently discards the fifty-seven checks
-that answer whether the database matches the numbered files. Select from
-`select check_name, actual, expected, ...` down to `) as t(check_name, actual,
-expected);` and run that alone. The summary sits first rather than last because
-a listing below it can raise on a database missing an object, and anything that
-raises takes every statement after it with it.
+**Run `verify.sql` whole and read the `ok` column.** It is one statement, and
+that is load-bearing rather than tidy. Ten listings used to sit below the
+summary, and a SQL editor shows the result of the **last** statement only — so
+pasting the file in and pressing Run displayed the ten most recent HTTP
+responses and silently discarded every check above them. The file carried a
+paragraph at the bottom explaining that to someone who had already lost their
+result, and told them to scroll up and select a six-hundred-line range by hand.
+It happened to the person who wrote that note, and then to the person it was
+written for. A check that awkward to run is a check that stops being run.
+
+Moving the summary to the end instead would have been worse. `cron.job` raises
+without pg_cron, `net._http_response` without pg_net, and a direct read of a
+table that was never created raises too — anything that raises takes every
+statement after it, so the summary would vanish on exactly the databases it
+exists for. **Two files is what lets each one's statement be last in its own.**
+The listings are `diagnose.sql`, which you open when a row says false and the
+next question is which object, which grant, which schedule. A raise in there is
+not a fault; it is that file reporting an extension or a table that is absent.
+
+A function in the database — `verify_doji()` — was the obvious fix and it is
+wrong twice over. It would put the expectations *inside* the thing being
+verified, applied by hand like everything else, so a stale copy reports a stale
+truth with nothing to catch it. And `agree.test.mjs` reads the summary's text in
+eight places; every one goes silently blind the moment those rows leave the file.
+
+`agree.test.mjs` counts the semicolons in `verify.sql` and asserts there is one,
+because the regression is a single appended `select` — the file still runs, every
+check still passes, and the grid shows something else.
 
 **If a trade does not appear**, the cron reporting `succeeded` proves nothing —
 `net.http_post` is asynchronous, so the SQL succeeded in *queuing* the request.

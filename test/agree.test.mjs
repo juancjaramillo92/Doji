@@ -1066,13 +1066,16 @@ test('the unreferenced-declaration scan can actually find one', () => {
     'dropping a step from render() leaves its renderer unreferenced and unseen');
 });
 
-/* ─── verify.sql's footer counts its own checks ──────────────────────────────
-   The footer is the paragraph a person reads at the moment they are already
-   lost: they ran the whole file, the editor showed them the last statement, and
-   the checks they came for scrolled past unseen. It tells them how many were
+/* ─── verify.sql's header counts its own checks ──────────────────────────────
+   It was a FOOTER, and the footer was a paragraph for someone already lost:
+   they ran the whole file, the editor showed them the last of ten statements,
+   and the checks they came for scrolled past unseen. It told them how many were
    thrown away — and it said fifty-seven while the summary held sixty, which is
-   the file describing itself wrongly in the one place that is read under
-   confusion.
+   a file describing itself wrongly in the one place read under confusion.
+
+   The file is one statement now and the listings are `diagnose.sql`, so nobody
+   arrives at the bottom lost and the count belongs where it is read BEFORE
+   running instead. The number still has to be right, and for the same reason.
 
    The number is a digit rather than a word so it can be compared. This
    repository has been bitten by a stale count twice already; CLAUDE.md's
@@ -1090,31 +1093,32 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
 
   const from = sql.indexOf('select check_name, actual, expected');
   const to   = sql.indexOf(') as t(check_name, actual, expected);', from);
-  assert.ok(from > -1 && to > from, 'the summary block is no longer where the footer sends people');
+  assert.ok(from > -1 && to > from, 'the summary block is no longer where the header says it is');
 
   const rows = (sql.slice(from, to).match(/^  \('/gm) || []).length;
   assert.ok(rows > 40, `only ${rows} checks parsed out of the summary — the reader has gone blind`);
 
-  // The footer is the banner-delimited note at the END of the file, not
-  // everything after the summary — between them sit the listings, the cron
-  // schedules and the embedding counts, all of them full of numbers.
-  const banner = sql.lastIndexOf('-- ═══');
-  const footer = sql.slice(sql.lastIndexOf('-- ═══', banner - 1));
-  const stated = footer.match(/the (\d+) checks that answer/);
-  assert.ok(stated, 'the footer no longer states how many checks were thrown away');
+  // The header is the banner-delimited note the file OPENS with, which is
+  // everything above the one statement.
+  const header = sql.slice(0, from);
+  const stated = header.match(/all (\d+) checks/);
+  assert.ok(stated, 'the header no longer states how many checks this runs');
   assert.equal(Number(stated[1]), rows,
-    `the footer says ${stated[1]} checks and the summary holds ${rows} — the one ` +
-    `paragraph read by someone who has just lost their result is wrong about it`);
+    `the header says ${stated[1]} checks and the summary holds ${rows} — the file ` +
+    `is wrong about itself in the paragraph read before it is run`);
 
-  // AND ONCE. A second copy of the count is a second thing to update, held
-  // together by nothing — the first stayed right while the sentence explaining
-  // WHY it is a digit carried the previous release's number, in the same
-  // paragraph, four lines below it. Any two-digit number in the footer that is
-  // not the stated count is that copy coming back.
-  const others = (footer.match(/\b\d{2,}\b/g) || [])
-    .filter(n => n !== stated[1] && n !== '10');
+  /* AND ONCE. A second copy of the count is a second thing to update, held
+     together by nothing — the first stayed right while the sentence explaining
+     WHY it is a digit carried the previous release's number, in the same
+     paragraph, four lines below it.
+
+     The numbered files are named in this paragraph (001, 002, 003, 004) and are
+     not counts, so they come out first — by their three-digit shape rather than
+     by a list, which would need extending the day a 011 is written. */
+  const others = (header.replace(/\b0\d{2}\b/g, '').match(/\b\d{2,}\b/g) || [])
+    .filter(n => n !== stated[1]);
   assert.deepEqual(others, [],
-    `the footer states a second number (${others.join(', ')}) beside its count of ` +
+    `the header states a second number (${others.join(', ')}) beside its count of ` +
     `${stated[1]} — one paragraph, one copy, or the spare one goes stale unwatched`);
 });
 
@@ -5139,4 +5143,51 @@ test('nothing invented gets reused as a term', () => {
   assert.match(EUGENIA_PROMPT, /NO PUNCHLINES/,
     'the no-punchline rule is gone, so a paragraph may close on a line that ' +
     'sounds good and takes a second to decode');
+});
+
+/* ─── verify.sql is one statement, and diagnose.sql is where the rest went ────
+   A SQL editor shows the result of the LAST statement only. Ten listings under
+   the summary meant that running the file top to bottom displayed the last ten
+   HTTP responses and threw all 71 checks away — which is not hypothetical: it
+   happened, to the person who wrote the note at the bottom explaining it, and
+   then again to the person that note was written for.
+
+   Moving the summary to the END instead would have been worse. Three of those
+   listings can RAISE on a database missing what they read — `cron.job` without
+   pg_cron, `net._http_response` without pg_net, a public table never created —
+   and anything that raises takes every statement after it, so the summary would
+   vanish on exactly the databases it exists for. Two files is what lets both be
+   last in their own.
+
+   The regression is one appended `select`, and it is silent: the file still
+   runs, every check still passes, and the grid shows something else.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('verify.sql runs exactly one statement, so the editor shows the checks', () => {
+  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+  /* Comments first, then string literals — the order this file already learned
+     the hard way, since a `--` comment here routinely carries an apostrophe and
+     one unpaired quote desynchronises literal matching for everything after. */
+  const bare = sql
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--[^\n]*/g, '')
+    .replace(/'(?:[^']|'')*'/g, "''");
+
+  const statements = (bare.match(/;/g) || []).length;
+  assert.equal(statements, 1,
+    `verify.sql holds ${statements} statements — a SQL editor shows the last one, ` +
+    `so every check above it is run and thrown away. The extra one belongs in ` +
+    `diagnose.sql`);
+});
+
+test('the listings still exist, in the file that can afford to raise', () => {
+  // Deleting them instead of moving them would pass the test above and lose the
+  // eye pass — the thing you reach for at the moment a check says false.
+  const diag = readFileSync(new URL('../supabase/diagnose.sql', import.meta.url), 'utf8');
+  for (const read of ['cron.job', 'net._http_response', 'information_schema.columns']) {
+    assert.ok(diag.includes(read),
+      `diagnose.sql no longer reads ${read}, so "which schedule, which column" ` +
+      `has no answer anywhere`);
+  }
 });
