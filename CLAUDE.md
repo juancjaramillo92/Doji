@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 544 tests, six suites
+npm test      # 546 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1241,6 +1241,30 @@ a blank.
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
 
+  IT IS ONE STATEMENT, AND THAT IS LOAD-BEARING RATHER THAN TIDY. A SQL editor
+  shows the result of the LAST statement only, so the ten listings that used to
+  sit below the summary meant running the file top to bottom displayed the last
+  ten HTTP responses and threw all 71 checks away — silently, with a paragraph at
+  the bottom explaining to someone who had already lost their result how to go
+  back and select the block by hand. It happened to the person who wrote that
+  note and then to the person it was written for. **A check that awkward to run
+  is a check that stops being run**, which is the ignored-monitor lesson arriving
+  about the checker itself.
+  Moving the summary to the END would have been worse: `cron.job`,
+  `net._http_response` and a direct public read can all RAISE, and anything that
+  raises takes every statement after it, so the summary would vanish on exactly
+  the databases it exists for. The listings are `diagnose.sql` now — two files,
+  each with its own statement last. `agree.test.mjs` counts the semicolons in
+  `verify.sql` and asserts there is ONE, because the regression is a single
+  appended `select` and the file still runs, still passes, and shows something
+  else.
+
+  A FUNCTION IN THE DATABASE WAS THE OBVIOUS FIX AND IT IS WRONG. `verify_doji()`
+  would put the expectations inside the thing being verified — applied by hand
+  like everything else, so a stale copy reports a stale truth with nothing to
+  catch it — and `agree.test.mjs` reads the summary's TEXT in eight places,
+  every one of which goes silently blind the moment those rows leave the file.
+
   AN ERROR IN IT IS NOT A FAILED ROW, IT IS A FILE THAT STOPPED. The summary is
   one query returning one row per fact, so anything that RAISES takes every
   check below it with it — and the run then reports itself as a fault in the
@@ -1265,6 +1289,11 @@ a blank.
   query. It strips block comments AND dash comments before it looks: an
   apostrophe in either desynchronises quote matching for everything after it,
   and the check then reads a guarded string as live SQL.
+
+  THE COUNT IS IN THE HEADER NOW, not a footer. A footer was a paragraph for
+  someone already lost, and nobody arrives at the bottom lost any more; it is
+  read before running instead. Stated once and as a digit, because a test counts
+  the summary rows and compares it.
 
   AND WHAT IT ASKS ABOUT IS HELD AGAINST THE FILES. It asserted 25 of 39
   declared objects — eleven indexes and the three policies the card reads were
