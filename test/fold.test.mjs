@@ -2150,6 +2150,101 @@ async function calendarWrites(releases) {
 const LANDED = { at: new Date(Date.now() - 600_000).toISOString(), name: 'CPI',
                  importance: 'high', actual: '+0.4% m/m', note: 'headline in line' };
 
+/* ─── The actual goes to the row that was looked at ──────────────────────────
+   The release look held `log_calendar`, whose key is (at, name) over a name the
+   model writes — so on 16 September it was handed
+   `US retail sales (August, advance)`, marked that row at 12:35:00 and filed
+   the print under `retail sales` at 12:36:15. An INSERT, silently: the actual
+   landed on a row with no consensus and the consensus stayed on a row with no
+   actual, which is the one comparison the table holds. The prompt had said *the
+   same time and name* since the tool was written, which is the evidence that an
+   instruction cannot carry this.
+
+   So the tool on that path cannot insert at all. These drive it rather than
+   asserting on its source, because "it is a PATCH" is exactly the claim a
+   reading cannot settle.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Every request record_actual made, with the answer it gave. `answers` is the
+// queue of what fetch returns, in order: the PATCH first, then the read.
+async function actualWrites(input, answers) {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null });
+    const next = answers.shift() ?? [];
+    return { ok: true, status: 200, json: async () => next };
+  };
+  console.error = () => {};
+  try {
+    return { said: await serve('record_actual', input), sent };
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+}
+
+const RETAIL = { at: '2026-09-16T12:30:00Z', name: 'US retail sales (August, advance)',
+                 actual: '+1.2% m/m; control group +1.4%', note: 'well above consensus' };
+
+test('the actual is patched onto the row and never posted as a new one', async () => {
+  const { said, sent } = await actualWrites(RETAIL, [[{ id: 1 }]]);
+  assert.equal(sent.length, 1, 'a second request went out after a write that landed');
+  assert.equal(sent[0].method, 'PATCH',
+    'record_actual is not a PATCH, so a name a shade off the one it was handed mints a row again');
+  assert.match(sent[0].url, /at=eq\.2026-09-16T12:30:00\.000Z/, 'the row is not selected by its time');
+  assert.match(said, /Recorded against/);
+});
+
+test('only the two columns a look owns are written', async () => {
+  /* THE SAME RELEASE CARRIED TWO CONTRADICTORY PRIORS — `+0.5% m/m (Jul)` on the
+     row the briefing filed and `-0.5% m/m (Jul, revised)` on the one the look
+     minted — because the look could write those columns at all. It cannot now,
+     and the schema is only half of that: a model sending them anyway must not
+     reach the database with them. */
+  const { sent } = await actualWrites(
+    { ...RETAIL, consensus: '+0.3% m/m', prior: '-0.5% m/m (Jul, revised)', importance: 'low' },
+    [[{ id: 1 }]]);
+  assert.deepEqual(Object.keys(sent[0].body).sort(), ['actual', 'note'],
+    'a look can write a column the briefing owns again');
+});
+
+test('a name carrying a comma is quoted, or it filters on half of itself', async () => {
+  // PostgREST reads a bare comma in a filter value as a list separator, and the
+  // row that started all of this is called `US retail sales (August, advance)`.
+  // Unquoted, the filter asks for `US retail sales (August` and matches nothing
+  // — which presents as her paraphrasing rather than as a broken URL.
+  const { sent } = await actualWrites(RETAIL, [[{ id: 1 }]]);
+  const name = decodeURIComponent(sent[0].url.split('name=eq.')[1]);
+  assert.equal(name, '"US retail sales (August, advance)"',
+    'the name is not double-quoted, so every release with a comma in it writes nothing');
+});
+
+test('a name that matches nothing answers with the names on file', async () => {
+  /* A PATCH FILTERED TO NOTHING IS A 200 WITH AN EMPTY BODY, which reads exactly
+     like a write that landed. Answered with what is actually there, the next
+     round has what it needs instead of leaving a second row behind. */
+  const { said, sent } = await actualWrites({ ...RETAIL, name: 'retail sales' },
+    [[], [{ name: 'US retail sales (August, advance)' }, { name: 'jobless claims' }]]);
+  assert.equal(sent.length, 2, 'nothing was read back, so she is told nothing and files again');
+  assert.equal(sent[1].method, undefined, 'the fallback is not a read');
+  assert.match(said, /US retail sales \(August, advance\)/);
+  assert.match(said, /jobless claims/);
+});
+
+test('nothing on file at that time is said plainly and nothing is written', async () => {
+  const { said, sent } = await actualWrites(RETAIL, [[], []]);
+  assert.equal(sent.filter(r => r.method === 'PATCH').length, 1);
+  assert.match(said, /Nothing is on file/);
+});
+
+test('a release without a readable time or a figure writes nothing at all', async () => {
+  for (const bad of [{ ...RETAIL, at: 'whenever' }, { ...RETAIL, name: '  ' }, { ...RETAIL, actual: '' }]) {
+    const { sent } = await actualWrites(bad, [[{ id: 1 }]]);
+    assert.equal(sent.length, 0, `${JSON.stringify(bad)} reached the database`);
+  }
+});
+
 test('a release beyond the day she is handed is not filed', async () => {
   /* THE DUPLICATES CAME FROM HERE, and from four different turns rather than
      from the release look: `August CPI` was laid down on the Sunday, `core CPI`
@@ -3963,6 +4058,7 @@ const TOOL_CALLS = [
   ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
   ['get_market',    {}],
   ['log_calendar',  { releases: [{ at: '2026-09-07T12:30:00Z', name: 'CPI', importance: 'high' }] }],
+  ['record_actual', { at: '2026-09-07T12:30:00Z', name: 'CPI', actual: '+0.3% m/m' }],
   ['set_thesis',    { thesis: 'a reading' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],

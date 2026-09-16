@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 528 tests, six suites
+npm test      # 539 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -455,21 +455,24 @@ compounds.
   the prefix each time the document is edited. It is markdown in a template
   literal, so every backtick in it is escaped.
 
-  THE PREFIX STATES `ttl: "1h"`, because the default window is five minutes and
-  her callers are hours apart. An hour catches the replies a briefing draws
-  through the morning and the 09:00 retry; nothing catches 08:00 to 22:00.
-
-  AND THAT ARGUMENT LEFT OUT THE PRICE OF THE HOUR, WHICH IS THE HALF THAT
-  DECIDES IT. A read is a tenth of the input rate; a WRITE is 1.25× at five
-  minutes and 2× at an hour — so the longer window moves the break-even from two
-  requests on a prefix to three, and a caller that makes one request and is not
-  followed inside the hour pays double for a lifetime nothing uses. The tool
-  ARRAY is part of the cache key, so the tool sets are that many separate
-  prefixes, each written at that rate and none readable by another. `cached` was
-  the only figure `ask()` collected and it can only ever report the good news:
-  `wrote_1h` and `wrote_5m` are the other side, kept apart because their rates
-  differ and their sum is not money. Do not move the window off an argument —
-  the rows exist now, so read them.
+  THE WINDOW IS DERIVED FROM THE TOOL ARRAY, AND IT WAS THE ROWS THAT DECIDED
+  IT. A read is a tenth of the input rate; a WRITE is 1.25× at five minutes and
+  2× at an hour — so the longer window moves the break-even from two requests on
+  a prefix to three, and a caller that makes one request and is not followed
+  inside the hour pays double for a lifetime nothing uses. The tool ARRAY is
+  where the cache key starts, so the tool sets are that many separate prefixes,
+  none readable by another — which makes *is a second turn likely inside the
+  hour* a question about the ARRAY rather than about the caller. A week of
+  `wrote_1h` answered it in one shape: every caller's turns equalled its prefix
+  writes except the release look, which made fourteen and wrote five, its
+  quarter-hourly job clustering several looks into one morning. The briefing is
+  08:00 and the pulse is 10:00 — two hours apart — so the hour they were paying
+  2× for could never have been read. `RELEASE_TOOLS` keeps it, everything else
+  is `5m`, and that loses nothing: the rounds within a turn are seconds apart and
+  a read refreshes the five minutes. `cached` was the only figure `ask()`
+  collected and it can only ever report the good news; `wrote_1h` and `wrote_5m`
+  are the other side, kept apart because their rates differ and their sum is not
+  money. Do not move a window off an argument — these rows are what that costs.
 
   She has no write path to it, deliberately: a document that decides whether he
   followed his rules cannot be edited by the thing checking them. The numbering
@@ -788,6 +791,28 @@ compounds.
   because PostgREST refuses a bulk insert that mixes them. It is a second job rather than a
   faster one because every hourly predicate tests `hour ===` — a `*/15` on the
   existing job runs four briefings a morning.
+
+  AND THE LOOK NO LONGER HOLDS THAT TOOL AT ALL, WHICH IS WHERE THE ROWS WERE
+  STILL COMING FROM. Deduplicating the LOOK left the WRITE alone: on 16
+  September it was handed `US retail sales (August, advance)`, marked that row
+  at 12:35:00 and filed the print under `retail sales` at 12:36:15 — an insert,
+  because the key is `(at, name)` over a name the model writes. The actual
+  landed on a row with no consensus and the consensus stayed on a row with no
+  actual. `RELEASE` had said *the same time and name* since the tool was
+  written, so this is the instruction-shaped guarantee failing in the file that
+  says instructions fail here. `ACTUAL_TOOL` replaces it in `RELEASE_TOOLS` and
+  `recordActual` is a PATCH with no insert path at any spelling; it cannot write
+  `consensus` or `prior`, which is how that release came to hold two
+  contradictory priors. A filter matching nothing is a 200 with an empty body —
+  `planned`'s failure exactly — so it reads the names back and says them.
+
+  AND `updated_at` MAY NOT MOVE ON A MARK. `markLooked` writes `looked_at`
+  alone, and an unconditional touch made the column say when a row was last
+  HANDLED where its own comment claims it says which of two contradictory rows
+  is later. On that release it ordered correctly by seventy-five seconds.
+  Compared as `jsonb` less the two bookkeeping columns rather than against a
+  list of the rest, so a column added later is compared without anyone
+  remembering to add it.
 
 - **A trigger on `trades` tells her a position opened or closed**, and the two
   things she may say are both his own rules read back: R-14/R-19 on a print

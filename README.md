@@ -1460,7 +1460,7 @@ one row.** The unique key is `(at, name)` and the name is free text she writes,
 so `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
 number to a person — and each one marked `high` used to fire its own look, its
 own model call and its own message. Five for a single CPI on 11 September. It
-also fed itself: the release look holds `log_calendar` too, so filing the actual
+also fed itself: the release look held `log_calendar` too, so filing the actual
 under a name a shade different from the one it was handed **inserted** rather
 than updated, and that new row was then unlooked and fired in its turn. What
 arrived as two apologies in two days was never her catching an error — it was a
@@ -1499,11 +1499,40 @@ hours — so a row beyond it had no consumer at all and existed only to become a
 duplicate. `log_calendar` refuses one now and says how many it refused, because
 a bound she cannot see is a bound she files against for ever.
 
-**And the row records when it was last written.** Two writers hours apart on one
-row means `created_at` says only when each was first seen — so when duplicates
-disagreed about what a number printed at, nothing could say which figure was the
-later one. `updated_at` moves on every UPDATE through a trigger, the same shape
-`trades` has used since `001`.
+**A look fills a release in and cannot file one.** Closing the loop above stopped
+the duplicate look; it did not stop the duplicate row, because `log_calendar` was
+still on that path. On 16 September the look was handed
+`US retail sales (August, advance)`, marked that row at 12:35:00, searched, and
+filed the print under `retail sales` at 12:36:15 — an insert. The actual landed
+on a row with no consensus, the consensus stayed on a row with no actual, and the
+one comparison this table exists to hold was gone with nothing failing. The
+`RELEASE` prompt had said *the same time and name* since the day the tool was
+written, which is the whole argument against carrying this in an instruction.
+
+So the release look is given `record_actual` instead, and it is a **PATCH and
+nothing else**: it matches an entry on `(at, name)`, writes `actual` and `note`,
+and has no insert path at any spelling. It cannot touch `consensus` or `prior`
+either — the briefing's columns, and how that same release came to hold
+`+0.5% m/m (Jul)` on one row and `-0.5% m/m (Jul, revised)` on the other. A name
+matching nothing is a 200 with an empty body, which reads exactly like a write,
+so it answers with the names actually on file and the next round writes to one of
+them. The look is handed the UTC stamp beside the ET heading, because the tool
+matches on the instant and asking her to convert is a conversion standing where
+an input belongs.
+
+**And the row records when its content was last written.** Two writers hours
+apart on one row means `created_at` says only when each was first seen — so when
+duplicates disagreed about what a number printed at, nothing could say which
+figure was the later one. `updated_at` moves through a trigger, the same shape
+`trades` has used since `001`, but **not on a mark**: `markLooked` writes
+`looked_at` and nothing else, and an unconditional touch made the column say when
+a row was last *handled*. On 16 September the row carrying the stale prior was
+marked at 12:35:00 and the row carrying the actual was written at 12:36:15 — it
+ordered correctly by seventy-five seconds. Reverse them and the column answers
+the opposite of the truth in the one question it has. The trigger compares the
+row as `jsonb` less `updated_at` and `looked_at`, rather than against a list of
+the other columns, so a column added later is compared without anyone having to
+remember it.
 
 **One chain per briefing, not one per event.** Every scheduled thing that
 matters still gets named — he needs the week — but only one of them gets its
@@ -1882,7 +1911,7 @@ Two kinds of memory, and they answer different questions.
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
-| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool |
+| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool, filled in by `record_actual` |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
@@ -2963,38 +2992,75 @@ seconds and cannot be extended — one call at the start left a thirty-second
 answer looking like a dead bot for twenty-five of them. It makes nothing faster;
 it makes the wait legible.
 
-**What she costs.** Roughly $0.20 a briefing and rather less for a pulse that
-finds nothing — call it $10 a month for six briefings and five pulses a week —
-of which a large share is web search at $10 per 1,000 searches rather than
-tokens. Questions are a few cents each. The model is the strongest one; at this
-volume the searches dominate, so a weaker model would save little.
+**What she costs, measured rather than estimated.** `eugenia_runs` carries every
+model call, and the week of 2026-09-10 came to **$16.68, about $72 a month** —
+not the $10 this paragraph used to claim from an estimate, and not spent where it
+claimed either:
+
+| | tokens | rate | |
+|---|---|---|---|
+| cache writes, 1h | 620,460 | 2× | **$6.20** |
+| cache reads | 6,267,957 | 0.1× | $3.13 |
+| cache writes, 5m | 435,375 | 1.25× | $2.72 |
+| output | 94,956 | $25/M | $2.37 |
+| web search | 123 searches | $10/1,000 | $1.23 |
+| fresh input | 202,653 | $5/M | $1.01 |
+
+**The cache is the bill.** Writes alone are 58% of the token spend and the
+largest line on the table — larger than everything she says. Search is 7%, where
+this paragraph used to say the searches dominate and a weaker model would
+therefore save little; that was wrong in both halves. Deriving the window from
+the tool array takes the 1h line to about $1.08 and moves the rest onto the 5m
+rate, roughly $64 a month. The next lever after that is the prefix itself: 23,309
+tokens written 32 times a week is what the top two rows are made of, and it is a
+question about what she is told rather than about how it is cached.
 
 **What the prompt cache actually buys, said plainly.** Her cached prefix is
 23,309 tokens with the chat tool set and 16,477 with the nightly pass's — read
 off `eugenia_runs.wrote_1h`, which records the size of the entry each caller
-writes, rather than estimated. It is cached — but the default window is five
-minutes and her callers are hours apart,
-so for most of this system's life the cache paid only for the rounds *within* one
-turn: a briefing that reads the journal and writes a note is three requests
-carrying that prefix. The window is now stated as an hour, which also catches the
-replies a briefing draws through the morning and the 09:00 retry after an 08:00
-failure. It does not catch 08:00 → 10:00, and nothing sensible would.
+writes, rather than estimated. The default window is five minutes, and what that
+buys is the rounds *within* one turn: a briefing that reads the journal and
+writes a note is three requests carrying that prefix, seconds apart, and a read
+refreshes the five minutes, so a long turn keeps its entry alive to the end.
 
-**And the hour has a price the argument above never named.** A cache READ is a
-tenth of the input rate; a cache WRITE is 1.25× at five minutes and **2× at an
-hour**. So the longer window does not simply buy more — it moves the break-even
-from two requests on a prefix to three, and a caller that makes one request and
-is not followed within the hour pays double for a lifetime nothing uses. That
-matters more than it looks, because *the tool array is part of the cache key*:
-five tool sets are five separate prefixes, none readable by another, each written
-at that doubled rate.
+**The hour has a price, and a week of rows decided who pays it.** A cache READ
+is a tenth of the input rate; a cache WRITE is 1.25× at five minutes and **2× at
+an hour**. So the longer window does not simply buy more — it moves the
+break-even from two requests on a prefix to three, and a caller that makes one
+request and is not followed within the hour pays double for a lifetime nothing
+uses. That matters more than it looks, because *the tool array is part of the
+cache key*: five tool sets are five separate prefixes, none readable by another.
+Which makes *is a second turn likely inside the hour?* a question about the
+**array** rather than about the caller — and the answer came back in one shape:
 
-`ask()` records both halves now — `cached` for the reads, `wrote_1h` and
-`wrote_5m` for the writes, kept apart because their rates differ and a sum of
-them cannot be turned back into money. Until those two columns existed the one
-figure that decides the `ttl` was the one figure the meter beside it did not
-collect, and the paragraph above was an argument with nothing under it. Give it a
-week of rows before changing the window.
+| caller | turns | prefixes written | inherited one |
+|---|---|---|---|
+| release look | 14 | 5 | **9** |
+| weekday briefing | 5 | 5 | 0 |
+| pulse | 5 | 5 | 0 |
+| critic | 6 | 6 | 0 |
+| consolidation | 6 | 5 | 0 |
+| move look | 2 | 2 | 0 |
+| reply | 1 | 1 | 0 |
+| Sunday briefing | 1 | 1 | 0 |
+
+Consolidation's sixth turn is neither: it is the row `ask()` writes for a turn
+that failed before the model answered, and reading it as an inherited prefix is
+the mistake this table is laid out to prevent.
+
+Only `RELEASE_TOOLS` earns the hour, and for a reason in the schedule rather than
+in the prompt: its job runs quarter-hourly, so a morning carrying several release
+times clusters the looks inside one window. The briefing is 08:00 and the pulse
+is 10:00 — two hours apart — so the hour those were paying 2× for could never
+have been read by anything. The window is derived from the tool array now: `1h`
+for `RELEASE_TOOLS`, `5m` for the rest, which is 512,059 tokens a week moving
+off the doubled rate.
+
+`ask()` records both halves — `cached` for the reads, `wrote_1h` and `wrote_5m`
+for the writes, kept apart because their rates differ and a sum of them cannot be
+turned back into money. Until those two columns existed the one figure that
+decides the window was the one figure the meter beside it did not collect, and
+the argument for the hour had nothing under it.
 
 **Inside a turn the conversation is cached too, at five minutes.** Only the
 system block carried a breakpoint, so each round of the tool loop re-sent

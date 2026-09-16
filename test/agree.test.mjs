@@ -1855,15 +1855,16 @@ test('the strategy rides on the cached system prompt, not on a message', () => {
     'the strategy is no longer part of the cached system prompt — either she has ' +
     'stopped being given it at all, or it is being paid for on every message');
 
-  /* AND THE WINDOW IS STATED, because the default is five minutes and her
-     callers are hours apart. Without a ttl the cache pays only for the rounds
-     within one turn and the comment above it claims more than that — the
-     briefing at 08:00 and the replies it draws through the morning share
-     nothing. Dropping the ttl is silent: the request still succeeds, and the
-     only sign is the `cached` figure in ask()'s log line. */
-  assert.match(src, /cache_control:\s*\{\s*type:\s*"ephemeral",\s*ttl:\s*"1h"\s*\}/,
-    'the cached prefix no longer states a ttl, so it falls back to five minutes ' +
-    'and almost nothing hits across turns');
+  /* AND THE WINDOW IS DERIVED FROM THE TOOL ARRAY, which is where the cache key
+     starts. A week of `wrote_1h` settled which array earns the hour: the release
+     look made fourteen turns and wrote five prefixes, its quarter-hourly job
+     clustering several looks into one morning, and every other caller wrote its
+     own on every single turn. A literal here is the shape that goes stale —
+     it reads as a decision and is a default, and the wrong one costs 2× the
+     input rate for a lifetime nothing reads. README.md carries the rows. */
+  assert.match(src, /ttl:\s*tools === RELEASE_TOOLS \? "1h" : "5m"/,
+    'the cached prefix states one window for every caller again — the hour is ' +
+    'only earned by RELEASE_TOOLS, see the measurement in README.md');
 });
 
 test('what is summarised into every turn can also be read in full', () => {
@@ -4979,4 +4980,82 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
     `function this repository deploys — every call is a 404`);
   assert.match(eugenia, /MARKET_URL[\s\S]{0,400}?x-doji-key/,
     'the market read presents no secret, so the poller will refuse it 401');
+});
+
+/* ─── A look may fill a release in and may never file one ────────────────────
+   The release look held `log_calendar`, whose key is (at, name) over a name the
+   model writes. On 16 September it was handed
+   `US retail sales (August, advance)`, marked that row at 12:35:00, and filed
+   the print under `retail sales` at 12:36:15 — an INSERT. The actual landed on
+   a row with no consensus, the consensus stayed on a row with no actual, and
+   the comparison the table exists for was gone with nothing failing.
+
+   The RELEASE prompt had said *the same time and name* since the tool was
+   written. That is the evidence, rather than an argument, that this cannot be
+   carried by an instruction — so the tool array is the guarantee now, and these
+   read for it. Every one of them is silent when it breaks: a look that can
+   upsert again still answers, still sends a correct message, and leaves a
+   second row behind that nobody is looking at.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the release look is handed no tool that can file a calendar row', () => {
+  const array = EUGENIA_TS.match(/const RELEASE_TOOLS = \[([^\]]*)\]/)?.[1];
+  assert.ok(array, 'RELEASE_TOOLS is no longer an array literal, so nothing here can read it');
+  assert.doesNotMatch(array, /CALENDAR_TOOL/,
+    'the release look can upsert the calendar again — it will mint the row it was ' +
+    'looking at, under a name a shade off the one it was handed');
+  assert.match(array, /ACTUAL_TOOL/,
+    'the release look has no way to record what a release printed, so the table ' +
+    'keeps a consensus for ever and never the number');
+});
+
+test('record_actual cannot be handed a column the briefing owns', () => {
+  const schema = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const ACTUAL_TOOL'));
+  const props = schema.slice(0, schema.indexOf('required:'));
+  for (const owned of ['consensus', 'prior', 'importance']) {
+    assert.doesNotMatch(props, new RegExp(`\\b${owned}:`),
+      `record_actual offers ${owned} — the same release once carried two ` +
+      `contradictory priors because a look could write one`);
+  }
+});
+
+test('the release prompt asks for the tool the release look actually has', () => {
+  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)?.[1];
+  assert.ok(release, 'the RELEASE prompt is no longer readable from here');
+  assert.match(release, /record_actual/,
+    'the release prompt names no tool for the number, so the look reads the print and files nothing');
+  assert.doesNotMatch(release, /log_calendar/,
+    'the release prompt still names log_calendar, which that path is no longer given — ' +
+    'she is being asked for a tool that answers "there is no tool called that here"');
+});
+
+test('the release look is handed the stamp its tool takes', () => {
+  /* THE HEADING IS IN ET AND THE TOOL TAKES UTC. Asked to convert, she converts
+     from a New York clock she was given as words — a conversion standing where
+     an input belongs, which is the shape the price line was moved for. Dropping
+     it breaks nothing: the look still runs, still says the right thing, and
+     writes against an instant an hour out for half the year. */
+  const at = EUGENIA_TS.indexOf('async function postRelease(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /toISOString\(\)[\s\S]{0,80}record_actual/,
+    'postRelease no longer hands her the UTC stamp record_actual matches on');
+});
+
+test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () => {
+  /* `updated_at` exists to say which of two contradictory rows carries the later
+     CONTENT. markLooked writes looked_at and nothing else, so an unconditional
+     touch makes it say when a row was last HANDLED — and on 16 September the row
+     with the stale prior was marked at 12:35:00 while the row with the actual
+     was written at 12:36:15. Seventy-five seconds is the whole reason it ordered
+     correctly. Reverse them and the column answers the opposite of the truth. */
+  const fn = SENSES_SQL.slice(SENSES_SQL.indexOf('function public.eugenia_calendar_touch()'));
+  const body = fn.slice(0, fn.indexOf('$$;') + 3);
+  assert.match(body, /is distinct from/,
+    'eugenia_calendar_touch moves updated_at on every update again, so a look ' +
+    'marking a stale row makes it read as the later one');
+  for (const ignored of ['updated_at', 'looked_at']) {
+    assert.ok(body.split(`- '${ignored}'`).length === 3,
+      `${ignored} is not excluded from both sides of the comparison, so the ` +
+      `trigger compares a column it is in the middle of writing`);
+  }
 });
