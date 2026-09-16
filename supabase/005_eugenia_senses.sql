@@ -185,15 +185,34 @@ create table if not exists public.eugenia_calendar (
   constraint eugenia_calendar_unique unique (at, name)
 );
 
--- The column above has a default for the INSERT; this is what moves it on every
--- UPDATE, including the PATCH that stamps looked_at. Named and shaped after
--- `trades_touch`, which does the same job for the same reason in 001.
+-- The column above has a default for the INSERT; this is what moves it when an
+-- UPDATE changes anything a person filed. Named and shaped after `trades_touch`,
+-- which does the same job for the same reason in 001.
 alter table public.eugenia_calendar add column if not exists updated_at timestamptz not null default now();
 
+-- A MARK IS NOT AN EDIT, AND THE COLUMN ABOVE CLAIMS TO ANSWER WHICH ROW HOLDS
+-- THE LATER CONTENT. markLooked stamps looked_at and touches nothing else, so a
+-- touch there makes updated_at say when a row was last HANDLED — and on
+-- 16 September the row carrying the stale prior was marked at 12:35:00 while the
+-- row carrying the actual was written at 12:36:15. It ordered correctly by
+-- seventy-five seconds. Reverse the two and updated_at names the stale row as
+-- the later one, which is the table saying the opposite of the truth in the one
+-- column it has for the question.
+--
+-- Compared as jsonb less the two bookkeeping columns, rather than as a list of
+-- the rest: a column added later is compared without anyone having to remember
+-- to add it here, and a list that goes stale fails by quietly ignoring the new
+-- column's edits.
 create or replace function public.eugenia_calendar_touch()
 returns trigger
 language plpgsql
-as $$ begin new.updated_at := now(); return new; end $$;
+as $$ begin
+  if to_jsonb(old) - 'updated_at' - 'looked_at'
+     is distinct from to_jsonb(new) - 'updated_at' - 'looked_at' then
+    new.updated_at := now();
+  end if;
+  return new;
+end $$;
 
 drop trigger if exists eugenia_calendar_touch_updated_at on public.eugenia_calendar;
 create trigger eugenia_calendar_touch_updated_at

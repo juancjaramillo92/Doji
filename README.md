@@ -1460,7 +1460,7 @@ one row.** The unique key is `(at, name)` and the name is free text she writes,
 so `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
 number to a person — and each one marked `high` used to fire its own look, its
 own model call and its own message. Five for a single CPI on 11 September. It
-also fed itself: the release look holds `log_calendar` too, so filing the actual
+also fed itself: the release look held `log_calendar` too, so filing the actual
 under a name a shade different from the one it was handed **inserted** rather
 than updated, and that new row was then unlooked and fired in its turn. What
 arrived as two apologies in two days was never her catching an error — it was a
@@ -1499,11 +1499,40 @@ hours — so a row beyond it had no consumer at all and existed only to become a
 duplicate. `log_calendar` refuses one now and says how many it refused, because
 a bound she cannot see is a bound she files against for ever.
 
-**And the row records when it was last written.** Two writers hours apart on one
-row means `created_at` says only when each was first seen — so when duplicates
-disagreed about what a number printed at, nothing could say which figure was the
-later one. `updated_at` moves on every UPDATE through a trigger, the same shape
-`trades` has used since `001`.
+**A look fills a release in and cannot file one.** Closing the loop above stopped
+the duplicate look; it did not stop the duplicate row, because `log_calendar` was
+still on that path. On 16 September the look was handed
+`US retail sales (August, advance)`, marked that row at 12:35:00, searched, and
+filed the print under `retail sales` at 12:36:15 — an insert. The actual landed
+on a row with no consensus, the consensus stayed on a row with no actual, and the
+one comparison this table exists to hold was gone with nothing failing. The
+`RELEASE` prompt had said *the same time and name* since the day the tool was
+written, which is the whole argument against carrying this in an instruction.
+
+So the release look is given `record_actual` instead, and it is a **PATCH and
+nothing else**: it matches an entry on `(at, name)`, writes `actual` and `note`,
+and has no insert path at any spelling. It cannot touch `consensus` or `prior`
+either — the briefing's columns, and how that same release came to hold
+`+0.5% m/m (Jul)` on one row and `-0.5% m/m (Jul, revised)` on the other. A name
+matching nothing is a 200 with an empty body, which reads exactly like a write,
+so it answers with the names actually on file and the next round writes to one of
+them. The look is handed the UTC stamp beside the ET heading, because the tool
+matches on the instant and asking her to convert is a conversion standing where
+an input belongs.
+
+**And the row records when its content was last written.** Two writers hours
+apart on one row means `created_at` says only when each was first seen — so when
+duplicates disagreed about what a number printed at, nothing could say which
+figure was the later one. `updated_at` moves through a trigger, the same shape
+`trades` has used since `001`, but **not on a mark**: `markLooked` writes
+`looked_at` and nothing else, and an unconditional touch made the column say when
+a row was last *handled*. On 16 September the row carrying the stale prior was
+marked at 12:35:00 and the row carrying the actual was written at 12:36:15 — it
+ordered correctly by seventy-five seconds. Reverse them and the column answers
+the opposite of the truth in the one question it has. The trigger compares the
+row as `jsonb` less `updated_at` and `looked_at`, rather than against a list of
+the other columns, so a column added later is compared without anyone having to
+remember it.
 
 **One chain per briefing, not one per event.** Every scheduled thing that
 matters still gets named — he needs the week — but only one of them gets its
@@ -1882,7 +1911,7 @@ Two kinds of memory, and they answer different questions.
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
-| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool |
+| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool, filled in by `record_actual` |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one

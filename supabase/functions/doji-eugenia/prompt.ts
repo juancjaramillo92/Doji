@@ -883,9 +883,9 @@ export const RELEASE = `A release you filed this morning has just landed. Find o
 what it actually printed and decide whether it is worth telling him.
 
 Search for the number, and fetch the page if the figure matters. Then call
-log_calendar with the same time and name and the actual filled in, plus one line
-on what it meant — that updates the entry rather than adding a second one, and it
-is what makes this a record rather than a message.
+record_actual with the time and name exactly as they are listed above, the actual
+filled in, and one line on what it meant — that fills in the entry you already
+filed, which is what makes this a record rather than a message.
 
 THEN DECIDE. Reply with the single word NOTHING — no punctuation, no explanation
 — unless it genuinely matters: it came in away from what was expected, or the

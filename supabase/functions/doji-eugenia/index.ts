@@ -1012,7 +1012,8 @@ const CALENDAR_TOOL = {
     "in the actual and one line on what it meant. Recording a release with " +
     "importance 'high' is also what wakes you to look at it after it lands, so a " +
     "print worth reacting to must be filed as high. Filing the same time and name " +
-    "twice updates the row rather than adding one.",
+    "twice updates the row rather than adding one — so if the release is already " +
+    "in the calendar you were handed, file it under that exact name.",
   input_schema: {
     type: "object",
     properties: {
@@ -1123,6 +1124,91 @@ async function logCalendar(releases: unknown): Promise<string> {
     return "That did not save. Carry on and do not mention it.";
   }
 }
+
+/* THE ACTUAL GOES TO THE ROW THAT WAS LOOKED AT, AND AN UPSERT COULD NOT PROMISE
+   THAT. The release look held `log_calendar`, whose key is (at, name) over a
+   name the model writes — so on 16 September it was handed
+   `US retail sales (August, advance)`, marked that row at 12:35:00, and filed
+   the print under `retail sales` at 12:36:15. An INSERT. The actual landed on a
+   row with no consensus and the consensus stayed on a row with no actual, which
+   is the single comparison this table exists to hold, and nothing failed. The
+   prompt had said *the same time and name* since the day the tool was written:
+   an instruction standing where a guarantee belongs, failing the way they all
+   fail here.
+
+   So this one CANNOT INSERT. A PATCH and nothing else, over the two columns a
+   look owns — which makes it structural rather than remembered: a look can no
+   longer mint a row under any spelling, and it can no longer write `consensus`
+   or `prior`, the briefing's columns, which is how that same release ended up
+   holding two contradictory priors.
+
+   AND A NAME THAT MATCHES NOTHING ANSWERS WITH THE NAMES ON FILE, because a
+   PATCH filtered to nothing is a 200 with an empty body — silence that reads
+   exactly like a write, the shape `planned` was repaired for in the poller. She
+   is handed the names in the message and quoting one is the whole job; when she
+   paraphrases anyway the next round has what it needs instead of a second row. */
+async function recordActual(at: unknown, name: unknown, actual: unknown, note: unknown): Promise<string> {
+  const when = new Date(String(at ?? ""));
+  const called = String(name ?? "").trim();
+  const printed = String(actual ?? "").trim().slice(0, NOTE_MAX);
+  if (isNaN(+when) || !called || !printed) {
+    return "That needs the release's time in UTC, its name exactly as the calendar lists it, and what it printed.";
+  }
+
+  const patch: Record<string, string> = { actual: printed };
+  const line = String(note ?? "").trim().slice(0, NOTE_MAX);
+  if (line) patch.note = line;
+
+  /* A COMMA INSIDE A FILTER VALUE IS A LIST SEPARATOR TO PostgREST, and these
+     names carry them — `US retail sales (August, advance)` is the row that
+     started this, and unquoted it would filter on `US retail sales (August`
+     and match nothing at all. Double-quoted, with any quote in the name
+     escaped, so the miss cannot come from the punctuation. */
+  const quoted = encodeURIComponent(`"${called.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+  const at_ = when.toISOString();
+
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?at=eq.${at_}&name=eq.${quoted}`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if ((await res.json()).length) return `Recorded against ${called}.`;
+
+    // Bounded like every other read here, and by the same number a single call
+    // may file: a release time holding more names than one briefing could have
+    // written is not a list worth reading back to her.
+    const standing = await readRows<Release>('Release',
+      `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=${CALENDAR_MAX}`);
+    return standing.length
+      ? `Nothing at that time is called "${called}". On file: ` +
+        `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
+      : "Nothing is on file at that time, so there is no entry to fill in. Leave it.";
+  } catch (err) {
+    console.error("doji-eugenia: actual not written —", err instanceof Error ? err.message : err);
+    return "That did not save. Carry on and do not mention it.";
+  }
+}
+
+const ACTUAL_TOOL = {
+  name: "record_actual",
+  description:
+    "Fill in what a release printed, on the entry already filed for it. Give the " +
+    "time in UTC and the name exactly as the list you were handed spells it. This " +
+    "updates that entry and can never add a second one, so a name that matches " +
+    "nothing writes nothing and tells you what is on file instead.",
+  input_schema: {
+    type: "object",
+    properties: {
+      at:     { type: "string", description: "When it landed, ISO 8601 in UTC, as the entry was filed." },
+      name:   { type: "string", description: "The entry's name, copied exactly from the list you were given." },
+      actual: { type: "string", description: "What it printed, with its unit." },
+      note:   { type: "string", description: `One line on what it meant. Optional, at most ${NOTE_MAX} characters.` },
+    },
+    required: ["at", "name", "actual"],
+    additionalProperties: false,
+  },
+} as const;
 
 /* ─── The price, read off the instrument ───────────────────────────────────
    She has quoted gold out of whatever a news page said, at whatever staleness
@@ -1543,7 +1629,10 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
-const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, CALENDAR_TOOL, LOOP_TOOL];
+/* NOT `CALENDAR_TOOL`, AND THAT IS THE WHOLE OF THE FIX ABOVE. A look that can
+   upsert by (at, name) can mint the row it was looking at, under a name a shade
+   off the one it was handed. It files an actual and nothing else. */
+const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* The critic reads a draft and returns a draft. Giving it a tool would let it
    go and check something, which is a second briefing at a second price.
@@ -1662,6 +1751,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
     case CALENDAR_TOOL.name: return await logCalendar(input.releases);
+    case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
@@ -3420,8 +3510,13 @@ async function postRelease(): Promise<Response> {
     `· ${r.name}` +
     (r.consensus ? `, ${r.consensus} expected` : "") +
     (r.prior ? `, after ${r.prior}` : "")).join("\n");
+  /* THE UTC STAMP, BECAUSE THE TOOL TAKES IT AND THE HEADING IS IN ET. She was
+     being asked to reconstruct it from a New York clock, which is a conversion
+     standing where an input belongs. Normalised through Date so both sides of
+     the filter spell the same instant the same way. */
   const asked = RELEASE +
-    `\n\nWhat landed at ${nyTime(due[0].at)} ET:\n${landed}` +
+    `\n\nWhat landed at ${nyTime(due[0].at)} ET — ${new Date(due[0].at).toISOString()} in UTC, ` +
+    `which is what record_actual takes:\n${landed}` +
     notes + channels + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],

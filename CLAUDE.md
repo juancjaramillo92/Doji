@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 528 tests, six suites
+npm test      # 539 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -791,6 +791,28 @@ compounds.
   because PostgREST refuses a bulk insert that mixes them. It is a second job rather than a
   faster one because every hourly predicate tests `hour ===` — a `*/15` on the
   existing job runs four briefings a morning.
+
+  AND THE LOOK NO LONGER HOLDS THAT TOOL AT ALL, WHICH IS WHERE THE ROWS WERE
+  STILL COMING FROM. Deduplicating the LOOK left the WRITE alone: on 16
+  September it was handed `US retail sales (August, advance)`, marked that row
+  at 12:35:00 and filed the print under `retail sales` at 12:36:15 — an insert,
+  because the key is `(at, name)` over a name the model writes. The actual
+  landed on a row with no consensus and the consensus stayed on a row with no
+  actual. `RELEASE` had said *the same time and name* since the tool was
+  written, so this is the instruction-shaped guarantee failing in the file that
+  says instructions fail here. `ACTUAL_TOOL` replaces it in `RELEASE_TOOLS` and
+  `recordActual` is a PATCH with no insert path at any spelling; it cannot write
+  `consensus` or `prior`, which is how that release came to hold two
+  contradictory priors. A filter matching nothing is a 200 with an empty body —
+  `planned`'s failure exactly — so it reads the names back and says them.
+
+  AND `updated_at` MAY NOT MOVE ON A MARK. `markLooked` writes `looked_at`
+  alone, and an unconditional touch made the column say when a row was last
+  HANDLED where its own comment claims it says which of two contradictory rows
+  is later. On that release it ordered correctly by seventy-five seconds.
+  Compared as `jsonb` less the two bookkeeping columns rather than against a
+  list of the rest, so a column added later is compared without anyone
+  remembering to add it.
 
 - **A trigger on `trades` tells her a position opened or closed**, and the two
   things she may say are both his own rules read back: R-14/R-19 on a print
