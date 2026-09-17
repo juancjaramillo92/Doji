@@ -1646,12 +1646,51 @@ const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
    size. An empty array is the smaller write of the two. REFACTOR.md R-15. */
 const CRITIC_TOOLS: unknown[] = [];
 
-/* NAMED, BECAUSE TWO THINGS NOW READ IT. The request asks for this model and
-   ask() compares what answered against it. A second literal would report a
-   fallback on every call from the day someone edited one of the two. */
-const MODEL = "claude-opus-5";
+/* ONE MODEL FOR EVERY CALLER WAS NEVER A DECISION, AND THE ROWS SAY WHAT IT
+   COST. A week of `eugenia_runs` put the release look at $5.30 and the whole
+   briefing at $4.12 — fourteen looks costing more than five briefings, and the
+   move look at $0.64 a turn, the most expensive single message she sends, for
+   two sentences about a price.
 
-async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
+   THE SPLIT IS BETWEEN JUDGING AND CHECKING, and nothing else. What stays on
+   Opus decides something open: the briefing is the product, the nightly pass
+   writes memory that outlives it by months, the critic is the LAST gate on the
+   thing he reads, the trade look reaches him while he is in a position, and a
+   reply is the conversation. What moves is bounded work handed everything it
+   needs — the release look is given the thesis, the calendar, the notes and the
+   channel map and asked whether one number came in away from expectations; the
+   pulse is a filter whose default output is one word; the move look compares
+   two prices against a threshold.
+
+   THE CRITIC IS THE ONE I EXPECTED TO MOVE AND IT DOES NOT. Sonnet would save
+   about $3.50 a month, and it runs LAST, it can rewrite, and it is the final
+   gate on the exact thing he spent two weeks saying read badly. That is a bad
+   trade at any saving.
+
+   Caches are MODEL-SCOPED, so this splits a prefix wherever two callers share a
+   tool array and part here. Nothing is lost: the release look and the move look
+   both move, so `RELEASE_TOOLS` — the one prefix anything ever inherited, nine
+   times in fourteen — stays whole; and the pulse parting from the briefing on
+   `CHAT_TOOLS` costs nothing, because the measured week shows the pulse
+   inheriting a prefix on none of its five turns. */
+const OPUS = "claude-opus-5";
+const SONNET = "claude-sonnet-5";
+
+/* KEYED ON THE CALLER'S LABEL, which is the same string `eugenia_runs.caller`
+   records and the same one `ask` is handed. A name here that no caller uses is
+   a row that silently never applies, so `agree.test.mjs` holds these keys
+   against the labels the file actually passes. Absent means Opus: a new caller
+   is expensive and correct rather than cheap and unnoticed. */
+const MODELS: Record<string, string> = {
+  'release look': SONNET,
+  'pulse':        SONNET,
+  'move look':    SONNET,
+};
+
+export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
+
+async function call(messages: any[], effort: Effort, tools: unknown[],
+                    model: string, container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1663,11 +1702,21 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       // rejects — and `fallbacks` without the header is rejected as well. So
       // the shape below 400s every call, briefing and reply alike, which is
       // the whole function. It shipped that way for one commit.
-      "anthropic-beta": "server-side-fallback-2026-07-01",
+      //
+      // IT RIDES WITH OPUS ALONE, AND THAT IS CAUTION RATHER THAN A RULE.
+      // `fallbacks` has carried this system's briefings since the morning a
+      // decline cost one, on the model it was turned on for. Whether the
+      // parameter is accepted on Sonnet is not something anything here has
+      // established, and if it is not, the failure is a 400 on every call —
+      // three callers dark at once. Widen it the day a Sonnet call is seen to
+      // take it, not before.
+      ...(model === OPUS
+          ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
+          : {}),
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: 16000,
       /* Cached: both are long, fixed, and sent on every turn — which is exactly
          why the strategy rides here rather than in the message.
@@ -1706,7 +1755,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       // on another model inside this same call and routes by refusal category,
       // so there is no model list here to go stale, and a decline before any
       // output is not billed.
-      fallbacks: "default",
+      ...(model === OPUS ? { fallbacks: "default" } : {}),
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
     }),
@@ -1772,6 +1821,10 @@ export async function serve(name: string, input: any): Promise<string> {
    before. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
                           tools: unknown[] = CHAT_TOOLS): Promise<string> {
+  // DERIVED FROM THE LABEL RATHER THAN PASSED, so a caller cannot be given one
+  // model and recorded under another — `label` is already what eugenia_runs
+  // stores, and one string deciding both is what keeps the meter answerable.
+  const model = modelFor(label);
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -1816,7 +1869,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   try {
   for (let round = 0; round < MAX_ROUNDS; round++) {
     rounds = round + 1;
-    const body = await call(convo, effort, tools, container);
+    const body = await call(convo, effort, tools, model, container);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
@@ -1828,7 +1881,10 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     wrote1h  += hour;
     wrote5m  += madeCache - hour;
-    if (body.model && body.model !== MODEL) fellBack = body.model;
+    // AGAINST WHAT THIS CALLER ASKED FOR, not against one name for the file.
+    // Compared with a single constant, every Sonnet caller would report a
+    // fallback on every call and the column would stop meaning anything.
+    if (body.model && body.model !== model) fellBack = body.model;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
     // content, so it is caught before the blocks are read rather than surfacing
@@ -1909,7 +1965,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        Searches are counted apart from the tokens because they bill apart.
        Only on the way out; the catch below records the turns that never got
        here, which are the ones a cost line could never see at all. */
-    console.log(`doji-eugenia: ${label} — ${round + 1} round(s), ${effort} effort, ` +
+    console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
@@ -2163,29 +2219,19 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
 const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
                   "person who is busy. Never breathless, never selling.";
 
-/* THE BOUND IS THE VENDOR'S NOW RATHER THAN A JUDGEMENT ABOUT LENGTH. It was
-   seven hundred characters — fifty seconds — on the reasoning that past that a
-   voice note stops being a reply and becomes a recording to scrub through. That
-   was right while the only thing spoken was an answer to a question. He asked
-   for everything in voice, and a briefing is two and a half minutes by design:
-   under that rule it would never have been spoken at all, and the cap would
-   have read as the feature quietly not working.
+/* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
+   cap — seven hundred characters, then four thousand — and a cap decides that
+   past some length a message is not worth hearing. Nothing she writes should be
+   shortened to fit a voice note, and nothing she writes should go unspoken for
+   being long: those are the same decision made twice, and it is his, and it is
+   no.
 
-   So what is left is the only hard limit there is — what the speech vendor will
-   accept in one request. Everything she writes already fits under it, because
-   the briefing's own ceiling is Telegram's four thousand characters. Over it,
-   `speak` is skipped and the text has already gone, which is the same degraded
-   outcome as a vendor that refused. */
-export const SPEAK_MAX = 4000;
-
-/* NO LONGER GATED ON HOW HE WROTE. `she answers in the channel he used` decided
-   this for its whole life, and the rule was a good one — but it only ever
-   decided a REPLY, and it left everything she starts silent as a side effect
-   rather than as a decision. He has now made that decision the other way.
-   Exported because it is the decision, and because it is the one thing here a
-   test can drive: everything below it is a vendor and a wire. */
-export const speaksBack = (answer: string): boolean =>
-  answer.length > 0 && answer.length <= SPEAK_MAX;
+   What remains is not a judgement at all. The speech vendor accepts a bounded
+   input in one request, so a long message becomes SEVERAL voice notes, exactly
+   as it already becomes several text messages. `chunk` is the one that does it,
+   with its paragraph preference, so each part is a whole thought rather than a
+   sentence cut in half. */
+const TTS_LIMIT = 4000;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2254,7 +2300,9 @@ async function speak(answer: string): Promise<void> {
    message she wrote is a different thing from a line the function printed. */
 async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
   await say(words, keyboard);
-  if (speaksBack(words)) await speak(words);
+  // In order, and sequentially: Telegram does not promise ordering across two
+  // sends, which is chunk()'s own reason for going one at a time.
+  for (const part of chunk(words, TTS_LIMIT)) await speak(part);
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -4232,16 +4280,16 @@ async function handleMessage(update: any): Promise<void> {
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
         calendarBlock(), positionsBlock(),
       ]);
-      /* TOLD THAT IT WILL BE HEARD, AND IT ALWAYS IS NOW. It used to depend on
-         how he wrote, because only a voice note drew a spoken answer. He asked
-         for everything in voice, so the instruction is unconditional and the
-         number in it is still the one SPEAK_MAX enforces — an answer she keeps
-         under it is one she chose, where an answer trimmed by the cap is one he
-         never learns was spoken. */
+      /* TOLD THAT IT WILL BE HEARD, AND NOT TOLD A LENGTH. The instruction used
+         to carry the cap, so that an answer over it was one she chose rather
+         than one silently left unspoken. There is no cap now — a long answer
+         becomes two voice notes — so a number here would be asking her to write
+         shorter for a limit that no longer exists, which is the one thing this
+         was changed to stop. */
       const aloud =
-        `\n\nYour answer will be read back to him aloud as well as written, so ` +
-        `write it to be heard: no lists, no headings, nothing that has to be ` +
-        `looked at. Keep it under ${SPEAK_MAX} characters.`;
+        `\n\nYour answer is sent as text and read back to him aloud, so write it ` +
+        `to be heard: plain sentences, no headings, and nothing that only works ` +
+        `on a page. Its length is whatever the answer needs.`;
       const context = text + aloud + notes + channels + story + loops + calendar + desk;
       answer = await ask(
         [...history, {

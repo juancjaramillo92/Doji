@@ -4587,12 +4587,16 @@ test('the text is his before anything is ever spoken', () => {
     'sayAloud speaks before it sends the text, so a speech vendor that hangs ' +
     'or throws costs him the message rather than the audio');
 
-  // AND THE BOUND IS STILL ASKED. Unguarded, an answer past what the vendor
-  // accepts is a request that fails on every long message rather than a message
-  // that simply arrives without audio.
-  assert.match(body, /speaksBack\(words\)/,
-    'sayAloud speaks without asking whether it can, so a message past the ' +
-    'vendor\'s limit fails instead of degrading to text');
+  /* AND IT IS SPLIT RATHER THAN CAPPED. There was a cap and he removed it:
+     nothing she writes is shortened to fit a voice note and nothing goes
+     unspoken for being long, so a long message becomes several notes the way it
+     already becomes several text messages. Sent whole to the vendor instead, a
+     long one is a refusal — a silence with the text beside it, which reads as
+     the feature working on short messages and broken on exactly the ones worth
+     hearing. */
+  assert.match(body, /for \(const part of chunk\(words, TTS_LIMIT\)\) await speak\(part\)/,
+    'sayAloud sends the whole message to the speech vendor, so anything past ' +
+    'its input limit arrives as text with no audio and nothing says why');
 });
 
 test('every message she writes goes out through sayAloud', () => {
@@ -4643,9 +4647,9 @@ test('the length she is told to write to is the length that is spoken', () => {
      dropped rather than never attempted. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  assert.match(src, /Keep it under \$\{SPEAK_MAX\} characters/,
-    'the instruction states a length as a literal rather than reading SPEAK_MAX, ' +
-    'so the two can disagree with nothing to reveal it');
+  assert.doesNotMatch(src, /Keep it under \$\{[A-Z_]*MAX[A-Z_]*\} characters/,
+    'the prompt asks her to write shorter to fit a voice note again — there is ' +
+    'no cap for it to fit, so that is a shorter answer bought for nothing');
 });
 
 test('every reason a voice note fails is one the handler can actually reach', () => {
@@ -5212,4 +5216,71 @@ test('the listings still exist, in the file that can afford to raise', () => {
       `diagnose.sql no longer reads ${read}, so "which schedule, which column" ` +
       `has no answer anywhere`);
   }
+});
+
+/* ─── One model per caller, and the map is keyed on a free-text label ────────
+   A week of `eugenia_runs` decided this: fourteen release looks cost more than
+   five briefings, and the move look is the most expensive single message she
+   sends. What moves to Sonnet is bounded work handed everything it needs; what
+   stays on Opus decides something open — the briefing, the nightly pass that
+   writes memory, the critic that is the last gate, the trade look that reaches
+   him mid-position, and the conversation.
+
+   THE MAP IS KEYED ON A STRING NOTHING CHECKS. A key no caller uses is a row
+   that silently never applies, and the caller then runs on the default, which
+   is the expensive one — correct output, quietly, at the price the change was
+   made to stop paying.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every model the map names belongs to a caller that exists', () => {
+  const labels = new Set([
+    ...[...EUGENIA_TS.matchAll(/ask\([\s\S]{0,400}?'(?:high|medium|low)',\s*'([^']+)'/g)]
+        .map(m => m[1]),
+    // The briefings are the one label built rather than written: `${due} briefing`.
+    ...[...EUGENIA_TS.matchAll(/\$\{due\} briefing/g)].map(() => 'weekday briefing'),
+  ]);
+  assert.ok(labels.size >= 5,
+    `only ${labels.size} caller labels read out of the file — the reader has gone blind`);
+
+  const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
+  const keyed = [...map.slice(0, map.indexOf('};')).matchAll(/'([^']+)':\s*(OPUS|SONNET)/g)]
+    .map(m => m[1]);
+  assert.ok(keyed.length > 0, 'the model map is empty or no longer readable from here');
+
+  for (const key of keyed) {
+    assert.ok(labels.has(key),
+      `the model map names '${key}' and nothing calls ask() with that label — ` +
+      `that caller runs on the default, which is the expensive one, silently`);
+  }
+});
+
+test('the critic is not among them, and that is the decision', () => {
+  /* IT IS THE ONE I EXPECTED TO MOVE. Sonnet saves about $3.50 a month on it —
+     and it runs LAST, it can rewrite, and it is the final gate on the exact
+     thing he spent two weeks saying read badly. A saving that small against
+     that risk is optimising because it is possible. */
+  const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
+  const body = map.slice(0, map.indexOf('};'));
+  for (const judging of ['critic', 'consolidation', 'reply', 'trade look', 'briefing']) {
+    assert.doesNotMatch(body, new RegExp(`'${judging}'`),
+      `'${judging}' has been moved off Opus — it decides something open rather ` +
+      `than checking something bounded, and nothing here can see the quality it costs`);
+  }
+});
+
+test('the refusal fallback rides only with the model it is proven on', () => {
+  /* NOT A RULE, CAUTION. `fallbacks` has carried the briefings since the
+     morning a decline cost one, on Opus. Whether the parameter is accepted on
+     Sonnet is not something anything here has established, and the failure if
+     it is not is a 400 on every call — three callers dark at once, all of them
+     scheduled. Both halves must be gated together: the header without the field
+     and the field without the header are each a 400 in their own right. */
+  const at = EUGENIA_TS.indexOf('async function call(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n  if (!res.ok)', at));
+  assert.match(body, /\.\.\.\(model === OPUS\s*\n?\s*\?\s*\{ "anthropic-beta": "server-side-fallback/,
+    'the fallback beta header is sent on every model, so a model that refuses ' +
+    'the header 400s on every call it makes');
+  assert.match(body, /\.\.\.\(model === OPUS \? \{ fallbacks: "default" \} : \{\}\)/,
+    'the fallbacks field is sent on every model, or is no longer sent at all — ' +
+    'the header and the field are a pair and either alone is a 400');
 });

@@ -46,7 +46,6 @@ import {
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
   quoteWindow, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
-  speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
@@ -1820,8 +1819,34 @@ async function costLines(responses) {
 
 test('the ordinary turn says nothing about the model, because nothing happened', async () => {
   const [line] = await costLines([answers('claude-opus-5')]);
-  assert.match(line, /test — 1 round\(s\), medium effort/);
+  assert.match(line, /test — claude-opus-5, 1 round\(s\), medium effort/);
   assert.doesNotMatch(line, /FELL BACK/);
+});
+
+test('a caller on a cheaper model does not read as having fallen back', async () => {
+  /* THE HALF THE SPLIT COULD HAVE BROKEN SILENTLY. The fallback column is
+     `what answered` against `what was asked for`, and that was one constant for
+     the whole file. Left that way, every Sonnet caller would report a fallback
+     on every single call — three of the eight, every turn — and `fell_back`
+     would stop meaning anything on the day the models parted.
+
+     Driven through `ask` with a Sonnet caller's label, because the comparison
+     is inside the loop and a constant put back there passes every pure test. */
+  const realFetch = globalThis.fetch, realLog = console.log;
+  const lines = [];
+  globalThis.fetch = async () => answers('claude-sonnet-5');
+  console.log = (line) => lines.push(line);
+  try {
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'pulse');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+  assert.match(lines[0], /pulse — claude-sonnet-5/,
+    'the pulse did not ask for Sonnet, so the model map is not reaching the request');
+  assert.doesNotMatch(lines[0], /FELL BACK/,
+    'a caller answered by the model it asked for reads as a fallback, so the ' +
+    'comparison is against one name for the file rather than against the caller');
 });
 
 test('a turn served by another model names it in the cost line', async () => {
@@ -3658,40 +3683,40 @@ test('an empty ask is answered empty rather than refused', () => {
    because the briefing's own ceiling is Telegram's.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-test('everything she writes is spoken, however he wrote to her', () => {
-  assert.equal(speaksBack('Gold is holding 4,410.'), true);
-  /* ASKED AS BEHAVIOUR, BECAUSE THE ARITY CANNOT ANSWER IT. `speaksBack.length`
-     was the first version of this line and it is unfalsifiable: a parameter
-     WITH A DEFAULT does not count toward it, so `(answer, heard = true)` reads
-     as arity 1 and the check passes on exactly the reintroduction it was
-     written to catch. Found by putting that signature back and watching the
-     suite stay green. Driving the value is the only form that can go red. */
-  assert.equal(speaksBack('Gold is holding 4,410.', false), true,
-    'a second argument can still switch speaking off, so the old rule is back ' +
-    'and everything she starts is silent again');
+test('nothing she writes is left unspoken for being long', () => {
+  /* THERE WAS A CAP AND NOW THERE IS NOT. Seven hundred characters, then four
+     thousand — and a cap decides that past some length a message is not worth
+     hearing, which is a judgement he made the other way. A long message becomes
+     SEVERAL voice notes, exactly as it already becomes several text messages.
+
+     Driven through `chunk` at the speech limit, because that is what sayAloud
+     does and the property that matters is that every character comes back. */
+  const long = Array.from({ length: 40 },
+    (_, i) => `Paragraph ${i}. ` + 'word '.repeat(40)).join('\n\n');
+  const parts = chunk(long, 4000);
+  assert.ok(parts.length > 1, 'the fixture is not long enough to be split');
+  assert.equal(parts.join(' ').replace(/\s+/g, ' ').trim(),
+               long.replace(/\s+/g, ' ').trim(),
+               'splitting for speech loses or repeats words');
+  for (const part of parts) {
+    assert.ok(part.length <= 4000,
+      `a part is ${part.length} characters, which the speech vendor refuses — ` +
+      `and a refused part is a silence in the middle of a message`);
+  }
 });
 
-test('an answer the vendor would refuse is left in text', () => {
-  /* THE ONE LIMIT LEFT IS WHAT THE SPEECH VENDOR ACCEPTS IN ONE REQUEST, and
-     the text has already been sent — so the audio is what gives way, which is
-     the same degraded outcome as a vendor that refused. */
-  assert.equal(speaksBack('x'.repeat(SPEAK_MAX)), true);
-  assert.equal(speaksBack('x'.repeat(SPEAK_MAX + 1)), false);
-});
-
-test('a briefing fits under the bound that a reply used to', () => {
-  // THE NUMBER THAT WOULD HAVE MADE THIS FEATURE LOOK BROKEN. At 700 the
-  // briefing — 250 to 400 words by its own rule — was over the cap on every
-  // single morning, so it would have arrived silently and correctly forever.
-  assert.equal(speaksBack('x'.repeat(2800)), true,
-    'a briefing-length message is not spoken, so the thing he asked for is the ' +
-    'one thing that stays text');
+test('a briefing is one voice note, not several', () => {
+  // The thing he asked for. 250-400 words by its own rule is ~2,800 characters,
+  // well inside one request — splitting it would arrive as two notes with the
+  // teaching block cut across them.
+  assert.equal(chunk('x'.repeat(2800), 4000).length, 1);
 });
 
 test('there is nothing to speak when there is nothing to say', () => {
-  // An empty answer would be a zero-length voice note, which renders in
-  // Telegram as a broken attachment rather than as nothing.
-  assert.equal(speaksBack(''), false);
+  // A zero-length voice note renders in Telegram as a broken attachment rather
+  // than as nothing. No guard says so any more and none is needed: chunk()
+  // returns no parts for an empty string, so the loop that speaks never runs.
+  assert.deepEqual(chunk('', 4000), []);
 });
 
 /* ─── What he has on, rendered ───────────────────────────────────────────────
