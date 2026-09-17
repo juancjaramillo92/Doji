@@ -1837,13 +1837,13 @@ test('a caller on a cheaper model does not read as having fallen back', async ()
   globalThis.fetch = async () => answers('claude-sonnet-5');
   console.log = (line) => lines.push(line);
   try {
-    await ask([{ role: 'user', content: 'anything' }], 'medium', 'pulse');
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'trim');
   } finally {
     globalThis.fetch = realFetch;
     console.log = realLog;
   }
-  assert.match(lines[0], /pulse — claude-sonnet-5/,
-    'the pulse did not ask for Sonnet, so the model map is not reaching the request');
+  assert.match(lines[0], /trim — claude-sonnet-5/,
+    'the trim did not ask for Sonnet, so the model map is not reaching the request');
   assert.doesNotMatch(lines[0], /FELL BACK/,
     'a caller answered by the model it asked for reads as a fallback, so the ' +
     'comparison is against one name for the file rather than against the caller');
