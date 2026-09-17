@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 546 tests, six suites
+npm test      # 548 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1161,16 +1161,41 @@ compounds.
   deliberately not in the boot guard, and `agree.test.mjs` makes that exemption
   cost something — an optional secret must be guarded where it is used.
 
-- **SHE ANSWERS IN THE CHANNEL HE USED, and that is the whole rule.** A voice note
-  is answered aloud, a typed line in text; no setting, no toggle, nothing stored.
-  It falls out that nothing SCHEDULED speaks, since none of those is a reply.
+- **EVERYTHING SHE WRITES IS SPOKEN, AND THAT REVERSED A RULE THAT WAS SOUND.**
+  It was *she answers in the channel he used* — a voice note aloud, a typed line
+  in text, no setting and nothing stored. What that rule decided was a REPLY, and
+  everything she STARTS was silent as a side effect of it rather than as a
+  decision. So the morning briefing, the one message he actually wanted read to
+  him, was the one the rule could never reach. He decided it the other way.
+
+  `SPEAK_MAX` WENT WITH IT, from 700 to 4,000. Seven hundred was fifty seconds,
+  on the reasoning that past that a voice note stops being a reply and becomes a
+  recording — right about a reply and fatal here, because a briefing is 250–400
+  words by its own rule and would have been over the cap every single morning.
+  It would have arrived silently, correctly, forever. What is left is not a
+  judgement about listening at all: it is what the speech vendor accepts in one
+  request, and everything she writes fits under it because the briefing's own
+  ceiling is Telegram's.
 
   THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember`
-  stores and what a search finds, so `say` before `speak`, and a speech vendor
-  that hangs or throws then costs the convenience rather than the answer. That
-  ordering is the one thing `agree.test.mjs` reads out of `handleMessage`.
+  stores, what `search_memory` finds and what the nightly pass reads, so `say`
+  before `speak`, and a speech vendor that hangs or throws costs the convenience
+  rather than the message. SIX PATHS send him something she wrote, so that
+  ordering lives in `sayAloud` rather than in six copies of two lines — five of
+  which nothing would be guarding. `agree.test.mjs` reads the order inside it AND
+  counts the six call sites, because a path that drops back to `say` still
+  reaches him and is simply silent.
+
+  `say` KEEPS three things deliberately: the `/notes` audit, which is a rendered
+  table and unlistenable; the apologies, which are failure notices rather than
+  messages she wrote; and the short operational lines. And the markdown is
+  stripped on the way to the vendor, because the calendar slot carries a bold
+  label per line — the one place the prose rule is relaxed, for a reader's eye,
+  and `**Today:**` read aloud is a gamble on what an asterisk becomes.
+
   `SPEAK_MAX` is stated to the prompt as well as enforced, because a cap alone
-  drops the audio on a long answer with nothing saying why.
+  drops the audio on a long answer with nothing saying why — and the instruction
+  is unconditional now, where it used to be given only when he had spoken first.
 
   `TTS_VOICE` and `TTS_MODEL` are environment rather than pinned, unlike
   `EMBED_MODEL` — nothing is stored, so a change alters one message rather than

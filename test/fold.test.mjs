@@ -3645,32 +3645,53 @@ test('an empty ask is answered empty rather than refused', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ANSWERING IN THE CHANNEL HE USED
+   EVERYTHING SHE WRITES IS ALSO SPOKEN
    ───────────────────────────────────────────────────────────────────────────
-   No setting and no stored preference: the message he sent decides. Which makes
-   this one predicate the whole feature, and the only part of speaking back that
-   is not a vendor and a wire.
+   It used to depend on how he wrote: a voice note was answered aloud and a
+   typed line was not. That rule was sound and it only ever decided a REPLY —
+   everything she STARTS was silent as a side effect of it rather than as a
+   decision, so the briefing he actually wanted read to him was the one message
+   the rule could never reach. He decided it the other way.
+
+   What is left is a bound, and it is the speech vendor's rather than a
+   judgement about listening: everything she writes already fits under it,
+   because the briefing's own ceiling is Telegram's.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-test('a voice note is answered aloud and a typed line is not', () => {
-  assert.equal(speaksBack('Gold is holding 4,410.', true), true);
-  assert.equal(speaksBack('Gold is holding 4,410.', false), false,
-    'she speaks back to a typed message — he is at a keyboard and did not ask ' +
-    'to be read to');
+test('everything she writes is spoken, however he wrote to her', () => {
+  assert.equal(speaksBack('Gold is holding 4,410.'), true);
+  /* ASKED AS BEHAVIOUR, BECAUSE THE ARITY CANNOT ANSWER IT. `speaksBack.length`
+     was the first version of this line and it is unfalsifiable: a parameter
+     WITH A DEFAULT does not count toward it, so `(answer, heard = true)` reads
+     as arity 1 and the check passes on exactly the reintroduction it was
+     written to catch. Found by putting that signature back and watching the
+     suite stay green. Driving the value is the only form that can go red. */
+  assert.equal(speaksBack('Gold is holding 4,410.', false), true,
+    'a second argument can still switch speaking off, so the old rule is back ' +
+    'and everything she starts is silent again');
 });
 
-test('an answer too long to listen to is left in text', () => {
-  /* PAST THE CAP IT IS A RECORDING TO SCRUB THROUGH rather than a reply, and
-     the text has already been sent — so the audio is what gives way. The prompt
-     is told the same number, so an answer over it is one she chose. */
-  assert.equal(speaksBack('x'.repeat(SPEAK_MAX), true), true);
-  assert.equal(speaksBack('x'.repeat(SPEAK_MAX + 1), true), false);
+test('an answer the vendor would refuse is left in text', () => {
+  /* THE ONE LIMIT LEFT IS WHAT THE SPEECH VENDOR ACCEPTS IN ONE REQUEST, and
+     the text has already been sent — so the audio is what gives way, which is
+     the same degraded outcome as a vendor that refused. */
+  assert.equal(speaksBack('x'.repeat(SPEAK_MAX)), true);
+  assert.equal(speaksBack('x'.repeat(SPEAK_MAX + 1)), false);
+});
+
+test('a briefing fits under the bound that a reply used to', () => {
+  // THE NUMBER THAT WOULD HAVE MADE THIS FEATURE LOOK BROKEN. At 700 the
+  // briefing — 250 to 400 words by its own rule — was over the cap on every
+  // single morning, so it would have arrived silently and correctly forever.
+  assert.equal(speaksBack('x'.repeat(2800)), true,
+    'a briefing-length message is not spoken, so the thing he asked for is the ' +
+    'one thing that stays text');
 });
 
 test('there is nothing to speak when there is nothing to say', () => {
   // An empty answer would be a zero-length voice note, which renders in
   // Telegram as a broken attachment rather than as nothing.
-  assert.equal(speaksBack('', true), false);
+  assert.equal(speaksBack(''), false);
 });
 
 /* ─── What he has on, rendered ───────────────────────────────────────────────
