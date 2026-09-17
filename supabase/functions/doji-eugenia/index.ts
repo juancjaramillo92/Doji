@@ -2163,29 +2163,19 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
 const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
                   "person who is busy. Never breathless, never selling.";
 
-/* THE BOUND IS THE VENDOR'S NOW RATHER THAN A JUDGEMENT ABOUT LENGTH. It was
-   seven hundred characters — fifty seconds — on the reasoning that past that a
-   voice note stops being a reply and becomes a recording to scrub through. That
-   was right while the only thing spoken was an answer to a question. He asked
-   for everything in voice, and a briefing is two and a half minutes by design:
-   under that rule it would never have been spoken at all, and the cap would
-   have read as the feature quietly not working.
+/* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
+   cap — seven hundred characters, then four thousand — and a cap decides that
+   past some length a message is not worth hearing. Nothing she writes should be
+   shortened to fit a voice note, and nothing she writes should go unspoken for
+   being long: those are the same decision made twice, and it is his, and it is
+   no.
 
-   So what is left is the only hard limit there is — what the speech vendor will
-   accept in one request. Everything she writes already fits under it, because
-   the briefing's own ceiling is Telegram's four thousand characters. Over it,
-   `speak` is skipped and the text has already gone, which is the same degraded
-   outcome as a vendor that refused. */
-export const SPEAK_MAX = 4000;
-
-/* NO LONGER GATED ON HOW HE WROTE. `she answers in the channel he used` decided
-   this for its whole life, and the rule was a good one — but it only ever
-   decided a REPLY, and it left everything she starts silent as a side effect
-   rather than as a decision. He has now made that decision the other way.
-   Exported because it is the decision, and because it is the one thing here a
-   test can drive: everything below it is a vendor and a wire. */
-export const speaksBack = (answer: string): boolean =>
-  answer.length > 0 && answer.length <= SPEAK_MAX;
+   What remains is not a judgement at all. The speech vendor accepts a bounded
+   input in one request, so a long message becomes SEVERAL voice notes, exactly
+   as it already becomes several text messages. `chunk` is the one that does it,
+   with its paragraph preference, so each part is a whole thought rather than a
+   sentence cut in half. */
+const TTS_LIMIT = 4000;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2254,7 +2244,9 @@ async function speak(answer: string): Promise<void> {
    message she wrote is a different thing from a line the function printed. */
 async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
   await say(words, keyboard);
-  if (speaksBack(words)) await speak(words);
+  // In order, and sequentially: Telegram does not promise ordering across two
+  // sends, which is chunk()'s own reason for going one at a time.
+  for (const part of chunk(words, TTS_LIMIT)) await speak(part);
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -4232,16 +4224,16 @@ async function handleMessage(update: any): Promise<void> {
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
         calendarBlock(), positionsBlock(),
       ]);
-      /* TOLD THAT IT WILL BE HEARD, AND IT ALWAYS IS NOW. It used to depend on
-         how he wrote, because only a voice note drew a spoken answer. He asked
-         for everything in voice, so the instruction is unconditional and the
-         number in it is still the one SPEAK_MAX enforces — an answer she keeps
-         under it is one she chose, where an answer trimmed by the cap is one he
-         never learns was spoken. */
+      /* TOLD THAT IT WILL BE HEARD, AND NOT TOLD A LENGTH. The instruction used
+         to carry the cap, so that an answer over it was one she chose rather
+         than one silently left unspoken. There is no cap now — a long answer
+         becomes two voice notes — so a number here would be asking her to write
+         shorter for a limit that no longer exists, which is the one thing this
+         was changed to stop. */
       const aloud =
-        `\n\nYour answer will be read back to him aloud as well as written, so ` +
-        `write it to be heard: no lists, no headings, nothing that has to be ` +
-        `looked at. Keep it under ${SPEAK_MAX} characters.`;
+        `\n\nYour answer is sent as text and read back to him aloud, so write it ` +
+        `to be heard: plain sentences, no headings, and nothing that only works ` +
+        `on a page. Its length is whatever the answer needs.`;
       const context = text + aloud + notes + channels + story + loops + calendar + desk;
       answer = await ask(
         [...history, {

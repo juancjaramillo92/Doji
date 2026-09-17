@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 548 tests, six suites
+npm test      # 547 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1168,14 +1168,18 @@ compounds.
   decision. So the morning briefing, the one message he actually wanted read to
   him, was the one the rule could never reach. He decided it the other way.
 
-  `SPEAK_MAX` WENT WITH IT, from 700 to 4,000. Seven hundred was fifty seconds,
-  on the reasoning that past that a voice note stops being a reply and becomes a
-  recording — right about a reply and fatal here, because a briefing is 250–400
-  words by its own rule and would have been over the cap every single morning.
-  It would have arrived silently, correctly, forever. What is left is not a
-  judgement about listening at all: it is what the speech vendor accepts in one
-  request, and everything she writes fits under it because the briefing's own
-  ceiling is Telegram's.
+  AND THE CAP WENT ENTIRELY, WHICH THE FIRST FIX ONLY MOVED. It was 700
+  characters — fifty seconds, on the reasoning that past that a voice note stops
+  being a reply and becomes a recording. Right about a reply and fatal here: a
+  briefing is 250–400 words by its own rule, so it would have been over the cap
+  every single morning and would have arrived silently, correctly, for ever.
+  Raising it to 4,000 fixed that morning and kept the SHAPE of the mistake — a
+  cap decides that past some length a message is not worth hearing, and nothing
+  she writes may be shortened to fit a voice note or left unspoken for being
+  long. A long message is SEVERAL notes now, split by the same `chunk` with its
+  paragraph preference so each part is a whole thought. The only number left is
+  `TTS_LIMIT`, which is what the vendor accepts in one request and is a chunk
+  size rather than a gate.
 
   THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember`
   stores, what `search_memory` finds and what the nightly pass reads, so `say`
@@ -1193,9 +1197,12 @@ compounds.
   label per line — the one place the prose rule is relaxed, for a reader's eye,
   and `**Today:**` read aloud is a gamble on what an asterisk becomes.
 
-  `SPEAK_MAX` is stated to the prompt as well as enforced, because a cap alone
-  drops the audio on a long answer with nothing saying why — and the instruction
-  is unconditional now, where it used to be given only when he had spoken first.
+  THE PROMPT IS TOLD NO LENGTH. It carried the cap, so that an answer over it was
+  one she chose rather than one silently left unspoken. With no cap, a number
+  there would be asking her to write shorter for a limit that does not exist,
+  which is the thing this was changed to stop; `agree.test.mjs` reads for its
+  absence. She is still told the answer will be heard, on every path rather than
+  only when he spoke first.
 
   `TTS_VOICE` and `TTS_MODEL` are environment rather than pinned, unlike
   `EMBED_MODEL` — nothing is stored, so a change alters one message rather than

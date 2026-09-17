@@ -1887,15 +1887,21 @@ is that the audio arrives and the text does not. A test reads the order inside i
 *and* counts the six call sites, because a path that drops back to `say()` still
 reaches him and is simply silent.
 
-**`SPEAK_MAX` went from 700 to 4,000 with the rule.** Seven hundred was fifty
-seconds, on the reasoning that past that a voice note stops being a reply and
-becomes a recording to scrub through. That is right about a reply and fatal here:
-a briefing is 250–400 words by its own rule, so it would have been over the cap
-**every single morning** and would have arrived silently, correctly, forever.
-What is left is not a judgement about listening at all — it is what the speech
-vendor accepts in one request, and everything she writes fits under it because
-the briefing's own ceiling is Telegram's. **The prompt is told the same number**,
-so an answer over it is one she chose rather than one silently left unspoken.
+**There was a cap, and there is not one now.** It was 700 characters — fifty
+seconds — on the reasoning that past that a voice note stops being a reply and
+becomes a recording to scrub through. That is right about a reply and fatal
+here: a briefing is 250–400 words by its own rule, so it would have been over
+the cap **every single morning** and would have arrived silently, correctly,
+forever.
+
+Raising it to 4,000 fixed that morning and left the shape of the mistake in
+place — a cap decides that past some length a message is not worth hearing, and
+**nothing she writes should be shortened to fit a voice note or go unspoken for
+being long**. So a long message becomes *several* voice notes, exactly as it
+already becomes several text messages, split by the same `chunk()` with the same
+paragraph preference so each part is a whole thought. The only number left is
+what the speech vendor accepts in one request, and it is a chunk size rather
+than a gate. The prompt is told no length at all.
 
 **The markdown is stripped on the way to the vendor.** The calendar slot carries
 a bold day label per line — the one place the prose rule is relaxed, and it is

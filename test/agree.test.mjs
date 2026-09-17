@@ -4587,12 +4587,16 @@ test('the text is his before anything is ever spoken', () => {
     'sayAloud speaks before it sends the text, so a speech vendor that hangs ' +
     'or throws costs him the message rather than the audio');
 
-  // AND THE BOUND IS STILL ASKED. Unguarded, an answer past what the vendor
-  // accepts is a request that fails on every long message rather than a message
-  // that simply arrives without audio.
-  assert.match(body, /speaksBack\(words\)/,
-    'sayAloud speaks without asking whether it can, so a message past the ' +
-    'vendor\'s limit fails instead of degrading to text');
+  /* AND IT IS SPLIT RATHER THAN CAPPED. There was a cap and he removed it:
+     nothing she writes is shortened to fit a voice note and nothing goes
+     unspoken for being long, so a long message becomes several notes the way it
+     already becomes several text messages. Sent whole to the vendor instead, a
+     long one is a refusal — a silence with the text beside it, which reads as
+     the feature working on short messages and broken on exactly the ones worth
+     hearing. */
+  assert.match(body, /for \(const part of chunk\(words, TTS_LIMIT\)\) await speak\(part\)/,
+    'sayAloud sends the whole message to the speech vendor, so anything past ' +
+    'its input limit arrives as text with no audio and nothing says why');
 });
 
 test('every message she writes goes out through sayAloud', () => {
@@ -4643,9 +4647,9 @@ test('the length she is told to write to is the length that is spoken', () => {
      dropped rather than never attempted. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  assert.match(src, /Keep it under \$\{SPEAK_MAX\} characters/,
-    'the instruction states a length as a literal rather than reading SPEAK_MAX, ' +
-    'so the two can disagree with nothing to reveal it');
+  assert.doesNotMatch(src, /Keep it under \$\{[A-Z_]*MAX[A-Z_]*\} characters/,
+    'the prompt asks her to write shorter to fit a voice note again — there is ' +
+    'no cap for it to fit, so that is a shorter answer bought for nothing');
 });
 
 test('every reason a voice note fails is one the handler can actually reach', () => {
