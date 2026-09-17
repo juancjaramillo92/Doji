@@ -87,6 +87,13 @@ create table if not exists public.eugenia_runs (
   -- produce a briefing.
   chars      int,
 
+  -- WHICH MODEL RAN. The log line named it and the row did not, so "how many
+  -- rounds does THIS model need on THIS caller" had no answer here — and the
+  -- day a tool-heavy caller changed model it ran out of rounds twice in half an
+  -- hour with nothing able to compare the two. Free text for `caller`'s reason:
+  -- a new model must not need a migration.
+  model      text,
+
   -- The model that actually answered, when it was not the one asked for.
   -- `fallbacks: "default"` rescues a decline invisibly; this is where that
   -- becomes a countable fact rather than a line in a log.
@@ -104,6 +111,14 @@ create table if not exists public.eugenia_runs (
 -- would say the cache was free rather than unmeasured.
 alter table public.eugenia_runs add column if not exists wrote_1h int;
 alter table public.eugenia_runs add column if not exists wrote_5m int;
+
+-- WHICH MODEL RAN, WHICH THE LOG LINE SAID AND THE ROW DID NOT. `rounds` has
+-- been written since this table existed and `fell_back` records only a decline,
+-- so "how many rounds does THIS model need on THIS caller" had no answer here —
+-- and the day a tool-heavy caller changed model it ran out of rounds twice in
+-- half an hour with nothing able to compare the two. Free text for `caller`'s
+-- reason: a new model must not need a migration.
+alter table public.eugenia_runs add column if not exists model text;
 
 -- The only reads are "recently" and "this caller recently".
 create index if not exists eugenia_runs_at_desc on public.eugenia_runs (at desc);

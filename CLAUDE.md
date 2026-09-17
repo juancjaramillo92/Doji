@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 558 tests, six suites
+npm test      # 560 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -443,6 +443,37 @@ code you write near it:
   to read and takes a second to decode is a line he reads twice and will not; and
   no COINED SHORTHAND, since a name she invents and then reuses arrives as a term
   he was taught and never was.
+
+  AND THE COUNTABLE HALF LANDED WHILE THE JUDGEMENT HALF DID NOT. The first
+  briefing under these rules had TWENTY prose sentences, none over the cap, the
+  longest eighteen words, no asides — measured, not eyeballed. In the same
+  message: `war premium` used bare, `dearer fuel`, `the basket`, `measured
+  inflation`, `stiffer competition`. A gate can count words; it cannot
+  adjudicate *is this the plainest word* against an adjective. So the rule that
+  could be counted was obeyed perfectly and the rule that needed taste was
+  ignored entirely, and that split is what the three repairs are aimed at.
+
+  THE OLD RULE BANNED THE REGISTER IT WAS WRITTEN TO PRODUCE. `NO COINED
+  SHORTHAND` forbade inventing a name and reusing it — and his own approved
+  draft leans on *the genuine part* three times. Read literally the prompt
+  contradicted its own target, which is how a rule comes to be ignored rather
+  than followed. SELF-DESCRIBING is the distinction that was meant: *the
+  leftover* tells a reader nothing, *the genuine part* tells them everything.
+  And the case it actually fails on is not an invented word at all — it is a
+  MARKET term used bare, which is every briefing rather than a rare one.
+
+  A WORKED EXAMPLE IS IN `WRITING` BECAUSE NO DESCRIPTION OF THE REGISTER
+  WORKED. *Use the plainest available word* had been in these rules for days and
+  produced *dearer fuel lifts measured inflation*. A model matches an example
+  where it ignores an adjective, and one example in `WRITING` teaches the writer
+  and both gates at once. It is the STANDARD rather than a taste of his, which
+  is the rule it sits next to — and that adjacency is worth checking against
+  before anything else goes in there.
+
+  A PARAGRAPH IS BOUNDED TOO, at three or four sentences. Sixteen easy sentences
+  arrived in one unbroken block, which reads as a wall however short each one
+  is; his own draft had air between the steps and the prompt had copied the
+  sentence rule from it without the shape.
 
   `WRITING` IS WHERE THEY LIVE, ONCE, AND THREE READ IT. They were in `SYSTEM`
   and restated in `CRITIC` — two copies held apart by a test, which works while
@@ -1199,7 +1230,12 @@ compounds.
   that never arrives, and of the two only the second has happened.
   `eugenia_runs.rounds` is written on every turn, so how close a caller runs to
   this is a question with an answer — and reading it is what should have come
-  before a model changed underneath it.
+  before a model changed underneath it. WHICH MODEL RAN IS A COLUMN NOW, which
+  it was not: the log line named it and the row did not, so `rounds` could not
+  be compared across the change it mattered for. Two guards, because a schema
+  check sees only half — the column existing, and `recordRun` actually writing
+  it. Absent the second, every row lands, the meter looks healthy, and the
+  column reads null for ever.
 
 - **SO IS THE MODEL NOW, AND ONE MODEL FOR EVERYTHING WAS NEVER A DECISION.** A
   week of `eugenia_runs` put the release look at $5.30 against the whole

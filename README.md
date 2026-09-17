@@ -1419,14 +1419,37 @@ plain words still read as hard, and no rule was being broken. The rules now:
 - **No em-dash aside, no stacked subordinate clause.** Short beats elegant.
 - **No punchlines.** A line that is satisfying to read and takes a second to
   decode is a line he reads twice, and he will not read it twice.
-- **No coined shorthand.** A name she invents — *the leftover*, *the door it came
-  through* — and then reuses arrives as a term he was taught and never was. Real
-  names he will meet elsewhere are the opposite case and stay: dot plot, retail
-  sales, jobless claims, the ten-year, each given its own sentence the first time
-  it appears.
+- **No term used bare, and the test is whether the name explains itself.** *The
+  leftover* tells a reader nothing; *the genuine part* tells them everything. The
+  old rule banned inventing a name at all — and the approved draft it was written
+  from leans on *the genuine part* three times, so read literally the prompt
+  forbade the register it existed to produce. The case it actually fails on is
+  not an invented word: it is a **market term used bare**. *"Oil has handed back
+  most of the war premium"* is four plain words and one that does all the damage.
+  Two ways out and no third — plain words instead, or the term with its own
+  sentence saying what it is. Real names he will meet elsewhere stay: dot plot,
+  retail sales, jobless claims, the ten-year.
+- **Use the word you would text.** *Dearer fuel* fails that; *expensive fuel*
+  passes. So does *makes gold a harder sell* over *stiffer competition for gold*.
+- **A paragraph is three or four sentences.** Sixteen easy sentences in one block
+  is still a wall.
 - **Four to six numbers in the whole briefing**, and a number that cannot be said
   to *mean* something is one of the ones to cut. Fourteen true figures is a page
   he skims; four he remembers by lunch.
+
+**The countable rules landed and the judgement rules did not, which is why
+`WRITING` carries a worked example.** The first briefing under these rules had
+twenty prose sentences, none over the twenty-word cap, the longest eighteen
+words, no em-dash asides — counted, not eyeballed. The same message said *war
+premium*, *dearer fuel*, *the basket* and *measured inflation*. A gate can count
+words; it cannot adjudicate *is this the plainest word* from an adjective. *Use
+the plainest available word* had been in the rules for days and produced *dearer
+fuel lifts measured inflation twice over*.
+
+So the rules end with a passage in the target register rather than more
+adjectives about it — a model matches an example where it ignores a description.
+It lives in `WRITING`, so the writer, `CRITIC` and `TRIM` are all shown the same
+one.
 
 **One chain is exempt from the rung, and it is the one under everything else.**
 Gold pays no interest, so it competes with what a bond pays once inflation is

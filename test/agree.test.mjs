@@ -5165,13 +5165,54 @@ test('the gold-against-real-yields chain is exempt from the rung, in both copies
   }
 });
 
-test('nothing invented gets reused as a term', () => {
-  assert.match(EUGENIA_PROMPT, /NO COINED SHORTHAND/,
-    'she may coin a name for something and then lean on it as jargon again — ' +
-    'which reads as a term he was taught and never was');
+test('no term is used bare, and the test is whether the name explains itself', () => {
+  /* THE RULE BANNED THE THING HE LIKED. It was "no coined shorthand — do not
+     invent a name and reuse it as though it were a term", and his own approved
+     draft leans on "the genuine part" three times. Read literally the prompt
+     forbade the register it was written to produce, which is the shape that
+     makes a rule get ignored rather than followed.
+
+     Self-describing is the distinction that was actually meant. "The leftover"
+     tells a reader nothing; "the genuine part" tells them everything. And the
+     case it really fails on is not an invented name at all — it is a MARKET
+     term used bare. "Oil has handed back most of the war premium" is four plain
+     words and one that does the whole damage. */
+  const flat = EUGENIA_PROMPT.replace(/\s+/g, ' ');
+  assert.match(flat, /NO TERM USED BARE/,
+    'a term may be used with no gloss again, which is what "war premium" was');
+  assert.match(flat, /explains itself|EXPLAINS ITSELF/,
+    'the self-describing test is gone, so the rule is back to banning the ' +
+    'register his own draft is written in');
+  assert.match(flat, /A MARKET TERM IS THE CASE THIS ACTUALLY FAILS ON/,
+    'nothing names the case that actually recurs — an invented word is rare, ' +
+    'a market term used bare is every briefing');
   assert.match(EUGENIA_PROMPT, /NO PUNCHLINES/,
     'the no-punchline rule is gone, so a paragraph may close on a line that ' +
     'sounds good and takes a second to decode');
+});
+
+test('the rules carry a worked example, because no description of them worked', () => {
+  /* "USE THE PLAINEST AVAILABLE WORD" HAD BEEN IN THESE RULES FOR DAYS and the
+     briefing it produced said "dearer fuel lifts measured inflation twice
+     over". Meanwhile the countable rule beside it — twenty words, one idea —
+     landed at a hundred per cent on its first morning: zero sentences over the
+     cap, longest eighteen words, no asides.
+
+     That split is the whole reason this is here. A gate can count words. It
+     cannot adjudicate "is this the plainest word" against an adjective, and a
+     model matches an example where it ignores a description. It lives in
+     WRITING so the writer and both gates read the same one. */
+  const at = EUGENIA_PROMPT.indexOf('export const WRITING = `');
+  const body = EUGENIA_PROMPT.slice(at, EUGENIA_PROMPT.indexOf('`;', at));
+  assert.match(body, /THIS IS THE STANDARD/,
+    'the worked example is gone from WRITING — the rules are back to describing ' +
+    'a register rather than showing one, which is what produced "dearer fuel"');
+  assert.match(body, /the genuine part/,
+    'the example no longer carries the chain it exists to demonstrate');
+  assert.match(body, /A PARAGRAPH IS THREE OR FOUR SENTENCES/,
+    'nothing bounds a paragraph, so sixteen easy sentences arrive in one block ' +
+    'with nowhere to breathe — which is how a briefing of short sentences still ' +
+    'reads as a wall');
 });
 
 /* ─── verify.sql is one statement, and diagnose.sql is where the rest went ────
@@ -5432,4 +5473,32 @@ test('keepDraft is relative, because it now reads three-sentence messages', () =
     'overruled on every message it ever checks');
   assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
     'keepDraft no longer scales with the draft it is judging');
+});
+
+/* ─── Which model ran, which the log line said and the row did not ───────────
+   `rounds` has been written since this table existed and `fell_back` records
+   only a decline, so "how many rounds does THIS model need on THIS caller" had
+   no answer here. The day a tool-heavy caller changed model it ran out of
+   rounds twice in half an hour, and nothing could compare the two.
+
+   The column existing is the half a schema check can see. The half it cannot is
+   NOTHING WRITING IT: every row still lands, the meter still looks healthy, and
+   the column reads null for ever — answerable-looking and unanswerable.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every run row records the model that answered it', () => {
+  const calls = [...EUGENIA_TS.matchAll(/recordRun\(\{([\s\S]*?)\}\)/g)]
+    .map(m => m[1])
+    // ask()'s two — the turn that finished and the turn that threw. The briefing
+    // marker and the two sweep meters write no model because they make no call.
+    .filter(body => /in_tokens/.test(body));
+  assert.equal(calls.length, 2,
+    `${calls.length} recordRun call sites carry token counts where two should — ` +
+    `the reader has gone blind, or a third model call is recording nothing`);
+
+  for (const body of calls) {
+    assert.match(body, /\bmodel\b/,
+      'a model call is recorded without naming the model that served it, so the ' +
+      'column reads null for ever and the question it exists for is still unanswerable');
+  }
 });
