@@ -2225,9 +2225,40 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
    breathless delivery of a deliberately unexcited paragraph contradicts the
    whole of it — the register has to survive the trip through audio. Pinned
    here for that reason where the voice is his to change: which voice reads it
-   is taste, how it is read is the product. */
-const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
-                  "person who is busy. Never breathless, never selling.";
+   is taste, how it is read is the product.
+
+   IT ASKED FOR THE REGISTER AND NOT FOR THE DELIVERY, WHICH IS WHY IT READ AS A
+   MACHINE. Two sentences, and both of them said what NOT to do — not breathless,
+   not selling. A model given only prohibitions gives back the null reading:
+   every sentence the same length of time, every pitch contour the same, no beat
+   at a paragraph break, which is exactly what a person means by robotic. What
+   was missing is the positive half. This is the one dial the vendor offers, and
+   the model and the voice are already the newest it serves, so there is nowhere
+   else for this to come from.
+
+   THE LAST LINE IS PRONUNCIATION AND IT EARNS ITS PLACE ON REAL TEXT. Her
+   calendar lines are `08:30 ET <name>`, the trade event reads R-11 and R-14/R-19
+   back at him, and a level is a comma'd figure. Read as glyphs those are three
+   stumbles in the middle of a fluent paragraph. Said here rather than rewritten
+   on the way out, because what `remember` stores must stay the text he can read
+   — a rewriter would either touch the transcript or be a second copy of it. */
+const TTS_STYLE = `Voice: a colleague reading something over to one person who is
+busy. Low and warm, certain of what she is saying, with nothing to sell.
+
+Pace: unhurried, and uneven the way speech is uneven. Slow across a number or a
+name. Let a short sentence go quickly. A read where every sentence takes the same
+time is the thing that sounds machine-made.
+
+Phrasing: breathe between sentences, and take a full beat at a blank line. Group
+the words into phrases rather than saying them one at a time.
+
+Emphasis: one word in a sentence carries it. Land on that and let the rest fall
+away. Sentences finish downward. Never lift at the end of a line, and never read
+it like a news bulletin.
+
+Say a number, a time or a code the way a person says it out loud: "08:30 ET" is
+"eight thirty Eastern", "R-11" is "rule eleven", "$4,412.50" is "four thousand
+four hundred and twelve dollars fifty".`;
 
 /* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
    cap — seven hundred characters, then four thousand — and a cap decides that
