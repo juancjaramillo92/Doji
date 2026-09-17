@@ -2163,16 +2163,29 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
 const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
                   "person who is busy. Never breathless, never selling.";
 
-/* Roughly fifty seconds of speech. Past that a voice note stops being a reply
-   and becomes a recording to scrub through, and the text — already sent — is
-   the better artifact for anything that long. The prompt is told the number so
-   a long answer is one she chose rather than one silently left unspoken. */
-export const SPEAK_MAX = 700;
+/* THE BOUND IS THE VENDOR'S NOW RATHER THAN A JUDGEMENT ABOUT LENGTH. It was
+   seven hundred characters — fifty seconds — on the reasoning that past that a
+   voice note stops being a reply and becomes a recording to scrub through. That
+   was right while the only thing spoken was an answer to a question. He asked
+   for everything in voice, and a briefing is two and a half minutes by design:
+   under that rule it would never have been spoken at all, and the cap would
+   have read as the feature quietly not working.
 
-// Exported because it is the decision, and because it is the one thing here a
-// test can drive: everything below it is a vendor and a wire.
-export const speaksBack = (answer: string, heard: boolean): boolean =>
-  heard && answer.length > 0 && answer.length <= SPEAK_MAX;
+   So what is left is the only hard limit there is — what the speech vendor will
+   accept in one request. Everything she writes already fits under it, because
+   the briefing's own ceiling is Telegram's four thousand characters. Over it,
+   `speak` is skipped and the text has already gone, which is the same degraded
+   outcome as a vendor that refused. */
+export const SPEAK_MAX = 4000;
+
+/* NO LONGER GATED ON HOW HE WROTE. `she answers in the channel he used` decided
+   this for its whole life, and the rule was a good one — but it only ever
+   decided a REPLY, and it left everything she starts silent as a side effect
+   rather than as a decision. He has now made that decision the other way.
+   Exported because it is the decision, and because it is the one thing here a
+   test can drive: everything below it is a vendor and a wire. */
+export const speaksBack = (answer: string): boolean =>
+  answer.length > 0 && answer.length <= SPEAK_MAX;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2197,7 +2210,14 @@ async function speak(answer: string): Promise<void> {
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: TTS_MODEL, voice: TTS_VOICE, input: answer,
+        /* WITHOUT THE MARKS THAT ARE FOR THE EYE. The calendar slot is a list
+           with a bold day label on each line, which is the one place the prose
+           rule is relaxed because he reads it — and `**Today:**` read aloud is
+           a gamble on what the vendor does with an asterisk. Stripped here
+           rather than written differently, because the text message wants them
+           and this is the only reader that does not. */
+        model: TTS_MODEL, voice: TTS_VOICE,
+        input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
       }),
     });
@@ -2217,6 +2237,24 @@ async function speak(answer: string): Promise<void> {
   } catch (err) {
     console.error("doji-eugenia: could not speak —", err instanceof Error ? err.message : err);
   }
+}
+
+/* SAID AND THEN HEARD, AND THE ORDER IS THE WHOLE SAFETY OF IT. Six paths send
+   him something she wrote, and every one of them must send the text first: it
+   is what `remember` stores, what `search_memory` finds and what the nightly
+   pass reads, and `speak` reaching a vendor that hangs then costs the
+   convenience rather than the message. Six copies of that ordering would be
+   five unguarded places to get it backwards, and getting it backwards fails in
+   the shape this repository keeps finding — the audio arrives, the text does
+   not, and nothing reports it.
+
+   IT IS NOT `say` ITSELF, because three things go through `say` that must stay
+   silent: the `/notes` audit, which is a rendered table and unlistenable; the
+   apologies, which are failure notices; and the short operational lines. A
+   message she wrote is a different thing from a line the function printed. */
+async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
+  await say(words, keyboard);
+  if (speaksBack(words)) await speak(words);
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -3144,7 +3182,7 @@ async function postBriefing(due: Brief): Promise<Response> {
      briefing is cheaper than sending four. */
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
-  await say(`${greeting(due)}\n\n${brief}`, feedbackKeyboard(nyDate(new Date())));
+  await sayAloud(`${greeting(due)}\n\n${brief}`, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
      written one row for the draft and one for the critic — what each of them
@@ -3389,7 +3427,7 @@ async function postPulse(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
-  await say(said);
+  await sayAloud(said);
   await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: said }]);
   return json({ ok: true, pulse: "sent" });
 }
@@ -3525,7 +3563,7 @@ async function postRelease(): Promise<Response> {
   const named = due.map(r => r.name).join(", ");
   if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
-  await say(said);
+  await sayAloud(said);
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
   await remember([{ role: 'user', content: `[${named} landed]` },
@@ -3643,7 +3681,7 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, trade: id, said: "quiet" });
 
-  await say(said);
+  await sayAloud(said);
   await remember([{ role: 'user', content: `[trade ${event}]` },
                   { role: 'assistant', content: said }]);
   return json({ ok: true, trade: id, said: "sent" });
@@ -3860,7 +3898,7 @@ async function postMove(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
-  await say(said);
+  await sayAloud(said);
   await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
                   { role: 'assistant', content: said }]);
   return json({ ok: true, move: worth.move, said: "sent" });
@@ -4076,10 +4114,6 @@ async function handleMessage(update: any): Promise<void> {
     const blocks: any[] = [];
 
     const voice = msg.voice ?? msg.audio;
-    // Remembered rather than re-derived at the bottom: `text` is rewritten by
-    // the transcription, so by the time the answer exists there is nothing left
-    // in it that says how it arrived.
-    const heard = Boolean(voice?.file_id);
     if (voice?.file_id) {
       // The download and the transcription both take seconds, so the indicator
       // starts here rather than after — otherwise the wait for a voice note is
@@ -4198,15 +4232,16 @@ async function handleMessage(update: any): Promise<void> {
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
         calendarBlock(), positionsBlock(),
       ]);
-      /* TOLD THAT IT WILL BE HEARD, rather than left to a cap that silently
-         drops the audio on a long answer. The instruction and SPEAK_MAX are one
-         number stated once — an answer she keeps under it is one she chose,
-         where an answer trimmed by the cap is one he never learns was spoken. */
-      const aloud = heard
-        ? `\n\nHe sent this as a voice note, so your answer will be read back to him ` +
-          `aloud. Keep it under ${SPEAK_MAX} characters and write it to be heard — ` +
-          `no lists, no headings, nothing that needs to be looked at.`
-        : "";
+      /* TOLD THAT IT WILL BE HEARD, AND IT ALWAYS IS NOW. It used to depend on
+         how he wrote, because only a voice note drew a spoken answer. He asked
+         for everything in voice, so the instruction is unconditional and the
+         number in it is still the one SPEAK_MAX enforces — an answer she keeps
+         under it is one she chose, where an answer trimmed by the cap is one he
+         never learns was spoken. */
+      const aloud =
+        `\n\nYour answer will be read back to him aloud as well as written, so ` +
+        `write it to be heard: no lists, no headings, nothing that has to be ` +
+        `looked at. Keep it under ${SPEAK_MAX} characters.`;
       const context = text + aloud + notes + channels + story + loops + calendar + desk;
       answer = await ask(
         [...history, {
@@ -4224,11 +4259,10 @@ async function handleMessage(update: any): Promise<void> {
       clearInterval(keepTyping);
     }
 
-    await say(answer);
-    // AFTER THE TEXT AND BEFORE THE WRITE. After, so the answer is already his
-    // whatever the vendor does; before, only because the write is the slower of
-    // the two and the audio is the half he is waiting on.
-    if (speaksBack(answer, heard)) await speak(answer);
+    // BEFORE THE WRITE, only because the write is the slower of the two and the
+    // audio is the half he is waiting on. The text-then-audio ordering inside
+    // sayAloud is the part that matters and is stated there.
+    await sayAloud(answer);
     // THE TEXT, NEVER THE BLOCKS. A chart stored as base64 would be a megabyte
     // of history resent on every turn for the next six exchanges, and the
     // transcript of a voice note is the part worth searching anyway. What was

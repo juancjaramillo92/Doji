@@ -1856,17 +1856,22 @@ the boot guard beside the secrets whose absence stops her working. `agree`
 enforces the exemption rather than waving it through: an optional secret must be
 guarded where it is used.
 
-**And she answers in the channel he used.** A voice note is answered aloud; a
-typed line is answered in text. **No setting, no toggle, no stored preference** —
-he speaks because his hands are busy, and the whole point is over the moment he
-has to look at a phone to read the reply, so the message he sent is the only
-thing that needs to decide.
+**Everything she writes is spoken as well as written**, and that reversed a rule
+that was sound. It was *she answers in the channel he used* — a voice note
+answered aloud, a typed line in text, no setting and no stored preference,
+because he speaks when his hands are busy and the point is over the moment he has
+to look at a phone.
 
-It falls out of that shape that **nothing scheduled ever speaks**: the briefing,
-the pulse, the release look, the move look and the trade event are not replies to
-anything, so they stay text without a rule saying so. Which is the right answer
-for the briefing especially — a fourteen-hundred-character read is something you
-skim, and audio is the one format you cannot.
+What that rule actually decided was a **reply**. Everything she *starts* was
+silent as a side effect of it rather than as a decision, so the morning briefing
+— the one message he wanted read to him — was the one the rule could never reach.
+He decided it the other way, and the cost is about a dollar a month.
+
+**Six paths speak**: both briefings, the pulse, the release look, the trade event
+and the move look, plus the reply. `say()` keeps three things deliberately — the
+`/notes` audit, which is a rendered table and unlistenable; the apologies, which
+are failure notices rather than messages she wrote; and the short operational
+lines.
 
 **The text goes first, and is never contingent on the voice.** It is what
 `remember()` stores, what a later search finds, and what he re-reads at a desk; a
@@ -1874,13 +1879,29 @@ voice note is none of those. So it has already landed before speech is attempted
 and an unset key, a vendor that refused or a format Telegram will not render
 costs the audio and nothing else. That is the opposite call from `VOICE_TROUBLE`
 below, and the difference is that a voice note she cannot *hear* costs the whole
-exchange while a reply she cannot *speak* costs a convenience.
+exchange while a message she cannot *speak* costs a convenience.
 
-`SPEAK_MAX` is 700 characters, roughly fifty seconds — past that it stops being a
-reply and becomes a recording to scrub through. **The prompt is told the same
-number**, so an answer over it is one she chose rather than one silently left
-unspoken, and a test holds the two together: a prompt allowed to run longer than
-the cap produces answers that are never spoken with nothing saying why.
+That ordering lives in **`sayAloud`** rather than in six copies of two lines —
+five of which nothing would be guarding, and the failure of getting it backwards
+is that the audio arrives and the text does not. A test reads the order inside it
+*and* counts the six call sites, because a path that drops back to `say()` still
+reaches him and is simply silent.
+
+**`SPEAK_MAX` went from 700 to 4,000 with the rule.** Seven hundred was fifty
+seconds, on the reasoning that past that a voice note stops being a reply and
+becomes a recording to scrub through. That is right about a reply and fatal here:
+a briefing is 250–400 words by its own rule, so it would have been over the cap
+**every single morning** and would have arrived silently, correctly, forever.
+What is left is not a judgement about listening at all — it is what the speech
+vendor accepts in one request, and everything she writes fits under it because
+the briefing's own ceiling is Telegram's. **The prompt is told the same number**,
+so an answer over it is one she chose rather than one silently left unspoken.
+
+**The markdown is stripped on the way to the vendor.** The calendar slot carries
+a bold day label per line — the one place the prose rule is relaxed, and it is
+relaxed for a reader's eye. `**Today:**` read aloud is a gamble on what an
+asterisk becomes, so the marks come off for the one reader that does not want
+them.
 
 `TTS_URL` and `TTS_KEY` are optional on the same terms as `STT_*`; `TTS_VOICE`
 and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,

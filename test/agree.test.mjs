@@ -4561,34 +4561,56 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
   }
 });
 
-test('the answer is his before it is ever spoken', () => {
-  /* THE ORDER IS THE WHOLE SAFETY OF THIS PATH. say() first, speak() after —
-     so an unset key, a vendor that refused, or a format Telegram will not
-     render costs the audio and nothing else. Reversed, a speech call that hung
-     would hold the reply behind it, and one that threw would lose it: he asked
-     a question aloud and got silence, which is the failure VOICE_TROUBLE exists
-     on the other side of.
+test('the text is his before anything is ever spoken', () => {
+  /* THE ORDER IS THE WHOLE SAFETY OF THIS PATH. say() first, speak() after — so
+     an unset key, a vendor that refused, or a format Telegram will not render
+     costs the audio and nothing else. Reversed, a speech call that hung would
+     hold the message behind it and one that threw would lose it, and the text
+     is what `remember` stores, what `search_memory` finds and what the nightly
+     pass reads.
 
-     Read as positions in the handler rather than as a call anywhere in the
-     file, because both are called exactly once and only their ORDER is wrong. */
+     SIX PATHS SEND HIM SOMETHING SHE WROTE, so the ordering lives in one
+     function rather than in six copies of two lines — five of which nothing
+     would be guarding. This reads that function, and the test below reads that
+     every path goes through it. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function handleMessage(');
-  assert.ok(at > -1, 'doji-eugenia no longer has handleMessage()');
-  const body = src.slice(at);
+  const at = src.indexOf('async function sayAloud(');
+  assert.ok(at > -1, 'doji-eugenia no longer has sayAloud()');
+  const body = src.slice(at, src.indexOf('\n}', at));
 
-  const said = body.indexOf('await say(answer);');
-  const spoke = body.indexOf('await speak(answer)');
-  assert.ok(said > -1, 'handleMessage no longer sends the answer as text');
-  assert.ok(spoke > -1, 'handleMessage never speaks the answer');
+  const said = body.indexOf('await say(');
+  const spoke = body.indexOf('await speak(');
+  assert.ok(said > -1, 'sayAloud no longer sends the text');
+  assert.ok(spoke > -1, 'sayAloud never speaks');
   assert.ok(said < spoke,
-    'handleMessage speaks before it sends the text, so a speech vendor that ' +
-    'hangs or throws costs him the answer rather than the audio');
+    'sayAloud speaks before it sends the text, so a speech vendor that hangs ' +
+    'or throws costs him the message rather than the audio');
 
-  // AND IT IS GATED, not spoken every time. Without this every typed line comes
-  // back as a voice note he did not ask for.
-  assert.match(body.slice(said, spoke + 40), /if \(speaksBack\(answer, heard\)\)/,
-    'the answer is spoken unconditionally rather than only when he spoke first');
+  // AND THE BOUND IS STILL ASKED. Unguarded, an answer past what the vendor
+  // accepts is a request that fails on every long message rather than a message
+  // that simply arrives without audio.
+  assert.match(body, /speaksBack\(words\)/,
+    'sayAloud speaks without asking whether it can, so a message past the ' +
+    'vendor\'s limit fails instead of degrading to text');
+});
+
+test('every message she writes goes out through sayAloud', () => {
+  /* THE HALF THE FUNCTION CANNOT GUARANTEE. A path that calls `say` directly
+     still works and still reaches him — it is simply silent, which is the
+     feature not happening on one message rather than failing anywhere. Six:
+     both briefings share a call site, then the pulse, the release look, the
+     trade event, the move look and the reply.
+
+     `/notes`, the apologies and the short operational lines keep `say`
+     deliberately: a rendered table read aloud is unlistenable and a failure
+     notice is not a message she wrote. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const spoken = (src.match(/await sayAloud\(/g) || []).length;
+  assert.equal(spoken, 6,
+    `${spoken} paths speak where six should — a message she writes that goes ` +
+    `out through say() alone arrives correctly and silently`);
 });
 
 test('the audio is asked for in the one format Telegram renders as a voice note', () => {
