@@ -5262,6 +5262,61 @@ test('every model the map names belongs to a caller that exists', () => {
   }
 });
 
+test('no caller that runs a tool loop is on the cheaper model', () => {
+  /* THE RELEASE LOOK DIED AT MAX_ROUNDS ON ITS FIRST TWO FIRINGS AFTER MOVING.
+     Twice inside half an hour, and what reached him was the apology. Fourteen
+     turns on Opus in the measured week had never come near the cap.
+
+     The cap is higher now and that is NOT why they came back. What the two
+     failures establish is that the round budget on a tool-heavy caller is a
+     property of the MODEL rather than of the task — which nothing here had
+     measured and the change assumed. A cheaper caller that does not answer is
+     not cheaper.
+
+     `trim` is the exception and the distinction is the whole of why: it is
+     handed `CRITIC_TOOLS`, which is empty, so it makes one request with no loop
+     to run out of. That is the shape a cheaper model is safe on here.
+
+     A caller added to this map with a non-empty tool array would look exactly
+     like the last one did: correct in every test, cheaper on paper, and dead on
+     the morning a print lands. */
+  const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
+  const keyed = [...map.slice(0, map.indexOf('};')).matchAll(/'([^']+)':\s*SONNET/g)]
+    .map(m => m[1]);
+
+  /* RESOLVED rather than looked for nearby, because a label reaches ask() two
+     ways: named beside its array, or handed to gate(), which supplies one for
+     it. A reader that only knew the first shape would have passed `trim` for
+     the wrong reason and would pass a tool-heavy caller wired the same way. */
+  const arrayFor = (label) => {
+    const direct = EUGENIA_TS.match(
+      new RegExp(`ask\\([\\s\\S]{0,400}?'(?:high|medium|low)',\\s*'${label}',\\s*(\\w+)`));
+    if (direct) return direct[1];
+    // Through gate(): its own ask() names the array every caller of it gets.
+    if (new RegExp(`gate\\([\\s\\S]{0,200}?'${label}'\\)`).test(EUGENIA_TS)) {
+      const at = EUGENIA_TS.indexOf('async function gate(');
+      return EUGENIA_TS.slice(at).match(/'medium', label, (\w+)/)?.[1];
+    }
+    return null;   // named by nothing the reader knows — never silently fine
+  };
+
+  for (const label of keyed) {
+    assert.equal(arrayFor(label), 'CRITIC_TOOLS',
+      `'${label}' is on the cheaper model with a tool array that is not empty — ` +
+      `that is what killed the release look twice in half an hour, and it fails ` +
+      `as an apology rather than as anything a test could see`);
+  }
+});
+
+test('the round cap is a backstop rather than a working limit', () => {
+  const at = EUGENIA_TS.indexOf('const MAX_ROUNDS =');
+  const value = Number(EUGENIA_TS.slice(at).match(/const MAX_ROUNDS = (\d+)/)?.[1]);
+  assert.ok(value >= 10,
+    `MAX_ROUNDS is ${value} — at six a release look that searched, fetched and ` +
+    `searched again ran out twice in half an hour, and the caller died rather ` +
+    `than answered`);
+});
+
 test('the critic is not among them, and that is the decision', () => {
   /* IT IS THE ONE I EXPECTED TO MOVE. Sonnet saves about $3.50 a month on it —
      and it runs LAST, it can rewrite, and it is the final gate on the exact

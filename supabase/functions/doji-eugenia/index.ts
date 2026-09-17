@@ -1652,27 +1652,29 @@ const CRITIC_TOOLS: unknown[] = [];
    move look at $0.64 a turn, the most expensive single message she sends, for
    two sentences about a price.
 
-   THE SPLIT IS BETWEEN JUDGING AND CHECKING, and nothing else. What stays on
-   Opus decides something open: the briefing is the product, the nightly pass
-   writes memory that outlives it by months, the critic is the LAST gate on the
-   thing he reads, the trade look reaches him while he is in a position, and a
-   reply is the conversation. What moves is bounded work handed everything it
-   needs — the release look is given the thesis, the calendar, the notes and the
-   channel map and asked whether one number came in away from expectations; the
-   pulse is a filter whose default output is one word; the move look compares
-   two prices against a threshold.
+   THE SPLIT WAS BETWEEN JUDGING AND CHECKING AND IT COST A CALLER ITS LIFE.
+   The release look, the pulse and the move look moved to Sonnet on that
+   reasoning — bounded work handed everything it needs. The release look then
+   died at `MAX_ROUNDS` on its first two firings the next morning, twice inside
+   half an hour, and what reached him was the apology. Fourteen turns on Opus in
+   the measured week had never once come near the cap.
+
+   THE CAP IS RAISED BELOW AND THAT IS NOT WHY THESE CAME BACK. What the two
+   failures actually establish is that the round budget on a tool-heavy caller
+   is a property of the MODEL and not of the task, which nothing here had
+   measured and the change assumed. A cheaper caller that does not answer is not
+   cheaper. They go back to the model they were measured on, and any future move
+   is one caller at a time with `rounds` read afterwards.
+
+   `trim` STAYS, and the distinction is the whole of why. It is handed
+   `CRITIC_TOOLS`, which is empty — one request, no tools, no loop — so it
+   cannot reach the cap at all, whatever a model's appetite for rounds. That is
+   the shape a cheaper model is safe on here.
 
    THE CRITIC IS THE ONE I EXPECTED TO MOVE AND IT DOES NOT. Sonnet would save
    about $3.50 a month, and it runs LAST, it can rewrite, and it is the final
    gate on the exact thing he spent two weeks saying read badly. That is a bad
-   trade at any saving.
-
-   Caches are MODEL-SCOPED, so this splits a prefix wherever two callers share a
-   tool array and part here. Nothing is lost: the release look and the move look
-   both move, so `RELEASE_TOOLS` — the one prefix anything ever inherited, nine
-   times in fourteen — stays whole; and the pulse parting from the briefing on
-   `CHAT_TOOLS` costs nothing, because the measured week shows the pulse
-   inheriting a prefix on none of its five turns. */
+   trade at any saving. */
 const OPUS = "claude-opus-5";
 const SONNET = "claude-sonnet-5";
 
@@ -1682,10 +1684,7 @@ const SONNET = "claude-sonnet-5";
    against the labels the file actually passes. Absent means Opus: a new caller
    is expensive and correct rather than cheap and unnoticed. */
 const MODELS: Record<string, string> = {
-  'release look': SONNET,
-  'pulse':        SONNET,
-  'move look':    SONNET,
-  'trim':         SONNET,
+  'trim': SONNET,
 };
 
 export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
@@ -1765,11 +1764,21 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
   return res.json();
 }
 
-// Six rounds, because a loop that cannot end is a loop that bills forever.
-// Three is the realistic maximum now — read the journal, write a note, answer —
-// and the cap exists for the case where that assumption is wrong rather than as
-// a working limit.
-const MAX_ROUNDS = 6;
+/* A BACKSTOP AGAINST A LOOP THAT CANNOT END, AND IT HAD BECOME A WORKING LIMIT.
+   Six was set on the reasoning that three is the realistic maximum — read the
+   journal, write a note, answer — with the cap there for the case where that
+   assumption is wrong. The assumption WAS wrong, and the way it announced
+   itself is the shape worth keeping: a release look that searched, fetched,
+   searched again and ran out, twice in half an hour, arriving as an apology
+   rather than as a number.
+
+   Ten keeps it a backstop rather than a limit. The failure it guards against is
+   a loop billing forever; the failure it CAUSED is a message that never
+   arrives, and of the two the second is the one that happened. `eugenia_runs`
+   records `rounds` on every turn, so how close a caller runs to this is a
+   question with an answer rather than a guess — which is what should have been
+   read before a model changed underneath it. */
+const MAX_ROUNDS = 10;
 
 /* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
    ifs because there are ten of them now and a reader should be able to

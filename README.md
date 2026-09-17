@@ -3155,17 +3155,28 @@ the same week says something the totals hide:
 
 **Fourteen release looks cost more than five briefings**, and the move look is
 $0.64 a turn — the most expensive single message she sends, for two sentences
-about a price. The split is between **judging and checking**: what stays on Opus
+about a price. The split was between **judging and checking**: what stays on Opus
 decides something open, and what moves is bounded work handed everything it
-needs. The critic is the one that looks like it should move and does not — Sonnet
-saves about $3.50 a month on it, and it runs *last*, it can rewrite, and it is
-the final gate on the thing he reads.
+needs.
 
-Caches are model-scoped, so this splits a prefix wherever two callers share a
-tool array and part. Nothing is lost: the release look and the move look both
-move, so `RELEASE_TOOLS` — the one prefix anything ever inherited, nine times in
-fourteen — stays whole, and the pulse inherited on none of its five turns anyway.
-**About $46 a month**, with the briefing, the memory and the last gate untouched.
+**It cost a caller its life, and the table above is what the money looked like
+before that was known.** The release look, the pulse and the move look moved to
+Sonnet; the release look died at `MAX_ROUNDS` on its first two firings the next
+morning, twice inside half an hour, arriving as the apology. Fourteen turns on
+Opus in the measured week had never come near the cap.
+
+What those two failures establish is that **the round budget on a tool-heavy
+caller is a property of the model, not of the task** — which nothing here had
+measured, and the change assumed while reasoning only about output quality. A
+cheaper caller that does not answer is not cheaper. All three are back on the
+model they were measured on, the cap is raised because it had become a working
+limit rather than a backstop, and any future move is one caller at a time with
+`rounds` read afterwards.
+
+`trim` stays on Sonnet, and the distinction is the whole of why: it is handed
+`CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it
+cannot reach the cap whatever a model's appetite for rounds. That is the shape a
+cheaper model is safe on here.
 
 The lever after that is the prefix itself: 23,309 tokens written 32 times a week.
 It is worth about $3 a month against editing what she is told on every turn, and

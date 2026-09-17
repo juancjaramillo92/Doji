@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 556 tests, six suites
+npm test      # 558 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1188,6 +1188,19 @@ compounds.
   a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
   read of the journal is worse than a slow one.
 
+- **`MAX_ROUNDS` IS A BACKSTOP AND IT HAD BECOME A WORKING LIMIT.** Six was set
+  on the reasoning that three is realistic — read the journal, write a note,
+  answer — with the cap there for the case where that assumption is wrong. The
+  assumption WAS wrong the day a tool-heavy caller changed model, and the way it
+  announced itself is the shape to remember: a release look that searched,
+  fetched and searched again, out of rounds, twice in half an hour, arriving as
+  an apology rather than as a number. Ten keeps it a backstop. The failure it
+  guards against is a loop billing for ever; the failure it CAUSED is a message
+  that never arrives, and of the two only the second has happened.
+  `eugenia_runs.rounds` is written on every turn, so how close a caller runs to
+  this is a question with an answer — and reading it is what should have come
+  before a model changed underneath it.
+
 - **SO IS THE MODEL NOW, AND ONE MODEL FOR EVERYTHING WAS NEVER A DECISION.** A
   week of `eugenia_runs` put the release look at $5.30 against the whole
   briefing's $4.12 — fourteen looks costing more than five briefings — and the
@@ -1197,19 +1210,31 @@ compounds.
   ran and what it is filed under; absent means Opus, because a new caller should
   be expensive and correct rather than cheap and unnoticed.
 
-  THE SPLIT IS BETWEEN JUDGING AND CHECKING. Sonnet takes the release look, the
-  pulse and the move look — bounded work handed everything it needs. Opus keeps
-  the briefing, the nightly pass, the trade look, the reply and THE CRITIC, which
-  is the one that looks like it should move: it saves about $3.50 a month and it
-  runs LAST, it can rewrite, and it is the final gate on the exact thing he spent
-  a fortnight saying read badly.
+  THE SPLIT WAS BETWEEN JUDGING AND CHECKING AND IT COST A CALLER ITS LIFE. The
+  release look, the pulse and the move look moved to Sonnet on that reasoning.
+  The release look then died at `MAX_ROUNDS` on its first two firings the next
+  morning — twice inside half an hour, arriving as the apology — where fourteen
+  turns on Opus in the measured week had never come near the cap.
 
-  CACHES ARE MODEL-SCOPED, so this splits a prefix wherever two callers share a
-  tool array and part. Nothing is lost, and that was checked rather than assumed:
-  the release look and the move look both move, so `RELEASE_TOOLS` — the one
-  prefix anything ever inherited, nine times in fourteen — stays whole, and the
-  pulse parting from the briefing on `CHAT_TOOLS` costs nothing because the
-  measured week shows the pulse inheriting on none of its five turns.
+  WHAT THE TWO FAILURES ESTABLISH is that the round budget on a TOOL-HEAVY
+  caller is a property of the MODEL rather than of the task. Nothing here had
+  measured that and the change assumed it, reasoning only about output quality.
+  A cheaper caller that does not answer is not cheaper. They are back on the
+  model they were measured on, the cap is raised because it had become a working
+  limit, and any future move is ONE caller at a time with `rounds` read
+  afterwards.
+
+  `trim` STAYS ON SONNET AND THE DISTINCTION IS THE WHOLE OF WHY: it is handed
+  `CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it
+  cannot reach the cap whatever a model's appetite for rounds. That is the shape
+  a cheaper model is safe on here, and `agree.test.mjs` RESOLVES the array each
+  Sonnet caller is handed rather than reading what sits near it, because a label
+  reaches `ask` two ways and a reader that knew only one would pass the next
+  tool-heavy caller wired through `gate`.
+
+  THE CRITIC IS THE ONE THAT LOOKS LIKE IT SHOULD MOVE AND DOES NOT: about $3.50
+  a month, and it runs LAST, it can rewrite, and it is the final gate on the
+  exact thing he spent a fortnight saying read badly.
 
   `fellBack` COMPARES AGAINST WHAT THE CALLER ASKED FOR. It was one constant for
   the file; left that way every Sonnet caller reports a fallback on every call
