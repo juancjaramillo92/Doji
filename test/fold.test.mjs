@@ -1819,8 +1819,34 @@ async function costLines(responses) {
 
 test('the ordinary turn says nothing about the model, because nothing happened', async () => {
   const [line] = await costLines([answers('claude-opus-5')]);
-  assert.match(line, /test — 1 round\(s\), medium effort/);
+  assert.match(line, /test — claude-opus-5, 1 round\(s\), medium effort/);
   assert.doesNotMatch(line, /FELL BACK/);
+});
+
+test('a caller on a cheaper model does not read as having fallen back', async () => {
+  /* THE HALF THE SPLIT COULD HAVE BROKEN SILENTLY. The fallback column is
+     `what answered` against `what was asked for`, and that was one constant for
+     the whole file. Left that way, every Sonnet caller would report a fallback
+     on every single call — three of the eight, every turn — and `fell_back`
+     would stop meaning anything on the day the models parted.
+
+     Driven through `ask` with a Sonnet caller's label, because the comparison
+     is inside the loop and a constant put back there passes every pure test. */
+  const realFetch = globalThis.fetch, realLog = console.log;
+  const lines = [];
+  globalThis.fetch = async () => answers('claude-sonnet-5');
+  console.log = (line) => lines.push(line);
+  try {
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'pulse');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+  assert.match(lines[0], /pulse — claude-sonnet-5/,
+    'the pulse did not ask for Sonnet, so the model map is not reaching the request');
+  assert.doesNotMatch(lines[0], /FELL BACK/,
+    'a caller answered by the model it asked for reads as a fallback, so the ' +
+    'comparison is against one name for the file rather than against the caller');
 });
 
 test('a turn served by another model names it in the cost line', async () => {

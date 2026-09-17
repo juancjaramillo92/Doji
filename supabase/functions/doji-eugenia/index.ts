@@ -1646,12 +1646,51 @@ const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
    size. An empty array is the smaller write of the two. REFACTOR.md R-15. */
 const CRITIC_TOOLS: unknown[] = [];
 
-/* NAMED, BECAUSE TWO THINGS NOW READ IT. The request asks for this model and
-   ask() compares what answered against it. A second literal would report a
-   fallback on every call from the day someone edited one of the two. */
-const MODEL = "claude-opus-5";
+/* ONE MODEL FOR EVERY CALLER WAS NEVER A DECISION, AND THE ROWS SAY WHAT IT
+   COST. A week of `eugenia_runs` put the release look at $5.30 and the whole
+   briefing at $4.12 — fourteen looks costing more than five briefings, and the
+   move look at $0.64 a turn, the most expensive single message she sends, for
+   two sentences about a price.
 
-async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
+   THE SPLIT IS BETWEEN JUDGING AND CHECKING, and nothing else. What stays on
+   Opus decides something open: the briefing is the product, the nightly pass
+   writes memory that outlives it by months, the critic is the LAST gate on the
+   thing he reads, the trade look reaches him while he is in a position, and a
+   reply is the conversation. What moves is bounded work handed everything it
+   needs — the release look is given the thesis, the calendar, the notes and the
+   channel map and asked whether one number came in away from expectations; the
+   pulse is a filter whose default output is one word; the move look compares
+   two prices against a threshold.
+
+   THE CRITIC IS THE ONE I EXPECTED TO MOVE AND IT DOES NOT. Sonnet would save
+   about $3.50 a month, and it runs LAST, it can rewrite, and it is the final
+   gate on the exact thing he spent two weeks saying read badly. That is a bad
+   trade at any saving.
+
+   Caches are MODEL-SCOPED, so this splits a prefix wherever two callers share a
+   tool array and part here. Nothing is lost: the release look and the move look
+   both move, so `RELEASE_TOOLS` — the one prefix anything ever inherited, nine
+   times in fourteen — stays whole; and the pulse parting from the briefing on
+   `CHAT_TOOLS` costs nothing, because the measured week shows the pulse
+   inheriting a prefix on none of its five turns. */
+const OPUS = "claude-opus-5";
+const SONNET = "claude-sonnet-5";
+
+/* KEYED ON THE CALLER'S LABEL, which is the same string `eugenia_runs.caller`
+   records and the same one `ask` is handed. A name here that no caller uses is
+   a row that silently never applies, so `agree.test.mjs` holds these keys
+   against the labels the file actually passes. Absent means Opus: a new caller
+   is expensive and correct rather than cheap and unnoticed. */
+const MODELS: Record<string, string> = {
+  'release look': SONNET,
+  'pulse':        SONNET,
+  'move look':    SONNET,
+};
+
+export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
+
+async function call(messages: any[], effort: Effort, tools: unknown[],
+                    model: string, container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1663,11 +1702,21 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       // rejects — and `fallbacks` without the header is rejected as well. So
       // the shape below 400s every call, briefing and reply alike, which is
       // the whole function. It shipped that way for one commit.
-      "anthropic-beta": "server-side-fallback-2026-07-01",
+      //
+      // IT RIDES WITH OPUS ALONE, AND THAT IS CAUTION RATHER THAN A RULE.
+      // `fallbacks` has carried this system's briefings since the morning a
+      // decline cost one, on the model it was turned on for. Whether the
+      // parameter is accepted on Sonnet is not something anything here has
+      // established, and if it is not, the failure is a 400 on every call —
+      // three callers dark at once. Widen it the day a Sonnet call is seen to
+      // take it, not before.
+      ...(model === OPUS
+          ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
+          : {}),
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: 16000,
       /* Cached: both are long, fixed, and sent on every turn — which is exactly
          why the strategy rides here rather than in the message.
@@ -1706,7 +1755,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       // on another model inside this same call and routes by refusal category,
       // so there is no model list here to go stale, and a decline before any
       // output is not billed.
-      fallbacks: "default",
+      ...(model === OPUS ? { fallbacks: "default" } : {}),
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
     }),
@@ -1772,6 +1821,10 @@ export async function serve(name: string, input: any): Promise<string> {
    before. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
                           tools: unknown[] = CHAT_TOOLS): Promise<string> {
+  // DERIVED FROM THE LABEL RATHER THAN PASSED, so a caller cannot be given one
+  // model and recorded under another — `label` is already what eugenia_runs
+  // stores, and one string deciding both is what keeps the meter answerable.
+  const model = modelFor(label);
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -1816,7 +1869,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   try {
   for (let round = 0; round < MAX_ROUNDS; round++) {
     rounds = round + 1;
-    const body = await call(convo, effort, tools, container);
+    const body = await call(convo, effort, tools, model, container);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
@@ -1828,7 +1881,10 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     wrote1h  += hour;
     wrote5m  += madeCache - hour;
-    if (body.model && body.model !== MODEL) fellBack = body.model;
+    // AGAINST WHAT THIS CALLER ASKED FOR, not against one name for the file.
+    // Compared with a single constant, every Sonnet caller would report a
+    // fallback on every call and the column would stop meaning anything.
+    if (body.model && body.model !== model) fellBack = body.model;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
     // content, so it is caught before the blocks are read rather than surfacing
@@ -1909,7 +1965,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        Searches are counted apart from the tokens because they bill apart.
        Only on the way out; the catch below records the turns that never got
        here, which are the ones a cost line could never see at all. */
-    console.log(`doji-eugenia: ${label} — ${round + 1} round(s), ${effort} effort, ` +
+    console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));

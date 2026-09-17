@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 547 tests, six suites
+npm test      # 551 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1144,6 +1144,39 @@ compounds.
 - **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
   a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
   read of the journal is worse than a slow one.
+
+- **SO IS THE MODEL NOW, AND ONE MODEL FOR EVERYTHING WAS NEVER A DECISION.** A
+  week of `eugenia_runs` put the release look at $5.30 against the whole
+  briefing's $4.12 — fourteen looks costing more than five briefings — and the
+  move look at $0.64 a turn, the most expensive single message she sends, for
+  two sentences about a price. `MODELS` is keyed on the caller's LABEL, which is
+  the same string `eugenia_runs.caller` records, so one string decides both what
+  ran and what it is filed under; absent means Opus, because a new caller should
+  be expensive and correct rather than cheap and unnoticed.
+
+  THE SPLIT IS BETWEEN JUDGING AND CHECKING. Sonnet takes the release look, the
+  pulse and the move look — bounded work handed everything it needs. Opus keeps
+  the briefing, the nightly pass, the trade look, the reply and THE CRITIC, which
+  is the one that looks like it should move: it saves about $3.50 a month and it
+  runs LAST, it can rewrite, and it is the final gate on the exact thing he spent
+  a fortnight saying read badly.
+
+  CACHES ARE MODEL-SCOPED, so this splits a prefix wherever two callers share a
+  tool array and part. Nothing is lost, and that was checked rather than assumed:
+  the release look and the move look both move, so `RELEASE_TOOLS` — the one
+  prefix anything ever inherited, nine times in fourteen — stays whole, and the
+  pulse parting from the briefing on `CHAT_TOOLS` costs nothing because the
+  measured week shows the pulse inheriting on none of its five turns.
+
+  `fellBack` COMPARES AGAINST WHAT THE CALLER ASKED FOR. It was one constant for
+  the file; left that way every Sonnet caller reports a fallback on every call
+  and the column stops meaning anything. AND `fallbacks` RIDES WITH OPUS ALONE —
+  caution rather than a rule. It has carried the briefings since the morning a
+  decline cost one, on the model it was turned on for; whether Sonnet accepts the
+  parameter is not something anything here has established, and if it does not
+  the failure is a 400 on every call, three scheduled callers dark at once. The
+  header and the field are a pair and either alone is its own 400, so both are
+  gated together and `agree.test.mjs` reads for both.
 - **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and the
   parts go sequentially; Telegram does not promise ordering. Its preference is
   paragraph break, then any newline, then a hard cut, and it must stay two lookups
