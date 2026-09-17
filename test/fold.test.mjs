@@ -47,7 +47,7 @@ import {
   quoteWindow, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel,
+  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -3682,6 +3682,39 @@ test('an empty ask is answered empty rather than refused', () => {
    judgement about listening: everything she writes already fits under it,
    because the briefing's own ceiling is Telegram's.
    ═══════════════════════════════════════════════════════════════════════════ */
+
+test('a speech vendor that cannot answer still leaves him the message', async () => {
+  /* THE ONE PROPERTY A SOURCE READ CANNOT SETTLE: there is no path on which he
+     gets nothing. Audio-only was the ask, and audio-only turns an unset key, a
+     refusing vendor and a format Telegram will not render into a MISSING
+     message rather than a degraded one — which is the failure shape the whole
+     system is built against.
+
+     Driven rather than read, and for free: with no TTS key `speak` answers
+     false without a request, which is exactly the shape of a vendor that
+     refused. So what this replays is the real sequence — every part fails, and
+     the text must still go. */
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  console.error = () => {};
+  try {
+    await sayAloud('Gold is holding 4,410 into the close.');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+
+  const texts = sent.filter(r => r.url.includes('sendMessage'));
+  assert.equal(texts.length, 1,
+    'no text went out when the audio could not be made, so a speech vendor ' +
+    'having a bad morning is a briefing he never receives');
+  assert.equal(texts[0].body.text, 'Gold is holding 4,410 into the close.',
+    'the fallback sent something other than the message itself');
+});
 
 test('nothing she writes is left unspoken for being long', () => {
   /* THERE WAS A CAP AND NOW THERE IS NOT. Seven hundred characters, then four
