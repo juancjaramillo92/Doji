@@ -1980,7 +1980,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
                 `${outTok} out, ${searches} search(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
     await recordRun({
-      caller: label, effort, rounds: round + 1, in_tokens: inTok, cached,
+      caller: label, model, effort, rounds: round + 1, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: true,
@@ -1995,7 +1995,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        message, not data, so "how often does this actually fail" had no answer.
        Recorded and rethrown: the caller's own handling is unchanged. */
     await recordRun({
-      caller: label, effort, rounds: rounds || null, in_tokens: inTok, cached,
+      caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: false,

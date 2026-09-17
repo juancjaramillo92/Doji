@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 71 checks above them, silently, leaving a
+-- HTTP responses and threw away all 72 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -509,6 +509,14 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_runs'
        and column_name in ('wrote_1h','wrote_5m')),
    '2'),
+  -- Absent, every row still writes and the meter still looks healthy: PostgREST
+  -- would refuse the whole row for an unknown key, so the FIRST symptom is a
+  -- cost table that stopped growing rather than a column that reads null.
+  ('eugenia_runs records which model ran',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_runs'
+       and column_name = 'model'),
+   '1'),
 
   -- The calendar's two writers are the briefing and the release look, hours
   -- apart on the same row, so without this nothing can say which of two
