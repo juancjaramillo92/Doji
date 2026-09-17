@@ -1987,10 +1987,29 @@ the answer, and it is why both defaults name the current model's own recommended
 pairing rather than the safest-looking one.
 
 **How it is read is pinned, where which voice reads it is not.** `TTS_STYLE`
-asks for calm and unhurried, because the prompt spends most of its length keeping
-her off signals and verdicts and a breathless delivery of a deliberately
-unexcited paragraph contradicts all of it. The register has to survive the trip
-through audio. Voice is taste; delivery is the product.
+carries it, because the prompt spends most of its length keeping her off signals
+and verdicts and a breathless delivery of a deliberately unexcited paragraph
+contradicts all of it. The register has to survive the trip through audio. Voice
+is taste; delivery is the product.
+
+**It asked for the register and not for the delivery, and that is why it read as
+a machine.** It was two sentences and both of them said what *not* to do — not
+breathless, not selling. Given only prohibitions the model returns the null
+reading: every sentence taking the same length of time, every sentence shaped the
+same way, and no beat at a paragraph break. That is what a person means by
+robotic, and none of it was ruled out. It says the positive half now — voice,
+pace, phrasing and emphasis, each in a line of its own — and it is the only dial
+there is. The defaults above already name the newest model the speech endpoint
+serves and one of the two voices the vendor recommends for it, so a better read
+was never going to come from moving either.
+
+**The last line of it is pronunciation, and it is there on real text rather than
+on a guess.** A calendar line is `08:30 ET <name>`, the trade event reads R-11
+and R-14/R-19 back at him, and a level is a comma'd figure — read as glyphs,
+those are three stumbles in the middle of a fluent paragraph. They are said in
+the instruction rather than rewritten on the way out, because the text `remember`
+stores has to stay the text he can read: a rewriter would either touch the
+transcript or become a second copy of it.
 
 **The audio is requested as OGG/Opus, and this is the one thing on the path that
 would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
