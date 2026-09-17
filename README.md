@@ -1589,6 +1589,37 @@ row as `jsonb` less `updated_at` and `looked_at`, rather than against a list of
 the other columns, so a column added later is compared without anyone having to
 remember it.
 
+**Every message she composes is read once more before it is sent, and for most of
+them that is new.** `CRITIC` ran on the briefing *alone*. The pulse, the release
+look and the move look went out unreviewed for their whole lives — which is most
+of what arrives in a week, and it is exactly where the writing rules were being
+ignored with nothing to answer for it.
+
+`TRIM` is that gate, and it is **not `CRITIC` with a shorter prompt**. The
+briefing's checks ask whether the first sentence is true only today, whether the
+chain is complete in the paragraph that matters, whether there is more than one
+chain, and whether it runs to 250–300 words. Every one is a question about a
+briefing; asked of three sentences they would demand a chain, complain about
+length, and rewrite a good message into a bad one. `TRIM` asks the writing
+questions and nothing else — off the same `WRITING` the writer was given — and is
+handed no notes and no channel map, because it is not judging whether a term was
+built. It runs on Sonnet.
+
+The trade event stays out: both its branches are decided from data before any
+model call, and what it says is one of his own rules read back. There is no
+composed prose to trim.
+
+`gate()` holds the half that makes either one safe — a revision failing
+`keepDraft` is overruled, and a gate that *throws* costs nothing. Copied, that
+catch is where one gate loses the message it was checking on the day a vendor is
+slow.
+
+And **`keepDraft` is relative now**. A flat 400 characters is a *briefing's*
+floor: shorter than that and what came back was an apology. A release look is two
+or three sentences and often under 400 to begin with, so that floor overrules
+every revision there is — and a gate overruled every time looks exactly like a
+gate that agreed with the draft.
+
 **One chain per briefing, not one per event.** Every scheduled thing that
 matters still gets named — he needs the week — but only one of them gets its
 mechanism walked. Nine subjects each carrying a clause of chain is not a
@@ -1873,13 +1904,26 @@ and the move look, plus the reply. `say()` keeps three things deliberately — t
 are failure notices rather than messages she wrote; and the short operational
 lines.
 
-**The text goes first, and is never contingent on the voice.** It is what
-`remember()` stores, what a later search finds, and what he re-reads at a desk; a
-voice note is none of those. So it has already landed before speech is attempted,
-and an unset key, a vendor that refused or a format Telegram will not render
-costs the audio and nothing else. That is the opposite call from `VOICE_TROUBLE`
-below, and the difference is that a voice note she cannot *hear* costs the whole
-exchange while a message she cannot *speak* costs a convenience.
+**The voice note is the message, and the text is what happens when it is not.**
+Sending both worked, and both arrived — two notifications and two bubbles for one
+thing she said. He asked for the voice note alone.
+
+The objection to audio-only was real, and the fallback is the answer to it rather
+than a climb-down. An unset key, a vendor that refused, a format Telegram will
+not render: audio alone turns each of those into a **missing** message, which is
+the failure shape this whole system is built against. So `say()` is still
+reachable and fires only when the audio did not land — in full rather than in
+part, because a message he heard three quarters of is worse than either.
+
+**What is stored is untouched.** `remember()` writes the transcript whatever
+happened on the wire, so her memory, `search_memory` and the nightly pass read
+exactly what they always did. The briefing's keyboard rides on the last voice
+note, since there is no text message under it to carry one.
+
+`fold.test.mjs` **drives** the fallback rather than reading it — the one property
+a source read cannot settle. With no TTS key every `speak()` answers false, which
+is exactly the shape of a vendor that refused, so the real sequence replays and
+the text must still go out.
 
 That ordering lives in **`sayAloud`** rather than in six copies of two lines —
 five of which nothing would be guarding, and the failure of getting it backwards

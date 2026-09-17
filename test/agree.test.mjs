@@ -2869,9 +2869,11 @@ test('the critic is handed his notes and the map it is asked to enforce', () => 
   const body = src.slice(at, src.indexOf('\n}', at))
     .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
 
-  // In the message, not merely in the signature: a parameter the content string
-  // never interpolates is a critic reading the rules with none of the inputs.
-  const content = body.match(/content:\s*`([\s\S]*?)`/);
+  /* In the message, not merely in the signature: a parameter the message string
+     never interpolates is a critic reading the rules with none of the inputs.
+     Read as the template literal critique() builds, wherever that is handed —
+     it goes to the shared gate() now rather than straight into an ask(). */
+  const content = body.match(/`([\s\S]*?)`/);
   assert.ok(content, 'critique() no longer builds its message from a template literal');
   for (const block of ['notes', 'channels']) {
     assert.match(content[1], new RegExp(`\\$\\{${block}\\}`),
@@ -4561,42 +4563,34 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
   }
 });
 
-test('the text is his before anything is ever spoken', () => {
-  /* THE ORDER IS THE WHOLE SAFETY OF THIS PATH. say() first, speak() after — so
-     an unset key, a vendor that refused, or a format Telegram will not render
-     costs the audio and nothing else. Reversed, a speech call that hung would
-     hold the message behind it and one that threw would lose it, and the text
-     is what `remember` stores, what `search_memory` finds and what the nightly
-     pass reads.
+test('the text is sent only when the audio did not land', () => {
+  /* THE VOICE NOTE IS THE MESSAGE NOW, and the ordering this used to assert is
+     reversed with it: `say` first meant two bubbles and two notifications for
+     one thing she said, which he asked to stop.
 
-     SIX PATHS SEND HIM SOMETHING SHE WROTE, so the ordering lives in one
-     function rather than in six copies of two lines — five of which nothing
-     would be guarding. This reads that function, and the test below reads that
-     every path goes through it. */
+     THE OBJECTION TO AUDIO-ONLY WAS REAL AND THIS IS THE ANSWER TO IT. A vendor
+     that refuses, an unset key, a format Telegram will not render — audio alone
+     turns each into a MISSING message. So `say` is still reachable and is the
+     fallback, and the property below is that it is reachable at all: deleted,
+     every one of those failures is silence with nothing reporting it. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function sayAloud(');
+  const at = src.indexOf('export async function sayAloud(');
   assert.ok(at > -1, 'doji-eugenia no longer has sayAloud()');
   const body = src.slice(at, src.indexOf('\n}', at));
 
-  const said = body.indexOf('await say(');
   const spoke = body.indexOf('await speak(');
-  assert.ok(said > -1, 'sayAloud no longer sends the text');
+  const said = body.indexOf('await say(');
   assert.ok(spoke > -1, 'sayAloud never speaks');
-  assert.ok(said < spoke,
-    'sayAloud speaks before it sends the text, so a speech vendor that hangs ' +
-    'or throws costs him the message rather than the audio');
-
-  /* AND IT IS SPLIT RATHER THAN CAPPED. There was a cap and he removed it:
-     nothing she writes is shortened to fit a voice note and nothing goes
-     unspoken for being long, so a long message becomes several notes the way it
-     already becomes several text messages. Sent whole to the vendor instead, a
-     long one is a refusal — a silence with the text beside it, which reads as
-     the feature working on short messages and broken on exactly the ones worth
-     hearing. */
-  assert.match(body, /for \(const part of chunk\(words, TTS_LIMIT\)\) await speak\(part\)/,
-    'sayAloud sends the whole message to the speech vendor, so anything past ' +
-    'its input limit arrives as text with no audio and nothing says why');
+  assert.ok(said > spoke,
+    'sayAloud sends the text before or instead of attempting the audio, which is ' +
+    'the two-message shape he asked to end');
+  assert.match(body, /if \(!heard\) await say\(words, keyboard\)/,
+    'the text is no longer the fallback — either it goes unconditionally, or a ' +
+    'speech vendor that refuses is now a message he never receives');
+  assert.match(body, /i === parts\.length - 1 \? keyboard/,
+    "the briefing's keyboard is on every part or on none — there is no text " +
+    'message under the voice note to carry it any more');
 });
 
 test('every message she writes goes out through sayAloud', () => {
@@ -5100,21 +5094,30 @@ test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () 
    well, and is simply back to the thing he said was too hard to read.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('one idea per sentence is stated to the writer and to the critic', () => {
-  /* THE DIAGNOSIS THAT WAS MISSING ENTIRELY. Everything here bounded word
-     CHOICE and nothing bounded a SENTENCE — so plain words in a sentence
-     carrying three ideas read as hard, correctly, and no rule was being
-     broken. */
-  assert.match(EUGENIA_PROMPT, /ONE IDEA PER SENTENCE/,
-    'the writer is no longer told to split a sentence, which is where the ' +
-    'difficulty actually comes from');
-  assert.match(EUGENIA_PROMPT, /DOES ANY SENTENCE CARRY MORE THAN ONE IDEA\?/,
-    'the critic no longer checks sentence length — the writer may obey it and ' +
-    'the pass that runs last has no reason to keep that version');
-  for (const half of [EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC')),
-                      EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'))]) {
-    assert.match(half, /[Tt]wenty words/,
-      'one of the two copies has lost the ceiling, so they disagree about what long is');
+test('the writing rules are stated once and read by all three', () => {
+  /* ONE IDEA PER SENTENCE IS THE RULE THE REST OF IT RESTS ON, and this is what
+     holds it: everything here bounded word CHOICE and nothing bounded a
+     SENTENCE, so a message built entirely of plain words still read as hard and
+     no rule was being broken.
+
+     THEY WERE TWO COPIES HELD APART BY A TEST, which worked while there were
+     two readers. The night a move look sent three paragraphs there was a third
+     reader needed — and a third copy is where two agreeing and one drifting
+     starts. `WRITING` is the source; SYSTEM writes to it, CRITIC checks the
+     briefing against it, TRIM checks the short messages against it.
+
+     A reader that stops interpolating it is silent: it still has a prompt, the
+     message still arrives, and one of the three is simply working from an older
+     idea of how she writes. */
+  assert.match(EUGENIA_PROMPT, /export const WRITING = `/,
+    'the writing rules are no longer stated in one place');
+  for (const reader of ['SYSTEM', 'CRITIC', 'TRIM']) {
+    const at = EUGENIA_PROMPT.indexOf(`export const ${reader} = \``);
+    assert.ok(at > -1, `${reader} is gone`);
+    const body = EUGENIA_PROMPT.slice(at, EUGENIA_PROMPT.indexOf('`;', at));
+    assert.match(body, /\$\{WRITING\}/,
+      `${reader} no longer reads WRITING, so it is working from its own older ` +
+      `idea of how she writes and nothing says the three have parted`);
   }
 });
 
@@ -5238,6 +5241,11 @@ test('every model the map names belongs to a caller that exists', () => {
         .map(m => m[1]),
     // The briefings are the one label built rather than written: `${due} briefing`.
     ...[...EUGENIA_TS.matchAll(/\$\{due\} briefing/g)].map(() => 'weekday briefing'),
+    // AND THE TWO THAT REACH ask() THROUGH gate(). The critic and the trim share
+    // one body, so their labels are arguments to it rather than literals beside
+    // an effort — invisible to the reader above, and a model row keyed on one of
+    // them would have read as naming nothing.
+    ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'\)/g)].map(m => m[1]),
   ]);
   assert.ok(labels.size >= 5,
     `only ${labels.size} caller labels read out of the file — the reader has gone blind`);
@@ -5283,4 +5291,90 @@ test('the refusal fallback rides only with the model it is proven on', () => {
   assert.match(body, /\.\.\.\(model === OPUS \? \{ fallbacks: "default" \} : \{\}\)/,
     'the fallbacks field is sent on every model, or is no longer sent at all — ' +
     'the header and the field are a pair and either alone is a 400');
+});
+
+/* ─── A move with no cause under it is a price callout ───────────────────────
+   The move look sent him three paragraphs about gold being up 35.8 since the
+   roll, ending "I can't find what did this" and "I've filed it to check
+   tomorrow". It was obeying `MOVE` exactly: the prompt said an unexplained move
+   was worth telling him as that, and that open_loop was the right home for it.
+
+   Both halves were wrong and the file already knew why. Without a cause all
+   that is left is the price, which is on his screen in more detail than she can
+   give it — and the whole justification for this path is TEACHING what moved
+   gold, so no cause means nothing to teach. The loop is worse: nothing arrives
+   tomorrow to close a thread about a move that had no event under it, so it
+   rides into every briefing after it. That is the $13 and $17 case from the
+   thin hours, recurring at $35 because the gate was fixed and the prompt was
+   not.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('an unexplained move is silence, and opens no thread', () => {
+  const move = EUGENIA_PROMPT.match(/export const MOVE = `([\s\S]*?)`;/)?.[1];
+  assert.ok(move, 'the MOVE prompt is no longer readable from here');
+  const flat = move.replace(/\s+/g, ' ');
+
+  assert.match(flat, /A MOVE YOU CANNOT EXPLAIN IS NOTHING/,
+    'the move look may report a move it could not explain again — which is a ' +
+    'price callout, and the price is already on his screen');
+  assert.match(flat, /OPEN NO LOOP FOR IT/,
+    'the move look may open a thread about a move with no event under it — ' +
+    'nothing will ever close it, so it rides into every briefing after it');
+
+  // AND THE LENGTH PERMISSION IS GONE. "Take the extra sentence or two that
+  // needs" was the only length signal on this path and it pointed the wrong
+  // way, at the end of the prompt, which is the last thing she reads.
+  assert.doesNotMatch(flat, /extra sentence or two/,
+    'MOVE ends by inviting a longer message again, which is the one length ' +
+    'instruction on a path the critic did not reach');
+});
+
+/* ─── The gate reaches the messages the critic never did ─────────────────────
+   `CRITIC` ran on the briefing ALONE. The pulse, the release look and the move
+   look went out unreviewed for their whole lives — which is most of what he
+   receives in a week, and it is where he was reading her and finding her hard.
+   The writing rules were live and global on those paths; nothing had to answer
+   for them.
+
+   The trade event stays out on purpose: both its branches are decided from data
+   before any model call and what it says is one of his own rules read back, so
+   there is no composed prose to trim.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every message she composes goes through a gate before it is sent', () => {
+  const trimmed = (EUGENIA_TS.match(/await sayAloud\(await trim\(said\)\)/g) || []).length;
+  assert.equal(trimmed, 3,
+    `${trimmed} of the three short paths are gated — an ungated one still ` +
+    `arrives and reads correctly, and is simply back to being unchecked`);
+  assert.match(EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function postBriefing(')),
+    /await critique\(/, 'the briefing is no longer gated at all');
+});
+
+test('the two gates share the half that makes a gate safe', () => {
+  /* A revision that fails `keepDraft` is overruled, and a gate that THROWS
+     costs nothing. Both are the same for either gate and both were about to be
+     copied — and a copy of the catch is where one gate loses the message it was
+     checking, on the day a vendor is slow. */
+  const at = EUGENIA_TS.indexOf('async function gate(');
+  assert.ok(at > -1, 'the shared gate body is gone, so each gate holds its own copy');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /if \(keepDraft\(draft, revised\)\)[\s\S]{0,200}return draft;/,
+    'a gate no longer overrules a failed revision, so a critic that returns an ' +
+    'apology sends the apology');
+  assert.match(body, /catch[\s\S]{0,200}return draft;/,
+    'a gate that throws no longer falls back to the draft, so a slow vendor ' +
+    'costs the message rather than the check');
+});
+
+test('keepDraft is relative, because it now reads three-sentence messages', () => {
+  /* IT WAS A FLAT FOUR HUNDRED CHARACTERS, which is a briefing's floor: shorter
+     than that and the thing that came back was an apology. A release look is two
+     or three sentences and often under four hundred to begin with, so that floor
+     overrules every revision there is — and a gate overruled every time looks
+     exactly like a gate that agreed with the draft. */
+  assert.doesNotMatch(EUGENIA_TS, /CRITIC_FLOOR/,
+    'the absolute floor is back, so the gate on the short paths is paid for and ' +
+    'overruled on every message it ever checks');
+  assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
+    'keepDraft no longer scales with the draft it is judging');
 });

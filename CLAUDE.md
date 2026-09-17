@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 551 tests, six suites
+npm test      # 556 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -442,8 +442,18 @@ code you write near it:
   no stacked subordinate clause; no punchline, because a line that is satisfying
   to read and takes a second to decode is a line he reads twice and will not; and
   no COINED SHORTHAND, since a name she invents and then reuses arrives as a term
-  he was taught and never was. Four to six numbers, and a number that cannot be
-  said to MEAN something is one of the ones to cut.
+  he was taught and never was.
+
+  `WRITING` IS WHERE THEY LIVE, ONCE, AND THREE READ IT. They were in `SYSTEM`
+  and restated in `CRITIC` — two copies held apart by a test, which works while
+  there are two readers. `TRIM` was the third, and a third copy is where two
+  agreeing and one drifting starts. `agree.test.mjs` asserts all three
+  interpolate it, because a reader that stops is silent: it still has a prompt,
+  the message still arrives, and one of the three is working from an older idea
+  of how she writes. THE COUNT OF NUMBERS STAYS WITH THE BRIEFING and the
+  principle moved into `WRITING`: four to six is a budget for four paragraphs
+  and says nothing useful about three sentences, where what generalises is which
+  number earns its place.
 
 - **ONE CHAIN IS EXEMPT FROM THE RUNG AND IT IS THE ONE UNDER EVERYTHING.** Gold
   pays no interest, so it competes with what a bond pays once inflation is taken
@@ -1053,7 +1063,40 @@ compounds.
   A drained archive answers `0 filled, 0 left` and must accuse nobody, or the
   line fires every night for the life of the deployment and stops being read.
 
-- **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
+- **EVERY MESSAGE SHE COMPOSES IS READ ONCE MORE BEFORE IT IS SENT, AND FOR MOST
+  OF THEM THAT IS NEW.** `CRITIC` ran on the briefing ALONE — the pulse, the
+  release look and the move look went out unreviewed for their whole lives,
+  which is most of what he receives in a week and is exactly where he was
+  reading her and finding her hard. The writing rules were live and global on
+  those paths and nothing had to answer for them.
+
+  `TRIM` is that gate and it is NOT `CRITIC` with a shorter prompt. The
+  briefing's checks ask whether the first sentence is true only today, whether
+  the chain is complete in the paragraph that matters, whether there is more
+  than one chain and whether it runs to 250–300 words. Every one is a question
+  about a briefing; asked of three sentences they demand a chain, complain about
+  length and rewrite a good message into a bad one. `TRIM` asks the writing
+  questions and nothing else, off the same `WRITING` the writer was given, and
+  is handed no notes and no channel map because it is not judging whether a term
+  was built. It runs on Sonnet: checking a message against a stated rule is the
+  bounded half of the split the models are chosen on.
+
+  THE TRADE EVENT STAYS OUT. Both its branches are decided from data before any
+  model call and what it says is one of his own rules read back — there is no
+  composed prose to trim.
+
+  `gate` HOLDS THE HALF THAT MAKES EITHER ONE SAFE: a revision failing
+  `keepDraft` is overruled and a gate that THROWS costs nothing. Copied, that
+  catch is where one gate loses the message it was checking on the day a vendor
+  is slow.
+
+  AND `keepDraft` IS RELATIVE NOW. A flat four hundred characters is a
+  BRIEFING's floor — shorter than that and what came back was an apology. A
+  release look is two or three sentences and often under four hundred to begin
+  with, so that floor overrules every revision there is, and a gate overruled
+  every time looks exactly like a gate that agreed with the draft.
+
+- **The briefing's own gate.** `CRITIC`, medium effort,
   no tools — and the empty array is the CHEAPER of the two as well as the
   stricter, which is the opposite of how it reads. Sharing the briefing's array
   so the critic could ride its cache was tried and measured and did not work:
@@ -1214,18 +1257,29 @@ compounds.
   `TTS_LIMIT`, which is what the vendor accepts in one request and is a chunk
   size rather than a gate.
 
-  THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember`
-  stores, what `search_memory` finds and what the nightly pass reads, so `say`
-  before `speak`, and a speech vendor that hangs or throws costs the convenience
-  rather than the message. SIX PATHS send him something she wrote, so that
-  ordering lives in `sayAloud` rather than in six copies of two lines — five of
-  which nothing would be guarding. `agree.test.mjs` reads the order inside it AND
-  counts the six call sites, because a path that drops back to `say` still
-  reaches him and is simply silent.
+  AND THE VOICE NOTE IS THE MESSAGE NOW, WITH THE TEXT AS THE FALLBACK. Sending
+  both worked and both arrived — two notifications and two bubbles for one thing
+  she said, which is not what he asked for. The objection to audio-only was real
+  and this is the ANSWER to it rather than a climb-down: a refusing vendor, an
+  unset key or a format Telegram will not render each turn audio-only into a
+  MISSING message, so `say` is still reachable and fires when the audio did not
+  land — in FULL rather than in part, because a message he heard three quarters
+  of is worse than either. What is STORED is untouched: `remember` writes the
+  transcript whatever happened on the wire. The briefing's keyboard rides on the
+  last voice note, since there is no text message under it to carry one.
 
-  `say` KEEPS three things deliberately: the `/notes` audit, which is a rendered
-  table and unlistenable; the apologies, which are failure notices rather than
-  messages she wrote; and the short operational lines. And the markdown is
+  SIX PATHS send him something she wrote, so that ordering lives in `sayAloud`
+  rather than in six copies — five of which nothing would be guarding.
+  `agree.test.mjs` reads it AND counts the six call sites, and `fold.test.mjs`
+  DRIVES the fallback, which is the one property a source read cannot settle:
+  with no TTS key every `speak` answers false, which is exactly the shape of a
+  vendor that refused, so the real sequence is replayed and the text must still
+  go.
+
+  `say` KEEPS three things deliberately, unspoken and unconditional: the `/notes`
+  audit, which is a rendered table and unlistenable; the apologies, which are
+  failure notices rather than messages she wrote; and the short operational
+  lines. And the markdown is
   stripped on the way to the vendor, because the calendar slot carries a bold
   label per line — the one place the prose rule is relaxed, for a reader's eye,
   and `**Today:**` read aloud is a gamble on what an asterisk becomes.

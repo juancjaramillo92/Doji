@@ -31,7 +31,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // The eight rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
@@ -1685,6 +1685,7 @@ const MODELS: Record<string, string> = {
   'release look': SONNET,
   'pulse':        SONNET,
   'move look':    SONNET,
+  'trim':         SONNET,
 };
 
 export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
@@ -2248,8 +2249,8 @@ const TTS_LIMIT = 4000;
    request succeeds, Telegram accepts the file, and it arrives as an ATTACHMENT
    rather than a voice note, with no waveform and no speed control. Nothing
    errors; the feature just stops being the thing it was for. */
-async function speak(answer: string): Promise<void> {
-  if (!TTS_KEY) return;
+async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
+  if (!TTS_KEY) return false;
 
   try {
     const spoken = await fetch(TTS_URL, {
@@ -2275,34 +2276,57 @@ async function speak(answer: string): Promise<void> {
     // other direction: it is not knowable which one Telegram reads.
     form.append("voice", new Blob([new Uint8Array(await spoken.arrayBuffer())],
                                   { type: "audio/ogg" }), "reply.ogg");
+    // The briefing's keyboard rides on the voice note now, because there is no
+    // text message under it to carry one. JSON in a multipart field, which is
+    // what Telegram takes for reply_markup on sendVoice.
+    if (keyboard) form.append("reply_markup", JSON.stringify(keyboard));
     const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
       method: "POST", body: form,
     });
     const said = await sent.json();
     if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
+    return true;
   } catch (err) {
     console.error("doji-eugenia: could not speak —", err instanceof Error ? err.message : err);
+    return false;
   }
 }
 
-/* SAID AND THEN HEARD, AND THE ORDER IS THE WHOLE SAFETY OF IT. Six paths send
-   him something she wrote, and every one of them must send the text first: it
-   is what `remember` stores, what `search_memory` finds and what the nightly
-   pass reads, and `speak` reaching a vendor that hangs then costs the
-   convenience rather than the message. Six copies of that ordering would be
-   five unguarded places to get it backwards, and getting it backwards fails in
-   the shape this repository keeps finding — the audio arrives, the text does
-   not, and nothing reports it.
+/* THE VOICE NOTE IS THE MESSAGE, AND THE TEXT IS WHAT HAPPENS WHEN IT IS NOT.
+   It sent both for one day and both arrived, which is two notifications and two
+   bubbles for one thing she said — he asked for the voice note alone.
+
+   THE OBJECTION TO THAT WAS REAL AND THIS IS THE ANSWER TO IT rather than a
+   climb-down. A speech vendor that refuses, an unset key, a format Telegram will
+   not render: audio-only turns every one of those into a MISSING message, which
+   is the failure shape this whole system is built against. So the text is not
+   dropped, it is the fallback — attempted only when the audio did not land, and
+   then in full rather than in part, because a half-heard message with no text
+   under it is worse than either.
+
+   WHAT IS STORED IS UNAFFECTED, and that is the half worth being clear about:
+   `remember` writes the transcript whatever happened on the wire, so her memory,
+   `search_memory` and the nightly pass read exactly what they always did.
 
    IT IS NOT `say` ITSELF, because three things go through `say` that must stay
    silent: the `/notes` audit, which is a rendered table and unlistenable; the
    apologies, which are failure notices; and the short operational lines. A
    message she wrote is a different thing from a line the function printed. */
-async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
-  await say(words, keyboard);
-  // In order, and sequentially: Telegram does not promise ordering across two
-  // sends, which is chunk()'s own reason for going one at a time.
-  for (const part of chunk(words, TTS_LIMIT)) await speak(part);
+// Exported for the one guarantee here that a source read cannot settle: that
+// there is no path on which he gets nothing. With no TTS key every `speak`
+// answers false, which is exactly the shape of a vendor that refused.
+export async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
+  const parts = chunk(words, TTS_LIMIT);
+  let heard = parts.length > 0;
+  // Sequentially, because Telegram does not promise ordering across two sends —
+  // chunk()'s own reason for the same shape in say(). The keyboard rides on the
+  // last part and only the last, which is say()'s rule as well.
+  for (const [i, part] of parts.entries()) {
+    if (!await speak(part, i === parts.length - 1 ? keyboard : undefined)) heard = false;
+  }
+  // ANY part missing, not all of them. A message he heard three quarters of is
+  // one he cannot act on, and the text is cheap.
+  if (!heard) await say(words, keyboard);
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -3163,26 +3187,57 @@ export const feedbackKeyboard = (day: string) => ({
    did — so the draft goes out. Same direction as the pulse's `isSilent`: the
    failure that costs a message is worse than the failure that sends the
    original one. */
-const CRITIC_FLOOR = 400;
+/* RELATIVE, BECAUSE THE GATE NOW READS THREE-SENTENCE MESSAGES TOO. It was a
+   flat four hundred characters — a briefing that came back shorter than that
+   was an apology, and the draft went instead. Applied to a release look, which
+   is two or three sentences and often under four hundred to begin with, that
+   floor rejects almost every revision there is: the gate would run, be paid
+   for, and be overruled every time, and it would look exactly like a gate that
+   agreed with the draft.
 
+   A third is the same judgement made scale-free. On a briefing it is stricter
+   than the four hundred ever was; on a short message it still catches the
+   apology, which is the shape it exists for. */
 export function keepDraft(draft: string, revised: string): boolean {
   const t = revised.trim();
-  return t.length < CRITIC_FLOOR || t.length > draft.length * 2;
+  return t.length < draft.length / 3 || t.length > draft.length * 2;
 }
 
 async function critique(draft: string, notes: string, channels: string): Promise<string> {
+  return await gate(draft, `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
+}
+
+/* THE SAME GATE ON THE MESSAGES THE CRITIC NEVER REACHED. `CRITIC` runs on the
+   briefing alone, so the pulse, the release look and the move look went out
+   unreviewed for their whole lives — which is most of what he receives in a
+   week, and it is where he was reading her and finding her hard. The rules were
+   live and global on those paths and nothing had to answer for them.
+
+   `TRIM` asks the writing questions and nothing else: the briefing's own checks
+   are about a chain, a first sentence true only today and a word count, and
+   asked of three sentences they would rewrite a good message into a bad one. It
+   is handed no notes and no channel map, because it is not judging whether a
+   term was built — only whether the sentences obey the rules she writes by. */
+async function trim(draft: string): Promise<string> {
+  return await gate(draft, `${TRIM}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
+}
+
+/* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
+   makes a gate safe is the same for both and is the part that must never be
+   copied: a revision that fails `keepDraft` is overruled, and a gate that
+   THROWS costs nothing at all. Both were stated once and would have been stated
+   twice the moment a second gate existed. */
+async function gate(draft: string, asked: string, label: string): Promise<string> {
   try {
-    const revised = await ask(
-      [{ role: 'user', content: `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}` }],
-      'medium', 'critic', CRITIC_TOOLS);
+    const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS);
     if (keepDraft(draft, revised)) {
-      console.log(`doji-eugenia: critic rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
+      console.log(`doji-eugenia: ${label} rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
       return draft;
     }
     return revised.trim();
   } catch (err) {
-    // A critic that fails must never cost the briefing it was checking.
-    console.error("doji-eugenia: critic failed —", err instanceof Error ? err.message : err);
+    // A gate that fails must never cost the message it was checking.
+    console.error(`doji-eugenia: ${label} failed —`, err instanceof Error ? err.message : err);
     return draft;
   }
 }
@@ -3475,7 +3530,7 @@ async function postPulse(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
-  await sayAloud(said);
+  await sayAloud(await trim(said));
   await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: said }]);
   return json({ ok: true, pulse: "sent" });
 }
@@ -3611,7 +3666,7 @@ async function postRelease(): Promise<Response> {
   const named = due.map(r => r.name).join(", ");
   if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
-  await sayAloud(said);
+  await sayAloud(await trim(said));
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
   await remember([{ role: 'user', content: `[${named} landed]` },
@@ -3946,7 +4001,7 @@ async function postMove(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
-  await sayAloud(said);
+  await sayAloud(await trim(said));
   await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
                   { role: 'assistant', content: said }]);
   return json({ ok: true, move: worth.move, said: "sent" });
