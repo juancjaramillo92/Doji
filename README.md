@@ -1997,11 +1997,26 @@ a machine.** It was two sentences and both of them said what *not* to do — not
 breathless, not selling. Given only prohibitions the model returns the null
 reading: every sentence taking the same length of time, every sentence shaped the
 same way, and no beat at a paragraph break. That is what a person means by
-robotic, and none of it was ruled out. It says the positive half now — voice,
-pace, phrasing and emphasis, each in a line of its own — and it is the only dial
-there is. The defaults above already name the newest model the speech endpoint
-serves and one of the two voices the vendor recommends for it, so a better read
-was never going to come from moving either.
+robotic, and none of it was ruled out. It says the positive half now — and it is
+the only dial there is. The defaults above already name the newest model the
+speech endpoint serves and one of the two voices the vendor recommends for it,
+so a better read was never going to come from moving either.
+
+**That first repair asked for a per-sentence shape, over text that is sixteen
+near-identical sentences.** It said *sentences finish downward*, which is right
+about one sentence and is the metronome itself against the register `WRITING`
+produces — measured over the approved example: sixteen sentences, mean 9.2
+words, fourteen of them between 5 and 13. Sixteen identical falls in a row, each
+resetting to the same place to start the next. The rule was aimed at news-reader
+uplift and it bought that at the price of the thing it was written to fix.
+
+**So the arc moved up a level, to the paragraph**, which is the one rhythm
+variable still free. The words cannot carry it: sentence length is fixed by
+rules that exist for the eye, and those rules are staying — he read a draft
+under them, and they are why the page works. What is left is where the pitch
+sits across four sentences and how long she rests between them, and neither was
+being asked for. Only the last sentence of a paragraph fully lands now; the ones
+before it stay open, which is what a person does when something is still coming.
 
 **The last line of it is pronunciation, and it is there on real text rather than
 on a guess.** A calendar line is `08:30 ET <name>`, the trade event reads R-11
