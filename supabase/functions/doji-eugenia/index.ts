@@ -2275,6 +2275,10 @@ across them. Start the second and third lower than the first, and let only the
 last sentence of a paragraph really land — the ones before it stay open, because
 something is still coming.
 
+An opening greeting is not a paragraph and gets none of that. Say hello lightly
+and move straight on. It is not the first idea, and weighting it like one is the
+slowest thing in the message.
+
 Pace: the rests do the work the sentence lengths cannot. Vary the gap between
 sentences, and take a full breath at a blank line. Inside a sentence, slow across
 a number or a name and let the plain words run.
@@ -2284,7 +2288,8 @@ away. Never lift at the end of a line, and never read it like a news bulletin.
 
 Say a number, a time or a code the way a person says it out loud: "08:30 ET" is
 "eight thirty Eastern", "R-11" is "rule eleven", "$4,412.50" is "four thousand
-four hundred and twelve dollars fifty".`;
+four hundred and twelve dollars fifty". A Spanish word is said in Spanish, not
+read as English letters.`;
 
 /* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
    cap — seven hundred characters, then four thousand — and a cap decides that
@@ -2299,6 +2304,20 @@ four hundred and twelve dollars fifty".`;
    with its paragraph preference, so each part is a whole thought rather than a
    sentence cut in half. */
 const TTS_LIMIT = 4000;
+
+/* HIS EAR SET THIS, NOT A DEFAULT. At 1.0 he was playing every voice note at
+   1.5x in Telegram and calling 1.5 a shade fast — so the number is his, read
+   off what he was already doing, and it belongs at generation rather than in a
+   player setting he has to remember on each message.
+
+   IT MAY BE IGNORED, AND THAT IS THE THING TO KNOW BEFORE READING A RESULT
+   HERE. `speed` is documented for this endpoint across 0.25–4.0, and
+   gpt-4o-mini-tts has been reported to quietly disregard it where tts-1 honours
+   it — no error, no header, audio at 1.0 and a constant in this file claiming
+   otherwise. Nothing in the test suite can see the difference, because the
+   suite never calls the vendor. So if the tempo is unchanged, this is the first
+   thing to suspect and the fallback is to ask for pace in TTS_STYLE instead. */
+const TTS_SPEED = 1.3;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2329,7 +2348,7 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
            a gamble on what the vendor does with an asterisk. Stripped here
            rather than written differently, because the text message wants them
            and this is the only reader that does not. */
-        model: TTS_MODEL, voice: TTS_VOICE,
+        model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
       }),
