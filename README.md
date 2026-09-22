@@ -1451,6 +1451,22 @@ adjectives about it — a model matches an example where it ignores a descriptio
 It lives in `WRITING`, so the writer, `CRITIC` and `TRIM` are all shown the same
 one.
 
+**She answers in English whatever he wrote in, and that is the opposite of the
+instinct.** He is a native Spanish speaker and writes to her in it, or sends a
+voice note in it, and a model's reflex is to mirror the language it was given.
+The markets he reads are in English and the vocabulary he is building is
+English, so the same idea in Spanish hands it to him in words he cannot reuse
+anywhere he will meet it again.
+
+**A word of Spanish now and then, though, because she is not a terminal.** A
+greeting, an aside, something said with a shrug — never a market term, never a
+number, never the sentence carrying the mechanism, because those are the words
+he is building. Most messages have none at all: it is seasoning, and the way it
+fails is trying. Both rules live in `WRITING` rather than in `SYSTEM`, and that
+placement is the whole of what makes the second one survive — `CRITIC` and
+`TRIM` read the same block, and a gate that had only been told to prefer the
+plainest word would take every Spanish word back out, last, every morning.
+
 **One chain is exempt from the rung, and it is the one under everything else.**
 Gold pays no interest, so it competes with what a bond pays once inflation is
 taken out rather than with the headline rate. `PITCH` says a channel at `owns`
@@ -2025,6 +2041,30 @@ those are three stumbles in the middle of a fluent paragraph. They are said in
 the instruction rather than rewritten on the way out, because the text `remember`
 stores has to stay the text he can read: a rewriter would either touch the
 transcript or become a second copy of it.
+
+**The tempo is his ear rather than a default.** At 1.0 he was playing every
+voice note at 1.5x in Telegram and calling 1.5 a shade fast, so `TTS_SPEED` is
+1.3 and it is read off what he was already doing. It sits at generation rather
+than in a player setting he has to remember on each message, and it is pinned
+where `TTS_VOICE` is not, for `TTS_STYLE`'s reason: how fast she is heard is the
+product.
+
+**It may also be ignored, and that has to be known before a result here is
+read.** `speed` is documented for this endpoint across 0.25–4.0, and
+`gpt-4o-mini-tts` has been reported to disregard it where `tts-1` honours it —
+no error, no header, audio at 1.0 and a constant in the file claiming otherwise.
+Nothing in the suite can see it, because the suite never calls the vendor. If
+the tempo is unchanged, that is the first thing to suspect, and the fallback is
+to ask for pace in `TTS_STYLE` instead.
+
+**And the greeting was the slowest thing in the message, from a rule written for
+paragraphs.** `Buenos dias jefesito` is its own one-line paragraph, so *let only
+the last sentence of a paragraph really land* applied to it at full strength —
+hello, delivered with the weight of a conclusion. An opening greeting is named
+as exempt now. That line has now been wrong twice in two unrelated ways, which
+is worth noticing about any text that is assembled rather than written: the
+greeting is prepended to the briefing, so no rule aimed at the briefing was ever
+looking at it.
 
 **The audio is requested as OGG/Opus, and this is the one thing on the path that
 would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
