@@ -2208,7 +2208,11 @@ delivered, the button spins, and nothing reports it — `allowed_updates` must n
 
 ### What she remembers
 
-Two kinds of memory, and they answer different questions.
+Six tables, and what separates them is how long a thing is true for. A turn
+rolls over inside a morning; a note about him outlives twenty of those; what he
+UNDERSTANDS outlives both; a thesis is only ever current, which is why it is one
+row rewritten rather than a log; a loop stays until it closes; and the calendar
+is the only dataset here that compounds.
 
 | | Holds | Window | Written by |
 |---|---|---|---|
@@ -2218,6 +2222,7 @@ Two kinds of memory, and they answer different questions.
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool, filled in by `record_actual` |
+| `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
@@ -3884,6 +3889,25 @@ than describing what the database might hold. The poller's job was not in this
 repository at all until then — its schedule, its timeout and the secret it
 presents were readable only by querying the live database, which is the same
 silent drift `deploy-functions.yml` exists to prevent for the functions.
+
+Seven jobs, and `select jobname, schedule, active from cron.job order by
+jobname` is how you read them back:
+
+| Job | Schedule | What it drives |
+|---|---|---|
+| `doji-mcp-sync` | `*/2 * * * *` | the poller |
+| `doji-eugenia` | `0 * * * *` | the briefing, the pulse and the nightly pass — the function decides which, or neither |
+| `doji-eugenia-spine` | `5,20,35,50 * * * *` | the release look |
+| `doji-eugenia-price` | `12,27,42,57 * * * *` | the price mark and the move look |
+| `doji-dispatch-watch` | `*/10 * * * *` | `009`'s sweep |
+| `doji-pace-watch` | `37 * * * *` | `010`'s one-a-day warning |
+| `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
+
+Only the first four call a function; the two watchers post to Telegram
+themselves, which is what keeps a watchdog off the thing it watches, and the
+last touches nothing outside pg_cron. `verify.sql` counts them, and
+`agree.test.mjs` holds that count against this file — a row that had already
+been wrong once, reporting a correct database as broken.
 
 ---
 

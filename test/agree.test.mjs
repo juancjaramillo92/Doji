@@ -4348,6 +4348,48 @@ test('010 states its ceiling once and quotes that one', () => {
     `— one of the two has been changed without the other`);
 });
 
+/* ─── And the README lists them, which is a third copy ───────────────────────
+   The count next door is the check that already existed; this is the table a
+   person reads to know what is supposed to be running, and a schedule written
+   into prose is a copy of 004 that nothing compared. It went in because the
+   three job NAMES appeared nowhere in the README at all — the watchers and the
+   history purge were documented as behaviour with no way to look them up — and
+   a table that names them is worth having only while it is true. Both
+   directions, since a row that quietly vanishes is as bad as one that lies.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the README names every cron job 004 schedules, on its stated schedule', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+  const scheduled = new Map(
+    [...CRON_SQL.matchAll(/cron\.schedule\(\s*'([\w-]+)',\s*'([^']+)'/g)]
+      .map(m => [m[1], m[2]]));
+  assert.ok(scheduled.size >= 5,
+    `only ${scheduled.size} cron jobs read out of 004 — the reader has gone blind`);
+
+  /* SLICED TO THE TABLE RATHER THAN MATCHED ACROSS THE FILE: the row shape is
+     three backticked cells, which the CSS palette table has too, and a reader
+     that swept the whole README pulled ten colour tokens in as cron jobs. */
+  const table = readme.slice(readme.indexOf('| Job | Schedule | What it drives |'));
+  assert.ok(table && table.length < readme.length,
+    'the README no longer has a job table with that header');
+  const listed = new Map(
+    [...table.slice(0, table.indexOf('\n\n')).matchAll(/^\| `([\w-]+)` \| `([^`]+)` \| /gm)]
+      .map(m => [m[1], m[2]]));
+  assert.ok(listed.size >= 5,
+    `only ${listed.size} job rows parsed out of the README — the table has moved`);
+
+  assert.deepEqual([...listed.keys()].sort(), [...scheduled.keys()].sort(),
+    'the README\'s job table and 004 name different jobs');
+
+  for (const [job, when] of listed) {
+    assert.equal(when, scheduled.get(job),
+      `the README says ${job} runs on \`${when}\` and 004 schedules it on ` +
+      `\`${scheduled.get(job)}\` — the table is how a person knows what is ` +
+      `supposed to be running, and pg_cron answers to the file`);
+  }
+});
+
 test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
   const cron = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8')
     .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
