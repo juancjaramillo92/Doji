@@ -4611,6 +4611,38 @@ test('every message she writes goes out through sayAloud', () => {
     `out through say() alone arrives correctly and silently`);
 });
 
+test('the three gated paths remember what the gate returned, not the draft', () => {
+  /* THE STALE COPY ARRIVING THROUGH THE DOOR THE GATE OPENED. `trim` may
+     rewrite, so the draft and the message he read are two different texts —
+     and for as long as these three had a gate they sent one and stored the
+     other. The cost is not the audit: it is that her own history then holds
+     words he never saw, resent as hers for the next six exchanges, which is
+     exactly what `remember` refuses for the notes and the week's trades.
+
+     `postBriefing` is not here because it never had the fault — it stores what
+     `critique` returned. Nothing in this suite can drive a path that sends, so
+     the binding is read out of the source. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  for (const fn of ['postPulse', 'postRelease', 'postMove']) {
+    const at = src.indexOf(`async function ${fn}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
+    const body = src.slice(at, src.indexOf('\n}', at));
+
+    assert.match(body, /const sent = await trim\(said\);/,
+      `${fn} no longer binds the revision — inlined into sayAloud it cannot ` +
+      'also be the thing that is stored');
+    assert.match(body, /await sayAloud\(sent\)/,
+      `${fn} speaks something other than the revision it bound`);
+    assert.match(body, /role: 'assistant', content: sent/,
+      `${fn} stores a text other than the one it sent — her history now holds ` +
+      'a message he never read');
+    assert.doesNotMatch(body, /role: 'assistant', content: said/,
+      `${fn} is back to storing the draft`);
+  }
+});
+
 test('the audio is asked for in the one format Telegram renders as a voice note', () => {
   /* THE ONLY THING ON THIS PATH THAT WOULD FAIL QUIETLY. The vendor's default
      is mp3, and mp3 WORKS: the request succeeds, Telegram accepts the file, and
@@ -5438,7 +5470,7 @@ test('an unexplained move is silence, and opens no thread', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every message she composes goes through a gate before it is sent', () => {
-  const trimmed = (EUGENIA_TS.match(/await sayAloud\(await trim\(said\)\)/g) || []).length;
+  const trimmed = (EUGENIA_TS.match(/const sent = await trim\(said\);/g) || []).length;
   assert.equal(trimmed, 3,
     `${trimmed} of the three short paths are gated — an ungated one still ` +
     `arrives and reads correctly, and is simply back to being unchecked`);

@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 560 tests, six suites
+npm test      # 561 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1094,8 +1094,8 @@ compounds.
   A drained archive answers `0 filled, 0 left` and must accuse nobody, or the
   line fires every night for the life of the deployment and stops being read.
 
-- **EVERY MESSAGE SHE COMPOSES IS READ ONCE MORE BEFORE IT IS SENT, AND FOR MOST
-  OF THEM THAT IS NEW.** `CRITIC` ran on the briefing ALONE — the pulse, the
+- **EVERY MESSAGE SHE SENDS ON A SCHEDULE IS READ ONCE MORE BEFORE IT GOES, AND
+  FOR THREE OF THE FOUR THAT IS NEW.** `CRITIC` ran on the briefing ALONE — the pulse, the
   release look and the move look went out unreviewed for their whole lives,
   which is most of what he receives in a week and is exactly where he was
   reading her and finding her hard. The writing rules were live and global on
@@ -1115,6 +1115,25 @@ compounds.
   THE TRADE EVENT STAYS OUT. Both its branches are decided from data before any
   model call and what it says is one of his own rules read back — there is no
   composed prose to trim.
+
+  AND SO DOES THE REPLY, ON A LANGUAGE ARGUMENT RATHER THAN A PROSE ONE. It is
+  composed prose and the writing rules are as live on it as anywhere, so it
+  reads as the one path still missing its gate — which is how one would come to
+  be added. It is also the ONLY path he speaks Spanish on, and `WRITING` is
+  English down to its worked example; `keepDraft` bounds a revision by LENGTH,
+  so a translation is the one failure it cannot catch, and what a flattened
+  Spanish answer costs is the half of the conversation where he actually
+  replies. That he is waiting on it with the typing indicator running is the
+  cheaper reason and not the deciding one.
+
+  WHAT IS REMEMBERED IS WHAT THE GATE RETURNED. The three callers bind the
+  revision before sending it, because storing the draft files a message he never
+  read as her own words and resends it as history for six exchanges — the stale
+  copy `remember` already refuses for the notes and the week's trades, arriving
+  through the door the gate itself opened. The briefing never had it, storing
+  what `critique` returned; the three that GAINED a gate kept storing the draft
+  for as long as they had one. `agree.test.mjs` reads all three bodies, because
+  nothing in the suite can drive a path that sends.
 
   `gate` HOLDS THE HALF THAT MAKES EITHER ONE SAFE: a revision failing
   `keepDraft` is overruled and a gate that THROWS costs nothing. Copied, that

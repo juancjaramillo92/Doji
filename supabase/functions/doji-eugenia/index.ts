@@ -3226,7 +3226,16 @@ async function critique(draft: string, notes: string, channels: string): Promise
    are about a chain, a first sentence true only today and a word count, and
    asked of three sentences they would rewrite a good message into a bad one. It
    is handed no notes and no channel map, because it is not judging whether a
-   term was built — only whether the sentences obey the rules she writes by. */
+   term was built — only whether the sentences obey the rules she writes by.
+
+   AND WHAT IT RETURNS IS WHAT GETS REMEMBERED, WHICH IS WHY THE THREE CALLERS
+   BIND IT. The draft is what `ask()` produced; the revision is what he read.
+   Storing the draft files a message he never saw as her own words, and hands it
+   back to her as history for the next six exchanges — the stale-copy failure
+   `remember` already refuses for the notes and the week's trades, arriving
+   through the door this gate opened. The briefing never had it: it stores what
+   `critique` returned. The three that GAINED a gate kept storing the draft for
+   as long as they had one. */
 async function trim(draft: string): Promise<string> {
   return await gate(draft, `${TRIM}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
 }
@@ -3539,8 +3548,9 @@ async function postPulse(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
-  await sayAloud(await trim(said));
-  await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: said }]);
+  const sent = await trim(said);
+  await sayAloud(sent);
+  await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: sent }]);
   return json({ ok: true, pulse: "sent" });
 }
 
@@ -3675,11 +3685,12 @@ async function postRelease(): Promise<Response> {
   const named = due.map(r => r.name).join(", ");
   if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
-  await sayAloud(await trim(said));
+  const sent = await trim(said);
+  await sayAloud(sent);
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
   await remember([{ role: 'user', content: `[${named} landed]` },
-                  { role: 'assistant', content: said }]);
+                  { role: 'assistant', content: sent }]);
   return json({ ok: true, release: named, said: "sent" });
 }
 
@@ -4010,9 +4021,10 @@ async function postMove(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
-  await sayAloud(await trim(said));
+  const sent = await trim(said);
+  await sayAloud(sent);
   await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
-                  { role: 'assistant', content: said }]);
+                  { role: 'assistant', content: sent }]);
   return json({ ok: true, move: worth.move, said: "sent" });
 }
 
