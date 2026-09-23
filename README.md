@@ -1727,9 +1727,21 @@ questions and nothing else — off the same `WRITING` the writer was given — a
 handed no notes and no channel map, because it is not judging whether a term was
 built. It runs on Sonnet.
 
-The trade event stays out: both its branches are decided from data before any
-model call, and what it says is one of his own rules read back. There is no
-composed prose to trim.
+**The trade event stays out, and the reason first given for it was wrong.** It
+said there was no composed prose to trim. Both branches do decide *whether to
+speak* from data before any model call — which is why an ordinary fill costs
+nothing — but the one that speaks then calls the model with the conversation
+window, her notes and two tools, and writes two sentences. That is composed
+prose by any reading.
+
+What exempts it is the gate's own shape. `TRIM` **rewrites**, and it is handed
+nothing but the draft: it cannot know this message reaches him while he is in a
+position, and the one thing that must never happen on this path is a sentence
+that reads as an instruction. That is a failure already seen once here — a gate
+not told the no-direction rule could take a compliant message and hand back one
+that broke it. `TRADE_EVENT` is also the most constrained prompt in the file —
+two sentences, the fact then the rule, no greeting, `NOTHING` as an explicit way
+out — so little of what `TRIM` checks is reachable inside it.
 
 `gate()` holds the half that makes either one safe — a revision failing
 `keepDraft` is overruled, and a gate that *throws* costs nothing. Copied, that

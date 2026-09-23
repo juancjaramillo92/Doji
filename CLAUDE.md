@@ -1215,8 +1215,17 @@ compounds.
   checking a message against a stated rule is the bounded half of the split the
   models are chosen on.
 
-  THE TRADE EVENT STAYS OUT, and the `SENDS` census carries the reason as a
-  row rather than as an absence: there is no composed prose to trim.
+  THE TRADE EVENT STAYS OUT AND ITS RECORDED REASON WAS FALSE. *No composed
+  prose to trim* was written of a path that calls `ask` with history, notes and
+  two tools and writes two sentences. What is true is the half about the
+  DECISION: both branches decide whether to speak before any model call, so an
+  ordinary fill costs nothing. What exempts the PROSE is that `TRIM` rewrites
+  and is handed only the draft, so it cannot know this one reaches a man who is
+  in a position — and a sentence that reads as an instruction is the single
+  thing that must never happen here. `TRADE_EVENT` is the most constrained
+  prompt in the file besides, so little of what `TRIM` checks is reachable in
+  two sentences. An exemption is only worth a row while the reason in it is
+  true.
 
   THE REPLY WAS OUT AND HAD NO ARGUMENT BEHIND IT, WHICH IS THE POINT. It was
   never exempted; it was simply not in the list the day the gate was written,

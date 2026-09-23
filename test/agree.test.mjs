@@ -6049,9 +6049,19 @@ test('an unexplained move is silence, and opens no thread', () => {
    The writing rules were live and global on those paths; nothing had to answer
    for them.
 
-   The trade event stays out on purpose: both its branches are decided from data
-   before any model call and what it says is one of his own rules read back, so
-   there is no composed prose to trim.
+   THE TRADE EVENT STAYS OUT, AND THE REASON ON RECORD FOR IT WAS WRONG. It
+   said there was no composed prose to trim, which is false: both branches
+   decide WHETHER TO SPEAK from data before any model call, and then the one
+   that speaks calls `ask` with history, notes and two tools and writes two
+   sentences. The half that is true is about the decision, not about the prose.
+
+   What actually exempts it is that TRIM REWRITES and is handed only the draft,
+   so it cannot know this message reaches a man who is in a position — and the
+   one thing that must never happen here is a sentence that reads as an
+   instruction. That is the shape already learned once, when a gate that had
+   not been told the no-direction rule could hand back a message breaking it.
+   TRADE_EVENT is also the most constrained prompt in the file, so almost
+   nothing TRIM checks is reachable inside two sentences.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* THE CENSUS, AND IT EXISTS BECAUSE EVERY OTHER CHECK HERE IS VERTICAL. They
@@ -6073,9 +6083,14 @@ const SENDS = {
   postMove:       { gate: 'trim',     carries: 'sent' },
   handleMessage:  { gate: 'trim',     carries: 'answer' },
   postTradeEvent: { gate: null,       carries: 'said',
-                    why: 'both branches are decided from data before any model ' +
-                         'call and what it says is one of his own rules read ' +
-                         'back — there is no composed prose to gate' },
+                    why: 'TRIM REWRITES AND IS HANDED ONLY THE DRAFT, so it ' +
+                         'cannot know this one reaches a man who is in a ' +
+                         'position — and the single thing that must not happen ' +
+                         'here is a sentence that reads as an instruction. ' +
+                         'TRADE_EVENT is the most constrained prompt in the ' +
+                         'file: two sentences, the fact then the rule, no ' +
+                         'greeting, and NOTHING as an explicit way out, so ' +
+                         'almost nothing TRIM checks is even reachable' },
 };
 
 test('every path that sends him something is in the census', () => {
