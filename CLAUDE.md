@@ -6,12 +6,13 @@ and you say so. The README is the contract for how the app behaves; this file is
 how to work on it, and it holds only what the README does not — every
 description of behaviour lives there, once.
 
-`REFACTOR.md` is the third document and the only one that is a record rather
-than a rule: what one long pass over this code changed, what it left open, and
-in §6 every move considered and REFUSED. Read that register before proposing a
-simplification — most of what looks like duplication here has already been
-looked at, and the register is what stops a refused move being re-proposed every
-few months and waved through on a tired afternoon.
+`REFACTOR.md` is the third document and it is the REGISTER: every move
+considered and REFUSED, with the reasoning that decided it. Read it before
+proposing a simplification — most of what looks like duplication here has
+already been looked at, and the register is what stops a refused move being
+re-proposed every few months and waved through on a tired afternoon. It also
+carries what no test reaches, which is the other half of the suites described
+below.
 
 Doji is a personal XAUUSD trading journal: one `index.html` of ~4,000 lines, one
 flat namespace, **no build step, no bundler**. Four writers share one Supabase
@@ -112,6 +113,14 @@ result was the tool being broken rather than the code being clean. The fix every
 time is to run the check against a known defect and confirm it finds it *before*
 trusting any zero. Do the same for every new test: break the thing on purpose,
 watch it go red, put it back.
+
+**A REFACTOR CHANGES HOW THE CODE READS, NEVER WHAT IT DOES,** and the two may
+not travel together. If a number, a rendered string, a written column or a
+model's answer changes, it is a behaviour change: it belongs in its own commit
+with its own justification, because a behaviour change riding inside a refactor
+leaves no way to tell which half broke something. The corollary is the
+expensive one — **you cannot refactor what you cannot prove you have not
+changed** — and `golden.test.mjs` exists to be that proof.
 
 **And the same applies to reasoning, which is the harder half.** A conclusion
 drawn from a value you have just proved is corrupt is worth nothing. State

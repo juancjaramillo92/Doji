@@ -52,7 +52,7 @@ default or duplicated something already in the head. Left alone deliberately.
 ```
 README.md                               the contract: what the app does and why
 CLAUDE.md                               how to work on it; the README outranks it
-REFACTOR.md                             what one long pass changed, and refused
+REFACTOR.md                             every move refused, and why
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
@@ -75,6 +75,9 @@ supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-email-sync/     Edge Function: the email fill's write
 supabase/functions/doji-gladys/         Edge Function: Gladys, the journal bot
 supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
+  doji-eugenia/prompt.ts                who she is, and what she may never say
+  doji-eugenia/strategy.ts              what he decided; she cannot write it
+  doji-eugenia/journal.ts               the app's arithmetic, ported so she can reach it
   doji-eugenia/adherence.ts             the eight rules a journal row can answer
 doji_gmail_sync.gs                      Apps Script: broker email parser
 scripts/backup-memory.mjs               the paged read behind the weekly copy
@@ -93,17 +96,21 @@ package-lock.json                       committed — see Tests
 
 ## The system
 
+Two halves that share one table and never write the same column. The journal is
+four writers on `trades`; Eugenia reads it through a view and owns nothing in
+it.
+
 ```
         ┌────────────────┐          ┌──────────────────┐
         │  cTrader MCP   │          │  cTrader email   │
-        │   get_deals    │          │  TP / SL alerts  │
-        │  get_balance   │          │                  │
+        │ deals·balance  │          │  TP / SL alerts  │
+        │ the open plan  │          │                  │
         └───────┬────────┘          └────────┬─────────┘
                 │ every 2 min                │ on arrival
-                │ (Edge Function)            │ (Apps Script)
-                │                            │
+                │ doji-mcp-sync              │ Apps Script →
+                │                            │ doji-email-sync
                 │   broker-owned columns     │  net_pnl · balance
-                │   balance on a fresh close │  fill_time · direction
+                │   balance where null       │  fill_time · direction
                 ▼                            ▼
         ┌──────────────────────────────────────────────┐
         │                   trades                     │
@@ -113,10 +120,11 @@ package-lock.json                       committed — see Tests
              │ (entry_time < 1h)     ▼
              │                       ┌──────────────┐
              │                       │     Doji     │
-             ▼                       └──────────────┘
-      ┌──────────────┐
-      │   Telegram   │   a tap writes setup and the three
-      │ one message  │   discipline answers back to trades
+             ▼                       │  index.html  │
+      ┌──────────────┐               └──────────────┘
+      │    Gladys    │   a tap writes setup and the three
+      │ doji-gladys  │   discipline answers back to trades
+      │ one message  │
       │  per trade   │
       └──────────────┘
 ```
@@ -150,6 +158,54 @@ construction. If either ever started reading it off a close, this column would
 disagree with itself depending on how old the trade was.
 
 Nothing else is shared. `id` is the join, not a value.
+
+**And the other half has no write path into any of it.** Eugenia reads the
+journal through `eugenia_trades`, a view granted `select` alone, and writes only
+tables of her own. She is woken by three things and never by a clock she keeps
+herself — a schedule in pg_cron, a message he sent, or a trigger on `trades`
+firing the moment a position opens or closes.
+
+```
+   WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
+ ┌─────────────────────────┐        ┌────────────────────────────────────┐
+ │ pg_cron   hourly        │        │ eugenia_trades   select only       │
+ │           spine  ×4/h   │        │ her own tables   9, 7 backed up    │
+ │           price  ×4/h   │        │ strategy.ts      no write path     │
+ │ Telegram  he writes     │        │ the web          search and fetch  │
+ │ trades    opened/closed │        │ the broker's price, via the poller │
+ └────────────┬────────────┘        └─────────────────┬──────────────────┘
+              └───────────────┬───────────────────────┘
+                              ▼
+              ┌──────────────────────────────────┐
+              │             Eugenia              │
+              │           doji-eugenia           │
+              │  briefing · pulse · reply ·      │
+              │  release look · move look ·      │
+              │  trade event · nightly pass      │
+              └────────────────┬─────────────────┘
+                               │ every composed message is read once
+                               │ more — CRITIC for the briefing, TRIM
+                               │ for the rest — and only then sent
+                               ▼
+                      ┌──────────────────┐
+                      │     Telegram     │  a voice note, with the
+                      │                  │  text as the fallback
+                      └──────────────────┘
+```
+
+She would be the fifth writer to `trades` and is deliberately not one: a
+document that decides whether he followed his rules cannot be edited by the
+thing checking them, and the same reasoning keeps her off the journal. The
+guarantee is structural rather than a grant — one database read of the journal,
+and no write path to it anywhere in the file.
+
+**Three monitors watch the parts that fail silently**, and each is written where
+the thing it watches cannot take it down with it. `sync_health` is marked by the
+two writers with no voice; `dispatch` is a ledger of what pg_net sent and what
+came back, and posts to Telegram itself rather than through the function it
+watches; `pace` speaks before a briefing runs out of wall clock, because
+afterwards there is nothing left to speak with. `diagnose.sql` reads all three
+in one grid. See **Deployment**.
 
 ---
 
@@ -365,7 +421,7 @@ be single-sourced at run time:
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
 | the **`eugenia_trades` column list** | the numbered SQL files — `003_eugenia.sql` creates it and `006_plan.sql` appends the plan, so the last definition is the one the database ends up with — the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document, and `TradeRow` in `adherence.ts`, which calls itself the row the view serves and is what every rule is written against — so a column it does not name is one no rule can be written against, and `readDesk` asking for `select=*` makes it the only description of what comes back |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
-| each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers |
+| each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers. Held in BOTH directions: every flag `004` calls with is read, and every flag read is either scheduled in `004` or declared as a door a person opens, so a sense can no longer ship with no job behind it |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search — a disagreement is a 400 on every write, reported to a console nobody reads |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port of all six so she can reach them — the break-even band, the session names and all four sets of market hours are read out of both files, and so is the SHAPE of the three definitions that look identical in every ordinary case and part on one |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, and one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys` and two in `doji-eugenia` — every one stating `hourCycle: 'h23'`, because `hour12: false` leaves the choice to the locale and a locale resolving to h24 renders midnight as hour 24. Harmless in the two `hourIn` ports, where 24 fails `h < close` as 0 fails `h >= open`; wrong in `nyParts` and `nyWall`, which compare the hour against 17 and feed it to `Date.UTC` |
@@ -577,6 +633,17 @@ exists for. **Two files is what lets each one's statement be last in its own.**
 The listings are `diagnose.sql`, which you open when a row says false and the
 next question is which object, which grant, which schedule. A raise in there is
 not a fault; it is that file reporting an extension or a table that is absent.
+
+Its **last** listing is the one to run on an ordinary day: the three monitors in
+one grid, which is what a top-to-bottom run leaves on screen. `008` records
+whether the two silent writers are alive, `009` what pg_net sent and what came
+back, `010` how much of its worker clock a briefing spent — and until that
+listing existed a person wanting the answer had to know all three tables were
+there and read them one at a time. It adds no fourth definition of broken:
+`dispatch_failures` decides what a failed dispatch is and the listing calls it,
+`pace_line` decides what too slow is and the listing quotes it, and
+`sync_health` shows its mark and its age because the judgment there is
+`healthLine`'s and lives in TypeScript.
 
 A function in the database — `verify_doji()` — was the obvious fix and it is
 wrong twice over. It would put the expectations *inside* the thing being
@@ -1630,9 +1697,25 @@ remember it.
 
 **Every message she composes is read once more before it is sent, and for most of
 them that is new.** `CRITIC` ran on the briefing *alone*. The pulse, the release
-look and the move look went out unreviewed for their whole lives — which is most
-of what arrives in a week, and it is exactly where the writing rules were being
-ignored with nothing to answer for it.
+look, the move look and the reply went out unreviewed for their whole lives —
+which is most of what arrives in a week, and it is exactly where the writing
+rules were being ignored with nothing to answer for it.
+
+**The reply was the one with no argument behind it at all.** It was never
+exempted; it simply was not in the list the day the gate was written, and it is
+the busiest thing she sends. The case made for leaving it out afterwards was
+wrong twice over: `TRIM` reads `WRITING`, and `WRITING` is where *English,
+always, whatever he wrote in* lives — so the one path he writes Spanish on was
+the one path with nothing checking the rule written for it. It is gated INSIDE
+the typing indicator, because clearing the ping first leaves three silent
+seconds in which she reads as having finished and then said nothing.
+
+**And what is remembered is what the gate returned.** The three callers that
+gained a gate went on storing the DRAFT — a message he never read, filed as her
+own words and resent as history for six exchanges, which is the stale copy
+`remember` already refuses for the notes and the week's trades, arriving through
+the door the gate itself opened. The briefing never had that fault; it stored
+what `critique` returned from the day it existed.
 
 `TRIM` is that gate, and it is **not `CRITIC` with a shorter prompt**. The
 briefing's checks ask whether the first sentence is true only today, whether the
@@ -2994,11 +3077,15 @@ supabase secrets set STT_KEY=<key>
 supabase secrets set STT_MODEL=whisper-1     # optional, defaults to whisper-1
 ```
 
-`verify.sql` answers whether the six tables, the two triggers, the three
-policies and the `pg_trgm` extension are actually there, which is the half no
-test in the repository can reach. It also counts the cron jobs — a row that had
-been wrong since the spine was added, reporting a mismatch on a correct database,
-which is the worst thing a check can do.
+`verify.sql` answers whether every table, trigger, policy, index and function
+the numbered files declare is actually there, which is the half no test in the
+repository can reach — and what it asks about is derived from those files by
+`agree.test.mjs` rather than typed here, so a number in this paragraph would go
+stale on the release that adds a row while the file itself stayed right. Read
+the count in its own header and the `ok` column in its grid. Several of its
+rows have been wrong that way already: it counted the cron jobs a mismatch on a
+correct database from the day the spine was added, and it named three triggers
+on `trades` while five existed, which is the worst thing a check can do.
 
 ### Applying 006, which is two columns and one view
 
@@ -3947,6 +4034,7 @@ tidy.
 |---|---|
 | `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
+| `test/golden.test.mjs` | the snapshot, and the only suite that asserts on what nothing else NAMES: the real page booted against a fixed fixture set on a frozen clock, with every derived value and every panel's markup compared byte for byte against `test/golden.json`. The others test named things; a refactor breaks unnamed ones — an attribute order, a class that stopped being emitted, a label whose whitespace collapsed. Its fixtures earn their place by mutation rather than by looking realistic, and the one to keep in mind is the pair entered and closed in opposite orders, because an ordering rule proved by rows that cannot disagree is the audit's own blind spot. It also SWEEPS `Dates.session` across six windows around both US and both EU changeovers rather than sampling it, since New York and London do not change on the same date and a spot check in July gets the right answer under almost any mistake in those tables. Regenerate with `GOLDEN=write npm test`, deliberately, in the same commit as the behaviour change and never to make a red run go away — a golden file regenerated on failure costs what it always cost and proves nothing |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
 | `test/agree.test.mjs` | the facts that live in more than one file: the setups vocabulary across `index.html`, `doji-gladys` and `trades_setup_check`; the four journal columns across `Data.OWNED`, Gladys's `COLUMNS`, the schema, and both lists inside `trades_telegram_on_answer`; Eugenia's 200-character note limit across `writeNote`, the constraint and the tool description; every function name and project ref a caller uses, across the SQL, the Apps Script, `config.toml`, `index.html` and the deploy workflow; Eugenia's two note kinds across her tool and the check constraint; her five channels across `prompt.ts`, the tool's enum, the check constraint and the seed as ids, and §2's headings as the names she says out loud; the four rungs of the ladder across `prompt.ts`, the constraint and §0's table of what to do at each one; every function's `verify_jwt` stanza against the directory that holds it; every secret a function reads against the guard that refuses to start without it; `notesBlock()` against the seven paths that must call it and `channelsBlock()` against the six — the briefing, the pulse, a reply, the release look, the move look, and the nightly pass, which is the worst one to lose it from: without her notes she cannot see what she already holds, so she never supersedes and writes the same fact again every night; `positionsBlock()` against those five and the move look besides; the conversation window against the six paths that speak to him; and `TradeRow` against the column list the view actually serves; and `secretMatches`' own body, because the one property that matters about it is invisible to every assertion about its answer; and the hour cycle across every formatter in the repository that asks for an hour; every `net.http_post` in the numbered SQL against 009's ledger and its job constraint, so a dispatch site cannot be added unwatched, and both trigger sites for the exception guard that keeps a ledger failure from failing the journal write it fires inside; the nightly sweep and the channel census against `recordRun`, both outcomes each, since a meter that records only its successes reports a vendor refusing every night as a table with nothing in it; and every `§N` the prompts cite, resolved through `readStrategy` — a dotted one having to name a heading actually present in what came back, since the parent fallback answers a citation that does not exist with one that does; and every `uses:` across the three workflows, which must name a commit rather than a tag anyone could repoint |
 | `test/types.test.mjs` | the two questions a compiler settles and nothing else here can, asked of the Edge Functions and of the app's inline script as two separate programs: nothing uses a name declared nowhere, and nothing declares a name nothing uses. Deliberately not a whole typecheck — under Node's lib a `Uint8Array` is not a `BlobPart`, which is true here and false on Deno, and without `--strict` a discriminated union stops narrowing; both are facts about the invocation rather than the code. The two questions it does ask are pure scope facts and cannot go red for either reason. A file carrying one planted defect per question goes into every program on every run, so a clean answer is only reported once that reader has been seen to produce a dirty one. `Chart` and `XLSX` are declared for the app, being CDN globals nothing here owns, and each is held against the page still loading the script that provides it |

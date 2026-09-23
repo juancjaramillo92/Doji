@@ -1797,8 +1797,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
 const MAX_ROUNDS = 10;
 
 /* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
-   ifs because there are ten of them now and a reader should be able to
-   enumerate what she can do by looking at one list.
+   ifs because a reader should be able to enumerate what she can do by looking
+   at one list. It said "ten of them" while there were thirteen, which is why
+   the number is gone rather than corrected: prefer a name to a count, as the
+   triggers row in verify.sql already says.
 
    NOTHING HERE THROWS, which is the rule every handler below already follows
    individually and which this restates as a property of the whole surface: it
@@ -1836,10 +1838,14 @@ export async function serve(name: string, input: any): Promise<string> {
   }
 }
 
-/* `label` names the caller in the log line below and does nothing else. The
-   four jobs are not distinguishable from effort alone — the briefing and the
-   nightly pass both run high — and a cost line that cannot say which of them
-   spent the money is a cost line nobody can act on.
+/* `label` NAMES THE CALLER, and it no longer does only that: `eugenia_runs`
+   files the row under it and `modelFor` picks the model from it, so one string
+   decides what ran and what it is filed as. The callers are not distinguishable
+   from effort alone — the briefing and the nightly pass both run high — and a
+   cost line that cannot say which of them spent the money is a cost line nobody
+   can act on. It said "the four jobs" while there were twice that; a count in a
+   comment goes stale on the release that adds a caller, and nothing compares
+   it.
 
    Exported so a test can drive the loop itself against a stubbed `fetch`.
    Asserting on a comparison in isolation would prove the arithmetic and not
