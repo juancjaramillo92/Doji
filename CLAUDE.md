@@ -989,7 +989,8 @@ compounds.
   saying nothing. It is pure — rows in, verdicts out, no clock but the one passed
   in — which is what lets every rule be driven in BOTH directions from a test.
   `unknown` is never `pass`, and an empty population is `unknown`.
-  `agree.test.mjs` holds the eight against §7's table.
+  `fold.test.mjs` holds the eight against §7's table, reading the `Evaluable`
+  column out of the document rather than a list typed into the test.
 
   A VERDICT IS NOT THE WHOLE ANSWER, WHICH IS HOW R-10 HID A MISCOUNT FOR ITS
   WHOLE LIFE. It compared each span with the one BEFORE it in entry order, which
