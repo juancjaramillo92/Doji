@@ -331,6 +331,12 @@ inside its window, so a hard delete would be undone within two minutes. The
 poller never sends the column, so the flag survives every later write. That one
 boolean is the entire resurrection guard.
 
+`created_at` is when this row was first written — the moment the poller or the
+email parser first saw the position, which is not the moment it was opened.
+`entry_time` is that, and is the column every reading of the trade uses.
+Nothing reads `created_at` on `trades`; it is the audit floor under a table
+four writers share.
+
 `updated_at` is maintained by a trigger, not by call sites that each have to
 remember. Read it as "when the poller last touched this row", not "when this row
 last changed" — the poller re-upserts every position in its window on every run,

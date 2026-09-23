@@ -1714,6 +1714,56 @@ test('the documents name only symbols the repository has', () => {
 });
 
 
+/* ─── The Data model is a copy of the schema, and nothing compared it ────────
+   The README's Data model section is where a reader goes to learn what a trade
+   row holds, and it is the contract: four writers share this table and the
+   whole design rests on which of them owns which column. It was a hand-kept
+   list. Twenty of the twenty-four columns sat in its two tables, three more
+   in the Bookkeeping prose below them, and `created_at` was in none of the
+   three — documented nowhere on `trades`, while the word appears twice in the
+   README about HER tables, which is the way a gap hides in a long document.
+
+   BOTH DIRECTIONS. A column the schema has and the section never names is one
+   a reader building against this cannot know exists — and it is exactly the
+   new column, the one whose ownership has not been argued yet. A name the
+   section carries that the schema dropped sends them looking for something
+   gone. Read out of the SQL rather than listed here, so the column added next
+   year is covered on the day it is added.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the Data model names every column the trades table has, and no other', () => {
+  const schema = SCHEMA.slice(SCHEMA.indexOf('create table public.trades'));
+  const declared = schema.slice(0, schema.indexOf('\n);'))
+    .split('\n').map(l => (l.match(/^ {2}([a-z_]+)\s+[a-z]/) ?? [])[1])
+    .filter(c => c && c !== 'constraint');
+  const added = [...readFileSync(new URL('../supabase/006_plan.sql', import.meta.url), 'utf8')
+    .matchAll(/add column if not exists (\w+)/g)].map(m => m[1]);
+  const columns = [...new Set([...declared, ...added])];
+  assert.ok(columns.length >= 20,
+    `only ${columns.length} columns read out of the schema — the reader has gone blind`);
+
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const from = readme.indexOf('## Data model');
+  const to   = readme.indexOf('## What is derived');
+  assert.ok(from > -1 && to > from, 'the README has no Data model section to read');
+  const section = readme.slice(from, to);
+
+  const undocumented = columns.filter(c => !section.includes('`' + c + '`'));
+  assert.deepEqual(undocumented, [],
+    'the trades table has columns the Data model never names — a reader ' +
+    'building against this section cannot know they exist, and a new column ' +
+    'is exactly the one whose ownership has not been argued yet');
+
+  /* AND NOTHING NAMED THERE IS GONE. Only the two tables are read for this
+     half: the prose around them names columns of HER tables and of the view,
+     which are not this schema's to answer for. */
+  const rows = [...section.matchAll(/^\| `(\w+)`(?:, `(\w+)`)? \|/gm)]
+    .flatMap(m => m.slice(1)).filter(Boolean);
+  assert.ok(rows.length >= 15, `only ${rows.length} column rows parsed — the tables have moved`);
+  assert.deepEqual(rows.filter(c => !columns.includes(c)), [],
+    'the Data model tabulates a column the schema does not have');
+});
+
 /* ─── The Layout block is a copy of the tree, and nothing compared it ───────
    README.md opens with a listing of every file and what it is for. It is the
    first thing a cold session reads and the only place the repository is
