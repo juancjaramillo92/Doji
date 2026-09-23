@@ -112,9 +112,17 @@ export async function heartbeat(who: "poller" | "email", failure?: unknown) {
     ? { last_ok: new Date().toISOString() }
     : {
         last_error_at: new Date().toISOString(),
-        // The column takes 500; truncate here rather than let PostgREST refuse
-        // the row, since a refused heartbeat is a writer that reads as dead.
-        last_error: String(failure instanceof Error ? failure.message : failure).slice(0, 500),
+        /* BOTH ENDS OF THE COLUMN'S BOUND, because this guarded only one and
+           the constraint is `between 1 and 500`. Truncating stops PostgREST
+           refusing a long message; an EMPTY one was refused just the same —
+           `new Error()` carries `message === ""` — and the refusal takes
+           `last_error_at` with it, since they are one PATCH. So the failure
+           this line exists to record is the failure that vanishes, which is
+           the state it calls a writer that reads as dead. `healthLine` already
+           says "no detail recorded" for a mark it cannot explain; this is what
+           lets one be written. */
+        last_error: String(failure instanceof Error ? failure.message : failure)
+          .slice(0, 500) || "no detail",
       };
   try {
     await fetch(`${SB_URL}/rest/v1/sync_health?id=eq.${who}`, {

@@ -3675,6 +3675,39 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── The detail column is bounded at both ends ──────────────────────────────
+   008 constrains `last_error` to `between 1 and 500`, and heartbeat() guarded
+   only the upper bound. An empty message — `new Error()` carries one — violated
+   the lower one, PostgREST refused the row, and `last_error_at` went with it
+   because they are a single PATCH. So the one failure a writer most needs
+   recorded is the one that leaves no mark, which is the state the truncation
+   comment calls a writer that reads as dead.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('heartbeat cannot write a detail the column refuses', () => {
+  const health = readFileSync(
+    new URL('../supabase/008_sync_health.sql', import.meta.url), 'utf8');
+  const bound = health.match(/char_length\(last_error\) between (\d+) and (\d+)/);
+  assert.ok(bound, '008 no longer bounds last_error — the reader has gone blind');
+
+  const edge = readFileSync(
+    new URL('../supabase/functions/_shared/edge.ts', import.meta.url), 'utf8');
+  const at = edge.indexOf('export async function heartbeat(');
+  assert.ok(at > -1, '_shared no longer exports heartbeat()');
+  const body = edge.slice(at, edge.indexOf('\n}', at));
+
+  assert.match(body, new RegExp(`slice\\(0, ${bound[2]}\\)`),
+    `heartbeat does not truncate at ${bound[2]}, so a long message is refused ` +
+    `and the failure it was reporting leaves no mark at all`);
+
+  if (+bound[1] > 0) {
+    assert.match(body, /\|\| "no detail"/,
+      `008 refuses a last_error shorter than ${bound[1]} characters and heartbeat ` +
+      `can produce one — new Error() carries an empty message — so the PATCH is ` +
+      `refused and last_error_at is lost with it`);
+  }
+});
+
 /* ─── When a briefing has stopped being possible ─────────────────────────────
    010 reports an ABSENCE, and the hour it may first do so is the one thing that
    decides whether it is a monitor or a nuisance: asked while a retry is still

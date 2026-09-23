@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 571 tests, six suites
+npm test      # 572 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1650,6 +1650,17 @@ a blank.
   everything — a database without 008, a 404, a refused network — because a
   monitor that can fail the work it monitors is worse than none, and the poll
   folds its deals exactly as before.
+
+  AND THE DETAIL COLUMN IS BOUNDED AT BOTH ENDS WHERE THE WRITER GUARDED ONE.
+  008 constrains `last_error` to `between 1 and 500`; `heartbeat` truncated at
+  500 and said why — a refused heartbeat is a writer that reads as dead — and
+  an EMPTY message was refused by the same constraint. `new Error()` carries
+  one, and the refusal takes `last_error_at` with it because they are a single
+  PATCH, so the failure the line exists to record is the one that leaves no
+  mark. `healthLine` already reads `?? "no detail recorded"`; the write side
+  simply could not produce it. `agree.test.mjs` derives BOTH bounds out of 008
+  and holds the writer against them, so widening the column retires the guard
+  rather than stranding it.
 
   IT IS A HEARTBEAT AND NOT AN ALARM, which is why `last_ok` moves on SUCCESS.
   A failure-triggered message cannot fire when the failure is that nothing ran:
