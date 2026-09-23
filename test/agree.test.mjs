@@ -3052,6 +3052,25 @@ test('the README registers each bot for the updates its code actually handles', 
   }
 });
 
+/* THE THREE POLLER RETURNS THAT LEGITIMATELY MARK NOTHING, and no two of them
+   for the same reason — which is why they are written down rather than
+   inferred from their status code. The first two are not runs: a 503 at boot
+   has no credentials to mark WITH, and a 401 is somebody knocking. The third
+   is a run and still must not mark, which is the one worth reading twice: the
+   quote door is reached every quarter hour by the price job, so a mark there
+   would keep `last_ok` fresh while the two-minute poll sat dead — the monitor
+   reporting health it read off a different job. */
+const UNMARKED = {
+  'not configured':
+    'the boot guard: no broker credentials loaded, so there is nothing to poll ' +
+    'and nothing the mark could truthfully say',
+  'unauthorized':
+    'a caller without the cron secret — a knock at the door rather than a run',
+  'symbol: SYMBOL_IDS[0]':
+    'the quote door, which is a different job on the same function: marking it ' +
+    'would let the quarter-hourly price read hold last_ok open over a dead poll',
+};
+
 /* ─── Both silent writers leave a mark, on both paths ────────────────────────
    The poller and the email function are the two writers with no voice: their
    failures reach console.error and a response pg_net discards. `sync_health` is
@@ -3142,13 +3161,42 @@ test('the two writers with no voice record both outcomes', () => {
 
        A monitor that is wrong on an ordinary day gets ignored, and an ignored
        monitor is worse than none. `healthLine` is pure and cannot see this —
-       it is handed rows — so the call site is read here instead. */
+       it is handed rows — so the call sites are read here instead.
+
+       THE PATHS ARE DERIVED AND THE SILENT ONES ARE DECLARED, which is the
+       half this check was missing: it read ONE early return by name, so the
+       second one to arrive unmarked would have been invisible in exactly the
+       way the first was. Three paths legitimately mark nothing and no two of
+       them for the same reason, so the reasons are written down rather than
+       inferred — an exemption is a row with a reason in it, never an absence. */
     if (fn === 'doji-mcp-sync') {
-      const at = code.indexOf('skipped: "market closed"');
-      assert.ok(at > -1, 'doji-mcp-sync no longer skips a closed market');
-      assert.match(code.slice(Math.max(0, at - 600), at), /await heartbeat\("poller"\)/,
-        'the market-closed return does not mark a completed run, so the poller ' +
-        'reads as dead across every weekend');
+      const returns = [...code.matchAll(/return json\([^;]*\);/g)];
+      assert.ok(returns.length >= 5,
+        `only ${returns.length} return paths found in ${fn} — the reader has gone blind`);
+
+      let from = 0;
+      const used = new Set();
+      for (const r of returns) {
+        const marked = /await heartbeat\("poller"/.test(code.slice(from, r.index));
+        from = r.index + r[0].length;
+        if (marked) continue;
+
+        const why = Object.keys(UNMARKED).find(k => r[0].includes(k));
+        assert.ok(why,
+          `${fn} returns \`${r[0].replace(/\s+/g, ' ').slice(0, 70)}…\` with no ` +
+          `heartbeat of its own behind it and no reason written down — a run that ` +
+          `completes without marking freezes the mark, and a frozen mark is how a ` +
+          `healthy writer comes to read as dead`);
+        used.add(why);
+      }
+
+      // AND NO REASON OUTLIVES ITS PATH, for the doors' reason: a sentence left
+      // behind excuses the next return that happens to carry those words.
+      for (const k of Object.keys(UNMARKED)) {
+        assert.ok(used.has(k),
+          `UNMARKED explains the '${k}' return of the poller and either it now ` +
+          `marks or it is gone — a stale exemption is one the next path inherits`);
+      }
     }
 
     /* And it must be a name the table both ACCEPTS and SEEDS. Asked of the

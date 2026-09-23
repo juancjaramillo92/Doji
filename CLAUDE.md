@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 578 tests, six suites
+npm test      # 579 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1236,6 +1236,21 @@ compounds.
   declaration, so a new thing that sends him something fails the suite until
   someone writes down what gate it runs and what text it carries. An exemption
   is a row with a reason in it, never an absence.
+
+  AND IT IS THE SHAPE RATHER THAN THE SUBJECT, which is why four more families
+  are censused the same way now. A read of a growing table — derived through
+  `readRows` and every `…Query()` builder it is handed, since `select=` is a
+  spelling and not what makes a path a read. A query flag `postScheduled`
+  reads — 004 answers for the scheduled ones and a declared list says which
+  are a person's repair doors. A return path in the poller — three may leave
+  `sync_health` alone and each says why, every other one must mark. A tool
+  `serve` dispatches — each is driven against four kinds of refusing database.
+  All four were ALREADY checked, one member at a time or one member by name,
+  and each could have lost a member in silence. **Ask of any check whether it
+  would notice a new sibling arriving beside its subject**, and the answer is a
+  census or it is no. The declarations they compare against live in
+  `agree.test.mjs`, the one file the symbol check cannot read — it quotes
+  these documents, so reading it would make every name in them resolve.
 
   `gate` HOLDS THE HALF THAT MAKES EITHER ONE SAFE: a revision failing
   `keepDraft` is overruled and a gate that THROWS costs nothing. Copied, that

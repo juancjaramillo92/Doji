@@ -4307,6 +4307,41 @@ const TOOL_CALLS = [
   ['close_loop',    { id: 1, resolution: 'answered' }],
 ];
 
+/* AND THE LIST IS HELD AGAINST THE SWITCH, because a list typed by hand is a
+   family that can quietly lose a member. Thirteen tools are driven here
+   against four refusals; a fourteenth added to `serve` and not added above
+   would be undriven, and this test would go on passing — which is the same
+   fault as a path with no heartbeat and a door with no cron job, arriving in
+   the one place that thought it was exhaustive. The names are resolved through
+   the `*_TOOL` constants rather than read off the `case` labels, because a
+   case names a constant and it is the constant that carries the string the
+   model actually sends. */
+test('every tool serve() dispatches is one this suite drives', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('export async function serve(');
+  assert.ok(at > -1, 'doji-eugenia no longer exports serve()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  const cases = [...body.matchAll(/case (\w+)\.name:/g)].map(m => m[1]);
+  assert.ok(cases.length >= 10,
+    `only ${cases.length} tool cases read out of serve() — the reader has gone blind`);
+
+  const dispatched = cases.map(constant => {
+    const decl = src.indexOf(`const ${constant} = {`);
+    assert.ok(decl > -1, `serve() dispatches ${constant}, which is declared nowhere`);
+    const name = src.slice(decl).match(/name:\s*"([^"]+)"/);
+    assert.ok(name, `${constant} carries no name for the model to call it by`);
+    return name[1];
+  });
+
+  const driven = TOOL_CALLS.map(([name]) => name);
+  assert.deepEqual([...dispatched].sort(), [...driven].sort(),
+    'the tools serve() dispatches and the tools this suite drives have parted — ' +
+    'a tool missing from TOOL_CALLS is never once run against a database that ' +
+    'refuses, which is the one property no reading of its source can settle');
+});
+
 const REFUSALS = {
   'a network that is not there': () => { throw new TypeError('fetch failed'); },
   'a 500':        () => new Response('upstream is unwell', { status: 500 }),
