@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 562 tests, six suites
+npm test      # 565 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -309,6 +309,26 @@ fixable one: it captures `innerHTML`, which is the DOM re-serialised, so `"` and
   all three callers, with the window sentence inside it rather than beside it,
   because a quote said three ways is three chances to print `change` without
   saying what it changed from.
+
+  AND A TYPE THAT LIED DEFEATED THE ONE GUARD THE DESIGN DESCRIBES. `foldSpot`
+  yields null rather than NaN for a price that will not parse, and says in its
+  own comment that a null is something the caller must handle — then declared
+  `prev_close` and `change` as `number` and forced them through with
+  `as number`, with `marketQuote` casting a second time on the far side. So the
+  state the function goes out of its way to produce was invisible to every
+  caller and to `tsc`, and `quoteLine` read it exactly as the comment says it
+  must not: `${null}` is the text "null", `null >= 0` is TRUE, and
+  `Math.abs(null)` is 0. A broker read with no `sessionClose` opened his
+  briefing with *against a previous close of null — up 0 since it* — both
+  halves of a confident sentence about the market, wrong. The bid and the range
+  are still worth having, so the MOVE goes rather than the quote, and she is
+  told not to reconstruct it. `change_pct` was deleted rather than made honest:
+  it crossed the wire, sat in two interfaces and was asserted in tests, and
+  nothing had ever read it.
+
+  `quoteLine` HAD NEVER BEEN EXECUTED BY A TEST, only read for a substring —
+  which is how a line every briefing opens on carried that for its whole life.
+  Both branches are driven now.
 
   AND THE WINDOW IS INSIDE THAT RENDERING RATHER THAN BESIDE IT. `high`, `low`,
   `prev_close` and `change` are all measured from the BROKER'S session open,

@@ -357,10 +357,21 @@ export const fromPipettes = (n: number) => Math.round(n / PIPETTES * 100) / 100;
    Pure, and exported, because it is the decision: a scale applied twice or not
    at all is invisible in the output and catastrophic in a briefing. A price
    that will not parse yields null rather than NaN — `NaN` formats as "NaN" and
-   would reach him as text, where a null is something the caller must handle. */
+   would reach him as text, where a null is something the caller must handle.
+
+   AND THE TYPE HAS TO ADMIT THE NULL OR NOTHING HANDLES IT. `prev_close` and
+   `change` were declared `number` and forced through with `as number`, so the
+   one state this function goes out of its way to produce was invisible to
+   every caller and to `tsc`. `quoteLine` read it exactly as the comment above
+   says it must not: `${null}` is the text "null", `null >= 0` is TRUE, and
+   `Math.abs(null)` is 0 — so a missing `sessionClose` opened his briefing with
+   "against a previous close of null — up 0 since it". A confident sentence
+   about the market, wrong in both halves.
+
+   `change_pct` is gone rather than made honest: nothing has ever read it. */
 export interface Spot {
   bid: number; ask: number; high: number; low: number;
-  prev_close: number; change: number; change_pct: number; at: string;
+  prev_close: number | null; change: number | null; at: string;
 }
 
 export function foldSpot(price: any): Spot | null {
@@ -378,10 +389,8 @@ export function foldSpot(price: any): Spot | null {
 
   return {
     bid, ask, high: at('high') ?? bid, low: at('low') ?? bid,
-    prev_close: prev as number,
-    change: change as number,
-    change_pct: change === null || !prev ? (null as any)
-      : Math.round(change / prev * 10000) / 100,
+    prev_close: prev,
+    change,
     at: new Date(Number(price?.timestamp) || Date.now()).toISOString(),
   };
 }

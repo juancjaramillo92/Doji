@@ -1256,7 +1256,7 @@ const MARKET_TOOL = {
    here is a display price — see the poller, where that asymmetry is named. */
 export interface Quote {
   bid: number; ask: number; high: number; low: number;
-  prev_close: number; change: number; change_pct: number; at: string;
+  prev_close: number | null; change: number | null; at: string;
 }
 
 /* THE NUMBERS, AND NULL WHERE THERE ARE NONE. Two callers want two different
@@ -1319,10 +1319,21 @@ export function quoteWindow(now: Date): string {
    reason: a bare field name in a blob is read as whatever it sounds like, and
    `change` sounds like the day. */
 export function quoteLine(q: Quote, now: Date): string {
+  /* THE BROKER MAY NOT REPORT A PREVIOUS CLOSE, and this is where that used to
+     become a sentence. `prev_close` was typed `number` and arrived null, so the
+     template printed the word "null", `null >= 0` chose "up", and
+     `Math.abs(null)` gave 0 — "against a previous close of null — up 0 since
+     it". Neither half true, in the line the briefing opens on. The bid and the
+     range are still worth having, so the move is what goes rather than the
+     quote, and she is told not to reconstruct it. */
+  const since = q.prev_close === null || q.change === null
+    ? `. The broker reported no previous close on this read, so there is no ` +
+      `move to state and you may not infer one.`
+    : ` against a previous close of ${q.prev_close} — ` +
+      `${q.change >= 0 ? "up" : "down"} ${Math.abs(q.change)} since it.`;
+
   return `Gold, read off his own broker: bid ${q.bid}, ask ${q.ask}. The session ` +
-    `has traded ${q.low} to ${q.high} against a previous close of ${q.prev_close} — ` +
-    `${q.change >= 0 ? "up" : "down"} ${Math.abs(q.change)} since it. ` +
-    quoteWindow(now);
+    `has traded ${q.low} to ${q.high}${since} ` + quoteWindow(now);
 }
 
 // Said rather than served empty, on both paths that can meet it: a briefing

@@ -44,7 +44,7 @@ import {
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
-  quoteWindow, ROLL_HOUR,
+  quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
@@ -3268,8 +3268,46 @@ test('the overnight move comes out of the same call as the price', () => {
   assert.equal(spot.low, 4381.13);
   assert.equal(spot.prev_close, 4387.96);
   assert.equal(spot.change, 31.86);
-  assert.equal(spot.change_pct, 0.73);
   assert.equal(spot.at, new Date(1788404105346).toISOString());
+});
+
+test('a quote with no previous close states no move rather than inventing one', () => {
+  /* THE LINE THE BRIEFING OPENS ON, AND IT HAD NEVER BEEN EXECUTED BY A TEST —
+     only read for a substring. `prev_close` and `change` were typed `number`
+     and forced through with `as number`, so the null `foldSpot` goes out of its
+     way to produce was invisible to every caller. In the template it became
+     text: `${null}` is "null", `null >= 0` is TRUE so the word chosen is "up",
+     and `Math.abs(null)` is 0. Both halves of a confident sentence about the
+     market, wrong, in the one figure he checks against his own screen. */
+  const blind = { bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
+                  prev_close: null, change: null, at: '2026-09-03T12:15:05.346Z' };
+  const said = quoteLine(blind, new Date('2026-09-03T12:15:05Z'));
+
+  assert.doesNotMatch(said, /\bnull\b/,
+    'the quote prints the word "null" at him — the type said the field could ' +
+    'not be null and the broker disagreed');
+  assert.doesNotMatch(said, /\b(up|down) 0\b/,
+    'a missing previous close reads as a flat session, which is a claim that ' +
+    'nothing moved rather than an absence of information');
+  assert.match(said, /bid 4419\.82/, 'the bid is still worth having');
+  assert.match(said, /4381\.13 to 4420\.14|4381\.13/, 'the range is still worth having');
+  assert.match(said, /no previous close/i, 'she is not told why there is no move');
+});
+
+test('a quote with a previous close still states the move', () => {
+  const said = quoteLine(
+    { bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
+      prev_close: 4387.96, change: 31.86, at: '2026-09-03T12:15:05.346Z' },
+    new Date('2026-09-03T12:15:05Z'));
+  assert.match(said, /previous close of 4387\.96/);
+  assert.match(said, /up 31\.86 since it/);
+});
+
+test('foldSpot leaves both halves of the move null when the close is unreadable', () => {
+  const out = foldSpot({ bid: 441982000, ask: 441993000, timestamp: 1788404105346 });
+  assert.equal(out.prev_close, null, 'an unreadable sessionClose must not become a number');
+  assert.equal(out.change, null, 'a change measured from nothing is not a change');
+  assert.equal(out.bid, 4419.82, 'the bid is unaffected');
 });
 
 test('a price that will not parse is null rather than NaN', () => {
@@ -3379,7 +3417,7 @@ test('every open position with a plan is filed, not just the first', () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 const QUOTE = {                            // the SPOT capture, after foldSpot
   bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
-  prev_close: 4387.96, change: 31.86, change_pct: 0.73,
+  prev_close: 4387.96, change: 31.86,
   at: '2026-09-03T12:15:05.346Z',
 };
 const LOOKED = Date.parse('2026-09-03T12:15:30Z');
@@ -3491,7 +3529,7 @@ test('a move small against the day range is the day, not an event', () => {
 // The session as she described it at 20:57: 4,485 the top, and a range that
 // began at the 17:00 roll rather than at the day's low near 4,440.
 const EVENING = { ...QUOTE, bid: 4485, high: 4485, low: 4467, prev_close: 4473,
-                  change: 12, change_pct: 0.27 };
+                  change: 12 };
 
 test('the $7 evening drift that reached him does not clear the gates now', () => {
   const out = moveWorth(EVENING, { ...MARK, bid: 4478 }, LOOKED);
