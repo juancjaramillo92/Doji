@@ -3082,6 +3082,20 @@ test('the two writers with no voice record both outcomes', () => {
         }
         from = r.index + r[0].length;
       }
+
+      /* AND THE ONE MARK THAT IS CONDITIONAL STAYS NARROW. `testSecret()` in
+         doji_gmail_sync.gs posts `{}` deliberately — a body this function
+         cannot accept, so a 400 proves the secret was taken — and marking that
+         would report a healthy sync as broken every time a person ran the
+         diagnostic. The carve-out is a body with no `id`, which `parseAlert_`
+         cannot produce; widened to anything else it swallows the finding the
+         mark exists for. */
+      assert.match(code, /const probe = !body \|\| typeof body !== "object" \|\| !\("id" in body\);/,
+        `${fn}'s probe test is no longer exactly "the body carries no id" — a ` +
+        `wider one stops marking fills that really were discarded`);
+      assert.match(code, /if \(!probe\) await heartbeat\("email",/,
+        `${fn} marks unconditionally on the refusal path, so running testSecret() ` +
+        `reports a working sync as a failing one`);
     }
 
     /* AND EVERY PATH THAT COMPLETES MUST MARK, NOT ONLY THE LAST ONE. The

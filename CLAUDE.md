@@ -1674,6 +1674,17 @@ a blank.
   heartbeat deleted, one borrowing the mark above it and one spanning the 500
   path's.
 
+  AND THE FIX FOR THAT CARRIED A THIRD FALSE ALARM IN IT, FOUND BY READING THE
+  CALLER. `testSecret()` in `doji_gmail_sync.gs` posts `{}` ON PURPOSE — a body
+  the function cannot accept, so a 400 proves the secret was taken and a 401
+  proves it was not, and nothing is written either way. Marking that refusal
+  reported a healthy sync as broken every time a person ran the diagnostic,
+  which is the ordinary-day false alarm this section is about, arriving inside
+  the repair for a different one. A body with no `id` is a PROBE and never was
+  a fill — `parseAlert_` cannot produce one without it — so that is the carve-
+  out, and `agree.test.mjs` reads its exact shape: widened to anything else it
+  swallows the finding the mark exists for.
+
   THE TWO FALSE ALARMS ARE THE WHOLE RISK, and both are ordinary days rather
   than edge cases. EVERY path that completes must mark: the poller's
   market-closed skip is a completed run, and unmarked it freezes the mark across

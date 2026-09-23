@@ -192,11 +192,21 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: "body is not JSON" }, 400);
   }
 
+  /* A BODY CARRYING NO `id` IS A PROBE AND NEVER WAS A FILL. `testSecret()` in
+     doji_gmail_sync.gs posts `{}` on purpose — a body this function cannot
+     accept, so a 400 proves the secret was taken and a 401 proves it was not,
+     and nothing is written either way. Marking that as a failure would report
+     a healthy sync as broken every time a person ran the diagnostic, which is
+     the ordinary-day false alarm every monitor here has to survive.
+
+     `parseAlert_` cannot produce a fill without one, so an `id` is what
+     separates a parsed fill being discarded from a caller knocking. */
   const fill = emailRow(body, USER_ID);
   if ("error" in fill) {
     console.error("doji-email-sync: refused —", fill.error);
-    await heartbeat("email", `refused, the fill is lost: ${fill.error}`);
-    return json({ ok: false, error: fill.error }, 400);
+    const probe = !body || typeof body !== "object" || !("id" in body);
+    if (!probe) await heartbeat("email", `refused, the fill is lost: ${fill.error}`);
+    return json({ ok: false, error: fill.error, probe }, 400);
   }
 
   let res: Response;
