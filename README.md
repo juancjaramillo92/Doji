@@ -129,36 +129,6 @@ it.
       └──────────────┘
 ```
 
-Four writers, one table. Journal columns and broker columns never meet, so
-between the journal half and the broker half there is nothing to arbitrate at
-all — that is the single idea the whole design rests on. Gladys is a writer on
-the journal side, the app's side, and reaches the same four columns through the
-same list.
-
-Every writer but the app is an Edge Function deployed from `main`. The email
-parser used to be the exception — it signed in as the trader from Apps Script,
-with the account password in Script Properties — and now posts its fill to
-`doji-email-sync` instead. See **The email parser**.
-
-**Two columns have two claimants, and they are arbitrated differently.**
-
-`balance` is settled by a filter rather than by a rule anybody has to remember:
-the poller writes it only `where balance is null`, and Postgres evaluates that
-inside the UPDATE, so an email landing mid-run cannot lose a race — there is no
-read to race with. The email's figure is the balance the broker itself printed
-on the fill, so it is the better number and it always wins; the poller fills
-only the gap the email leaves, which is every manually closed trade.
-
-`direction` has no filter at all: last write wins. The poller re-upserts every
-position inside its six-hour write window, so the poller's reading wins for
-anything it can see, and the email's survives only on a position the poller
-never reached. That is safe for one reason and it is worth stating rather than
-trusting — **both sources read the side off the OPENING deal**, so they agree by
-construction. If either ever started reading it off a close, this column would
-disagree with itself depending on how old the trade was.
-
-Nothing else is shared. `id` is the join, not a value.
-
 **And the other half has no write path into any of it.** Eugenia reads the
 journal through `eugenia_trades`, a view granted `select` alone, and writes only
 tables of her own. She is woken by three things and never by a clock she keeps
@@ -192,6 +162,36 @@ firing the moment a position opens or closes.
                       │                  │  text as the fallback
                       └──────────────────┘
 ```
+
+Four writers, one table. Journal columns and broker columns never meet, so
+between the journal half and the broker half there is nothing to arbitrate at
+all — that is the single idea the whole design rests on. Gladys is a writer on
+the journal side, the app's side, and reaches the same four columns through the
+same list.
+
+Every writer but the app is an Edge Function deployed from `main`. The email
+parser used to be the exception — it signed in as the trader from Apps Script,
+with the account password in Script Properties — and now posts its fill to
+`doji-email-sync` instead. See **The email parser**.
+
+**Two columns have two claimants, and they are arbitrated differently.**
+
+`balance` is settled by a filter rather than by a rule anybody has to remember:
+the poller writes it only `where balance is null`, and Postgres evaluates that
+inside the UPDATE, so an email landing mid-run cannot lose a race — there is no
+read to race with. The email's figure is the balance the broker itself printed
+on the fill, so it is the better number and it always wins; the poller fills
+only the gap the email leaves, which is every manually closed trade.
+
+`direction` has no filter at all: last write wins. The poller re-upserts every
+position inside its six-hour write window, so the poller's reading wins for
+anything it can see, and the email's survives only on a position the poller
+never reached. That is safe for one reason and it is worth stating rather than
+trusting — **both sources read the side off the OPENING deal**, so they agree by
+construction. If either ever started reading it off a close, this column would
+disagree with itself depending on how old the trade was.
+
+Nothing else is shared. `id` is the join, not a value.
 
 She would be the fifth writer to `trades` and is deliberately not one: a
 document that decides whether he followed his rules cannot be edited by the

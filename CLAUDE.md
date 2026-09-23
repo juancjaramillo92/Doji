@@ -829,12 +829,11 @@ compounds.
   `CHANNEL_TOOL`'s description, the CONSOLIDATE prompt, and §0; the prompt is the
   one whose absence is silent, so `agree.test.mjs` reads it.
 
-- **`unseen` IS UNREACHABLE BY ANY OF IT**, guarded in `setChannel` before the
-  write. That rung says a channel has never once come up — history, not
-  understanding — and a demotion able to write it would report a channel she
-  taught last week as one he has never met, which is the census saying the
-  opposite of the truth in the one column it exists for. A channel he has lost
-  goes to `explained`.
+- **`unseen` IS UNREACHABLE BY ANY OF IT**, and the guard belongs in
+  `setChannel` rather than at a call site, because every writer of a rung goes
+  through it. A channel he has lost goes to `explained`; the README says what
+  that rung means and why writing it back is the census stating the opposite of
+  the truth.
 
 ### What she is handed about his desk
 
@@ -1178,29 +1177,22 @@ compounds.
   functions because `sweepLine` is pure and cannot see whether anyone wrote its
   answer down.
 
-  AND BOTH SHIPPED BEHIND AN EARLY RETURN, WHICH IS THE FAILURE THEY EXIST TO
-  END ARRIVING INSIDE THE FIX FOR IT. `postConsolidation` returns at once on a
-  day nobody spoke, and the two meters sat after that return — so on exactly the
-  nights when nothing else happens, neither ran. Quiet nights are ordinary: two
-  of the four before this was found were `nothing said`, and a dead embedding
-  vendor could have survived all of them with the meter reporting nothing at
-  all. The quiet day is a BRANCH now and the meters sit past it, and what
-  `agree.test.mjs` asserts is that `postConsolidation` has exactly ONE `return`:
-  the branch shape will change, a second return is what puts the hole back. The
-  census may NOT be hoisted to the top to solve it — it is taken after the pass
-  because the pass is the only thing that can move a rung, and a test holds that
-  ordering too.
+  AND BOTH SHIPPED BEHIND AN EARLY RETURN, which the README tells as the
+  failure they exist to end arriving inside the fix for it. TWO RULES COME OUT
+  OF IT AND BOTH BIND CODE. `postConsolidation` may have exactly ONE `return` —
+  the branch shape will change and a second return is what puts the hole back,
+  so `agree.test.mjs` counts them rather than reading where the meters sit. And
+  the census may NOT be hoisted to the top to solve it: it is taken after the
+  pass because the pass is the only thing that can move a rung, and a test holds
+  that ordering too.
 
-  AND A JOB THAT DIES BEFORE ITS FIRST MODEL CALL LEAVES A ROW TOO. `ask()`
-  records a failed turn, so the table could answer *how often does a model call
-  die* and could say NOTHING about a job that never reached one — two
-  consolidations threw in `turnsSince` one line into `postConsolidation`,
-  apologised on two consecutive nights, and left no row on either, so the table
-  read as a system with nothing to do. `postScheduled`'s catch writes
-  `caller: '<job> job'` — the apology's vocabulary, suffixed so it cannot be
-  confused with an `ask()` label — BEFORE the apology, because that send carries
-  `.catch(() => {})` and a Telegram that is refusing would otherwise take the
-  only notice with it. `agree.test.mjs` reads the order, not just the call.
+  AND A JOB THAT DIES BEFORE ITS FIRST MODEL CALL LEAVES A ROW TOO — the
+  README carries the two nights that proved it. THE ORDER IS THE PART TO KEEP:
+  `postScheduled`'s catch writes its row BEFORE the apology, because that send
+  carries `.catch(() => {})` and a Telegram that is refusing would otherwise
+  take the only notice with it. `caller` is `'<job> job'`, the apology's own
+  vocabulary suffixed so it cannot be confused with an `ask()` label, and
+  `agree.test.mjs` reads the order rather than just the call.
 
   `sweepLine` PARTS THREE REPAIRS AND THE THIRD IS THE FALSE ALARM. A refusing
   vendor throws and arrives as its own message; an unset key does NOT throw —
@@ -1216,20 +1208,15 @@ compounds.
   reading her and finding her hard. The writing rules were live and global on
   those paths and nothing had to answer for them.
 
-  `TRIM` is that gate and it is NOT `CRITIC` with a shorter prompt. The
-  briefing's checks ask whether the first sentence is true only today, whether
-  the chain is complete in the paragraph that matters, whether there is more
-  than one chain and whether it runs to 250–300 words. Every one is a question
-  about a briefing; asked of three sentences they demand a chain, complain about
-  length and rewrite a good message into a bad one. `TRIM` asks the writing
-  questions and nothing else, off the same `WRITING` the writer was given, and
-  is handed no notes and no channel map because it is not judging whether a term
-  was built. It runs on Sonnet: checking a message against a stated rule is the
-  bounded half of the split the models are chosen on.
+  `TRIM` IS NOT `CRITIC` WITH A SHORTER PROMPT, and the README says why each
+  of the briefing's four checks would ruin three sentences. What constrains code
+  here: `TRIM` reads the same `WRITING` the writer was given rather than a copy,
+  it is handed no notes and no channel map, and it runs on Sonnet because
+  checking a message against a stated rule is the bounded half of the split the
+  models are chosen on.
 
-  THE TRADE EVENT STAYS OUT. Both its branches are decided from data before any
-  model call and what it says is one of his own rules read back — there is no
-  composed prose to trim.
+  THE TRADE EVENT STAYS OUT, and the `SENDS` census carries the reason as a
+  row rather than as an absence: there is no composed prose to trim.
 
   THE REPLY WAS OUT AND HAD NO ARGUMENT BEHIND IT, WHICH IS THE POINT. It was
   never exempted; it was simply not in the list the day the gate was written,
@@ -1277,16 +1264,14 @@ compounds.
   `agree.test.mjs`, the one file the symbol check cannot read — it quotes
   these documents, so reading it would make every name in them resolve.
 
-  `gate` HOLDS THE HALF THAT MAKES EITHER ONE SAFE: a revision failing
-  `keepDraft` is overruled and a gate that THROWS costs nothing. Copied, that
-  catch is where one gate loses the message it was checking on the day a vendor
-  is slow.
+  `gate` IS ONE FUNCTION AND MUST STAY ONE. Its catch is what makes both gates
+  safe; copied, that catch is where one of them loses the message it was
+  checking on the day a vendor is slow. The README says why.
 
-  AND `keepDraft` IS RELATIVE NOW. A flat four hundred characters is a
-  BRIEFING's floor — shorter than that and what came back was an apology. A
-  release look is two or three sentences and often under four hundred to begin
-  with, so that floor overrules every revision there is, and a gate overruled
-  every time looks exactly like a gate that agreed with the draft.
+  AND `keepDraft` IS RELATIVE TO THE DRAFT, never a flat length — the README
+  has the arithmetic. A gate overruled every time looks exactly like a gate that
+  agreed with the draft, which is the shape to check before putting any absolute
+  number back.
 
 - **The briefing's own gate.** `CRITIC`, medium effort,
   no tools — and the empty array is the CHEAPER of the two as well as the
@@ -1421,13 +1406,12 @@ compounds.
   limit, and any future move is ONE caller at a time with `rounds` read
   afterwards.
 
-  `trim` STAYS ON SONNET AND THE DISTINCTION IS THE WHOLE OF WHY: it is handed
-  `CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it
-  cannot reach the cap whatever a model's appetite for rounds. That is the shape
-  a cheaper model is safe on here, and `agree.test.mjs` RESOLVES the array each
-  Sonnet caller is handed rather than reading what sits near it, because a label
-  reaches `ask` two ways and a reader that knew only one would pass the next
-  tool-heavy caller wired through `gate`.
+  `trim` STAYS ON SONNET because it is handed an EMPTY tool array and so cannot
+  reach the cap — that is the shape a cheaper model is safe on here, and the
+  README says why the others were moved back. `agree.test.mjs` RESOLVES the
+  array each Sonnet caller is handed rather than reading what sits near it: a
+  label reaches `ask` two ways, and a reader that knew only one would pass the
+  next tool-heavy caller wired through `gate`.
 
   THE CRITIC IS THE ONE THAT LOOKS LIKE IT SHOULD MOVE AND DOES NOT: about $3.50
   a month, and it runs LAST, it can rewrite, and it is the final gate on the
@@ -1794,11 +1778,10 @@ a blank.
   that same function to send a message would share the failure mode of its
   subject. So this one posts to Telegram directly.
 
-  `net.http_post` RETURNS the request id and all six callers threw it away. That
-  id is the only link to the response row, which carries NO URL — so what a
-  failed request was for is unrecoverable without capturing it. The ledger is
-  that capture, and `agree.test.mjs` counts `net.http_post` calls against ledger
-  rows so a seventh site cannot be added unwatched.
+  EVERY `net.http_post` CAPTURES ITS REQUEST ID INTO THE LEDGER — that id is
+  the only link to the response row, which carries no URL, so an uncaptured
+  dispatch is a failure nobody can attribute afterwards. `agree.test.mjs` counts
+  the calls against ledger rows, so a seventh site cannot be added unwatched.
 
   **A SINGLE LOST POLL IS AN ORDINARY DAY AND MUST NOT BE REPORTED.** The poller
   runs 720 times a day with the next one two minutes away; naming every refused
@@ -1834,16 +1817,16 @@ a blank.
   its own. `agree.test.mjs` reads both readers for `dispatch_bad` and refuses a
   gate that names `dispatch_failures` or the response table.
 
-  **THE LEDGER MAY NOT BREAK THE TRIGGER IT SITS IN.** Both trigger sites post
-  into a variable FIRST and record it behind `exception when others then null`,
-  because they fire inside the UPDATE that set the column — a raise there fails
-  the journal write itself. Proved by renaming the table away and watching the
-  trade still write and all four messages still dispatch.
+  **THE LEDGER MAY NOT BREAK THE TRIGGER IT SITS IN.** Post into a variable
+  first, record it behind `exception when others then null`, and never inline
+  the post into the insert — these fire inside the UPDATE that set the column,
+  so a raise there fails the journal write itself. `agree.test.mjs` reads both
+  sites for that shape.
 
-  The window has BOTH ends. Judged at fifteen minutes so a slow call is not
-  called dead, and not at all past three hours, because pg_net's own pruning
-  makes every old row read as `no answer` — which on the day the watcher itself
-  stopped would come back as a hundred invented failures.
+  The window has BOTH ends, fifteen minutes and three hours, and neither may
+  be dropped: pg_net's own pruning makes every older row read as `no answer`, so
+  an unbounded far end invents a hundred failures on the one day the watcher
+  itself stopped.
 
   **AND ITS OWN REPORT CAN BE LOST, WHICH THE FIRST ONE EVER SENT WAS.** pg_net
   answered `timed_out` with the whole twenty-second budget spent in the TCP/SSL
