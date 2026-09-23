@@ -93,6 +93,30 @@ alter table public.dispatch enable row level security;
 -- and judges at fifteen, so nothing reaches three hours in the ordinary case;
 -- the bound only matters on the day the watcher itself stopped, which is
 -- exactly the day it must not come back with a hundred invented failures.
+/* ONE DEFINITION OF A FAILED DISPATCH, AND IT IS ASKED IN TWO PLACES.
+   `dispatch_failures` selects them and the repeat gate counts them, and while
+   the predicate was written out twice the second copy was narrower: it tested
+   only `no response row` or `a non-2xx status`, so a request that TIMED OUT —
+   a row with a null status_code and `timed_out` set — counted as zero, and a
+   timing-out poller could never reach the three that let it be reported.
+
+   A missing response row is a failure, which is why this is `not exists` over
+   the successes rather than `exists` over the failures: there is nothing to
+   match against when pg_net has not answered at all. A null `timed_out` is
+   read as timed out, because an unknown outcome is not a success. */
+create or replace function public.dispatch_bad(req bigint)
+returns boolean
+language sql
+stable
+as $$
+  select not exists (
+    select 1 from net._http_response r
+     where r.id = req
+       and not coalesce(r.timed_out, true)
+       and r.error_msg is null
+       and r.status_code between 200 and 299);
+$$;
+
 create or replace function public.dispatch_failures(now_ timestamptz default now())
 returns table (id bigint, job text, at timestamptz, why text)
 language sql
@@ -113,10 +137,7 @@ as $$
      and d.reported_by is null
      and d.at <= now_ - interval '15 minutes'
      and d.at >  now_ - interval '3 hours'
-     and (r.id is null
-          or r.timed_out
-          or r.error_msg is not null
-          or r.status_code not between 200 and 299)
+     and public.dispatch_bad(d.id)
    order by d.at;
 $$;
 
@@ -201,23 +222,25 @@ begin
                       to_char(f.at at time zone 'America/New_York', 'HH24:MI'), f.why)
     from public.dispatch_failures(now_) f
    where not public.dispatch_repeats(f.job)
-      /* COUNTED OUT OF dispatch_failures ITSELF, because this restated what a
-         failed dispatch IS and the restatement was narrower. It tested only
-         `no response row` or `a non-2xx status`, so a request that TIMED OUT —
-         which has a row, a null status_code and `timed_out` set — counted as
-         zero. The three repeating jobs are the poller, the spine and the price
-         mark, and a refused or timed-out worker on the poller is the exact
-         failure this table was built for: selected by dispatch_failures above,
-         gated to silence by a count that could not see it.
+      /* ROWS, NOT UNSETTLED ROWS, AND NOT dispatch_failures EITHER. The
+         threshold asks how often this job has failed in the hour, which is a
+         question about the job rather than about what has been dealt with —
+         and the step below settles a suppressed failure on purpose, so a count
+         that skipped settled rows could never reach three on the very jobs
+         this gate exists for.
 
-         It also counted requests made SECONDS ago, where the outer query
-         judges nothing under fifteen minutes old — so an in-flight poll read
-         as a failure and pushed a healthy job toward the threshold. Both go
-         away by asking the one function that decides this. The hour is the
-         quantity window and is the only thing stated twice. */
-      or (select count(*) from public.dispatch_failures(now_) g
-           where g.job = f.job
-             and g.at > now_ - interval '1 hour') >= 3;
+         It shares the PREDICATE and nothing else. Restated, it was narrower
+         and could not see a timed-out request at all; taken from
+         dispatch_failures, it would inherit that function's `not settled` and
+         `reported_by is null` filters, which are about bookkeeping rather than
+         about failure. The maturity bound is stated here too, because an
+         in-flight poll dispatched seconds ago has no answer yet and is not a
+         failure. */
+      or (select count(*) from public.dispatch d
+           where d.job = f.job
+             and d.at >  now_ - interval '1 hour'
+             and d.at <= now_ - interval '15 minutes'
+             and public.dispatch_bad(d.id)) >= 3;
 
   select string_agg(line, E'\n' order by id), count(*) into told, n from _said;
 
@@ -273,6 +296,7 @@ $$;
 -- Reachable by the publishable key otherwise, from the default privileges
 -- Supabase grants on the public schema — `revoke ... from public` alone does
 -- not take those, which is the mistake 007 exists to have corrected once.
+revoke execute on function public.dispatch_bad(bigint)            from public, anon, authenticated;
 revoke execute on function public.dispatch_failures(timestamptz) from public, anon, authenticated;
 revoke execute on function public.dispatch_repeats(text)         from public, anon, authenticated;
 revoke execute on function public.dispatch_watch(timestamptz)    from public, anon, authenticated;

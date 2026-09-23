@@ -3726,28 +3726,47 @@ test('010 waits until the last retry hour has passed, in both languages', () => 
    toward the threshold from the other side.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the repeat gate asks dispatch_failures rather than restating it', () => {
+test('both readers of "a failed dispatch" ask the same function', () => {
+  // Comments stripped first: the restatement this forbids is DESCRIBED in the
+  // comment above the gate, and prose about a predicate is not the predicate.
   const sql = readFileSync(
-    new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8');
-  const at = sql.indexOf('create or replace function public.dispatch_watch');
-  assert.ok(at > -1, '009 no longer defines dispatch_watch');
-  // Comments stripped: the restatement this forbids is described in the one
-  // above the gate, and prose about a predicate is not the predicate.
-  const body = sql.slice(at).replace(/\/\*[\s\S]*?\*\//g, '')
+    new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
+
+  const fn = (name) => {
+    const at = sql.indexOf(`create or replace function public.${name}`);
+    assert.ok(at > -1, `009 no longer defines ${name}`);
+    const end = sql.indexOf('$$;', at);
+    return sql.slice(at, end === -1 ? undefined : end);
+  };
+  const body = fn('dispatch_watch');
 
   const gate = body.match(/or \(select count\(\*\)([\s\S]*?)>= 3;/);
   assert.ok(gate, 'the repeat gate is gone, so a repeating job reports on one failure');
 
-  assert.match(gate[1], /from public\.dispatch_failures\(now_\)/,
-    'the repeat gate counts out of its own query again — every predicate it ' +
-    'restates is one it can get narrower than the query it gates, and the last ' +
-    'one could not see a timed-out request at all');
-  assert.doesNotMatch(gate[1], /net\._http_response|status_code|timed_out|error_msg/,
-    'the repeat gate names the response table itself, which is the restatement ' +
-    'this exists to prevent');
+  // The PREDICATE is shared; the population is not. The gate counts rows
+  // rather than unsettled ones, because the step below settles a suppressed
+  // failure on purpose — counting out of dispatch_failures would inherit its
+  // `not settled` filter and the tally could never reach three.
+  for (const [what, src] of [['the repeat gate', gate[1]],
+                             ['dispatch_failures', fn('dispatch_failures')]]) {
+    assert.match(src, /public\.dispatch_bad\(/,
+      `${what} decides what a failed dispatch is for itself — the last copy ` +
+      `that did could not see a timed-out request at all`);
+    assert.doesNotMatch(src, /net\._http_response r\s+where r\.id/,
+      `${what} tests the response table directly, which is the restatement ` +
+      `this exists to prevent`);
+  }
+  assert.doesNotMatch(gate[1], /dispatch_failures/,
+    'the gate counts out of dispatch_failures, inheriting its `not settled` ' +
+    'filter — so a suppressed failure, which the sweep settles on purpose, ' +
+    'drops out of the tally and three in an hour can never be reached');
   assert.match(gate[1], /interval '1 hour'/,
     'the quantity window is gone — three failures with no window is not a rate');
+  assert.match(gate[1], /interval '15 minutes'/,
+    'the gate counts requests too young to have answered, so an in-flight poll ' +
+    'pushes a healthy job toward the threshold');
 });
 
 /* ─── A door in the schedule and a door in the code ──────────────────────────
