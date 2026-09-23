@@ -66,8 +66,8 @@ supabase/006_plan.sql                   where a trade was aimed, off the open po
 supabase/007_semantic.sql               her memory searchable by meaning
 supabase/008_sync_health.sql            the heartbeat the two silent writers mark
 supabase/009_dispatch.sql               what pg_net sent, and what came back
-supabase/009_trades_grants.sql          which columns the app may write
 supabase/010_pace.sql                   how much of its clock a briefing spends
+supabase/011_trades_grants.sql          which columns the app may write
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -356,7 +356,7 @@ be single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
-| the **five columns the app may WRITE** | the `grant update (…)` in `009_trades_grants.sql`, and both lists in `verify.sql` — the exclusion and the positive one. Four of them are `Data.OWNED`; the fifth is `deleted`, which no tap or save may name but `remove()` and `undo()` write directly, so a grant list built from `Data.OWNED` alone reads as correct and takes soft delete out on the day it is applied |
+| the **five columns the app may WRITE** | the `grant update (…)` in `011_trades_grants.sql`, and both lists in `verify.sql` — the exclusion and the positive one. Four of them are `Data.OWNED`; the fifth is `deleted`, which no tap or save may name but `remove()` and `undo()` write directly, so a grant list built from `Data.OWNED` alone reads as correct and takes soft delete out on the day it is applied |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its short/long P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, and the app's Long/Short label — narrowing the constraint refuses every SELL at PostgREST and the poller reports it to the console only |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes — her own turns are half of every pair, so a constraint that refuses `assistant` leaves a history of his messages alone |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
@@ -401,7 +401,7 @@ It also asserts the guarantee rather than only the lists: no broker column may
 appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
 rests on, tested rather than repeated.
 
-**And the database holds it too, since `009_trades_grants.sql`.** The RLS policy
+**And the database holds it too, since `011_trades_grants.sql`.** The RLS policy
 on `trades` scopes rows to their owner and says nothing about columns, so a
 client signed in as the trader could write any column of its own rows —
 `net_pnl`, `direction`, `fill_time`, every figure the app does not own and
@@ -3863,15 +3863,15 @@ silent drift `deploy-functions.yml` exists to prevent for the functions.
     `supabase/007_semantic.sql`. The hourly job drives both the briefing and the
     pulse; the function decides which, or neither. 005, 006 and 007 are safe to
     re-run in full.
-13. Run `supabase/008_sync_health.sql`, `supabase/009_trades_grants.sql`,
-    `supabase/009_dispatch.sql` and `supabase/010_pace.sql` — the three monitors
-    and the column grant. Each is safe to re-run. **010 needs the two Vault
-    names 009 reads**, `eugenia_bot_token` and `telegram_chat_id`, since both
-    watchers post to Telegram themselves rather than through the function they
-    are watching; store them lower-case, the way step 5's cron secret is.
+13. Run `supabase/008_sync_health.sql`, `supabase/009_dispatch.sql`,
+    `supabase/010_pace.sql` and `supabase/011_trades_grants.sql` — the three
+    monitors and the column grant. Each is safe to re-run. **010 needs the two
+    Vault names 009 reads**, `eugenia_bot_token` and `telegram_chat_id`, since
+    both watchers post to Telegram themselves rather than through the function
+    they are watching; store them lower-case, the way step 5's cron secret is.
     Re-run `supabase/004_cron.sql` afterwards if the two watchers' jobs are not
     already scheduled — it upserts on the job name.
-14. Run `supabase/verify.sql` and read it against 001–010. Nothing is set up
+14. Run `supabase/verify.sql` and read it against 001–011. Nothing is set up
     until that agrees.
 
 ---

@@ -2,7 +2,7 @@
 -- DOJI — the eye pass, for when verify.sql says false
 -- ───────────────────────────────────────────────────────────────────────────
 -- verify.sql answers one question in one grid: does the live database match the
--- numbered files. This is the other half — ELEVEN listings that say WHAT the
+-- numbered files. This is the other half — TWELVE listings that say WHAT the
 -- database actually holds, for the moment a check comes back false and the next
 -- question is which object, which grant, which schedule.
 --
@@ -173,3 +173,55 @@ select status_code, content, created
 from net._http_response
 order by created desc
 limit 10;
+
+-- ─── Is anything wrong right now? ──────────────────────────────────────────
+-- THE THREE MONITORS IN ONE GRID, because until this listing there was no
+-- single thing a person could run to ask it. 008 records whether the two
+-- silent writers are alive, 009 records what pg_net sent and what came back,
+-- 010 records how much of its worker clock a briefing spent — three tables,
+-- three definitions of broken, and a reader who wanted the answer had to know
+-- all three existed and read them one at a time.
+--
+-- IT ADDS NO FOURTH DEFINITION, which is the constraint that shapes it. The
+-- judgments live where they were argued: `dispatch_failures` decides what a
+-- failed dispatch is and this calls it, `pace_line` decides what too slow is
+-- and this quotes it. `sync_health` is the one arm with no function behind it
+-- because its judgment is `healthLine`'s and lives in TypeScript — SCHEDULED
+-- is what parts a poller that has been silent for six hours from an email
+-- function that has simply had a quiet week, and restating that here would be
+-- exactly the fourth definition this listing exists to avoid. So it shows the
+-- mark and its age and leaves the reading to whoever is looking.
+--
+-- A dispatch whose report is in flight is deliberately absent: `reported_by`
+-- takes it out of `dispatch_failures` so one outage is not announced every ten
+-- minutes, and reading around that filter would be the second definition
+-- again. The unsettled count beside it is the table's own column rather than a
+-- verdict, and is what shows a backlog the sweep is not clearing.
+select 'sync_health'::text as monitor,
+       h.id                as subject,
+       (case when h.last_ok is null then 'never marked'
+             else 'last ok ' || to_char(h.last_ok at time zone 'America/New_York',
+                                        'Dy DD Mon HH24:MI')
+                  || ' (' || date_trunc('minute', now() - h.last_ok)::text || ' ago)'
+        end)::text         as state,
+       (coalesce(h.last_error || ' at '
+                 || to_char(h.last_error_at at time zone 'America/New_York',
+                            'Dy DD Mon HH24:MI'),
+                 'no failure recorded'))::text as detail
+  from public.sync_health h
+union all
+select 'dispatch', f.job, f.why,
+       'request ' || f.id || ', sent '
+         || to_char(f.at at time zone 'America/New_York', 'Dy DD Mon HH24:MI')
+  from public.dispatch_failures() f
+union all
+select 'dispatch', '(unsettled rows)', count(*)::text,
+       coalesce('oldest ' || to_char((min(d.at)) at time zone 'America/New_York',
+                                     'Dy DD Mon HH24:MI'),
+                'none outstanding')
+  from public.dispatch d
+ where not d.settled
+union all
+select 'pace', '(the briefing)', coalesce(public.pace_line(), 'clear'),
+       'read against the paid worker ceiling 010 states'
+ order by monitor, subject;

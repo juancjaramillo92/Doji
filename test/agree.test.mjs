@@ -407,7 +407,7 @@ test('no broker column is reachable through either writer', async () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the columns 009 grants are exactly the columns the app writes', async () => {
-  const grants = readFileSync(new URL('../supabase/009_trades_grants.sql', import.meta.url), 'utf8');
+  const grants = readFileSync(new URL('../supabase/011_trades_grants.sql', import.meta.url), 'utf8');
   const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
 
   const stated = grants.match(/grant update \(([^)]*)\)\s*\n?\s*on public\.trades/);
@@ -4737,6 +4737,33 @@ test('the hybrid search still answers in the shape the function reads', () => {
   for (const idx of ['eugenia_notes_trgm', 'eugenia_turns_trgm']) {
     assert.match(SENSES_SQL, new RegExp(`create index if not exists ${idx}[\\s\\S]*?gin_trgm_ops`),
       `${idx} is missing, so <% falls back to a sequential scan of the archive`);
+  }
+});
+
+/* ─── The number IS the apply order ──────────────────────────────────────────
+   Nothing applies these files but a person reading the README and pasting them
+   one at a time, so the three digits are the whole of what says which goes
+   first. Two files carried 009 for three releases: the README ran the grants
+   before the dispatch ledger, and every derivation in this file sorts
+   lexically, which runs them the other way round. Harmless there, because
+   neither creates anything the other reads — and invisible for exactly that
+   reason, which is the part worth catching. The test above decides "earlier"
+   by comparing file names, so a shared prefix makes its answer arbitrary on
+   the day two files at the same number DO touch the same object.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no two numbered SQL files claim the same position', () => {
+  const files = readdirSync(new URL('../supabase', import.meta.url))
+    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
+  assert.ok(files.length >= 6, `only ${files.length} numbered files found — the reader has gone blind`);
+
+  const seen = new Map();
+  for (const f of files) {
+    const n = f.slice(0, 3);
+    assert.ok(!seen.has(n),
+      `${seen.get(n)} and ${f} are both numbered ${n} — the number is the apply ` +
+      `order, and two files at one number leave it to whoever reads the directory`);
+    seen.set(n, f);
   }
 });
 
