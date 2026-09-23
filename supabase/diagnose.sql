@@ -204,9 +204,24 @@ select 'sync_health'::text as monitor,
                                         'Dy DD Mon HH24:MI')
                   || ' (' || date_trunc('minute', now() - h.last_ok)::text || ' ago)'
         end)::text         as state,
+       /* THE FAILURE IS DATED AGAINST THE MARK, NOT AGAINST THE WALL CLOCK.
+          `last_error` is kept after a later success on purpose — a writer that
+          fails one run in three is healthy by `last_ok` and is not healthy —
+          so a six-day-old error sits beside a mark from a minute ago and reads
+          as an outage until you compare two dates in two columns. Saying how
+          far BEFORE the mark it happened answers that in the cell itself, and
+          an error dated after the mark is the case worth seeing: it means the
+          last thing this writer did was fail. */
        (coalesce(h.last_error || ' at '
                  || to_char(h.last_error_at at time zone 'America/New_York',
-                            'Dy DD Mon HH24:MI'),
+                            'Dy DD Mon HH24:MI')
+                 || case
+                      when h.last_ok is null then ''
+                      when h.last_error_at > h.last_ok then ' — AFTER the mark'
+                      else ' ('
+                           || date_trunc('minute', h.last_ok - h.last_error_at)::text
+                           || ' before the mark)'
+                    end,
                  'no failure recorded'))::text as detail
   from public.sync_health h
 union all
