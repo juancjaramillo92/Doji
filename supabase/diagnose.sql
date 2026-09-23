@@ -2,14 +2,21 @@
 -- DOJI — the eye pass, for when verify.sql says false
 -- ───────────────────────────────────────────────────────────────────────────
 -- verify.sql answers one question in one grid: does the live database match the
--- numbered files. This is the other half — ten listings that say WHAT the
+-- numbered files. This is the other half — ELEVEN listings that say WHAT the
 -- database actually holds, for the moment a check comes back false and the next
 -- question is which object, which grant, which schedule.
 --
 -- THEY LIVE HERE RATHER THAN BELOW THE SUMMARY, AND THAT IS THE WHOLE REASON
 -- THIS FILE EXISTS. A SQL editor shows the result of the LAST statement only, so
--- ten listings under the summary meant running verify.sql top to bottom
+-- the listings under the summary meant running verify.sql top to bottom
 -- displayed the last ten HTTP responses and threw away every check above them.
+--
+-- WHICH IS ALSO WHY THE COUNT ABOVE IS A DIGIT AND A TEST COUNTS IT. It said
+-- ten while this file held eleven: 007 added the embedding backlog and nothing
+-- compared the number beside it. Run this file top to bottom and only the LAST
+-- listing shows, so a reader who trusts the count to know what they have seen
+-- is reading a stale one — the same trap the summary was rewritten to escape,
+-- one file over.
 -- The summary could not simply be moved to the end either: three of the reads
 -- below can RAISE on a database missing the thing they read — `cron.job`
 -- without pg_cron, `net._http_response` without pg_net, a public table that was

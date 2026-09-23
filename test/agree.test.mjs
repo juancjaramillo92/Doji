@@ -3675,6 +3675,36 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── diagnose.sql counts itself too ─────────────────────────────────────────
+   Its header says how many listings it holds, and that number went stale the
+   way a number in prose does: it said ten while the file held eleven, 007
+   having added the embedding backlog with nothing comparing the sentence
+   beside it. The count matters here for the same reason it does next door —
+   run the file top to bottom and a SQL editor shows only the LAST listing, so
+   a reader trusting the header to know what is in front of them is trusting
+   the one thing nothing checked.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('diagnose.sql says how many listings it holds, and holds that many', () => {
+  const sql = readFileSync(
+    new URL('../supabase/diagnose.sql', import.meta.url), 'utf8');
+
+  // Statements, not `select` keywords: one listing unions two tables, and a
+  // count of the keyword would read it as two.
+  const WORDS = { eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13 };
+  const code = sql.split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
+  const held = code.split(';').filter(x => x.trim()).length;
+  assert.ok(held > 5, `only ${held} listings parsed — the reader has gone blind`);
+
+  const stated = sql.match(/— (\w+) listings that say/i);
+  assert.ok(stated, 'the header no longer states how many listings this holds');
+  const said = WORDS[stated[1].toLowerCase()] ?? Number(stated[1]);
+  assert.equal(said, held,
+    `the header says ${stated[1]} listings and the file holds ${held} — and only ` +
+    `the last one shows when it is run, so the header is how a reader knows ` +
+    `what they have not seen`);
+});
+
 /* ─── Every definer runs with an empty search_path ───────────────────────────
    `security definer` is what makes vault.decrypted_secrets readable to a
    trigger firing under service_role, and it is also what makes an unqualified

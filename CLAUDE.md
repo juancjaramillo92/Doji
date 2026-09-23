@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 574 tests, six suites
+npm test      # 575 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1544,7 +1544,10 @@ a blank.
   `net._http_response` and a direct public read can all RAISE, and anything that
   raises takes every statement after it, so the summary would vanish on exactly
   the databases it exists for. The listings are `diagnose.sql` now — two files,
-  each with its own statement last. `agree.test.mjs` counts the semicolons in
+  each with its own statement last. ITS OWN COUNT WENT STALE THE SAME WAY: the
+  header said ten while the file held eleven, 007 having added the embedding
+  backlog with nothing comparing the number beside it, so `agree.test.mjs`
+  counts that file's statements too. `agree.test.mjs` counts the semicolons in
   `verify.sql` and asserts there is ONE, because the regression is a single
   appended `select` and the file still runs, still passes, and shows something
   else.
