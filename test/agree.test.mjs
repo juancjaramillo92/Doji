@@ -2111,11 +2111,22 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   /* AND EVERY TOOL SET IS DRAWN FROM THAT SAME LIST. A name appearing in a set
      but nowhere as a definition is a tool the model is offered and the loop has
      never heard of. */
-  for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS', 'RELEASE_TOOLS', 'TRADE_TOOLS']) {
-    const block = src.match(new RegExp(`const ${set} = \\[([\\s\\S]*?)\\];`));
-    assert.ok(block, `doji-eugenia no longer defines ${set}`);
-    const named = [...block[1].matchAll(/([A-Z_]+_TOOL)/g)].map(m => m[1]);
-    assert.ok(named.length, `${set} offers no tool this file defines`);
+  /* DERIVED, BECAUSE "EVERY TOOL SET" CANNOT BE FOUR NAMES TYPED HERE. The list
+     held four while the file defined five, so a set added later would be
+     offered to a model with nothing checking that the loop can serve what is
+     in it — which is the one thing this test is for.
+
+     CRITIC_TOOLS is the empty one, deliberately, and a test beside it says so:
+     it is the only set exempt from having to offer anything. */
+  const sets = [...src.matchAll(/const ([A-Z_]+_TOOLS)(?:: unknown\[\])? = \[([\s\S]*?)\];/g)];
+  assert.ok(sets.length >= 5,
+    `read ${sets.length} tool sets out of the file — the reader has gone blind`);
+
+  for (const [, set, block] of sets) {
+    const named = [...block.matchAll(/([A-Z_]+_TOOL)\b/g)].map(m => m[1]);
+    if (set !== 'CRITIC_TOOLS') {
+      assert.ok(named.length, `${set} offers no tool this file defines`);
+    }
     for (const t of named) {
       assert.ok(defined.includes(t), `${set} offers ${t}, which is not defined anywhere`);
     }
