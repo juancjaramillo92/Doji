@@ -289,7 +289,23 @@ fixable one: it captures `innerHTML`, which is the DOM re-serialised, so `"` and
   would file R-04's break-even stop as the plan — which is the filter, the same
   arbitration `balance` uses and the second-ever use of it. Say **as first
   seen**, never as set: up to two minutes separate the entry from the poll that
-  caught it. `planned` IN THE ANSWER COUNTS ROWS WRITTEN, NOT CALLS MADE, which
+  caught it.
+
+  EACH SIDE IS ITS OWN FIRST SIGHTING, AND REQUIRING THE PAIR IS WHAT CORRUPTED
+  IT. `openPlans` used to skip a position carrying only one side, so a
+  stop-only entry recorded NOTHING — and `planned_sl is null` was therefore
+  still true when a target appeared later, by which time R-04 had moved the
+  stop to break-even and the break-even stop was filed as the plan it exists to
+  be compared against. Silent, and wrong in the only direction that matters.
+  The reason given for the pair was that half a row would produce a division by
+  a missing number; nothing divides — no rule in `adherence.ts` reads either
+  column, and §6 step 4 says the ratio is arithmetic HE runs. So `writePlan` is
+  one PATCH per column on its own `is null` filter, because a filter cannot
+  arbitrate a column it does not name. `positionsBlock` shows whichever half
+  exists and NEVER names the absence: a null is equally *he set none* and *the
+  poller never saw this position open*, and nothing here tells those apart.
+
+  `planned` IN THE ANSWER COUNTS ROWS WRITTEN, NOT CALLS MADE, which
   it did not: with a position open it read 1 every two minutes, and a working
   filter, one that had stopped filtering, and a row the upsert had not yet
   reached all looked identical — the meter could not see the failure it sits
