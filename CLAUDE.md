@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 572 tests, six suites
+npm test      # 573 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1617,7 +1617,15 @@ a blank.
   privilege arrived.
 
 - **`007_semantic.sql` is dropped-and-recreated on purpose, which nothing else
-  here does.** `create or replace function` cannot change an argument list, so
+  here does.** AND `verify.sql` COULD NOT SEE WHICH ONE SURVIVED: it counted
+  functions NAMED `eugenia_search` and expected one, which is what a database
+  holding 003's two-argument version answers — 007 never applied, every
+  `search_memory` erroring inside her tool loop, reported here as correct. The
+  row asks for the ARITIES now, as a `string_agg`, so it names what it found:
+  `3` is right, `2` is 007 unapplied, `2,3` is the overload 007 exists to
+  remove, and NULL is no function at all. Prefer a name to a count, which the
+  triggers row already said.
+ `create or replace function` cannot change an argument list, so
   the three-argument search beside the two-argument one is an OVERLOAD: a
   two-argument call matches both and Postgres refuses it as ambiguous. The drop
   takes the grants, and a bare `create function` carries `execute` to PUBLIC

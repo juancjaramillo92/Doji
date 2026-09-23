@@ -3675,6 +3675,40 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── The search 007 built, not merely one by that name ──────────────────────
+   003 creates a two-argument eugenia_search and 007 DROPS it, because
+   `create or replace function` cannot change an argument list and the two
+   side by side are an overload a two-argument call cannot resolve. On a fresh
+   database the order handles it. On one where 007 was never applied, 003's
+   version is still there — and a check that COUNTS functions by that name
+   answers 1 for both, so a search that errors inside her tool loop on every
+   call was reported as correct.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('verify.sql asks eugenia_search which arguments it takes', () => {
+  const verify = readFileSync(
+    new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const row = verify.match(
+    /\('eugenia_search[^']*',\s*\(select ([\s\S]*?)\),\s*'([^']*)'\)/);
+  assert.ok(row, 'verify.sql no longer asks after eugenia_search at all');
+
+  assert.match(row[1], /pronargs/,
+    'the row counts functions by NAME again — 003 leaves a two-argument ' +
+    'eugenia_search that 007 drops, and a count answers 1 for a database ' +
+    'holding either one');
+  assert.equal(row[2], '3',
+    `it expects "${row[2]}" where 007's signature takes three arguments`);
+
+  // The three-argument function is the one 007 creates and the one her search
+  // calls, so the expected value is read out of the file rather than typed.
+  const created = SEMANTIC_SQL.match(
+    /create function public\.eugenia_search\(([^)]*)\)/);
+  assert.ok(created, '007 no longer creates eugenia_search');
+  assert.equal(created[1].split(',').length, 3,
+    "007's eugenia_search no longer takes three arguments, so verify.sql now " +
+    'asks for an arity the file does not produce');
+});
+
 /* ─── The detail column is bounded at both ends ──────────────────────────────
    008 constrains `last_error` to `between 1 and 500`, and heartbeat() guarded
    only the upper bound. An empty message — `new Error()` carries one — violated

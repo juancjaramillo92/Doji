@@ -370,10 +370,19 @@ from (values
      every role is a member of PUBLIC, a privilege held through PUBLIC shows up
      there too. A copy that can go stale, in a file whose errors are fatal, in
      service of a question already answered, is three reasons to delete it. */
-  ('eugenia_search exists',
-   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  -- BY ARITY, NOT BY COUNT. Counting functions called eugenia_search answers 1
+  -- for a database where 007 was never applied and 003's two-argument version
+  -- is still the only one there — a search that errors inside her tool loop on
+  -- every call, reported here as correct. It answers 1 for the right database
+  -- too, so the count could not part them. The arities themselves name what is
+  -- there: '3' is right, '2' is 007 unapplied, '2,3' is the overload 007 exists
+  -- to remove, and NULL is no function at all. Prefer a name to a count, which
+  -- is what the triggers row above already does.
+  ('eugenia_search exists, and takes the query vector',
+   (select string_agg(p.pronargs::text, ',' order by p.pronargs)
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'eugenia_search'),
-   '1'),
+   '3'),
   ('both search columns exist',
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and column_name = 'search'
