@@ -2837,6 +2837,69 @@ test('R-11 reads the account off the size, and only flags trading after the limi
   ], 'R-11').verdict, 'unknown');
 });
 
+test('R-11 will not pass a day it could only partly add up', () => {
+  /* THE R-15 REPAIR, UN-APPLIED TO R-11. `fill_time` is the email path's column
+     and a close with no alert behind it has an `exit_price` and no instant —
+     so it was filtered out of the running total and the day added up without
+     it. A lost LOSS never reaches the floor and the day reports `pass`; a lost
+     WIN breaches a day that never did. Both directions, same absence.
+
+     Found by the two halves of this file disagreeing: `dayStanding` sums every
+     closed row, so it can tell him the day is over while this reports pass. */
+  const leg = (id, pnl, from, to) =>
+    trade({ id, pnl, open_day: '2026-01-06', entry_time: from, fill_time: to,
+            exit_price: 4400 });
+
+  // −90 against a −80 floor, but the losing row carries no instant. The day
+  // cannot be walked in order, so it cannot be cleared either.
+  const partial = verdictOf([
+    leg('PIDx', -90, '2026-01-06T10:00:00Z', null),
+    leg('PIDy', 10,  '2026-01-06T12:00:00Z', '2026-01-06T13:00:00Z'),
+  ], 'R-11');
+  assert.equal(partial.verdict, 'unknown',
+    'a day missing a closed row from its running total came back decided');
+  assert.equal(partial.passed, 0, 'the day was counted as clean');
+
+  // Every close unstamped: the day used to vanish from the population entirely.
+  const none = verdictOf([leg('PIDx', -90, '2026-01-06T10:00:00Z', null)], 'R-11');
+  assert.equal(none.verdict, 'unknown');
+  assert.equal(none.unresolved, 1, 'the day is not in the population at all');
+
+  // Nothing closed yet is genuinely not this rule's day, and stays out.
+  assert.equal(verdictOf([
+    trade({ id: 'PIDo', open_day: '2026-01-06', entry_time: '2026-01-06T10:00:00Z' }),
+  ], 'R-11').unresolved, 0);
+});
+
+test('a day carrying two sizes has no account, in both readers', () => {
+  /* `find(s => s != null)` took whichever size arrived first, and a day with
+     two of them is the day R-13 exists to flag — so the denominator of the
+     limit was decided by row order exactly where it mattered. 4 oz implies
+     2,000 and a −80 floor; 20 oz implies 10,000 and a −400 floor, so the two
+     answers are not close to each other. */
+  const rows = [
+    trade({ id: 'PIDx', pnl: -90, size_oz: 4,  open_day: '2026-01-06',
+            entry_time: '2026-01-06T10:00:00Z', fill_time: '2026-01-06T11:00:00Z' }),
+    trade({ id: 'PIDy', pnl: -10, size_oz: 20, open_day: '2026-01-06',
+            entry_time: '2026-01-06T12:00:00Z', fill_time: '2026-01-06T13:00:00Z' }),
+  ];
+  assert.equal(verdictOf(rows, 'R-11').verdict, 'unknown',
+    'the limit was computed against a size picked by row order');
+  assert.equal(dayStanding(rows, '2026-01-06'), null,
+    'dayStanding still names an account it cannot derive');
+});
+
+test('dayStanding counts a close the running total cannot place', () => {
+  /* The deliberate difference between the two: this is a SUM and needs no
+     order, so an unstamped close still counts here where r11 must step past
+     it. Collapsing them would take the day-close message down with the rule. */
+  const out = dayStanding([
+    trade({ id: 'PIDx', pnl: -90, open_day: '2026-01-06', exit_price: 4400 }),
+  ], '2026-01-06');
+  assert.equal(out.pnl, -90, 'a closed row with no fill_time was dropped from the sum');
+  assert.equal(out.breached, true, 'the day is past −4% and reads as clear');
+});
+
 test('R-12 separates a late second entry from a sweep it cannot see', () => {
   const entry = (id, at, filled) =>
     trade({ id, open_day: '2026-01-06', entry_time: at, fill_time: filled });

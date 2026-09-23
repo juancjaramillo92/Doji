@@ -271,8 +271,9 @@ function r01(rows: TradeRow[]): RuleResult {
 /* ─── R-02 ─────────────────────────────────────────────────────────────────
    Stop never beyond $20 from entry. §7: no loss with |exit − entry| > 20 — the
    CAP only. The other half of R-02, whether the stop was RESPECTED, is not
-   recoverable: the broker reports only the final stop, so one moved to
-   break-even has overwritten the original. This checks the cap and says so. */
+   checked here: `planned_sl` records the stop as the poller first saw it, so it
+   is no longer unrecoverable — but almost no row carries one yet, which is why
+   §7's Evaluable column did not move. This checks the cap and says so. */
 function r02(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
@@ -381,12 +382,32 @@ function r11(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
 
   for (const [day, all] of byDay(rows)) {
-    const settled = all.filter(t => t.pnl != null && t.fill_time)
-      .sort((a, b) => +new Date(a.fill_time as string) - +new Date(b.fill_time as string));
-    if (!settled.length) continue;
+    const done = all.filter(t => t.pnl != null);
+    if (!done.length) continue;
 
-    const size = all.map(t => t.size_oz).find(s => s != null);
-    if (size == null) { unknown.push(day); continue; }
+    /* ONE SIZE OR NONE. `find` took whichever non-null size came first in
+       whatever order the rows arrived in, and a day carrying two of them is
+       exactly the day R-13 exists to flag — so the denominator of the limit
+       was decided by row order on the days least able to afford it. A bigger
+       size is a bigger account and a more forgiving floor, so the two answers
+       are not close. Two sizes means no account, which means no limit. */
+    const sizes = new Set(done.map(t => t.size_oz).filter(s => s != null));
+    if (sizes.size !== 1) { unknown.push(day); continue; }
+    const size = [...sizes][0] as number;
+
+    /* A CLOSED ROW WITH NO `fill_time` CANNOT BE PLACED IN THE SEQUENCE, and
+       this rule is a running total walked in time order. Dropping it silently
+       is what R-15 was repaired for and R-11 kept doing: a lost LOSS never
+       reaches the floor and the day comes back `pass`, a lost WIN breaches a
+       day that never did. Both directions are corrupted by the same absence,
+       so the day is undecidable rather than either answer.
+
+       `dayStanding` below sums every closed row and needs no order, so it
+       stays whole — which is how this was found: the two disagreed about the
+       same day, one telling him the day was over while this reported pass. */
+    const settled = done.filter(t => t.fill_time)
+      .sort((a, b) => +new Date(a.fill_time as string) - +new Date(b.fill_time as string));
+    if (settled.length < done.length) { unknown.push(day); continue; }
 
     const floor = -DAY_LOSS * (size * 500);
     let running = 0, breached: number | null = null;
@@ -562,8 +583,12 @@ export function dayStanding(rows: TradeRow[], day: string): Standing | null {
   const all = rows.filter(t => isBroker(t) && t.open_day === day);
   if (!all.length) return null;
 
-  const size = all.map(t => t.size_oz).find(s => s != null);
-  if (size == null) return null;
+  // Two sizes is no account, for r11's reason. Whole rather than ordered: this
+  // is a sum and not a sequence, so a close with no `fill_time` still counts
+  // here where r11 cannot place it.
+  const sizes = new Set(all.map(t => t.size_oz).filter(s => s != null));
+  if (sizes.size !== 1) return null;
+  const size = [...sizes][0] as number;
 
   const pnl = all.reduce((sum, t) => sum + (t.pnl ?? 0), 0);
   const account = size * 500;

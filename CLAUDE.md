@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 565 tests, six suites
+npm test      # 568 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1000,6 +1000,23 @@ compounds.
   asserting on `verdict` alone could not have found it. **Assert on the counts and
   on `ids`:** those are what `check_rules` hands him to check, and a breach missing
   from that list is one he cannot see.
+
+  R-11 KEPT THE FAULT R-15 WAS REPAIRED FOR, AND THE SAME FILE PROVED IT. The
+  running total filtered on `fill_time`, which the email owns — so a close with
+  no alert behind it carries an `exit_price`, a real P&L and no instant, and
+  was stepped over in silence. A lost LOSS never reaches the floor and the day
+  reports `pass`; a lost WIN breaches a day that never did. Both directions,
+  one absence. Found by the two halves of `adherence.ts` disagreeing:
+  `dayStanding` is a SUM and needs no order, so it counts every closed row and
+  could tell him the day was over while `check_rules` reported R-11 clean. A
+  day it cannot add up whole is `unknown` now, including the day where NOTHING
+  is stamped, which used to leave the population entirely.
+
+  AND THE ACCOUNT WAS PICKED BY ROW ORDER. `all.map(t => t.size_oz).find(...)`
+  took whichever size came first, and a day carrying two is exactly the day
+  R-13 exists to flag — 4 oz implies a −80 floor and 20 oz a −400 one, so the
+  two answers are not near each other. Two sizes is no account, in both
+  readers.
 
   Two numbers in it are decisions rather than facts and are named constants for
   that reason: `CLOSEOUT_MIN` gives §6's "at or very near" the Friday close a
