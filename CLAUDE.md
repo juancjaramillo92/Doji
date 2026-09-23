@@ -1643,8 +1643,8 @@ a blank.
   owner's rights. 002 sets `search_path = ''` and writes down why; 005's
   trigger on the SAME table with the SAME privileges set it to `public`.
   Nothing was reachable through it, because every name in that function is
-  qualified and `jsonb_build_object` is `pg_catalog`, which is implicit
-  whatever the path says. The hardening was simply applied to one of two.
+  qualified and `jsonb_build_object` lives in the catalog schema, which is
+  searched implicitly whatever the path says. The hardening was simply applied to one of two.
   `agree.test.mjs` derives every definer out of the numbered SQL now, so a
   third cannot arrive without it.
 
