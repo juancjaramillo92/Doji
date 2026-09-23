@@ -3675,6 +3675,43 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── Every definer runs with an empty search_path ───────────────────────────
+   `security definer` is what makes vault.decrypted_secrets readable to a
+   trigger firing under service_role, and it is also what makes an unqualified
+   name dangerous: the function runs as the owner, so anything it resolves
+   through a schema someone else can create in resolves with the owner's
+   rights. 002 empties the path and says so; 005's trigger on the SAME table
+   with the SAME privileges set it to `public` instead. Nothing was reachable
+   through it — every name in that function is qualified — but the hardening
+   was applied to one of two, which is how the second one comes to be written
+   without it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every security definer function empties its search_path', () => {
+  const files = ['001_trades', '002_gladys', '003_eugenia', '005_eugenia_senses',
+                 '006_plan', '007_semantic', '008_sync_health', '009_dispatch', '010_pace'];
+  let seen = 0;
+
+  for (const f of files) {
+    const sql = readFileSync(
+      new URL(`../supabase/${f}.sql`, import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
+
+    for (const m of sql.matchAll(/create (?:or replace )?function public\.(\w+)[\s\S]*?\bas \$\$/g)) {
+      if (!/security definer/.test(m[0])) continue;
+      seen++;
+      assert.match(m[0], /set search_path = ''/,
+        `${f}.sql: ${m[1]} is security definer and does not empty its ` +
+        `search_path — it runs as the owner, so any name it resolves through a ` +
+        `schema someone else can create in resolves with the owner's rights`);
+    }
+  }
+  assert.ok(seen >= 2,
+    `only ${seen} security definer functions read out of the numbered SQL — ` +
+    `the reader has gone blind`);
+});
+
 /* ─── The search 007 built, not merely one by that name ──────────────────────
    003 creates a two-argument eugenia_search and 007 DROPS it, because
    `create or replace function` cannot change an argument list and the two

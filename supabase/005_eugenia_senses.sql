@@ -442,7 +442,13 @@ create or replace function public.trades_eugenia_on_event()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+/* EMPTIED, AND EVERY NAME BELOW QUALIFIED, for the reason 002 states about the
+   other security definer trigger on this same table: running as the owner is
+   what makes vault.decrypted_secrets readable, and a search_path that still
+   names a schema someone else can create in is a name this function might
+   resolve somewhere it did not mean to. Two functions with the same privileges
+   on the same table, and only one of them was hardened. */
+set search_path = ''
 as $$
 declare
   kind text;

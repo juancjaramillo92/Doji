@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 573 tests, six suites
+npm test      # 574 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1634,6 +1634,19 @@ a blank.
   (`?embed=1`) has no cron job by design: the archive is a one-off and the
   trickle a failed vendor call leaves is swept by the nightly pass, which
   already runs and already reads the day.
+
+- **EVERY `security definer` FUNCTION EMPTIES ITS SEARCH PATH, AND ONE OF THE
+  TWO DID NOT.** That modifier is what makes `vault.decrypted_secrets` readable
+  to a trigger firing under service_role, and it is also what makes an
+  unqualified name dangerous — the function runs as the OWNER, so anything it
+  resolves through a schema someone else can create in resolves with the
+  owner's rights. 002 sets `search_path = ''` and writes down why; 005's
+  trigger on the SAME table with the SAME privileges set it to `public`.
+  Nothing was reachable through it, because every name in that function is
+  qualified and `jsonb_build_object` is `pg_catalog`, which is implicit
+  whatever the path says. The hardening was simply applied to one of two.
+  `agree.test.mjs` derives every definer out of the numbered SQL now, so a
+  third cannot arrive without it.
 
 - **`005_eugenia_senses.sql` is safe to re-run in full, and `003` is not.**
   Every statement is `if not exists`, `or replace` or `on conflict do nothing`,
