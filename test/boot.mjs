@@ -35,6 +35,16 @@ const EXPOSED = [
   'PendingDelete'
 ];
 
+/* THE INLINE SCRIPT, WHICH IS THE WHOLE APP. Exported because types.test.mjs
+   compiles this same text: two readers slicing the page by hand is two chances
+   for one of them to be reading a different program than the other, and the
+   one that drifts would go on passing about a file nobody is running. The
+   three `<script src>` tags come before it, so the LAST opening tag is the
+   inline one. */
+export function appScript() {
+  return HTML.slice(HTML.lastIndexOf('<script>') + 8, HTML.lastIndexOf('</script>'));
+}
+
 export async function boot({ now } = {}) {
   const dom = new JSDOM(HTML, {
     url: 'https://doji.test/',
@@ -194,8 +204,7 @@ export async function boot({ now } = {}) {
     write: () => new Uint8Array([0])
   };
 
-  const script = HTML.slice(HTML.lastIndexOf('<script>') + 8, HTML.lastIndexOf('</script>'));
-  win.eval(script + `\nwindow.__app = { ${EXPOSED.join(', ')} };`);
+  win.eval(appScript() + `\nwindow.__app = { ${EXPOSED.join(', ')} };`);
 
   const app = win.__app;
   for (const name of EXPOSED) {

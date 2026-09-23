@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 579 tests, six suites
+npm test      # 581 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -160,8 +160,24 @@ most of what a full run reports is a fact about the invocation. **The two
 questions it asks cannot go red for that reason, which is the whole basis for trusting a zero
 from it** — and it does not rely on that trust either: a file naming something
 that does not exist is compiled alongside the real ones on every run, and the
-assertion is that THAT was found and nothing else. `typescript` is a dev
-dependency, never a build step, and never runs over `index.html`.
+assertion is that THAT was found and nothing else — TWO planted defects now,
+one per question, because nothing could tell an unused declaration going
+unreported from there being none.
+
+  IT READS `index.html` TOO, AND THAT IS THE LARGER HALF. The app is the
+  biggest artefact here, one flat namespace and no bundler, so a renamed helper
+  with one call site missed is a TypeError the browser is the first thing to
+  mention. Every argument for asking a compiler carries over unchanged and the
+  only thing that had stopped it was that the script sits inside markup —
+  `boot.mjs` already sliced it out to run it, and `appScript()` is now that
+  slice, exported, so the two readers cannot come to be reading different
+  programs. It is its OWN program, never beside the functions: one is modules
+  and the other a classic script, and a shim written for the browser must not
+  declare a name into Deno. `Chart` and `XLSX` are that shim — globals off CDN
+  scripts this repository does not own — and each is held against the page
+  still loading the script that provides it, or the row becomes a free variable
+  wearing a declaration. `typescript` is a dev dependency and never a build
+  step.
 
 **`golden.test.mjs` is the fifth, and it asserts on what the other four do not
 name.** They test named things; a refactor breaks unnamed ones — an attribute
