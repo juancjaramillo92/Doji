@@ -4889,7 +4889,7 @@ test('the three columns with two claimants are filtered inside the UPDATE', () =
      he had closed, cited R-19 and R-15 at him about them, and her close sense
      never fired once. The filter is what keeps the email owning it wherever it
      lands, with this filling the gaps rather than racing it. */
-  for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', 'planned_sl'],
+  for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', '\\$\\{col\\}'],
                            ['writeFill', 'fill_time']]) {
     const at = src.indexOf(`function ${fn}(`);
     assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
@@ -5012,18 +5012,28 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
     assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
     const body = src.slice(at, src.indexOf('\n}', at));
 
-    assert.match(body, /Promise<boolean>/,
+    // A count or a yes/no — what matters is that the answer is DERIVED from the
+    // representation rather than from the call having been made. writeFill
+    // stamps one column and says whether it did; writePlan may stamp two.
+    assert.match(body, /Promise<(boolean|number)>/,
       `${fn} no longer answers whether it wrote, so the count beside it is ` +
       `back to counting calls`);
+    assert.match(body, /\(\(await res\.json\(\)\) as unknown\[\]\)\.length > 0/,
+      `${fn} stopped reading the rows it got back, so its answer is no longer ` +
+      `about what the database did`);
     assert.match(body, /sbHeaders\("return=representation"\)/,
       `${fn} asks for no representation, so a PATCH that matched nothing and ` +
       `one that wrote come back identical — the meter reads 0 forever, which ` +
       `is indistinguishable from a quiet poll`);
   }
 
-  assert.match(src, /if \(await writePlan\([^)]*\)\)\s*planned\+\+/,
+  assert.match(src, /planned \+= await writePlan\(/,
     'the poller increments its plan count on the call rather than on the answer, ' +
     'so a filter that stopped filtering would report exactly what a working one does');
+  assert.match(src, /for \(const col of \["planned_sl", "planned_tp"\] as const\)/,
+    'writePlan is back to one PATCH for both sides — `planned_sl is null` cannot ' +
+    'arbitrate `planned_tp`, so a side that appears later either never lands or ' +
+    'lands as whatever R-04 has since moved it to');
 });
 
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {

@@ -3381,14 +3381,28 @@ test('an open position yields its plan, keyed the way the poller files it', () =
   assert.equal(plans[0].planned_tp, 4432.1);
 });
 
-test('half a plan is no plan, and a bad id is dropped', () => {
-  /* HALF-WRITTEN IS WORSE THAN ABSENT: the reward-to-risk needs both sides, and
-     a row carrying one would look answerable and produce a division by a
-     missing number. A position with no stop set is a real state — it is what
-     R-02 exists about — and it is recorded as nothing rather than as half. */
-  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 4403.24 }]), []);
-  assert.deepEqual(openPlans([{ positionId: 1, takeProfit: 4432.1 }]), []);
-  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 4432.1 }]), []);
+test('each side of the plan is recorded on its own, and a bad id is dropped', () => {
+  /* REQUIRING THE PAIR WAS WHAT CORRUPTED IT. A stop-only entry recorded
+     NOTHING, so `planned_sl is null` was still true when a target appeared
+     later — by which time R-04 had moved the stop to break-even, and the
+     break-even stop was filed as the plan it exists to be compared against.
+
+     The reason given for the pair was that half a row "would produce a
+     division by a missing number", and nothing divides: no rule in
+     `adherence.ts` reads either column and `positionsBlock` names only what it
+     has. The ratio is arithmetic HE runs. The guard belonged at the render. */
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 4403.24 }]),
+    [{ id: 'PID1', planned_sl: 4403.24, planned_tp: undefined }],
+    'a stop set with no target is thrown away, and the next poll to see a ' +
+    'target will file whatever R-04 has since moved the stop to');
+  assert.deepEqual(openPlans([{ positionId: 1, takeProfit: 4432.1 }]),
+    [{ id: 'PID1', planned_sl: undefined, planned_tp: 4432.1 }]);
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 4432.1 }]),
+    [{ id: 'PID1', planned_sl: undefined, planned_tp: 4432.1 }],
+    'a zero is "not set" rather than a price, and must not survive as one');
+
+  // Neither side, a bad id, and nothing at all are still nothing.
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]), []);
   assert.deepEqual(openPlans([{ stopLoss: 4403.24, takeProfit: 4432.1 }]), []);
   assert.deepEqual(openPlans([]), []);
   assert.deepEqual(openPlans(undefined), []);
@@ -3907,14 +3921,25 @@ test('a position with no plan recorded says nothing about a plan', () => {
    THIS CASE IS THE TEST. The both-null row above passes whether the guard reads
    `&&` or `||`, so it was proving nothing about the guard it was written for —
    only a row carrying exactly one column can tell those two apart. */
-test('a row carrying one half of the plan is treated as carrying none', () => {
-  for (const half of [{ planned_tp: null }, { planned_sl: null }]) {
-    const out = positionsList([trade({ ...OPEN, ...half })], null, null, DESK_NOW);
-    assert.doesNotMatch(out, /null/,
-      `a row with only ${Object.keys(half)[0]} missing renders it: ${out}`);
-    assert.doesNotMatch(out, /stop|target/,
-      'half a plan is being shown as a plan');
-  }
+test('a row carrying one half of the plan shows that half and never the absence', () => {
+  /* THE HALF THAT EXISTS IS WORTH SAYING and the half that does not must not be
+     named: a null is equally "he set none" and "the poller never saw this
+     position open", and nothing here can tell those apart. Printing "no stop"
+     would state the first as fact. */
+  const stopOnly = positionsList([trade({ ...OPEN, planned_tp: null })], null, null, DESK_NOW);
+  assert.doesNotMatch(stopOnly, /null/, `renders a null: ${stopOnly}`);
+  assert.match(stopOnly, /stop 4380 as first seen/, 'the stop it has is dropped');
+  assert.doesNotMatch(stopOnly, /target/, 'a target it does not have is named');
+
+  const targetOnly = positionsList([trade({ ...OPEN, planned_sl: null })], null, null, DESK_NOW);
+  assert.doesNotMatch(targetOnly, /null/, `renders a null: ${targetOnly}`);
+  assert.match(targetOnly, /target 4412 as first seen/, 'the target it has is dropped');
+  assert.doesNotMatch(targetOnly, /stop/, 'a stop it does not have is named');
+
+  const neither = positionsList(
+    [trade({ ...OPEN, planned_sl: null, planned_tp: null })], null, null, DESK_NOW);
+  assert.doesNotMatch(neither, /stop|target|null/,
+    'a row the poller never saw open claims a plan');
 });
 
 test('a hand-opened row with no side, size or price prints no nulls', () => {

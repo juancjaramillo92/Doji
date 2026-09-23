@@ -556,21 +556,38 @@ async function writeBalance(id: string, balance: number) {
    they are already written by the time this runs. A plan that fails to record
    is one trade with a null, which is the same state every historical row is in.
    ───────────────────────────────────────────────────────────────────────── */
-export interface OpenPlan { id: string; planned_sl: number; planned_tp: number }
+export interface OpenPlan { id: string; planned_sl?: number; planned_tp?: number }
 
 /* Pure, so the shape the broker actually returned can be driven from a test.
    Prices come off `get_positions` as DISPLAY values and must not meet
    fromPipettes — a spot call in the same session serves the same symbol scaled
    by a hundred thousand, and applying that here would file a stop at four
-   hundredths of a cent. A position missing either side is skipped rather than
-   half-written: half a plan cannot answer any question that needs it. */
+   hundredths of a cent.
+
+   EACH SIDE STANDS ALONE, AND SKIPPING THE PAIR WAS THE THING THAT CORRUPTED
+   IT. Requiring both meant a stop-only entry recorded NOTHING — and then, when
+   a target was added later, `planned_sl is null` was still true and R-04 had
+   already moved the stop to break-even, so the break-even stop was filed as
+   the plan it exists to be compared against. Silent, and wrong in the one
+   direction that matters.
+
+   The reason given for the pair was that half a row "would produce a division
+   by a missing number", and nothing divides: no rule in `adherence.ts` reads
+   either column, and `positionsBlock` names only what it has. The ratio is
+   arithmetic HE runs, which §6 step 4 says outright. So the guard belonged at
+   the render, where it already was, and never at the write. */
 export function openPlans(positions: any[]): OpenPlan[] {
   return (positions ?? []).flatMap((p: any) => {
-    const sl = Number(p?.stopLoss), tp = Number(p?.takeProfit);
     const id = Number(p?.positionId);
     if (!Number.isInteger(id) || id <= 0) return [];
-    if (!Number.isFinite(sl) || !Number.isFinite(tp) || sl <= 0 || tp <= 0) return [];
-    return [{ id: `PID${id}`, planned_sl: sl, planned_tp: tp }];
+
+    const side = (k: string) => {
+      const n = Number(p?.[k]);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    };
+    const planned_sl = side('stopLoss'), planned_tp = side('takeProfit');
+    if (planned_sl === undefined && planned_tp === undefined) return [];
+    return [{ id: `PID${id}`, planned_sl, planned_tp }];
   });
 }
 
@@ -585,14 +602,26 @@ export function openPlans(positions: any[]): OpenPlan[] {
    Without the Prefer header the body is empty and this returns false forever,
    which reads as the healthy steady state. That is the silent half, so a test
    reads for it. */
-async function writePlan(plan: OpenPlan): Promise<boolean> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/trades?id=eq.${plan.id}&planned_sl=is.null`, {
-      method: "PATCH", headers: sbHeaders("return=representation"),
-      body: JSON.stringify({ planned_sl: plan.planned_sl, planned_tp: plan.planned_tp }),
-    });
-  if (!res.ok) throw new Error(`Plan write failed (HTTP ${res.status}): ${await res.text()}`);
-  return ((await res.json()) as unknown[]).length > 0;
+async function writePlan(plan: OpenPlan): Promise<number> {
+  /* ONE PATCH PER COLUMN, EACH ON ITS OWN FILTER, because `planned_sl is null`
+     cannot arbitrate a column it does not name: with both sides on one write,
+     a target appearing after the stop was already recorded would never land,
+     and a stop appearing after the target would arrive as whatever R-04 had
+     since moved it to. First-seen is a claim about a COLUMN. */
+  let wrote = 0;
+  for (const col of ["planned_sl", "planned_tp"] as const) {
+    const value = plan[col];
+    if (value === undefined) continue;
+
+    const res = await fetch(
+      `${SB_URL}/rest/v1/trades?id=eq.${plan.id}&${col}=is.null`, {
+        method: "PATCH", headers: sbHeaders("return=representation"),
+        body: JSON.stringify({ [col]: value }),
+      });
+    if (!res.ok) throw new Error(`Plan write failed (HTTP ${res.status}): ${await res.text()}`);
+    if (((await res.json()) as unknown[]).length > 0) wrote++;
+  }
+  return wrote;
 }
 
 /* ─── The close instant ────────────────────────────────────────────────────
@@ -947,7 +976,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       // Counted on the answer rather than on the attempt: steady state is 0
       // with a position open, the poll that first sees one reads 1, and a
       // filter that stopped filtering would read 1 every two minutes forever.
-      for (const plan of plans) { if (await writePlan(plan)) planned++; }
+      for (const plan of plans) planned += await writePlan(plan);
     } catch (err) {
       console.error("doji-mcp-sync: plan not recorded —",
         err instanceof Error ? err.message : err);

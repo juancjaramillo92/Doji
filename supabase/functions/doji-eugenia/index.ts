@@ -3007,9 +3007,16 @@ export function positionsList(
     const what = [t.direction, t.size_oz != null ? `${t.size_oz}oz` : null]
       .filter(Boolean).join(" ") || "side and size not recorded";
     const from = t.entry_price != null ? ` from ${t.entry_price}` : "";
-    const plan = t.planned_sl != null && t.planned_tp != null
-      ? `, stop ${t.planned_sl} and target ${t.planned_tp} as first seen`
-      : "";
+    /* WHICHEVER SIDES WERE SEEN, AND NEVER AN ABSENCE. The poller records each
+       column the first time it sees one, so a stop-only entry now carries its
+       stop — which requiring the pair used to throw away. A null is still not
+       "he set none": it is equally a position the poller never saw open, and
+       nothing here can tell those apart, so the missing half is not named. */
+    const seen = [
+      t.planned_sl != null ? `stop ${t.planned_sl}` : null,
+      t.planned_tp != null ? `target ${t.planned_tp}` : null,
+    ].filter(Boolean);
+    const plan = seen.length ? `, ${seen.join(" and ")} as first seen` : "";
     return `· ${since} — ${what}${from}${plan}`;
   });
 
