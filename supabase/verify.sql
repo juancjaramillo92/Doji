@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 72 checks above them, silently, leaving a
+-- HTTP responses and threw away all 73 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -516,6 +516,15 @@ from (values
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_runs'
        and column_name = 'model'),
+   '1'),
+  -- The other half of the server bill. web_search was counted from the day this
+  -- table existed and web_fetch, in the same tool arrays and on its own tariff,
+  -- was counted nowhere -- so every comparison of what a caller costs was made
+  -- against the half of the spend that happened to have a column.
+  ('eugenia_runs counts the fetches beside the searches',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_runs'
+       and column_name = 'fetches'),
    '1'),
 
   -- The calendar's two writers are the briefing and the release look, hours

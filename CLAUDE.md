@@ -1041,6 +1041,18 @@ compounds.
   briefing carrying its length, plus a row for the turns that FAILED, which is the
   row that never existed.
 
+  AND `web_fetch` WAS THE SAME OMISSION IN ITS PLAINEST FORM: it sits in the
+  same two tool arrays as `web_search`, carries `max_uses: 6`, bills on its own
+  tariff, and was tallied NOWHERE — so every comparison of what a caller costs
+  was made against the half of the server bill that happened to have a column,
+  and `searches: 0` on a turn that burned its rounds read as idle when it may
+  have been fetching throughout. `fetches` is summed from whatever `*_requests`
+  keys come back rather than from a key this file guessed at, because a name
+  spelled wrong reads 0 for ever — `planned`'s failure exactly. `agree.test.mjs`
+  censuses the columns BOTH ways now: every key `recordRun` writes is a column,
+  and every column is written by some `recordRun`. The second direction is the
+  one `model` shipped without.
+
   A METER THAT RECORDS ONLY THE CHEAP SIDE OF A PRICE IS THE SAME OMISSION AGAIN.
   `cached` counts reads, at a tenth of the input rate — the number that can only
   ever look good — while the write beside it, at 1.25× or 2×, was counted

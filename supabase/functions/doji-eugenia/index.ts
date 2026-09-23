@@ -1847,7 +1847,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   let container: string | undefined;
   // Summed across the rounds rather than logged per round, because the unit
   // worth knowing is what one briefing cost, not what one leg of it did.
-  let inTok = 0, outTok = 0, cached = 0, searches = 0;
+  let inTok = 0, outTok = 0, cached = 0, searches = 0, fetches = 0;
   /* WHAT THE CACHE COSTS, WHICH NOTHING HERE COULD SEE. A cache READ is a tenth
      of the input price and was counted from the first day; a cache WRITE is
      1.25× at five minutes and 2× at an hour, and was counted nowhere — so the
@@ -1891,7 +1891,28 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     inTok    += used.input_tokens ?? 0;
     outTok   += used.output_tokens ?? 0;
     cached   += used.cache_read_input_tokens ?? 0;
-    searches += used.server_tool_use?.web_search_requests ?? 0;
+    /* THE OTHER SERVER TOOL, AND IT WAS BILLING INTO A COLUMN THAT DID NOT
+       EXIST. `web_search` was counted from the day this meter was written;
+       `web_fetch` sits in the same two arrays with `max_uses: 6`, bills on its
+       own tariff, and was tallied nowhere — so "fourteen looks cost more than
+       five briefings" was read off the half of the server bill that happened to
+       have a column. It also made `searches: 0` unreadable: a release look that
+       burned six rounds without one search looks idle and may have been
+       fetching the whole time.
+
+       SUMMED RATHER THAN NAMED, because `web_fetch_requests` is this file's
+       expectation of a key it has never seen come back, and a key spelled wrong
+       reads 0 for ever — which is `planned`'s failure exactly. Whatever
+       `*_requests` the response carries beyond the search is what gets counted,
+       so a renamed field, or a third server tool, arrives in the meter instead
+       of vanishing from it. Kept apart from `searches` for the reason
+       `wrote_1h` and `wrote_5m` are: the tariffs differ and their sum is not
+       money. */
+    const server = used.server_tool_use ?? {};
+    searches += server.web_search_requests ?? 0;
+    fetches  += Object.entries(server)
+      .filter(([k]) => k !== "web_search_requests" && k.endsWith("_requests"))
+      .reduce((n, [, v]) => n + (typeof v === "number" ? v : 0), 0);
     const madeCache = used.cache_creation_input_tokens ?? 0;
     const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     wrote1h  += hour;
@@ -1982,12 +2003,12 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        here, which are the ones a cost line could never see at all. */
     console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
-                `${outTok} out, ${searches} search(es)` +
+                `${outTok} out, ${searches} search(es), ${fetches} fetch(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
     await recordRun({
       caller: label, model, effort, rounds: round + 1, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
-      out_tokens: outTok, searches, fell_back: fellBack || null,
+      out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: true,
     });
     return text;
@@ -2002,7 +2023,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     await recordRun({
       caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
-      out_tokens: outTok, searches, fell_back: fellBack || null,
+      out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: false,
       detail: (err instanceof Error ? err.message : String(err)).slice(0, 500),
     });

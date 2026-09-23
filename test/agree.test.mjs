@@ -3568,6 +3568,28 @@ test('every column the cost meter writes is a column the table has', () => {
     }
   }
 
+  /* AND THE OTHER DIRECTION, WHICH IS THE ONE THAT SHIPPED BROKEN. A column
+     nothing writes reads null on every row for ever: the insert succeeds, the
+     table keeps growing, the meter looks healthy, and the one figure somebody
+     added the column FOR is the figure that is not there. `model` went in that
+     way and needed a second guard written by hand. This is that guard for every
+     column at once, so the next one costs nothing.
+
+     `id` and `at` are the only exemptions and they are structural — a bigserial
+     and a default the writer must not set. */
+  const written = new Set(calls.flatMap(([, body]) => {
+    let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    for (let i = 0; i < 8 && /\([^()]*\)/.test(flat); i++) flat = flat.replace(/\([^()]*\)/g, '');
+    return flat.split(',').map(seg => seg.trim().match(/^(\w+)/)?.[1]).filter(Boolean);
+  }));
+  for (const col of columns) {
+    if (col === 'id' || col === 'at') continue;
+    assert.ok(written.has(col),
+      `eugenia_runs has a "${col}" column and no recordRun call writes it — every ` +
+      `row lands, the meter looks healthy, and the one figure it was added for ` +
+      `reads null for ever`);
+  }
+
   /* AND THE CHECK THAT WOULD CATCH THAT ON A LIVE DATABASE NAMES THEM A THIRD
      TIME. A verify.sql row asking after a column 005 does not declare comes back
      false on a correct database, which is the failure mode that gets a checker

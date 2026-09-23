@@ -69,6 +69,14 @@ create table if not exists public.eugenia_runs (
   out_tokens int,
   searches   int,
 
+  -- THE OTHER HALF OF THE SERVER BILL. `web_search` has been counted since this
+  -- table existed; `web_fetch` sits in the same tool arrays, bills on its own
+  -- tariff, and was tallied nowhere — so every comparison of what a caller
+  -- costs was made against the half of the server spend that had a column.
+  -- Apart from `searches` for wrote_1h/wrote_5m's reason: two tariffs, and
+  -- their sum is not money.
+  fetches    int,
+
   -- WHAT THE CACHE COST TO FILL, which is the one price this table was built
   -- without. `cached` is a read at a tenth of the input rate and was here from
   -- the start; a WRITE is 1.25× at five minutes and 2× at an hour, so the
@@ -109,6 +117,7 @@ create table if not exists public.eugenia_runs (
 -- and null on every row written before it ran — which is a real state and not a
 -- gap: those turns were billed for the writes, nothing counted them, and a zero
 -- would say the cache was free rather than unmeasured.
+alter table public.eugenia_runs add column if not exists fetches int;
 alter table public.eugenia_runs add column if not exists wrote_1h int;
 alter table public.eugenia_runs add column if not exists wrote_5m int;
 
