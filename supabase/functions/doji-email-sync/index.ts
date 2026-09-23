@@ -170,16 +170,32 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   // labels the thread and it leaves the queue. 5xx says try again, so the
   // thread stays unlabelled and the next run retries it. Collapsing the two is
   // how a momentary Supabase outage used to discard a fill's P&L forever.
+  /* A 400 FROM HERE IS A FILL DISCARDED FOR EVER, AND NEITHER ONE LEFT A TRACE.
+     The two refusals below are the only paths that end a thread's life without
+     writing anything: the Apps Script labels it, it drops out of the Gmail
+     query, and the settled P&L is gone. `heartbeat` was called on the write
+     paths and on neither of these, so the one failure mode that loses data
+     reached nobody — `sync_health` went on showing whatever the last fill said,
+     possibly weeks old.
+
+     NOT A FALSE ALARM ON AN ORDINARY DAY, which is the test every monitor here
+     has to pass. Only the Apps Script holds this secret, and it sends a payload
+     it built from a parse it had already accepted — so a body this boundary
+     refuses is the two halves DISAGREEING about the same email. That is never
+     ordinary, and it is exactly the state `healthLine` exists to put in front
+     of him. */
   let body: unknown;
   try {
     body = await req.json();
   } catch {
+    await heartbeat("email", "body is not JSON");
     return json({ ok: false, error: "body is not JSON" }, 400);
   }
 
   const fill = emailRow(body, USER_ID);
   if ("error" in fill) {
     console.error("doji-email-sync: refused —", fill.error);
+    await heartbeat("email", `refused, the fill is lost: ${fill.error}`);
     return json({ ok: false, error: fill.error }, 400);
   }
 

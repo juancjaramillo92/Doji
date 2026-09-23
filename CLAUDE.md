@@ -1659,6 +1659,20 @@ a blank.
   both call sites in both functions, since a mark missing from the success path
   makes a healthy writer read as dead.
 
+  AND IN THE EMAIL FUNCTION EVERY 400 IS A FILL DISCARDED FOR EVER, WHICH IS
+  THE ONE OUTCOME THAT MARKED NOTHING. That status tells the Apps Script the
+  row will never be accepted, so it labels the thread, the thread leaves the
+  Gmail query, and the settled P&L is gone — and two of the three paths that
+  answer it recorded nothing at all, leaving `sync_health` showing whatever the
+  last good fill said, possibly weeks old. It is not a false alarm on an
+  ordinary day either: only the Apps Script holds that secret and it sends a
+  payload built from a parse it had already accepted, so a body `emailRow`
+  refuses is the two halves DISAGREEING about one email. `agree.test.mjs`
+  DERIVES the refusal paths rather than naming them, and bounds each window at
+  the previous `return` — two weaker versions of that check passed with a
+  heartbeat deleted, one borrowing the mark above it and one spanning the 500
+  path's.
+
   THE TWO FALSE ALARMS ARE THE WHOLE RISK, and both are ordinary days rather
   than edge cases. EVERY path that completes must mark: the poller's
   market-closed skip is a completed run, and unmarked it freezes the mark across

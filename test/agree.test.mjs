@@ -3028,6 +3028,40 @@ test('the two writers with no voice record both outcomes', () => {
       `${fn} never records a failure, so the only account of a run that failed ` +
       `at 03:00 is still a console nobody reads`);
 
+    /* AND IN THE EMAIL FUNCTION, EVERY 400 IS A FILL DISCARDED FOR EVER. That
+       status tells the Apps Script the row will never be accepted, so it
+       labels the thread, the thread leaves the Gmail query, and the settled
+       P&L is gone. Two of those paths refused a body and marked nothing, so
+       the one failure mode that loses data left `sync_health` showing whatever
+       the last good fill said. Derived rather than named, so a third refusal
+       added later cannot arrive unmarked. */
+    if (who === 'email') {
+      /* EACH WINDOW ENDS AT THE PREVIOUS `return`, because every return ends a
+         path and a path may only be credited with its OWN mark. Two weaker
+         versions of this check passed while a heartbeat was deleted: a flat
+         400-character look-back borrowed the mark above it, and bounding at
+         the previous REFUSAL still spanned the 500 path's mark in between.
+         Written down because the check failing to fail is the thing this
+         repository keeps finding, and it found it here twice in a row. */
+      const returns = [...code.matchAll(/return json\([^;]*\);/g)];
+      // `answer` is answerFor(res.status), 400 for a row PostgREST will never
+      // accept — the same discard, reached by a computed status.
+      const isDiscard = (t) => /,\s*(?:400|answer)\s*\)/.test(t);
+      const discards = returns.filter(r => isDiscard(r[0]));
+      assert.ok(discards.length >= 3,
+        `only ${discards.length} refusal paths found in ${fn} — the reader has gone blind`);
+
+      let from = 0;
+      for (const r of returns) {
+        if (isDiscard(r[0])) {
+          assert.match(code.slice(from, r.index), /await heartbeat\("email",/,
+            `${fn} answers 400 with no heartbeat of its own behind it — that ` +
+            `answer ends a thread's life, so the fill is lost and nothing says so`);
+        }
+        from = r.index + r[0].length;
+      }
+    }
+
     /* AND EVERY PATH THAT COMPLETES MUST MARK, NOT ONLY THE LAST ONE. The
        poller returns early when the market is closed, which is a completed run
        by every measure the mark exists for — cron fired, the function is
