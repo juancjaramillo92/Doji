@@ -1733,9 +1733,20 @@ a blank.
   price mark, and a timed-out worker on the poller is the exact failure this
   table exists for. It also counted requests made seconds ago, where the outer
   query judges nothing under fifteen minutes — so an in-flight poll pushed a
-  healthy job toward the threshold from the other side. It counts out of
-  `dispatch_failures` now; the hour is the only thing stated twice, because the
-  hour is the quantity window rather than a definition.
+  healthy job toward the threshold from the other side. `dispatch_bad` is that
+  one definition now, asked by both.
+
+  AND THE FIRST REPAIR FOR IT COUNTED OUT OF `dispatch_failures`, WHICH BROKE
+  THE GATE A DIFFERENT WAY. That function filters `not settled`, and the sweep
+  SETTLES a suppressed failure on purpose twenty lines below the gate, under a
+  comment saying why that is safe — *the threshold counts rows rather than
+  unsettled ones*. It no longer did. Each lost poll was tidied away and the
+  tally could never reach three, on exactly the three jobs the gate exists for.
+  The threshold is about how often a JOB has failed in the hour rather than
+  about what has been dealt with, so it counts rows; it shares the PREDICATE
+  and nothing else, and the population, the hour and the maturity bound stay
+  its own. `agree.test.mjs` reads both readers for `dispatch_bad` and refuses a
+  gate that names `dispatch_failures` or the response table.
 
   **THE LEDGER MAY NOT BREAK THE TRIGGER IT SITS IN.** Both trigger sites post
   into a variable FIRST and record it behind `exception when others then null`,
