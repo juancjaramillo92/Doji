@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 561 tests, six suites
+npm test      # 562 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1094,8 +1094,8 @@ compounds.
   A drained archive answers `0 filled, 0 left` and must accuse nobody, or the
   line fires every night for the life of the deployment and stops being read.
 
-- **EVERY MESSAGE SHE SENDS ON A SCHEDULE IS READ ONCE MORE BEFORE IT GOES, AND
-  FOR THREE OF THE FOUR THAT IS NEW.** `CRITIC` ran on the briefing ALONE — the pulse, the
+- **EVERY MESSAGE SHE COMPOSES IS READ ONCE MORE BEFORE IT GOES, AND FOR FOUR
+  OF THE FIVE THAT IS NEW.** `CRITIC` ran on the briefing ALONE — the pulse, the
   release look and the move look went out unreviewed for their whole lives,
   which is most of what he receives in a week and is exactly where he was
   reading her and finding her hard. The writing rules were live and global on
@@ -1116,15 +1116,15 @@ compounds.
   model call and what it says is one of his own rules read back — there is no
   composed prose to trim.
 
-  AND SO DOES THE REPLY, ON A LANGUAGE ARGUMENT RATHER THAN A PROSE ONE. It is
-  composed prose and the writing rules are as live on it as anywhere, so it
-  reads as the one path still missing its gate — which is how one would come to
-  be added. It is also the ONLY path he speaks Spanish on, and `WRITING` is
-  English down to its worked example; `keepDraft` bounds a revision by LENGTH,
-  so a translation is the one failure it cannot catch, and what a flattened
-  Spanish answer costs is the half of the conversation where he actually
-  replies. That he is waiting on it with the typing indicator running is the
-  cheaper reason and not the deciding one.
+  THE REPLY WAS OUT AND HAD NO ARGUMENT BEHIND IT, WHICH IS THE POINT. It was
+  never exempted; it was simply not in the list the day the gate was written,
+  and it is the busiest thing she sends. The case for leaving it out was made
+  after the fact and was wrong twice over: `WRITING` is what `TRIM` reads, and
+  `WRITING` is where `ENGLISH, ALWAYS, WHATEVER HE WROTE IN` lives — so the one
+  path he writes Spanish on was the one path with nothing checking the rule
+  written for it. It is gated INSIDE the typing indicator, because clearing the
+  ping first leaves three silent seconds in which she reads as having finished
+  and then said nothing.
 
   WHAT IS REMEMBERED IS WHAT THE GATE RETURNED. The three callers bind the
   revision before sending it, because storing the draft files a message he never
@@ -1134,6 +1134,18 @@ compounds.
   what `critique` returned; the three that GAINED a gate kept storing the draft
   for as long as they had one. `agree.test.mjs` reads all three bodies, because
   nothing in the suite can drive a path that sends.
+
+  `SENDS` IN `agree.test.mjs` IS THE CENSUS, AND IT EXISTS BECAUSE EVERY OTHER
+  CHECK HERE IS VERTICAL. They ask whether a name exists, whether two copies
+  agree, whether an output drifted — one fact each, verified deeply. The fault
+  none of them can see is HORIZONTAL: six paths that should do comparable
+  things, one missing a step. It hid twice in one week — the gate reached three
+  paths and not the reply, and the three that gained a gate went on storing the
+  draft — and neither was findable by any check in the file taken alone. The
+  census DERIVES the path list from the source and compares it with a
+  declaration, so a new thing that sends him something fails the suite until
+  someone writes down what gate it runs and what text it carries. An exemption
+  is a row with a reason in it, never an absence.
 
   `gate` HOLDS THE HALF THAT MAKES EITHER ONE SAFE: a revision failing
   `keepDraft` is overruled and a gate that THROWS costs nothing. Copied, that

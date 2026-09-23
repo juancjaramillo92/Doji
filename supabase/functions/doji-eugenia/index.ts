@@ -4443,7 +4443,7 @@ async function handleMessage(update: any): Promise<void> {
         `to be heard: plain sentences, no headings, and nothing that only works ` +
         `on a page. Its length is whatever the answer needs.`;
       const context = text + aloud + notes + channels + story + loops + calendar + desk;
-      answer = await ask(
+      const draft = await ask(
         [...history, {
           role: 'user',
           // An image rides as a block beside the text; everything else is the
@@ -4452,6 +4452,11 @@ async function handleMessage(update: any): Promise<void> {
           content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
         }],
         'medium', 'reply');
+      /* GATED INSIDE THE TYPING INDICATOR, which is why it is here rather than
+         beside the send. Cleared first, the ping stops and three silent seconds
+         pass before anything lands, so she reads as having finished and then
+         said nothing. */
+      answer = await trim(draft);
     } finally {
       // Stopped the moment there is something to send, not after sending it —
       // otherwise a ping fires between the message landing and the write, and

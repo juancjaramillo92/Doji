@@ -5469,13 +5469,69 @@ test('an unexplained move is silence, and opens no thread', () => {
    there is no composed prose to trim.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('every message she composes goes through a gate before it is sent', () => {
-  const trimmed = (EUGENIA_TS.match(/const sent = await trim\(said\);/g) || []).length;
-  assert.equal(trimmed, 3,
-    `${trimmed} of the three short paths are gated — an ungated one still ` +
-    `arrives and reads correctly, and is simply back to being unchecked`);
-  assert.match(EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function postBriefing(')),
-    /await critique\(/, 'the briefing is no longer gated at all');
+/* THE CENSUS, AND IT EXISTS BECAUSE EVERY OTHER CHECK HERE IS VERTICAL. They
+   ask whether a name exists, whether two copies agree, whether an output
+   drifted — one fact each, verified deeply. The fault they cannot see is
+   HORIZONTAL: six paths that should do comparable things, one of them missing a
+   step. That is invisible to every check in this file taken one at a time, and
+   it stayed invisible twice — the gate reached three paths and not the reply,
+   and the three that gained a gate kept storing the draft.
+
+   So the table is derived from the source and compared with a declaration.
+   A new path that sends him something makes the derived set grow, and the test
+   fails until someone writes down what gate it runs and what it carries. An
+   exemption is a row with a reason in it, never an absence. */
+const SENDS = {
+  postBriefing:   { gate: 'critique', carries: 'brief' },
+  postPulse:      { gate: 'trim',     carries: 'sent' },
+  postRelease:    { gate: 'trim',     carries: 'sent' },
+  postMove:       { gate: 'trim',     carries: 'sent' },
+  handleMessage:  { gate: 'trim',     carries: 'answer' },
+  postTradeEvent: { gate: null,       carries: 'said',
+                    why: 'both branches are decided from data before any model ' +
+                         'call and what it says is one of his own rules read ' +
+                         'back — there is no composed prose to gate' },
+};
+
+test('every path that sends him something is in the census', () => {
+  const fns = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)/gm)]
+    .map(m => [m[1], m.index]);
+  const sending = fns.filter(([, at]) => {
+    const end = EUGENIA_TS.indexOf('\n}\n', at);
+    return /await sayAloud\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
+  }).map(([name]) => name).sort();
+
+  assert.deepEqual(sending, Object.keys(SENDS).sort(),
+    'a path sends him something and is not in the census, or a censused one no ' +
+    'longer sends — the census is what makes a missing gate visible, and it can ' +
+    'only see paths it knows about');
+});
+
+test('every censused path gates, speaks and stores the same one text', () => {
+  for (const [fn, spec] of Object.entries(SENDS)) {
+    const at = EUGENIA_TS.indexOf(`async function ${fn}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
+    const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
+
+    if (spec.gate) {
+      assert.match(body, new RegExp(`${spec.carries} = await ${spec.gate}\\(`),
+        `${fn} no longer binds what ${spec.gate}() returned — an ungated ` +
+        'message still arrives and still reads correctly, and is simply back ' +
+        'to being unchecked');
+    } else {
+      assert.ok(spec.why, `${fn} is exempt from the gate with no reason written down`);
+      assert.doesNotMatch(body, /await (trim|critique)\(/,
+        `${fn} is declared exempt from the gate and now runs one`);
+    }
+
+    const spoken = body.match(/await sayAloud\([\s\S]*?\);/);
+    assert.ok(spoken, `${fn} no longer speaks at all`);
+    assert.match(spoken[0], new RegExp(`\\b${spec.carries}\\b`),
+      `${fn} speaks something other than the text the census says it carries`);
+    assert.match(body, new RegExp(`role: 'assistant', content: ${spec.carries}\\b`),
+      `${fn} stores a text other than the one it sent — her history then holds ` +
+      'words he never read, resent as hers for the next six exchanges');
+  }
 });
 
 test('the two gates share the half that makes a gate safe', () => {
