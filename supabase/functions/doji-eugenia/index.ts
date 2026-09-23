@@ -31,7 +31,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // The eight rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
@@ -1012,7 +1012,8 @@ const CALENDAR_TOOL = {
     "in the actual and one line on what it meant. Recording a release with " +
     "importance 'high' is also what wakes you to look at it after it lands, so a " +
     "print worth reacting to must be filed as high. Filing the same time and name " +
-    "twice updates the row rather than adding one.",
+    "twice updates the row rather than adding one — so if the release is already " +
+    "in the calendar you were handed, file it under that exact name.",
   input_schema: {
     type: "object",
     properties: {
@@ -1123,6 +1124,91 @@ async function logCalendar(releases: unknown): Promise<string> {
     return "That did not save. Carry on and do not mention it.";
   }
 }
+
+/* THE ACTUAL GOES TO THE ROW THAT WAS LOOKED AT, AND AN UPSERT COULD NOT PROMISE
+   THAT. The release look held `log_calendar`, whose key is (at, name) over a
+   name the model writes — so on 16 September it was handed
+   `US retail sales (August, advance)`, marked that row at 12:35:00, and filed
+   the print under `retail sales` at 12:36:15. An INSERT. The actual landed on a
+   row with no consensus and the consensus stayed on a row with no actual, which
+   is the single comparison this table exists to hold, and nothing failed. The
+   prompt had said *the same time and name* since the day the tool was written:
+   an instruction standing where a guarantee belongs, failing the way they all
+   fail here.
+
+   So this one CANNOT INSERT. A PATCH and nothing else, over the two columns a
+   look owns — which makes it structural rather than remembered: a look can no
+   longer mint a row under any spelling, and it can no longer write `consensus`
+   or `prior`, the briefing's columns, which is how that same release ended up
+   holding two contradictory priors.
+
+   AND A NAME THAT MATCHES NOTHING ANSWERS WITH THE NAMES ON FILE, because a
+   PATCH filtered to nothing is a 200 with an empty body — silence that reads
+   exactly like a write, the shape `planned` was repaired for in the poller. She
+   is handed the names in the message and quoting one is the whole job; when she
+   paraphrases anyway the next round has what it needs instead of a second row. */
+async function recordActual(at: unknown, name: unknown, actual: unknown, note: unknown): Promise<string> {
+  const when = new Date(String(at ?? ""));
+  const called = String(name ?? "").trim();
+  const printed = String(actual ?? "").trim().slice(0, NOTE_MAX);
+  if (isNaN(+when) || !called || !printed) {
+    return "That needs the release's time in UTC, its name exactly as the calendar lists it, and what it printed.";
+  }
+
+  const patch: Record<string, string> = { actual: printed };
+  const line = String(note ?? "").trim().slice(0, NOTE_MAX);
+  if (line) patch.note = line;
+
+  /* A COMMA INSIDE A FILTER VALUE IS A LIST SEPARATOR TO PostgREST, and these
+     names carry them — `US retail sales (August, advance)` is the row that
+     started this, and unquoted it would filter on `US retail sales (August`
+     and match nothing at all. Double-quoted, with any quote in the name
+     escaped, so the miss cannot come from the punctuation. */
+  const quoted = encodeURIComponent(`"${called.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+  const at_ = when.toISOString();
+
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?at=eq.${at_}&name=eq.${quoted}`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if ((await res.json()).length) return `Recorded against ${called}.`;
+
+    // Bounded like every other read here, and by the same number a single call
+    // may file: a release time holding more names than one briefing could have
+    // written is not a list worth reading back to her.
+    const standing = await readRows<Release>('Release',
+      `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=${CALENDAR_MAX}`);
+    return standing.length
+      ? `Nothing at that time is called "${called}". On file: ` +
+        `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
+      : "Nothing is on file at that time, so there is no entry to fill in. Leave it.";
+  } catch (err) {
+    console.error("doji-eugenia: actual not written —", err instanceof Error ? err.message : err);
+    return "That did not save. Carry on and do not mention it.";
+  }
+}
+
+const ACTUAL_TOOL = {
+  name: "record_actual",
+  description:
+    "Fill in what a release printed, on the entry already filed for it. Give the " +
+    "time in UTC and the name exactly as the list you were handed spells it. This " +
+    "updates that entry and can never add a second one, so a name that matches " +
+    "nothing writes nothing and tells you what is on file instead.",
+  input_schema: {
+    type: "object",
+    properties: {
+      at:     { type: "string", description: "When it landed, ISO 8601 in UTC, as the entry was filed." },
+      name:   { type: "string", description: "The entry's name, copied exactly from the list you were given." },
+      actual: { type: "string", description: "What it printed, with its unit." },
+      note:   { type: "string", description: `One line on what it meant. Optional, at most ${NOTE_MAX} characters.` },
+    },
+    required: ["at", "name", "actual"],
+    additionalProperties: false,
+  },
+} as const;
 
 /* ─── The price, read off the instrument ───────────────────────────────────
    She has quoted gold out of whatever a news page said, at whatever staleness
@@ -1543,7 +1629,10 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
-const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, CALENDAR_TOOL, LOOP_TOOL];
+/* NOT `CALENDAR_TOOL`, AND THAT IS THE WHOLE OF THE FIX ABOVE. A look that can
+   upsert by (at, name) can mint the row it was looking at, under a name a shade
+   off the one it was handed. It files an actual and nothing else. */
+const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* The critic reads a draft and returns a draft. Giving it a tool would let it
    go and check something, which is a second briefing at a second price.
@@ -1557,12 +1646,51 @@ const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
    size. An empty array is the smaller write of the two. REFACTOR.md R-15. */
 const CRITIC_TOOLS: unknown[] = [];
 
-/* NAMED, BECAUSE TWO THINGS NOW READ IT. The request asks for this model and
-   ask() compares what answered against it. A second literal would report a
-   fallback on every call from the day someone edited one of the two. */
-const MODEL = "claude-opus-5";
+/* ONE MODEL FOR EVERY CALLER WAS NEVER A DECISION, AND THE ROWS SAY WHAT IT
+   COST. A week of `eugenia_runs` put the release look at $5.30 and the whole
+   briefing at $4.12 — fourteen looks costing more than five briefings, and the
+   move look at $0.64 a turn, the most expensive single message she sends, for
+   two sentences about a price.
 
-async function call(messages: any[], effort: Effort, tools: unknown[], container?: string) {
+   THE SPLIT WAS BETWEEN JUDGING AND CHECKING AND IT COST A CALLER ITS LIFE.
+   The release look, the pulse and the move look moved to Sonnet on that
+   reasoning — bounded work handed everything it needs. The release look then
+   died at `MAX_ROUNDS` on its first two firings the next morning, twice inside
+   half an hour, and what reached him was the apology. Fourteen turns on Opus in
+   the measured week had never once come near the cap.
+
+   THE CAP IS RAISED BELOW AND THAT IS NOT WHY THESE CAME BACK. What the two
+   failures actually establish is that the round budget on a tool-heavy caller
+   is a property of the MODEL and not of the task, which nothing here had
+   measured and the change assumed. A cheaper caller that does not answer is not
+   cheaper. They go back to the model they were measured on, and any future move
+   is one caller at a time with `rounds` read afterwards.
+
+   `trim` STAYS, and the distinction is the whole of why. It is handed
+   `CRITIC_TOOLS`, which is empty — one request, no tools, no loop — so it
+   cannot reach the cap at all, whatever a model's appetite for rounds. That is
+   the shape a cheaper model is safe on here.
+
+   THE CRITIC IS THE ONE I EXPECTED TO MOVE AND IT DOES NOT. Sonnet would save
+   about $3.50 a month, and it runs LAST, it can rewrite, and it is the final
+   gate on the exact thing he spent two weeks saying read badly. That is a bad
+   trade at any saving. */
+const OPUS = "claude-opus-5";
+const SONNET = "claude-sonnet-5";
+
+/* KEYED ON THE CALLER'S LABEL, which is the same string `eugenia_runs.caller`
+   records and the same one `ask` is handed. A name here that no caller uses is
+   a row that silently never applies, so `agree.test.mjs` holds these keys
+   against the labels the file actually passes. Absent means Opus: a new caller
+   is expensive and correct rather than cheap and unnoticed. */
+const MODELS: Record<string, string> = {
+  'trim': SONNET,
+};
+
+export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
+
+async function call(messages: any[], effort: Effort, tools: unknown[],
+                    model: string, container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1574,11 +1702,21 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       // rejects — and `fallbacks` without the header is rejected as well. So
       // the shape below 400s every call, briefing and reply alike, which is
       // the whole function. It shipped that way for one commit.
-      "anthropic-beta": "server-side-fallback-2026-07-01",
+      //
+      // IT RIDES WITH OPUS ALONE, AND THAT IS CAUTION RATHER THAN A RULE.
+      // `fallbacks` has carried this system's briefings since the morning a
+      // decline cost one, on the model it was turned on for. Whether the
+      // parameter is accepted on Sonnet is not something anything here has
+      // established, and if it is not, the failure is a 400 on every call —
+      // three callers dark at once. Widen it the day a Sonnet call is seen to
+      // take it, not before.
+      ...(model === OPUS
+          ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
+          : {}),
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: 16000,
       /* Cached: both are long, fixed, and sent on every turn — which is exactly
          why the strategy rides here rather than in the message.
@@ -1617,7 +1755,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
       // on another model inside this same call and routes by refusal category,
       // so there is no model list here to go stale, and a decline before any
       // output is not billed.
-      fallbacks: "default",
+      ...(model === OPUS ? { fallbacks: "default" } : {}),
       // Only once there is one — the first request of a turn has no container.
       ...(container ? { container } : {}),
     }),
@@ -1626,11 +1764,21 @@ async function call(messages: any[], effort: Effort, tools: unknown[], container
   return res.json();
 }
 
-// Six rounds, because a loop that cannot end is a loop that bills forever.
-// Three is the realistic maximum now — read the journal, write a note, answer —
-// and the cap exists for the case where that assumption is wrong rather than as
-// a working limit.
-const MAX_ROUNDS = 6;
+/* A BACKSTOP AGAINST A LOOP THAT CANNOT END, AND IT HAD BECOME A WORKING LIMIT.
+   Six was set on the reasoning that three is the realistic maximum — read the
+   journal, write a note, answer — with the cap there for the case where that
+   assumption is wrong. The assumption WAS wrong, and the way it announced
+   itself is the shape worth keeping: a release look that searched, fetched,
+   searched again and ran out, twice in half an hour, arriving as an apology
+   rather than as a number.
+
+   Ten keeps it a backstop rather than a limit. The failure it guards against is
+   a loop billing forever; the failure it CAUSED is a message that never
+   arrives, and of the two the second is the one that happened. `eugenia_runs`
+   records `rounds` on every turn, so how close a caller runs to this is a
+   question with an answer rather than a guess — which is what should have been
+   read before a model changed underneath it. */
+const MAX_ROUNDS = 10;
 
 /* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
    ifs because there are ten of them now and a reader should be able to
@@ -1662,6 +1810,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
     case CALENDAR_TOOL.name: return await logCalendar(input.releases);
+    case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
@@ -1682,6 +1831,10 @@ export async function serve(name: string, input: any): Promise<string> {
    before. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
                           tools: unknown[] = CHAT_TOOLS): Promise<string> {
+  // DERIVED FROM THE LABEL RATHER THAN PASSED, so a caller cannot be given one
+  // model and recorded under another — `label` is already what eugenia_runs
+  // stores, and one string deciding both is what keeps the meter answerable.
+  const model = modelFor(label);
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -1726,7 +1879,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   try {
   for (let round = 0; round < MAX_ROUNDS; round++) {
     rounds = round + 1;
-    const body = await call(convo, effort, tools, container);
+    const body = await call(convo, effort, tools, model, container);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
@@ -1738,7 +1891,10 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     wrote1h  += hour;
     wrote5m  += madeCache - hour;
-    if (body.model && body.model !== MODEL) fellBack = body.model;
+    // AGAINST WHAT THIS CALLER ASKED FOR, not against one name for the file.
+    // Compared with a single constant, every Sonnet caller would report a
+    // fallback on every call and the column would stop meaning anything.
+    if (body.model && body.model !== model) fellBack = body.model;
     // Still checked, and it still happens: `fallbacks` rescues a model that
     // declines, and this is the case where the whole chain did. No usable
     // content, so it is caught before the blocks are read rather than surfacing
@@ -1819,12 +1975,12 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        Searches are counted apart from the tokens because they bill apart.
        Only on the way out; the catch below records the turns that never got
        here, which are the ones a cost line could never see at all. */
-    console.log(`doji-eugenia: ${label} — ${round + 1} round(s), ${effort} effort, ` +
+    console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
     await recordRun({
-      caller: label, effort, rounds: round + 1, in_tokens: inTok, cached,
+      caller: label, model, effort, rounds: round + 1, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: true,
@@ -1839,7 +1995,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
        message, not data, so "how often does this actually fail" had no answer.
        Recorded and rethrown: the caller's own handling is unchanged. */
     await recordRun({
-      caller: label, effort, rounds: rounds || null, in_tokens: inTok, cached,
+      caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: false,
@@ -2073,16 +2229,19 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
 const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
                   "person who is busy. Never breathless, never selling.";
 
-/* Roughly fifty seconds of speech. Past that a voice note stops being a reply
-   and becomes a recording to scrub through, and the text — already sent — is
-   the better artifact for anything that long. The prompt is told the number so
-   a long answer is one she chose rather than one silently left unspoken. */
-export const SPEAK_MAX = 700;
+/* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
+   cap — seven hundred characters, then four thousand — and a cap decides that
+   past some length a message is not worth hearing. Nothing she writes should be
+   shortened to fit a voice note, and nothing she writes should go unspoken for
+   being long: those are the same decision made twice, and it is his, and it is
+   no.
 
-// Exported because it is the decision, and because it is the one thing here a
-// test can drive: everything below it is a vendor and a wire.
-export const speaksBack = (answer: string, heard: boolean): boolean =>
-  heard && answer.length > 0 && answer.length <= SPEAK_MAX;
+   What remains is not a judgement at all. The speech vendor accepts a bounded
+   input in one request, so a long message becomes SEVERAL voice notes, exactly
+   as it already becomes several text messages. `chunk` is the one that does it,
+   with its paragraph preference, so each part is a whole thought rather than a
+   sentence cut in half. */
+const TTS_LIMIT = 4000;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2099,15 +2258,22 @@ export const speaksBack = (answer: string, heard: boolean): boolean =>
    request succeeds, Telegram accepts the file, and it arrives as an ATTACHMENT
    rather than a voice note, with no waveform and no speed control. Nothing
    errors; the feature just stops being the thing it was for. */
-async function speak(answer: string): Promise<void> {
-  if (!TTS_KEY) return;
+async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
+  if (!TTS_KEY) return false;
 
   try {
     const spoken = await fetch(TTS_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: TTS_MODEL, voice: TTS_VOICE, input: answer,
+        /* WITHOUT THE MARKS THAT ARE FOR THE EYE. The calendar slot is a list
+           with a bold day label on each line, which is the one place the prose
+           rule is relaxed because he reads it — and `**Today:**` read aloud is
+           a gamble on what the vendor does with an asterisk. Stripped here
+           rather than written differently, because the text message wants them
+           and this is the only reader that does not. */
+        model: TTS_MODEL, voice: TTS_VOICE,
+        input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
       }),
     });
@@ -2119,14 +2285,57 @@ async function speak(answer: string): Promise<void> {
     // other direction: it is not knowable which one Telegram reads.
     form.append("voice", new Blob([new Uint8Array(await spoken.arrayBuffer())],
                                   { type: "audio/ogg" }), "reply.ogg");
+    // The briefing's keyboard rides on the voice note now, because there is no
+    // text message under it to carry one. JSON in a multipart field, which is
+    // what Telegram takes for reply_markup on sendVoice.
+    if (keyboard) form.append("reply_markup", JSON.stringify(keyboard));
     const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
       method: "POST", body: form,
     });
     const said = await sent.json();
     if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
+    return true;
   } catch (err) {
     console.error("doji-eugenia: could not speak —", err instanceof Error ? err.message : err);
+    return false;
   }
+}
+
+/* THE VOICE NOTE IS THE MESSAGE, AND THE TEXT IS WHAT HAPPENS WHEN IT IS NOT.
+   It sent both for one day and both arrived, which is two notifications and two
+   bubbles for one thing she said — he asked for the voice note alone.
+
+   THE OBJECTION TO THAT WAS REAL AND THIS IS THE ANSWER TO IT rather than a
+   climb-down. A speech vendor that refuses, an unset key, a format Telegram will
+   not render: audio-only turns every one of those into a MISSING message, which
+   is the failure shape this whole system is built against. So the text is not
+   dropped, it is the fallback — attempted only when the audio did not land, and
+   then in full rather than in part, because a half-heard message with no text
+   under it is worse than either.
+
+   WHAT IS STORED IS UNAFFECTED, and that is the half worth being clear about:
+   `remember` writes the transcript whatever happened on the wire, so her memory,
+   `search_memory` and the nightly pass read exactly what they always did.
+
+   IT IS NOT `say` ITSELF, because three things go through `say` that must stay
+   silent: the `/notes` audit, which is a rendered table and unlistenable; the
+   apologies, which are failure notices; and the short operational lines. A
+   message she wrote is a different thing from a line the function printed. */
+// Exported for the one guarantee here that a source read cannot settle: that
+// there is no path on which he gets nothing. With no TTS key every `speak`
+// answers false, which is exactly the shape of a vendor that refused.
+export async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
+  const parts = chunk(words, TTS_LIMIT);
+  let heard = parts.length > 0;
+  // Sequentially, because Telegram does not promise ordering across two sends —
+  // chunk()'s own reason for the same shape in say(). The keyboard rides on the
+  // last part and only the last, which is say()'s rule as well.
+  for (const [i, part] of parts.entries()) {
+    if (!await speak(part, i === parts.length - 1 ? keyboard : undefined)) heard = false;
+  }
+  // ANY part missing, not all of them. A message he heard three quarters of is
+  // one he cannot act on, and the text is cheap.
+  if (!heard) await say(words, keyboard);
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -2987,26 +3196,66 @@ export const feedbackKeyboard = (day: string) => ({
    did — so the draft goes out. Same direction as the pulse's `isSilent`: the
    failure that costs a message is worse than the failure that sends the
    original one. */
-const CRITIC_FLOOR = 400;
+/* RELATIVE, BECAUSE THE GATE NOW READS THREE-SENTENCE MESSAGES TOO. It was a
+   flat four hundred characters — a briefing that came back shorter than that
+   was an apology, and the draft went instead. Applied to a release look, which
+   is two or three sentences and often under four hundred to begin with, that
+   floor rejects almost every revision there is: the gate would run, be paid
+   for, and be overruled every time, and it would look exactly like a gate that
+   agreed with the draft.
 
+   A third is the same judgement made scale-free. On a briefing it is stricter
+   than the four hundred ever was; on a short message it still catches the
+   apology, which is the shape it exists for. */
 export function keepDraft(draft: string, revised: string): boolean {
   const t = revised.trim();
-  return t.length < CRITIC_FLOOR || t.length > draft.length * 2;
+  return t.length < draft.length / 3 || t.length > draft.length * 2;
 }
 
 async function critique(draft: string, notes: string, channels: string): Promise<string> {
+  return await gate(draft, `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
+}
+
+/* THE SAME GATE ON THE MESSAGES THE CRITIC NEVER REACHED. `CRITIC` runs on the
+   briefing alone, so the pulse, the release look and the move look went out
+   unreviewed for their whole lives — which is most of what he receives in a
+   week, and it is where he was reading her and finding her hard. The rules were
+   live and global on those paths and nothing had to answer for them.
+
+   `TRIM` asks the writing questions and nothing else: the briefing's own checks
+   are about a chain, a first sentence true only today and a word count, and
+   asked of three sentences they would rewrite a good message into a bad one. It
+   is handed no notes and no channel map, because it is not judging whether a
+   term was built — only whether the sentences obey the rules she writes by.
+
+   AND WHAT IT RETURNS IS WHAT GETS REMEMBERED, WHICH IS WHY THE THREE CALLERS
+   BIND IT. The draft is what `ask()` produced; the revision is what he read.
+   Storing the draft files a message he never saw as her own words, and hands it
+   back to her as history for the next six exchanges — the stale-copy failure
+   `remember` already refuses for the notes and the week's trades, arriving
+   through the door this gate opened. The briefing never had it: it stores what
+   `critique` returned. The three that GAINED a gate kept storing the draft for
+   as long as they had one. */
+async function trim(draft: string): Promise<string> {
+  return await gate(draft, `${TRIM}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
+}
+
+/* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
+   makes a gate safe is the same for both and is the part that must never be
+   copied: a revision that fails `keepDraft` is overruled, and a gate that
+   THROWS costs nothing at all. Both were stated once and would have been stated
+   twice the moment a second gate existed. */
+async function gate(draft: string, asked: string, label: string): Promise<string> {
   try {
-    const revised = await ask(
-      [{ role: 'user', content: `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}` }],
-      'medium', 'critic', CRITIC_TOOLS);
+    const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS);
     if (keepDraft(draft, revised)) {
-      console.log(`doji-eugenia: critic rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
+      console.log(`doji-eugenia: ${label} rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
       return draft;
     }
     return revised.trim();
   } catch (err) {
-    // A critic that fails must never cost the briefing it was checking.
-    console.error("doji-eugenia: critic failed —", err instanceof Error ? err.message : err);
+    // A gate that fails must never cost the message it was checking.
+    console.error(`doji-eugenia: ${label} failed —`, err instanceof Error ? err.message : err);
     return draft;
   }
 }
@@ -3054,7 +3303,7 @@ async function postBriefing(due: Brief): Promise<Response> {
      briefing is cheaper than sending four. */
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
-  await say(`${greeting(due)}\n\n${brief}`, feedbackKeyboard(nyDate(new Date())));
+  await sayAloud(`${greeting(due)}\n\n${brief}`, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
      written one row for the draft and one for the critic — what each of them
@@ -3299,8 +3548,9 @@ async function postPulse(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
-  await say(said);
-  await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: said }]);
+  const sent = await trim(said);
+  await sayAloud(sent);
+  await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: sent }]);
   return json({ ok: true, pulse: "sent" });
 }
 
@@ -3420,8 +3670,13 @@ async function postRelease(): Promise<Response> {
     `· ${r.name}` +
     (r.consensus ? `, ${r.consensus} expected` : "") +
     (r.prior ? `, after ${r.prior}` : "")).join("\n");
+  /* THE UTC STAMP, BECAUSE THE TOOL TAKES IT AND THE HEADING IS IN ET. She was
+     being asked to reconstruct it from a New York clock, which is a conversion
+     standing where an input belongs. Normalised through Date so both sides of
+     the filter spell the same instant the same way. */
   const asked = RELEASE +
-    `\n\nWhat landed at ${nyTime(due[0].at)} ET:\n${landed}` +
+    `\n\nWhat landed at ${nyTime(due[0].at)} ET — ${new Date(due[0].at).toISOString()} in UTC, ` +
+    `which is what record_actual takes:\n${landed}` +
     notes + channels + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
@@ -3430,11 +3685,12 @@ async function postRelease(): Promise<Response> {
   const named = due.map(r => r.name).join(", ");
   if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
-  await say(said);
+  const sent = await trim(said);
+  await sayAloud(sent);
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
   await remember([{ role: 'user', content: `[${named} landed]` },
-                  { role: 'assistant', content: said }]);
+                  { role: 'assistant', content: sent }]);
   return json({ ok: true, release: named, said: "sent" });
 }
 
@@ -3548,7 +3804,7 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, trade: id, said: "quiet" });
 
-  await say(said);
+  await sayAloud(said);
   await remember([{ role: 'user', content: `[trade ${event}]` },
                   { role: 'assistant', content: said }]);
   return json({ ok: true, trade: id, said: "sent" });
@@ -3765,9 +4021,10 @@ async function postMove(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
-  await say(said);
+  const sent = await trim(said);
+  await sayAloud(sent);
   await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
-                  { role: 'assistant', content: said }]);
+                  { role: 'assistant', content: sent }]);
   return json({ ok: true, move: worth.move, said: "sent" });
 }
 
@@ -3981,10 +4238,6 @@ async function handleMessage(update: any): Promise<void> {
     const blocks: any[] = [];
 
     const voice = msg.voice ?? msg.audio;
-    // Remembered rather than re-derived at the bottom: `text` is rewritten by
-    // the transcription, so by the time the answer exists there is nothing left
-    // in it that says how it arrived.
-    const heard = Boolean(voice?.file_id);
     if (voice?.file_id) {
       // The download and the transcription both take seconds, so the indicator
       // starts here rather than after — otherwise the wait for a voice note is
@@ -4103,15 +4356,16 @@ async function handleMessage(update: any): Promise<void> {
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
         calendarBlock(), positionsBlock(),
       ]);
-      /* TOLD THAT IT WILL BE HEARD, rather than left to a cap that silently
-         drops the audio on a long answer. The instruction and SPEAK_MAX are one
-         number stated once — an answer she keeps under it is one she chose,
-         where an answer trimmed by the cap is one he never learns was spoken. */
-      const aloud = heard
-        ? `\n\nHe sent this as a voice note, so your answer will be read back to him ` +
-          `aloud. Keep it under ${SPEAK_MAX} characters and write it to be heard — ` +
-          `no lists, no headings, nothing that needs to be looked at.`
-        : "";
+      /* TOLD THAT IT WILL BE HEARD, AND NOT TOLD A LENGTH. The instruction used
+         to carry the cap, so that an answer over it was one she chose rather
+         than one silently left unspoken. There is no cap now — a long answer
+         becomes two voice notes — so a number here would be asking her to write
+         shorter for a limit that no longer exists, which is the one thing this
+         was changed to stop. */
+      const aloud =
+        `\n\nYour answer is sent as text and read back to him aloud, so write it ` +
+        `to be heard: plain sentences, no headings, and nothing that only works ` +
+        `on a page. Its length is whatever the answer needs.`;
       const context = text + aloud + notes + channels + story + loops + calendar + desk;
       answer = await ask(
         [...history, {
@@ -4129,11 +4383,10 @@ async function handleMessage(update: any): Promise<void> {
       clearInterval(keepTyping);
     }
 
-    await say(answer);
-    // AFTER THE TEXT AND BEFORE THE WRITE. After, so the answer is already his
-    // whatever the vendor does; before, only because the write is the slower of
-    // the two and the audio is the half he is waiting on.
-    if (speaksBack(answer, heard)) await speak(answer);
+    // BEFORE THE WRITE, only because the write is the slower of the two and the
+    // audio is the half he is waiting on. The text-then-audio ordering inside
+    // sayAloud is the part that matters and is stated there.
+    await sayAloud(answer);
     // THE TEXT, NEVER THE BLOCKS. A chart stored as base64 would be a megabyte
     // of history resent on every turn for the next six exchanges, and the
     // transcript of a voice note is the part worth searching anyway. What was

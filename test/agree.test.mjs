@@ -1066,13 +1066,16 @@ test('the unreferenced-declaration scan can actually find one', () => {
     'dropping a step from render() leaves its renderer unreferenced and unseen');
 });
 
-/* ─── verify.sql's footer counts its own checks ──────────────────────────────
-   The footer is the paragraph a person reads at the moment they are already
-   lost: they ran the whole file, the editor showed them the last statement, and
-   the checks they came for scrolled past unseen. It tells them how many were
+/* ─── verify.sql's header counts its own checks ──────────────────────────────
+   It was a FOOTER, and the footer was a paragraph for someone already lost:
+   they ran the whole file, the editor showed them the last of ten statements,
+   and the checks they came for scrolled past unseen. It told them how many were
    thrown away — and it said fifty-seven while the summary held sixty, which is
-   the file describing itself wrongly in the one place that is read under
-   confusion.
+   a file describing itself wrongly in the one place read under confusion.
+
+   The file is one statement now and the listings are `diagnose.sql`, so nobody
+   arrives at the bottom lost and the count belongs where it is read BEFORE
+   running instead. The number still has to be right, and for the same reason.
 
    The number is a digit rather than a word so it can be compared. This
    repository has been bitten by a stale count twice already; CLAUDE.md's
@@ -1090,31 +1093,32 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
 
   const from = sql.indexOf('select check_name, actual, expected');
   const to   = sql.indexOf(') as t(check_name, actual, expected);', from);
-  assert.ok(from > -1 && to > from, 'the summary block is no longer where the footer sends people');
+  assert.ok(from > -1 && to > from, 'the summary block is no longer where the header says it is');
 
   const rows = (sql.slice(from, to).match(/^  \('/gm) || []).length;
   assert.ok(rows > 40, `only ${rows} checks parsed out of the summary — the reader has gone blind`);
 
-  // The footer is the banner-delimited note at the END of the file, not
-  // everything after the summary — between them sit the listings, the cron
-  // schedules and the embedding counts, all of them full of numbers.
-  const banner = sql.lastIndexOf('-- ═══');
-  const footer = sql.slice(sql.lastIndexOf('-- ═══', banner - 1));
-  const stated = footer.match(/the (\d+) checks that answer/);
-  assert.ok(stated, 'the footer no longer states how many checks were thrown away');
+  // The header is the banner-delimited note the file OPENS with, which is
+  // everything above the one statement.
+  const header = sql.slice(0, from);
+  const stated = header.match(/all (\d+) checks/);
+  assert.ok(stated, 'the header no longer states how many checks this runs');
   assert.equal(Number(stated[1]), rows,
-    `the footer says ${stated[1]} checks and the summary holds ${rows} — the one ` +
-    `paragraph read by someone who has just lost their result is wrong about it`);
+    `the header says ${stated[1]} checks and the summary holds ${rows} — the file ` +
+    `is wrong about itself in the paragraph read before it is run`);
 
-  // AND ONCE. A second copy of the count is a second thing to update, held
-  // together by nothing — the first stayed right while the sentence explaining
-  // WHY it is a digit carried the previous release's number, in the same
-  // paragraph, four lines below it. Any two-digit number in the footer that is
-  // not the stated count is that copy coming back.
-  const others = (footer.match(/\b\d{2,}\b/g) || [])
-    .filter(n => n !== stated[1] && n !== '10');
+  /* AND ONCE. A second copy of the count is a second thing to update, held
+     together by nothing — the first stayed right while the sentence explaining
+     WHY it is a digit carried the previous release's number, in the same
+     paragraph, four lines below it.
+
+     The numbered files are named in this paragraph (001, 002, 003, 004) and are
+     not counts, so they come out first — by their three-digit shape rather than
+     by a list, which would need extending the day a 011 is written. */
+  const others = (header.replace(/\b0\d{2}\b/g, '').match(/\b\d{2,}\b/g) || [])
+    .filter(n => n !== stated[1]);
   assert.deepEqual(others, [],
-    `the footer states a second number (${others.join(', ')}) beside its count of ` +
+    `the header states a second number (${others.join(', ')}) beside its count of ` +
     `${stated[1]} — one paragraph, one copy, or the spare one goes stale unwatched`);
 });
 
@@ -2865,9 +2869,11 @@ test('the critic is handed his notes and the map it is asked to enforce', () => 
   const body = src.slice(at, src.indexOf('\n}', at))
     .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
 
-  // In the message, not merely in the signature: a parameter the content string
-  // never interpolates is a critic reading the rules with none of the inputs.
-  const content = body.match(/content:\s*`([\s\S]*?)`/);
+  /* In the message, not merely in the signature: a parameter the message string
+     never interpolates is a critic reading the rules with none of the inputs.
+     Read as the template literal critique() builds, wherever that is handed —
+     it goes to the shared gate() now rather than straight into an ask(). */
+  const content = body.match(/`([\s\S]*?)`/);
   assert.ok(content, 'critique() no longer builds its message from a template literal');
   for (const block of ['notes', 'channels']) {
     assert.match(content[1], new RegExp(`\\$\\{${block}\\}`),
@@ -4557,34 +4563,84 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
   }
 });
 
-test('the answer is his before it is ever spoken', () => {
-  /* THE ORDER IS THE WHOLE SAFETY OF THIS PATH. say() first, speak() after —
-     so an unset key, a vendor that refused, or a format Telegram will not
-     render costs the audio and nothing else. Reversed, a speech call that hung
-     would hold the reply behind it, and one that threw would lose it: he asked
-     a question aloud and got silence, which is the failure VOICE_TROUBLE exists
-     on the other side of.
+test('the text is sent only when the audio did not land', () => {
+  /* THE VOICE NOTE IS THE MESSAGE NOW, and the ordering this used to assert is
+     reversed with it: `say` first meant two bubbles and two notifications for
+     one thing she said, which he asked to stop.
 
-     Read as positions in the handler rather than as a call anywhere in the
-     file, because both are called exactly once and only their ORDER is wrong. */
+     THE OBJECTION TO AUDIO-ONLY WAS REAL AND THIS IS THE ANSWER TO IT. A vendor
+     that refuses, an unset key, a format Telegram will not render — audio alone
+     turns each into a MISSING message. So `say` is still reachable and is the
+     fallback, and the property below is that it is reachable at all: deleted,
+     every one of those failures is silence with nothing reporting it. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function handleMessage(');
-  assert.ok(at > -1, 'doji-eugenia no longer has handleMessage()');
-  const body = src.slice(at);
+  const at = src.indexOf('export async function sayAloud(');
+  assert.ok(at > -1, 'doji-eugenia no longer has sayAloud()');
+  const body = src.slice(at, src.indexOf('\n}', at));
 
-  const said = body.indexOf('await say(answer);');
-  const spoke = body.indexOf('await speak(answer)');
-  assert.ok(said > -1, 'handleMessage no longer sends the answer as text');
-  assert.ok(spoke > -1, 'handleMessage never speaks the answer');
-  assert.ok(said < spoke,
-    'handleMessage speaks before it sends the text, so a speech vendor that ' +
-    'hangs or throws costs him the answer rather than the audio');
+  const spoke = body.indexOf('await speak(');
+  const said = body.indexOf('await say(');
+  assert.ok(spoke > -1, 'sayAloud never speaks');
+  assert.ok(said > spoke,
+    'sayAloud sends the text before or instead of attempting the audio, which is ' +
+    'the two-message shape he asked to end');
+  assert.match(body, /if \(!heard\) await say\(words, keyboard\)/,
+    'the text is no longer the fallback — either it goes unconditionally, or a ' +
+    'speech vendor that refuses is now a message he never receives');
+  assert.match(body, /i === parts\.length - 1 \? keyboard/,
+    "the briefing's keyboard is on every part or on none — there is no text " +
+    'message under the voice note to carry it any more');
+});
 
-  // AND IT IS GATED, not spoken every time. Without this every typed line comes
-  // back as a voice note he did not ask for.
-  assert.match(body.slice(said, spoke + 40), /if \(speaksBack\(answer, heard\)\)/,
-    'the answer is spoken unconditionally rather than only when he spoke first');
+test('every message she writes goes out through sayAloud', () => {
+  /* THE HALF THE FUNCTION CANNOT GUARANTEE. A path that calls `say` directly
+     still works and still reaches him — it is simply silent, which is the
+     feature not happening on one message rather than failing anywhere. Six:
+     both briefings share a call site, then the pulse, the release look, the
+     trade event, the move look and the reply.
+
+     `/notes`, the apologies and the short operational lines keep `say`
+     deliberately: a rendered table read aloud is unlistenable and a failure
+     notice is not a message she wrote. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const spoken = (src.match(/await sayAloud\(/g) || []).length;
+  assert.equal(spoken, 6,
+    `${spoken} paths speak where six should — a message she writes that goes ` +
+    `out through say() alone arrives correctly and silently`);
+});
+
+test('the three gated paths remember what the gate returned, not the draft', () => {
+  /* THE STALE COPY ARRIVING THROUGH THE DOOR THE GATE OPENED. `trim` may
+     rewrite, so the draft and the message he read are two different texts —
+     and for as long as these three had a gate they sent one and stored the
+     other. The cost is not the audit: it is that her own history then holds
+     words he never saw, resent as hers for the next six exchanges, which is
+     exactly what `remember` refuses for the notes and the week's trades.
+
+     `postBriefing` is not here because it never had the fault — it stores what
+     `critique` returned. Nothing in this suite can drive a path that sends, so
+     the binding is read out of the source. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  for (const fn of ['postPulse', 'postRelease', 'postMove']) {
+    const at = src.indexOf(`async function ${fn}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
+    const body = src.slice(at, src.indexOf('\n}', at));
+
+    assert.match(body, /const sent = await trim\(said\);/,
+      `${fn} no longer binds the revision — inlined into sayAloud it cannot ` +
+      'also be the thing that is stored');
+    assert.match(body, /await sayAloud\(sent\)/,
+      `${fn} speaks something other than the revision it bound`);
+    assert.match(body, /role: 'assistant', content: sent/,
+      `${fn} stores a text other than the one it sent — her history now holds ` +
+      'a message he never read');
+    assert.doesNotMatch(body, /role: 'assistant', content: said/,
+      `${fn} is back to storing the draft`);
+  }
 });
 
 test('the audio is asked for in the one format Telegram renders as a voice note', () => {
@@ -4617,9 +4673,9 @@ test('the length she is told to write to is the length that is spoken', () => {
      dropped rather than never attempted. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  assert.match(src, /Keep it under \$\{SPEAK_MAX\} characters/,
-    'the instruction states a length as a literal rather than reading SPEAK_MAX, ' +
-    'so the two can disagree with nothing to reveal it');
+  assert.doesNotMatch(src, /Keep it under \$\{[A-Z_]*MAX[A-Z_]*\} characters/,
+    'the prompt asks her to write shorter to fit a voice note again — there is ' +
+    'no cap for it to fit, so that is a shorter answer bought for nothing');
 });
 
 test('every reason a voice note fails is one the handler can actually reach', () => {
@@ -4980,4 +5036,501 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
     `function this repository deploys — every call is a 404`);
   assert.match(eugenia, /MARKET_URL[\s\S]{0,400}?x-doji-key/,
     'the market read presents no secret, so the poller will refuse it 401');
+});
+
+/* ─── A look may fill a release in and may never file one ────────────────────
+   The release look held `log_calendar`, whose key is (at, name) over a name the
+   model writes. On 16 September it was handed
+   `US retail sales (August, advance)`, marked that row at 12:35:00, and filed
+   the print under `retail sales` at 12:36:15 — an INSERT. The actual landed on
+   a row with no consensus, the consensus stayed on a row with no actual, and
+   the comparison the table exists for was gone with nothing failing.
+
+   The RELEASE prompt had said *the same time and name* since the tool was
+   written. That is the evidence, rather than an argument, that this cannot be
+   carried by an instruction — so the tool array is the guarantee now, and these
+   read for it. Every one of them is silent when it breaks: a look that can
+   upsert again still answers, still sends a correct message, and leaves a
+   second row behind that nobody is looking at.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the release look is handed no tool that can file a calendar row', () => {
+  const array = EUGENIA_TS.match(/const RELEASE_TOOLS = \[([^\]]*)\]/)?.[1];
+  assert.ok(array, 'RELEASE_TOOLS is no longer an array literal, so nothing here can read it');
+  assert.doesNotMatch(array, /CALENDAR_TOOL/,
+    'the release look can upsert the calendar again — it will mint the row it was ' +
+    'looking at, under a name a shade off the one it was handed');
+  assert.match(array, /ACTUAL_TOOL/,
+    'the release look has no way to record what a release printed, so the table ' +
+    'keeps a consensus for ever and never the number');
+});
+
+test('record_actual cannot be handed a column the briefing owns', () => {
+  const schema = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const ACTUAL_TOOL'));
+  const props = schema.slice(0, schema.indexOf('required:'));
+  for (const owned of ['consensus', 'prior', 'importance']) {
+    assert.doesNotMatch(props, new RegExp(`\\b${owned}:`),
+      `record_actual offers ${owned} — the same release once carried two ` +
+      `contradictory priors because a look could write one`);
+  }
+});
+
+test('the release prompt asks for the tool the release look actually has', () => {
+  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)?.[1];
+  assert.ok(release, 'the RELEASE prompt is no longer readable from here');
+  assert.match(release, /record_actual/,
+    'the release prompt names no tool for the number, so the look reads the print and files nothing');
+  assert.doesNotMatch(release, /log_calendar/,
+    'the release prompt still names log_calendar, which that path is no longer given — ' +
+    'she is being asked for a tool that answers "there is no tool called that here"');
+});
+
+test('the release look is handed the stamp its tool takes', () => {
+  /* THE HEADING IS IN ET AND THE TOOL TAKES UTC. Asked to convert, she converts
+     from a New York clock she was given as words — a conversion standing where
+     an input belongs, which is the shape the price line was moved for. Dropping
+     it breaks nothing: the look still runs, still says the right thing, and
+     writes against an instant an hour out for half the year. */
+  const at = EUGENIA_TS.indexOf('async function postRelease(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /toISOString\(\)[\s\S]{0,80}record_actual/,
+    'postRelease no longer hands her the UTC stamp record_actual matches on');
+});
+
+test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () => {
+  /* `updated_at` exists to say which of two contradictory rows carries the later
+     CONTENT. markLooked writes looked_at and nothing else, so an unconditional
+     touch makes it say when a row was last HANDLED — and on 16 September the row
+     with the stale prior was marked at 12:35:00 while the row with the actual
+     was written at 12:36:15. Seventy-five seconds is the whole reason it ordered
+     correctly. Reverse them and the column answers the opposite of the truth. */
+  const fn = SENSES_SQL.slice(SENSES_SQL.indexOf('function public.eugenia_calendar_touch()'));
+  const body = fn.slice(0, fn.indexOf('$$;') + 3);
+  assert.match(body, /is distinct from/,
+    'eugenia_calendar_touch moves updated_at on every update again, so a look ' +
+    'marking a stale row makes it read as the later one');
+  for (const ignored of ['updated_at', 'looked_at']) {
+    assert.ok(body.split(`- '${ignored}'`).length === 3,
+      `${ignored} is not excluded from both sides of the comparison, so the ` +
+      `trigger compares a column it is in the middle of writing`);
+  }
+});
+
+/* ─── The shape rules, and the critic's second copy of each ──────────────────
+   `CRITIC` runs LAST. A rule tightened for the writer and left out of the
+   critic is a rule the critic removes again every morning, which is how the
+   build-up `PITCH` had just required came to be cut from every briefing before
+   it was sent. These hold the pairs together.
+
+   Each one is silent when it breaks: the briefing still arrives, still reads
+   well, and is simply back to the thing he said was too hard to read.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the writing rules are stated once and read by all three', () => {
+  /* ONE IDEA PER SENTENCE IS THE RULE THE REST OF IT RESTS ON, and this is what
+     holds it: everything here bounded word CHOICE and nothing bounded a
+     SENTENCE, so a message built entirely of plain words still read as hard and
+     no rule was being broken.
+
+     THEY WERE TWO COPIES HELD APART BY A TEST, which worked while there were
+     two readers. The night a move look sent three paragraphs there was a third
+     reader needed — and a third copy is where two agreeing and one drifting
+     starts. `WRITING` is the source; SYSTEM writes to it, CRITIC checks the
+     briefing against it, TRIM checks the short messages against it.
+
+     A reader that stops interpolating it is silent: it still has a prompt, the
+     message still arrives, and one of the three is simply working from an older
+     idea of how she writes. */
+  assert.match(EUGENIA_PROMPT, /export const WRITING = `/,
+    'the writing rules are no longer stated in one place');
+  for (const reader of ['SYSTEM', 'CRITIC', 'TRIM']) {
+    const at = EUGENIA_PROMPT.indexOf(`export const ${reader} = \``);
+    assert.ok(at > -1, `${reader} is gone`);
+    const body = EUGENIA_PROMPT.slice(at, EUGENIA_PROMPT.indexOf('`;', at));
+    assert.match(body, /\$\{WRITING\}/,
+      `${reader} no longer reads WRITING, so it is working from its own older ` +
+      `idea of how she writes and nothing says the three have parted`);
+  }
+});
+
+test('the number budget is stated to the writer and to the critic', () => {
+  // Nothing bounded these before. Fourteen true figures is a page he skims.
+  assert.match(EUGENIA_PROMPT, /FOUR TO SIX NUMBERS IN THE WHOLE BRIEFING/,
+    'the writer is no longer given a number budget');
+  assert.match(EUGENIA_PROMPT, /HOW MANY NUMBERS ARE IN IT\?/,
+    'the critic no longer counts them, so the budget is advisory');
+});
+
+test('the word count never outranks the teaching block, in either copy', () => {
+  /* A CEILING ON ITS OWN WAS TRIED HERE AND IT CUT THE TEACHING, every morning,
+     because the teaching block is the longest thing on the page. The count is
+     only safe while what to cut INSTEAD is stated beside it — so these two
+     belong to one decision and a copy holding the count alone reproduces the
+     failure the count was removed for. */
+  const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
+  const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
+  for (const [who, half] of [['writer', writer], ['critic', critic]]) {
+    assert.match(half, /250 to 300 words/, `the ${who} has lost the word count`);
+    assert.match(half, /[Nn]ever the teaching block|NOT A PLACE YOU CUT|never out of the block/,
+      `the ${who} holds a word count with nothing saying what to cut instead — ` +
+      `which is the arrangement that stopped her teaching the first time`);
+  }
+});
+
+test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
+  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, and it has to be said in both: the
+     critic is the half that decides a mechanism it can see inside one briefing
+     is a repetition. At `owns` the map says use it bare, and for this chain
+     that is wrong — it is under nearly every briefing, and a reader who has
+     lost it has lost all of them. */
+  // WHITESPACE-COLLAPSED, because this file is hard-wrapped at eighty columns by
+  // its own prose guard — a phrase is routinely split across two lines, and a
+  // reader that cannot see one would report a rule missing that is sitting there.
+  const flat = at => EUGENIA_PROMPT.slice(...at).replace(/\s+/g, ' ');
+  const cut = EUGENIA_PROMPT.indexOf('export const CRITIC');
+  for (const [who, half] of [['writer', flat([0, cut])], ['critic', flat([cut])]]) {
+    assert.match(half, /once inflation is taken out/,
+      `the ${who} no longer names the chain that is never assumed`);
+    assert.match(half, /exempt from the map|map does not apply/,
+      `the ${who} does not say the rung is overridden for it, so at \`owns\` it ` +
+      `gets used bare and the one load-bearing mechanism goes unsaid`);
+  }
+});
+
+test('no term is used bare, and the test is whether the name explains itself', () => {
+  /* THE RULE BANNED THE THING HE LIKED. It was "no coined shorthand — do not
+     invent a name and reuse it as though it were a term", and his own approved
+     draft leans on "the genuine part" three times. Read literally the prompt
+     forbade the register it was written to produce, which is the shape that
+     makes a rule get ignored rather than followed.
+
+     Self-describing is the distinction that was actually meant. "The leftover"
+     tells a reader nothing; "the genuine part" tells them everything. And the
+     case it really fails on is not an invented name at all — it is a MARKET
+     term used bare. "Oil has handed back most of the war premium" is four plain
+     words and one that does the whole damage. */
+  const flat = EUGENIA_PROMPT.replace(/\s+/g, ' ');
+  assert.match(flat, /NO TERM USED BARE/,
+    'a term may be used with no gloss again, which is what "war premium" was');
+  assert.match(flat, /explains itself|EXPLAINS ITSELF/,
+    'the self-describing test is gone, so the rule is back to banning the ' +
+    'register his own draft is written in');
+  assert.match(flat, /A MARKET TERM IS THE CASE THIS ACTUALLY FAILS ON/,
+    'nothing names the case that actually recurs — an invented word is rare, ' +
+    'a market term used bare is every briefing');
+  assert.match(EUGENIA_PROMPT, /NO PUNCHLINES/,
+    'the no-punchline rule is gone, so a paragraph may close on a line that ' +
+    'sounds good and takes a second to decode');
+});
+
+test('the rules carry a worked example, because no description of them worked', () => {
+  /* "USE THE PLAINEST AVAILABLE WORD" HAD BEEN IN THESE RULES FOR DAYS and the
+     briefing it produced said "dearer fuel lifts measured inflation twice
+     over". Meanwhile the countable rule beside it — twenty words, one idea —
+     landed at a hundred per cent on its first morning: zero sentences over the
+     cap, longest eighteen words, no asides.
+
+     That split is the whole reason this is here. A gate can count words. It
+     cannot adjudicate "is this the plainest word" against an adjective, and a
+     model matches an example where it ignores a description. It lives in
+     WRITING so the writer and both gates read the same one. */
+  const at = EUGENIA_PROMPT.indexOf('export const WRITING = `');
+  const body = EUGENIA_PROMPT.slice(at, EUGENIA_PROMPT.indexOf('`;', at));
+  assert.match(body, /THIS IS THE STANDARD/,
+    'the worked example is gone from WRITING — the rules are back to describing ' +
+    'a register rather than showing one, which is what produced "dearer fuel"');
+  assert.match(body, /the genuine part/,
+    'the example no longer carries the chain it exists to demonstrate');
+  assert.match(body, /A PARAGRAPH IS THREE OR FOUR SENTENCES/,
+    'nothing bounds a paragraph, so sixteen easy sentences arrive in one block ' +
+    'with nowhere to breathe — which is how a briefing of short sentences still ' +
+    'reads as a wall');
+});
+
+/* ─── verify.sql is one statement, and diagnose.sql is where the rest went ────
+   A SQL editor shows the result of the LAST statement only. Ten listings under
+   the summary meant that running the file top to bottom displayed the last ten
+   HTTP responses and threw all 71 checks away — which is not hypothetical: it
+   happened, to the person who wrote the note at the bottom explaining it, and
+   then again to the person that note was written for.
+
+   Moving the summary to the END instead would have been worse. Three of those
+   listings can RAISE on a database missing what they read — `cron.job` without
+   pg_cron, `net._http_response` without pg_net, a public table never created —
+   and anything that raises takes every statement after it, so the summary would
+   vanish on exactly the databases it exists for. Two files is what lets both be
+   last in their own.
+
+   The regression is one appended `select`, and it is silent: the file still
+   runs, every check still passes, and the grid shows something else.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('verify.sql runs exactly one statement, so the editor shows the checks', () => {
+  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+
+  /* Comments first, then string literals — the order this file already learned
+     the hard way, since a `--` comment here routinely carries an apostrophe and
+     one unpaired quote desynchronises literal matching for everything after. */
+  const bare = sql
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--[^\n]*/g, '')
+    .replace(/'(?:[^']|'')*'/g, "''");
+
+  const statements = (bare.match(/;/g) || []).length;
+  assert.equal(statements, 1,
+    `verify.sql holds ${statements} statements — a SQL editor shows the last one, ` +
+    `so every check above it is run and thrown away. The extra one belongs in ` +
+    `diagnose.sql`);
+});
+
+test('the listings still exist, in the file that can afford to raise', () => {
+  // Deleting them instead of moving them would pass the test above and lose the
+  // eye pass — the thing you reach for at the moment a check says false.
+  const diag = readFileSync(new URL('../supabase/diagnose.sql', import.meta.url), 'utf8');
+  for (const read of ['cron.job', 'net._http_response', 'information_schema.columns']) {
+    assert.ok(diag.includes(read),
+      `diagnose.sql no longer reads ${read}, so "which schedule, which column" ` +
+      `has no answer anywhere`);
+  }
+});
+
+/* ─── One model per caller, and the map is keyed on a free-text label ────────
+   A week of `eugenia_runs` decided this: fourteen release looks cost more than
+   five briefings, and the move look is the most expensive single message she
+   sends. What moves to Sonnet is bounded work handed everything it needs; what
+   stays on Opus decides something open — the briefing, the nightly pass that
+   writes memory, the critic that is the last gate, the trade look that reaches
+   him mid-position, and the conversation.
+
+   THE MAP IS KEYED ON A STRING NOTHING CHECKS. A key no caller uses is a row
+   that silently never applies, and the caller then runs on the default, which
+   is the expensive one — correct output, quietly, at the price the change was
+   made to stop paying.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every model the map names belongs to a caller that exists', () => {
+  const labels = new Set([
+    ...[...EUGENIA_TS.matchAll(/ask\([\s\S]{0,400}?'(?:high|medium|low)',\s*'([^']+)'/g)]
+        .map(m => m[1]),
+    // The briefings are the one label built rather than written: `${due} briefing`.
+    ...[...EUGENIA_TS.matchAll(/\$\{due\} briefing/g)].map(() => 'weekday briefing'),
+    // AND THE TWO THAT REACH ask() THROUGH gate(). The critic and the trim share
+    // one body, so their labels are arguments to it rather than literals beside
+    // an effort — invisible to the reader above, and a model row keyed on one of
+    // them would have read as naming nothing.
+    ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'\)/g)].map(m => m[1]),
+  ]);
+  assert.ok(labels.size >= 5,
+    `only ${labels.size} caller labels read out of the file — the reader has gone blind`);
+
+  const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
+  const keyed = [...map.slice(0, map.indexOf('};')).matchAll(/'([^']+)':\s*(OPUS|SONNET)/g)]
+    .map(m => m[1]);
+  assert.ok(keyed.length > 0, 'the model map is empty or no longer readable from here');
+
+  for (const key of keyed) {
+    assert.ok(labels.has(key),
+      `the model map names '${key}' and nothing calls ask() with that label — ` +
+      `that caller runs on the default, which is the expensive one, silently`);
+  }
+});
+
+test('no caller that runs a tool loop is on the cheaper model', () => {
+  /* THE RELEASE LOOK DIED AT MAX_ROUNDS ON ITS FIRST TWO FIRINGS AFTER MOVING.
+     Twice inside half an hour, and what reached him was the apology. Fourteen
+     turns on Opus in the measured week had never come near the cap.
+
+     The cap is higher now and that is NOT why they came back. What the two
+     failures establish is that the round budget on a tool-heavy caller is a
+     property of the MODEL rather than of the task — which nothing here had
+     measured and the change assumed. A cheaper caller that does not answer is
+     not cheaper.
+
+     `trim` is the exception and the distinction is the whole of why: it is
+     handed `CRITIC_TOOLS`, which is empty, so it makes one request with no loop
+     to run out of. That is the shape a cheaper model is safe on here.
+
+     A caller added to this map with a non-empty tool array would look exactly
+     like the last one did: correct in every test, cheaper on paper, and dead on
+     the morning a print lands. */
+  const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
+  const keyed = [...map.slice(0, map.indexOf('};')).matchAll(/'([^']+)':\s*SONNET/g)]
+    .map(m => m[1]);
+
+  /* RESOLVED rather than looked for nearby, because a label reaches ask() two
+     ways: named beside its array, or handed to gate(), which supplies one for
+     it. A reader that only knew the first shape would have passed `trim` for
+     the wrong reason and would pass a tool-heavy caller wired the same way. */
+  const arrayFor = (label) => {
+    const direct = EUGENIA_TS.match(
+      new RegExp(`ask\\([\\s\\S]{0,400}?'(?:high|medium|low)',\\s*'${label}',\\s*(\\w+)`));
+    if (direct) return direct[1];
+    // Through gate(): its own ask() names the array every caller of it gets.
+    if (new RegExp(`gate\\([\\s\\S]{0,200}?'${label}'\\)`).test(EUGENIA_TS)) {
+      const at = EUGENIA_TS.indexOf('async function gate(');
+      return EUGENIA_TS.slice(at).match(/'medium', label, (\w+)/)?.[1];
+    }
+    return null;   // named by nothing the reader knows — never silently fine
+  };
+
+  for (const label of keyed) {
+    assert.equal(arrayFor(label), 'CRITIC_TOOLS',
+      `'${label}' is on the cheaper model with a tool array that is not empty — ` +
+      `that is what killed the release look twice in half an hour, and it fails ` +
+      `as an apology rather than as anything a test could see`);
+  }
+});
+
+test('the round cap is a backstop rather than a working limit', () => {
+  const at = EUGENIA_TS.indexOf('const MAX_ROUNDS =');
+  const value = Number(EUGENIA_TS.slice(at).match(/const MAX_ROUNDS = (\d+)/)?.[1]);
+  assert.ok(value >= 10,
+    `MAX_ROUNDS is ${value} — at six a release look that searched, fetched and ` +
+    `searched again ran out twice in half an hour, and the caller died rather ` +
+    `than answered`);
+});
+
+test('the critic is not among them, and that is the decision', () => {
+  /* IT IS THE ONE I EXPECTED TO MOVE. Sonnet saves about $3.50 a month on it —
+     and it runs LAST, it can rewrite, and it is the final gate on the exact
+     thing he spent two weeks saying read badly. A saving that small against
+     that risk is optimising because it is possible. */
+  const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
+  const body = map.slice(0, map.indexOf('};'));
+  for (const judging of ['critic', 'consolidation', 'reply', 'trade look', 'briefing']) {
+    assert.doesNotMatch(body, new RegExp(`'${judging}'`),
+      `'${judging}' has been moved off Opus — it decides something open rather ` +
+      `than checking something bounded, and nothing here can see the quality it costs`);
+  }
+});
+
+test('the refusal fallback rides only with the model it is proven on', () => {
+  /* NOT A RULE, CAUTION. `fallbacks` has carried the briefings since the
+     morning a decline cost one, on Opus. Whether the parameter is accepted on
+     Sonnet is not something anything here has established, and the failure if
+     it is not is a 400 on every call — three callers dark at once, all of them
+     scheduled. Both halves must be gated together: the header without the field
+     and the field without the header are each a 400 in their own right. */
+  const at = EUGENIA_TS.indexOf('async function call(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n  if (!res.ok)', at));
+  assert.match(body, /\.\.\.\(model === OPUS\s*\n?\s*\?\s*\{ "anthropic-beta": "server-side-fallback/,
+    'the fallback beta header is sent on every model, so a model that refuses ' +
+    'the header 400s on every call it makes');
+  assert.match(body, /\.\.\.\(model === OPUS \? \{ fallbacks: "default" \} : \{\}\)/,
+    'the fallbacks field is sent on every model, or is no longer sent at all — ' +
+    'the header and the field are a pair and either alone is a 400');
+});
+
+/* ─── A move with no cause under it is a price callout ───────────────────────
+   The move look sent him three paragraphs about gold being up 35.8 since the
+   roll, ending "I can't find what did this" and "I've filed it to check
+   tomorrow". It was obeying `MOVE` exactly: the prompt said an unexplained move
+   was worth telling him as that, and that open_loop was the right home for it.
+
+   Both halves were wrong and the file already knew why. Without a cause all
+   that is left is the price, which is on his screen in more detail than she can
+   give it — and the whole justification for this path is TEACHING what moved
+   gold, so no cause means nothing to teach. The loop is worse: nothing arrives
+   tomorrow to close a thread about a move that had no event under it, so it
+   rides into every briefing after it. That is the $13 and $17 case from the
+   thin hours, recurring at $35 because the gate was fixed and the prompt was
+   not.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('an unexplained move is silence, and opens no thread', () => {
+  const move = EUGENIA_PROMPT.match(/export const MOVE = `([\s\S]*?)`;/)?.[1];
+  assert.ok(move, 'the MOVE prompt is no longer readable from here');
+  const flat = move.replace(/\s+/g, ' ');
+
+  assert.match(flat, /A MOVE YOU CANNOT EXPLAIN IS NOTHING/,
+    'the move look may report a move it could not explain again — which is a ' +
+    'price callout, and the price is already on his screen');
+  assert.match(flat, /OPEN NO LOOP FOR IT/,
+    'the move look may open a thread about a move with no event under it — ' +
+    'nothing will ever close it, so it rides into every briefing after it');
+
+  // AND THE LENGTH PERMISSION IS GONE. "Take the extra sentence or two that
+  // needs" was the only length signal on this path and it pointed the wrong
+  // way, at the end of the prompt, which is the last thing she reads.
+  assert.doesNotMatch(flat, /extra sentence or two/,
+    'MOVE ends by inviting a longer message again, which is the one length ' +
+    'instruction on a path the critic did not reach');
+});
+
+/* ─── The gate reaches the messages the critic never did ─────────────────────
+   `CRITIC` ran on the briefing ALONE. The pulse, the release look and the move
+   look went out unreviewed for their whole lives — which is most of what he
+   receives in a week, and it is where he was reading her and finding her hard.
+   The writing rules were live and global on those paths; nothing had to answer
+   for them.
+
+   The trade event stays out on purpose: both its branches are decided from data
+   before any model call and what it says is one of his own rules read back, so
+   there is no composed prose to trim.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every message she composes goes through a gate before it is sent', () => {
+  const trimmed = (EUGENIA_TS.match(/const sent = await trim\(said\);/g) || []).length;
+  assert.equal(trimmed, 3,
+    `${trimmed} of the three short paths are gated — an ungated one still ` +
+    `arrives and reads correctly, and is simply back to being unchecked`);
+  assert.match(EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function postBriefing(')),
+    /await critique\(/, 'the briefing is no longer gated at all');
+});
+
+test('the two gates share the half that makes a gate safe', () => {
+  /* A revision that fails `keepDraft` is overruled, and a gate that THROWS
+     costs nothing. Both are the same for either gate and both were about to be
+     copied — and a copy of the catch is where one gate loses the message it was
+     checking, on the day a vendor is slow. */
+  const at = EUGENIA_TS.indexOf('async function gate(');
+  assert.ok(at > -1, 'the shared gate body is gone, so each gate holds its own copy');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /if \(keepDraft\(draft, revised\)\)[\s\S]{0,200}return draft;/,
+    'a gate no longer overrules a failed revision, so a critic that returns an ' +
+    'apology sends the apology');
+  assert.match(body, /catch[\s\S]{0,200}return draft;/,
+    'a gate that throws no longer falls back to the draft, so a slow vendor ' +
+    'costs the message rather than the check');
+});
+
+test('keepDraft is relative, because it now reads three-sentence messages', () => {
+  /* IT WAS A FLAT FOUR HUNDRED CHARACTERS, which is a briefing's floor: shorter
+     than that and the thing that came back was an apology. A release look is two
+     or three sentences and often under four hundred to begin with, so that floor
+     overrules every revision there is — and a gate overruled every time looks
+     exactly like a gate that agreed with the draft. */
+  assert.doesNotMatch(EUGENIA_TS, /CRITIC_FLOOR/,
+    'the absolute floor is back, so the gate on the short paths is paid for and ' +
+    'overruled on every message it ever checks');
+  assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
+    'keepDraft no longer scales with the draft it is judging');
+});
+
+/* ─── Which model ran, which the log line said and the row did not ───────────
+   `rounds` has been written since this table existed and `fell_back` records
+   only a decline, so "how many rounds does THIS model need on THIS caller" had
+   no answer here. The day a tool-heavy caller changed model it ran out of
+   rounds twice in half an hour, and nothing could compare the two.
+
+   The column existing is the half a schema check can see. The half it cannot is
+   NOTHING WRITING IT: every row still lands, the meter still looks healthy, and
+   the column reads null for ever — answerable-looking and unanswerable.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every run row records the model that answered it', () => {
+  const calls = [...EUGENIA_TS.matchAll(/recordRun\(\{([\s\S]*?)\}\)/g)]
+    .map(m => m[1])
+    // ask()'s two — the turn that finished and the turn that threw. The briefing
+    // marker and the two sweep meters write no model because they make no call.
+    .filter(body => /in_tokens/.test(body));
+  assert.equal(calls.length, 2,
+    `${calls.length} recordRun call sites carry token counts where two should — ` +
+    `the reader has gone blind, or a third model call is recording nothing`);
+
+  for (const body of calls) {
+    assert.match(body, /\bmodel\b/,
+      'a model call is recorded without naming the model that served it, so the ' +
+      'column reads null for ever and the question it exists for is still unanswerable');
+  }
 });

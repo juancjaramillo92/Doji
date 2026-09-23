@@ -87,6 +87,13 @@ create table if not exists public.eugenia_runs (
   -- produce a briefing.
   chars      int,
 
+  -- WHICH MODEL RAN. The log line named it and the row did not, so "how many
+  -- rounds does THIS model need on THIS caller" had no answer here — and the
+  -- day a tool-heavy caller changed model it ran out of rounds twice in half an
+  -- hour with nothing able to compare the two. Free text for `caller`'s reason:
+  -- a new model must not need a migration.
+  model      text,
+
   -- The model that actually answered, when it was not the one asked for.
   -- `fallbacks: "default"` rescues a decline invisibly; this is where that
   -- becomes a countable fact rather than a line in a log.
@@ -104,6 +111,14 @@ create table if not exists public.eugenia_runs (
 -- would say the cache was free rather than unmeasured.
 alter table public.eugenia_runs add column if not exists wrote_1h int;
 alter table public.eugenia_runs add column if not exists wrote_5m int;
+
+-- WHICH MODEL RAN, WHICH THE LOG LINE SAID AND THE ROW DID NOT. `rounds` has
+-- been written since this table existed and `fell_back` records only a decline,
+-- so "how many rounds does THIS model need on THIS caller" had no answer here —
+-- and the day a tool-heavy caller changed model it ran out of rounds twice in
+-- half an hour with nothing able to compare the two. Free text for `caller`'s
+-- reason: a new model must not need a migration.
+alter table public.eugenia_runs add column if not exists model text;
 
 -- The only reads are "recently" and "this caller recently".
 create index if not exists eugenia_runs_at_desc on public.eugenia_runs (at desc);
@@ -185,15 +200,34 @@ create table if not exists public.eugenia_calendar (
   constraint eugenia_calendar_unique unique (at, name)
 );
 
--- The column above has a default for the INSERT; this is what moves it on every
--- UPDATE, including the PATCH that stamps looked_at. Named and shaped after
--- `trades_touch`, which does the same job for the same reason in 001.
+-- The column above has a default for the INSERT; this is what moves it when an
+-- UPDATE changes anything a person filed. Named and shaped after `trades_touch`,
+-- which does the same job for the same reason in 001.
 alter table public.eugenia_calendar add column if not exists updated_at timestamptz not null default now();
 
+-- A MARK IS NOT AN EDIT, AND THE COLUMN ABOVE CLAIMS TO ANSWER WHICH ROW HOLDS
+-- THE LATER CONTENT. markLooked stamps looked_at and touches nothing else, so a
+-- touch there makes updated_at say when a row was last HANDLED — and on
+-- 16 September the row carrying the stale prior was marked at 12:35:00 while the
+-- row carrying the actual was written at 12:36:15. It ordered correctly by
+-- seventy-five seconds. Reverse the two and updated_at names the stale row as
+-- the later one, which is the table saying the opposite of the truth in the one
+-- column it has for the question.
+--
+-- Compared as jsonb less the two bookkeeping columns, rather than as a list of
+-- the rest: a column added later is compared without anyone having to remember
+-- to add it here, and a list that goes stale fails by quietly ignoring the new
+-- column's edits.
 create or replace function public.eugenia_calendar_touch()
 returns trigger
 language plpgsql
-as $$ begin new.updated_at := now(); return new; end $$;
+as $$ begin
+  if to_jsonb(old) - 'updated_at' - 'looked_at'
+     is distinct from to_jsonb(new) - 'updated_at' - 'looked_at' then
+    new.updated_at := now();
+  end if;
+  return new;
+end $$;
 
 drop trigger if exists eugenia_calendar_touch_updated_at on public.eugenia_calendar;
 create trigger eugenia_calendar_touch_updated_at

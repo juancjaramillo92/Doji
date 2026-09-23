@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 528 tests, six suites
+npm test      # 561 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -399,9 +399,14 @@ code you write near it:
   and deliberate: *what the market is pricing* and *what would surprise it* are
   facts about today and are hers to say; what price will do never is. Widening
   that is a product decision, not a prompt tweak.
-- **The briefing is prose and must stay prose.** Numbered sections with headings
-  are a report however plain the words inside them. Do not reintroduce
-  scaffolding to "organise" it.
+- **The briefing is prose and must stay prose, with ONE relaxation that is his
+  and is written down.** Numbered sections with headings are a report however
+  plain the words inside them, and reintroducing scaffolding to "organise" the
+  prose is still the move to refuse. The CALENDAR slot is the exception: a bold
+  day label and one line per item, because he read a draft of it beside the prose
+  and the list was the half that was instantly readable. It holds times and names
+  — `NAMED AND NOTHING MORE` — and no mechanism, which is the rule the reshape
+  had to carry across and nearly did not.
 - **ONE CHAIN PER BRIEFING, AND IT IS A BREADTH RULE RATHER THAN A LENGTH ONE.**
   Every scheduled thing that matters still gets named — he needs the week — but
   only one gets its mechanism walked. Nine subjects each carrying a clause of
@@ -413,16 +418,86 @@ code you write near it:
   critic runs last and a rule loosened in one place is a rule it puts back every
   morning.
 
-- **LENGTH IS NOT A RULE, AND THE CRITIC HOLDS A SECOND COPY OF EVERY RULE IT
-  RESTATES.** A flat ceiling for the whole briefing was what decided she could
-  not teach: with channels at `unseen`, where §0 says build the term before using
-  it, there is room for four paragraphs of market OR three plus a build-up, and
-  one ceiling chose the first every morning. Four thousand characters is the only
-  bound and it is Telegram's. What replaced the ceiling is a test on the writing —
-  every sentence worth reading, the market half being where that fails first.
-  `CRITIC` restates several of the prompt's rules, so changing one there and not
-  here has the critic undo it; that is the shape to check whenever a prompt rule
-  moves.
+- **LENGTH IS A RULE AGAIN, AND IT IS ONLY SAFE BECAUSE OF WHAT SITS BESIDE IT.**
+  A flat ceiling was tried and it decided she could not teach: with channels at
+  `unseen`, where §0 says build the term before using it, there is room for four
+  paragraphs of market OR three plus a build-up, and one ceiling chose the first
+  every morning. **A ceiling on its own is what failed, not a ceiling** — asked
+  to be shorter with nothing saying WHAT to lose, she cuts the teaching block,
+  because it is the longest thing on the page. So 250–300 words, 400 at the
+  outside, and beside it a fixed ORDER of what comes out: numbers he cannot act
+  on, then levels he can read off his own screen, then any market sentence that
+  could have been written on any morning. Never the teaching block, never an
+  event. Still over means the briefing is about too many things. Four thousand
+  characters remains the separate mechanical bound and it is Telegram's.
+  `agree.test.mjs` reads BOTH halves for the count AND for the protection,
+  because a copy holding the count alone reproduces exactly the failure the
+  count was removed for the first time.
+
+- **WHAT WAS MISSING WAS A BOUND ON A SENTENCE, NOT ON A WORD.** Everything here
+  governed word CHOICE — plain words first, `the gap between rates and inflation`
+  before `real yields` — and nothing governed how many ideas one sentence could
+  carry. So a briefing built entirely of plain words still read as hard, and no
+  rule was being broken. One idea per sentence, twenty words, no em-dash aside,
+  no stacked subordinate clause; no punchline, because a line that is satisfying
+  to read and takes a second to decode is a line he reads twice and will not; and
+  no COINED SHORTHAND, since a name she invents and then reuses arrives as a term
+  he was taught and never was.
+
+  AND THE COUNTABLE HALF LANDED WHILE THE JUDGEMENT HALF DID NOT. The first
+  briefing under these rules had TWENTY prose sentences, none over the cap, the
+  longest eighteen words, no asides — measured, not eyeballed. In the same
+  message: `war premium` used bare, `dearer fuel`, `the basket`, `measured
+  inflation`, `stiffer competition`. A gate can count words; it cannot
+  adjudicate *is this the plainest word* against an adjective. So the rule that
+  could be counted was obeyed perfectly and the rule that needed taste was
+  ignored entirely, and that split is what the three repairs are aimed at.
+
+  THE OLD RULE BANNED THE REGISTER IT WAS WRITTEN TO PRODUCE. `NO COINED
+  SHORTHAND` forbade inventing a name and reusing it — and his own approved
+  draft leans on *the genuine part* three times. Read literally the prompt
+  contradicted its own target, which is how a rule comes to be ignored rather
+  than followed. SELF-DESCRIBING is the distinction that was meant: *the
+  leftover* tells a reader nothing, *the genuine part* tells them everything.
+  And the case it actually fails on is not an invented word at all — it is a
+  MARKET term used bare, which is every briefing rather than a rare one.
+
+  A WORKED EXAMPLE IS IN `WRITING` BECAUSE NO DESCRIPTION OF THE REGISTER
+  WORKED. *Use the plainest available word* had been in these rules for days and
+  produced *dearer fuel lifts measured inflation*. A model matches an example
+  where it ignores an adjective, and one example in `WRITING` teaches the writer
+  and both gates at once. It is the STANDARD rather than a taste of his, which
+  is the rule it sits next to — and that adjacency is worth checking against
+  before anything else goes in there.
+
+  A PARAGRAPH IS BOUNDED TOO, at three or four sentences. Sixteen easy sentences
+  arrived in one unbroken block, which reads as a wall however short each one
+  is; his own draft had air between the steps and the prompt had copied the
+  sentence rule from it without the shape.
+
+  `WRITING` IS WHERE THEY LIVE, ONCE, AND THREE READ IT. They were in `SYSTEM`
+  and restated in `CRITIC` — two copies held apart by a test, which works while
+  there are two readers. `TRIM` was the third, and a third copy is where two
+  agreeing and one drifting starts. `agree.test.mjs` asserts all three
+  interpolate it, because a reader that stops is silent: it still has a prompt,
+  the message still arrives, and one of the three is working from an older idea
+  of how she writes. THE COUNT OF NUMBERS STAYS WITH THE BRIEFING and the
+  principle moved into `WRITING`: four to six is a budget for four paragraphs
+  and says nothing useful about three sentences, where what generalises is which
+  number earns its place.
+
+- **ONE CHAIN IS EXEMPT FROM THE RUNG AND IT IS THE ONE UNDER EVERYTHING.** Gold
+  pays no interest, so it competes with what a bond pays once inflation is taken
+  out rather than with the headline rate. `PITCH` says `owns` gets a term bare,
+  which is right for every term but this one: it sits under nearly every briefing
+  written, and a reader who has lost it has lost all of them. Stated in both
+  copies, because the critic is the half that decides a mechanism it can see
+  inside one briefing is a repetition — that is the failure that cut the build-up
+  `PITCH` had just required, and it would cut this the same way.
+
+- **`CRITIC` restates several of the prompt's rules**, so changing one there and
+  not here has the critic undo it; it runs LAST. That is the shape to check
+  whenever a prompt rule moves, and `agree.test.mjs` holds each pair together.
 - **THE PROMPT STATES NO PREFERENCE OF HIS, AND THAT IS STRICTER THAN SOURCING
   ONE HONESTLY.** It held a taste he had never expressed, in the file that decides
   how she talks to the person it is about — so it reached him as her quoting
@@ -792,6 +867,28 @@ compounds.
   faster one because every hourly predicate tests `hour ===` — a `*/15` on the
   existing job runs four briefings a morning.
 
+  AND THE LOOK NO LONGER HOLDS THAT TOOL AT ALL, WHICH IS WHERE THE ROWS WERE
+  STILL COMING FROM. Deduplicating the LOOK left the WRITE alone: on 16
+  September it was handed `US retail sales (August, advance)`, marked that row
+  at 12:35:00 and filed the print under `retail sales` at 12:36:15 — an insert,
+  because the key is `(at, name)` over a name the model writes. The actual
+  landed on a row with no consensus and the consensus stayed on a row with no
+  actual. `RELEASE` had said *the same time and name* since the tool was
+  written, so this is the instruction-shaped guarantee failing in the file that
+  says instructions fail here. `ACTUAL_TOOL` replaces it in `RELEASE_TOOLS` and
+  `recordActual` is a PATCH with no insert path at any spelling; it cannot write
+  `consensus` or `prior`, which is how that release came to hold two
+  contradictory priors. A filter matching nothing is a 200 with an empty body —
+  `planned`'s failure exactly — so it reads the names back and says them.
+
+  AND `updated_at` MAY NOT MOVE ON A MARK. `markLooked` writes `looked_at`
+  alone, and an unconditional touch made the column say when a row was last
+  HANDLED where its own comment claims it says which of two contradictory rows
+  is later. On that release it ordered correctly by seventy-five seconds.
+  Compared as `jsonb` less the two bookkeeping columns rather than against a
+  list of the rest, so a column added later is compared without anyone
+  remembering to add it.
+
 - **A trigger on `trades` tells her a position opened or closed**, and the two
   things she may say are both his own rules read back: R-14/R-19 on a print
   pending against an open position, R-11 on a fill that took the day past its
@@ -997,7 +1094,59 @@ compounds.
   A drained archive answers `0 filled, 0 left` and must accuse nobody, or the
   line fires every night for the life of the deployment and stops being read.
 
-- **The briefing is read once more before it is sent.** `CRITIC`, medium effort,
+- **EVERY MESSAGE SHE SENDS ON A SCHEDULE IS READ ONCE MORE BEFORE IT GOES, AND
+  FOR THREE OF THE FOUR THAT IS NEW.** `CRITIC` ran on the briefing ALONE — the pulse, the
+  release look and the move look went out unreviewed for their whole lives,
+  which is most of what he receives in a week and is exactly where he was
+  reading her and finding her hard. The writing rules were live and global on
+  those paths and nothing had to answer for them.
+
+  `TRIM` is that gate and it is NOT `CRITIC` with a shorter prompt. The
+  briefing's checks ask whether the first sentence is true only today, whether
+  the chain is complete in the paragraph that matters, whether there is more
+  than one chain and whether it runs to 250–300 words. Every one is a question
+  about a briefing; asked of three sentences they demand a chain, complain about
+  length and rewrite a good message into a bad one. `TRIM` asks the writing
+  questions and nothing else, off the same `WRITING` the writer was given, and
+  is handed no notes and no channel map because it is not judging whether a term
+  was built. It runs on Sonnet: checking a message against a stated rule is the
+  bounded half of the split the models are chosen on.
+
+  THE TRADE EVENT STAYS OUT. Both its branches are decided from data before any
+  model call and what it says is one of his own rules read back — there is no
+  composed prose to trim.
+
+  AND SO DOES THE REPLY, ON A LANGUAGE ARGUMENT RATHER THAN A PROSE ONE. It is
+  composed prose and the writing rules are as live on it as anywhere, so it
+  reads as the one path still missing its gate — which is how one would come to
+  be added. It is also the ONLY path he speaks Spanish on, and `WRITING` is
+  English down to its worked example; `keepDraft` bounds a revision by LENGTH,
+  so a translation is the one failure it cannot catch, and what a flattened
+  Spanish answer costs is the half of the conversation where he actually
+  replies. That he is waiting on it with the typing indicator running is the
+  cheaper reason and not the deciding one.
+
+  WHAT IS REMEMBERED IS WHAT THE GATE RETURNED. The three callers bind the
+  revision before sending it, because storing the draft files a message he never
+  read as her own words and resends it as history for six exchanges — the stale
+  copy `remember` already refuses for the notes and the week's trades, arriving
+  through the door the gate itself opened. The briefing never had it, storing
+  what `critique` returned; the three that GAINED a gate kept storing the draft
+  for as long as they had one. `agree.test.mjs` reads all three bodies, because
+  nothing in the suite can drive a path that sends.
+
+  `gate` HOLDS THE HALF THAT MAKES EITHER ONE SAFE: a revision failing
+  `keepDraft` is overruled and a gate that THROWS costs nothing. Copied, that
+  catch is where one gate loses the message it was checking on the day a vendor
+  is slow.
+
+  AND `keepDraft` IS RELATIVE NOW. A flat four hundred characters is a
+  BRIEFING's floor — shorter than that and what came back was an apology. A
+  release look is two or three sentences and often under four hundred to begin
+  with, so that floor overrules every revision there is, and a gate overruled
+  every time looks exactly like a gate that agreed with the draft.
+
+- **The briefing's own gate.** `CRITIC`, medium effort,
   no tools — and the empty array is the CHEAPER of the two as well as the
   stricter, which is the opposite of how it reads. Sharing the briefing's array
   so the critic could ride its cache was tried and measured and did not work:
@@ -1088,6 +1237,69 @@ compounds.
 - **Effort is per caller, and it is the latency dial.** The briefing runs `high`;
   a reply and the pulse run `medium`. Nothing here runs `low`, because a careless
   read of the journal is worse than a slow one.
+
+- **`MAX_ROUNDS` IS A BACKSTOP AND IT HAD BECOME A WORKING LIMIT.** Six was set
+  on the reasoning that three is realistic — read the journal, write a note,
+  answer — with the cap there for the case where that assumption is wrong. The
+  assumption WAS wrong the day a tool-heavy caller changed model, and the way it
+  announced itself is the shape to remember: a release look that searched,
+  fetched and searched again, out of rounds, twice in half an hour, arriving as
+  an apology rather than as a number. Ten keeps it a backstop. The failure it
+  guards against is a loop billing for ever; the failure it CAUSED is a message
+  that never arrives, and of the two only the second has happened.
+  `eugenia_runs.rounds` is written on every turn, so how close a caller runs to
+  this is a question with an answer — and reading it is what should have come
+  before a model changed underneath it. WHICH MODEL RAN IS A COLUMN NOW, which
+  it was not: the log line named it and the row did not, so `rounds` could not
+  be compared across the change it mattered for. Two guards, because a schema
+  check sees only half — the column existing, and `recordRun` actually writing
+  it. Absent the second, every row lands, the meter looks healthy, and the
+  column reads null for ever.
+
+- **SO IS THE MODEL NOW, AND ONE MODEL FOR EVERYTHING WAS NEVER A DECISION.** A
+  week of `eugenia_runs` put the release look at $5.30 against the whole
+  briefing's $4.12 — fourteen looks costing more than five briefings — and the
+  move look at $0.64 a turn, the most expensive single message she sends, for
+  two sentences about a price. `MODELS` is keyed on the caller's LABEL, which is
+  the same string `eugenia_runs.caller` records, so one string decides both what
+  ran and what it is filed under; absent means Opus, because a new caller should
+  be expensive and correct rather than cheap and unnoticed.
+
+  THE SPLIT WAS BETWEEN JUDGING AND CHECKING AND IT COST A CALLER ITS LIFE. The
+  release look, the pulse and the move look moved to Sonnet on that reasoning.
+  The release look then died at `MAX_ROUNDS` on its first two firings the next
+  morning — twice inside half an hour, arriving as the apology — where fourteen
+  turns on Opus in the measured week had never come near the cap.
+
+  WHAT THE TWO FAILURES ESTABLISH is that the round budget on a TOOL-HEAVY
+  caller is a property of the MODEL rather than of the task. Nothing here had
+  measured that and the change assumed it, reasoning only about output quality.
+  A cheaper caller that does not answer is not cheaper. They are back on the
+  model they were measured on, the cap is raised because it had become a working
+  limit, and any future move is ONE caller at a time with `rounds` read
+  afterwards.
+
+  `trim` STAYS ON SONNET AND THE DISTINCTION IS THE WHOLE OF WHY: it is handed
+  `CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it
+  cannot reach the cap whatever a model's appetite for rounds. That is the shape
+  a cheaper model is safe on here, and `agree.test.mjs` RESOLVES the array each
+  Sonnet caller is handed rather than reading what sits near it, because a label
+  reaches `ask` two ways and a reader that knew only one would pass the next
+  tool-heavy caller wired through `gate`.
+
+  THE CRITIC IS THE ONE THAT LOOKS LIKE IT SHOULD MOVE AND DOES NOT: about $3.50
+  a month, and it runs LAST, it can rewrite, and it is the final gate on the
+  exact thing he spent a fortnight saying read badly.
+
+  `fellBack` COMPARES AGAINST WHAT THE CALLER ASKED FOR. It was one constant for
+  the file; left that way every Sonnet caller reports a fallback on every call
+  and the column stops meaning anything. AND `fallbacks` RIDES WITH OPUS ALONE —
+  caution rather than a rule. It has carried the briefings since the morning a
+  decline cost one, on the model it was turned on for; whether Sonnet accepts the
+  parameter is not something anything here has established, and if it does not
+  the failure is a 400 on every call, three scheduled callers dark at once. The
+  header and the field are a pair and either alone is its own 400, so both are
+  gated together and `agree.test.mjs` reads for both.
 - **A briefing can exceed Telegram's 4,096 characters.** `chunk` splits it and the
   parts go sequentially; Telegram does not promise ordering. Its preference is
   paragraph break, then any newline, then a hard cut, and it must stay two lookups
@@ -1105,16 +1317,59 @@ compounds.
   deliberately not in the boot guard, and `agree.test.mjs` makes that exemption
   cost something — an optional secret must be guarded where it is used.
 
-- **SHE ANSWERS IN THE CHANNEL HE USED, and that is the whole rule.** A voice note
-  is answered aloud, a typed line in text; no setting, no toggle, nothing stored.
-  It falls out that nothing SCHEDULED speaks, since none of those is a reply.
+- **EVERYTHING SHE WRITES IS SPOKEN, AND THAT REVERSED A RULE THAT WAS SOUND.**
+  It was *she answers in the channel he used* — a voice note aloud, a typed line
+  in text, no setting and nothing stored. What that rule decided was a REPLY, and
+  everything she STARTS was silent as a side effect of it rather than as a
+  decision. So the morning briefing, the one message he actually wanted read to
+  him, was the one the rule could never reach. He decided it the other way.
 
-  THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE AUDIO: it is what `remember`
-  stores and what a search finds, so `say` before `speak`, and a speech vendor
-  that hangs or throws then costs the convenience rather than the answer. That
-  ordering is the one thing `agree.test.mjs` reads out of `handleMessage`.
-  `SPEAK_MAX` is stated to the prompt as well as enforced, because a cap alone
-  drops the audio on a long answer with nothing saying why.
+  AND THE CAP WENT ENTIRELY, WHICH THE FIRST FIX ONLY MOVED. It was 700
+  characters — fifty seconds, on the reasoning that past that a voice note stops
+  being a reply and becomes a recording. Right about a reply and fatal here: a
+  briefing is 250–400 words by its own rule, so it would have been over the cap
+  every single morning and would have arrived silently, correctly, for ever.
+  Raising it to 4,000 fixed that morning and kept the SHAPE of the mistake — a
+  cap decides that past some length a message is not worth hearing, and nothing
+  she writes may be shortened to fit a voice note or left unspoken for being
+  long. A long message is SEVERAL notes now, split by the same `chunk` with its
+  paragraph preference so each part is a whole thought. The only number left is
+  `TTS_LIMIT`, which is what the vendor accepts in one request and is a chunk
+  size rather than a gate.
+
+  AND THE VOICE NOTE IS THE MESSAGE NOW, WITH THE TEXT AS THE FALLBACK. Sending
+  both worked and both arrived — two notifications and two bubbles for one thing
+  she said, which is not what he asked for. The objection to audio-only was real
+  and this is the ANSWER to it rather than a climb-down: a refusing vendor, an
+  unset key or a format Telegram will not render each turn audio-only into a
+  MISSING message, so `say` is still reachable and fires when the audio did not
+  land — in FULL rather than in part, because a message he heard three quarters
+  of is worse than either. What is STORED is untouched: `remember` writes the
+  transcript whatever happened on the wire. The briefing's keyboard rides on the
+  last voice note, since there is no text message under it to carry one.
+
+  SIX PATHS send him something she wrote, so that ordering lives in `sayAloud`
+  rather than in six copies — five of which nothing would be guarding.
+  `agree.test.mjs` reads it AND counts the six call sites, and `fold.test.mjs`
+  DRIVES the fallback, which is the one property a source read cannot settle:
+  with no TTS key every `speak` answers false, which is exactly the shape of a
+  vendor that refused, so the real sequence is replayed and the text must still
+  go.
+
+  `say` KEEPS three things deliberately, unspoken and unconditional: the `/notes`
+  audit, which is a rendered table and unlistenable; the apologies, which are
+  failure notices rather than messages she wrote; and the short operational
+  lines. And the markdown is
+  stripped on the way to the vendor, because the calendar slot carries a bold
+  label per line — the one place the prose rule is relaxed, for a reader's eye,
+  and `**Today:**` read aloud is a gamble on what an asterisk becomes.
+
+  THE PROMPT IS TOLD NO LENGTH. It carried the cap, so that an answer over it was
+  one she chose rather than one silently left unspoken. With no cap, a number
+  there would be asking her to write shorter for a limit that does not exist,
+  which is the thing this was changed to stop; `agree.test.mjs` reads for its
+  absence. She is still told the answer will be heard, on every path rather than
+  only when he spoke first.
 
   `TTS_VOICE` and `TTS_MODEL` are environment rather than pinned, unlike
   `EMBED_MODEL` — nothing is stored, so a change alters one message rather than
@@ -1185,6 +1440,30 @@ a blank.
   is deliberate, so nothing keeps the live schema honest on its own. Run
   `verify.sql` after any manual change and before believing the numbered files.
 
+  IT IS ONE STATEMENT, AND THAT IS LOAD-BEARING RATHER THAN TIDY. A SQL editor
+  shows the result of the LAST statement only, so the ten listings that used to
+  sit below the summary meant running the file top to bottom displayed the last
+  ten HTTP responses and threw all 71 checks away — silently, with a paragraph at
+  the bottom explaining to someone who had already lost their result how to go
+  back and select the block by hand. It happened to the person who wrote that
+  note and then to the person it was written for. **A check that awkward to run
+  is a check that stops being run**, which is the ignored-monitor lesson arriving
+  about the checker itself.
+  Moving the summary to the END would have been worse: `cron.job`,
+  `net._http_response` and a direct public read can all RAISE, and anything that
+  raises takes every statement after it, so the summary would vanish on exactly
+  the databases it exists for. The listings are `diagnose.sql` now — two files,
+  each with its own statement last. `agree.test.mjs` counts the semicolons in
+  `verify.sql` and asserts there is ONE, because the regression is a single
+  appended `select` and the file still runs, still passes, and shows something
+  else.
+
+  A FUNCTION IN THE DATABASE WAS THE OBVIOUS FIX AND IT IS WRONG. `verify_doji()`
+  would put the expectations inside the thing being verified — applied by hand
+  like everything else, so a stale copy reports a stale truth with nothing to
+  catch it — and `agree.test.mjs` reads the summary's TEXT in eight places,
+  every one of which goes silently blind the moment those rows leave the file.
+
   AN ERROR IN IT IS NOT A FAILED ROW, IT IS A FILE THAT STOPPED. The summary is
   one query returning one row per fact, so anything that RAISES takes every
   check below it with it — and the run then reports itself as a fault in the
@@ -1209,6 +1488,11 @@ a blank.
   query. It strips block comments AND dash comments before it looks: an
   apostrophe in either desynchronises quote matching for everything after it,
   and the check then reads a guarded string as live SQL.
+
+  THE COUNT IS IN THE HEADER NOW, not a footer. A footer was a paragraph for
+  someone already lost, and nobody arrives at the bottom lost any more; it is
+  read before running instead. Stated once and as a digit, because a test counts
+  the summary rows and compares it.
 
   AND WHAT IT ASKS ABOUT IS HELD AGAINST THE FILES. It asserted 25 of 39
   declared objects — eleven indexes and the three policies the card reads were

@@ -46,9 +46,8 @@ import {
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
   quoteWindow, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
-  speaksBack, SPEAK_MAX,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel,
+  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -1820,8 +1819,34 @@ async function costLines(responses) {
 
 test('the ordinary turn says nothing about the model, because nothing happened', async () => {
   const [line] = await costLines([answers('claude-opus-5')]);
-  assert.match(line, /test — 1 round\(s\), medium effort/);
+  assert.match(line, /test — claude-opus-5, 1 round\(s\), medium effort/);
   assert.doesNotMatch(line, /FELL BACK/);
+});
+
+test('a caller on a cheaper model does not read as having fallen back', async () => {
+  /* THE HALF THE SPLIT COULD HAVE BROKEN SILENTLY. The fallback column is
+     `what answered` against `what was asked for`, and that was one constant for
+     the whole file. Left that way, every Sonnet caller would report a fallback
+     on every single call — three of the eight, every turn — and `fell_back`
+     would stop meaning anything on the day the models parted.
+
+     Driven through `ask` with a Sonnet caller's label, because the comparison
+     is inside the loop and a constant put back there passes every pure test. */
+  const realFetch = globalThis.fetch, realLog = console.log;
+  const lines = [];
+  globalThis.fetch = async () => answers('claude-sonnet-5');
+  console.log = (line) => lines.push(line);
+  try {
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'trim');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+  assert.match(lines[0], /trim — claude-sonnet-5/,
+    'the trim did not ask for Sonnet, so the model map is not reaching the request');
+  assert.doesNotMatch(lines[0], /FELL BACK/,
+    'a caller answered by the model it asked for reads as a fallback, so the ' +
+    'comparison is against one name for the file rather than against the caller');
 });
 
 test('a turn served by another model names it in the cost line', async () => {
@@ -2149,6 +2174,101 @@ async function calendarWrites(releases) {
 // reason that has nothing to do with the code.
 const LANDED = { at: new Date(Date.now() - 600_000).toISOString(), name: 'CPI',
                  importance: 'high', actual: '+0.4% m/m', note: 'headline in line' };
+
+/* ─── The actual goes to the row that was looked at ──────────────────────────
+   The release look held `log_calendar`, whose key is (at, name) over a name the
+   model writes — so on 16 September it was handed
+   `US retail sales (August, advance)`, marked that row at 12:35:00 and filed
+   the print under `retail sales` at 12:36:15. An INSERT, silently: the actual
+   landed on a row with no consensus and the consensus stayed on a row with no
+   actual, which is the one comparison the table holds. The prompt had said *the
+   same time and name* since the tool was written, which is the evidence that an
+   instruction cannot carry this.
+
+   So the tool on that path cannot insert at all. These drive it rather than
+   asserting on its source, because "it is a PATCH" is exactly the claim a
+   reading cannot settle.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// Every request record_actual made, with the answer it gave. `answers` is the
+// queue of what fetch returns, in order: the PATCH first, then the read.
+async function actualWrites(input, answers) {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null });
+    const next = answers.shift() ?? [];
+    return { ok: true, status: 200, json: async () => next };
+  };
+  console.error = () => {};
+  try {
+    return { said: await serve('record_actual', input), sent };
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+}
+
+const RETAIL = { at: '2026-09-16T12:30:00Z', name: 'US retail sales (August, advance)',
+                 actual: '+1.2% m/m; control group +1.4%', note: 'well above consensus' };
+
+test('the actual is patched onto the row and never posted as a new one', async () => {
+  const { said, sent } = await actualWrites(RETAIL, [[{ id: 1 }]]);
+  assert.equal(sent.length, 1, 'a second request went out after a write that landed');
+  assert.equal(sent[0].method, 'PATCH',
+    'record_actual is not a PATCH, so a name a shade off the one it was handed mints a row again');
+  assert.match(sent[0].url, /at=eq\.2026-09-16T12:30:00\.000Z/, 'the row is not selected by its time');
+  assert.match(said, /Recorded against/);
+});
+
+test('only the two columns a look owns are written', async () => {
+  /* THE SAME RELEASE CARRIED TWO CONTRADICTORY PRIORS — `+0.5% m/m (Jul)` on the
+     row the briefing filed and `-0.5% m/m (Jul, revised)` on the one the look
+     minted — because the look could write those columns at all. It cannot now,
+     and the schema is only half of that: a model sending them anyway must not
+     reach the database with them. */
+  const { sent } = await actualWrites(
+    { ...RETAIL, consensus: '+0.3% m/m', prior: '-0.5% m/m (Jul, revised)', importance: 'low' },
+    [[{ id: 1 }]]);
+  assert.deepEqual(Object.keys(sent[0].body).sort(), ['actual', 'note'],
+    'a look can write a column the briefing owns again');
+});
+
+test('a name carrying a comma is quoted, or it filters on half of itself', async () => {
+  // PostgREST reads a bare comma in a filter value as a list separator, and the
+  // row that started all of this is called `US retail sales (August, advance)`.
+  // Unquoted, the filter asks for `US retail sales (August` and matches nothing
+  // — which presents as her paraphrasing rather than as a broken URL.
+  const { sent } = await actualWrites(RETAIL, [[{ id: 1 }]]);
+  const name = decodeURIComponent(sent[0].url.split('name=eq.')[1]);
+  assert.equal(name, '"US retail sales (August, advance)"',
+    'the name is not double-quoted, so every release with a comma in it writes nothing');
+});
+
+test('a name that matches nothing answers with the names on file', async () => {
+  /* A PATCH FILTERED TO NOTHING IS A 200 WITH AN EMPTY BODY, which reads exactly
+     like a write that landed. Answered with what is actually there, the next
+     round has what it needs instead of leaving a second row behind. */
+  const { said, sent } = await actualWrites({ ...RETAIL, name: 'retail sales' },
+    [[], [{ name: 'US retail sales (August, advance)' }, { name: 'jobless claims' }]]);
+  assert.equal(sent.length, 2, 'nothing was read back, so she is told nothing and files again');
+  assert.equal(sent[1].method, undefined, 'the fallback is not a read');
+  assert.match(said, /US retail sales \(August, advance\)/);
+  assert.match(said, /jobless claims/);
+});
+
+test('nothing on file at that time is said plainly and nothing is written', async () => {
+  const { said, sent } = await actualWrites(RETAIL, [[], []]);
+  assert.equal(sent.filter(r => r.method === 'PATCH').length, 1);
+  assert.match(said, /Nothing is on file/);
+});
+
+test('a release without a readable time or a figure writes nothing at all', async () => {
+  for (const bad of [{ ...RETAIL, at: 'whenever' }, { ...RETAIL, name: '  ' }, { ...RETAIL, actual: '' }]) {
+    const { sent } = await actualWrites(bad, [[{ id: 1 }]]);
+    assert.equal(sent.length, 0, `${JSON.stringify(bad)} reached the database`);
+  }
+});
 
 test('a release beyond the day she is handed is not filed', async () => {
   /* THE DUPLICATES CAME FROM HERE, and from four different turns rather than
@@ -3550,32 +3670,86 @@ test('an empty ask is answered empty rather than refused', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ANSWERING IN THE CHANNEL HE USED
+   EVERYTHING SHE WRITES IS ALSO SPOKEN
    ───────────────────────────────────────────────────────────────────────────
-   No setting and no stored preference: the message he sent decides. Which makes
-   this one predicate the whole feature, and the only part of speaking back that
-   is not a vendor and a wire.
+   It used to depend on how he wrote: a voice note was answered aloud and a
+   typed line was not. That rule was sound and it only ever decided a REPLY —
+   everything she STARTS was silent as a side effect of it rather than as a
+   decision, so the briefing he actually wanted read to him was the one message
+   the rule could never reach. He decided it the other way.
+
+   What is left is a bound, and it is the speech vendor's rather than a
+   judgement about listening: everything she writes already fits under it,
+   because the briefing's own ceiling is Telegram's.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-test('a voice note is answered aloud and a typed line is not', () => {
-  assert.equal(speaksBack('Gold is holding 4,410.', true), true);
-  assert.equal(speaksBack('Gold is holding 4,410.', false), false,
-    'she speaks back to a typed message — he is at a keyboard and did not ask ' +
-    'to be read to');
+test('a speech vendor that cannot answer still leaves him the message', async () => {
+  /* THE ONE PROPERTY A SOURCE READ CANNOT SETTLE: there is no path on which he
+     gets nothing. Audio-only was the ask, and audio-only turns an unset key, a
+     refusing vendor and a format Telegram will not render into a MISSING
+     message rather than a degraded one — which is the failure shape the whole
+     system is built against.
+
+     Driven rather than read, and for free: with no TTS key `speak` answers
+     false without a request, which is exactly the shape of a vendor that
+     refused. So what this replays is the real sequence — every part fails, and
+     the text must still go. */
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  console.error = () => {};
+  try {
+    await sayAloud('Gold is holding 4,410 into the close.');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+
+  const texts = sent.filter(r => r.url.includes('sendMessage'));
+  assert.equal(texts.length, 1,
+    'no text went out when the audio could not be made, so a speech vendor ' +
+    'having a bad morning is a briefing he never receives');
+  assert.equal(texts[0].body.text, 'Gold is holding 4,410 into the close.',
+    'the fallback sent something other than the message itself');
 });
 
-test('an answer too long to listen to is left in text', () => {
-  /* PAST THE CAP IT IS A RECORDING TO SCRUB THROUGH rather than a reply, and
-     the text has already been sent — so the audio is what gives way. The prompt
-     is told the same number, so an answer over it is one she chose. */
-  assert.equal(speaksBack('x'.repeat(SPEAK_MAX), true), true);
-  assert.equal(speaksBack('x'.repeat(SPEAK_MAX + 1), true), false);
+test('nothing she writes is left unspoken for being long', () => {
+  /* THERE WAS A CAP AND NOW THERE IS NOT. Seven hundred characters, then four
+     thousand — and a cap decides that past some length a message is not worth
+     hearing, which is a judgement he made the other way. A long message becomes
+     SEVERAL voice notes, exactly as it already becomes several text messages.
+
+     Driven through `chunk` at the speech limit, because that is what sayAloud
+     does and the property that matters is that every character comes back. */
+  const long = Array.from({ length: 40 },
+    (_, i) => `Paragraph ${i}. ` + 'word '.repeat(40)).join('\n\n');
+  const parts = chunk(long, 4000);
+  assert.ok(parts.length > 1, 'the fixture is not long enough to be split');
+  assert.equal(parts.join(' ').replace(/\s+/g, ' ').trim(),
+               long.replace(/\s+/g, ' ').trim(),
+               'splitting for speech loses or repeats words');
+  for (const part of parts) {
+    assert.ok(part.length <= 4000,
+      `a part is ${part.length} characters, which the speech vendor refuses — ` +
+      `and a refused part is a silence in the middle of a message`);
+  }
+});
+
+test('a briefing is one voice note, not several', () => {
+  // The thing he asked for. 250-400 words by its own rule is ~2,800 characters,
+  // well inside one request — splitting it would arrive as two notes with the
+  // teaching block cut across them.
+  assert.equal(chunk('x'.repeat(2800), 4000).length, 1);
 });
 
 test('there is nothing to speak when there is nothing to say', () => {
-  // An empty answer would be a zero-length voice note, which renders in
-  // Telegram as a broken attachment rather than as nothing.
-  assert.equal(speaksBack('', true), false);
+  // A zero-length voice note renders in Telegram as a broken attachment rather
+  // than as nothing. No guard says so any more and none is needed: chunk()
+  // returns no parts for an empty string, so the loop that speaks never runs.
+  assert.deepEqual(chunk('', 4000), []);
 });
 
 /* ─── What he has on, rendered ───────────────────────────────────────────────
@@ -3963,6 +4137,7 @@ const TOOL_CALLS = [
   ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
   ['get_market',    {}],
   ['log_calendar',  { releases: [{ at: '2026-09-07T12:30:00Z', name: 'CPI', importance: 'high' }] }],
+  ['record_actual', { at: '2026-09-07T12:30:00Z', name: 'CPI', actual: '+0.3% m/m' }],
   ['set_thesis',    { thesis: 'a reading' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],

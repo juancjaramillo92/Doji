@@ -69,6 +69,7 @@ supabase/009_dispatch.sql               what pg_net sent, and what came back
 supabase/009_trades_grants.sql          which columns the app may write
 supabase/010_pace.sql                   how much of its clock a briefing spends
 supabase/verify.sql                     read-only: does the database match these?
+supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
 supabase/functions/doji-email-sync/     Edge Function: the email fill's write
@@ -558,15 +559,34 @@ a shared machine. `app.test.mjs` drives that path — removing the delete goes
 red, as does a confirmed load that writes no snapshot or a failed one that
 ignores it.
 
-**Running `verify.sql` means running its summary block on its own.** A SQL
-editor shows the result of the last statement only, and the last statement in
-that file is the ten most recent HTTP responses — so pasting the whole file in
-and pressing Run displays those and silently discards the fifty-seven checks
-that answer whether the database matches the numbered files. Select from
-`select check_name, actual, expected, ...` down to `) as t(check_name, actual,
-expected);` and run that alone. The summary sits first rather than last because
-a listing below it can raise on a database missing an object, and anything that
-raises takes every statement after it with it.
+**Run `verify.sql` whole and read the `ok` column.** It is one statement, and
+that is load-bearing rather than tidy. Ten listings used to sit below the
+summary, and a SQL editor shows the result of the **last** statement only — so
+pasting the file in and pressing Run displayed the ten most recent HTTP
+responses and silently discarded every check above them. The file carried a
+paragraph at the bottom explaining that to someone who had already lost their
+result, and told them to scroll up and select a six-hundred-line range by hand.
+It happened to the person who wrote that note, and then to the person it was
+written for. A check that awkward to run is a check that stops being run.
+
+Moving the summary to the end instead would have been worse. `cron.job` raises
+without pg_cron, `net._http_response` without pg_net, and a direct read of a
+table that was never created raises too — anything that raises takes every
+statement after it, so the summary would vanish on exactly the databases it
+exists for. **Two files is what lets each one's statement be last in its own.**
+The listings are `diagnose.sql`, which you open when a row says false and the
+next question is which object, which grant, which schedule. A raise in there is
+not a fault; it is that file reporting an extension or a table that is absent.
+
+A function in the database — `verify_doji()` — was the obvious fix and it is
+wrong twice over. It would put the expectations *inside* the thing being
+verified, applied by hand like everything else, so a stale copy reports a stale
+truth with nothing to catch it. And `agree.test.mjs` reads the summary's text in
+eight places; every one goes silently blind the moment those rows leave the file.
+
+`agree.test.mjs` counts the semicolons in `verify.sql` and asserts there is one,
+because the regression is a single appended `select` — the file still runs, every
+check still passes, and the grid shows something else.
 
 **If a trade does not appear**, the cron reporting `succeeded` proves nothing —
 `net.http_post` is asynchronous, so the SQL succeeded in *queuing* the request.
@@ -1349,39 +1369,97 @@ is the same trade `marketOpen()` makes for the poller. A test walks every hour
 of a week and asserts the two never both fire, because one call cannot owe two
 answers.
 
-### The briefing is prose, not a report
+### The briefing is prose, with one list in it
 
-Four or five short paragraphs of someone talking: where gold is, the one thing
-that matters today and the chain of why, everything else in a sentence, one
-genuinely odd fact, and a single question or nothing.
+Five slots. What happened, in two or three sentences with the conclusion first;
+**why that matters for gold**, walked link by link, one sentence per step; the
+calendar; one context line; one thing worth noticing.
+
+**The calendar is the one place the prose rule is deliberately relaxed** — a bold
+day label and one line per item, times in ET, one fact each. It reads better than
+the prose around it did, which is the whole argument for it. The relaxation is
+narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
+no mechanism goes in it. That slot is where a second chain hides.
 
 It used to be seven numbered sections with impact emoji, and plain-Englishing
 the words inside them did not help — **seven numbered sections with headings
 *are* a report**, whatever the vocabulary. The scaffolding was doing the
 talking.
 
-**Length is not a rule at all, and that is a correction.** It was a flat nine
-hundred to fourteen hundred characters for the whole briefing, and with four
-of the five channels sitting at `unseen` — where §0 says *build it before using
-it* — that number was the thing deciding she could not. A briefing has room for
-four paragraphs of market or three plus a term built from the ground up, and a
-single ceiling silently chose the first every morning.
+**Length is a rule again, and what makes it safe is what sits beside it.** It was
+once a flat nine hundred to fourteen hundred characters, and with four of the
+five channels at `unseen` — where §0 says *build it before using it* — that
+number was the thing deciding she could not. A briefing has room for four
+paragraphs of market or three plus a term built from the ground up, and a single
+ceiling silently chose the first every morning.
 
-The only bound left is four thousand characters, which is not an aesthetic — it
-is where Telegram stops delivering one message. What replaced the ceiling is a
-test on the writing rather than on the size: **every sentence has to be worth
-reading**, and the market half is where that fails first, since a line restating
-the number above it or a caveat protecting the analyst still reads like content.
-The paragraph that teaches takes the links the chain needs and the build-up the
-rung asks for on top of them — which on most mornings is a clause restating the
-mechanism, since most channels sit at `explained` rather than at either end.
+The lesson was not *no ceiling*. It was that **a ceiling with nothing saying what
+to lose cuts the teaching block**, because the teaching block is the longest
+thing on the page. So the budget is 250–300 words, 400 at the outside, and beside
+it a fixed order of what comes out: numbers he cannot act on, then levels he can
+read off his own screen, then any sentence in the market read that could have
+been written on any morning. **Never the teaching block and never an event.**
+Still over means the briefing is about too many things, and the answer is to
+decide which one rather than to shave the chain. Four thousand characters remains
+the separate mechanical bound — it is where Telegram stops delivering one
+message.
 
-Running long is still cut by dropping words, never events, and never a link out
-of a chain.
+`agree.test.mjs` reads both the writer's copy and the critic's for the count
+**and** for the protection, because a copy holding the count alone is exactly the
+arrangement that stopped her teaching the first time.
 
-The vocabulary rule is now "plain words first": *the gap between rates and
-inflation* before *real yields*, and the short name only once the long one has
-been said. The ideas stay exactly as sophisticated; only the words come down.
+**And what was missing was a bound on a sentence, not on a word.** Every rule
+here governed vocabulary — *the gap between rates and inflation* before *real
+yields*, the short name only once the long one has been said — and nothing
+governed how many ideas one sentence could carry. So a briefing built entirely of
+plain words still read as hard, and no rule was being broken. The rules now:
+
+- **One idea per sentence.** Two `because` clauses or two `and` clauses make two
+  sentences. Twenty words is the ceiling.
+- **No em-dash aside, no stacked subordinate clause.** Short beats elegant.
+- **No punchlines.** A line that is satisfying to read and takes a second to
+  decode is a line he reads twice, and he will not read it twice.
+- **No term used bare, and the test is whether the name explains itself.** *The
+  leftover* tells a reader nothing; *the genuine part* tells them everything. The
+  old rule banned inventing a name at all — and the approved draft it was written
+  from leans on *the genuine part* three times, so read literally the prompt
+  forbade the register it existed to produce. The case it actually fails on is
+  not an invented word: it is a **market term used bare**. *"Oil has handed back
+  most of the war premium"* is four plain words and one that does all the damage.
+  Two ways out and no third — plain words instead, or the term with its own
+  sentence saying what it is. Real names he will meet elsewhere stay: dot plot,
+  retail sales, jobless claims, the ten-year.
+- **Use the word you would text.** *Dearer fuel* fails that; *expensive fuel*
+  passes. So does *makes gold a harder sell* over *stiffer competition for gold*.
+- **A paragraph is three or four sentences.** Sixteen easy sentences in one block
+  is still a wall.
+- **Four to six numbers in the whole briefing**, and a number that cannot be said
+  to *mean* something is one of the ones to cut. Fourteen true figures is a page
+  he skims; four he remembers by lunch.
+
+**The countable rules landed and the judgement rules did not, which is why
+`WRITING` carries a worked example.** The first briefing under these rules had
+twenty prose sentences, none over the twenty-word cap, the longest eighteen
+words, no em-dash asides — counted, not eyeballed. The same message said *war
+premium*, *dearer fuel*, *the basket* and *measured inflation*. A gate can count
+words; it cannot adjudicate *is this the plainest word* from an adjective. *Use
+the plainest available word* had been in the rules for days and produced *dearer
+fuel lifts measured inflation twice over*.
+
+So the rules end with a passage in the target register rather than more
+adjectives about it — a model matches an example where it ignores a description.
+It lives in `WRITING`, so the writer, `CRITIC` and `TRIM` are all shown the same
+one.
+
+**One chain is exempt from the rung, and it is the one under everything else.**
+Gold pays no interest, so it competes with what a bond pays once inflation is
+taken out rather than with the headline rate. `PITCH` says a channel at `owns`
+gets its term bare, which is right for every term but this one: it sits under
+nearly every briefing written, and a reader who has lost it has lost all of them.
+Both the writer and the critic are told the map does not apply to it — the critic
+especially, since it is the half that decides a mechanism it can see inside one
+briefing is a repetition, which is the failure that once cut the build-up `PITCH`
+had just required.
 
 **She teaches, and that is a rule about depth rather than length.** He is
 learning macro deliberately, so the paragraph on the day's one thing states its
@@ -1460,7 +1538,7 @@ one row.** The unique key is `(at, name)` and the name is free text she writes,
 so `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
 number to a person — and each one marked `high` used to fire its own look, its
 own model call and its own message. Five for a single CPI on 11 September. It
-also fed itself: the release look holds `log_calendar` too, so filing the actual
+also fed itself: the release look held `log_calendar` too, so filing the actual
 under a name a shade different from the one it was handed **inserted** rather
 than updated, and that new row was then unlooked and fired in its turn. What
 arrived as two apologies in two days was never her catching an error — it was a
@@ -1499,11 +1577,71 @@ hours — so a row beyond it had no consumer at all and existed only to become a
 duplicate. `log_calendar` refuses one now and says how many it refused, because
 a bound she cannot see is a bound she files against for ever.
 
-**And the row records when it was last written.** Two writers hours apart on one
-row means `created_at` says only when each was first seen — so when duplicates
-disagreed about what a number printed at, nothing could say which figure was the
-later one. `updated_at` moves on every UPDATE through a trigger, the same shape
-`trades` has used since `001`.
+**A look fills a release in and cannot file one.** Closing the loop above stopped
+the duplicate look; it did not stop the duplicate row, because `log_calendar` was
+still on that path. On 16 September the look was handed
+`US retail sales (August, advance)`, marked that row at 12:35:00, searched, and
+filed the print under `retail sales` at 12:36:15 — an insert. The actual landed
+on a row with no consensus, the consensus stayed on a row with no actual, and the
+one comparison this table exists to hold was gone with nothing failing. The
+`RELEASE` prompt had said *the same time and name* since the day the tool was
+written, which is the whole argument against carrying this in an instruction.
+
+So the release look is given `record_actual` instead, and it is a **PATCH and
+nothing else**: it matches an entry on `(at, name)`, writes `actual` and `note`,
+and has no insert path at any spelling. It cannot touch `consensus` or `prior`
+either — the briefing's columns, and how that same release came to hold
+`+0.5% m/m (Jul)` on one row and `-0.5% m/m (Jul, revised)` on the other. A name
+matching nothing is a 200 with an empty body, which reads exactly like a write,
+so it answers with the names actually on file and the next round writes to one of
+them. The look is handed the UTC stamp beside the ET heading, because the tool
+matches on the instant and asking her to convert is a conversion standing where
+an input belongs.
+
+**And the row records when its content was last written.** Two writers hours
+apart on one row means `created_at` says only when each was first seen — so when
+duplicates disagreed about what a number printed at, nothing could say which
+figure was the later one. `updated_at` moves through a trigger, the same shape
+`trades` has used since `001`, but **not on a mark**: `markLooked` writes
+`looked_at` and nothing else, and an unconditional touch made the column say when
+a row was last *handled*. On 16 September the row carrying the stale prior was
+marked at 12:35:00 and the row carrying the actual was written at 12:36:15 — it
+ordered correctly by seventy-five seconds. Reverse them and the column answers
+the opposite of the truth in the one question it has. The trigger compares the
+row as `jsonb` less `updated_at` and `looked_at`, rather than against a list of
+the other columns, so a column added later is compared without anyone having to
+remember it.
+
+**Every message she composes is read once more before it is sent, and for most of
+them that is new.** `CRITIC` ran on the briefing *alone*. The pulse, the release
+look and the move look went out unreviewed for their whole lives — which is most
+of what arrives in a week, and it is exactly where the writing rules were being
+ignored with nothing to answer for it.
+
+`TRIM` is that gate, and it is **not `CRITIC` with a shorter prompt**. The
+briefing's checks ask whether the first sentence is true only today, whether the
+chain is complete in the paragraph that matters, whether there is more than one
+chain, and whether it runs to 250–300 words. Every one is a question about a
+briefing; asked of three sentences they would demand a chain, complain about
+length, and rewrite a good message into a bad one. `TRIM` asks the writing
+questions and nothing else — off the same `WRITING` the writer was given — and is
+handed no notes and no channel map, because it is not judging whether a term was
+built. It runs on Sonnet.
+
+The trade event stays out: both its branches are decided from data before any
+model call, and what it says is one of his own rules read back. There is no
+composed prose to trim.
+
+`gate()` holds the half that makes either one safe — a revision failing
+`keepDraft` is overruled, and a gate that *throws* costs nothing. Copied, that
+catch is where one gate loses the message it was checking on the day a vendor is
+slow.
+
+And **`keepDraft` is relative now**. A flat 400 characters is a *briefing's*
+floor: shorter than that and what came back was an apology. A release look is two
+or three sentences and often under 400 to begin with, so that floor overrules
+every revision there is — and a gate overruled every time looks exactly like a
+gate that agreed with the draft.
 
 **One chain per briefing, not one per event.** Every scheduled thing that
 matters still gets named — he needs the week — but only one of them gets its
@@ -1772,31 +1910,71 @@ the boot guard beside the secrets whose absence stops her working. `agree`
 enforces the exemption rather than waving it through: an optional secret must be
 guarded where it is used.
 
-**And she answers in the channel he used.** A voice note is answered aloud; a
-typed line is answered in text. **No setting, no toggle, no stored preference** —
-he speaks because his hands are busy, and the whole point is over the moment he
-has to look at a phone to read the reply, so the message he sent is the only
-thing that needs to decide.
+**Everything she writes is spoken as well as written**, and that reversed a rule
+that was sound. It was *she answers in the channel he used* — a voice note
+answered aloud, a typed line in text, no setting and no stored preference,
+because he speaks when his hands are busy and the point is over the moment he has
+to look at a phone.
 
-It falls out of that shape that **nothing scheduled ever speaks**: the briefing,
-the pulse, the release look, the move look and the trade event are not replies to
-anything, so they stay text without a rule saying so. Which is the right answer
-for the briefing especially — a fourteen-hundred-character read is something you
-skim, and audio is the one format you cannot.
+What that rule actually decided was a **reply**. Everything she *starts* was
+silent as a side effect of it rather than as a decision, so the morning briefing
+— the one message he wanted read to him — was the one the rule could never reach.
+He decided it the other way, and the cost is about a dollar a month.
 
-**The text goes first, and is never contingent on the voice.** It is what
-`remember()` stores, what a later search finds, and what he re-reads at a desk; a
-voice note is none of those. So it has already landed before speech is attempted,
-and an unset key, a vendor that refused or a format Telegram will not render
-costs the audio and nothing else. That is the opposite call from `VOICE_TROUBLE`
-below, and the difference is that a voice note she cannot *hear* costs the whole
-exchange while a reply she cannot *speak* costs a convenience.
+**Six paths speak**: both briefings, the pulse, the release look, the trade event
+and the move look, plus the reply. `say()` keeps three things deliberately — the
+`/notes` audit, which is a rendered table and unlistenable; the apologies, which
+are failure notices rather than messages she wrote; and the short operational
+lines.
 
-`SPEAK_MAX` is 700 characters, roughly fifty seconds — past that it stops being a
-reply and becomes a recording to scrub through. **The prompt is told the same
-number**, so an answer over it is one she chose rather than one silently left
-unspoken, and a test holds the two together: a prompt allowed to run longer than
-the cap produces answers that are never spoken with nothing saying why.
+**The voice note is the message, and the text is what happens when it is not.**
+Sending both worked, and both arrived — two notifications and two bubbles for one
+thing she said. He asked for the voice note alone.
+
+The objection to audio-only was real, and the fallback is the answer to it rather
+than a climb-down. An unset key, a vendor that refused, a format Telegram will
+not render: audio alone turns each of those into a **missing** message, which is
+the failure shape this whole system is built against. So `say()` is still
+reachable and fires only when the audio did not land — in full rather than in
+part, because a message he heard three quarters of is worse than either.
+
+**What is stored is untouched.** `remember()` writes the transcript whatever
+happened on the wire, so her memory, `search_memory` and the nightly pass read
+exactly what they always did. The briefing's keyboard rides on the last voice
+note, since there is no text message under it to carry one.
+
+`fold.test.mjs` **drives** the fallback rather than reading it — the one property
+a source read cannot settle. With no TTS key every `speak()` answers false, which
+is exactly the shape of a vendor that refused, so the real sequence replays and
+the text must still go out.
+
+That ordering lives in **`sayAloud`** rather than in six copies of two lines —
+five of which nothing would be guarding, and the failure of getting it backwards
+is that the audio arrives and the text does not. A test reads the order inside it
+*and* counts the six call sites, because a path that drops back to `say()` still
+reaches him and is simply silent.
+
+**There was a cap, and there is not one now.** It was 700 characters — fifty
+seconds — on the reasoning that past that a voice note stops being a reply and
+becomes a recording to scrub through. That is right about a reply and fatal
+here: a briefing is 250–400 words by its own rule, so it would have been over
+the cap **every single morning** and would have arrived silently, correctly,
+forever.
+
+Raising it to 4,000 fixed that morning and left the shape of the mistake in
+place — a cap decides that past some length a message is not worth hearing, and
+**nothing she writes should be shortened to fit a voice note or go unspoken for
+being long**. So a long message becomes *several* voice notes, exactly as it
+already becomes several text messages, split by the same `chunk()` with the same
+paragraph preference so each part is a whole thought. The only number left is
+what the speech vendor accepts in one request, and it is a chunk size rather
+than a gate. The prompt is told no length at all.
+
+**The markdown is stripped on the way to the vendor.** The calendar slot carries
+a bold day label per line — the one place the prose rule is relaxed, and it is
+relaxed for a reader's eye. `**Today:**` read aloud is a gamble on what an
+asterisk becomes, so the marks come off for the one reader that does not want
+them.
 
 `TTS_URL` and `TTS_KEY` are optional on the same terms as `STT_*`; `TTS_VOICE`
 and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,
@@ -1882,7 +2060,7 @@ Two kinds of memory, and they answer different questions.
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
-| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool |
+| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool, filled in by `record_actual` |
 
 Turns roll over in a morning, so without notes she could never know in September
 that he has been working on holding his stop since August. Notes are one
@@ -2963,14 +3141,69 @@ seconds and cannot be extended — one call at the start left a thirty-second
 answer looking like a dead bot for twenty-five of them. It makes nothing faster;
 it makes the wait legible.
 
-**What she costs.** That figure is now measurable and was not when it was first
-written: cache writes alone ran 620,460 tokens in the week of 2026-09-10, which
-is about $6 before a single search, a read or an output token — so the "$10 a
-month" this paragraph used to state was an estimate the meter has since
-contradicted. `eugenia_runs` carries every model call and is what the number
-should be re-derived from. A large share is still web search at $10 per 1,000
-searches rather than tokens; the model is the strongest one, and at this volume
-the searches dominate, so a weaker model would save little.
+**What she costs, measured rather than estimated.** `eugenia_runs` carries every
+model call, and the week of 2026-09-10 came to **$16.68, about $72 a month** —
+not the $10 this paragraph used to claim from an estimate, and not spent where it
+claimed either:
+
+| | tokens | rate | |
+|---|---|---|---|
+| cache writes, 1h | 620,460 | 2× | **$6.20** |
+| cache reads | 6,267,957 | 0.1× | $3.13 |
+| cache writes, 5m | 435,375 | 1.25× | $2.72 |
+| output | 94,956 | $25/M | $2.37 |
+| web search | 123 searches | $10/1,000 | $1.23 |
+| fresh input | 202,653 | $5/M | $1.01 |
+
+**The cache is the bill.** Writes alone are 58% of the token spend and the
+largest line on the table — larger than everything she says. Search is 7%, where
+this paragraph used to say the searches dominate and a weaker model would
+therefore save little; that was wrong in both halves. Deriving the window from
+the tool array takes the 1h line to about $1.08 and moves the rest onto the 5m
+rate, roughly $64 a month.
+
+**And one model for every caller was never a decision either.** Read per caller,
+the same week says something the totals hide:
+
+| caller | turns | $/wk | model |
+|---|---|---|---|
+| release look | 14 | **$5.30** | Sonnet 5 |
+| weekday briefing | 5 | $4.12 | Opus 5 |
+| pulse | 5 | $1.89 | Sonnet 5 |
+| consolidation | 7 | $1.47 | Opus 5 |
+| critic | 6 | $1.35 | Opus 5 |
+| move look | 2 | $1.27 | Sonnet 5 |
+| Sunday briefing | 1 | $0.98 | Opus 5 |
+| reply | 1 | $0.31 | Opus 5 |
+
+**Fourteen release looks cost more than five briefings**, and the move look is
+$0.64 a turn — the most expensive single message she sends, for two sentences
+about a price. The split was between **judging and checking**: what stays on Opus
+decides something open, and what moves is bounded work handed everything it
+needs.
+
+**It cost a caller its life, and the table above is what the money looked like
+before that was known.** The release look, the pulse and the move look moved to
+Sonnet; the release look died at `MAX_ROUNDS` on its first two firings the next
+morning, twice inside half an hour, arriving as the apology. Fourteen turns on
+Opus in the measured week had never come near the cap.
+
+What those two failures establish is that **the round budget on a tool-heavy
+caller is a property of the model, not of the task** — which nothing here had
+measured, and the change assumed while reasoning only about output quality. A
+cheaper caller that does not answer is not cheaper. All three are back on the
+model they were measured on, the cap is raised because it had become a working
+limit rather than a backstop, and any future move is one caller at a time with
+`rounds` read afterwards.
+
+`trim` stays on Sonnet, and the distinction is the whole of why: it is handed
+`CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it
+cannot reach the cap whatever a model's appetite for rounds. That is the shape a
+cheaper model is safe on here.
+
+The lever after that is the prefix itself: 23,309 tokens written 32 times a week.
+It is worth about $3 a month against editing what she is told on every turn, and
+it is refused on those terms rather than pending.
 
 **What the prompt cache actually buys, said plainly.** Her cached prefix is
 23,309 tokens with the chat tool set and 16,477 with the nightly pass's — read
