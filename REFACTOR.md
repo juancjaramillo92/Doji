@@ -329,6 +329,91 @@ reads worse at both call sites than the four lines do. Two sites, fourteen lines
 apart, visible on one screen.
 **Revisit if:** a third caller appears, or the empty-row behaviour has to change.
 
+### R-16 — splitting `doji-eugenia/index.ts` into modules
+**Why refused:** it was proposed, costed and turned down, and the reason is not
+the one R-1 gives. R-1 refuses splitting `index.html` because the browser has no
+bundler and modules there would mean adding a build step. None of that applies
+here: Deno has real modules, `import` needs nothing built, and this repository
+already does it five times — `_shared/edge.ts`, `prompt.ts`, `strategy.ts`,
+`journal.ts`, `adherence.ts`. The banner comments already name the seams.
+
+What decides it is that the move finds nothing. Four and a half thousand lines
+is hard to hold in one head and easy to lose a helper inside, which is a real
+cost — but it is a cost paid by a reader, and every defect found in this file
+was found by reading it with a question, not by its being shorter. Against that:
+load-order safety is free in one file and stops being free across five, and
+`agree.test.mjs` reads function bodies out of one string in some thirty places,
+every one of which would have to learn to read a directory. That is days of
+careful work on the checks themselves, which is the worst thing to be editing
+for a reason that is not about what they check.
+
+**Revisit if:** the file gains a second subject — something that is not Eugenia
+answering, remembering or being scheduled — or a second function needs one of
+its blocks. Not on length alone. And if it ever happens, the entry point stays
+where it is, guarded, for the reason `CLAUDE.md` gives.
+
+### R-17 — bounding the lexical arm of `eugenia_search`
+**Why refused:** it was proposed on a reading of the query and the reading was
+wrong. This is the second entry here made against a measurement rather than an
+argument, and like R-15 the argument is right in every part except the one that
+decides it.
+
+The argument: the two semantic arms are capped at 25 each and the lexical arm
+is capped at nothing, so a common word against a growing archive pulls every
+matching row out of both tables and the fusion sorts the lot. Bound each
+lexical branch by its own ranking and the sort stops growing.
+
+Every sentence of that is true about the SQL and none of it is where the time
+goes. On a throwaway Postgres 16 seeded with 120,000 turns and 4,000 notes at
+the real column and index definitions:
+
+| what | ms |
+|---|---|
+| the lexical arm as written | 1,565 |
+| the same with each branch bounded to 200 | 1,506 |
+| the full-text predicate alone (`search @@ tsq`) | 28 |
+| `ts_rank` over every matching row | 27 |
+| `word_similarity` projected over every matching row | 30 |
+| **the trigram predicate alone (`q <% content`)** | **1,246** |
+
+The bound saves four per cent. The sort was never the cost — `ts_rank` and
+`word_similarity` are nearly free as projections and the full-text match is
+index-served. What costs is `<%` as a PREDICATE: a short query against
+`gin_trgm_ops` produces an enormous candidate set, and it is slowest on
+`R-08`, which is the exact query shape `CLAUDE.md` says the trigram arm exists
+to serve.
+
+It grows linearly and gently. Measured on the real plan, the whole archive
+scanned each time:
+
+| turns | ms |
+|---|---|
+| 10,000 | 108 |
+| 20,000 | 211 |
+| 40,000 | 435 |
+| 80,000 | 834 |
+| 120,000 | 1,326 |
+
+About eleven milliseconds per thousand turns. Several years of use is one and
+a third seconds inside a tool loop bounded at 150, so there is nothing here to
+repair.
+
+A GiST index with a KNN order (`content <<-> q limit 200`) was measured too:
+412 ms against the GIN predicate's 1,265. Three times better, for a second
+index type, a rebuild, and an arm that returns the nearest N rather than
+everything above the threshold — which is a change to what `search_memory`
+finds, not a speed-up of it.
+
+**Revisit if:** `eugenia_turns` passes a few hundred thousand rows, or a
+`search_memory` call is ever seen taking a share of a turn worth noticing. The
+thing to change then is the trigram arm and the index under it. Never the
+lexical bound, and never on the shape of the query alone — reading this one
+produced a confident wrong answer about which line was expensive.
+
+**And the shape to carry away:** an unbounded row count is a claim about
+memory, not about time. The question is which operator runs per row and
+whether an index can serve it, and that is a measurement rather than a reading.
+
 ---
 
 ## 7 · THE RULE THIS PASS KEEPS RE-LEARNING
