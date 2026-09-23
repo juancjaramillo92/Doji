@@ -2605,11 +2605,46 @@ test('every row-returning read of her own tables carries a limit', () => {
      wrong end. A reader that names its subjects goes blind the moment one of
      them is spelled differently, and says nothing when it does. */
   const joined = src.replace(/`\s*\+\s*`/g, '');
-  const reads = [...joined.matchAll(/rest\/v1\/([^?`]+)\?(select=[^`]*)/g)];
+  const reads = [...joined.matchAll(/rest\/v1\/([^?`]+)\?(select=[^`]*)/g)]
+    .map(m => [m[1], m[2]]);
+
+  /* AND `select=` IS NOT WHAT MAKES A PATH A READ — the read HELPER is, and
+     naming the query string was a third way of naming subjects. Two rows come
+     back from `eugenia_trades?open_day=eq.${day}&limit=50`, which asks for
+     every column and therefore writes no `select=` at all: a read of a growing
+     table, invisible to the clause above for its whole life. It carries a
+     limit, so nothing was wrong — but the reader could not have said so, which
+     is the half this census is for. Every call to readRows is a read by
+     construction, and a new one cannot be spelled out of view. */
+  /* THE PATH-BUILDERS ARE RESOLVED RATHER THAN EXEMPTED. Three call sites
+     hand readRows `${SB_URL}/rest/v1/${tradesQuery(days)}`, and two more name
+     briefedQuery and dayQuery — the limit is inside the builder because that
+     is where the model's `days` is clamped. Exempting them would be the census
+     naming a subject again, which is the fault the comment above it describes.
+     Any `…Query()` in the argument is substituted for its body, so the same
+     question is asked of every read and a limit deleted from a builder fails
+     here rather than quietly widening five call sites at once. */
+  const bodyOf = (fn) => {
+    const at = joined.indexOf(`function ${fn}(`);
+    assert.ok(at > -1, `the read helper names ${fn}(), which no longer exists`);
+    return joined.slice(at, joined.indexOf('\n}', at));
+  };
+  const resolve = (arg) => arg.replace(/(\w+Query)\(/g, (_, fn) => bodyOf(fn));
+
+  const helper = [...joined.matchAll(/readRows<[^>]*>\(\s*'[^']*',\s*([\s\S]{0,240}?)\);/g)]
+    .map(m => resolve(m[1]))
+    .filter(arg => /rest\/v1\/|[a-z_]+\?[a-z_]+=/.test(arg));
+  assert.ok(helper.length >= 15,
+    `only ${helper.length} readRows calls found — the reader has gone blind`);
+  for (const arg of helper) {
+    const table = (arg.match(/(?:rest\/v1\/\$?\{?|`)([a-z_]+)\?/) ?? [, 'a computed path'])[1];
+    reads.push([table, arg]);
+  }
+
   assert.ok(reads.length >= 3,
     `only ${reads.length} reads found — the reader has gone blind`);
 
-  for (const [, table, query] of reads) {
+  for (const [table, query] of reads) {
     assert.match(query, /limit=/,
       `the read of ${table} has no limit — an unusual day puts the whole window ` +
       `into a model call with nothing to stop it`);
@@ -3977,6 +4012,69 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   // falls through to the briefing would pass the check above.
   assert.match(body, /get\("release"\) === "1"\)\s*\{[^}]*postRelease\(\)/);
   assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
+});
+
+/* ─── And the same census from the other side ────────────────────────────────
+   The check above reads 004 and asks whether the function answers. Nothing
+   asked the reverse, which is the half that fails silently: a door written
+   into postScheduled with no job behind it is answered correctly by nobody.
+   `dueNow` has this guard already — every answer it can give has a branch —
+   and the FLAGS, which are the other way in, did not.
+
+   Two kinds of door are legitimate and they are declared rather than derived,
+   because nothing in the source tells them apart: a scheduled sense, which
+   needs a job in 004, and a door a PERSON opens, which must not have one. An
+   exemption is a row with a reason in it, never an absence — so a new flag
+   fails this suite until someone says which kind it is, and the day a sense
+   ships without its job is the day that sentence cannot be written.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const BY_HAND = {
+  embed:       'the backfill, called until it answers `left: 0` — the one door ' +
+               'whose answer IS its interface, and so the one that may wait',
+  force:       'the repair door: a briefing on demand, taking its kind from ' +
+               'briefKind rather than from the hour',
+  pulse:       'the hourly job carries no flag and dueNow decides the hour — ' +
+               'this forces a pulse out of that schedule',
+  consolidate: 'the same door for the nightly pass, which is how a missed ' +
+               'night is made up without waiting for the next one',
+};
+
+test('every door the function reads is opened by a cron job or by a person', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+  const at = src.indexOf('async function postScheduled(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  const read = [...new Set([...body.matchAll(/searchParams\.get\("(\w+)"\)/g)].map(m => m[1]))];
+  assert.ok(read.length >= 4,
+    `only ${read.length} doors read out of postScheduled — the reader has gone blind`);
+
+  const dispatched = new Set(
+    [...CRON_SQL.matchAll(/functions\/v1\/[\w-]+\?(\w+)=\w+/g)].map(m => m[1]));
+  assert.ok(dispatched.size >= 2,
+    `only ${dispatched.size} flagged cron URLs read — the reader has gone blind`);
+
+  for (const flag of read) {
+    assert.ok(dispatched.has(flag) || BY_HAND[flag],
+      `?${flag}=1 is a door postScheduled reads, no cron job in 004 calls it, and ` +
+      `BY_HAND does not say why — so either a schedule is missing and that sense ` +
+      `never runs, or it is a repair door and nothing says so`);
+    assert.ok(!(dispatched.has(flag) && BY_HAND[flag]),
+      `?${flag}=1 is declared by hand AND scheduled in 004 — one of the two is ` +
+      `stale, and the reason in BY_HAND is the one nothing else would contradict`);
+  }
+
+  // AND NO REASON OUTLIVES ITS DOOR. A flag retired from the function leaves a
+  // sentence here that reads as a working exemption for the next one named it.
+  for (const flag of Object.keys(BY_HAND)) {
+    assert.ok(read.includes(flag),
+      `BY_HAND explains ?${flag}=1 and postScheduled no longer reads it — the ` +
+      `exemption outlived the door, which is the shape that lets the next flag ` +
+      `of that name arrive already excused`);
+  }
 });
 
 /* ─── The watcher's own report can be lost, and it plans for that ───────────
