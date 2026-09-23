@@ -3675,6 +3675,42 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── When a briefing has stopped being possible ─────────────────────────────
+   010 reports an ABSENCE, and the hour it may first do so is the one thing that
+   decides whether it is a monitor or a nuisance: asked while a retry is still
+   running it names a briefing that is being written as one that never came,
+   which is the ordinary-day false alarm that gets a monitor ignored.
+
+   The bound is the last RETRY hour plus one, and that relationship lived in a
+   comment on one side and a literal on the other, in two languages with no
+   build step between them. Widening retryDue by an hour — which is a change
+   anyone might make for a good reason — would have made 010 wrong every single
+   day, with nothing here comparing the two.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('010 waits until the last retry hour has passed, in both languages', () => {
+  const retry = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export function retryDue('));
+  const last = Object.fromEntries(
+    [...retry.slice(0, retry.indexOf('\n}')).matchAll(
+      /hour >= \d+ && hour <= (\d+)\) return '(weekday|sunday)'/g)]
+      .map(m => [m[2], +m[1]]));
+  assert.deepEqual(Object.keys(last).sort(), ['sunday', 'weekday'],
+    'retryDue no longer states a bounded window per briefing — the reader has gone blind');
+
+  const judged = Object.fromEntries(
+    [...PACE_SQL.matchAll(/hour >= (\d+) then '(weekday|sunday)'/g)]
+      .map(m => [m[2], +m[1]]));
+  assert.deepEqual(Object.keys(judged).sort(), ['sunday', 'weekday'],
+    '010 no longer judges both briefings for absence');
+
+  for (const kind of ['weekday', 'sunday']) {
+    assert.equal(judged[kind], last[kind] + 1,
+      `010 judges the ${kind} briefing missing from ${judged[kind]}:00 while ` +
+      `retryDue still sends one at ${last[kind]}:00 — a retry that is running ` +
+      `is reported as a briefing that never arrived`);
+  }
+});
+
 /* ─── One definition of a failed dispatch ────────────────────────────────────
    `dispatch_watch` gates a REPEATING job behind three failures in an hour, and
    the gate used to restate what a failure is rather than ask the function that

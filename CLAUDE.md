@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 570 tests, six suites
+npm test      # 571 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1786,6 +1786,14 @@ a blank.
   asked any earlier it reports a briefing still being written. The caller it
   looks for is `postBriefing`'s, in two languages with no build step between
   them, so a rename would report a briefing missing every single day.
+
+  AND THE HOUR IT MAY FIRST SPEAK IS THE LAST RETRY HOUR PLUS ONE, which lived
+  as a comment on one side and a literal on the other. Widening `retryDue` by
+  an hour — an ordinary change to make for a good reason — would have had 010
+  naming a briefing that was still being written as one that never came, every
+  single day, with nothing comparing the two. `agree.test.mjs` derives the
+  retry window out of `retryDue` and asserts 010's bound against it per
+  briefing, in both directions.
 
   AND THE ROW IT WRITES IS THE GUARD, which is what makes one ordering
   load-bearing. It speaks at most once a New York day and decides that by
