@@ -201,11 +201,23 @@ begin
                       to_char(f.at at time zone 'America/New_York', 'HH24:MI'), f.why)
     from public.dispatch_failures(now_) f
    where not public.dispatch_repeats(f.job)
-      or (select count(*) from public.dispatch d
-           left join net._http_response r on r.id = d.id
-          where d.job = f.job
-            and d.at > now_ - interval '1 hour'
-            and (r.id is null or r.status_code not between 200 and 299)) >= 3;
+      /* COUNTED OUT OF dispatch_failures ITSELF, because this restated what a
+         failed dispatch IS and the restatement was narrower. It tested only
+         `no response row` or `a non-2xx status`, so a request that TIMED OUT —
+         which has a row, a null status_code and `timed_out` set — counted as
+         zero. The three repeating jobs are the poller, the spine and the price
+         mark, and a refused or timed-out worker on the poller is the exact
+         failure this table was built for: selected by dispatch_failures above,
+         gated to silence by a count that could not see it.
+
+         It also counted requests made SECONDS ago, where the outer query
+         judges nothing under fifteen minutes old — so an in-flight poll read
+         as a failure and pushed a healthy job toward the threshold. Both go
+         away by asking the one function that decides this. The hour is the
+         quantity window and is the only thing stated twice. */
+      or (select count(*) from public.dispatch_failures(now_) g
+           where g.job = f.job
+             and g.at > now_ - interval '1 hour') >= 3;
 
   select string_agg(line, E'\n' order by id), count(*) into told, n from _said;
 

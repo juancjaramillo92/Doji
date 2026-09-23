@@ -3675,6 +3675,45 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── One definition of a failed dispatch ────────────────────────────────────
+   `dispatch_watch` gates a REPEATING job behind three failures in an hour, and
+   the gate used to restate what a failure is rather than ask the function that
+   decides it. The restatement was narrower — `no response row` or `a non-2xx
+   status` — so a request that TIMED OUT, which has a row, a null status_code
+   and `timed_out` set, counted as ZERO. The repeating three are the poller, the
+   spine and the price mark, and a timing-out worker on the poller is the exact
+   failure this table was built for: selected by dispatch_failures and gated to
+   silence by a count that could not see it.
+
+   It also counted requests made seconds ago, where the outer query judges
+   nothing under fifteen minutes old, so an in-flight poll pushed a healthy job
+   toward the threshold from the other side.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the repeat gate asks dispatch_failures rather than restating it', () => {
+  const sql = readFileSync(
+    new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8');
+  const at = sql.indexOf('create or replace function public.dispatch_watch');
+  assert.ok(at > -1, '009 no longer defines dispatch_watch');
+  // Comments stripped: the restatement this forbids is described in the one
+  // above the gate, and prose about a predicate is not the predicate.
+  const body = sql.slice(at).replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
+
+  const gate = body.match(/or \(select count\(\*\)([\s\S]*?)>= 3;/);
+  assert.ok(gate, 'the repeat gate is gone, so a repeating job reports on one failure');
+
+  assert.match(gate[1], /from public\.dispatch_failures\(now_\)/,
+    'the repeat gate counts out of its own query again — every predicate it ' +
+    'restates is one it can get narrower than the query it gates, and the last ' +
+    'one could not see a timed-out request at all');
+  assert.doesNotMatch(gate[1], /net\._http_response|status_code|timed_out|error_msg/,
+    'the repeat gate names the response table itself, which is the restatement ' +
+    'this exists to prevent');
+  assert.match(gate[1], /interval '1 hour'/,
+    'the quantity window is gone — three failures with no window is not a rate');
+});
+
 /* ─── A door in the schedule and a door in the code ──────────────────────────
    The two data-driven senses are reached by a query flag and nothing else, and
    the flag is written twice: in the cron job's URL and in the branch that reads

@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 569 tests, six suites
+npm test      # 570 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1722,6 +1722,20 @@ a blank.
   makes, arriving for a second reason — a job that comes round on its own is
   evidence only in QUANTITY (three in an hour), and a job that does not is
   evidence alone. The hourly job, the trade event and Gladys are one-shot.
+
+  **AND THE REPEAT GATE RESTATED WHAT A FAILURE IS, NARROWER THAN THE QUERY IT
+  GATES.** `dispatch_repeats` decides that a job which comes round on its own is
+  evidence only in quantity — three in an hour — and the count beside it asked
+  `net._http_response` directly for `no row or a non-2xx status`. A request that
+  TIMED OUT has a row, a null `status_code` and `timed_out` set, so it counted
+  as ZERO: selected by `dispatch_failures` and gated to silence by a tally that
+  could not see it. The three repeating jobs are the poller, the spine and the
+  price mark, and a timed-out worker on the poller is the exact failure this
+  table exists for. It also counted requests made seconds ago, where the outer
+  query judges nothing under fifteen minutes — so an in-flight poll pushed a
+  healthy job toward the threshold from the other side. It counts out of
+  `dispatch_failures` now; the hour is the only thing stated twice, because the
+  hour is the quantity window rather than a definition.
 
   **THE LEDGER MAY NOT BREAK THE TRIGGER IT SITS IN.** Both trigger sites post
   into a variable FIRST and record it behind `exception when others then null`,
