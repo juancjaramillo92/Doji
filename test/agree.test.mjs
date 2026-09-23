@@ -3675,6 +3675,46 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
+/* ─── The prohibition that is the product ────────────────────────────────────
+   No calls on where price goes. It is the line between a market analyst and a
+   signal service, it is stated in the file rather than enforced by anything,
+   and until now nothing asserted it was there at all — deleting it from SYSTEM
+   broke no test, and what came back would have read like a better briefing.
+
+   THE TWO GATES NEED IT AS MUCH AS THE WRITER DOES, and for a reason that is
+   theirs alone: they do not merely approve, they REWRITE. A gate that has not
+   been told the rule can take a compliant message and hand back one that
+   breaks it, and the gate runs LAST, so nothing after it disagrees. That is
+   the same argument that already keeps the writing rules in all three copies.
+
+   SYSTEM is the system prompt on every call, so RELEASE and CONSOLIDATE
+   inherit it and do not restate it — which is why this names the prompts that
+   must carry it rather than requiring it everywhere.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('no prompt that writes or rewrites may lose the no-direction prohibition', () => {
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+
+  // Several phrasings, so rewording it does not fail and deleting it does.
+  const SAYS = /where price goes|what price will do|whether a level holds|what the day will look like|what the rest of the session looks like/i;
+
+  for (const who of ['SYSTEM', 'CRITIC', 'TRIM', 'MOVE', 'TRADE_EVENT']) {
+    assert.ok(bodies[who], `prompt.ts no longer exports ${who}`);
+    assert.match(bodies[who], SAYS,
+      `${who} no longer forbids a call on where price goes. That line is the ` +
+      `difference between a market analyst and a signal service, nothing else ` +
+      `in this repository enforces it, and a gate that has not been told it ` +
+      `rewrites a compliant message into one that breaks it`);
+  }
+
+  // And the two that send nothing he reads as analysis are deliberately out:
+  // CONSOLIDATE writes memory, RELEASE runs under SYSTEM like every caller.
+  assert.ok(bodies.CONSOLIDATE && bodies.RELEASE,
+    'prompt.ts no longer exports CONSOLIDATE or RELEASE');
+});
+
 /* ─── diagnose.sql counts itself too ─────────────────────────────────────────
    Its header says how many listings it holds, and that number went stale the
    way a number in prose does: it said ten while the file held eleven, 007

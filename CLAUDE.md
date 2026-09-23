@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 575 tests, six suites
+npm test      # 576 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -430,7 +430,18 @@ code you write near it:
 
 ### What she is, and what she may never do
 
-- **The prohibitions live in `prompt.ts`, and they are the product.** No signals,
+- **The prohibitions live in `prompt.ts`, and they are the product.** AND
+  NOTHING ASSERTED THE MAIN ONE WAS THERE. *No calls on where price goes* is
+  the line between a market analyst and a signal service, it is enforced by
+  nothing but the sentence itself, and deleting it from `SYSTEM` broke no test
+  — what came back would have read like a better briefing. `agree.test.mjs`
+  reads for it now in `SYSTEM`, `CRITIC`, `TRIM`, `MOVE` and `TRADE_EVENT`.
+  THE TWO GATES NEED IT AS MUCH AS THE WRITER, for a reason that is theirs
+  alone: they do not approve, they REWRITE, so one that has not been told the
+  rule can take a compliant message and hand back one that breaks it — and it
+  runs LAST, so nothing after it disagrees. `RELEASE` and `CONSOLIDATE` are
+  out by design: `SYSTEM` is the system prompt on every call, so they inherit
+  it. No signals,
   no verdict on a trade, one question at a time. The line she may cross is narrow
   and deliberate: *what the market is pricing* and *what would surprise it* are
   facts about today and are hers to say; what price will do never is. Widening
