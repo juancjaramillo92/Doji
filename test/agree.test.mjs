@@ -2495,9 +2495,20 @@ test('no paragraph of the prompt shows where it was edited', () => {
   /* The template literals as the FILE holds them, not the interpolated
      constants: ${CHANNEL_NAMES} expands one short source line to 168
      characters, and it is the source wrapping that is the artifact. */
-  const bodies = [...EUGENIA_PROMPT.matchAll(
-    /export const (SYSTEM|CONSOLIDATE|CRITIC|RELEASE|TRADE_EVENT) = `([\s\S]*?)`;/g)];
-  assert.equal(bodies.length, 5,
+  /* DERIVED, BECAUSE THE NAMED LIST WENT STALE THE WAY A NAMED LIST DOES. It
+     held five while the file exported nine, so every prompt written after it —
+     MOVE and TRIM among them — was exempt without anyone deciding that. MOVE
+     had a 112-character line sitting between neighbours of 75 and 78: the
+     artifact this test exists for, in a prompt it could not see. The test
+     below it derives its bodies and was always right; these two sat next to
+     each other.
+
+     PITCH IS THE ONE EXEMPTION AND IT IS STRUCTURAL: it is a markdown table,
+     and a `|` row cannot be wrapped without breaking the table it draws. */
+  const WRAPPED = /export const (\w+) = `([\s\S]*?)`;/g;
+  const TABLE = new Set(['PITCH']);
+  const bodies = [...EUGENIA_PROMPT.matchAll(WRAPPED)].filter(([, n]) => !TABLE.has(n));
+  assert.ok(bodies.length >= 8,
     `read ${bodies.length} prompt bodies out of prompt.ts — the reader has gone blind`);
 
   for (const [, name, body] of bodies) {

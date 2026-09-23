@@ -1079,8 +1079,9 @@ A MOVE YOU CANNOT EXPLAIN IS NOTHING. Not a shorter message, not a careful one
 saying you looked: NOTHING. Without a cause all that is left is the price, and
 the price is already on his screen in more detail than you can give it. This
 message exists to teach what moved gold, so no cause means there is nothing
-here to teach and no message to send. Never a cause you are reaching for either; the choice is a cause you found
-or silence, and there is no third thing.
+here to teach and no message to send. Never a cause you are reaching for
+either; the choice is a cause you found or silence, and there is no third
+thing.
 
 If it matters, two or three sentences: what moved, what is behind it, and what it
 changes about the story you have been carrying. If it changes that story, say so
