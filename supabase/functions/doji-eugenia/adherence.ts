@@ -29,6 +29,10 @@
 // is on her judging the trading, and this judges the rule.
 // ═══════════════════════════════════════════════════════════════════════════
 import { nyDate } from "../_shared/edge.ts";
+/* The journal's own break-even band, not a second reading of it. `journal.ts`
+   imports `TradeRow` from here with `import type`, which is erased — so this is
+   a one-way dependency at runtime and not a cycle. */
+import { BE } from "./journal.ts";
 
 /* The row as eugenia_trades serves it. Written out rather than inferred,
    because this module is the one place that reasons about every column at once
@@ -259,12 +263,29 @@ function r01(rows: TradeRow[]): RuleResult {
     if (!isBroker(t) || !closed(t) || (t.pnl as number) <= 0) continue;
     if (!priced(t)) { unknown.push(t.id); continue; }
     if (gap(t) >= 25 - CENT) { pass.push(t.id); continue; }
-    // Under $25. A Friday close-out is the one exit the data cannot tell from a
-    // discretionary one, so it is unknown rather than either answer.
+
+    /* A SCRATCH IS NOT A WIN THAT FAILED TO TAKE PROFIT, and §7's predicate
+       read literally says it is. The document contradicts itself here: its
+       Exit section names four legitimate ways a trade ends and one of them is
+       "at break-even once R-04 has moved the stop there" — while the predicate
+       flags any win closing under $25. A break-even stop-out filling a few
+       cents favourable clears the commission, so `pnl > 0`, and every one of
+       them came back a breach of a rule he had just followed.
+
+       The journal already decides what a scratch is: `resultOf` calls it `be`
+       inside ±$3 of the ENTRY PRICE, and that band is what leaves this
+       population rather than a second number invented here. The reading is
+       named for CLOSEOUT_MIN's reason — where §7 and §6 part, the code has to
+       choose, and a choice buried in a comparison is one nobody can find. */
+    if (gap(t) <= BE) continue;
+
+    // Under $25 and beyond a scratch. A Friday close-out is the one exit the
+    // data cannot tell from a discretionary one, so it is unknown rather than
+    // either answer.
     if (t.fill_time && nearFridayClose(new Date(t.fill_time))) unknown.push(t.id);
     else fail.push(t.id);
   }
-  return result('R-01', 'wins closing under $25 from entry, Friday close-outs excepted',
+  return result('R-01', 'wins closing under $25 from entry, break-even exits and Friday close-outs excepted',
                 pass, fail, unknown);
 }
 

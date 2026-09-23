@@ -2837,6 +2837,41 @@ test('R-11 reads the account off the size, and only flags trading after the limi
   ], 'R-11').verdict, 'unknown');
 });
 
+test('R-01 does not call a break-even stop-out a failure to take profit', () => {
+  /* THE STRATEGY CONTRADICTS ITSELF HERE and the code had followed the wrong
+     half. §7's predicate says "no win with abs(exit − entry) < 25"; the Exit
+     section names four legitimate ways a trade ends and one of them is "at
+     break-even once R-04 has moved the stop there". A stop moved to break-even
+     and taken out a few cents favourable clears the commission — so `pnl > 0`,
+     the gap is pennies, and R-01 reported a breach of a rule he had just
+     followed. Common rather than rare: commission is cents at this size. */
+  const scratch = verdictOf([trade({
+    id: 'PIDbe', pnl: 0.12, entry_price: 4400, exit_price: 4400.1,
+    fill_time: '2026-01-06T15:00:00Z',
+  })], 'R-01');
+  assert.equal(scratch.failed, 0,
+    'a break-even exit is counted as a win that failed to reach its target');
+  assert.equal(scratch.passed, 0, 'a scratch is not a passing win either');
+  assert.equal(scratch.unresolved, 0, 'a scratch is simply not R-01\'s population');
+
+  // The band is the journal's own, so $3 of entry price is still a scratch and
+  // a dollar past it is a real flag.
+  assert.equal(verdictOf([trade({
+    id: 'PIDedge', pnl: 11, entry_price: 4400, exit_price: 4403,
+    fill_time: '2026-01-06T15:00:00Z',
+  })], 'R-01').failed, 0, 'the band parted from journal.ts BE');
+  assert.equal(verdictOf([trade({
+    id: 'PIDreal', pnl: 40, entry_price: 4400, exit_price: 4410,
+    fill_time: '2026-01-06T15:00:00Z',
+  })], 'R-01').failed, 1, 'a genuine $10 discretionary exit stopped being flagged');
+
+  // And a win that did reach the target is untouched.
+  assert.equal(verdictOf([trade({
+    id: 'PIDok', pnl: 120, entry_price: 4400, exit_price: 4430,
+    fill_time: '2026-01-06T15:00:00Z',
+  })], 'R-01').verdict, 'pass');
+});
+
 test('R-11 will not pass a day it could only partly add up', () => {
   /* THE R-15 REPAIR, UN-APPLIED TO R-11. `fill_time` is the email path's column
      and a close with no alert behind it has an `exit_price` and no instant —

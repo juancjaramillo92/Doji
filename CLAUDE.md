@@ -132,7 +132,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 568 tests, six suites
+npm test      # 569 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1000,6 +1000,19 @@ compounds.
   asserting on `verdict` alone could not have found it. **Assert on the counts and
   on `ids`:** those are what `check_rules` hands him to check, and a breach missing
   from that list is one he cannot see.
+
+  R-01 WAS FLAGGING A RULE HE HAD JUST FOLLOWED, and the strategy contradicts
+  itself where it does. §7's predicate is *no win with `abs(exit − entry) <
+  25`*; §6's Exit section names four legitimate ways a trade ends and one of
+  them is *at break-even once R-04 has moved the stop there*. A stop moved to
+  break-even and taken out a few cents favourable clears the commission — cents,
+  at this size — so `pnl > 0`, the gap is pennies, and every such exit came back
+  a breach. The journal already decides what a scratch is, so `BE` from
+  `journal.ts` is what leaves the population rather than a second number
+  invented here; `journal.ts` imports `TradeRow` with `import type`, which is
+  erased, so this is one-way at runtime and not a cycle. Named for
+  CLOSEOUT_MIN's reason: where two sections of his document part, the code has
+  to choose, and a choice buried in a comparison is one nobody can find.
 
   R-11 KEPT THE FAULT R-15 WAS REPAIRED FOR, AND THE SAME FILE PROVED IT. The
   running total filtered on `fill_time`, which the email owns — so a close with
