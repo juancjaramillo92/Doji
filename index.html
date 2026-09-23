@@ -2259,8 +2259,11 @@ const Data = {
     return false;
   },
 
-  // Applied locally first so the UI responds immediately, then reconciled — the
-  // returned row is authoritative, including the generated pnl.
+  // NOT APPLIED LOCALLY FIRST: the dot carries the wait, and what comes back is
+  // what replaces the row. `pnl` is a generated column, so the database is the
+  // only thing that knows the figure — an optimistic write would have to invent
+  // one and then correct it, which is a number changing under him for no reason
+  // he can see.
   async save(id, fields) {
     if (this.offline) { notify('Offline — changes are not saved.', true); return false; }
     const patch = {};
@@ -2939,10 +2942,16 @@ function rrBar(list) {
     return `<div class="period-disc-row"><div class="bar-empty"></div>${head(DASH)}</div>`;
   }
 
-  // No losses means no ratio, only a direction. The figure caps rather than
-  // dividing by zero — a ceiling, not a value.
+  /* No losses means no ratio, only a direction. The figure caps rather than
+     dividing by zero — a ceiling, not a value.
+
+     ONE BRANCH, because the other was unreachable. `averages` labels a loss off
+     `resultOf`, which needs `pnl < 0` and a move past the scratch band, so
+     avgLoss is null or positive and never zero; and the early return above has
+     already taken the case where both are null. So a falsy avgLoss here means
+     wins with nothing to divide them by, and nothing else. */
   const RR_CAP = 9.99;
-  const ratio = avgLoss ? (avgWin || 0) / avgLoss : (avgWin ? RR_CAP : 1);
+  const ratio = avgLoss ? (avgWin || 0) / avgLoss : RR_CAP;
   const total = ratio + 1;
   const { html, track } = segments([
     { cls: 'sess-wr-seg-win',  v: ratio / total * 100 },
