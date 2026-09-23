@@ -187,10 +187,15 @@ export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
 
 // Buenos días before the week, buenas tardes for the Sunday open — which is
 // the evening, and the only briefing that is not a morning one.
+//
+// IT POINTED AT SOMETHING THAT IS NO LONGER THERE. The salutation ended `todays
+// news below`, which was true while a briefing was a block of text with the
+// news underneath it. The briefing is a voice note now, so there is no below —
+// she says it, and then she says the news. A line telling him where to look in
+// a message he is listening to is the written form outliving the written
+// message.
 export const greeting = (brief: Brief) =>
-  brief === 'sunday'
-    ? 'Buenas tardes jefesito, todays news below'
-    : 'Buenos dias jefesito, todays news below';
+  brief === 'sunday' ? 'Buenas tardes jefesito' : 'Buenos dias jefesito';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
    THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
@@ -2225,9 +2230,66 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
    breathless delivery of a deliberately unexcited paragraph contradicts the
    whole of it — the register has to survive the trip through audio. Pinned
    here for that reason where the voice is his to change: which voice reads it
-   is taste, how it is read is the product. */
-const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one " +
-                  "person who is busy. Never breathless, never selling.";
+   is taste, how it is read is the product.
+
+   IT ASKED FOR THE REGISTER AND NOT FOR THE DELIVERY, WHICH IS WHY IT READ AS A
+   MACHINE. Two sentences, and both of them said what NOT to do — not breathless,
+   not selling. A model given only prohibitions gives back the null reading:
+   every sentence the same length of time, every pitch contour the same, no beat
+   at a paragraph break, which is exactly what a person means by robotic. What
+   was missing is the positive half. This is the one dial the vendor offers, and
+   the model and the voice are already the newest it serves, so there is nowhere
+   else for this to come from.
+
+   THE LAST LINE IS PRONUNCIATION AND IT EARNS ITS PLACE ON REAL TEXT. Her
+   calendar lines are `08:30 ET <name>`, the trade event reads R-11 and R-14/R-19
+   back at him, and a level is a comma'd figure. Read as glyphs those are three
+   stumbles in the middle of a fluent paragraph. Said here rather than rewritten
+   on the way out, because what `remember` stores must stay the text he can read
+   — a rewriter would either touch the transcript or be a second copy of it.
+
+   AND THE FIRST REPAIR ASKED FOR A PER-SENTENCE SHAPE OVER TEXT THAT IS SIXTEEN
+   NEAR-IDENTICAL SENTENCES. It said `sentences finish downward`, which is right
+   about one sentence and is the metronome itself when applied to the register
+   `WRITING` produces: measured over the approved example, sixteen sentences,
+   mean 9.2 words, fourteen of them between 5 and 13. Sixteen identical falls in
+   a row, each one resetting to the same place to start the next. The rule was
+   aimed at news-reader uplift and it bought that at the price of the thing it
+   was written to fix.
+
+   SO THE ARC MOVED UP A LEVEL, TO THE PARAGRAPH. That is the one rhythm
+   variable still free: the WORDS cannot carry it, because sentence length is
+   fixed by rules that exist for the eye and are staying — he read a draft under
+   them and they are why the page works. What is left is where the pitch sits
+   across four sentences and how long she rests between them, and neither was
+   being asked for. Only the last sentence of a paragraph fully lands now; the
+   ones before it stay open, which is what a person does when something is still
+   coming. */
+const TTS_STYLE = `Voice: a colleague reading something over to one person who is
+busy. Low and warm, certain of what she is saying, with nothing to sell.
+
+Shape: a paragraph is one arc, not four separate readings. The sentences are
+short and nearly all of them are the same length, so giving each one the same
+rise and fall is exactly what makes a read sound counted out. Carry the thought
+across them. Start the second and third lower than the first, and let only the
+last sentence of a paragraph really land — the ones before it stay open, because
+something is still coming.
+
+An opening greeting is not a paragraph and gets none of that. Say hello lightly
+and move straight on. It is not the first idea, and weighting it like one is the
+slowest thing in the message.
+
+Pace: the rests do the work the sentence lengths cannot. Vary the gap between
+sentences, and take a full breath at a blank line. Inside a sentence, slow across
+a number or a name and let the plain words run.
+
+Emphasis: one word in a sentence carries it. Land on that and let the rest fall
+away. Never lift at the end of a line, and never read it like a news bulletin.
+
+Say a number, a time or a code the way a person says it out loud: "08:30 ET" is
+"eight thirty Eastern", "R-11" is "rule eleven", "$4,412.50" is "four thousand
+four hundred and twelve dollars fifty". A Spanish word is said in Spanish, not
+read as English letters.`;
 
 /* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
    cap — seven hundred characters, then four thousand — and a cap decides that
@@ -2242,6 +2304,20 @@ const TTS_STYLE = "Calm, measured and unhurried, like an analyst talking to one 
    with its paragraph preference, so each part is a whole thought rather than a
    sentence cut in half. */
 const TTS_LIMIT = 4000;
+
+/* HIS EAR SET THIS, NOT A DEFAULT. At 1.0 he was playing every voice note at
+   1.5x in Telegram and calling 1.5 a shade fast — so the number is his, read
+   off what he was already doing, and it belongs at generation rather than in a
+   player setting he has to remember on each message.
+
+   IT MAY BE IGNORED, AND THAT IS THE THING TO KNOW BEFORE READING A RESULT
+   HERE. `speed` is documented for this endpoint across 0.25–4.0, and
+   gpt-4o-mini-tts has been reported to quietly disregard it where tts-1 honours
+   it — no error, no header, audio at 1.0 and a constant in this file claiming
+   otherwise. Nothing in the test suite can see the difference, because the
+   suite never calls the vendor. So if the tempo is unchanged, this is the first
+   thing to suspect and the fallback is to ask for pace in TTS_STYLE instead. */
+const TTS_SPEED = 1.3;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2272,7 +2348,7 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
            a gamble on what the vendor does with an asterisk. Stripped here
            rather than written differently, because the text message wants them
            and this is the only reader that does not. */
-        model: TTS_MODEL, voice: TTS_VOICE,
+        model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
       }),

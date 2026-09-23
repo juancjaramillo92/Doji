@@ -1451,6 +1451,22 @@ adjectives about it — a model matches an example where it ignores a descriptio
 It lives in `WRITING`, so the writer, `CRITIC` and `TRIM` are all shown the same
 one.
 
+**She answers in English whatever he wrote in, and that is the opposite of the
+instinct.** He is a native Spanish speaker and writes to her in it, or sends a
+voice note in it, and a model's reflex is to mirror the language it was given.
+The markets he reads are in English and the vocabulary he is building is
+English, so the same idea in Spanish hands it to him in words he cannot reuse
+anywhere he will meet it again.
+
+**A word of Spanish now and then, though, because she is not a terminal.** A
+greeting, an aside, something said with a shrug — never a market term, never a
+number, never the sentence carrying the mechanism, because those are the words
+he is building. Most messages have none at all: it is seasoning, and the way it
+fails is trying. Both rules live in `WRITING` rather than in `SYSTEM`, and that
+placement is the whole of what makes the second one survive — `CRITIC` and
+`TRIM` read the same block, and a gate that had only been told to prefer the
+plainest word would take every Spanish word back out, last, every morning.
+
 **One chain is exempt from the rung, and it is the one under everything else.**
 Gold pays no interest, so it competes with what a bond pays once inflation is
 taken out rather than with the headline rate. `PITCH` says a channel at `owns`
@@ -1987,10 +2003,68 @@ the answer, and it is why both defaults name the current model's own recommended
 pairing rather than the safest-looking one.
 
 **How it is read is pinned, where which voice reads it is not.** `TTS_STYLE`
-asks for calm and unhurried, because the prompt spends most of its length keeping
-her off signals and verdicts and a breathless delivery of a deliberately
-unexcited paragraph contradicts all of it. The register has to survive the trip
-through audio. Voice is taste; delivery is the product.
+carries it, because the prompt spends most of its length keeping her off signals
+and verdicts and a breathless delivery of a deliberately unexcited paragraph
+contradicts all of it. The register has to survive the trip through audio. Voice
+is taste; delivery is the product.
+
+**It asked for the register and not for the delivery, and that is why it read as
+a machine.** It was two sentences and both of them said what *not* to do — not
+breathless, not selling. Given only prohibitions the model returns the null
+reading: every sentence taking the same length of time, every sentence shaped the
+same way, and no beat at a paragraph break. That is what a person means by
+robotic, and none of it was ruled out. It says the positive half now — and it is
+the only dial there is. The defaults above already name the newest model the
+speech endpoint serves and one of the two voices the vendor recommends for it,
+so a better read was never going to come from moving either.
+
+**That first repair asked for a per-sentence shape, over text that is sixteen
+near-identical sentences.** It said *sentences finish downward*, which is right
+about one sentence and is the metronome itself against the register `WRITING`
+produces — measured over the approved example: sixteen sentences, mean 9.2
+words, fourteen of them between 5 and 13. Sixteen identical falls in a row, each
+resetting to the same place to start the next. The rule was aimed at news-reader
+uplift and it bought that at the price of the thing it was written to fix.
+
+**So the arc moved up a level, to the paragraph**, which is the one rhythm
+variable still free. The words cannot carry it: sentence length is fixed by
+rules that exist for the eye, and those rules are staying — he read a draft
+under them, and they are why the page works. What is left is where the pitch
+sits across four sentences and how long she rests between them, and neither was
+being asked for. Only the last sentence of a paragraph fully lands now; the ones
+before it stay open, which is what a person does when something is still coming.
+
+**The last line of it is pronunciation, and it is there on real text rather than
+on a guess.** A calendar line is `08:30 ET <name>`, the trade event reads R-11
+and R-14/R-19 back at him, and a level is a comma'd figure — read as glyphs,
+those are three stumbles in the middle of a fluent paragraph. They are said in
+the instruction rather than rewritten on the way out, because the text `remember`
+stores has to stay the text he can read: a rewriter would either touch the
+transcript or become a second copy of it.
+
+**The tempo is his ear rather than a default.** At 1.0 he was playing every
+voice note at 1.5x in Telegram and calling 1.5 a shade fast, so `TTS_SPEED` is
+1.3 and it is read off what he was already doing. It sits at generation rather
+than in a player setting he has to remember on each message, and it is pinned
+where `TTS_VOICE` is not, for `TTS_STYLE`'s reason: how fast she is heard is the
+product.
+
+**It may also be ignored, and that has to be known before a result here is
+read.** `speed` is documented for this endpoint across 0.25–4.0, and
+`gpt-4o-mini-tts` has been reported to disregard it where `tts-1` honours it —
+no error, no header, audio at 1.0 and a constant in the file claiming otherwise.
+Nothing in the suite can see it, because the suite never calls the vendor. If
+the tempo is unchanged, that is the first thing to suspect, and the fallback is
+to ask for pace in `TTS_STYLE` instead.
+
+**And the greeting was the slowest thing in the message, from a rule written for
+paragraphs.** `Buenos dias jefesito` is its own one-line paragraph, so *let only
+the last sentence of a paragraph really land* applied to it at full strength —
+hello, delivered with the weight of a conclusion. An opening greeting is named
+as exempt now. That line has now been wrong twice in two unrelated ways, which
+is worth noticing about any text that is assembled rather than written: the
+greeting is prepended to the briefing, so no rule aimed at the briefing was ever
+looking at it.
 
 **The audio is requested as OGG/Opus, and this is the one thing on the path that
 would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
