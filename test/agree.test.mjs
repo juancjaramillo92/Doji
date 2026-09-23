@@ -2875,6 +2875,17 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
       `she said the same thing an hour ago, and a repetition reads as emphasis`);
   }
 
+  /* AND THE ABSENCE IS ASSERTED, NOT LEFT TO A LIST. `postConsolidation` was
+     said to be deliberately without the window — in a comment, and by not
+     appearing in the array above, which is not a check. Adding `recent()` to
+     the pass passed the whole suite. Half a census is the fault this file
+     keeps finding: presence held on the paths that need it and absence held
+     nowhere, so the one path the rule is ABOUT is the one nothing reads. */
+  assert.ok(!reaches(reads('postConsolidation'), 'recent'),
+    'the nightly pass now takes the twelve-turn window as well as its own ' +
+    'fixed twenty-four hours — a second, shorter copy of the same day, paid ' +
+    'for on every request of the one caller that reads a whole day at once');
+
   /* AND WHAT HE HAS ON, WHICH IS SIX PATHS RATHER THAN FIVE. The move look
      joins because the message that talks past a live position is whichever one
      happens to be next, and a sharp move is the likeliest of all of them to
@@ -5694,6 +5705,21 @@ test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () 
   assert.match(body, /is distinct from/,
     'eugenia_calendar_touch moves updated_at on every update again, so a look ' +
     'marking a stale row makes it read as the later one');
+  /* AND THE WRITER IS THE OTHER HALF OF THAT GUARANTEE, which was checked on
+     the trigger side alone. The exclusion above only helps while the MARK
+     sends `looked_at` and nothing else — a PATCH that names `updated_at`
+     itself moves the column whatever the trigger compares, and the guarantee
+     is gone with both halves still reading as present. Proved by adding
+     `updated_at` to the body and watching this go red; before it existed, that
+     mutation passed the whole suite. */
+  const mark = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function markLooked'));
+  const sent = mark.slice(0, mark.indexOf('\n}')).match(/JSON\.stringify\(\{([^}]*)\}/);
+  assert.ok(sent, 'markLooked no longer PATCHes a literal body this can read');
+  assert.deepEqual([...sent[1].matchAll(/(\w+):/g)].map(m => m[1]), ['looked_at'],
+    'markLooked writes a column other than looked_at, so a mark is an edit — ' +
+    'and updated_at then says when a row was last HANDLED rather than which ' +
+    'of two contradictory rows carries the later content');
+
   for (const ignored of ['updated_at', 'looked_at']) {
     assert.ok(body.split(`- '${ignored}'`).length === 3,
       `${ignored} is not excluded from both sides of the comparison, so the ` +

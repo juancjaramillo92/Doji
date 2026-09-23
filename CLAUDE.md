@@ -378,9 +378,11 @@ fixable one: it captures `innerHTML`, which is the DOM re-serialised, so `"` and
   JSON it read as "on the day", and she said so at 20:57 about a session under
   four hours old. Nothing here can see the calendar day; `get_trendbars` rolls on
   the same boundary, so `quoteWindow` NAMES the window rather than computing one
-  out of numbers that cannot carry it, and `agree.test.mjs` reads `readMarket`,
-  `marketBlock` and `postMove` for the call — dropping it breaks nothing and the
-  message still reads as a working price.
+  out of numbers that cannot carry it. `quoteWindow` is called ONCE, inside
+  `quoteLine`, and `agree.test.mjs` holds that pair — then reads `readMarket`,
+  `marketBlock` and `postMove` for `quoteLine`, so a fourth caller rendering
+  its own quote is the way this comes back. Dropping either breaks nothing and
+  the message still reads as a working price.
 
 - **Eugenia reads a price through the poller and must never hold the broker
   token.** The endpoint that serves a quote also serves `create_order`, so the
