@@ -1336,8 +1336,8 @@ A daily XAU/USD briefing, a quieter look later in the morning, a look at any
 number that actually lands, a word when a position opens into one, and a
 conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 second is the gold open, so the week's first briefing lands exactly as the
-market does. She greets with `Buenos dias jefesito` in the morning and `Buenas
-tardes jefesito` on Sunday evening.
+market does. She opens with `Buenos días, jefesito.` in the morning and `Buenas
+tardes, jefesito.` on Sunday evening.
 
 Reply to her and she answers — by typing, by voice, or by sending a chart.
 `supabase/003_eugenia.sql` holds her memory and her read of the journal,
@@ -2158,14 +2158,17 @@ Nothing in the suite can see it, because the suite never calls the vendor. If
 the tempo is unchanged, that is the first thing to suspect, and the fallback is
 to ask for pace in `TTS_STYLE` instead.
 
-**And the greeting was the slowest thing in the message, from a rule written for
-paragraphs.** `Buenos dias jefesito` is its own one-line paragraph, so *let only
-the last sentence of a paragraph really land* applied to it at full strength —
-hello, delivered with the weight of a conclusion. An opening greeting is named
-as exempt now. That line has now been wrong twice in two unrelated ways, which
-is worth noticing about any text that is assembled rather than written: the
-greeting is prepended to the briefing, so no rule aimed at the briefing was ever
-looking at it.
+**The greeting opens the first paragraph rather than standing as its own, and
+that is what makes it quick.** On a line of its own it was a one-line paragraph,
+so every rule about a paragraph's last sentence landed on hello: *let only the
+last sentence really land*, *take a full breath at a blank line*. Telling the
+voice it was exempt only put an instruction against the text, and the text won.
+Two more things converged on the same last word — it carried no full stop, so
+nothing said *jefesito* was finished, and *slow across a name* read what she
+calls him as a name to slow on. So it is a punctuated sentence now, joined to
+the briefing by a space, and the voice slows only for a name he has to catch.
+The join is the half a tidy edit would undo — on its own line it looks neater
+and sounds worst — so a test reads the call site for it.
 
 **The audio is requested as OGG/Opus, and this is the one thing on the path that
 would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
