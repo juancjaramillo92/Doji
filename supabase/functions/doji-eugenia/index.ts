@@ -2301,7 +2301,16 @@ const TTS_VOICE = env("TTS_VOICE") || "marin";
    across four sentences and how long she rests between them, and neither was
    being asked for. Only the last sentence of a paragraph fully lands now; the
    ones before it stay open, which is what a person does when something is still
-   coming. */
+   coming.
+
+   SPANISH IS SAID AS A NATIVE SAYS IT, AND CAREFUL IS THE GRINGO TELL. `Not
+   read as English letters` ruled out the worst reading and asked for nothing
+   better: a correct, deliberate Spanish word in an American mouth is still an
+   American saying a Spanish word, and slowing down to get it right is the tell
+   itself — the same slowing that dragged `jefesito` out. A native speaker is
+   quickest in their own language. So the switch is asked for as code-switching,
+   both directions, because the other failure is a Spanish accent leaking onto
+   the English around it. */
 const TTS_STYLE = `Voice: a colleague reading something over to one person who is
 busy. Low and warm, certain of what she is saying, with nothing to sell.
 
@@ -2321,8 +2330,14 @@ away. Never lift at the end of a line, and never read it like a news bulletin.
 
 Say a number, a time or a code the way a person says it out loud: "08:30 ET" is
 "eight thirty Eastern", "R-11" is "rule eleven", "$4,412.50" is "four thousand
-four hundred and twelve dollars fifty". A Spanish word is said in Spanish, not
-read as English letters.`;
+four hundred and twelve dollars fifty".
+
+Spanish: she is bilingual and switches the way bilingual people do. A Spanish
+word is said in native Latin American Spanish — pure short vowels, a tapped r,
+the stress where Spanish puts it: "claro" is never "clair-oh", "jefesito" is
+heh-feh-SEE-toh. Say it at speed and without care, the way anyone says their
+own language; slowing down to get it right is exactly what sounds foreign. Then
+straight back to her ordinary English, with no accent carried across.`;
 
 /* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
    cap — seven hundred characters, then four thousand — and a cap decides that

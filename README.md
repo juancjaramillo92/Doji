@@ -1540,6 +1540,16 @@ placement is the whole of what makes the second one survive — `CRITIC` and
 `TRIM` read the same block, and a gate that had only been told to prefer the
 plainest word would take every Spanish word back out, last, every morning.
 
+**And the Spanish is said as a native says it, which takes two halves.** The
+voice can only pronounce what is written, so `WRITING` asks for the accents and
+the ñ — its stress comes off the spelling. `TTS_STYLE` then asks for native
+Latin American Spanish at speed: *not read as English letters* ruled out the
+worst reading and asked for nothing better, and a correct, careful Spanish word
+in an American mouth is still the gringo version. Slowing down to get it right
+is the tell itself, and a native speaker is quickest in their own language. It
+is asked for as code-switching in both directions, because the other failure is
+a Spanish accent leaking onto the English around it.
+
 **One chain is exempt from the rung, and it is the one under everything else.**
 Gold pays no interest, so it competes with what a bond pays once inflation is
 taken out rather than with the headline rate. `PITCH` says a channel at `owns`
