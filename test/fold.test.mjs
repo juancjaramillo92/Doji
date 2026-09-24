@@ -923,12 +923,11 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
 });
 
 test('the salutation matches the time of day the briefing lands', () => {
-  /* AND IT POINTS AT NOTHING. It used to end `todays news below`, which was a
-     direction to the reader's eye — correct while the briefing was text with
-     the news printed underneath the greeting, and meaningless once it became a
-     voice note where there is no below to look at. */
-  assert.equal(greeting('weekday'), 'Buenos dias jefesito');
-  assert.equal(greeting('sunday'),  'Buenas tardes jefesito');
+  /* AND IT ENDS AS A SENTENCE ENDS. It is heard, so its punctuation is the only
+     prosody it carries: bare, the voice had no full stop to finish `jefesito`
+     on and drew the last syllable out. */
+  assert.equal(greeting('weekday'), 'Buenos días, jefesito.');
+  assert.equal(greeting('sunday'),  'Buenas tardes, jefesito.');
 });
 
 /* ─── Eugenia: the pulse ─────────────────────────────────────────────────────
@@ -1605,7 +1604,7 @@ test('a briefing longer than one message is split, and never mid-sentence', () =
 });
 
 test('a message that fits is sent whole, as one', () => {
-  assert.deepEqual(chunk('Buenos dias jefesito'), ['Buenos dias jefesito']);
+  assert.deepEqual(chunk('Buenos días, jefesito.'), ['Buenos días, jefesito.']);
 });
 
 test('the seam lands on a paragraph break, not on the last newline in budget', () => {

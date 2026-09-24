@@ -5229,6 +5229,20 @@ test('the text is sent only when the audio did not land', () => {
     'message under the voice note to carry it any more');
 });
 
+test('the greeting opens the first paragraph rather than standing as its own', () => {
+  /* THE HALF `greeting()` CANNOT SEE. On a line of its own the greeting is a
+     one-line paragraph, and every TTS_STYLE rule about a paragraph's last
+     sentence and its closing breath lands on hello — it came out the slowest
+     thing in the message. Putting it back on its own line is the tidy-looking
+     edit, it breaks nothing here, and the only symptom is how it sounds. */
+  const at = EUGENIA_TS.indexOf('async function postBriefing(');
+  assert.ok(at > -1, 'doji-eugenia no longer has postBriefing()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /sayAloud\(`\$\{greeting\(due\)\} \$\{brief\}`/,
+    'the greeting is no longer joined to the briefing by a space — on its own ' +
+    'line it is a paragraph, and the paragraph rules slow it to a crawl');
+});
+
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE. A path that calls `say` directly
      still works and still reaches him — it is simply silent, which is the

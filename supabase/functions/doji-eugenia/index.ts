@@ -188,14 +188,13 @@ export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
 // Buenos días before the week, buenas tardes for the Sunday open — which is
 // the evening, and the only briefing that is not a morning one.
 //
-// IT POINTED AT SOMETHING THAT IS NO LONGER THERE. The salutation ended `todays
-// news below`, which was true while a briefing was a block of text with the
-// news underneath it. The briefing is a voice note now, so there is no below —
-// she says it, and then she says the news. A line telling him where to look in
-// a message he is listening to is the written form outliving the written
-// message.
+// PUNCTUATED AS THE SENTENCE IT IS, BECAUSE IT IS HEARD RATHER THAN READ. Bare,
+// it ended on `jefesito` with no full stop, and a voice given no sentence end
+// has nothing to say the word is finished — it drew the last syllable out. The
+// comma before the name and the stop after it are ordinary Spanish, and they
+// are also the only prosody this line gets to carry.
 export const greeting = (brief: Brief) =>
-  brief === 'sunday' ? 'Buenas tardes jefesito' : 'Buenos dias jefesito';
+  brief === 'sunday' ? 'Buenas tardes, jefesito.' : 'Buenos días, jefesito.';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
    THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
@@ -2313,13 +2312,9 @@ across them. Start the second and third lower than the first, and let only the
 last sentence of a paragraph really land — the ones before it stay open, because
 something is still coming.
 
-An opening greeting is not a paragraph and gets none of that. Say hello lightly
-and move straight on. It is not the first idea, and weighting it like one is the
-slowest thing in the message.
-
 Pace: the rests do the work the sentence lengths cannot. Vary the gap between
 sentences, and take a full breath at a blank line. Inside a sentence, slow across
-a number or a name and let the plain words run.
+a number or a name he has to catch, and let the plain words run.
 
 Emphasis: one word in a sentence carries it. Land on that and let the rest fall
 away. Never lift at the end of a line, and never read it like a news bulletin.
@@ -3424,7 +3419,10 @@ async function postBriefing(due: Brief): Promise<Response> {
      briefing is cheaper than sending four. */
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
-  await sayAloud(`${greeting(due)}\n\n${brief}`, feedbackKeyboard(nyDate(new Date())));
+  // A space, not a blank line. On a line of its own the greeting is a one-line
+  // paragraph, and every TTS_STYLE rule about a paragraph's last sentence and
+  // its closing breath lands on hello — which is how it came out slowest.
+  await sayAloud(`${greeting(due)} ${brief}`, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
      written one row for the draft and one for the critic — what each of them
