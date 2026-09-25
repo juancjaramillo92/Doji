@@ -86,7 +86,7 @@ scripts/backup-memory.mjs               the paged read behind the weekly copy
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-.github/workflows/backup-memory.yml     the weekly copy of her seven tables
+.github/workflows/backup-memory.yml     the weekly copy of the nine tables nothing else holds
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -596,9 +596,11 @@ policy that would let it. The copy has to be taken with the secret key, from
 outside the browser.
 
 **`scripts/backup-memory.mjs` is that copy, and `.github/workflows/backup-memory.yml`
-runs it every Sunday evening.** It reads the seven tables that have no other
+runs it every Sunday evening.** It reads the nine tables that have no other
 source — the channel map, the notes, the turns, the thesis, the open loops, the
-calendar and the feedback — and writes one JSON document as a build artifact.
+calendar and the feedback, and Forex Factory's weeks as R-14 was judged against
+them, since the export only ever serves the current one — and writes one JSON
+document as a build artifact.
 `eugenia_runs` is deliberately out: it is the cost meter, by far the largest
 table, and every row in it is a fact about a model call rather than about him.
 
@@ -2041,8 +2043,8 @@ a dropped row could be the red folder. The history is only what the pass kept, a
 every entry in the missed one would pass — so `ff_weeks` records each week a fetch
 landed for and an entry outside one is `unknown`. The fetch is metered as
 `caller: 'forexfactory'` in `eugenia_runs`, both outcomes. The calendar's history
-exists nowhere else and the weekly backup does not carry it yet: that backup pages
-each table by one unique column, and this one is keyed on three.
+exists nowhere else, so the weekly backup carries both tables, paging
+`ff_calendar` by all three columns of its key.
 
 **`unknown` is not a pass**, and the code says so rather than the prompt: the
 verdict is the worst outcome present, and an empty population is `unknown`. A

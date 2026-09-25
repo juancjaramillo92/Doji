@@ -3337,13 +3337,15 @@ test('every table the backup reads is ordered by a column it has', async () => {
 
     // The column as DECLARED — a name in a constraint or a comment is not one.
     const columns = created[1].split('\n')
-      .map(l => l.trim().match(/^([a-z_]+)\s+(text|bigserial|bigint|int|numeric|boolean|timestamptz|vector)/))
+      .map(l => l.trim().match(/^([a-z_]+)\s+(text|bigserial|bigint|int|numeric|boolean|timestamptz|date|vector)/))
       .filter(Boolean).map(m => m[1]);
     assert.ok(columns.length >= 2,
       `read ${columns.length} columns out of ${table} — the reader has gone blind`);
-    assert.ok(columns.includes(orderBy),
-      `the backup orders ${table} by '${orderBy}' and that column is not on it — ` +
-      `PostgREST answers 400 and the entire backup is refused, on every run`);
+    for (const col of [orderBy].flat()) {
+      assert.ok(columns.includes(col),
+        `the backup orders ${table} by '${col}' and that column is not on it — ` +
+        `PostgREST answers 400 and the entire backup is refused, on every run`);
+    }
   }
 });
 

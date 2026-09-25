@@ -50,6 +50,13 @@ export const TABLES = [
   ['eugenia_loops',    'id'],
   ['eugenia_calendar', 'id'],
   ['eugenia_feedback', 'id'],
+  /* FOREX FACTORY'S WEEKS, which have no other source either: the export is
+     only ever the current week, so the calendar R-14 is judged against exists
+     nowhere but here once the week has turned. Its key is three columns, so it
+     is ordered by all three — by `at` alone, two releases at one instant could
+     be served on both pages of a boundary or on neither. */
+  ['ff_calendar',      ['at', 'country', 'title']],
+  ['ff_weeks',         'week'],
 ];
 
 const PAGE = 1000;
@@ -60,7 +67,8 @@ const PAGE = 1000;
 export async function readAll(url, key, table, orderBy, fetchImpl = fetch) {
   const rows = [];
   for (let from = 0; ; from += PAGE) {
-    const res = await fetchImpl(`${url}/rest/v1/${table}?select=*&order=${orderBy}.asc`, {
+    const order = [orderBy].flat().map(c => `${c}.asc`).join(',');
+    const res = await fetchImpl(`${url}/rest/v1/${table}?select=*&order=${order}`, {
       headers: {
         apikey: key,
         // Range rather than limit/offset: PostgREST answers it with a

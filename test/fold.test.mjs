@@ -1606,10 +1606,18 @@ test('a refused read throws rather than backing up a blank', async () => {
 });
 
 test('the backup names every table that has no other source', async () => {
-  const stub = async () => ({ ok: true, json: async () => [] });
+  const asked = [];
+  const stub = async (u) => { asked.push(u); return { ok: true, json: async () => [] }; };
   const out = await backup('https://x', 'k', stub);
+  // A three-column key is ordered by all three, or a page boundary between two
+  // releases at one instant can serve a row twice or not at all.
+  assert.ok(asked.includes('https://x/rest/v1/ff_calendar?select=*&order=at.asc,country.asc,title.asc'),
+    'ff_calendar is not paged by its whole key');
+  assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
+    'a one-column key is no longer paged the way it was');
   for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
-                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar']) {
+                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
+                   'ff_calendar', 'ff_weeks']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
   // The cost meter is deliberately out: every row is about a model call rather

@@ -1552,7 +1552,7 @@ and what could not be verified.
 
 ## Her memory is backed up from outside the browser
 
-`scripts/backup-memory.mjs` is the only copy of the seven tables that have no
+`scripts/backup-memory.mjs` is the only copy of the nine tables that have no
 other source. It is run weekly by `.github/workflows/backup-memory.yml` and can
 be run by hand for a durable copy; the README carries the mechanics. The part to
 be careful with is the PAGING: PostgREST caps a response at its own `max-rows`
