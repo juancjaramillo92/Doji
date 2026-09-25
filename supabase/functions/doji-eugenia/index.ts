@@ -1056,7 +1056,10 @@ const CALENDAR_TOOL = {
     "consensus and the prior — and call it again once a number has landed to fill " +
     "in the actual and one line on what it meant. Recording a release with " +
     "importance 'high' is also what wakes you to look at it after it lands, so a " +
-    "print worth reacting to must be filed as high. Filing the same time and name " +
+    "print worth reacting to must be filed as high. Forex Factory's rating is the " +
+    "one he reads: a USD red folder at that exact minute files it as high, and " +
+    "where only USD releases are listed then, their rating replaces yours. The " +
+    "answer says when that happened. Filing the same time and name " +
     "twice updates the row rather than adding one — so if the release is already " +
     "in the calendar you were handed, file it under that exact name.",
   input_schema: {
@@ -1098,7 +1101,7 @@ async function logCalendar(releases: unknown): Promise<string> {
   const now = Date.now();
   let unseen = 0;
 
-  const rows = list.map((r: any) => {
+  let rows = list.map((r: any) => {
     const at = new Date(String(r?.at ?? ""));
     if (isNaN(+at) || !String(r?.name ?? "").trim()) return null;
     // Outside what she is handed, so she cannot check it against what is
@@ -1143,6 +1146,25 @@ async function logCalendar(releases: unknown): Promise<string> {
       : "None of those had a readable time, so nothing was recorded.";
   }
 
+  /* FOREX FACTORY RATES A USD RELEASE, NOT HER. Her importance came off a
+     search page, and on 25 September she filed as high a print he read as
+     medium — the correction she asked him to keep making. He reads the folder,
+     so where Forex Factory lists a USD release at the same minute, its rating
+     wins — under the one-way rule ffRated states. Matched on the instant and
+     never the name: the name is free text, and a match on it is the duplicates
+     problem again. Anything it does not list keeps hers. A read that fails
+     leaves her ratings standing rather than the filing unsaved. */
+  let rerated = 0;
+  try {
+    const times = rows.map(r => r!.at).sort();
+    const rated = await readRows<{ at: string; impact: string; country: string }>('Ratings',
+      `${SB_URL}/rest/v1/${ratingsQuery(times[0], times[times.length - 1])}`);
+    ({ rows, changed: rerated } = ffRated(rows as { at: string; importance: string }[], rated));
+  } catch (err) {
+    console.error("doji-eugenia: Forex Factory ratings unavailable —",
+      err instanceof Error ? err.message : err);
+  }
+
   /* AND THE ROWS GO UP IN GROUPS THAT CARRY THE SAME KEYS, which is what makes
      the omission above reach the database at all: PostgREST refuses a bulk
      insert whose objects do not all name the same columns. A briefing filing
@@ -1163,7 +1185,10 @@ async function logCalendar(releases: unknown): Promise<string> {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     }
-    return `Recorded ${rows.length}.${beyond}`;
+    const swapped = rerated
+      ? ` ${rerated} took Forex Factory's rating for the USD release at that minute rather than yours.`
+      : "";
+    return `Recorded ${rows.length}.${swapped}${beyond}`;
   } catch (err) {
     console.error("doji-eugenia: calendar not written —", err instanceof Error ? err.message : err);
     return "That did not save. Carry on and do not mention it.";
@@ -3748,6 +3773,51 @@ async function postConsolidation(): Promise<Response> {
      time, and it would be again. */
   return day.length ? json({ ok: true, consolidated: day.length })
                     : json({ ok: true, skipped: "nothing said" });
+}
+
+/* Her calendar's words for Forex Factory's folders. Holiday is not a release
+   and rates nothing. */
+const FF_IMPORTANCE: Record<string, string> = { High: 'high', Medium: 'medium', Low: 'low' };
+const RANK = ['low', 'medium', 'high'];
+
+/* Pure, so the match can be driven. Several USD releases at one minute — CPI
+   and core CPI — rate the minute by the highest of them, which is the folder
+   he sees first. Returns how many it changed, so she can be told.
+
+   A MINUTE IS NOT AN EVENT, and matching on one is only safe in one direction.
+   At 05:15 on 25 September Forex Factory listed the Bank of England governor,
+   red, beside a Fed member it rated low — so her "Bailey speaks" would have
+   been demoted to low by a speech she never filed. A USD red folder at the
+   minute raises her rating whatever else shares it, because that is a print
+   worth waking for; anything lower replaces hers only when every release at
+   that minute is USD, since otherwise the row she filed may be the other one. */
+export function ffRated<T extends { at: string; importance: string }>(
+  rows: T[], rated: { at: string; impact: string; country: string }[],
+): { rows: T[]; changed: number } {
+  const best = new Map<number, string>(), shared = new Set<number>();
+  for (const r of rated) {
+    const at = +new Date(r.at);
+    if (r.country !== RED.country) { shared.add(at); continue; }
+    const imp = FF_IMPORTANCE[r.impact], was = best.get(at);
+    if (imp && (!was || RANK.indexOf(imp) > RANK.indexOf(was))) best.set(at, imp);
+  }
+  let changed = 0;
+  return {
+    rows: rows.map(r => {
+      const at = +new Date(r.at), ff = best.get(at);
+      if (!ff || ff === r.importance || (ff !== 'high' && shared.has(at))) return r;
+      changed++;
+      return { ...r, importance: ff };
+    }),
+    changed,
+  };
+}
+
+// Every release over the minutes being filed — every currency, because which
+// others share a minute is what decides whether a USD rating may lower hers.
+export function ratingsQuery(from: string, to: string): string {
+  return `ff_calendar?select=at,impact,country` +
+         `&at=gte.${from}&at=lte.${to}&order=at.desc&limit=500`;
 }
 
 /* ─── Forex Factory's week ─────────────────────────────────────────────────

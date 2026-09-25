@@ -3337,13 +3337,15 @@ test('every table the backup reads is ordered by a column it has', async () => {
 
     // The column as DECLARED — a name in a constraint or a comment is not one.
     const columns = created[1].split('\n')
-      .map(l => l.trim().match(/^([a-z_]+)\s+(text|bigserial|bigint|int|numeric|boolean|timestamptz|vector)/))
+      .map(l => l.trim().match(/^([a-z_]+)\s+(text|bigserial|bigint|int|numeric|boolean|timestamptz|date|vector)/))
       .filter(Boolean).map(m => m[1]);
     assert.ok(columns.length >= 2,
       `read ${columns.length} columns out of ${table} — the reader has gone blind`);
-    assert.ok(columns.includes(orderBy),
-      `the backup orders ${table} by '${orderBy}' and that column is not on it — ` +
-      `PostgREST answers 400 and the entire backup is refused, on every run`);
+    for (const col of [orderBy].flat()) {
+      assert.ok(columns.includes(col),
+        `the backup orders ${table} by '${col}' and that column is not on it — ` +
+        `PostgREST answers 400 and the entire backup is refused, on every run`);
+    }
   }
 });
 
@@ -3528,6 +3530,17 @@ test('the importance a release may carry is the one the table accepts', () => {
   assert.ok(offered, 'the log_calendar tool no longer declares an importance enum');
   assert.deepEqual([...offered[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
     'log_calendar offers an importance the table refuses, or the reverse');
+
+  /* AND FOREX FACTORY'S FOLDERS MAP ONTO THE SAME THREE. ffRated writes these
+     values into her rows, so one the table refuses is a 400 on every filing
+     it touched — caught by logCalendar and reported to her as "did not save". */
+  const mapped = src.match(/const FF_IMPORTANCE[^=]*= \{([^}]+)\}/);
+  assert.ok(mapped, 'FF_IMPORTANCE no longer maps Forex Factory folders to importance');
+  assert.deepEqual([...mapped[1].matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort(), declared,
+    "a Forex Factory folder maps to an importance the table refuses, or one is unreachable");
+  const ranked = src.match(/const RANK = \[([^\]]+)\]/);
+  assert.deepEqual([...ranked[1].matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort(), declared,
+    'ffRated ranks importances the table does not have');
 
   /* AND THE ONE THAT WAKES HER IS ONE OF THEM. The event spine selects on
      importance='high', so a rename on either side leaves a spine that matches
@@ -5729,6 +5742,22 @@ test('the nightly pass fetches Forex Factory, meters both outcomes, and check_ru
   assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
   assert.match(body, /checkRules\(rows, Date\.now\(\), \{/,
     'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
+});
+
+test('what she files takes Forex Factory\'s rating before it is written', () => {
+  /* ffRated is driven in fold.test.mjs and cannot see whether logCalendar
+     calls it — or calls it AFTER the upsert, which writes her rating and then
+     computes Forex Factory's for nothing. So the body is read, in order. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function logCalendar(');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  const rated = body.indexOf('ffRated(rows');
+  const read = body.indexOf('ratingsQuery(');
+  const write = body.indexOf('eugenia_calendar?on_conflict');
+  assert.ok(read > -1 && rated > -1, 'logCalendar no longer takes Forex Factory\'s rating');
+  assert.ok(read < rated && rated < write,
+    'Forex Factory\'s rating is taken after the rows are written, so hers is what lands');
 });
 
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {

@@ -50,7 +50,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  ffEvents, releasesQuery, weeksQuery,
+  ffEvents, releasesQuery, weeksQuery, ffRated, ratingsQuery,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -1606,10 +1606,18 @@ test('a refused read throws rather than backing up a blank', async () => {
 });
 
 test('the backup names every table that has no other source', async () => {
-  const stub = async () => ({ ok: true, json: async () => [] });
+  const asked = [];
+  const stub = async (u) => { asked.push(u); return { ok: true, json: async () => [] }; };
   const out = await backup('https://x', 'k', stub);
+  // A three-column key is ordered by all three, or a page boundary between two
+  // releases at one instant can serve a row twice or not at all.
+  assert.ok(asked.includes('https://x/rest/v1/ff_calendar?select=*&order=at.asc,country.asc,title.asc'),
+    'ff_calendar is not paged by its whole key');
+  assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
+    'a one-column key is no longer paged the way it was');
   for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
-                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar']) {
+                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
+                   'ff_calendar', 'ff_weeks']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
   // The cost meter is deliberately out: every row is about a model call rather
@@ -2818,6 +2826,49 @@ test("Forex Factory's export parses to UTC instants, and one bad row refuses the
      the week is simply not filed — its trades read unknown, never pass. */
   assert.throws(() => ffEvents([...FF.slice(0, 3), { ...FF[3], date: 'soon' }]), /event 3/);
   assert.throws(() => ffEvents({ events: FF }), /not a list/);
+});
+
+test("Forex Factory's rating replaces hers at the same minute, and nowhere else", () => {
+  // Her calendar as she filed it on the 25th, beside the whole week he read.
+  const ff = ffEvents(FF);
+  const mine = [
+    { at: '2026-09-25T14:00:00.000Z', name: 'Michigan sentiment', importance: 'high' },   // FF: USD Medium, alone
+    { at: '2026-09-24T12:30:00.000Z', name: 'jobless claims', importance: 'medium' },     // FF: USD Medium
+    { at: '2026-09-25T09:15:00.000Z', name: 'Bailey speaks', importance: 'high' },        // FF: GBP High, USD Low
+  ];
+  const { rows, changed } = ffRated(mine, ff);
+  assert.equal(changed, 1);
+  assert.equal(rows[0].importance, 'medium', 'the print he read as medium stayed filed as high');
+  assert.equal(rows[1], mine[1], 'a rating that already agreed was rewritten');
+  /* THE ONE THE FIRST VERSION GOT WRONG, off this very file: a Fed member
+     rated low shares Bailey's minute, and demoting her Bailey row to low for a
+     speech she never filed is exactly what a match on the minute does. */
+  assert.equal(rows[2].importance, 'high', "a USD speech demoted her Bank of England row by sharing its minute");
+
+  /* THE HIGHEST FOLDER AT A MINUTE RATES IT, both ways round — CPI is red and
+     core CPI beside it may not be, and he sees the red one first. */
+  const cpi = [{ at: '2026-10-14T12:30:00Z', impact: 'Medium', country: 'USD' },
+               { at: '2026-10-14T12:30:00Z', impact: 'High', country: 'USD' }];
+  const low = [{ at: '2026-10-14T12:30:00.000Z', name: 'CPI', importance: 'low' }];
+  assert.equal(ffRated(low, cpi).rows[0].importance, 'high');
+  assert.equal(ffRated(low, [...cpi].reverse()).rows[0].importance, 'high');
+  // A red folder raises hers even with another currency at the minute.
+  const withCad = [...cpi, { at: '2026-10-14T12:30:00Z', impact: 'Medium', country: 'CAD' }];
+  assert.equal(ffRated(low, withCad).rows[0].importance, 'high');
+  // A USD release alone at its minute lowers hers.
+  const high = [{ at: '2026-10-14T12:30:00.000Z', name: 'Richmond Fed', importance: 'high' }];
+  assert.equal(ffRated(high, [{ at: '2026-10-14T12:30:00Z', impact: 'Low', country: 'USD' }]).rows[0].importance, 'low');
+  // A holiday rates nothing.
+  assert.equal(ffRated(low, [{ at: '2026-10-14T12:30:00Z', impact: 'Holiday', country: 'USD' }]).changed, 0);
+});
+
+test('the ratings read takes every currency over the minutes filed, newest first', () => {
+  const q = ratingsQuery('2026-09-24T12:30:00.000Z', '2026-09-25T14:00:00.000Z');
+  // Every currency: which others share a minute decides whether USD may lower hers.
+  assert.doesNotMatch(q, /country=eq/);
+  assert.match(q, /select=at,impact,country/);
+  assert.match(q, /at=gte\.2026-09-24T12:30:00\.000Z&at=lte\.2026-09-25T14:00:00\.000Z/);
+  assert.match(q, /order=at\.desc&limit=\d+/);
 });
 
 test('an instant files under the Sunday its Forex Factory week began, in New York', () => {
