@@ -450,7 +450,7 @@ be single-sourced at run time:
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, and one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys` and two in `doji-eugenia` — every one stating `hourCycle: 'h23'`, because `hour12: false` leaves the choice to the locale and a locale resolving to h24 renders midnight as hour 24. Harmless in the two `hourIn` ports, where 24 fails `h < close` as 0 fails `h >= open`; wrong in `nyParts` and `nyWall`, which compare the hour against 17 and feed it to `Date.UTC` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, which closes Friday and opens Sunday on it, and `ROLL_HOUR` in `index.ts`, which decides whether a quote is describing the night or the evening — one boundary, and a disagreement is a window labelled wrong for an hour a day |
 | the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
-| the **importance a release may carry** | the `log_calendar` enum, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing |
+| the **importance a release may carry** | the `log_calendar` enum, the check constraint, the `importance=eq.high` the event spine selects on, and `FF_IMPORTANCE` and `RANK`, which carry Forex Factory's folders into it — a rename on any side is a spine that files everything and wakes for nothing, or a filing refused whole |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
@@ -1681,6 +1681,18 @@ every morning before writing a word. A **quarter-hourly job** then asks one
 question: **which release time has landed and not yet been looked at?** If there
 is one she searches for what those printed, files the actuals, and decides
 whether it is worth saying.
+
+**What she rates is checked against what he reads.** Her importance comes off a
+search page, and on 25 September she filed as high a print Forex Factory had
+medium. So `log_calendar` reads Forex Factory's calendar for the minutes she is
+filing and `ffRated` corrects her — **one way only**, because a minute is not an
+event: a USD red folder at the minute makes it high whatever else shares it, and
+a lower USD rating replaces hers only when every release listed then is USD. At
+05:15 on the 25th the Bank of England governor, red, shared a minute with a Fed
+member rated low, and matching on the minute alone would have demoted her Bailey
+row for a speech she never filed. Matched on the instant, never the name — the
+name is free text, which is the duplicates problem below. The answer tells her
+how many were changed, and a read that fails leaves hers standing.
 
 **The question is about the time rather than the row, because one print is not
 one row.** The unique key is `(at, name)` and the name is free text she writes,
