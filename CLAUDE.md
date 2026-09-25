@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 586 tests, six suites
+npm test      # 588 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -929,6 +929,18 @@ compounds.
   past that window, so those rows had no consumer at all. The count of what was
   refused goes back in the tool's answer: a bound she cannot see is one she
   files against for ever.
+
+  AND THE WINDOW HAS A FLOOR AS WELL AS A CEILING, which is the half nobody had
+  checked. It must carry the 08:00 briefing past tomorrow's 10:00, because
+  `aheadToday` can only warn about what is filed and every trade opened before
+  tomorrow's briefing reads today's filing. At twenty-four hours it stopped at
+  08:00 and the London session was blind to the 08:30 print every morning.
+  `fold.test.mjs` derives the briefing hour and `CAL_AHEAD` from the source and
+  asserts the reach, so narrowing the window "back to a day" fails the suite.
+  The wider window is safe for the duplicates only because READ and WRITE are
+  one constant — anything filed that far out is inside the next briefing's
+  window too — and `calendarList` names the day on every line that is not
+  today's; split the constant or drop the day and both failures come back.
 
   `log_calendar` IS THE SECOND BOUNDARY HERE THAT UPSERTS, and it now follows
   the rule `emailRow` already states: an absent key and a null key mean opposite

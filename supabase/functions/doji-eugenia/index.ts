@@ -989,8 +989,8 @@ const CALENDAR_MAX = 12;
    answer as well as the cheaper one. What a briefing wants is "what just landed
    and what is coming", which straddles midnight in exactly the way a civil-day
    filter handles worst — the Sunday 17:00 briefing is about a week that has not
-   started yet. Twelve hours back and a day forward covers both without any
-   boundary arithmetic to get wrong.
+   started yet. Twelve hours back and a day and a morning forward covers both
+   without any boundary arithmetic to get wrong.
 
    AND IT BOUNDS THE WRITE AS WELL AS THE READ NOW, which is what stops the
    duplicates rather than stopping them speaking. She was filing releases four
@@ -1001,18 +1001,33 @@ const CALENDAR_MAX = 12;
    `US CPI (core CPI)`, `US CPI (August)` and `headline CPI`: five rows laid
    down by four different turns, each blind to the last.
 
-   Nothing reads past this window either — `readCalendar` stops at a day,
+   Nothing reads past this window either — `readCalendar` stops at this one,
    `aheadToday` at eight hours, `pendingRelease` looks only backwards — so a row
    beyond it has no consumer and exists purely to become a duplicate. She may
-   file what she can see, which is also what `log_calendar` already tells her to
-   file: what is scheduled TODAY. */
-const CAL_BACK = 12, CAL_AHEAD = 24;
+   file what she can see, and she sees what she may file: one constant, both
+   sides.
+
+   AND A DAY WAS FOUR HOURS SHORT OF THE TRADE IT EXISTS FOR. `aheadToday` asks
+   what is pending against a position the moment it opens, and it can only find
+   what is filed. At a day forward, the 08:00 briefing reached 08:00 tomorrow and
+   stopped — so tomorrow's 08:30 and 10:00 prints, the biggest there are, were
+   not on file until tomorrow's OWN briefing, and every trade opened before it
+   checked an empty calendar, found nothing pending, and said nothing. On 25
+   September an entry at about 07:38 did exactly that against the 10:00 Michigan
+   print, while the entry at 09:38 was warned about the same release. The London
+   session is that window every day. Twenty-eight hours carries the weekday
+   briefing past tomorrow's 10:00; Sunday's at 17:00 already reached Monday
+   morning. Nothing about the duplicates changes, because anything filed this far
+   ahead is inside the NEXT briefing's window too — she sees it again before she
+   could re-file it — and `calendarList` names the day of every line that is not
+   today's, since at this width two different mornings have an 08:30 each. */
+const CAL_BACK = 12, CAL_AHEAD = 28;
 
 const CALENDAR_TOOL = {
   name: "log_calendar",
   description:
-    "Record what is scheduled today and what it printed. Call it in the briefing " +
-    "with everything on the day's calendar — the time in UTC, the name, the " +
+    "Record what is scheduled today and tomorrow morning, and what it printed. Call " +
+    "it in the briefing with everything on the calendar — the time in UTC, the name, the " +
     "consensus and the prior — and call it again once a number has landed to fill " +
     "in the actual and one line on what it meant. Recording a release with " +
     "importance 'high' is also what wakes you to look at it after it lands, so a " +
@@ -2961,10 +2976,19 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
 /* A LANDED RELEASE READS DIFFERENTLY FROM A PENDING ONE, and rendering them the
    same way is how a briefing comes to describe a print that has already
    happened as something to watch for. `actual` present is the whole test. */
-export function calendarList(rows: Release[]): string {
+/* A LINE FROM ANOTHER DAY NAMES THE DAY, `positionsList`'s rule for the same
+   reason: a clock time with no date beside it reads as today's. At a day and a
+   morning forward, tomorrow's 08:30 and today's are two identical-looking lines,
+   and last night's 20:00 read as tonight's — `due` on a release that had already
+   happened, where the prompt forbids describing a print as still to come. Today
+   stays bare, or the date is noise on nearly every line. */
+export function calendarList(rows: Release[], now = Date.now()): string {
   if (!rows.length) return "";
+  const today = nyDate(new Date(now));
   const lines = rows.map(r => {
-    const head = `· ${nyTime(r.at)} ET ${r.name}`;
+    const day = nyDate(new Date(r.at));
+    const head = `· ${nyTime(r.at)} ET` + (day === today ? "" : ` on ${civilDay(day)}`) +
+                 ` ${r.name}`;
     if (r.actual) {
       return `${head} — LANDED at ${r.actual}` +
              (r.consensus ? ` against ${r.consensus} expected` : "") +

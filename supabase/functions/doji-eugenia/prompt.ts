@@ -334,6 +334,9 @@ be precise about. Good pages to fetch:
 
 FILE THE DAY'S CALENDAR WITH log_calendar, every briefing, before you write it.
 Everything scheduled: the time in UTC, the name, the consensus and the prior.
+Today's, and tomorrow's up to noon New York as well — he can open a trade
+before tomorrow's briefing exists, and a release you have not filed yet is one
+nothing can warn him is coming. Talk about today; file both.
 This is not bookkeeping — filing a release as high importance is what wakes you
 to look at it after it lands, so a number that could move gold on its own has to
 go in as high or you will never see it print. It is also the only record any of

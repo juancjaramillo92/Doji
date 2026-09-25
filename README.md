@@ -1813,6 +1813,19 @@ print and no breach means the function returns having spent nothing. A trade
 event that always ran a model call would be a bill attached to every fill for a
 message that usually should not be sent.
 
+**"Pending" means filed, and the calendar was filed a morning too late for the
+trades that need it most.** The check reads her own calendar, and her calendar
+is filed by the 08:00 briefing — which reached twenty-four hours ahead, so it
+stopped at 08:00 the next day. Tomorrow's 08:30 and 10:00 prints, the biggest
+there are, went in only at tomorrow's own briefing, and every trade opened
+before it checked an empty calendar and said nothing. On 25 September an entry
+around 07:38 was silent about the 10:00 Michigan print while the 09:38 entry
+was warned about the same release. The London session is that window every
+morning. The briefing now files today's calendar and tomorrow's up to noon New
+York, the window she is handed moves with it so she never files what she cannot
+see, and every calendar line from a day other than today names its day — at this
+width two mornings each have an 08:30, and a time with no date reads as today's.
+
 The trigger fires on the transition and not on every poll. `fill_time` is null on
 every open position, so the close clause compares with `is distinct from` — `<>`
 is NULL there, a `WHEN` that is not true does not fire, and the one event it

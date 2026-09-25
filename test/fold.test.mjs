@@ -3207,15 +3207,58 @@ test('the open threads are split by what closes them', () => {
 });
 
 test('a landed release is never described as one still to come', () => {
+  // The morning of those two prints, so both are today's and carry no date.
   const out = calendarList([
     { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
       consensus: '0.3%', prior: '0.2%', actual: '0.4%', note: 'Hotter than expected.' },
     { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', importance: 'high',
       consensus: null, prior: null, actual: null, note: null },
-  ]);
+  ], Date.parse('2026-01-09T13:05:00Z'));
   assert.match(out, /08:30 ET core CPI — LANDED at 0\.4%/);
   assert.match(out, /15:00 ET FOMC minutes — due/);
   assert.equal(calendarList([]), '');
+});
+
+test('a calendar line from another day names the day, and today stays bare', () => {
+  /* At a day and a morning forward the briefing is handed two 08:30s — today's
+     and tomorrow's — and at twelve hours back last night's 20:00 would read as
+     tonight's. Driven across all three: yesterday evening, this morning, and
+     tomorrow morning, from the 08:00 weekday briefing on a Thursday. */
+  const row = (at, name) => ({ id: 0, at, name, importance: 'high',
+    consensus: null, prior: null, actual: null, note: null });
+  const out = calendarList([
+    row('2026-09-24T00:00:00Z', 'FOMC minutes'),       // Wed 20:00 New York
+    row('2026-09-24T12:30:00Z', 'jobless claims'),     // Thu 08:30
+    row('2026-09-25T12:30:00Z', 'durable goods'),      // Fri 08:30
+    row('2026-09-25T14:00:00Z', 'Michigan expectations'), // Fri 10:00
+  ], Date.parse('2026-09-24T12:02:00Z'));
+  assert.match(out, /· 08:30 ET jobless claims — due/,
+    'today\'s release carries a date it does not need');
+  assert.match(out, /· 08:30 ET on 25 Sept? durable goods/,
+    'tomorrow\'s 08:30 reads exactly like today\'s — she can brief it as due this morning');
+  assert.match(out, /· 10:00 ET on 25 Sept? Michigan expectations/);
+  assert.match(out, /· 20:00 ET on 23 Sept? FOMC minutes/,
+    'last night\'s release reads as tonight\'s, due, when it has already happened');
+});
+
+test('the calendar filed at the weekday briefing reaches the next morning\'s prints', () => {
+  /* A trade opened before tomorrow's briefing is checked against what is filed
+     today, by `aheadToday`, and nothing else. So the window has to carry the
+     08:00 briefing past tomorrow's 10:00 — at twenty-four hours it stopped at
+     08:00, and every London-session entry found the day's calendar empty and
+     said nothing about the 08:30 print it was sitting in front of. Derived from
+     the source, so narrowing either the window or moving the briefing later
+     fails here rather than quietly re-opening the gap. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const ahead = Number(src.match(/const CAL_BACK = \d+, CAL_AHEAD = (\d+);/)?.[1]);
+  const hour  = Number(src.match(/hour === (\d+)\) return 'weekday'/)?.[1]);
+  assert.ok(ahead > 0 && hour > 0, 'the window or the briefing hour can no longer be read');
+  const LAST_MORNING_PRINT = 10;   // 10:00 New York: ISM, Michigan, JOLTS
+  assert.ok(hour + ahead > 24 + LAST_MORNING_PRINT,
+    `the ${hour}:00 briefing files ${ahead}h ahead, which stops before tomorrow's ` +
+    `${LAST_MORNING_PRINT}:00 — a trade opened before tomorrow's briefing is ` +
+    `checked against a calendar with nothing on it`);
 });
 
 test('the critic cannot destroy a briefing it was meant to check', () => {
