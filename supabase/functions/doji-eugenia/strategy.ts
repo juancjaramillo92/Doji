@@ -41,7 +41,7 @@
    was ever reachable: §0 below its summary is get_strategy-only. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.15";
+export const VERSION = "v1.16";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
    paragraph she holds on every turn and the paragraph get_strategy serves are
@@ -119,7 +119,7 @@ counts as kept just because nothing contradicted it.
 | R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market holiday | §5 | v1.11 |
 | R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
-| R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | judgment | *"Did the orders do it, or did you?"* — R-15's Friday close-out is the one permitted manual close | §6 | v1.13 |
+| R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | journal | no closed trade without a broker alert (\`net_pnl\` null — cTrader sends none for a hand close), except one closing at the Friday close; a close under an hour old is \`unknown\` | §6 | v1.13 |
 | R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | judgment | *"Was a print pending, and was this trade opened in an earlier session?"* | §6 | v1.13 |
 
 Call get_strategy for the reasoning behind any of this.`;
@@ -130,7 +130,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.14
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.15
 
 ### Summary
 
@@ -1381,9 +1381,18 @@ boolean each, covering every rule mapped to them.
 
 **R-18 is what makes R-01 and R-02 mean what they say.** With resting orders, a loss
 beyond $20 is an edited order rather than a decision at the screen, and a win under
-$25 is the order not having been where the rule puts it. Judgment rather than
-journal because nothing on the row says whether an exit was an order filling or a
-hand-close — the prices look the same either way.
+$25 is the order not having been where the rule puts it.
+
+**R-18 IS \`journal\` BECAUSE A HAND CLOSE SENDS NOTHING.** The prices look the same
+either way, which is why this was judgment. The broker's alert does not: cTrader
+emails "Stop loss filled" or "Take profit filled" when an order fills and sends no
+alert at all for a position closed by hand — his own account, confirmed against
+eight closes with no alert behind them. \`net_pnl\` is written from that alert
+alone, so a closed row without one is a hand close. **R-15's Friday close-out is
+the permitted one** and passes at the Friday close (R-01's window). **A close under
+an hour old is \`unknown\`**, because its alert may still be on its way. The risk is
+one-directional and named: an alert the sync lost would read as a hand close, and
+the failure names the trade so it can be looked up in Gmail.
 
 **R-19 is judgment and must stay narrow.** Nothing records that a print was pending,
 and the rule is written for one path: a position inherited from an earlier session
@@ -1619,9 +1628,10 @@ row can answer it, and today almost no row carries this.
 follows a sweep. The fifteen-minute window makes a late second entry checkable; a
 prompt one is \`unknown\`.
 
-**Whether a Friday close-out was the rule or a choice.** R-15 forces the exit;
-nothing on the row says the exit was forced. Only the timing near 17:00 New York
-suggests it.
+**Whether a Friday close-out was the rule or a choice** is now half answered. A
+missing \`net_pnl\` says the position was closed by hand (R-18), and the timing says
+whether that was at the Friday close — so a hand close then is R-15 firing. What no
+row says is why a Friday exit that was an order filling happened to land then.
 
 **Whether a high-impact release was ahead of an entry.** R-14's standing-aside has no
 boundary in the data, because the window is open-ended by his own description.
@@ -1678,6 +1688,11 @@ is in the Asian session that opened the previous evening, and files under the cu
 reading \`computed_pnl\` on every row whose broker email has not landed — the one case
 this account cannot afford, because \`computed_pnl\` is folded from deals and carries
 no swap, and positions here cross the 17:00 rollover.
+
+**And a row with no email is almost always a hand close.** cTrader alerts only when
+a stop or target fills, so a position he closed himself never gets a settled
+figure: \`net_pnl\` stays null for good and \`pnl\` is the folded one. That is also
+R-18's evidence (§7).
 
 **R-15 does not change this.** Nothing is held over a weekend, but weekday rollovers
 still apply and Wednesday's triple swap is the expensive one.
@@ -1885,7 +1900,7 @@ honestly while the behaviour is still bad.`,
 
   "10": `## 10 · What would have to change, and what he has decided
 
-§7 labels nine rules \`judgment\`. This section is what would lift each, and which
+§7 labels eight rules \`judgment\`. This section is what would lift each, and which
 routes are open.
 
 ### The two closed routes
@@ -2059,6 +2074,7 @@ it stays as written, because correcting the record would falsify it.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.16 | [decide] | **R-18 made checkable, from a fact about the broker he confirmed.** cTrader sends an alert when a stop or target fills and none for a position closed by hand, so a closed trade with no alert — \`net_pnl\` null — was closed by hand. R-18 moves to \`journal\`: that is a fail, except at the Friday close, which is R-15 and permitted; a close under an hour old is \`unknown\` while its alert may still arrive. §8 records what a missing \`net_pnl\` means, and that a Friday hand close is now R-15 firing rather than a guess. | Eight closes with no alert, looked up in Gmail with him |
 | v1.15 | [decide] | **R-04 made checkable from the broker, not from him.** §7, §8 and §10 called it uncheckable for good because how far a trade ran was "stored nowhere, including at the broker"; the broker's minute bars go back a year, so \`best_price\` now records the furthest each trade ran in his favour, and R-04 moves to \`journal\` — a loss beyond the scratch band on a trade that had been $20 in his favour is a stop that was not moved. Nothing asked of him, nothing added to Gladys; the v1.9 decision against widening the journal stands for R-05 to R-07. | Eugenia's own review of which rules she could not see |
 | v1.14 | [decide] | **A full stop is the stop hit at $20 from entry**, in his words. §12 had also counted a stop set tighter and taken in full, which no row can tell from a hand-cut exit — so R-03's population was missing and the rule was \`field\`. With the definition his, R-03 moves to \`journal\` and its predicate reads a loss of $20 or more; §5's example of a full stop on a $12 stop is gone with it. | His definition, asked while making R-03 checkable |
 | v1.13 | [decide] | **Three gaps closed, found by asking what the document never asked.** R-18: **stop and target are always resting broker orders and a position is never closed by hand** — which makes R-01 and R-02 exact rather than suggestive, since a loss beyond $20 is now an edited order rather than a decision at the screen, and R-15's Friday close-out is named as the one permitted manual close. R-19: **a high-impact print landing on a position inherited from an earlier session** — in profit the stop goes to break-even regardless of R-04's threshold, losing it is tightened to a closer invalidation or pulled in if there is none, and the target never moves. Written narrowly on his instruction: he should not be holding through a print, and the path that produces this is an Asian-session trade still running into New York. §5's "never moved tighter" now carries that exception, and §8 records that R-19 muddies "break-even means R-04 fired" — a sub-$20 break-even on a trade opened in the same session is not R-19 and is a question. **Direction recorded: he trades both ways**, with a noticed preference for shorting held as a preference and explicitly not a rule, since \`direction\` is on every row and a skew would otherwise read as confirmation of a decision. | Asking what the document had never asked |

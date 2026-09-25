@@ -58,7 +58,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -2759,6 +2759,39 @@ test('R-03 allows one entry after a $20 stop, and a tighter loss is not one', ()
   const cannot = r([stop({ fill_time: null }), win('PIDa', '10:40')]);
   assert.deepEqual([cannot.verdict, cannot.unresolved], ['pass', 0],
     'two entries cannot breach this, so there was nothing the data failed to decide');
+});
+
+test('R-18 reads a close with no broker alert as a hand close, and spares the Friday one', () => {
+  // cTrader alerts on a stop or target filling and on nothing else, and the
+  // alert is the only writer of net_pnl — so its absence is the hand close.
+  const closeAt = (iso, o) => trade({ id: 'PIDx', pnl: -20, entry_price: 4000, exit_price: 3995,
+    open_day: iso.slice(0, 10), entry_time: iso, fill_time: iso, ...o });
+  const later = Date.parse('2026-01-12T12:00:00Z');
+  const r = (rows, now = later) => verdictOf(rows, 'R-18', now);
+
+  assert.equal(r([closeAt('2026-01-06T18:00:00Z', { net_pnl: -20.14 })]).verdict, 'pass',
+    'a close the broker alerted on was read as a hand close');
+  const cut = r([closeAt('2026-01-06T18:00:00Z')]);
+  assert.deepEqual([cut.verdict, cut.failed, cut.ids], ['fail', 1, ['PIDx']]);
+
+  /* R-15'S CLOSE-OUT IS THE ONE PERMITTED HAND CLOSE, and it is read through
+     R-01's window — 16:50 New York is inside it, 14:00 the same Friday is not. */
+  assert.equal(r([closeAt('2026-01-09T21:50:00Z')]).verdict, 'pass',
+    'the Friday close-out R-15 forces was flagged as a breach of R-18');
+  assert.equal(r([closeAt('2026-01-09T19:00:00Z')]).verdict, 'fail',
+    'a Friday 2 p.m. hand close was excused as the close-out');
+
+  /* THE SAME CLOSE, REPLAYED. Minutes after it the alert may still be in
+     flight, so the verdict waits; past the grace its absence is the answer. */
+  const fresh = closeAt('2026-01-06T18:00:00Z');
+  const fill = Date.parse('2026-01-06T18:00:00Z');
+  assert.equal(r([fresh], fill + 10 * 60_000).verdict, 'unknown');
+  assert.equal(r([fresh], fill + (ALERT_GRACE_MIN + 1) * 60_000).verdict, 'fail');
+
+  // No instant is unknown, and a position still open is not in the population.
+  assert.equal(r([closeAt('2026-01-06T18:00:00Z', { fill_time: null })]).verdict, 'unknown');
+  const open = r([closeAt('2026-01-06T18:00:00Z', { pnl: null, exit_price: null, fill_time: null })]);
+  assert.deepEqual([open.passed, open.failed, open.unresolved], [0, 0, 0]);
 });
 
 test('R-10 catches two positions open at once, and an open one still counts', () => {

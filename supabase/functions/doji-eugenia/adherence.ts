@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// THE STRATEGY, EXECUTED — the ten rules a row can actually answer
+// THE STRATEGY, EXECUTED — the eleven rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
 // §7 of strategy.ts writes a predicate for all nineteen rules and §8 writes the
 // population filters and the three verdicts. Both were prose: she was handed up
@@ -16,9 +16,9 @@
 // driven from a test with a hand-built row and broken on purpose — which is the
 // only way anything here earns the word "checked".
 //
-// TEN RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
-// `journal` means a row can answer it today. R-05 through R-09, R-14, R-17,
-// R-18 and R-19 are `judgment` — nothing stored can see them,
+// ELEVEN RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
+// `journal` means a row can answer it today. R-05 through R-09, R-14, R-17 and
+// R-19 are `judgment` — nothing stored can see them,
 // and inventing an approximation here would be worse than the gap, because a
 // judgment rule that starts reporting `pass` is exactly the "no violations"
 // claim §8 warns is close to saying nothing.
@@ -642,6 +642,42 @@ function r16(rows: TradeRow[]): RuleResult {
   return result('R-16', 'entries taken on a US market holiday or in the Christmas stretch', pass, fail, []);
 }
 
+/* ─── R-18 ─────────────────────────────────────────────────────────────────
+   Stop and target are resting orders; a position is never closed by hand.
+   §7: no closed trade without a broker alert, except at the Friday close.
+
+   THE ALERT IS THE EVIDENCE, AND ITS ABSENCE IS THE BREACH. cTrader emails
+   when a stop or target fills and sends nothing for a hand close — his own
+   account, confirmed against eight closes nothing was ever sent for. net_pnl
+   is written from that alert alone, so a closed row without one is a position
+   he closed himself. The prices cannot say this: a hand close at the stop and
+   the stop filling look identical.
+
+   R-15's close-out is the one permitted hand close, read through R-01's window
+   so the two rules agree on what "at the Friday close" is. A close under the
+   grace is unknown rather than a breach — the alert is normally seconds behind
+   the fill, and the Apps Script retries anything the function refused — and a
+   close with no instant cannot be aged or placed against Friday.
+
+   ONE WAY TO BE WRONG, AND IT IS NAMED. An alert the email path lost reads as
+   a hand close. The failure carries the id, so it can be looked up in Gmail
+   rather than believed. */
+export const ALERT_GRACE_MIN = 60;
+
+function r18(rows: TradeRow[], now: number): RuleResult {
+  const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
+  for (const t of rows) {
+    if (!isBroker(t) || !closed(t)) continue;
+    if (t.net_pnl != null) { pass.push(t.id); continue; }
+    if (!t.fill_time) { unknown.push(t.id); continue; }
+    const fill = new Date(t.fill_time);
+    if (now - +fill < ALERT_GRACE_MIN * 60_000) unknown.push(t.id);
+    else (nearFridayClose(fill) ? pass : fail).push(t.id);
+  }
+  return result('R-18', 'closes with no broker alert behind them — closed by hand — the Friday close-out excepted',
+                pass, fail, unknown);
+}
+
 /* One pass over the rows to bucket them by filing day, so the two day-scoped
    rules do not each scan the list per day. The same reason index.html builds
    Data.byDay once rather than filtering inside a loop. */
@@ -660,7 +696,8 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
    so a rule that stopped being evaluated is a gap in a sequence rather than an
    absence nobody can see. */
 export function checkRules(rows: TradeRow[], now = Date.now()): RuleResult[] {
-  return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows), r12(rows), r13(rows), r15(rows), r16(rows)];
+  return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows),
+          r12(rows), r13(rows), r15(rows), r16(rows), r18(rows, now)];
 }
 
 /* ─── Where a day stands right now ────────────────────────────────────────
