@@ -3766,20 +3766,34 @@ test('every column the cost meter writes is a column the table has', () => {
   const calls = [...src.matchAll(/recordRun\(\{([\s\S]*?)\}\)/g)];
   assert.ok(calls.length >= 3, `only ${calls.length} recordRun call sites — the reader has gone blind`);
 
-  for (const [, body] of calls) {
-    // Shorthand and long form both, since `cached` and `caller: label` sit in
-    // the same literal. Comments stripped: a name in prose is not a key.
-    // Parenthesised sub-expressions come out first: `Date.now() - started` and
-    // `.slice(0, 500)` both carry commas that are not key separators, and
-    // splitting naively reads "500" as a column name.
-    // And string literals before either, for the same reason one level up: a
-    // comma inside `failed, the draft went` is prose, and a split that cannot
-    // tell reads "the" as a column and fails a row that PostgREST would take.
+  /* ONE READER FOR BOTH DIRECTIONS. It was two, and the day one of them learned
+     to skip string literals the other did not — a census whose halves read the
+     same source two ways is the drift it exists to catch, inside itself.
+
+     Shorthand and long form both, since `cached` and `caller: label` sit in the
+     same literal. Comments stripped: a name in prose is not a key. Strings come
+     out next — a comma inside `failed, the draft went` is prose, and a split
+     that cannot tell reads "the" as a column. Then every bracketed group,
+     innermost first: `.slice(0, 500)` and `[message, toolLine()]` both carry
+     commas that separate items rather than keys, and splitting naively reads
+     "500" or "toolLine" as a column name. */
+  const group = /\([^()[\]{}]*\)|\[[^()[\]{}]*\]|\{[^()[\]{}]*\}/g;
+  const keysOf = (body) => {
     let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
       .replace(/`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''");
-    for (let i = 0; i < 8 && /\([^()]*\)/.test(flat); i++) flat = flat.replace(/\([^()]*\)/g, '');
-    const keys = flat.split(',').map(seg => seg.trim().match(/^(\w+)/)?.[1]).filter(Boolean);
-    for (const k of keys) {
+    // Until nothing changes, rather than `group.test(flat)`: a regex carrying
+    // the g flag keeps its position between calls, and a test() that starts
+    // where the last one stopped reports no match that is there.
+    for (let i = 0; i < 8; i++) {
+      const next = flat.replace(group, '');
+      if (next === flat) break;
+      flat = next;
+    }
+    return flat.split(',').map(seg => seg.trim().match(/^(\w+)/)?.[1]).filter(Boolean);
+  };
+
+  for (const [, body] of calls) {
+    for (const k of keysOf(body)) {
       assert.ok(columns.has(k),
         `recordRun writes "${k}" and eugenia_runs has no such column — PostgREST ` +
         `refuses the whole row, so the meter goes quiet and only the console says so`);
@@ -3795,11 +3809,7 @@ test('every column the cost meter writes is a column the table has', () => {
 
      `id` and `at` are the only exemptions and they are structural — a bigserial
      and a default the writer must not set. */
-  const written = new Set(calls.flatMap(([, body]) => {
-    let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
-    for (let i = 0; i < 8 && /\([^()]*\)/.test(flat); i++) flat = flat.replace(/\([^()]*\)/g, '');
-    return flat.split(',').map(seg => seg.trim().match(/^(\w+)/)?.[1]).filter(Boolean);
-  }));
+  const written = new Set(calls.flatMap(([, body]) => keysOf(body)));
   for (const col of columns) {
     if (col === 'id' || col === 'at') continue;
     assert.ok(written.has(col),

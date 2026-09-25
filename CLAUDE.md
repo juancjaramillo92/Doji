@@ -1415,13 +1415,18 @@ compounds.
   morning — twice inside half an hour, arriving as the apology — where fourteen
   turns on Opus in the measured week had never come near the cap.
 
-  WHAT THE TWO FAILURES ESTABLISH is that the round budget on a TOOL-HEAVY
-  caller is a property of the MODEL rather than of the task. Nothing here had
-  measured that and the change assumed it, reasoning only about output quality.
-  A cheaper caller that does not answer is not cheaper. They are back on the
-  model they were measured on, the cap is raised because it had become a working
-  limit, and any future move is ONE caller at a time with `rounds` read
-  afterwards.
+  AND THE TWO FAILURES DO NOT ESTABLISH WHAT THEY WERE WRITTEN DOWN AS. They
+  were recorded as proof that the round budget on a tool-heavy caller is a
+  property of the MODEL — but `record_actual` replaced `log_calendar` in the
+  release look eighty minutes before the model changed, the model was reverted,
+  and the rounds stayed at seven to ten where they had been two or three. A
+  confounded pair is not evidence for either half, and this is the conclusion
+  a future cheaper-model proposal would have been refused on. What survives is
+  the policy, which never needed the attribution: a cheaper caller that does
+  not answer is not cheaper, and any move is ONE caller at a time with `rounds`
+  read afterwards. A SUCCESSFUL TURN'S `detail` IS NOW ITS CLIENT-TOOL TALLY,
+  because `rounds` said how many and never on what — do not raise the cap or
+  move a model again until those rows say where the rounds go.
 
   `trim` STAYS ON SONNET because it is handed an EMPTY tool array and so cannot
   reach the cap — that is the shape a cheaper model is safe on here, and the

@@ -3411,13 +3411,28 @@ Sonnet; the release look died at `MAX_ROUNDS` on its first two firings the next
 morning, twice inside half an hour, arriving as the apology. Fourteen turns on
 Opus in the measured week had never come near the cap.
 
-What those two failures establish is that **the round budget on a tool-heavy
-caller is a property of the model, not of the task** — which nothing here had
-measured, and the change assumed while reasoning only about output quality. A
-cheaper caller that does not answer is not cheaper. All three are back on the
-model they were measured on, the cap is raised because it had become a working
-limit rather than a backstop, and any future move is one caller at a time with
-`rounds` read afterwards.
+**What those two failures were first read as establishing, they do not.** They
+were written down as proof that *the round budget on a tool-heavy caller is a
+property of the model* — but two changes landed that night, not one. At 23:16
+`record_actual` replaced `log_calendar` in the release look; at 00:35 the look
+moved to Sonnet. The model was reverted at 12:41 and the rounds did not come
+back: before that night the look took two or three, and back on Opus it took
+10, 8, 5, 9, 9, 7 and 8. The change that was not reverted is the one still
+standing. The model is not ruled out; it is not established either, and a
+lesson drawn from a confounded pair is exactly what this repository says is
+worth nothing.
+
+What survives is the policy, which never depended on the attribution: a cheaper
+caller that does not answer is not cheaper, and any future move is one caller at
+a time with `rounds` read afterwards. **The cap is a working limit again** —
+seven to nine rounds against ten — and neither raising it nor moving a model is
+the next step. The row now says what the rounds were SPENT on: a successful
+turn's `detail` carries the count of each of her own tools it called
+(`record_actual×4, get_market×1`), and a failed turn's carries the same after
+its error. Server-side searches and fetches were already counted beside it. A
+name `record_actual` cannot match costs a round and says so; so does each
+`get_market`; so does a model calling one tool per round instead of batching
+them. Those are different repairs, and the tally is what tells them apart.
 
 `trim` stays on Sonnet, and the distinction is the whole of why: it is handed
 `CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it

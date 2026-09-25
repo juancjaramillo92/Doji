@@ -1894,6 +1894,18 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   // turn that died in round three should say three.
   const started = Date.now();
   let rounds = 0;
+  /* WHAT THE ROUNDS WERE SPENT ON, because a count of them could not say. The
+     release look went from two or three rounds to seven, eight and nine on the
+     morning `record_actual` replaced `log_calendar`, and one of those mornings
+     took six rounds with no search at all — rounds spent on her own tools, and
+     nothing recorded which. A name `record_actual` could not match costs a
+     round and says so; so does each `get_market`, and a model that calls one
+     tool per round rather than batching them. Those are different repairs and
+     the row could not tell them apart. Server-side searches and fetches are
+     already counted beside it; this is the client half. */
+  const called: Record<string, number> = {};
+  const toolLine = () =>
+    Object.entries(called).map(([name, n]) => `${name}×${n}`).join(', ') || null;
   // The tool_result block currently carrying the loop's breakpoint, so the next
   // round can take the mark off it before marking its own.
   let marked: any;
@@ -1963,6 +1975,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
          blocks are matched by tool_use_id, but a stable order keeps the
          transcript readable and the tests deterministic. */
       const calls = (body.content ?? []).filter((b: any) => b.type === "tool_use");
+      for (const c of calls) called[c.name] = (called[c.name] ?? 0) + 1;
       const results = await Promise.all(calls.map(async (b: any) => ({
         type: "tool_result", tool_use_id: b.id, content: await serve(b.name, b.input ?? {}),
       })));
@@ -2026,7 +2039,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       caller: label, model, effort, rounds: round + 1, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
-      ms: Date.now() - started, ok: true,
+      ms: Date.now() - started, ok: true, detail: toolLine(),
     });
     return text;
   }
@@ -2042,7 +2055,8 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: false,
-      detail: (err instanceof Error ? err.message : String(err)).slice(0, 500),
+      detail: [err instanceof Error ? err.message : String(err), toolLine()]
+        .filter(Boolean).join(' · tools: ').slice(0, 500),
     });
     throw err;
   }
