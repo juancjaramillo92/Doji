@@ -1346,10 +1346,10 @@ about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
 `strategy.ts` what he decided, `adherence.ts` the eight rules a row can answer;
 `index.ts` is the wiring.
 
-**Three objects in the database, and only two of them store anything.**
+**The conversation and what she remembers are two tables, and stay two.**
 `eugenia_turns` is the conversation window, `eugenia_notes` is what she
-remembers, and `eugenia_trades` is a view — a saved `select`, no rows of its
-own. The two tables stay two because nothing ever reads them together: notes go
+remembers, and `eugenia_trades` beside them is a view — a saved `select`, no
+rows of its own. The two tables stay two because nothing ever reads them together: notes go
 in at the top of a turn, turns at the end, with different windows, different
 shapes and different constraints. Merged, they would need a `kind` column, a
 nullable `role`, two constraints that each say "unless this is the other kind"
@@ -2239,7 +2239,7 @@ delivered, the button spins, and nothing reports it — `allowed_updates` must n
 
 ### What she remembers
 
-Six tables, and what separates them is how long a thing is true for. A turn
+Seven tables, and what separates them is how long a thing is true for. A turn
 rolls over inside a morning; a note about him outlives twenty of those; what he
 UNDERSTANDS outlives both; a thesis is only ever current, which is why it is one
 row rewritten rather than a log; a loop stays until it closes; and the calendar
@@ -2262,8 +2262,8 @@ price is stale tomorrow and the prompt forbids it. They are handed back at the
 start of every turn, briefing and reply alike.
 
 **And they are how he corrects her, which is the only way he can.** There is no
-settings page and no feedback button, and the conversation window rolls over in
-a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
+settings page, the button under a briefing carries a verdict and not a reason,
+and the conversation window rolls over in a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
 is odd"* would all be forgotten by tomorrow if they stayed in the conversation.
 Recorded as notes they are standing instructions: written the moment he gives
 one, in his words, obeyed from the next message on, and overriding the shape the

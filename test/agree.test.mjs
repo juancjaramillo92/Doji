@@ -1881,8 +1881,8 @@ test('every clock in the repository states the same hour cycle', () => {
 
 /* ─── Every way she speaks to him reads what he has told her ────────────────
    His notes are the only channel he has for correcting her — there is no
-   settings page, no feedback button, and nothing else that survives the twelve
-   turns of conversation window. "Stop mentioning the ten-year" becomes a note,
+   settings page, the button under a briefing carries a verdict and not a
+   reason, and nothing else survives the twelve turns of conversation window. "Stop mentioning the ten-year" becomes a note,
    and every later message is supposed to obey it.
 
    That makes notesBlock() load-bearing in a way it was not before, and its

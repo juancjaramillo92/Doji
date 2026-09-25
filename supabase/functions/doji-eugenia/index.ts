@@ -27,7 +27,8 @@
 //
 // Deploy:   supabase functions deploy doji-eugenia --no-verify-jwt
 // Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET and
-//           allowed_updates = ["message"] — she answers text and nothing else.
+//           allowed_updates = ["message", "callback_query"] — without the
+//           second, the taps under a briefing are never delivered.
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
