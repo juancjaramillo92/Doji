@@ -34,7 +34,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
-// The nine rules a row can answer, evaluated rather than reasoned about. Pure
+// The ten rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
 // are exported in the app: it is the part that has to be testable.
 import {
@@ -872,23 +872,23 @@ async function readTrades(days: unknown): Promise<string> {
    and R-12 allows fifteen" is a fact about his rule; what it MEANT is his to
    say, and the prohibitions are untouched.
 
-   Nine rules and not one more. §7's Evaluable column decides the set, and the
-   ten marked `judgment` stay out — an approximation of one would be worse
+   Ten rules and not one more. §7's Evaluable column decides the set, and the
+   nine marked `judgment` stay out — an approximation of one would be worse
    than the gap, because a judgment rule that starts reporting `pass` is exactly
    the "no violations" claim §8 warns is close to saying nothing.
    ───────────────────────────────────────────────────────────────────────── */
 const CHECK_TOOL = {
   name: "check_rules",
   description:
-    "Check his journal against the nine rules a row can actually answer — R-01, " +
-    "R-02, R-03, R-10, R-11, R-12, R-13, R-15 and R-16 — over the last N days. Returns a " +
+    "Check his journal against the ten rules a row can actually answer — R-01, " +
+    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-15 and R-16 — over the last N days. Returns a " +
     "verdict per rule with the counts behind it and the rows that failed. Use it " +
     "whenever he asks how he has been following his rules, or before saying " +
     "anything about his discipline: this is computed from the rows, so it is not " +
     "something to reproduce by reading trades yourself. A verdict of unknown means " +
-    "the data cannot decide it and is NEVER the same as a pass. The other ten " +
+    "the data cannot decide it and is NEVER the same as a pass. The other nine " +
     "rules are judgment rules and nothing stored can check them — say so " +
-    "rather than implying the nine are the whole strategy.",
+    "rather than implying the ten are the whole strategy.",
   input_schema: {
     type: "object",
     properties: {

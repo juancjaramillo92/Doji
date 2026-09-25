@@ -32,7 +32,7 @@ import { secretMatches, nyClock, nyDate, marketOpen } from '../supabase/function
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget, parseSse,
-  fromPipettes, foldSpot, PIPETTES, openPlans,
+  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -58,7 +58,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -2674,7 +2674,7 @@ const trade = (o) => ({
   id: 'PID1', direction: 'BUY', entry_time: null, fill_time: null,
   entry_price: null, exit_price: null, pnl: null, open_day: null, setup: null,
   followed_rules: null, followed_sl: null, followed_tp: null,
-  size_oz: 4, net_pnl: null, planned_sl: null, planned_tp: null, ...o,
+  size_oz: 4, net_pnl: null, planned_sl: null, planned_tp: null, best_price: null, ...o,
 });
 const verdictOf = (rows, rule, now) =>
   checkRules(rows, now).find(r => r.rule === rule);
@@ -3628,6 +3628,79 @@ test('every open position with a plan is filed, not just the first', () => {
     { positionId: 2, stopLoss: 4200, takeProfit: 4230 },
   ]);
   assert.deepEqual(plans.map(p => p.id), ['PID1', 'PID2']);
+});
+
+/* ─── How far a trade ran, off the broker's minute bars ─────────────────────
+   The capture is `?bars=raw`'s answer for 17 Sep 2026 14:00–14:15 UTC,
+   unchanged — sixteen bars, the scale and the field names as the broker sent
+   them. The two trades below are placed so the extreme of the window sits in
+   an EDGE minute, which is the bar the figure must never read.
+   ─────────────────────────────────────────────────────────────────────────── */
+const BARS = JSON.parse(parseSse(readFileSync(
+  new URL('./fixtures/ctrader-get-trendbars.txt', import.meta.url), 'utf8'))
+  .result.content[0].text).trendbars;
+const at = (hm) => Date.parse(`2026-09-17T${hm}Z`);
+
+test('a real minute bar is in pipettes, and the best price comes out in dollars', () => {
+  assert.equal(BARS.length, 16, 'the capture no longer holds the sixteen bars the probe returned');
+  // 14:09's high, the top of the window, read as a price and not a pipette count.
+  assert.equal(bestPrice(BARS, 'BUY', at('14:00:30'), at('14:14:10')), 4380.14);
+  assert.equal(bestPrice(BARS, 'SELL', at('14:00:30'), at('14:14:10')), 4364.64);
+});
+
+test('the minute he entered in and the minute he left in are never read', () => {
+  /* THE ONE PROPERTY THE COLUMN PROMISES. A bar holds a whole minute of prices
+     and he was in for only part of it, so an edge bar can carry a spike from
+     before the fill or after the close. The window's lowest low is 14:00's,
+     the minute a 14:00:30 entry landed in; its highest high is 14:09's. Each
+     trade below is placed so that bar is an edge, and each must come back
+     short of it rather than past it. */
+  assert.equal(bestPrice(BARS, 'SELL', at('14:00:30'), at('14:14:10')), 4364.64,
+    "14:00's low of 4364.48 is from before the entry and was read as his");
+  assert.equal(bestPrice(BARS, 'BUY', at('14:09:30'), at('14:15:30')), 4379.95,
+    "14:09's high of 4380.14 was read on a trade that entered half-way through it");
+  // And a close that lands mid-minute drops that minute from the far end.
+  assert.equal(bestPrice(BARS, 'BUY', at('14:02:00'), at('14:09:59')), 4378.03);
+});
+
+test('a trade too short to hold a whole minute has no figure, never a flat one', () => {
+  assert.equal(barSpan(at('14:00:30'), at('14:01:40')), null);
+  assert.deepEqual(barSpan(at('14:00:30'), at('14:02:00')), { from: at('14:01:00'), to: at('14:02:00') });
+  assert.equal(bestPrice(BARS, 'BUY', at('14:00:30'), at('14:01:40')), null,
+    'a 70-second trade reported a best price, which reads as one that went nowhere');
+  assert.equal(bestPrice([], 'BUY', at('14:00:30'), at('14:14:10')), null);
+  assert.equal(bestPrice(BARS, null, at('14:00:30'), at('14:14:10')), null);
+  // A bar that will not parse refuses the whole answer — it may be the extreme.
+  const torn = BARS.map((b, i) => i === 9 ? { ...b, high: 'x' } : b);
+  assert.equal(bestPrice(torn, 'BUY', at('14:00:30'), at('14:14:10')), null);
+});
+
+test('R-04 fails a loss taken after the trade had already run $20 his way', () => {
+  const loss = (o) => trade({ pnl: -80, entry_price: 4000, exit_price: 3985, open_day: '2026-01-06', ...o });
+  const r = (rows) => verdictOf(rows, 'R-04');
+
+  const breached = r([loss({ best_price: 4000 + TO_BREAK_EVEN })]);
+  assert.deepEqual([breached.verdict, breached.failed, breached.ids], ['fail', 1, ['PID1']]);
+  assert.equal(r([loss({ best_price: 4019.99 })]).verdict, 'pass',
+    'a trade that never reached +$20 was held to a rule that never engaged');
+
+  // A short is the mirror, and reading it the buy's way inverts every verdict.
+  const short = (best) => loss({ direction: 'SELL', exit_price: 4015, best_price: best });
+  assert.equal(r([short(3980)]).verdict, 'fail');
+  assert.equal(r([short(4020)]).verdict, 'pass');
+
+  /* THE POPULATION IS LOSSES BEYOND THE SCRATCH BAND. A break-even exit is
+     R-04 having fired and a win says nothing about the stop, so neither is
+     counted — even at $25 in his favour. */
+  const outside = r([
+    loss({ id: 'PIDbe', pnl: -8, exit_price: 3998, best_price: 4025 }),
+    trade({ id: 'PIDw', pnl: 120, entry_price: 4000, exit_price: 4030, best_price: 4031, open_day: '2026-01-06' }),
+  ]);
+  assert.deepEqual([outside.passed, outside.failed, outside.unresolved], [0, 0, 0]);
+
+  // No figure is unknown, never a pass.
+  const unmeasured = r([loss({ best_price: null })]);
+  assert.deepEqual([unmeasured.verdict, unmeasured.unresolved], ['unknown', 1]);
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════

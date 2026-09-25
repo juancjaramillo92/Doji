@@ -662,6 +662,118 @@ async function writeFill(id: string, closedAt: number): Promise<boolean> {
   return ((await res.json()) as unknown[]).length > 0;
 }
 
+/* ─── How far the trade ran in his favour ──────────────────────────────────
+   §7 and §10 called R-04 uncheckable for good because the path of a closed
+   trade was "stored nowhere, including at the broker". `?bars=raw` showed the
+   broker keeps minute bars for at least a year, so the path is recoverable for
+   every trade in the journal, closed or not — and the one fact R-04 turns on
+   is its furthest point: the best price the position saw while it was open.
+
+   ONLY WHOLE MINUTES INSIDE THE TRADE, and that is what makes the figure
+   one-sided. A bar opening before the entry holds prices from before he was
+   in, and one still running at the close holds prices from after he was out,
+   so both edges are dropped: the figure can miss a spike in the first or last
+   minute and can never report one that did not happen to him. A trade too
+   short to hold one whole minute has no figure, and stays null rather than
+   reading as a trade that went nowhere.
+
+   IN PIPETTES, like the spot read and unlike a position — the probe showed a
+   bar's `high` of 428834000 beside a spot of the same order — so this is the
+   second place fromPipettes applies, and the reason it is exported. The bars
+   are the chart he reads, which is also where §5 measures the stop from.
+
+   Pure, and exported, because it is the decision; the fetch around it is not.
+   `span` is the half the request is sized from, and the filter below is the
+   half the figure is trusted from — a broker that answers wider than it was
+   asked cannot put an edge bar into the result. */
+export interface Bar { timestamp: number; high: number; low: number }
+const MINUTE = 60_000;
+
+export function barSpan(entryMs: number, closeMs: number): { from: number; to: number } | null {
+  const from = Math.ceil(entryMs / MINUTE) * MINUTE;
+  const to = Math.floor(closeMs / MINUTE) * MINUTE;
+  return to - from >= MINUTE ? { from, to } : null;
+}
+
+export function bestPrice(bars: Bar[], direction: string, entryMs: number, closeMs: number): number | null {
+  const span = barSpan(entryMs, closeMs);
+  if (!span || (direction !== "BUY" && direction !== "SELL")) return null;
+  const inside = (bars ?? []).filter(b => b.timestamp >= span.from && b.timestamp + MINUTE <= span.to);
+  if (!inside.length) return null;
+
+  // A bar that will not parse is refused whole rather than skipped: the
+  // extreme could be the bar that was dropped, and a figure short of its real
+  // value is the one direction this column promises not to err in silently.
+  const side = direction === "BUY" ? inside.map(b => Number(b.high)) : inside.map(b => Number(b.low));
+  if (side.some(n => !Number.isFinite(n) || n <= 0)) return null;
+  return fromPipettes(direction === "BUY" ? Math.max(...side) : Math.min(...side));
+}
+
+/* FOUR HOURS A REQUEST, because nothing has established how many bars one
+   answer will carry, and a page cut short is a trade whose later half was
+   never looked at — its best price reported low with nothing to say so. A day
+   of minutes is 1,440; a multi-session hold is several of those. The probe
+   asked for sixteen, which proves the shape and nothing about the ceiling. */
+const BAR_CHUNK_MS = 4 * 3600_000;
+
+async function readBars(sid: string, from: number, to: number): Promise<Bar[]> {
+  const bars: Bar[] = [];
+  for (let at = from; at < to; at += BAR_CHUNK_MS) {
+    const got = await mcpCall(sid, "get_trendbars", {
+      symbolId: SYMBOL_IDS[0], period: "M_1",
+      fromTimestamp: String(at), toTimestamp: String(Math.min(at + BAR_CHUNK_MS, to) - MINUTE),
+    });
+    bars.push(...(got.trendbars ?? []));
+  }
+  return bars;
+}
+
+/* THE NEWEST CLOSED TRADES STILL MISSING A FIGURE, a few a poll. One path for
+   the trade that closed a minute ago and for the year behind it: newest first,
+   so a fresh close is never queued behind the backlog, and the backlog drains
+   at a few trades every two minutes without a door anyone has to remember to
+   call. The read carries a limit and takes the newest rows, for the reason
+   every read of a growing table here does.
+
+   A trade too short to measure stays null and is stepped over on every poll
+   at no broker cost; one the broker answered with no bars is asked again next
+   time, which is right for an outage and costs one request for the rare trade
+   that sat wholly inside the daily break.
+
+   `best_price is null` IN THE PATCH, so a figure is written once — the bars
+   of a closed trade do not change, and the filter is what keeps a second
+   writer from ever mattering. Counted on the answer, for writePlan's reason. */
+const EXCURSIONS_PER_POLL = 3;
+
+async function fillExcursions(sid: string): Promise<number> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/trades?select=id,direction,entry_time,fill_time` +
+    `&best_price=is.null&exit_price=not.is.null&fill_time=not.is.null` +
+    `&entry_time=not.is.null&deleted=is.false&id=like.PID*` +
+    `&order=entry_time.desc&limit=50`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Excursion read failed (HTTP ${res.status}): ${await res.text()}`);
+
+  const due = ((await res.json()) as { id: string; direction: string; entry_time: string; fill_time: string }[])
+    .map(t => ({ ...t, entry: +new Date(t.entry_time), close: +new Date(t.fill_time) }))
+    .filter(t => barSpan(t.entry, t.close))
+    .slice(0, EXCURSIONS_PER_POLL);
+
+  let wrote = 0;
+  for (const t of due) {
+    const span = barSpan(t.entry, t.close) as { from: number; to: number };
+    const best = bestPrice(await readBars(sid, span.from, span.to), t.direction, t.entry, t.close);
+    if (best === null) continue;
+    const patch = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${t.id}&best_price=is.null`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ best_price: best }),
+    });
+    if (!patch.ok) throw new Error(`Excursion write failed (HTTP ${patch.status}): ${await patch.text()}`);
+    if (((await patch.json()) as unknown[]).length > 0) wrote++;
+  }
+  return wrote;
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing — the file loads under plain
 // Node, where Deno.serve does not exist.
@@ -1027,6 +1139,18 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         err instanceof Error ? err.message : err);
     }
 
+    /* THE EXCURSION, LAST, because it is the only step here that reads the
+       table rather than the broker's answer — and never takes the poll down,
+       for the plan's reason: a figure that fails to record is one trade still
+       null, which is where every trade started. */
+    let excursions = 0;
+    try {
+      excursions = await fillExcursions(sid);
+    } catch (err) {
+      console.error("doji-mcp-sync: excursion not recorded —",
+        err instanceof Error ? err.message : err);
+    }
+
     // A completed poll, recorded where something can read it. Every line above
     // this one has already run, so the mark means the deals landed rather than
     // that the function was reached.
@@ -1034,7 +1158,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
-      deals: deals.length, positions: n, balance_for: target, planned, stamped,
+      deals: deals.length, positions: n, balance_for: target, planned, stamped, excursions,
       // Reported rather than acted on: it says more deals exist beyond the
       // window, which is true of almost every run.
       has_more: data.hasMore ?? null,

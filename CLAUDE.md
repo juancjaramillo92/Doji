@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 589 tests, six suites
+npm test      # 594 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1032,13 +1032,13 @@ compounds.
 ### Checking his rules
 
 - **`adherence.ts` is the strategy executed, and the set of rules is not a
-  choice.** §7's `Evaluable` column decides it: nine `journal` rules, and the
-  ten `judgment` ones stay out, because a judgment rule that starts
+  choice.** §7's `Evaluable` column decides it: ten `journal` rules, and the
+  nine `judgment` ones stay out, because a judgment rule that starts
   reporting `pass` is exactly the "no violations" claim §8 warns is close to
   saying nothing. It is pure — rows in, verdicts out, no clock but the one passed
   in — which is what lets every rule be driven in BOTH directions from a test.
   `unknown` is never `pass`, and an empty population is `unknown`.
-  `fold.test.mjs` holds the nine against §7's table, reading the `Evaluable`
+  `fold.test.mjs` holds the ten against §7's table, reading the `Evaluable`
   column out of the document rather than a list typed into the test.
 
   A VERDICT IS NOT THE WHOLE ANSWER, WHICH IS HOW R-10 HID A MISCOUNT FOR ITS

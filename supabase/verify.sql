@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 73 checks above them, silently, leaving a
+-- HTTP responses and threw away all 75 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -267,6 +267,19 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_trades'
        and column_name in ('planned_sl','planned_tp')),
    '2'),
+
+  -- 012. The excursion write is a PATCH filtered on `best_price=is.null`, so
+  -- without the column the read that picks its trades is a 400 the poller
+  -- swallows to keep the deals landing — every poll then reports excursions: 0
+  -- and R-04 reads unknown on every trade, which looks like nothing to check.
+  ('trades has its best_price column',
+   (select data_type from information_schema.columns
+     where table_schema = 'public' and table_name = 'trades' and column_name = 'best_price'),
+   'numeric'),
+  ('eugenia_trades exposes best_price',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_trades' and column_name = 'best_price'),
+   '1'),
 
   ('RLS on trades',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.trades')),
