@@ -69,6 +69,7 @@ supabase/009_dispatch.sql               what pg_net sent, and what came back
 supabase/010_pace.sql                   how much of its clock a briefing spends
 supabase/011_trades_grants.sql          which columns the app may write
 supabase/012_excursion.sql              how far a trade ran in his favour
+supabase/013_ff_calendar.sql            Forex Factory's week, which R-14 is judged against
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -79,7 +80,7 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/prompt.ts                who she is, and what she may never say
   doji-eugenia/strategy.ts              what he decided; she cannot write it
   doji-eugenia/journal.ts               the app's arithmetic, ported so she can reach it
-  doji-eugenia/adherence.ts             the eleven rules a journal row can answer
+  doji-eugenia/adherence.ts             the twelve rules a journal row can answer
 doji_gmail_sync.gs                      Apps Script: broker email parser
 scripts/backup-memory.mjs               the paged read behind the weekly copy
 test/                                   node:test suites — see Tests
@@ -454,7 +455,7 @@ be single-sourced at run time:
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the two `verify.sql` names in the row that asks whether a database has the cache-write columns — a key with no column is a row PostgREST refuses whole, so the meter goes quiet for every caller at once |
-| **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the eleven predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
+| **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the twelve predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union it interpolates, and `010`'s `owed \|\| ' briefing delivered'` — the two halves are in two languages with no build step between them, and a watcher looking for a caller nobody writes reports a briefing missing every single day |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `004` and the count `verify.sql` asserts — a row that has been wrong once already, reporting a correct database as broken |
 | the **paid worker wall clock** | `ceiling_ms` in `010`, which is also what its message quotes back, and the sentence in `CLAUDE.md` explaining why the cron half answers before it works — a fact about the plan rather than about this repository, so it moves in both places or neither |
@@ -1390,7 +1391,7 @@ Reply to her and she answers — by typing, by voice, or by sending a chart.
 `supabase/003_eugenia.sql` holds her memory and her read of the journal,
 `005_eugenia_senses.sql` her meters, her calendar and the trigger that tells her
 about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
-`strategy.ts` what he decided, `adherence.ts` the eleven rules a row can answer;
+`strategy.ts` what he decided, `adherence.ts` the twelve rules a row can answer;
 `index.ts` is the wiring.
 
 **The conversation and what she remembers are two tables, and stay two.**
@@ -2019,12 +2020,29 @@ which is the one thing a model is worst at, and where a wrong answer is least
 visible, because a rate computed over the wrong population looks exactly like one
 computed over the right one. That is §8's own opening sentence.
 
-`adherence.ts` evaluates the eleven rules a row can answer — **R-01, R-02,
-R-03, R-04, R-10, R-11, R-12, R-13, R-15, R-16 and R-18** — and `check_rules` serves it. The set is not a
-choice: §7's `Evaluable` column decides it, and `agree` holds the two lists
+`adherence.ts` evaluates the twelve rules a row can answer — **R-01, R-02,
+R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16 and R-18** — and
+`check_rules` serves it. The set is not a choice: §7's `Evaluable` column decides it, and `agree` holds the two lists
 against each other, because a rule marked `journal` and never implemented is a
 check she cites that nobody runs, and one marked `judgment` and implemented
 anyway starts reporting `pass` for something nothing stored can see.
+
+**R-14 is the one rule judged against something other than the journal: Forex
+Factory's calendar.** He defined high impact as the red folder there, USD only, and
+the floor as thirty minutes, so the rule reads the rating he reads rather than
+Eugenia's, which comes off a search page and is the thing she asked to be corrected
+on. Forex Factory publishes a weekly export for programs — the current week, Sunday
+to Saturday, and nothing else — so the nightly pass fetches it and
+`ff_calendar_replace` swaps that week's rows in one transaction: a release moved or
+retitled mid-week must not stay at its old time and fail an entry against a print
+that never happened then. `ffEvents` refuses the whole file on one bad row, because
+a dropped row could be the red folder. The history is only what the pass kept, and
+**a week it missed is not a quiet week** — both would have no releases stored, and
+every entry in the missed one would pass — so `ff_weeks` records each week a fetch
+landed for and an entry outside one is `unknown`. The fetch is metered as
+`caller: 'forexfactory'` in `eugenia_runs`, both outcomes. The calendar's history
+exists nowhere else and the weekly backup does not carry it yet: that backup pages
+each table by one unique column, and this one is keyed on three.
 
 **`unknown` is not a pass**, and the code says so rather than the prompt: the
 verdict is the worst outcome present, and an empty population is `unknown`. A
@@ -2424,7 +2442,7 @@ because `positionsList` is pure, was always driven from both sides, and renders
 exactly what it is handed — the mistake was upstream of it, in deciding what to
 hand it.
 
-**The same column runs through two of the eleven rules.** R-10 ended an unclosed
+**The same column runs through two of the twelve rules.** R-10 ended an unclosed
 span at *now*, so one missing email made every trade after it overlap a phantom —
 a cascade of failures each naming a real row and each wrong. A close with no time
 is now `unknown`, which is what an end nothing recorded actually is. R-15 used to
@@ -3330,6 +3348,15 @@ Once it is applied the backlog fills itself at three trades every two minutes.
 `excursions` in the poller's answer counts rows written, for `planned`'s reason,
 and reads `0` once every trade that can be measured has been.
 
+### Applying 013, which is Forex Factory's week
+
+`013_ff_calendar.sql` creates `ff_calendar` and `ff_weeks` and the function that
+fills both. **Safe to re-run.** Nothing reads it until the nightly pass has fetched
+once, so R-14 answers `unknown` on every trade until 22:00 New York the day it is
+applied, and on every trade from before that for good — the export has no history.
+`eugenia_runs` rows with `caller = 'forexfactory'` say what each night fetched, or
+why it could not.
+
 ### Programmatic tool calls need their container
 
 `web_search_20260209` does dynamic filtering, and **that runs code execution on
@@ -4135,8 +4162,9 @@ been wrong once, reporting a correct database as broken.
     they are watching; store them lower-case, the way step 5's cron secret is.
     Re-run `supabase/004_cron.sql` afterwards if the two watchers' jobs are not
     already scheduled — it upserts on the job name.
-14. Run `supabase/012_excursion.sql`, which is safe to re-run.
-15. Run `supabase/verify.sql` and read it against 001–012. Nothing is set up
+14. Run `supabase/012_excursion.sql` and `supabase/013_ff_calendar.sql`, both
+    safe to re-run.
+15. Run `supabase/verify.sql` and read it against 001–013. Nothing is set up
     until that agrees.
 
 ---
@@ -4210,7 +4238,7 @@ tidy.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eleven rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the twelve rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `test/golden.test.mjs` | the snapshot, and the only suite that asserts on what nothing else NAMES: the real page booted against a fixed fixture set on a frozen clock, with every derived value and every panel's markup compared byte for byte against `test/golden.json`. The others test named things; a refactor breaks unnamed ones — an attribute order, a class that stopped being emitted, a label whose whitespace collapsed. Its fixtures earn their place by mutation rather than by looking realistic, and the one to keep in mind is the pair entered and closed in opposite orders, because an ordering rule proved by rows that cannot disagree is the audit's own blind spot. It also SWEEPS `Dates.session` across six windows around both US and both EU changeovers rather than sampling it, since New York and London do not change on the same date and a spot check in July gets the right answer under almost any mistake in those tables. Regenerate with `GOLDEN=write npm test`, deliberately, in the same commit as the behaviour change and never to make a red run go away — a golden file regenerated on failure costs what it always cost and proves nothing |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |

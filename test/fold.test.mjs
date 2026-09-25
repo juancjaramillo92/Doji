@@ -50,6 +50,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
+  ffEvents, releasesQuery, weeksQuery,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -58,7 +59,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, RED, weekOf,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -2792,6 +2793,83 @@ test('R-18 reads a close with no broker alert as a hand close, and spares the Fr
   assert.equal(r([closeAt('2026-01-06T18:00:00Z', { fill_time: null })]).verdict, 'unknown');
   const open = r([closeAt('2026-01-06T18:00:00Z', { pnl: null, exit_price: null, fill_time: null })]);
   assert.deepEqual([open.passed, open.failed, open.unresolved], [0, 0, 0]);
+});
+
+/* ─── R-14, against Forex Factory's own week ───────────────────────────────
+   The export below is the one he downloaded on 25 Sep 2026, unchanged — which
+   is why its week holds no USD red folder at all, and why the fixture of
+   releases further down is built rather than read.
+   ─────────────────────────────────────────────────────────────────────────── */
+const FF = JSON.parse(readFileSync(new URL('./fixtures/ff-calendar-thisweek.json', import.meta.url), 'utf8'));
+
+test("Forex Factory's export parses to UTC instants, and one bad row refuses the file", () => {
+  const events = ffEvents(FF);
+  assert.equal(events.length, FF.length);
+  // `2026-09-24T08:30:00-04:00` is 12:30 UTC — the offset is on the date, so
+  // no clock change can move it.
+  const claims = events.find(e => e.title === 'Unemployment Claims');
+  assert.deepEqual([claims.at, claims.country, claims.impact],
+                   ['2026-09-24T12:30:00.000Z', 'USD', 'Medium']);
+  // The week he read: plenty of high impact, and none of it USD.
+  assert.ok(events.some(e => e.impact === RED.impact));
+  assert.equal(events.filter(e => e.country === RED.country && e.impact === RED.impact).length, 0);
+
+  /* A DROPPED ROW COULD BE THE RED FOLDER, so the whole file is refused and
+     the week is simply not filed — its trades read unknown, never pass. */
+  assert.throws(() => ffEvents([...FF.slice(0, 3), { ...FF[3], date: 'soon' }]), /event 3/);
+  assert.throws(() => ffEvents({ events: FF }), /not a list/);
+});
+
+test('an instant files under the Sunday its Forex Factory week began, in New York', () => {
+  // The export's first event is Sunday 19:00 New York, which is Monday UTC.
+  assert.equal(weekOf(new Date('2026-09-20T23:00:00Z')), '2026-09-20');
+  assert.equal(weekOf(new Date('2026-09-26T14:00:00Z')), '2026-09-20');   // Saturday
+  // Saturday 21:00 New York is Sunday 01:00 UTC, and still the old week.
+  assert.equal(weekOf(new Date('2026-09-27T01:00:00Z')), '2026-09-20');
+  assert.equal(weekOf(new Date('2026-09-27T05:00:00Z')), '2026-09-27');
+});
+
+test('R-14 fails an entry in the thirty minutes before a red folder, and nothing else', () => {
+  const cpi = '2026-10-14T12:30:00Z';                      // 08:30 New York
+  const cal = { releases: [cpi], weeks: new Set(['2026-10-11']) };
+  const at = (iso, id = 'PIDx') => trade({ id, entry_time: iso, open_day: '2026-10-14' });
+  const r = (rows) => verdictOf(rows, 'R-14', Date.parse('2026-10-20T00:00:00Z'));
+  const rr = (rows, c = cal) => checkRules(rows, Date.parse('2026-10-20T00:00:00Z'), c)
+    .find(x => x.rule === 'R-14');
+
+  const inside = rr([at('2026-10-14T12:05:00Z')]);
+  assert.deepEqual([inside.verdict, inside.failed, inside.ids], ['fail', 1, ['PIDx']]);
+  // Exactly thirty minutes before is inside the floor; thirty-one is not.
+  assert.equal(rr([at('2026-10-14T12:00:00Z')]).verdict, 'fail');
+  /* PAST THE FLOOR IS HIS JUDGEMENT, not a pass: the stand-aside is
+     open-ended and he set only the part no reading of it excuses. */
+  assert.equal(rr([at('2026-10-14T11:59:00Z')]).verdict, 'unknown');
+  assert.equal(rr([at('2026-10-14T09:00:00Z')]).verdict, 'unknown',
+    'an entry hours ahead of CPI on its own day was passed');
+  // After the print, and on a day with nothing ahead, is a pass.
+  assert.equal(rr([at('2026-10-14T12:31:00Z')]).verdict, 'pass');
+  assert.equal(rr([at('2026-10-13T13:00:00Z')]).verdict, 'pass');
+
+  /* A WEEK NOBODY FETCHED LOOKS EXACTLY LIKE A QUIET ONE, which is the whole
+     reason ff_weeks exists: the same CPI entry, with the week unfetched, is
+     unknown rather than the pass an empty calendar would hand it. */
+  assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set() }).verdict, 'unknown');
+  assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set(['2026-10-11']) }).verdict, 'pass');
+  // And with no calendar handed at all, which is every caller but check_rules.
+  assert.equal(r([at('2026-10-14T12:05:00Z')]).verdict, 'unknown');
+  assert.equal(NEWS_MIN, 30);
+});
+
+test("R-14's reads cover the trades' window, the red folder only, newest first", () => {
+  const now = Date.parse('2026-10-20T15:00:00Z');
+  const since = tradesQuery(30, now).match(/open_day=gte\.([\d-]+)/)[1];
+  const rel = releasesQuery(30, now), wk = weeksQuery(30, now);
+  assert.match(rel, new RegExp(`country=eq\\.${RED.country}&impact=eq\\.${RED.impact}`));
+  // A day earlier than the trades, and a week earlier for the weeks.
+  assert.ok(rel.match(/at=gte\.([\d-]+)/)[1] < since);
+  assert.ok(wk.match(/week=gte\.([\d-]+)/)[1] <= new Date(Date.parse(since) - 7 * 864e5).toISOString().slice(0, 10));
+  assert.match(rel, /order=at\.desc&limit=\d+/);
+  assert.match(wk, /order=week\.desc&limit=\d+/);
 });
 
 test('R-10 catches two positions open at once, and an open one still counts', () => {

@@ -34,11 +34,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
-// The eleven rules a row can answer, evaluated rather than reasoned about. Pure
+// The twelve rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
 // are exported in the app: it is the part that has to be testable.
 import {
-  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker,
+  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, RED,
   type TradeRow, type Standing,
 } from "./adherence.ts";
 // The app's own arithmetic over the journal — a win rate, the money split, the
@@ -827,14 +827,33 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
    wrong date. So today's New York date is taken first and the days are stepped
    off it — the same way index.html walks to a week or a month boundary. */
 export function tradesQuery(days: unknown, now = Date.now()): string {
+  return `eugenia_trades?open_day=gte.${windowStart(days, now, 0)}` +
+         `&order=open_day.desc,entry_time.desc&limit=400`;
+}
+
+// The first civil day of the window, `back` days further out still.
+function windowStart(days: unknown, now: number, back: number): string {
   const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
 
   const [y, m, d] = nyDate(new Date(now)).split('-').map(Number);
   const from = new Date(Date.UTC(y, m - 1, d));
-  from.setUTCDate(from.getUTCDate() - n);
+  from.setUTCDate(from.getUTCDate() - n - back);
+  return from.toISOString().slice(0, 10);
+}
 
-  return `eugenia_trades?open_day=gte.${from.toISOString().slice(0, 10)}` +
-         `&order=open_day.desc,entry_time.desc&limit=400`;
+/* R-14's two reads, over the same window check_rules reads the trades in. The
+   releases are the red folder only — RED is the rule's, imported rather than
+   typed here — and a day early, because a UTC midnight bound would drop the
+   evening before a New York one. The weeks go back a further seven, since an
+   entry on the window's first day sits in a week that began before it. */
+export function releasesQuery(days: unknown, now = Date.now()): string {
+  return `ff_calendar?select=at&country=eq.${RED.country}&impact=eq.${RED.impact}` +
+         `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=500`;
+}
+
+export function weeksQuery(days: unknown, now = Date.now()): string {
+  return `ff_weeks?select=week&week=gte.${windowStart(days, now, 7)}` +
+         `&order=week.desc&limit=60`;
 }
 
 /* NEVER THROWS, for the reason searchMemory and writeNote do not: this runs
@@ -872,23 +891,23 @@ async function readTrades(days: unknown): Promise<string> {
    and R-12 allows fifteen" is a fact about his rule; what it MEANT is his to
    say, and the prohibitions are untouched.
 
-   Eleven rules and not one more. §7's Evaluable column decides the set, and
-   the eight marked `judgment` stay out — an approximation of one would be worse
+   Twelve rules and not one more. §7's Evaluable column decides the set, and
+   the seven marked `judgment` stay out — an approximation of one would be worse
    than the gap, because a judgment rule that starts reporting `pass` is exactly
    the "no violations" claim §8 warns is close to saying nothing.
    ───────────────────────────────────────────────────────────────────────── */
 const CHECK_TOOL = {
   name: "check_rules",
   description:
-    "Check his journal against the eleven rules a row can actually answer — R-01, " +
-    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-15, R-16 and R-18 — over the last N days. Returns a " +
+    "Check his journal against the twelve rules a row can actually answer — R-01, " +
+    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16 and R-18 — over the last N days. Returns a " +
     "verdict per rule with the counts behind it and the rows that failed. Use it " +
     "whenever he asks how he has been following his rules, or before saying " +
     "anything about his discipline: this is computed from the rows, so it is not " +
     "something to reproduce by reading trades yourself. A verdict of unknown means " +
-    "the data cannot decide it and is NEVER the same as a pass. The other eight " +
+    "the data cannot decide it and is NEVER the same as a pass. The other seven " +
     "rules are judgment rules and nothing stored can check them — say so " +
-    "rather than implying the eleven are the whole strategy.",
+    "rather than implying the twelve are the whole strategy.",
   input_schema: {
     type: "object",
     properties: {
@@ -904,9 +923,15 @@ const CHECK_TOOL = {
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
+    const [rows, releases, weeks] = await Promise.all([
+      readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
+      readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
+      readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
+    ]);
     if (!rows.length) return "No trades in that window, so there is nothing to check.";
-    return adherenceList(checkRules(rows));
+    return adherenceList(checkRules(rows, Date.now(), {
+      releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
+    }));
   } catch (err) {
     console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
@@ -3702,11 +3727,72 @@ async function postConsolidation(): Promise<Response> {
     await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
   }
 
+  /* AND FOREX FACTORY'S WEEK, which R-14 is judged against. Nightly for the
+     sweep's reason — this job already runs every night, weekends included —
+     and wrapped for the same one: a calendar that will not load must not
+     report itself as a pass that failed. The export is always the current
+     week, so a missed night costs nothing the next night does not recover,
+     and a missed week is what `ff_weeks` exists to say. */
+  try {
+    const filed = await refreshCalendar();
+    console.log(`doji-eugenia: calendar — ${filed} events filed`);
+    await recordRun({ caller: 'forexfactory', ok: true, detail: `${filed} events filed` });
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    console.error("doji-eugenia: calendar not refreshed —", why);
+    await recordRun({ caller: 'forexfactory', ok: false, detail: why.slice(0, 500) });
+  }
+
   /* ONE EXIT, and it is what the test asserts rather than the branch shape: a
      second `return` in this function is how the meters got skipped the first
      time, and it would be again. */
   return day.length ? json({ ok: true, consolidated: day.length })
                     : json({ ok: true, skipped: "nothing said" });
+}
+
+/* ─── Forex Factory's week ─────────────────────────────────────────────────
+   The export Forex Factory publishes for programs, rather than the calendar
+   page: a page is laid out for a reader and read by program breaks the day the
+   layout moves. It is the current week, Sunday to Saturday, in New York time
+   with the offset written on every date — so an instant parses straight to UTC
+   and no clock change can move it.
+
+   A BOUNDARY, AND IT REFUSES THE WHOLE FILE RATHER THAN A ROW. A dropped row
+   could be the red folder, and a week filed without its one release passes
+   every entry before it — the failure R-14 exists to catch, reported as
+   compliance. Refused, the week is simply not filed, and its trades read
+   unknown. Kept whole otherwise: which folder counts is the rule's. */
+const FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+
+export interface FfEvent {
+  at: string; country: string; title: string; impact: string;
+  forecast: string; previous: string;
+}
+
+export function ffEvents(body: unknown): FfEvent[] {
+  if (!Array.isArray(body)) throw new Error("the Forex Factory export is not a list");
+  return body.map((e: any, i: number) => {
+    const at = new Date(String(e?.date ?? ''));
+    const text = (k: string) => typeof e?.[k] === 'string' ? e[k].trim() : '';
+    if (isNaN(+at) || !text('title') || !text('country') || !text('impact')) {
+      throw new Error(`Forex Factory event ${i} is missing a date, title, currency or impact`);
+    }
+    return { at: at.toISOString(), country: text('country'), title: text('title'),
+             impact: text('impact'), forecast: text('forecast'), previous: text('previous') };
+  });
+}
+
+// Replaces the fetched week in one transaction, and says how many it filed.
+async function refreshCalendar(): Promise<number> {
+  const got = await fetch(FF_URL);
+  if (!got.ok) throw new Error(`Forex Factory export refused (HTTP ${got.status})`);
+  const events = ffEvents(await got.json());
+
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/ff_calendar_replace`, {
+    method: "POST", headers: sbHeaders(), body: JSON.stringify({ events }),
+  });
+  if (!res.ok) throw new Error(`Calendar write failed (HTTP ${res.status}): ${await res.text()}`);
+  return Number(await res.json());
 }
 
 /* THE ONE CLAIM IN THIS SYSTEM THAT HAD NO METER.
