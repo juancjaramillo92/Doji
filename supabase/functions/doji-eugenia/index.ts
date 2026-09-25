@@ -3392,18 +3392,36 @@ async function trim(draft: string): Promise<string> {
    makes a gate safe is the same for both and is the part that must never be
    copied: a revision that fails `keepDraft` is overruled, and a gate that
    THROWS costs nothing at all. Both were stated once and would have been stated
-   twice the moment a second gate existed. */
+   twice the moment a second gate existed.
+
+   AND WHAT IT DECIDED IS A ROW, BECAUSE IT WAS A CONSOLE LINE. The first days
+   with a gate on every path showed the paragraph rule broken in nearly every
+   message that passed through one — five, six, seven sentences where `WRITING`
+   says three or four — and nothing could say why. `ask` records that the gate
+   RAN; whether it then sent its revision, sent the draft back untouched, or
+   was overruled by `keepDraft` went to a log nobody reads. Those are three
+   different repairs, and a gate paid for on every message whose effect cannot
+   be seen is the cheap-half meter again. One verdict per gated message, on
+   every outcome including the one that threw, so the rows count the messages. */
 async function gate(draft: string, asked: string, label: string): Promise<string> {
+  const caller = `${label} verdict`;
   try {
     const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS);
     if (keepDraft(draft, revised)) {
-      console.log(`doji-eugenia: ${label} rejected — kept the draft (${draft.length} vs ${revised.trim().length})`);
+      await recordRun({ caller, ok: true, chars: draft.length,
+                        detail: `kept the draft — revision ${revised.trim().length} vs draft ${draft.length}` });
       return draft;
     }
-    return revised.trim();
+    const sent = revised.trim();
+    await recordRun({ caller, ok: true, chars: sent.length,
+                      detail: sent === draft.trim() ? 'unchanged' : `revised ${draft.length} → ${sent.length}` });
+    return sent;
   } catch (err) {
     // A gate that fails must never cost the message it was checking.
-    console.error(`doji-eugenia: ${label} failed —`, err instanceof Error ? err.message : err);
+    const why = err instanceof Error ? err.message : String(err);
+    console.error(`doji-eugenia: ${label} failed —`, why);
+    await recordRun({ caller, ok: false, chars: draft.length,
+                      detail: `failed, the draft went — ${why}`.slice(0, 500) });
     return draft;
   }
 }

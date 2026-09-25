@@ -3772,7 +3772,11 @@ test('every column the cost meter writes is a column the table has', () => {
     // Parenthesised sub-expressions come out first: `Date.now() - started` and
     // `.slice(0, 500)` both carry commas that are not key separators, and
     // splitting naively reads "500" as a column name.
-    let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    // And string literals before either, for the same reason one level up: a
+    // comma inside `failed, the draft went` is prose, and a split that cannot
+    // tell reads "the" as a column and fails a row that PostgREST would take.
+    let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
+      .replace(/`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''");
     for (let i = 0; i < 8 && /\([^()]*\)/.test(flat); i++) flat = flat.replace(/\([^()]*\)/g, '');
     const keys = flat.split(',').map(seg => seg.trim().match(/^(\w+)/)?.[1]).filter(Boolean);
     for (const k of keys) {
@@ -6232,12 +6236,54 @@ test('the two gates share the half that makes a gate safe', () => {
   const at = EUGENIA_TS.indexOf('async function gate(');
   assert.ok(at > -1, 'the shared gate body is gone, so each gate holds its own copy');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
-  assert.match(body, /if \(keepDraft\(draft, revised\)\)[\s\S]{0,200}return draft;/,
+
+  /* THE FIRST RETURN IN EACH BRANCH, NOT THE RETURN WITHIN SOME CHARACTERS. A
+     window of two hundred passed while each branch was a line long and failed
+     the day the verdict row went in front of the return — the branch still
+     returned the draft, and the check had been measuring its length. */
+  const firstReturn = (from) => {
+    const i = body.indexOf(from);
+    return i < 0 ? null : (body.slice(i).match(/return [^;]+;/) ?? [])[0];
+  };
+  assert.equal(firstReturn('if (keepDraft(draft, revised))'), 'return draft;',
     'a gate no longer overrules a failed revision, so a critic that returns an ' +
     'apology sends the apology');
-  assert.match(body, /catch[\s\S]{0,200}return draft;/,
+  assert.equal(firstReturn('} catch'), 'return draft;',
     'a gate that throws no longer falls back to the draft, so a slow vendor ' +
     'costs the message rather than the check');
+});
+
+/* ─── And what the gate decided is a row ─────────────────────────────────────
+   The first three days with a gate on every path showed the paragraph rule
+   broken in nearly every message that passed through one, and nothing could
+   say why: `ask` records that the gate RAN, and whether it then sent its
+   revision, sent the draft back untouched, or was overruled went to a console
+   line. Those are three different repairs. One verdict per gated message on
+   every outcome, so the rows count the messages — bounded at the previous
+   `return`, the heartbeat test's reason: a path may only be credited with its
+   own mark, never with the one above it. */
+
+test('every message a gate decides leaves one verdict row, on all three outcomes', () => {
+  const at = EUGENIA_TS.indexOf('async function gate(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /const caller = `\$\{label\} verdict`;/,
+    'the verdict is no longer filed under the gate\'s own label, so a query ' +
+    'for what TRIM decided cannot be told from one for what CRITIC decided');
+
+  const returns = [...body.matchAll(/return [^;]+;/g)];
+  assert.equal(returns.length, 3,
+    `gate has ${returns.length} returns — each outcome is one, and a fourth is ` +
+    `an outcome this check cannot see`);
+  let from = 0;
+  for (const r of returns) {
+    assert.match(body.slice(from, r.index), /await recordRun\(\{ caller,/,
+      `gate reaches \`${r[0]}\` without recording what it decided, so that ` +
+      `outcome is the one the table can never show`);
+    from = r.index + r[0].length;
+  }
+  assert.match(body.slice(body.indexOf('} catch')), /recordRun\(\{ caller, ok: false/,
+    'a gate that threw records itself as fine, which is the one outcome the ' +
+    'verdict has to be able to say');
 });
 
 test('keepDraft is relative, because it now reads three-sentence messages', () => {

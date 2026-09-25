@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 585 tests, six suites
+npm test      # 586 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1277,7 +1277,13 @@ compounds.
 
   `gate` IS ONE FUNCTION AND MUST STAY ONE. Its catch is what makes both gates
   safe; copied, that catch is where one of them loses the message it was
-  checking on the day a vendor is slow. The README says why.
+  checking on the day a vendor is slow. The README says why. AND EVERY OUTCOME IN IT
+  RECORDS A VERDICT ROW BEFORE IT RETURNS — revised, unchanged, overruled, or
+  thrown. The gate RUNNING was always metered; what it DECIDED was a console
+  line, which is how a rule could fail through every gate for three days with
+  nothing able to say whether the gate had tried. `agree.test.mjs` bounds each
+  return's window at the previous one, so a fourth outcome cannot arrive
+  unrecorded.
 
   AND `keepDraft` IS RELATIVE TO THE DRAFT, never a flat length — the README
   has the arithmetic. A gate overruled every time looks exactly like a gate that

@@ -1764,6 +1764,18 @@ out — so little of what `TRIM` checks is reachable inside it.
 catch is where one gate loses the message it was checking on the day a vendor is
 slow.
 
+**And what a gate decided is a row in `eugenia_runs`, not a console line.** The
+first three days with a gate on every path showed the paragraph rule broken in
+nearly every message that went through one — five, six and seven sentences where
+`WRITING` asks for three or four — and nothing could say why. The model call was
+recorded, so the gate had plainly RUN; whether it then sent its revision, handed
+the draft back unchanged, or was overruled by `keepDraft` was written to a log
+nobody reads. Those are three different repairs. Every gated message now leaves
+one `trim verdict` or `critic verdict` row — `revised 1840 → 1795`,
+`unchanged`, `kept the draft`, or `failed, the draft went` — so the rows count
+the messages, and a gate costing sixty seconds on a long reply can be seen
+earning it or not.
+
 And **`keepDraft` is relative now**. A flat 400 characters is a *briefing's*
 floor: shorter than that and what came back was an apology. A release look is two
 or three sentences and often under 400 to begin with, so that floor overrules
