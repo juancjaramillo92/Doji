@@ -1346,10 +1346,10 @@ about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
 `strategy.ts` what he decided, `adherence.ts` the eight rules a row can answer;
 `index.ts` is the wiring.
 
-**Three objects in the database, and only two of them store anything.**
+**The conversation and what she remembers are two tables, and stay two.**
 `eugenia_turns` is the conversation window, `eugenia_notes` is what she
-remembers, and `eugenia_trades` is a view — a saved `select`, no rows of its
-own. The two tables stay two because nothing ever reads them together: notes go
+remembers, and `eugenia_trades` beside them is a view — a saved `select`, no
+rows of its own. The two tables stay two because nothing ever reads them together: notes go
 in at the top of a turn, turns at the end, with different windows, different
 shapes and different constraints. Merged, they would need a `kind` column, a
 nullable `role`, two constraints that each say "unless this is the other kind"
@@ -2239,7 +2239,7 @@ delivered, the button spins, and nothing reports it — `allowed_updates` must n
 
 ### What she remembers
 
-Six tables, and what separates them is how long a thing is true for. A turn
+Seven tables, and what separates them is how long a thing is true for. A turn
 rolls over inside a morning; a note about him outlives twenty of those; what he
 UNDERSTANDS outlives both; a thesis is only ever current, which is why it is one
 row rewritten rather than a log; a loop stays until it closes; and the calendar
@@ -2262,14 +2262,23 @@ price is stale tomorrow and the prompt forbids it. They are handed back at the
 start of every turn, briefing and reply alike.
 
 **And they are how he corrects her, which is the only way he can.** There is no
-settings page and no feedback button, and the conversation window rolls over in
-a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
+settings page, the button under a briefing carries a verdict and not a reason,
+and the conversation window rolls over in a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
 is odd"* would all be forgotten by tomorrow if they stayed in the conversation.
 Recorded as notes they are standing instructions: written the moment he gives
 one, in his words, obeyed from the next message on, and overriding the shape the
 prompt otherwise asks for. She acknowledges an instruction in four words or
 fewer — a fact about him she records silently — because otherwise he cannot tell
 it stuck and will say it again.
+
+**A reply to one of her messages tells her which one.** Swipe a message in
+Telegram and answer it, typed or spoken, and she is handed the message he
+answered — the text when it has any, otherwise the stored turn sent at that
+moment, since a voice note carries no words and her history dates a turn by the
+day alone. Without it, *"too dense"* under the 10:00 pulse and under the release
+look an hour later arrive identically. What is stored is his words behind a
+marker carrying her message's opening, so the nightly pass can tell what a
+correction was about.
 
 `notesBlock()` is therefore load-bearing on **all seven paths**, and its absence
 would be silent: drop it from one and she carries on ignoring an instruction he
@@ -4087,7 +4096,7 @@ tidy.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the eight rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `test/golden.test.mjs` | the snapshot, and the only suite that asserts on what nothing else NAMES: the real page booted against a fixed fixture set on a frozen clock, with every derived value and every panel's markup compared byte for byte against `test/golden.json`. The others test named things; a refactor breaks unnamed ones — an attribute order, a class that stopped being emitted, a label whose whitespace collapsed. Its fixtures earn their place by mutation rather than by looking realistic, and the one to keep in mind is the pair entered and closed in opposite orders, because an ordering rule proved by rows that cannot disagree is the audit's own blind spot. It also SWEEPS `Dates.session` across six windows around both US and both EU changeovers rather than sampling it, since New York and London do not change on the same date and a spot check in July gets the right answer under almost any mistake in those tables. Regenerate with `GOLDEN=write npm test`, deliberately, in the same commit as the behaviour change and never to make a red run go away — a golden file regenerated on failure costs what it always cost and proves nothing |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
