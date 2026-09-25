@@ -1336,8 +1336,8 @@ A daily XAU/USD briefing, a quieter look later in the morning, a look at any
 number that actually lands, a word when a position opens into one, and a
 conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 second is the gold open, so the week's first briefing lands exactly as the
-market does. She opens with `Buenos días, jefesito.` in the morning and `Buenas
-tardes, jefesito.` on Sunday evening.
+market does. She opens with `Buenos días jefesito.` in the morning and `Buenas
+tardes jefesito.` on Sunday evening.
 
 Reply to her and she answers — by typing, by voice, or by sending a chart.
 `supabase/003_eugenia.sql` holds her memory and her read of the journal,
@@ -2175,10 +2175,15 @@ last sentence really land*, *take a full breath at a blank line*. Telling the
 voice it was exempt only put an instruction against the text, and the text won.
 Two more things converged on the same last word — it carried no full stop, so
 nothing said *jefesito* was finished, and *slow across a name* read what she
-calls him as a name to slow on. So it is a punctuated sentence now, joined to
-the briefing by a space, and the voice slows only for a name he has to catch.
-The join is the half a tidy edit would undo — on its own line it looks neater
-and sounds worst — so a test reads the call site for it.
+calls him as a name to slow on. So it ends on a full stop now, joined to the
+briefing by a space, and the voice slows only for a name he has to catch.
+
+**Two tidy edits would each undo it, and both look correct.** On its own line
+the greeting looks neater and sounds worst, so a test reads the call site for
+the space. And written Spanish puts a comma before the name — `Buenos días,
+jefesito.` — which shipped and opened a long gap between the two halves of a
+greeting anyone says in one breath: to a voice a comma is a rest. The greeting
+test asserts the exact string, so the comma cannot come back quietly.
 
 **The audio is requested as OGG/Opus, and this is the one thing on the path that
 would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request

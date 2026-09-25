@@ -189,13 +189,13 @@ export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
 // Buenos días before the week, buenas tardes for the Sunday open — which is
 // the evening, and the only briefing that is not a morning one.
 //
-// PUNCTUATED AS THE SENTENCE IT IS, BECAUSE IT IS HEARD RATHER THAN READ. Bare,
-// it ended on `jefesito` with no full stop, and a voice given no sentence end
-// has nothing to say the word is finished — it drew the last syllable out. The
-// comma before the name and the stop after it are ordinary Spanish, and they
-// are also the only prosody this line gets to carry.
+// PUNCTUATED FOR THE EAR, BECAUSE IT IS HEARD RATHER THAN READ. The full stop
+// is what tells the voice `jefesito` is finished; without one it drew the last
+// syllable out. And there is deliberately no comma before the name, though
+// written Spanish puts one there: to a voice a comma is a rest, and it opened a
+// long gap inside a greeting anyone says in one breath.
 export const greeting = (brief: Brief) =>
-  brief === 'sunday' ? 'Buenas tardes, jefesito.' : 'Buenos días, jefesito.';
+  brief === 'sunday' ? 'Buenas tardes jefesito.' : 'Buenos días jefesito.';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
    THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
