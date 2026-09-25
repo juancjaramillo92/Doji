@@ -2132,6 +2132,22 @@ async function recent(): Promise<Turn[]> {
   return openOnUser(dateTurns(rows.reverse()));
 }
 
+/* WHICH OF HER MESSAGES A SWIPE-REPLY ANSWERS. Telegram hands back the message
+   he replied to, but a voice note carries no text, and her history dates a turn
+   by the day alone — so "too dense" under the 10:00 pulse and under the release
+   look an hour later read identically, and the second may already be outside
+   the twelve turns. Every caller stores after it sends, so the turn is the
+   EARLIEST assistant row at or after the send; the newest would be whatever she
+   said since, which is the one message it is certainly not. Five minutes covers
+   a briefing's several voice notes and bounds a message that was never stored.
+   Exported because it is the decision, the same reason dayQuery is. */
+export function repliedQuery(sent: number): string {
+  const at = (s: number) => new Date(s * 1000).toISOString();
+  return `eugenia_turns?select=content&role=eq.assistant` +
+         `&created_at=gte.${at(sent)}&created_at=lte.${at(sent + 300)}` +
+         `&order=created_at.asc&limit=1`;
+}
+
 /* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
    in the only sense that matters: he has the message before this runs. Both
    turns go in one vendor call and one INSERT — and the pair still has to be one
@@ -4485,12 +4501,32 @@ async function handleMessage(update: any): Promise<void> {
     typing();
     const keepTyping = setInterval(typing, 4_500);
 
+    // A reply to one of her own messages names it. A text message carries its
+    // words; a voice note does not, and is found by when it was sent. Optional
+    // like the blocks beside it: a failed read costs the quote, never the answer.
+    const replied = msg.reply_to_message?.from?.is_bot ? msg.reply_to_message : null;
+    const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
+      : typeof replied.text === 'string' ? Promise.resolve(replied.text)
+      : readRows<{ content: string }>('Replied-to', `${SB_URL}/rest/v1/${repliedQuery(replied.date)}`)
+          .then(([turn]) => turn?.content ?? "", () => "");
+
     let answer: string;
     try {
-      const [history, notes, channels, story, loops, calendar, desk] = await Promise.all([
+      const [history, notes, channels, story, loops, calendar, desk, quoted] = await Promise.all([
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
-        calendarBlock(), positionsBlock(),
+        calendarBlock(), positionsBlock(), quoting,
       ]);
+      /* THE MARKER IS STORED, THE QUOTE IS NOT. The nightly pass reads the day's
+         turns, and "too long" with nothing saying under which message is a
+         correction it can only guess at; the opening words are enough to find
+         it there, and are a fact about the message rather than context that
+         goes stale — the `[voice note]` marker's reason. */
+      if (quoted !== null) {
+        const words = quoted.trim().split(/\s+/).filter(Boolean);
+        const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
+        text = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
+      }
+      const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
       /* TOLD THAT IT WILL BE HEARD, AND NOT TOLD A LENGTH. The instruction used
          to carry the cap, so that an answer over it was one she chose rather
          than one silently left unspoken. There is no cap now — a long answer
@@ -4501,7 +4537,7 @@ async function handleMessage(update: any): Promise<void> {
         `\n\nYour answer is sent as text and read back to him aloud, so write it ` +
         `to be heard: plain sentences, no headings, and nothing that only works ` +
         `on a page. Its length is whatever the answer needs.`;
-      const context = text + aloud + notes + channels + story + loops + calendar + desk;
+      const context = text + about + aloud + notes + channels + story + loops + calendar + desk;
       const draft = await ask(
         [...history, {
           role: 'user',

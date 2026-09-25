@@ -40,7 +40,7 @@ import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
-  notesList, channelsList, searchList, readStrategy, dayQuery, ask,
+  notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
@@ -1412,6 +1412,41 @@ test('the window starts exactly the stated number of hours back', () => {
   const at = Date.UTC(2026, 7, 19, 12, 0);
   assert.match(dayQuery(24, at), /gte\.2026-08-18T12:00:00/);
   assert.match(dayQuery(1, at),  /gte\.2026-08-19T11:00:00/);
+});
+
+/* ─── Eugenia: which message a swipe-reply answers ───────────────────────────
+   Answered off a stand-in table rather than by reading the query's spelling,
+   because the spelling of a wrong answer is equally plausible: the newest row
+   in the window is what she said SINCE, and a query ordered that way reads
+   exactly as well as the right one.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const pickTurn = (query, rows) => {
+  const params = new URLSearchParams(query.split('?')[1]);
+  const [col, dir] = params.get('order').split('.');
+  const kept = rows.filter(r => params.getAll('role').every(v => v === `eq.${r.role}`) &&
+    params.getAll('created_at').every(v => {
+      const [op, ...rest] = v.split('.'); const bound = rest.join('.');
+      return op === 'gte' ? r.created_at >= bound : op === 'lte' ? r.created_at <= bound : false;
+    }));
+  kept.sort((a, b) => (a[col] < b[col] ? -1 : 1) * (dir === 'desc' ? -1 : 1));
+  return kept.slice(0, Number(params.get('limit'))).map(r => r.content);
+};
+
+test('a reply is matched to the message it answers, not to what she said since', () => {
+  const sent = Date.UTC(2026, 8, 25, 14, 0, 0) / 1000;
+  const iso = (s) => new Date((sent + s) * 1000).toISOString();
+  const rows = [
+    { role: 'assistant', content: 'the briefing',        created_at: iso(-7200) },
+    { role: 'user',      content: '[pulse]',             created_at: iso(12) },
+    { role: 'assistant', content: 'the pulse',           created_at: iso(12) },
+    { role: 'user',      content: 'what does that mean', created_at: iso(90) },
+    { role: 'assistant', content: 'her answer to that',  created_at: iso(90) },
+  ];
+  assert.equal(repliedQuery(sent).split('?')[0], 'eugenia_turns');
+  assert.deepEqual(pickTurn(repliedQuery(sent), rows), ['the pulse']);
+  // A message that was never stored finds nothing, rather than a turn from later.
+  assert.deepEqual(pickTurn(repliedQuery(sent - 3600), rows), []);
 });
 
 
