@@ -41,7 +41,7 @@
    was ever reachable: §0 below its summary is get_strategy-only. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.13";
+export const VERSION = "v1.14";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
    paragraph she holds on every turn and the paragraph get_strategy serves are
@@ -104,7 +104,7 @@ counts as kept just because nothing contradicted it.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit $30 from entry price, or $25 where the level looks hard to reach | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\`, except a Friday close-out, which is \`unknown\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` — the CAP only, see §7 | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day, except one sweep re-entry | day | \`followed_rules\` | field | within an \`open_day\`, at most one \`entry_time\` later than the \`fill_time\` of a full-stop loss; only losses at $20 are identifiable, so \`unknown\` elsewhere | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day, except one sweep re-entry | day | \`followed_rules\` | journal | within an \`open_day\`, at most one \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels only — marked by the grid or by a previous price reaction — never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -130,7 +130,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.12
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.13
 
 ### Summary
 
@@ -1012,10 +1012,11 @@ not the statistics.**
 
 ### The day also ends at 4%, and a full stop is the usual way of reaching it
 
-**Two rules, not one seen twice.** A full stop on a $12 stop costs 2.4%, so R-03
-and R-11 can disagree in both directions: a tight stop taken in full ends the day
-under R-03 having spent well under the limit, and several hand-cut exits can spend
-the limit without R-03 firing.
+**Two rules, not one seen twice.** A full stop is the stop taken at its $20
+ceiling (§12), so R-03 and R-11 can disagree in both directions: a full stop at a
+small rung ends the day under R-03 having spent well under the limit, and several
+smaller losses — a tighter stop taken, or a hand-cut exit — can spend the limit
+without R-03 firing.
 
 **R-11 is the limit. R-03 is the usual shape of hitting it.** In practice R-12's
 one-entry cap reaches first on most days.
@@ -1421,11 +1422,15 @@ read a clean R-02 run as stops respected — read it as no stop having gone past
 Expect occasional false positives from the spread: a broker stop fills against bid
 or ask, so a $20 stop can close a dollar further out (§0).
 
-**R-03 IS \`field\`, AND IT IS THE POPULATION THAT IS MISSING RATHER THAN THE
-PREDICATE.** What is unavailable is *which losses are full stops*: the stop is
-capped at $20 and placed anywhere inside that, the broker reports only the final
-one, so a $12 loss cannot be told from a hand-cut exit. Losses at $20 are
-identifiable, so the rule runs over those and returns \`unknown\` elsewhere.
+**R-03 IS \`journal\` BECAUSE A FULL STOP IS $20 FROM ENTRY, BY HIS DEFINITION.**
+It was \`field\` while §12 also counted a stop set tighter at entry and taken in
+full — a $12 loss of that kind cannot be told from a hand-cut exit, so the
+population was missing. He settled it at v1.14: a full stop is the stop hit at
+$20. A loss $20 or more from entry is one, anything smaller is not, and the rule
+runs over every row that carries both prices. A loss past $20 is also R-02's
+breach, and it is still a full stop — the stop is what ended the day. A day whose
+losses cannot be measured, or whose full stop carries no \`fill_time\` to count
+later entries from, is \`unknown\` wherever it holds enough entries to breach.
 
 **Its exception is real and it opens a door.** One re-entry is permitted after a
 sweep, so the predicate allows a second entry and fails on a third. But nothing
@@ -1588,8 +1593,8 @@ a sell. That is a number rather than a probe, on any row carrying both.
 
 **What it does NOT settle.** R-02's respect half stays open: an exit past the planned
 stop is a widened stop or ordinary slippage on a gap, and the row cannot tell those
-apart — so no rule verdict is computed from it. R-03's full-stop population, and
-whether a win at $25 was a shortened target or an early close, are unchanged.
+apart — so no rule verdict is computed from it. Whether a win at $25 was a
+shortened target or an early close is unchanged.
 
 The Evaluable column in §7 is therefore unchanged too. A rule is \`journal\` when a
 row can answer it, and today almost no row carries this.
@@ -1959,9 +1964,9 @@ to be wrong, so usually tighter. **A resting broker order** (R-18). Moved only t
 break-even (R-04), or tightened under R-19 when a print lands on a position inherited
 from an earlier session — never wider, and never tightened outside that case.
 
-**Full stop.** A loss closed at the stop — $20 of price distance, or tighter where the
-stop was set tighter at entry. The second half is not identifiable from a row (R-03),
-so *the checkable definition is the first half only* and it under-detects.
+**Full stop.** A loss closed at the stop at its $20 ceiling — $20 or more of price
+distance from entry. A stop set tighter and taken is a loss, not a full stop, and
+R-03 does not fire on it; R-11 is what bounds a day of those.
 
 **Grid.** The $25 increments. **Psychological levels** are 00 and 50; **quarters** are
 the 25 and 75 between them. One grid at two strengths, marked on the 1H and 30m.
@@ -2036,6 +2041,7 @@ it stays as written, because correcting the record would falsify it.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.14 | [decide] | **A full stop is the stop hit at $20 from entry**, in his words. §12 had also counted a stop set tighter and taken in full, which no row can tell from a hand-cut exit — so R-03's population was missing and the rule was \`field\`. With the definition his, R-03 moves to \`journal\` and its predicate reads a loss of $20 or more; §5's example of a full stop on a $12 stop is gone with it. | His definition, asked while making R-03 checkable |
 | v1.13 | [decide] | **Three gaps closed, found by asking what the document never asked.** R-18: **stop and target are always resting broker orders and a position is never closed by hand** — which makes R-01 and R-02 exact rather than suggestive, since a loss beyond $20 is now an edited order rather than a decision at the screen, and R-15's Friday close-out is named as the one permitted manual close. R-19: **a high-impact print landing on a position inherited from an earlier session** — in profit the stop goes to break-even regardless of R-04's threshold, losing it is tightened to a closer invalidation or pulled in if there is none, and the target never moves. Written narrowly on his instruction: he should not be holding through a print, and the path that produces this is an Asian-session trade still running into New York. §5's "never moved tighter" now carries that exception, and §8 records that R-19 muddies "break-even means R-04 fired" — a sub-$20 break-even on a trade opened in the same session is not R-19 and is a question. **Direction recorded: he trades both ways**, with a noticed preference for shorting held as a preference and explicitly not a rule, since \`direction\` is on every row and a skew would otherwise read as confirmation of a decision. | Asking what the document had never asked |
 | v1.12 | [decide] | **Verification pass rather than new rules.** Eighteen inherited claims — carried since before the audit and never confirmed by him — read back and confirmed, one corrected: **an interior level is any level inside the range, marked by the quarter grid OR by a previous price reaction**, so R-05, §4.1 and §12 no longer reduce interior levels to quarters and a previous high mid-range is tradeable for Break & Retest. §13's history confirmed as record rather than reconstruction. **§9's "identical rows" corrected** — the *price data* is identical, but \`followed_rules\` is not, and since he marks it honestly the marker is the signature and the only one. **§3 proofread**: the opening definition no longer contradicts cost-push, the room-to-cut argument now follows from nominal = real + expected inflation rather than asserting the Fed would have none, the 2.5% breakeven line is reconciled against the CPI/PCE gap, and the dot plot distinguishes participants from voters. **§3 given a term index** so a single lookup is not a scan of thirty thousand characters, plus retail sales, Michigan inflation expectations, the ISM/S&P PMI split, and the FRED codes for every rates series. | Verification of what was already written |
 | v1.11 | [decide] | **Four rules added, all from gaps an audit surfaced rather than from new behaviour.** R-14: no entries in the hours before a high-impact release, resuming once the volatility has passed and the news has confirmed something — the first rule connecting the briefing to the trading, and judgment because the window is open-ended by his description. R-15: nothing held across the Friday close, closed at market right before it, because a weekend gap can open past the stop — which forces a narrow R-01 exception for wins under $25 filling at that close. R-16: no trading on known low-volume days. R-17: **he stops trading when the trading has deteriorated — rules broken, losses running, chasing — and the trigger is behaviour, never drawdown.** He has stopped at a 5% loss; a threshold would fire on the wrong variable. **§3 written — the foundation**, built bottom-up from what inflation is through the funds rate, the transmission chain, bonds and yields, TIPS and breakevens, to why gold sits at the end of it, plus every metric a briefing uses. Written because he said the technical content lands as terms he nods past and he wants it from the inside out. **§0 records that the document teaches at more than one level**, against \`eugenia_channels\` states, with demotions from him never argued with. **§2 deepened** and pointed down to §3. **Sweep re-entry bounded at three 5-minute candles**, which makes half of R-12 checkable. **Session characters recorded** — New York violent, Asia calmer — as an input to the read, with London thin because of when he sleeps rather than by preference, and the Asian session's straddle of the calendar date written into §4, §8 and §12. **Slippage \`[decide]\` closed**: the stop is $20 from the chart fill with no spread allowance, so slippage is his. **The weekly review dropped** — he has never done one, and §8 no longer defers to it. **§9 corrected twice**: the NY-open caution now has its reason, and revenge trading is recorded as the same failure accelerating rather than a second failure. | A provenance and coverage audit, worked through question by question |
