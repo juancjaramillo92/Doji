@@ -923,11 +923,12 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
 });
 
 test('the salutation matches the time of day the briefing lands', () => {
-  /* AND IT ENDS AS A SENTENCE ENDS. It is heard, so its punctuation is the only
-     prosody it carries: bare, the voice had no full stop to finish `jefesito`
-     on and drew the last syllable out. */
-  assert.equal(greeting('weekday'), 'Buenos días, jefesito.');
-  assert.equal(greeting('sunday'),  'Buenas tardes, jefesito.');
+  /* PUNCTUATED FOR THE EAR. The full stop ends it, so the voice does not draw
+     `jefesito` out; and there is no comma before the name, because a comma is a
+     rest to a voice and it split one breath into two. The vocative comma is the
+     correct-looking edit, and refusing it is half of what this asserts. */
+  assert.equal(greeting('weekday'), 'Buenos días jefesito.');
+  assert.equal(greeting('sunday'),  'Buenas tardes jefesito.');
 });
 
 /* ─── Eugenia: the pulse ─────────────────────────────────────────────────────
@@ -1639,7 +1640,7 @@ test('a briefing longer than one message is split, and never mid-sentence', () =
 });
 
 test('a message that fits is sent whole, as one', () => {
-  assert.deepEqual(chunk('Buenos días, jefesito.'), ['Buenos días, jefesito.']);
+  assert.deepEqual(chunk('Buenos días jefesito.'), ['Buenos días jefesito.']);
 });
 
 test('the seam lands on a paragraph break, not on the last newline in budget', () => {
