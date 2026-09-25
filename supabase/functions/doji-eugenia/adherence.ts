@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// THE STRATEGY, EXECUTED — the eleven rules a row can actually answer
+// THE STRATEGY, EXECUTED — the twelve rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
 // §7 of strategy.ts writes a predicate for all nineteen rules and §8 writes the
 // population filters and the three verdicts. Both were prose: she was handed up
@@ -16,9 +16,9 @@
 // driven from a test with a hand-built row and broken on purpose — which is the
 // only way anything here earns the word "checked".
 //
-// ELEVEN RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
-// `journal` means a row can answer it today. R-05 through R-09, R-14, R-17 and
-// R-19 are `judgment` — nothing stored can see them,
+// TWELVE RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
+// `journal` means a row can answer it today. R-05 through R-09, R-17 and R-19
+// are `judgment` — nothing stored can see them,
 // and inventing an approximation here would be worse than the gap, because a
 // judgment rule that starts reporting `pass` is exactly the "no violations"
 // claim §8 warns is close to saying nothing.
@@ -573,6 +573,54 @@ function r13(rows: TradeRow[]): RuleResult {
   return result('R-13', 'calendar months carrying more than one position size', pass, fail, []);
 }
 
+/* ─── R-14 ─────────────────────────────────────────────────────────────────
+   No entries in the hours before a high-impact release. §7: no entry in the
+   30 minutes before a USD red-folder release on Forex Factory; an entry with
+   one later that day but further off is unknown.
+
+   BOTH NUMBERS ARE HIS, and the second is a floor rather than the rule. §6
+   calls the stand-aside open-ended — a 10 a.m. print can cost the New York
+   morning from the open — so thirty minutes is the part no reading of it can
+   excuse, and a release further ahead the same day leaves the entry to his
+   judgement: unknown, never pass. RED is what counts as high impact, stated
+   here because it is the rule's decision; the query that reads the calendar
+   imports it rather than typing it again.
+
+   A WEEK NOBODY FETCHED IS NOT A QUIET WEEK. The export is only ever the
+   current week, so the calendar holds what the nightly pass kept, and a week
+   it missed has no releases in the table for the same reason a quiet one
+   does. `weeks` is the evidence of a fetch; an entry outside one is unknown.
+   After the print is not checked: he stands aside through it by judgement,
+   and set no number for it. */
+export const NEWS_MIN = 30;
+export const RED = { country: 'USD', impact: 'High' };
+
+export interface Calendar { releases: string[]; weeks: Set<string> }
+
+// The Sunday, New York, that the Forex Factory week holding `at` began on —
+// the key ff_weeks is written under.
+export function weekOf(at: Date): string {
+  const w = nyWall(at);
+  const d = new Date(Date.UTC(w.y, w.m - 1, w.d - w.wd));
+  return iso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+function r14(rows: TradeRow[], cal: Calendar): RuleResult {
+  const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
+  const prints = cal.releases.map(r => +new Date(r));
+  for (const t of rows) {
+    if (!isBroker(t) || !t.entry_time) continue;
+    const entry = new Date(t.entry_time), e = +entry;
+    if (!cal.weeks.has(weekOf(entry))) { unknown.push(t.id); continue; }
+    const day = nyDate(entry);
+    const ahead = prints.filter(p => p > e && nyDate(new Date(p)) === day);
+    if (prints.some(p => p > e && p - e <= NEWS_MIN * 60_000)) fail.push(t.id);
+    else (ahead.length ? unknown : pass).push(t.id);
+  }
+  return result('R-14', `entries in the ${NEWS_MIN} minutes before a USD red-folder release`,
+                pass, fail, unknown);
+}
+
 /* ─── R-15 ─────────────────────────────────────────────────────────────────
    Nothing is held over the weekend. §7: no entry_time before and fill_time
    after a Friday 17:00 New York close.
@@ -695,9 +743,10 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
    the point: the list she is handed should be the list the rules table states,
    so a rule that stopped being evaluated is a gap in a sequence rather than an
    absence nobody can see. */
-export function checkRules(rows: TradeRow[], now = Date.now()): RuleResult[] {
+export function checkRules(rows: TradeRow[], now = Date.now(),
+                           cal: Calendar = { releases: [], weeks: new Set() }): RuleResult[] {
   return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows),
-          r12(rows), r13(rows), r15(rows), r16(rows), r18(rows, now)];
+          r12(rows), r13(rows), r14(rows, cal), r15(rows), r16(rows), r18(rows, now)];
 }
 
 /* ─── Where a day stands right now ────────────────────────────────────────

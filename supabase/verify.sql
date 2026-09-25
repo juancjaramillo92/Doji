@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 75 checks above them, silently, leaving a
+-- HTTP responses and threw away all 79 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -583,6 +583,24 @@ from (values
   ('RLS on dispatch',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.dispatch')),
    'true'),
+
+  -- ─── 013, Forex Factory's week ──────────────────────────────────────────
+  -- Without these the nightly fetch fails into its own meter and R-14 reads
+  -- unknown on every trade, which looks like a rule with nothing to report.
+  ('013 tables exist',
+   (select count(*)::text from information_schema.tables
+     where table_schema = 'public' and table_name in ('ff_calendar','ff_weeks')),
+   '2'),
+  ('RLS on ff_calendar',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.ff_calendar')),
+   'true'),
+  ('RLS on ff_weeks',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.ff_weeks')),
+   'true'),
+  ('ff_calendar_replace exists',
+   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'ff_calendar_replace'),
+   '1'),
 
   -- THE TWO VAULT NAMES THE WATCHER READS, and they are the third and fourth
   -- pair in this system that is one value under two spellings. Postgres

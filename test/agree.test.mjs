@@ -5708,6 +5708,29 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
     'and R-04 is unknown on every trade for ever');
 });
 
+test('the nightly pass fetches Forex Factory, meters both outcomes, and check_rules reads it', () => {
+  /* ffEvents and r14 are driven in fold.test.mjs, and neither can see whether
+     anything calls them. A pass that stopped fetching leaves every week
+     unfetched, R-14 unknown on every trade, and nothing anywhere erroring — so
+     the call sites are read, along with both meters and the calendar handed
+     to the rules. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function postConsolidation(');
+  const pass = src.slice(at, src.indexOf('\n}', at));
+  assert.match(pass, /await refreshCalendar\(\)/,
+    'the nightly pass no longer fetches the calendar R-14 is judged against');
+  assert.match(pass, /caller: 'forexfactory', ok: true/, 'the calendar fetch records no success');
+  assert.match(pass, /caller: 'forexfactory', ok: false/, 'the calendar fetch records no failure');
+
+  const check = src.slice(src.indexOf('async function checkAdherence('));
+  const body = check.slice(0, check.indexOf('\n}'));
+  assert.match(body, /releasesQuery\(days\)/, 'check_rules no longer reads the releases');
+  assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
+  assert.match(body, /checkRules\(rows, Date\.now\(\), \{/,
+    'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
+});
+
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {
   /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. So the market
      read is deliberately not hers to make: doji-mcp-sync holds

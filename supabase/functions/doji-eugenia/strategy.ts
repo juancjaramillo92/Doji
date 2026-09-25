@@ -41,7 +41,7 @@
    was ever reachable: §0 below its summary is get_strategy-only. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.16";
+export const VERSION = "v1.17";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
    paragraph she holds on every turn and the paragraph get_strategy serves are
@@ -115,7 +115,7 @@ counts as kept just because nothing contradicted it.
 | R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
 | R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry more than 15 min after the prior \`fill_time\` is a \`fail\`, within 15 min is \`unknown\` | §5 | v1.10 |
 | R-13 | The sizing rung moves only between months, never inside one | month | \`followed_rules\` | journal | one distinct \`size_oz\` per calendar month, over rows carrying one | §5 | v1.10 |
-| R-14 | No entries in the hours before a high-impact release; resume only once the volatility has passed and the news has confirmed something | trade | \`followed_rules\` | judgment | *"Was there a high-impact print ahead of this, and had it landed and settled?"* | §6 | v1.11 |
+| R-14 | No entries in the hours before a high-impact release; resume only once the volatility has passed and the news has confirmed something | trade | \`followed_rules\` | journal | no \`entry_time\` in the 30 minutes before a USD red-folder release on Forex Factory; a release later that day but further off is \`unknown\`, as is an entry in a week the calendar was not fetched | §6 | v1.11 |
 | R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market holiday | §5 | v1.11 |
 | R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
@@ -130,7 +130,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.15
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.16
 
 ### Summary
 
@@ -1169,6 +1169,9 @@ step that can never be the step you stopped at breaks the one claim R-08 makes.
   is open-ended rather than a fixed clock** — for a 10 a.m. print he may not trade
   from the New York open onward. A stated "two hours" would be a number invented
   for him, and he would breach it constantly without having broken anything.
+  **What he did fix is the floor: never in the thirty minutes before one**, and
+  high impact means **the red folder on Forex Factory, USD only** — his reading,
+  and the one he checks. The rest of the window stays his judgement.
 - **At the print.** Stand aside through the immediate volatility.
 - **After.** Entries resume once the move has settled and **the news has confirmed
   something** — the release read as a condition on whether price is behaving
@@ -1490,16 +1493,20 @@ because the data cannot tell a sweep re-entry from a fast revenge trade.
 **R-13's violation is retrospective.** More than one distinct \`size_oz\` inside a
 calendar month means the rung moved mid-month.
 
-**R-14 is judgment by his own description, and deliberately so.** The standing-aside
-window is open-ended — a 10 a.m. print can cost the New York morning from the open.
-Writing a fixed window would invent a number he never set and would flag him
-constantly. The probe asks whether a print was ahead of the trade and whether it had
-landed and settled.
+**R-14 IS \`journal\` ON THE HALF HE GAVE A NUMBER TO.** The standing-aside window is
+open-ended — a 10 a.m. print can cost the New York morning from the open — and a
+fixed window written for him would flag him constantly. He set the floor himself at
+v1.17: thirty minutes, before a USD red-folder release on Forex Factory. An entry
+inside it is a breach. An entry with a red folder later the same day but further off
+is \`unknown\` rather than \`pass\`, because the rest of the window is his judgement;
+one with nothing ahead that day passes. **After the print is not checked** — he
+stands aside through it by judgement and set no number for it.
 
-The economic calendar is knowable, so a *partial* check exists — an entry in the
-half-hour before a scheduled high-impact release is suspicious on the face of it.
-It is not written as a predicate because the front edge, which is where he actually
-stands aside, has no boundary in the data.
+**The calendar is Forex Factory's, fetched nightly, and only ever the current
+week.** So the rule sees nothing before the first fetch, and a week the fetch
+missed is \`unknown\` rather than quiet — a week with no releases stored and a week
+nobody fetched would otherwise read the same, and every entry in the second would
+pass.
 
 **R-15 is fully checkable in one half and not at all in the other.** A position open
 across the Friday close is unambiguous. Whether a Friday close-out was the rule
@@ -1520,8 +1527,9 @@ probe is a question, and it is one he can answer better than any row.
 R-05, R-06 and R-07 would each become checkable with a single question at
 journalling time. **He decided against adding them at v1.9**, and §10 records the
 decision and its cost. R-04 was on that list and left it at v1.15 by another route —
-the broker's own bars, with nothing asked of him. R-14 and R-17 were never candidates — both watch things no
-column could hold.`,
+the broker's own bars, with nothing asked of him. R-17 was never a candidate — it
+watches something no column could hold — and R-14 became \`journal\` at v1.17 on the
+floor he set.`,
 
   "8": `## 8 · Journal binding
 
@@ -1633,8 +1641,10 @@ missing \`net_pnl\` says the position was closed by hand (R-18), and the timing 
 whether that was at the Friday close — so a hand close then is R-15 firing. What no
 row says is why a Friday exit that was an order filling happened to land then.
 
-**Whether a high-impact release was ahead of an entry.** R-14's standing-aside has no
-boundary in the data, because the window is open-ended by his own description.
+**How long before a release he stood aside.** Whether a red folder was within
+thirty minutes of an entry is answerable now, off Forex Factory's calendar (R-14);
+the rest of the window is open-ended by his own description, and no row says
+whether he waited long enough before it.
 
 **Which rule broke.** \`followed_rules\` is one boolean covering R-03, R-05 through
 R-14, and R-16 and R-17. It records that something broke, not what — and on his own
@@ -1900,7 +1910,7 @@ honestly while the behaviour is still bad.`,
 
   "10": `## 10 · What would have to change, and what he has decided
 
-§7 labels eight rules \`judgment\`. This section is what would lift each, and which
+§7 labels seven rules \`judgment\`. This section is what would lift each, and which
 routes are open.
 
 ### The two closed routes
@@ -1934,10 +1944,11 @@ and nothing added to Gladys (§8, \`best_price\`).
 
 ### The rules that were never candidates
 
-**R-14 and R-17 watch things no column could hold.** R-14's standing-aside window is
-open-ended by his own description, and R-17's trigger is the quality of his trading
-rather than any number. Turning either into a field would mean inventing a threshold
-he never set — the failure §5 names about the sizing rung.
+**R-17 watches something no column could hold.** Its trigger is the quality of his
+trading rather than any number, and turning it into a field would mean inventing a
+threshold he never set — the failure §5 names about the sizing rung. R-14 was here
+for the same reason until he set its floor himself (v1.17); the open-ended rest of
+its window still is.
 
 **R-08 and R-09 likewise.** *Which step did you stop at* and *was the trend obvious*
 are judgments, not fields.
@@ -2034,7 +2045,8 @@ once per day, and the only exception to R-03. Past fifteen minutes it is a new i
 inside it, indistinguishable in the data from a revenge trade.
 
 **High-impact release.** A scheduled economic print or decision capable of moving gold
-sharply — NFP, CPI, PCE, FOMC. §3 covers what each is. R-14 keeps him out before one
+sharply — NFP, CPI, PCE, FOMC. **For R-14, the red folder on Forex Factory, USD
+only**, which is his definition and the rating he reads. §3 covers what each is. R-14 keeps him out before one
 and lets him back in once the volatility has passed and the news has confirmed
 something. R-19 covers the leftover case where one lands on a position he is already
 in.
@@ -2074,6 +2086,7 @@ it stays as written, because correcting the record would falsify it.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.17 | [decide] | **R-14 made checkable on the floor he set.** High impact is **the red folder on Forex Factory, USD only**, and **no entry in the thirty minutes before one**; the rest of the stand-aside stays open-ended and his. R-14 moves to \`journal\`: an entry inside the thirty minutes fails, one with a red folder later that day but further off is \`unknown\`, one with none ahead passes. The calendar is Forex Factory's own export, fetched nightly and kept, so the rule sees nothing before the first fetch and reads a missed week as \`unknown\` rather than quiet. Nothing after the print is checked — he set no number for it. | His definitions, asked for while making R-14 checkable |
 | v1.16 | [decide] | **R-18 made checkable, from a fact about the broker he confirmed.** cTrader sends an alert when a stop or target fills and none for a position closed by hand, so a closed trade with no alert — \`net_pnl\` null — was closed by hand. R-18 moves to \`journal\`: that is a fail, except at the Friday close, which is R-15 and permitted; a close under an hour old is \`unknown\` while its alert may still arrive. §8 records what a missing \`net_pnl\` means, and that a Friday hand close is now R-15 firing rather than a guess. | Eight closes with no alert, looked up in Gmail with him |
 | v1.15 | [decide] | **R-04 made checkable from the broker, not from him.** §7, §8 and §10 called it uncheckable for good because how far a trade ran was "stored nowhere, including at the broker"; the broker's minute bars go back a year, so \`best_price\` now records the furthest each trade ran in his favour, and R-04 moves to \`journal\` — a loss beyond the scratch band on a trade that had been $20 in his favour is a stop that was not moved. Nothing asked of him, nothing added to Gladys; the v1.9 decision against widening the journal stands for R-05 to R-07. | Eugenia's own review of which rules she could not see |
 | v1.14 | [decide] | **A full stop is the stop hit at $20 from entry**, in his words. §12 had also counted a stop set tighter and taken in full, which no row can tell from a hand-cut exit — so R-03's population was missing and the rule was \`field\`. With the definition his, R-03 moves to \`journal\` and its predicate reads a loss of $20 or more; §5's example of a full stop on a $12 stop is gone with it. | His definition, asked while making R-03 checkable |
