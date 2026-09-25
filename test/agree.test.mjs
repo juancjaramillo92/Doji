@@ -1736,8 +1736,10 @@ test('the Data model names every column the trades table has, and no other', () 
   const declared = schema.slice(0, schema.indexOf('\n);'))
     .split('\n').map(l => (l.match(/^ {2}([a-z_]+)\s+[a-z]/) ?? [])[1])
     .filter(c => c && c !== 'constraint');
-  const added = [...readFileSync(new URL('../supabase/006_plan.sql', import.meta.url), 'utf8')
-    .matchAll(/add column if not exists (\w+)/g)].map(m => m[1]);
+  // Every numbered file, not the one that happened to add the last column: 012
+  // appended best_price and a reader anchored on 006 did not see it arrive.
+  const added = [...NUMBERED.matchAll(/alter table public\.trades add column if not exists (\w+)/g)]
+    .map(m => m[1]);
   const columns = [...new Set([...declared, ...added])];
   assert.ok(columns.length >= 20,
     `only ${columns.length} columns read out of the schema — the reader has gone blind`);
@@ -5676,6 +5678,34 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
     'writePlan is back to one PATCH for both sides — `planned_sl is null` cannot ' +
     'arbitrate `planned_tp`, so a side that appears later either never lands or ' +
     'lands as whatever R-04 has since moved it to');
+});
+
+test('the poller fills best_price once, newest first, and counts what it wrote', () => {
+  /* THE PURE HALF IS DRIVEN IN fold.test.mjs AND PROVES NOTHING ABOUT THE CALL.
+     bestPrice can be right on every bar while the poll never reaches it, reads
+     the backlog oldest first so a fresh close waits behind a year of history,
+     or overwrites a figure every two minutes — and none of those is a wrong
+     number any test of the function could see. So the call site is read. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('async function fillExcursions(');
+  assert.ok(at > -1, 'doji-mcp-sync no longer has fillExcursions()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+
+  assert.match(body, /order=entry_time\.desc&limit=\d+/,
+    'the excursion read is no longer newest first with a limit — a fresh close ' +
+    'queues behind the backlog, or the read grows with the table');
+  assert.match(body, /trades\?id=eq\.\$\{t\.id\}&best_price=is\.null/,
+    'the excursion write lost its `best_price is null` filter, so a figure is ' +
+    'rewritten on every poll rather than written once');
+  assert.match(body, /sbHeaders\("return=representation"\)/,
+    'the excursion PATCH asks for no representation, so its count reads 0 for ' +
+    'ever — the healthy steady state, whether or not anything was written');
+  assert.match(body, /\(\(await patch\.json\(\)\) as unknown\[\]\)\.length > 0/,
+    'the excursion count is taken from the call rather than the rows written');
+  assert.match(src, /excursions = await fillExcursions\(sid\)/,
+    'the poll no longer calls fillExcursions, so best_price is never written ' +
+    'and R-04 is unknown on every trade for ever');
 });
 
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {

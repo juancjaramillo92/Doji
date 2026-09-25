@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// THE STRATEGY, EXECUTED — the nine rules a row can actually answer
+// THE STRATEGY, EXECUTED — the ten rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
 // §7 of strategy.ts writes a predicate for all nineteen rules and §8 writes the
 // population filters and the three verdicts. Both were prose: she was handed up
@@ -16,8 +16,8 @@
 // driven from a test with a hand-built row and broken on purpose — which is the
 // only way anything here earns the word "checked".
 //
-// NINE RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
-// `journal` means a row can answer it today. R-04 through R-09, R-14, R-17,
+// TEN RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
+// `journal` means a row can answer it today. R-05 through R-09, R-14, R-17,
 // R-18 and R-19 are `judgment` — nothing stored can see them,
 // and inventing an approximation here would be worse than the gap, because a
 // judgment rule that starts reporting `pass` is exactly the "no violations"
@@ -54,6 +54,7 @@ export interface TradeRow {
   net_pnl: number | null;
   planned_sl: number | null;
   planned_tp: number | null;
+  best_price: number | null;
 }
 
 /* §8's three verdicts, and the third is not a formality — it mirrors the
@@ -350,6 +351,39 @@ function r03(rows: TradeRow[]): RuleResult {
                 pass, fail, unknown);
 }
 
+/* ─── R-04 ─────────────────────────────────────────────────────────────────
+   Stop to break-even once price reaches +$20. §7: no loss beyond the scratch
+   band on a trade whose best_price was $20 or more in his favour.
+
+   THE POPULATION IS LOSSES, and that is the rule's own shape rather than a
+   limit of the data. A win says nothing about where the stop sat, and an exit
+   inside the ±$3 band is R-04 having fired — so only a loss beyond the band
+   can breach it, and it does exactly when the trade had already been $20 his
+   way: the stop that should have been at entry was not. A loss that never got
+   there passes, because the rule never engaged.
+
+   best_price reads whole minutes inside the trade only, so the excursion here
+   can fall short of what happened and never exceed it — a breach can be
+   missed, never invented. Null is a trade too short to measure or not yet
+   reached by the poller, and is unknown. */
+export const TO_BREAK_EVEN = 20;
+
+function r04(rows: TradeRow[]): RuleResult {
+  const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
+  for (const t of rows) {
+    if (!isBroker(t) || !closed(t) || (t.pnl as number) >= 0) continue;
+    if (!priced(t)) { unknown.push(t.id); continue; }
+    if (gap(t) <= BE) continue;
+    if (t.best_price == null || (t.direction !== 'BUY' && t.direction !== 'SELL')) { unknown.push(t.id); continue; }
+    const ran = t.direction === 'BUY'
+      ? t.best_price - (t.entry_price as number)
+      : (t.entry_price as number) - t.best_price;
+    (ran >= TO_BREAK_EVEN - CENT ? fail : pass).push(t.id);
+  }
+  return result('R-04', `losses beyond break-even on trades that had already run $${TO_BREAK_EVEN} in his favour`,
+                pass, fail, unknown);
+}
+
 /* ─── R-10 ─────────────────────────────────────────────────────────────────
    One position at a time. §7: no two rows whose entry_time→fill_time spans
    overlap.
@@ -626,7 +660,7 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
    so a rule that stopped being evaluated is a gap in a sequence rather than an
    absence nobody can see. */
 export function checkRules(rows: TradeRow[], now = Date.now()): RuleResult[] {
-  return [r01(rows), r02(rows), r03(rows), r10(rows, now), r11(rows), r12(rows), r13(rows), r15(rows), r16(rows)];
+  return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows), r12(rows), r13(rows), r15(rows), r16(rows)];
 }
 
 /* ─── Where a day stands right now ────────────────────────────────────────

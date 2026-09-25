@@ -41,7 +41,7 @@
    was ever reachable: §0 below its summary is get_strategy-only. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.14";
+export const VERSION = "v1.15";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
    paragraph she holds on every turn and the paragraph get_strategy serves are
@@ -105,7 +105,7 @@ counts as kept just because nothing contradicted it.
 | R-01 | Take profit $30 from entry price, or $25 where the level looks hard to reach | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\`, except a Friday close-out, which is \`unknown\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` — the CAP only, see §7 | §5 | v1.0 |
 | R-03 | No entry after a full-stop loss on the same day, except one sweep re-entry | day | \`followed_rules\` | journal | within an \`open_day\`, at most one \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
-| R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | judgment | *"Did this one reach +$20 before it turned?"* — asked on full-stop losses only | §6 | v1.0 |
+| R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | journal | no loss beyond the ±$3 scratch band on a trade whose \`best_price\` was $20 or more in his favour; \`unknown\` where \`best_price\` is null | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels only — marked by the grid or by a previous price reaction — never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
 | R-07 | A rejection alone is not an entry — confirmation required, by close or by read | trade | \`followed_rules\` | judgment | *"Did you wait, or did you take the touch?"* — see §9 | §9 | v1.0 |
@@ -130,7 +130,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.13
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.14
 
 ### Summary
 
@@ -1438,10 +1438,19 @@ separates a genuine sweep re-entry from a rationalised one — *"that was just a
 sweep"* is available every time. R-11, R-12 and R-17 are the backstops; the honesty
 is his.
 
-**R-04 cannot be confirmed, only violated.** Whether a losing trade reached +$20 is
-not recoverable: the prices are endpoints and the path is stored nowhere, including
-at the broker. One-sided — a win proves its own excursion, a break-even is R-04
-having fired — so the probe fires on full-stop losses alone.
+**R-04 is \`journal\` because the broker keeps the path.** This section called it
+unrecoverable — the prices on a row are endpoints — and the broker's minute bars go
+back a year, so \`best_price\` records the furthest a trade ran in his favour while
+it was open (§8). A loss beyond the scratch band on a trade that had already been
+$20 in his favour is a stop that was not moved: that is the breach. **Still
+one-sided, and the population is losses alone** — a win proves nothing about the
+stop, and a break-even is R-04 having fired. A loss that never reached $20 passes,
+since the rule never engaged.
+
+**It under-detects and never over-detects.** Only whole minutes inside the trade
+are read, so a spike in the first or last minute is missed; the figure can fall
+short of the truth and cannot pass it. A trade too short to hold a whole minute
+carries no figure and is \`unknown\`.
 
 **R-05 and R-06 are judgment because of where the zone map lives**, not because they
 are vague. The probe can also ask the better question now that §4 records how a
@@ -1499,9 +1508,10 @@ probe is a question, and it is one he can answer better than any row.
 
 ### The judgment set is now settled rather than pending
 
-R-04, R-05, R-06 and R-07 would each become checkable with a single question at
+R-05, R-06 and R-07 would each become checkable with a single question at
 journalling time. **He decided against adding them at v1.9**, and §10 records the
-decision and its cost. R-14 and R-17 were never candidates — both watch things no
+decision and its cost. R-04 was on that list and left it at v1.15 by another route —
+the broker's own bars, with nothing asked of him. R-14 and R-17 were never candidates — both watch things no
 column could hold.`,
 
   "8": `## 8 · Journal binding
@@ -1518,7 +1528,7 @@ before producing any number, not after being asked to justify one.
 **Broker-owned and served to you** — written by the poller and the email parser,
 never by the app: \`direction\` · \`entry_time\` · \`fill_time\` · \`entry_price\` ·
 \`exit_price\` · \`size_oz\` · \`open_day\` · \`pnl\` · \`net_pnl\` · \`planned_sl\` ·
-\`planned_tp\`.
+\`planned_tp\` · \`best_price\`.
 
 **Journal-owned** — written by the app alone: \`setup\` · \`followed_rules\` ·
 \`followed_sl\` · \`followed_tp\`.
@@ -1568,8 +1578,14 @@ Filter for it rather than assuming it.
 
 ### What is still not on a row, and why
 
-**Maximum favourable excursion.** How far a trade travelled before it turned. Not
-stored, not available from the broker — which is what makes R-04 a probe.
+**Maximum favourable excursion is on the row now, as \`best_price\`** — the highest
+bid on a buy, the lowest on a sell, read off the broker's minute bars for whole
+minutes inside the trade. This list said it was not available from the broker, and
+it was: the bars go back a year, so it reaches every trade in the journal rather
+than only the ones after it. Excursion is \`best_price − entry_price\` on a buy and
+the reverse on a sell. It can fall short of the truth, never pass it — a spike in
+the first or last minute is not read — and it is null on a trade under a minute
+long, and on any the poller has not reached yet.
 
 **The plan — no longer entirely absent, and the change is narrow.** This section
 said it was unrecoverable, and that was right about a CLOSED position: a stop moved
@@ -1869,7 +1885,7 @@ honestly while the behaviour is still bad.`,
 
   "10": `## 10 · What would have to change, and what he has decided
 
-§7 labels seven rules \`judgment\`. This section is what would lift each, and which
+§7 labels nine rules \`judgment\`. This section is what would lift each, and which
 routes are open.
 
 ### The two closed routes
@@ -1889,15 +1905,17 @@ reader should see why the door was shut:
 - **\`confirmation\`** (\`close\` | \`read\` | \`neither\`) would settle **R-07** — the rule
   §9 identifies as his primary failure — and \`neither\` would be a self-reported
   violation, the strongest signal the system could carry.
-- **R-04 does not fit the existing pattern.** Gladys fires at OPEN, when the trade has
-  done nothing yet, so *did it reach +$20 before it turned* has no answer when the
-  form is drawn. It needs a close-time trigger and a second message path.
+- **R-04 did not fit the existing pattern.** Gladys fires at OPEN, when the trade has
+  done nothing yet, so *did it reach +$20 before it turned* had no answer when the
+  form is drawn.
 - **A fifth question would have helped R-12** — whether a second entry was the sweep
   re-entry — now partly covered by the fifteen-minute window (§6).
 
-**He decided against all of it at v1.9.** R-04 through R-07 are \`judgment\`
-permanently. R-04's cost compounds: excursion is unrecoverable afterwards, so *did it
-reach +$20* is a question no version of this system will answer from data.
+**He decided against all of it at v1.9.** R-05 through R-07 are \`judgment\`
+permanently. R-04 was too, on the reasoning that excursion is unrecoverable
+afterwards — and that was wrong about the broker rather than about him: its minute
+bars carry the path, so at v1.15 R-04 became \`journal\` with nothing asked of him
+and nothing added to Gladys (§8, \`best_price\`).
 
 ### The rules that were never candidates
 
@@ -2041,6 +2059,7 @@ it stays as written, because correcting the record would falsify it.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.15 | [decide] | **R-04 made checkable from the broker, not from him.** §7, §8 and §10 called it uncheckable for good because how far a trade ran was "stored nowhere, including at the broker"; the broker's minute bars go back a year, so \`best_price\` now records the furthest each trade ran in his favour, and R-04 moves to \`journal\` — a loss beyond the scratch band on a trade that had been $20 in his favour is a stop that was not moved. Nothing asked of him, nothing added to Gladys; the v1.9 decision against widening the journal stands for R-05 to R-07. | Eugenia's own review of which rules she could not see |
 | v1.14 | [decide] | **A full stop is the stop hit at $20 from entry**, in his words. §12 had also counted a stop set tighter and taken in full, which no row can tell from a hand-cut exit — so R-03's population was missing and the rule was \`field\`. With the definition his, R-03 moves to \`journal\` and its predicate reads a loss of $20 or more; §5's example of a full stop on a $12 stop is gone with it. | His definition, asked while making R-03 checkable |
 | v1.13 | [decide] | **Three gaps closed, found by asking what the document never asked.** R-18: **stop and target are always resting broker orders and a position is never closed by hand** — which makes R-01 and R-02 exact rather than suggestive, since a loss beyond $20 is now an edited order rather than a decision at the screen, and R-15's Friday close-out is named as the one permitted manual close. R-19: **a high-impact print landing on a position inherited from an earlier session** — in profit the stop goes to break-even regardless of R-04's threshold, losing it is tightened to a closer invalidation or pulled in if there is none, and the target never moves. Written narrowly on his instruction: he should not be holding through a print, and the path that produces this is an Asian-session trade still running into New York. §5's "never moved tighter" now carries that exception, and §8 records that R-19 muddies "break-even means R-04 fired" — a sub-$20 break-even on a trade opened in the same session is not R-19 and is a question. **Direction recorded: he trades both ways**, with a noticed preference for shorting held as a preference and explicitly not a rule, since \`direction\` is on every row and a skew would otherwise read as confirmation of a decision. | Asking what the document had never asked |
 | v1.12 | [decide] | **Verification pass rather than new rules.** Eighteen inherited claims — carried since before the audit and never confirmed by him — read back and confirmed, one corrected: **an interior level is any level inside the range, marked by the quarter grid OR by a previous price reaction**, so R-05, §4.1 and §12 no longer reduce interior levels to quarters and a previous high mid-range is tradeable for Break & Retest. §13's history confirmed as record rather than reconstruction. **§9's "identical rows" corrected** — the *price data* is identical, but \`followed_rules\` is not, and since he marks it honestly the marker is the signature and the only one. **§3 proofread**: the opening definition no longer contradicts cost-push, the room-to-cut argument now follows from nominal = real + expected inflation rather than asserting the Fed would have none, the 2.5% breakeven line is reconciled against the CPI/PCE gap, and the dot plot distinguishes participants from voters. **§3 given a term index** so a single lookup is not a scan of thirty thousand characters, plus retail sales, Michigan inflation expectations, the ISM/S&P PMI split, and the FRED codes for every rates series. | Verification of what was already written |
