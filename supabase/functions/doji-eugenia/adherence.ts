@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// THE STRATEGY, EXECUTED — the eight rules a row can actually answer
+// THE STRATEGY, EXECUTED — the nine rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
 // §7 of strategy.ts writes a predicate for all nineteen rules and §8 writes the
 // population filters and the three verdicts. Both were prose: she was handed up
@@ -16,9 +16,9 @@
 // driven from a test with a hand-built row and broken on purpose — which is the
 // only way anything here earns the word "checked".
 //
-// EIGHT RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
-// `journal` means a row can answer it today. R-03 is `field`, and R-04 through
-// R-09, R-14, R-17, R-18 and R-19 are `judgment` — nothing stored can see them,
+// NINE RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
+// `journal` means a row can answer it today. R-04 through R-09, R-14, R-17,
+// R-18 and R-19 are `judgment` — nothing stored can see them,
 // and inventing an approximation here would be worse than the gap, because a
 // judgment rule that starts reporting `pass` is exactly the "no violations"
 // claim §8 warns is close to saying nothing.
@@ -306,6 +306,50 @@ function r02(rows: TradeRow[]): RuleResult {
                 pass, fail, unknown);
 }
 
+/* ─── R-03 ─────────────────────────────────────────────────────────────────
+   No entry after a full-stop loss on the same day, except one sweep re-entry.
+   §7: within an open_day, at most one entry_time later than the fill_time of a
+   loss with |exit − entry| ≥ 20.
+
+   A FULL STOP IS $20 FROM ENTRY BECAUSE HE SAID SO, and that is the whole of
+   why this is checkable. §12 used to count a stop set tighter and taken in
+   full, which no row can tell from a hand-cut exit; his definition is the stop
+   at its ceiling, so a smaller loss is not one and leaves the population
+   rather than making the day unknown.
+
+   UNKNOWN ONLY WHERE THE ANSWER COULD DIFFER. A loss with no prices might be a
+   full stop, and a full stop with no fill_time cannot be placed before the
+   entries it would count — but a day with fewer than three entries cannot
+   breach this whatever those rows turn out to be, so it is not reported as
+   something the data failed to decide. A breach found elsewhere in the day
+   stands regardless: a known third entry after a known full stop is a fail
+   whatever else is unmeasured. */
+export const FULL_STOP = 20;
+
+function r03(rows: TradeRow[]): RuleResult {
+  const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
+
+  for (const [day, all] of byDay(rows)) {
+    const entries = all.filter(t => t.entry_time).map(t => +new Date(t.entry_time as string));
+    const losses = all.filter(t => closed(t) && (t.pnl as number) < 0);
+    const full = losses.filter(t => priced(t) && gap(t) >= FULL_STOP - CENT);
+    const unmeasured = losses.filter(t => !priced(t));
+    if (!full.length && !unmeasured.length) continue;
+
+    // Entries after the loss closed; null where there is no instant to count from.
+    const after = (t: TradeRow) =>
+      t.fill_time ? entries.filter(at => at > +new Date(t.fill_time as string)).length : null;
+
+    if (full.some(t => (after(t) ?? 0) >= 2)) { fail.push(day); continue; }
+    const couldBreach = entries.length >= 3 &&
+      [...full, ...unmeasured].some(t => after(t) === null || (after(t) as number) >= 2);
+    if (couldBreach) unknown.push(day);
+    else if (full.length) pass.push(day);
+  }
+  return result('R-03', `days with more than one entry after a full-stop loss — a loss $${FULL_STOP} or more from entry`,
+                pass, fail, unknown);
+}
+
 /* ─── R-10 ─────────────────────────────────────────────────────────────────
    One position at a time. §7: no two rows whose entry_time→fill_time spans
    overlap.
@@ -582,7 +626,7 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
    so a rule that stopped being evaluated is a gap in a sequence rather than an
    absence nobody can see. */
 export function checkRules(rows: TradeRow[], now = Date.now()): RuleResult[] {
-  return [r01(rows), r02(rows), r10(rows, now), r11(rows), r12(rows), r13(rows), r15(rows), r16(rows)];
+  return [r01(rows), r02(rows), r03(rows), r10(rows, now), r11(rows), r12(rows), r13(rows), r15(rows), r16(rows)];
 }
 
 /* ─── Where a day stands right now ────────────────────────────────────────
