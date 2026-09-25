@@ -861,14 +861,20 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         while (![2, 3, 4].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() - 1);
         return { days, from: Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 14) };
       });
-      const bodies = await Promise.all(windows.map(w => mcpPost(sid, "get_trendbars", {
-        symbolId: SYMBOL_IDS[0], period: "M_1",
-        fromTimestamp: String(w.from), toTimestamp: String(w.from + 15 * 60_000),
-      })));
-      return new Response(
-        windows.map((w, i) =>
-          `--- get_trendbars M_1, ${w.days} days back, from ${new Date(w.from).toISOString()} ---\n${bodies[i]}`)
-          .join("\n"),
+      /* ONE AT A TIME, AND EACH ONE'S FAILURE IS ITS OWN ANSWER. Six in
+         parallel came back as a single 504 that took the other five with it —
+         and which age the broker cannot serve is half of what this asks. */
+      const parts: string[] = [];
+      for (const w of windows) {
+        const began = Date.now();
+        const body = await mcpPost(sid, "get_trendbars", {
+          symbolId: SYMBOL_IDS[0], period: "M_1",
+          fromTimestamp: String(w.from), toTimestamp: String(w.from + 15 * 60_000),
+        }).catch((err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+        parts.push(`--- get_trendbars M_1, ${w.days} days back, from ` +
+          `${new Date(w.from).toISOString()}, ${Date.now() - began} ms ---\n${body}`);
+      }
+      return new Response(parts.join("\n"),
         { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 
