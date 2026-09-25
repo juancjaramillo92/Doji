@@ -706,10 +706,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     // over it can both enumerate what this entry point reads.
     const market    = url.searchParams.get("market") === "1";
     const marketRaw = url.searchParams.get("market") === "raw";
-    // The two read-only flags answer over the weekend too, which is when a
+    const bars      = url.searchParams.get("bars") === "raw";
+    // The read-only flags answer over the weekend too, which is when a
     // suspicious row actually gets looked at. Neither writes, so the market
     // check has nothing to protect here.
-    if (!force && !raw && !tools && !posns && !market && !marketRaw && !marketOpen()) {
+    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !marketOpen()) {
       // A SKIP IS A COMPLETED RUN, and the heartbeat has to say so or it lies
       // every weekend. Gold closes Friday 17:00 New York and opens Sunday
       // 17:00, so without this the mark freezes for forty-eight hours against a
@@ -831,6 +832,44 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       // wrong number — the failure this whole endpoint was probed to avoid.
       if (!spot) throw new Error("get_spot_prices returned no readable bid/ask");
       return json({ ok: true, symbol: SYMBOL_IDS[0], ...spot });
+    }
+
+    /* ?bars=raw — WHETHER THE PATH OF A CLOSED TRADE IS RECOVERABLE AFTER ALL.
+
+       §7 and §10 call R-04 uncheckable for good because "the path is stored
+       nowhere, including at the broker". `get_trendbars` is the path: minute
+       bars between an entry and its close carry the furthest the trade ran in
+       its favour, which is the one fact R-04 turns on. What nobody has read is
+       what a minute bar looks like coming out of this endpoint — its fields,
+       and which of the two scales above it is on — or how far back the broker
+       keeps them, which decides whether that reaches the trades already closed
+       or only the ones after it.
+
+       Raw, for ?market=raw's reason: the field names and the scale are the
+       whole question, and a fold written before seeing them is the guess this
+       file keeps paying for. Fifteen minutes at each age, which is enough to
+       read a bar's shape and whether any came back at all, without a year of
+       minutes in one reply. The windows are the clock's and never the
+       request's, and each aged one is moved to 14:00 UTC on a Tuesday to
+       Thursday, so a weekend or a Monday open cannot read as history the broker
+       no longer keeps. */
+    if (bars) {
+      const ages = [0, 7, 30, 90, 180, 365];
+      const windows = ages.map(days => {
+        if (!days) return { days, from: to - 15 * 60_000 };
+        const d = new Date(to - days * 86_400_000);
+        while (![2, 3, 4].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() - 1);
+        return { days, from: Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 14) };
+      });
+      const bodies = await Promise.all(windows.map(w => mcpPost(sid, "get_trendbars", {
+        symbolId: SYMBOL_IDS[0], period: "M_1",
+        fromTimestamp: String(w.from), toTimestamp: String(w.from + 15 * 60_000),
+      })));
+      return new Response(
+        windows.map((w, i) =>
+          `--- get_trendbars M_1, ${w.days} days back, from ${new Date(w.from).toISOString()} ---\n${bodies[i]}`)
+          .join("\n"),
+        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 
     const dealArgs = {

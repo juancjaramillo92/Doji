@@ -1056,14 +1056,27 @@ offers *"(count) → last N bars ending now"*; sending exactly that answers
 `fromTimestamp: must not be null`. The range form is what it accepts, so that is
 what is sent. Worth knowing before trusting any other combination it lists.
 
+**`?bars=raw` asks whether a closed trade's path can be read back.** §7 calls
+R-04 uncheckable because how far a trade ran in his favour is *"stored nowhere,
+including at the broker"* — and `get_trendbars` serves minute bars, which are that
+path. Nobody has read one: which fields a bar carries, which of the two scales
+above it is on, or how far back the broker keeps them, and that last one decides
+whether R-04 could reach the trades already closed or only the ones after. So it
+returns fifteen minutes of `M_1` bars at six ages — now, and 7, 30, 90, 180 and
+365 days back, each aged window moved to 14:00 UTC on a Tuesday to Thursday so a
+weekend cannot read as missing history — raw, for `?market=raw`'s reason. Nothing
+folds a bar until this has been read.
+
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?positions=1" \
      -H "x-doji-key: $DOJI_CRON_SECRET"
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?market=1" \
      -H "x-doji-key: $DOJI_CRON_SECRET"
+curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?bars=raw" \
+     -H "x-doji-key: $DOJI_CRON_SECRET"
 ```
 
-**All four read-only flags answer when the market is shut**, and a test holds that:
+**Every read-only flag answers when the market is shut**, and a test holds that:
 every flag the entry point reads must appear in the market gate. One left out
 replies `market closed` all weekend — which is exactly when a suspicious row gets
 looked at — and it fails silently, looks like the flag working, and is invisible
@@ -4372,7 +4385,7 @@ and it used to be described as though it were.** Say it per endpoint:
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`) or a price (`?market=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`) or minute bars (`?bars=raw`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?pulse=1` costs a medium-effort call that usually answers `NOTHING` and sends nothing. `?embed=1` spends at the embedding vendor. `?release=1`, `?move=1` and a `{trade}` body reach the three cheaper event paths |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
