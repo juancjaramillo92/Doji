@@ -1033,7 +1033,7 @@ compounds.
 
 - **`adherence.ts` is the strategy executed, and the set of rules is not a
   choice.** §7's `Evaluable` column decides it: twelve `journal` rules, and the
-  seven `judgment` ones stay out, because a judgment rule that starts
+  six `judgment` ones stay out, because a judgment rule that starts
   reporting `pass` is exactly the "no violations" claim §8 warns is close to
   saying nothing. It is pure — rows in, verdicts out, no clock but the one passed
   in — which is what lets every rule be driven in BOTH directions from a test.

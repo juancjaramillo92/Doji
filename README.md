@@ -2036,7 +2036,7 @@ gate.**
 
 ### Checking his rules
 
-§7 of the strategy writes a concrete predicate for all nineteen rules and §8
+§7 of the strategy writes a concrete predicate for all eighteen rules and §8
 writes the population filters and the three verdicts. **Nothing executed any of
 it.** She was handed up to four hundred rows of JSON and expected to apply seven
 filters and three-state logic in her head on the way to producing a number —
@@ -2926,8 +2926,9 @@ and three smaller losses can spend the whole 4% without R-03 seeing anything.
 §12 had also counted a tighter stop taken in full, which no row can tell from a
 hand-cut exit.
 
-**The table is nineteen rules now, and the eight after R-11 came out of audits
-rather than out of new behaviour.** R-12 caps him at one entry a day, two only
+**The table reached nineteen rules, and the eight after R-11 came out of audits
+rather than out of new behaviour.** It is eighteen since v1.18 retired R-09, a line
+from a book he read while learning rather than one he traded by. R-12 caps him at one entry a day, two only
 when the second is a sweep re-entry. R-13 pins a rung change to a month boundary.
 R-14 stands him aside in the hours before a high-impact release — the first rule
 connecting the briefing to the trading. R-15 closes anything live before the

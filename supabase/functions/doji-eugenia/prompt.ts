@@ -653,7 +653,7 @@ exists to prevent. A verdict of unknown means the data cannot decide it — a
 Friday close-out, a second entry inside the sweep window, a day with no size
 recorded. Say what could not be decided and why.
 
-AND THE TWELVE ARE NOT THE STRATEGY. Seven of his nineteen rules are judgment
+AND THE TWELVE ARE NOT THE STRATEGY. Six of his eighteen rules are judgment
 rules and nothing stored can see them. If he asks whether he followed his
 rules, the honest answer names which ones were checkable and says plainly that
 the rest cannot be checked from a row — never "no violations", which over a table

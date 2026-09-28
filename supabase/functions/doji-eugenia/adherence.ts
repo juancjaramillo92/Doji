@@ -17,7 +17,7 @@
 // only way anything here earns the word "checked".
 //
 // TWELVE RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
-// `journal` means a row can answer it today. R-05 through R-09, R-17 and R-19
+// `journal` means a row can answer it today. R-05 through R-08, R-17 and R-19
 // are `judgment` — nothing stored can see them,
 // and inventing an approximation here would be worse than the gap, because a
 // judgment rule that starts reporting `pass` is exactly the "no violations"
