@@ -3105,7 +3105,11 @@ tokens in and out, how many were served from cache, and how many web searches
 were billed. `postBriefing` adds the briefing's length in characters, and
 the `<brief> briefing delivered` row carries it, which is where a manual run
 reads it now: `?force=1` answers before it works, like everything else a cron
-secret reaches, so its body says `accepted` rather than `chars`.
+secret reaches, so its body says `accepted` rather than `chars`. Its `detail`
+splits what came after the critic — `stored in 1s, spoken in 19s` — because
+both model calls have rows of their own and that stretch had none: the Sunday
+that took 315s spent 155 of them there, where Monday spent 20, and nothing
+could say whether the embedding or the voice was the slow half.
 
 None of this changes what she does. It exists because nothing else can see any
 of it: the spend cap on the Anthropic key is a ceiling rather than a meter, web

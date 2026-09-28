@@ -3555,8 +3555,10 @@ async function postBriefing(due: Brief): Promise<Response> {
      Written first, the failure mode inverts: a send that fails after the marker
      lands costs the retry rather than duplicating it, and he is told. Losing a
      briefing is cheaper than sending four. */
+  const checked = Date.now();
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
+  const stored = Date.now();
   // A space, not a blank line. On a line of its own the greeting is a one-line
   // paragraph, and every TTS_STYLE rule about a paragraph's last sentence and
   // its closing breath lands on hello — which is how it came out slowest.
@@ -3568,10 +3570,19 @@ async function postBriefing(due: Brief): Promise<Response> {
      received and how long the whole thing took, which is the question a reader
      asks. Keeping them apart is what makes "the critic is costing more than it
      is worth" and "the briefing is drifting long again" two separate answerable
-     questions rather than one blurred figure. */
+     questions rather than one blurred figure.
+
+     AND WHAT CAME AFTER THE CRITIC IS SPLIT, because it was the one stretch no
+     row could see. Both model calls have rows of their own; storing the turn
+     embeds it, and speaking it is a vendor call and an upload per part — so
+     the Sunday that took 315s had 155s between the critic's row and this one,
+     where Monday's took 20, with nothing to say which half it was. */
+  const spoken = Date.now();
   await recordRun({
     caller: `${due} briefing delivered`, chars: brief.length,
-    ms: Date.now() - opened, ok: true,
+    ms: spoken - opened, ok: true,
+    detail: `stored in ${Math.round((stored - checked) / 1000)}s, `
+          + `spoken in ${Math.round((spoken - stored) / 1000)}s`,
   });
   return json({ ok: true, brief: due, chars: brief.length });
 }

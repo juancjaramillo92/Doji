@@ -4535,6 +4535,28 @@ test('010 marks the day said only where the message was actually sent', () => {
     'written on a failed send, which is the same silence from the other side');
 });
 
+test('the delivered row splits what came after the critic, around the right calls', () => {
+  /* THE STRETCH THAT HAD NO ROW. Sunday spent 155s between the critic's row and
+     the delivered one, Monday 20s, and nothing could say whether storing or
+     speaking was the slow half. A stamp on the wrong side of its call still
+     writes a plausible number — so the order is what is read. */
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('async function postBriefing('),
+                         src.indexOf('export const isSilent'));
+  const at = (s) => body.indexOf(s);
+  const order = ['const checked = Date.now()', 'await remember(', 'const stored = Date.now()',
+                 'await sayAloud(', 'const spoken = Date.now()', 'await recordRun('];
+  for (const s of order) assert.ok(at(s) > -1, `postBriefing no longer has ${s}`);
+  for (let i = 1; i < order.length; i++) {
+    assert.ok(at(order[i - 1]) < at(order[i]),
+      `postBriefing has ${order[i - 1]} after ${order[i]} — the split would time ` +
+      `the wrong call and still read as a number`);
+  }
+  assert.match(body, /detail: `stored in \$\{[^}]+\}s, `\s*\+ `spoken in \$\{[^}]+\}s`/,
+    'the delivered row no longer carries the stored/spoken split');
+});
+
 test('010 says a slow run once, and the week stays visible to diagnose', () => {
   /* THE DAY WAS THE ONLY GUARD, AND A RUN OUTLIVES A DAY. It stays in a
      seven-day window for seven days, so the first Sunday over the share was
