@@ -1,8 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — 010: how much of the worker's clock the briefing is spending
 -- ───────────────────────────────────────────────────────────────────────────
--- RUN AFTER 009. Every statement is `create or replace`, so this file is safe
--- to re-run in full. It creates no table: what it needs is already recorded.
+-- RUN AFTER 009. Every statement is `create or replace` or `drop ... if
+-- exists`, so this file is safe to re-run in full. It creates no table: what it
+-- needs is already recorded.
 --
 -- THE NUMBER THIS WATCHES IS THE LAST ONE IN THE SYSTEM THAT NOTHING READS.
 -- `eugenia_runs.ms` has been written on every model call and every delivered
@@ -59,7 +60,24 @@
 -- and rarest of them, and the one whose absence takes seven days to come round
 -- again — and because a window that outlives a repair stops reporting the
 -- repair.
-create or replace function public.pace_line(now_ timestamptz default now())
+--
+-- AND A RUN IS SAID ONCE, WHICH THE WINDOW ALONE COULD NOT SAY. The only guard
+-- was the day, and a run stays in a seven-day window for seven days — so the
+-- first Sunday to cross the share, at 315s, was announced at 17:37 and again
+-- at 00:37, and would have been every midnight until the next Sunday: the same
+-- sentence eight times, which is how a monitor is taught to be swiped away.
+-- `since` is when the watcher last spoke, and a run at or before it has been
+-- said. diagnose.sql passes nothing, because it shows the week rather than
+-- what is left to say. The absence is untouched — it is about a day, and the
+-- day guard is what already says it once.
+--
+-- A SECOND ARGUMENT IS A SECOND FUNCTION, which is why the drop comes first.
+-- `create or replace` cannot change an argument list, so the one-argument
+-- version would survive beside this one and `pace_line()` would match both —
+-- Postgres refuses that as ambiguous, which is 007's overload arriving here.
+drop function if exists public.pace_line(timestamptz);
+create or replace function public.pace_line(now_  timestamptz default now(),
+                                            since timestamptz default null)
 returns text
 language plpgsql
 stable
@@ -114,6 +132,7 @@ begin
     from public.eugenia_runs r
    where r.ms is not null
      and r.at > now_ - interval '7 days'
+     and (since is null or r.at > since)
    order by r.ms desc
    limit 1;
 
@@ -165,7 +184,9 @@ language plpgsql
 as $$
 declare
   today date := (now_ at time zone 'America/New_York')::date;
-  said  text := public.pace_line(now_);
+  said  text := public.pace_line(now_, (select max(r.at) from public.eugenia_runs r
+                                          where r.caller = 'pace' and not r.ok
+                                            and r.at <= now_));
   token text;
   chat  text;
 begin
@@ -209,5 +230,5 @@ $$;
 -- Reachable by the publishable key otherwise, from the default privileges
 -- Supabase grants on the public schema — `revoke ... from public` alone does
 -- not take those, which is the mistake 007 exists to have corrected once.
-revoke execute on function public.pace_line(timestamptz)  from public, anon, authenticated;
-revoke execute on function public.pace_watch(timestamptz) from public, anon, authenticated;
+revoke execute on function public.pace_line(timestamptz, timestamptz) from public, anon, authenticated;
+revoke execute on function public.pace_watch(timestamptz)            from public, anon, authenticated;

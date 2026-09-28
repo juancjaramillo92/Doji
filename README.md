@@ -821,6 +821,16 @@ a weekday, 21:00 on a Sunday, both a full ceiling past the final retry — with 
 briefing that is still being written, which is the ordinary-day false alarm that
 gets a monitor muted in a week.
 
+**A slow run is said once.** The day was once the only guard, and a run stays in
+a seven-day window for seven days — so the first Sunday over the share, at 315s,
+was announced at 17:37 and again at 00:37, on its way to the same sentence every
+midnight until the next Sunday. The watcher hands `pace_line` the time it last
+spoke, and a run at or before that has been said; `diagnose.sql` hands it
+nothing, because a person looking wants the week rather than what is left to
+say. The second argument is a second function to Postgres, so 010 drops the
+one-argument version first — left beside it, `pace_line()` matches both and is
+refused as ambiguous.
+
 **It speaks at most once a New York day, and the row it writes is the guard.**
 Which is what makes one ordering load-bearing: a row written after a send that
 could *not* be made would mark the day as said and swallow the warning for good,

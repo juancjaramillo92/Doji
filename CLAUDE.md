@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 603 tests, six suites
+npm test      # 604 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1908,6 +1908,15 @@ a blank.
   single day, with nothing comparing the two. `agree.test.mjs` derives the
   retry window out of `retryDue` and asserts 010's bound against it per
   briefing, in both directions.
+
+  AND A RUN IS SAID ONCE, WHICH THE DAY GUARD NEVER SAID. A run outlives a
+  day in a seven-day window, so one slow Sunday was announced every midnight
+  for a week — two of them reached him before anyone asked why. `since` is
+  the watcher's own last warning and `diagnose.sql` passes none. Replayed
+  against a local Postgres (`/usr/lib/postgresql/16/bin`, stubs for `vault`
+  and `net`) before it shipped: eight sends before, one after. That replay is
+  the only thing that has ever EXECUTED this file, and it is worth repeating
+  on any change to it — `agree.test.mjs` reads the shape and cannot run it.
 
   AND THE ROW IT WRITES IS THE GUARD, which is what makes one ordering
   load-bearing. It speaks at most once a New York day and decides that by

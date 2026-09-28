@@ -4535,6 +4535,38 @@ test('010 marks the day said only where the message was actually sent', () => {
     'written on a failed send, which is the same silence from the other side');
 });
 
+test('010 says a slow run once, and the week stays visible to diagnose', () => {
+  /* THE DAY WAS THE ONLY GUARD, AND A RUN OUTLIVES A DAY. It stays in a
+     seven-day window for seven days, so the first Sunday over the share was
+     announced at 17:37 and again at 00:37, on its way to eight identical
+     messages. Replayed against a real Postgres before this went in: eight sends
+     before, one after, and a second slow run later in the week said once in its
+     own right. Nothing here runs SQL, so this reads for the three pieces that
+     replay depended on. */
+  const line = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_line('),
+                              PACE_SQL.indexOf('create or replace function public.pace_watch('));
+  const watch = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_watch('));
+  assert.match(line, /and \(since is null or r\.at > since\)/,
+    'pace_line no longer leaves out a run the watcher has already said — every ' +
+    'midnight for a week repeats the same sentence about the same run');
+  assert.match(watch, /public\.pace_line\(now_, \(select max\(r\.at\) from public\.eugenia_runs r\s+where r\.caller = 'pace' and not r\.ok/,
+    "pace_watch no longer hands pace_line the time it last spoke, off its own " +
+    "'pace' rows — the filter above then has nothing to filter with");
+
+  /* AND THE SECOND ARGUMENT IS A SECOND FUNCTION. Without the drop the old
+     one-argument version survives on every database that ran 010 before, and
+     `pace_line()` in diagnose.sql matches both and is refused as ambiguous. The
+     revoke has to name the signature that exists, or it raises and the file
+     stops half-applied. */
+  const drop = PACE_SQL.indexOf('drop function if exists public.pace_line(timestamptz);');
+  assert.ok(drop > -1 && drop < PACE_SQL.indexOf('create or replace function public.pace_line('),
+    '010 no longer drops the one-argument pace_line before creating the two-argument one');
+  const args = line.match(/public\.pace_line\(([\s\S]*?)\)\s*returns/)[1]
+    .split(',').map(a => a.trim().split(/\s+/)[1]).join(', ');
+  assert.ok(PACE_SQL.includes(`revoke execute on function public.pace_line(${args}) from`),
+    `010 revokes a pace_line signature other than the (${args}) it creates`);
+});
+
 /* ─── Everything a cron job dispatches answers before it works ───────────────
    TWO LIMITS, AND PAYING MOVES ONLY ONE. The worker's wall clock is 150s free
    and 400s paid; that is what killed the Sunday briefing at 145.4s of drafting,
