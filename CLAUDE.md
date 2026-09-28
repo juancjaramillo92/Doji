@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 606 tests, six suites
+npm test      # 609 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1032,13 +1032,13 @@ compounds.
 ### Checking his rules
 
 - **`adherence.ts` is the strategy executed, and the set of rules is not a
-  choice.** §7's `Evaluable` column decides it: twelve `journal` rules, and the
-  seven `judgment` ones stay out, because a judgment rule that starts
+  choice.** §7's `Evaluable` column decides it: thirteen `journal` rules, and the
+  five `judgment` ones stay out, because a judgment rule that starts
   reporting `pass` is exactly the "no violations" claim §8 warns is close to
   saying nothing. It is pure — rows in, verdicts out, no clock but the one passed
   in — which is what lets every rule be driven in BOTH directions from a test.
   `unknown` is never `pass`, and an empty population is `unknown`.
-  `fold.test.mjs` holds the twelve against §7's table, reading the `Evaluable`
+  `fold.test.mjs` holds the thirteen against §7's table, reading the `Evaluable`
   column out of the document rather than a list typed into the test.
 
   A VERDICT IS NOT THE WHOLE ANSWER, WHICH IS HOW R-10 HID A MISCOUNT FOR ITS
@@ -1552,7 +1552,7 @@ and what could not be verified.
 
 ## Her memory is backed up from outside the browser
 
-`scripts/backup-memory.mjs` is the only copy of the nine tables that have no
+`scripts/backup-memory.mjs` is the only copy of the ten tables that have no
 other source. It is run weekly by `.github/workflows/backup-memory.yml` and can
 be run by hand for a durable copy; the README carries the mechanics. The part to
 be careful with is the PAGING: PostgREST caps a response at its own `max-rows`

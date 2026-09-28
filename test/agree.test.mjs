@@ -5818,6 +5818,16 @@ test('the nightly pass fetches Forex Factory, meters both outcomes, and check_ru
   assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
   assert.match(body, /checkRules\(rows, Date\.now\(\), \{/,
     'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
+  assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
+  assert.match(body, /\}, stops\)\);/,
+    'check_rules hands the rules no stop history, so R-19 is unknown on every trade');
+
+  /* AND THE POLLER WRITES THE HISTORY, inside the step that already read the
+     open positions — a pure stopChanges proves nothing about being called. */
+  const poller = readFileSync(
+    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  assert.match(poller, /planned \+= await writePlan\(plan\);\s*stops = await recordStops\(plans\);/,
+    'the poll no longer records stop moves, so trade_stops stops growing and R-19 goes unknown');
 });
 
 test('what she files takes Forex Factory\'s rating before it is written', () => {

@@ -57,6 +57,10 @@ export const TABLES = [
      be served on both pages of a boundary or on neither. */
   ['ff_calendar',      ['at', 'country', 'title']],
   ['ff_weeks',         'week'],
+  // Every stop and target a position carried. The broker reports only the final
+  // stop once a position closes, so the moves R-19 is judged on are kept here
+  // and nowhere else.
+  ['trade_stops',      ['id', 'seen_at']],
 ];
 
 const PAGE = 1000;

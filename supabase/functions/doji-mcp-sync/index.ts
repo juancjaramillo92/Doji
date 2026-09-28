@@ -624,6 +624,52 @@ async function writePlan(plan: OpenPlan): Promise<number> {
   return wrote;
 }
 
+/* ─── Every stop and target, as they move ──────────────────────────────────
+   The plan above is the FIRST sighting and refuses every later one, because a
+   plan that tracked the stop would file R-04's break-even as the plan. R-19
+   asks the other question — where the stop and target sat when a print landed
+   — and a closed position reports only its final stop, so the moves in between
+   were seen every two minutes and kept nowhere.
+
+   A ROW PER CHANGE, NEVER PER POLL, and this is the decision: a position whose
+   latest row already says what the broker says gets nothing. A side the broker
+   stopped carrying is a change too, written as null, so a pulled target is not
+   read as the old one still resting. Pure, so it can be driven; the latest row
+   per position is whatever the caller read, newest first. */
+export interface StopRow { id: string; sl: number | null; tp: number | null }
+
+export function stopChanges(plans: OpenPlan[], latest: StopRow[]): StopRow[] {
+  const last = new Map<string, StopRow>();
+  for (const r of latest) if (!last.has(r.id)) last.set(r.id, r);
+  // PostgREST serves numeric as a number or a string depending on its size, so
+  // the stored side is read through Number rather than compared as it came.
+  const eq = (stored: number | null, seen: number | null) =>
+    stored == null ? seen == null : Number(stored) === seen;
+  return plans.flatMap(p => {
+    const now = { id: p.id, sl: p.planned_sl ?? null, tp: p.planned_tp ?? null };
+    const was = last.get(p.id);
+    return was && eq(was.sl, now.sl) && eq(was.tp, now.tp) ? [] : [now];
+  });
+}
+
+// Writes what stopChanges found, and says how many.
+async function recordStops(plans: OpenPlan[]): Promise<number> {
+  if (!plans.length) return 0;
+  const ids = plans.map(p => p.id).join(',');
+  const res = await fetch(
+    `${SB_URL}/rest/v1/trade_stops?select=id,sl,tp&id=in.(${ids})` +
+    `&order=seen_at.desc&limit=${plans.length * 20}`, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Stop read failed (HTTP ${res.status}): ${await res.text()}`);
+
+  const moved = stopChanges(plans, await res.json());
+  if (!moved.length) return 0;
+  const put = await fetch(`${SB_URL}/rest/v1/trade_stops`, {
+    method: "POST", headers: sbHeaders("return=minimal"), body: JSON.stringify(moved),
+  });
+  if (!put.ok) throw new Error(`Stop write failed (HTTP ${put.status}): ${await put.text()}`);
+  return moved.length;
+}
+
 /* ─── The close instant ────────────────────────────────────────────────────
    `fill_time` HAD ONE WRITER AND IT WAS AN EMAIL. `doji-email-sync` set it off
    cTrader's alert; this function, which sees every close within two minutes and
@@ -1123,7 +1169,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        Never takes the poll down. The deals are why this function exists and
        they are written by the time this runs; a plan that fails to record
        leaves one trade in the state every historical row is already in. */
-    let planned = 0;
+    let planned = 0, stops = 0;
     try {
       const open = await mcpCall(sid, "get_positions", {});
       const plans = openPlans(open.positions ?? []);
@@ -1134,6 +1180,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       // with a position open, the poll that first sees one reads 1, and a
       // filter that stopped filtering would read 1 every two minutes forever.
       for (const plan of plans) planned += await writePlan(plan);
+      stops = await recordStops(plans);
     } catch (err) {
       console.error("doji-mcp-sync: plan not recorded —",
         err instanceof Error ? err.message : err);
@@ -1158,7 +1205,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
-      deals: deals.length, positions: n, balance_for: target, planned, stamped, excursions,
+      deals: deals.length, positions: n, balance_for: target, planned, stamped, stops, excursions,
       // Reported rather than acted on: it says more deals exist beyond the
       // window, which is true of almost every run.
       has_more: data.hasMore ?? null,

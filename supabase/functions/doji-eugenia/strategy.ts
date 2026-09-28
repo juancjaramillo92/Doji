@@ -41,7 +41,7 @@
    was ever reachable: §0 below its summary is get_strategy-only. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.17";
+export const VERSION = "v1.19";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
    paragraph she holds on every turn and the paragraph get_strategy serves are
@@ -110,7 +110,6 @@ counts as kept just because nothing contradicted it.
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
 | R-07 | A rejection alone is not an entry — confirmation required, by close or by read | trade | \`followed_rules\` | judgment | *"Did you wait, or did you take the touch?"* — see §9 | §9 | v1.0 |
 | R-08 | Pre-trade sequence run in order; a failed step ends it rather than being weighed | trade | \`followed_rules\` | judgment | *"Which step did you stop at, if any?"* | §6 | v1.0 |
-| R-09 | Only operate in obvious trends and cycles | trade | \`followed_rules\` | judgment | *"Was the trend obvious on the daily and 4H, or were you reading into it?"* | §6 | v1.0 |
 | R-10 | One position at a time — no scaling in, no adding, no second trade open | trade | \`followed_rules\` | journal | no two rows whose \`entry_time\`→\`fill_time\` spans overlap | §5 | v1.9 |
 | R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
 | R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry more than 15 min after the prior \`fill_time\` is a \`fail\`, within 15 min is \`unknown\` | §5 | v1.10 |
@@ -120,7 +119,7 @@ counts as kept just because nothing contradicted it.
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market holiday | §5 | v1.11 |
 | R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
 | R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | journal | no closed trade without a broker alert (\`net_pnl\` null — cTrader sends none for a hand close), except one closing at the Friday close; a close under an hour old is \`unknown\` | §6 | v1.13 |
-| R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | judgment | *"Was a print pending, and was this trade opened in an earlier session?"* | §6 | v1.13 |
+| R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | journal | at the first USD red folder inside a position's span whose session is not the one it opened in, the stop in force (\`trade_stops\`) is at break-even or better, and neither wider than first seen nor untouched; the target unmoved. Tightened short of break-even is \`unknown\`, as is a position whose stop history starts after the print | §6 | v1.13 |
 
 Call get_strategy for the reasoning behind any of this.`;
 
@@ -130,7 +129,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.16
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.18
 
 ### Summary
 
@@ -850,7 +849,7 @@ Six charts with three jobs, and the hourly does two of them.
 
 | Job | Charts |
 |---|---|
-| **Bias** — step 1, and what R-09's *obvious trend* is read from | daily, 4H, 1H |
+| **Bias** — step 1 | daily, 4H, 1H |
 | **Levels** — where the map is marked | 1H, 30m |
 | **Entry** — the signal, the confirmation, the fill | 15m, 5m |
 
@@ -956,7 +955,7 @@ second one ends it.
 
 **How it loses:** the range is over. A level that had turned price back stops doing
 so, and a fade taken into a break is the failure this setup has — the mirror of
-§4.1's, and the reason R-09 restricts both to obvious trends and cycles.`,
+§4.1's.`,
 
   "5": `## 5 · Risk
 
@@ -1397,11 +1396,23 @@ an hour old is \`unknown\`**, because its alert may still be on its way. The ris
 one-directional and named: an alert the sync lost would read as a hand close, and
 the failure names the trade so it can be looked up in Gmail.
 
-**R-19 is judgment and must stay narrow.** Nothing records that a print was pending,
-and the rule is written for one path: a position inherited from an earlier session
-when a release lands. Read generally it turns "there is news later" into a reason to
-touch any position, which is the same door §7 already flags on R-03's sweep
-exception.
+**R-19 is \`journal\` since v1.19, and it must stay narrow.** Two things made it
+checkable: Forex Factory's calendar says a print was pending (R-14), and
+\`trade_stops\` keeps every stop and target the poller saw a position carry, where
+the row keeps only the first and the broker only the last. The population is a
+position a USD red folder landed on in a session later than the one it opened in —
+the one path the rule is written for. Read generally it turns "there is news later"
+into a reason to touch any position, which is the same door §7 already flags on
+R-03's sweep exception.
+
+**What it can and cannot part.** A stop at break-even or better passes, whichever
+way the trade stood — a losing trade cannot hold a stop past its entry. An
+untouched stop fails, because both branches move it; so does a wider one, and a
+target that moved. **A stop tightened short of break-even is \`unknown\`**: that is
+the rule on a losing trade and a breach on a winning one, and whether it was winning
+at the print is a price no row holds. A move is recorded up to two minutes after it
+is made, so the stop in force is read a few minutes past the print — a move just
+before it is never read as late, and one just after it passes.
 
 **R-01's lower bound is the half that catches anything.** The target may be $25, so
 a win at $25 is the rule working. A win BELOW $25 is a position closed before any
@@ -1475,8 +1486,6 @@ lately, and the journal cannot separate those.
 
 **R-07 IS THE ONE THAT MATTERS MOST AND THE ONE NOTHING CAN SEE.** His primary
 failure mode by his own account, invisible in every row. §9 is the section about it.
-
-**R-09's probe names the charts.** *Obvious* is read from the daily, 4H and 1H (§4).
 
 **R-10 and R-11 were rules without IDs** until v1.9 — both stated in §5's prose from
 v1.5, neither ever checked. Both are computable from broker columns alone.
@@ -1910,7 +1919,7 @@ honestly while the behaviour is still bad.`,
 
   "10": `## 10 · What would have to change, and what he has decided
 
-§7 labels seven rules \`judgment\`. This section is what would lift each, and which
+§7 labels five rules \`judgment\`. This section is what would lift each, and which
 routes are open.
 
 ### The two closed routes
@@ -1950,8 +1959,7 @@ threshold he never set — the failure §5 names about the sizing rung. R-14 was
 for the same reason until he set its floor himself (v1.17); the open-ended rest of
 its window still is.
 
-**R-08 and R-09 likewise.** *Which step did you stop at* and *was the trend obvious*
-are judgments, not fields.
+**R-08 likewise.** *Which step did you stop at* is a judgment, not a field.
 
 ### The route that stays open, and it is not a schema change
 
@@ -2086,6 +2094,8 @@ it stays as written, because correcting the record would falsify it.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.19 | [decide] | **R-19 made checkable.** \`trade_stops\` records every stop and target the poller sees a position carry, one row per change, where the row keeps the first and the broker only the last; with Forex Factory's calendar saying a print was pending, R-19 moves to \`journal\`. Judged at the first USD red folder landing on a position opened in an earlier session: break-even or better passes, an untouched or wider stop fails, a moved target fails, a stop tightened short of break-even is \`unknown\` — right if the trade was losing, wrong if winning, and no row holds which. | His go-ahead, after asking which rules still had holes |
+| v1.18 | [decide] | **R-09 retired** — *only operate in obvious trends and cycles*. A line from a book he read while learning, never one he traded by, so it goes rather than being made checkable; its ID is not reused. §4's bias chart and §4.2's failure mode no longer lean on it. | His decision |
 | v1.17 | [decide] | **R-14 made checkable on the floor he set.** High impact is **the red folder on Forex Factory, USD only**, and **no entry in the thirty minutes before one**; the rest of the stand-aside stays open-ended and his. R-14 moves to \`journal\`: an entry inside the thirty minutes fails, one with a red folder later that day but further off is \`unknown\`, one with none ahead passes. The calendar is Forex Factory's own export, fetched nightly and kept, so the rule sees nothing before the first fetch and reads a missed week as \`unknown\` rather than quiet. Nothing after the print is checked — he set no number for it. | His definitions, asked for while making R-14 checkable |
 | v1.16 | [decide] | **R-18 made checkable, from a fact about the broker he confirmed.** cTrader sends an alert when a stop or target fills and none for a position closed by hand, so a closed trade with no alert — \`net_pnl\` null — was closed by hand. R-18 moves to \`journal\`: that is a fail, except at the Friday close, which is R-15 and permitted; a close under an hour old is \`unknown\` while its alert may still arrive. §8 records what a missing \`net_pnl\` means, and that a Friday hand close is now R-15 firing rather than a guess. | Eight closes with no alert, looked up in Gmail with him |
 | v1.15 | [decide] | **R-04 made checkable from the broker, not from him.** §7, §8 and §10 called it uncheckable for good because how far a trade ran was "stored nowhere, including at the broker"; the broker's minute bars go back a year, so \`best_price\` now records the furthest each trade ran in his favour, and R-04 moves to \`journal\` — a loss beyond the scratch band on a trade that had been $20 in his favour is a stop that was not moved. Nothing asked of him, nothing added to Gladys; the v1.9 decision against widening the journal stands for R-05 to R-07. | Eugenia's own review of which rules she could not see |

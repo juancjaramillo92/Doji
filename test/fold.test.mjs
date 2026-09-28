@@ -32,7 +32,7 @@ import { secretMatches, nyClock, nyDate, marketOpen } from '../supabase/function
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget, parseSse,
-  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice,
+  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -50,7 +50,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  ffEvents, releasesQuery, weeksQuery, ffRated, ratingsQuery,
+  ffEvents, releasesQuery, weeksQuery, ffRated, ratingsQuery, stopsQuery,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -59,7 +59,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, RED, weekOf,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, RED, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -1617,7 +1617,7 @@ test('the backup names every table that has no other source', async () => {
     'a one-column key is no longer paged the way it was');
   for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
                    'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
-                   'ff_calendar', 'ff_weeks']) {
+                   'ff_calendar', 'ff_weeks', 'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
   // The cost meter is deliberately out: every row is about a model call rather
@@ -2923,6 +2923,66 @@ test("R-14's reads cover the trades' window, the red folder only, newest first",
   assert.match(wk, /order=week\.desc&limit=\d+/);
 });
 
+test('R-19 judges the stop in force when a print lands on a position from an earlier session', () => {
+  /* Opened at 19:00 New York on the Tuesday — the Asian session — and still
+     running at Wednesday's 08:30 CPI, which is the one path §6 writes R-19 for. */
+  const cpi = '2026-10-14T12:30:00Z';
+  const cal = { releases: [cpi], weeks: new Set(['2026-10-11']) };
+  const buy = (o) => trade({ id: 'PIDx', direction: 'BUY', entry_price: 4000, exit_price: 4010, pnl: 40,
+    entry_time: '2026-10-13T23:00:00Z', fill_time: '2026-10-14T15:00:00Z', open_day: '2026-10-13', ...o });
+  const first = { seen_at: '2026-10-13T23:02:00Z', sl: 3980, tp: 4030 };
+  const moved = (sl, at = '2026-10-14T12:00:00Z', tp = 4030) => ({ seen_at: at, sl, tp });
+  const r = (history, t = buy(), c = cal) =>
+    checkRules([t], Date.parse('2026-10-20T00:00:00Z'), c, new Map([['PIDx', history]]))
+      .find(x => x.rule === 'R-19');
+
+  const be = r([first, moved(4000)]);
+  assert.deepEqual([be.verdict, be.passed], ['pass', 1]);
+  const idle = r([first]);
+  assert.deepEqual([idle.verdict, idle.failed, idle.ids], ['fail', 1, ['PIDx']],
+    'a stop left where it was through the print passed');
+  assert.equal(r([first, moved(3975)]).verdict, 'fail', 'a stop widened into the print passed');
+  assert.equal(r([first, moved(4000, '2026-10-14T12:00:00Z', 4025)]).verdict, 'fail',
+    'a target shortened for the print passed — it never moves');
+  /* THE ONE CASE NO ROW CAN PART: tightened short of break-even is the rule if
+     the trade was losing and a breach if it was winning. */
+  assert.equal(r([first, moved(3990)]).verdict, 'unknown');
+
+  // A move the poller wrote a couple of minutes after the print is not late;
+  // one well after it is.
+  assert.equal(r([first, moved(4000, '2026-10-14T12:33:00Z')]).verdict, 'pass');
+  assert.equal(r([first, moved(4000, `2026-10-14T12:${30 + STOP_GRACE_MIN + 1}:00Z`)]).verdict, 'fail');
+
+  // A short is the mirror.
+  const sell = buy({ direction: 'SELL', exit_price: 3990 });
+  const high = { seen_at: '2026-10-13T23:02:00Z', sl: 4020, tp: 3970 };
+  assert.equal(r([high, { seen_at: '2026-10-14T12:00:00Z', sl: 4000, tp: 3970 }], sell).verdict, 'pass');
+  assert.equal(r([high, { seen_at: '2026-10-14T12:00:00Z', sl: 4025, tp: 3970 }], sell).verdict, 'fail');
+
+  /* NARROW BECAUSE §6 MADE IT NARROW: opened in the session the print lands
+     in, it is R-14's business and not in this population at all. */
+  const same = r([first], buy({ entry_time: '2026-10-14T12:00:00Z', open_day: '2026-10-14' }));
+  assert.deepEqual([same.passed, same.failed, same.unresolved], [0, 0, 0]);
+
+  // No history, a history that starts after the print, or a week never fetched.
+  assert.equal(r([]).verdict, 'unknown');
+  assert.equal(r([moved(3980, '2026-10-14T13:00:00Z')]).verdict, 'unknown');
+  /* A HISTORY THAT BEGINS JUST AFTER THE PRINT, inside the grace, is the one
+     that could be misread: its first row is the stop in force, so it looks
+     untouched — but nothing says where the stop was before it. */
+  assert.equal(r([moved(3980, '2026-10-14T12:32:00Z')]).verdict, 'unknown',
+    'a stop history begun after the print was read as a stop left untouched');
+  assert.equal(r([first, moved(4000)], buy(), { releases: [cpi], weeks: new Set() }).verdict, 'unknown');
+});
+
+test("R-19's read reaches a week before the trades, newest first", () => {
+  const now = Date.parse('2026-10-20T15:00:00Z');
+  const since = tradesQuery(30, now).match(/open_day=gte\.([\d-]+)/)[1];
+  const q = stopsQuery(30, now);
+  assert.ok(q.match(/seen_at=gte\.([\d-]+)/)[1] <= new Date(Date.parse(since) - 7 * 864e5).toISOString().slice(0, 10));
+  assert.match(q, /order=seen_at\.desc&limit=\d+/);
+});
+
 test('R-10 catches two positions open at once, and an open one still counts', () => {
   const span = (id, from, to) => trade({ id, entry_time: from, fill_time: to });
   assert.equal(verdictOf([
@@ -3782,6 +3842,24 @@ test('each side of the plan is recorded on its own, and a bad id is dropped', ()
   assert.deepEqual(openPlans([{ stopLoss: 4403.24, takeProfit: 4432.1 }]), []);
   assert.deepEqual(openPlans([]), []);
   assert.deepEqual(openPlans(undefined), []);
+});
+
+test('a stop or target is written when it moves, and never on a poll where it did not', () => {
+  const plan = (sl, tp) => ({ id: 'PID1', planned_sl: sl, planned_tp: tp });
+  // The first sighting has nothing before it, so it is always written.
+  assert.deepEqual(stopChanges([plan(3980, 4030)], []), [{ id: 'PID1', sl: 3980, tp: 4030 }]);
+  /* SEVEN HUNDRED POLLS OF A STOP THAT NEVER MOVED ARE ONE ROW — and PostgREST
+     can serve the stored numeric as a string, which must still read as equal. */
+  assert.deepEqual(stopChanges([plan(3980, 4030)], [{ id: 'PID1', sl: '3980', tp: 4030 }]), []);
+  // Only the newest row per position is compared: the stop was moved back.
+  assert.deepEqual(stopChanges([plan(3980, 4030)],
+    [{ id: 'PID1', sl: 4000, tp: 4030 }, { id: 'PID1', sl: 3980, tp: 4030 }]),
+    [{ id: 'PID1', sl: 3980, tp: 4030 }]);
+  assert.deepEqual(stopChanges([plan(4000, 4030)], [{ id: 'PID1', sl: 3980, tp: 4030 }]),
+    [{ id: 'PID1', sl: 4000, tp: 4030 }]);
+  // A pulled target is a change, written as null rather than left as the old one.
+  assert.deepEqual(stopChanges([plan(4000, undefined)], [{ id: 'PID1', sl: 4000, tp: 4030 }]),
+    [{ id: 'PID1', sl: 4000, tp: null }]);
 });
 
 test('every open position with a plan is filed, not just the first', () => {
