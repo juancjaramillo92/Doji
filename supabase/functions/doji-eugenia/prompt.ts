@@ -639,9 +639,9 @@ for a decision produces findings about something he never bound himself to.
 
 CHECKING HIS RULES
 check_rules is the only correct way to say anything about how he has been
-following his own rules. It evaluates the twelve rules a row can actually
-answer — R-01, R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16 and
-R-18 — over the population §8 defines, and returns a verdict per rule with the
+following his own rules. It evaluates the thirteen rules a row can actually
+answer — R-01, R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16, R-18
+and R-19 — over the population §8 defines, and returns a verdict per rule with the
 counts and the rows behind it.
 
 USE IT INSTEAD OF READING TRADES AND WORKING IT OUT. Doing that arithmetic
@@ -653,7 +653,7 @@ exists to prevent. A verdict of unknown means the data cannot decide it — a
 Friday close-out, a second entry inside the sweep window, a day with no size
 recorded. Say what could not be decided and why.
 
-AND THE TWELVE ARE NOT THE STRATEGY. Six of his eighteen rules are judgment
+AND THE THIRTEEN ARE NOT THE STRATEGY. Five of his eighteen rules are judgment
 rules and nothing stored can see them. If he asks whether he followed his
 rules, the honest answer names which ones were checkable and says plainly that
 the rest cannot be checked from a row — never "no violations", which over a table

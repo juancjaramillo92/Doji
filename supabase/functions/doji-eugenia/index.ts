@@ -34,12 +34,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
-// The twelve rules a row can answer, evaluated rather than reasoned about. Pure
+// The thirteen rules a row can answer, evaluated rather than reasoned about. Pure
 // and imported rather than inlined for the reason balanceTarget and foldHours
 // are exported in the app: it is the part that has to be testable.
 import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, RED,
-  type TradeRow, type Standing,
+  type TradeRow, type Standing, type Stop,
 } from "./adherence.ts";
 // The app's own arithmetic over the journal — a win rate, the money split, the
 // realised reward-to-risk, the session and setup breakdowns. Pure and imported
@@ -851,6 +851,13 @@ export function releasesQuery(days: unknown, now = Date.now()): string {
          `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=500`;
 }
 
+// R-19's read: every stop and target the poller saw move, from a week before
+// the window so a position opened before it still has its first sighting.
+export function stopsQuery(days: unknown, now = Date.now()): string {
+  return `trade_stops?select=id,seen_at,sl,tp&seen_at=gte.${windowStart(days, now, 7)}` +
+         `&order=seen_at.desc&limit=2000`;
+}
+
 export function weeksQuery(days: unknown, now = Date.now()): string {
   return `ff_weeks?select=week&week=gte.${windowStart(days, now, 7)}` +
          `&order=week.desc&limit=60`;
@@ -891,23 +898,23 @@ async function readTrades(days: unknown): Promise<string> {
    and R-12 allows fifteen" is a fact about his rule; what it MEANT is his to
    say, and the prohibitions are untouched.
 
-   Twelve rules and not one more. §7's Evaluable column decides the set, and
-   the six marked `judgment` stay out — an approximation of one would be worse
+   Thirteen rules and not one more. §7's Evaluable column decides the set, and
+   the five marked `judgment` stay out — an approximation of one would be worse
    than the gap, because a judgment rule that starts reporting `pass` is exactly
    the "no violations" claim §8 warns is close to saying nothing.
    ───────────────────────────────────────────────────────────────────────── */
 const CHECK_TOOL = {
   name: "check_rules",
   description:
-    "Check his journal against the twelve rules a row can actually answer — R-01, " +
-    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16 and R-18 — over the last N days. Returns a " +
+    "Check his journal against the thirteen rules a row can actually answer — R-01, " +
+    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16, R-18 and R-19 — over the last N days. Returns a " +
     "verdict per rule with the counts behind it and the rows that failed. Use it " +
     "whenever he asks how he has been following his rules, or before saying " +
     "anything about his discipline: this is computed from the rows, so it is not " +
     "something to reproduce by reading trades yourself. A verdict of unknown means " +
-    "the data cannot decide it and is NEVER the same as a pass. The other six " +
+    "the data cannot decide it and is NEVER the same as a pass. The other five " +
     "rules are judgment rules and nothing stored can check them — say so " +
-    "rather than implying the twelve are the whole strategy.",
+    "rather than implying the thirteen are the whole strategy.",
   input_schema: {
     type: "object",
     properties: {
@@ -923,15 +930,18 @@ const CHECK_TOOL = {
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const [rows, releases, weeks] = await Promise.all([
+    const [rows, releases, weeks, moves] = await Promise.all([
       readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
       readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
       readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
+      readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
     ]);
     if (!rows.length) return "No trades in that window, so there is nothing to check.";
+    const stops = new Map<string, Stop[]>();
+    for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
     return adherenceList(checkRules(rows, Date.now(), {
       releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
-    }));
+    }, stops));
   } catch (err) {
     console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";

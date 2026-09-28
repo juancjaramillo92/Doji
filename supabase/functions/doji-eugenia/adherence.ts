@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// THE STRATEGY, EXECUTED — the twelve rules a row can actually answer
+// THE STRATEGY, EXECUTED — the thirteen rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
 // §7 of strategy.ts writes a predicate for all nineteen rules and §8 writes the
 // population filters and the three verdicts. Both were prose: she was handed up
@@ -16,9 +16,9 @@
 // driven from a test with a hand-built row and broken on purpose — which is the
 // only way anything here earns the word "checked".
 //
-// TWELVE RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides it:
-// `journal` means a row can answer it today. R-05 through R-08, R-17 and R-19
-// are `judgment` — nothing stored can see them,
+// THIRTEEN RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides
+// it: `journal` means a row can answer it today. R-05 through R-08 and R-17 are
+// `judgment` — nothing stored can see them,
 // and inventing an approximation here would be worse than the gap, because a
 // judgment rule that starts reporting `pass` is exactly the "no violations"
 // claim §8 warns is close to saying nothing.
@@ -32,7 +32,7 @@ import { nyDate } from "../_shared/edge.ts";
 /* The journal's own break-even band, not a second reading of it. `journal.ts`
    imports `TradeRow` from here with `import type`, which is erased — so this is
    a one-way dependency at runtime and not a cycle. */
-import { BE } from "./journal.ts";
+import { BE, sessionAt } from "./journal.ts";
 
 /* The row as eugenia_trades serves it. Written out rather than inferred,
    because this module is the one place that reasons about every column at once
@@ -726,6 +726,72 @@ function r18(rows: TradeRow[], now: number): RuleResult {
                 pass, fail, unknown);
 }
 
+/* ─── R-19 ─────────────────────────────────────────────────────────────────
+   A print landing on a position inherited from an earlier session: in profit,
+   stop to break-even; losing, tighten; the target never moves; never wider.
+   §7: judged at the first USD red folder inside the position's span whose
+   session is not the one it was opened in, against the stop and target in
+   force then.
+
+   THE POPULATION IS NARROW BECAUSE §6 MADE IT NARROW. "Read generally it turns
+   there is news later into a reason to touch any position" — so a trade opened
+   in the session its print lands in is R-14's business and never this one's,
+   and a trade no print lands on is not in it at all.
+
+   ONE CASE THE DATA CANNOT PART. A stop tightened but short of break-even is
+   the rule on a losing trade and a breach on a winning one, and whether it was
+   winning at the print is a price nothing here holds — so it is unknown rather
+   than guessed. Break-even or better passes either way, since a losing trade
+   cannot hold a stop past its entry; an untouched stop fails either way, since
+   both branches move it. So does a wider one, and a target that moved.
+
+   STOP_GRACE_MIN because the poller writes a move up to two minutes after it
+   is made: a stop pulled in a minute before the print must not read as late. A
+   move a few minutes after the print passes for the same reason, and that is
+   the direction this errs in. A trade whose stop history starts after its
+   print — anything before 014 — is unknown. */
+export const STOP_GRACE_MIN = 5;
+
+export interface Stop { seen_at: string; sl: number | null; tp: number | null }
+
+function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleResult {
+  const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
+  const prints = cal.releases.map(r => +new Date(r)).sort((a, b) => a - b);
+  const price = (v: number | null) => v == null ? null : Number(v);
+
+  for (const t of rows) {
+    if (!isBroker(t) || !t.entry_time) continue;
+    const entry = new Date(t.entry_time), e = +entry;
+    if (!cal.weeks.has(weekOf(entry))) { unknown.push(t.id); continue; }
+    // Closed with no instant: the span has no end, so what it spanned is unknown.
+    if (!t.fill_time && t.exit_price !== null) { unknown.push(t.id); continue; }
+    const end = t.fill_time ? +new Date(t.fill_time) : Infinity;
+
+    const opened = sessionAt(entry);
+    const print = prints.find(p => p > e && p < end && sessionAt(new Date(p)) !== opened);
+    if (print === undefined) continue;
+
+    const seen = [...(stops.get(t.id) ?? [])].sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at));
+    const first = seen[0];
+    const held = seen.filter(s => +new Date(s.seen_at) <= print + STOP_GRACE_MIN * 60_000).pop();
+    const buy = t.direction === 'BUY';
+    if (!first || !held || +new Date(first.seen_at) > print || t.entry_price == null ||
+        (t.direction !== 'BUY' && t.direction !== 'SELL')) { unknown.push(t.id); continue; }
+
+    const [was, now] = [price(first.sl), price(held.sl)];
+    const targetMoved = price(first.tp) !== null && price(held.tp) !== price(first.tp);
+    const wider = was !== null && now !== null && (buy ? now < was : now > was);
+    if (targetMoved || wider) { fail.push(t.id); continue; }
+    if (was === null || now === null) { unknown.push(t.id); continue; }
+
+    const atEntry = buy ? now >= t.entry_price - CENT : now <= t.entry_price + CENT;
+    if (atEntry) pass.push(t.id);
+    else (now === was ? fail : unknown).push(t.id);
+  }
+  return result('R-19', 'positions from an earlier session a USD red folder landed on, judged on the stop and target in force at the print',
+                pass, fail, unknown);
+}
+
 /* One pass over the rows to bucket them by filing day, so the two day-scoped
    rules do not each scan the list per day. The same reason index.html builds
    Data.byDay once rather than filtering inside a loop. */
@@ -744,9 +810,11 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
    so a rule that stopped being evaluated is a gap in a sequence rather than an
    absence nobody can see. */
 export function checkRules(rows: TradeRow[], now = Date.now(),
-                           cal: Calendar = { releases: [], weeks: new Set() }): RuleResult[] {
+                           cal: Calendar = { releases: [], weeks: new Set() },
+                           stops: Map<string, Stop[]> = new Map()): RuleResult[] {
   return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows),
-          r12(rows), r13(rows), r14(rows, cal), r15(rows), r16(rows), r18(rows, now)];
+          r12(rows), r13(rows), r14(rows, cal), r15(rows), r16(rows), r18(rows, now),
+          r19(rows, cal, stops)];
 }
 
 /* ─── Where a day stands right now ────────────────────────────────────────
