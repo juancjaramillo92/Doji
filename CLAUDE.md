@@ -1928,10 +1928,15 @@ a blank.
   outcomes, always.
 
 - **No numbered file reads into a variable with `select … into`.** The SQL
-  editor took one inside 010 for a new table and spliced an RLS statement into
-  the function body; `x := (select …)` is the form, and the README says why.
-  A test holds it, but only against the one misreading seen so far — a file that
-  refuses to run in the editor is the symptom, and the editor is what to suspect.
+  editor takes one for a new table and offers to append an RLS statement for it,
+  which rolls the whole paste back; `x := (select …)` is the form, and the README
+  says why. AND THAT WAS NOT WHAT FIRST BROKE 010, which is the half to keep: the
+  paste had arrived cut at line 150, both times, and `unterminated
+  dollar-quoted string` was the truncation — diagnosed first as the editor
+  splicing text into the body, which its own source (Studio, in the public
+  supabase/supabase repository) shows it cannot do: it only ever appends at the
+  end of what it was given. When the editor
+  refuses a file, read what it actually received before explaining why.
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file. `verify.sql` counts

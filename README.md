@@ -3900,13 +3900,20 @@ from the Apps Script editor; it holds no secrets in the file and nothing reads
 it from here.
 
 **The editor reads the words and not the language, so no file says `select …
-into`.** It appends `alter table <x> enable row level security` after anything
-it takes for a new table, and it took `select … into worst` inside a plpgsql
-function for `create table worst` — splicing that statement into the function
-body, which broke the dollar quote and refused the whole file. Every function
-here reads into a variable as `x := (select …)` instead, which means the same
-and cannot be mistaken for a table, and `agree.test.mjs` refuses the other form
-in any numbered file.
+into`.** Before it runs anything it looks for new tables without RLS, and it
+takes `select … into worst` inside a plpgsql function for `create table worst`.
+It then warns, and its *run with RLS* button appends `alter table worst enable
+row level security` to the END of the paste — a table that does not exist, so
+Postgres refuses the statement and the whole paste, which runs as one
+transaction, rolls back with it. Every function here reads into a variable as
+`x := (select …)` instead, which means the same and cannot be mistaken for a
+table, and `agree.test.mjs` refuses the other form in any numbered file.
+
+**Check the paste ends where the file does.** The editor runs its whole contents,
+or only the selection if there is one. A paste that stopped partway — 010 has
+twice arrived cut at line 150 — fails as `unterminated dollar-quoted string`,
+which reads like a fault in the file. The last line in the editor should be the
+file's last line.
 
 **Applying by hand means the files are a claim, so `supabase/verify.sql` is how
 the claim gets tested.** It writes nothing: it reads back the columns, the
