@@ -3892,12 +3892,21 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `010_pace.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `013_ff_calendar.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
 from the Apps Script editor; it holds no secrets in the file and nothing reads
 it from here.
+
+**The editor reads the words and not the language, so no file says `select …
+into`.** It appends `alter table <x> enable row level security` after anything
+it takes for a new table, and it took `select … into worst` inside a plpgsql
+function for `create table worst` — splicing that statement into the function
+body, which broke the dollar quote and refused the whole file. Every function
+here reads into a variable as `x := (select …)` instead, which means the same
+and cannot be mistaken for a table, and `agree.test.mjs` refuses the other form
+in any numbered file.
 
 **Applying by hand means the files are a claim, so `supabase/verify.sql` is how
 the claim gets tested.** It writes nothing: it reads back the columns, the

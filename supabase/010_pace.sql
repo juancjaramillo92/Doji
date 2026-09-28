@@ -94,7 +94,7 @@ declare
   hour    int  := extract(hour from now_ at time zone 'America/New_York')::int;
   today   date := (now_ at time zone 'America/New_York')::date;
   owed    text;
-  worst   record;
+  worst   public.eugenia_runs;
   lines   text[] := '{}';
 begin
   /* ── THE ABSENCE ──────────────────────────────────────────────────────────
@@ -128,13 +128,12 @@ begin
      that spend most of it are exactly the ones worth seeing. Rows this
      watcher writes carry no `ms`, so they fall out of the population here
      rather than needing to be named out of it. */
-  select r.caller, r.ms, r.at into worst
-    from public.eugenia_runs r
-   where r.ms is not null
-     and r.at > now_ - interval '7 days'
-     and (since is null or r.at > since)
-   order by r.ms desc
-   limit 1;
+  worst := (select r from public.eugenia_runs r
+             where r.ms is not null
+               and r.at > now_ - interval '7 days'
+               and (since is null or r.at > since)
+             order by r.ms desc
+             limit 1);
 
   /* EACH FINDING CARRIES ITS OWN CONSEQUENCE, and there is no opening line
      over the top of them. One was tried and it could only be true of one case:
@@ -195,10 +194,10 @@ begin
         where caller = 'pace' and not ok
           and (at at time zone 'America/New_York')::date = today) then
 
-    select decrypted_secret into token from vault.decrypted_secrets
-     where name = 'eugenia_bot_token';
-    select decrypted_secret into chat  from vault.decrypted_secrets
-     where name = 'telegram_chat_id';
+    token := (select decrypted_secret from vault.decrypted_secrets
+               where name = 'eugenia_bot_token');
+    chat  := (select decrypted_secret from vault.decrypted_secrets
+               where name = 'telegram_chat_id');
 
     if token is not null and chat is not null then
       perform net.http_post(

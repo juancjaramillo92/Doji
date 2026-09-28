@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 605 tests, six suites
+npm test      # 606 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1927,6 +1927,11 @@ a blank.
   where the post was made. A quiet day still leaves a `clear` row: both
   outcomes, always.
 
+- **No numbered file reads into a variable with `select … into`.** The SQL
+  editor took one inside 010 for a new table and spliced an RLS statement into
+  the function body; `x := (select …)` is the form, and the README says why.
+  A test holds it, but only against the one misreading seen so far — a file that
+  refuses to run in the editor is the symptom, and the editor is what to suspect.
 - **`004_cron.sql` holds every schedule and is safe to re-run.** `cron.schedule`
   upserts on the job name, so applying the file makes the database match it. Add
   a new scheduled job there, never in a feature's own file. `verify.sql` counts

@@ -242,13 +242,14 @@ begin
              and d.at <= now_ - interval '15 minutes'
              and public.dispatch_bad(d.id)) >= 3;
 
-  select string_agg(line, E'\n' order by id), count(*) into told, n from _said;
+  told := (select string_agg(line, E'\n' order by id) from _said);
+  n    := (select count(*) from _said);
 
   if n > 0 then
-    select decrypted_secret into token from vault.decrypted_secrets
-     where name = 'eugenia_bot_token';
-    select decrypted_secret into chat  from vault.decrypted_secrets
-     where name = 'telegram_chat_id';
+    token := (select decrypted_secret from vault.decrypted_secrets
+               where name = 'eugenia_bot_token');
+    chat  := (select decrypted_secret from vault.decrypted_secrets
+               where name = 'telegram_chat_id');
 
     if token is not null and chat is not null then
       req := net.http_post(

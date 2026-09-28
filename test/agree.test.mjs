@@ -4535,6 +4535,27 @@ test('010 marks the day said only where the message was actually sent', () => {
     'written on a failed send, which is the same silence from the other side');
 });
 
+test('no numbered SQL file reads into a variable with SELECT … INTO', () => {
+  /* THE DASHBOARD READS THE WORDS AND NOT THE LANGUAGE. The Supabase SQL editor
+     now appends `alter table <x> enable row level security` after anything it
+     takes for a new table, and it took `select … into worst` inside 010's
+     plpgsql for `create table worst` — splicing the statement into the
+     function body, where it broke the dollar quote and the whole file
+     refused to run. Nothing here can see the editor, so the shape it misreads
+     is kept out of every file a person pastes into it: `x := (select …)` says
+     the same thing and cannot be mistaken for a table. */
+  const dir = new URL('../supabase/', import.meta.url);
+  const files = readdirSync(dir).filter(f => /^\d{3}_.*\.sql$/.test(f));
+  assert.ok(files.length >= 13, `only ${files.length} numbered SQL files read — the reader has gone blind`);
+  for (const f of files) {
+    const sql = readFileSync(new URL(f, dir), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '').replace(/'(?:[^']|'')*'/g, "''");
+    const hit = sql.match(/\bselect\b[^;]*?(?<!\binsert\s+)\binto\s+\w+/i);
+    assert.ok(!hit, `${f} has \`${hit?.[0].replace(/\s+/g, ' ').slice(-60)}\` — the SQL editor ` +
+      `reads that as a new table and splices a statement into the function around it`);
+  }
+});
+
 test('the delivered row splits what came after the critic, around the right calls', () => {
   /* THE STRETCH THAT HAD NO ROW. Sunday spent 155s between the critic's row and
      the delivered one, Monday 20s, and nothing could say whether storing or

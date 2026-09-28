@@ -43,9 +43,8 @@ begin
   -- 004_cron.sql reads exactly this name. Postgres compares it case-sensitively
   -- and a name that matches nothing yields null, so the upper-case spelling
   -- costs every trade its message and raises nothing.
-  select decrypted_secret into secret
-    from vault.decrypted_secrets
-    where name = 'doji_cron_secret';
+  secret := (select decrypted_secret from vault.decrypted_secrets
+              where name = 'doji_cron_secret');
 
   -- An AFTER trigger that raises takes the write down with it, and a missing
   -- secret must never cost the trade its row. The prompt is the expendable half

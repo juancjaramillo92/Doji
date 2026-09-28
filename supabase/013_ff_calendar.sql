@@ -63,9 +63,8 @@ declare
   hi timestamptz;
   n  integer;
 begin
-  select min((e->>'at')::timestamptz), max((e->>'at')::timestamptz)
-    into lo, hi
-    from jsonb_array_elements(events) e;
+  lo := (select min((e->>'at')::timestamptz) from jsonb_array_elements(events) e);
+  hi := (select max((e->>'at')::timestamptz) from jsonb_array_elements(events) e);
   if lo is null then return 0; end if;
 
   delete from public.ff_calendar where at between lo and hi;
