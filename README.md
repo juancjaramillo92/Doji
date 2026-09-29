@@ -71,6 +71,7 @@ supabase/011_trades_grants.sql          which columns the app may write
 supabase/012_excursion.sql              how far a trade ran in his favour
 supabase/013_ff_calendar.sql            Forex Factory's week, which R-14 is judged against
 supabase/014_stops.sql                  every stop and target a position carried, which R-19 reads
+supabase/015_commitments.sql            what he committed to, as a third kind of note
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -2384,7 +2385,7 @@ is the only dataset here that compounds.
 | | Holds | Window | Written by |
 |---|---|---|---|
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
-| `eugenia_notes` | facts about him, and what he has told her to do | last 20 notes | her `remember` tool |
+| `eugenia_notes` | facts about him, what he has told her to do, and what he has committed to | last 20 of each kind | her `remember` tool |
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
@@ -2406,6 +2407,20 @@ one, in his words, obeyed from the next message on, and overriding the shape the
 prompt otherwise asks for. She acknowledges an instruction in four words or
 fewer — a fact about him she records silently — because otherwise he cannot tell
 it stuck and will say it again.
+
+**What he commits to is the third kind, and it is read the other way round.**
+*"This week I stop after two losses"* is not something she does — it is something
+he does, so she holds his trades against it rather than obeying it. Written in
+his words with its period, acknowledged like an instruction, and never one he did
+not make. When a closed trade breaks one she says so, fact first and verdict
+after, the way she says a broken rule; the briefing gives it one sentence the
+morning after. The nightly pass reads each day's trades against them, and a
+commitment whose period is over is retired by superseding it with a fact saying
+how it went — kept, or broken and on which trade — because how he does against
+his own word outlives the commitment by months. Its own kind rather than an
+instruction because the two are read in opposite directions, and one window over
+both would have her telling them apart from the wording alone. `/notes` lists
+them between what he told her and what she noticed.
 
 **A reply to one of her messages tells her which one.** Swipe a message in
 Telegram and answer it, typed or spoken, and she is handed the message he
@@ -3393,6 +3408,14 @@ Once it is applied the backlog fills itself at three trades every two minutes.
 `excursions` in the poller's answer counts rows written, for `planned`'s reason,
 and reads `0` once every trade that can be measured has been.
 
+### Applying 015, which is his commitments
+
+`015_commitments.sql` recreates the check on `eugenia_notes.kind` with a third
+word, `commitment`. **Safe to re-run.** Deploying the function first costs one
+thing: a commitment she tries to record is refused by the old constraint, and she
+tells him it did not save — so run the file first. `verify.sql`'s **`eugenia_notes
+accepts a commitment`** row is what says which.
+
 ### Applying 014, which is the stop history
 
 `014_stops.sql` creates `trade_stops`. **Safe to re-run.** It looks forward only:
@@ -4250,9 +4273,10 @@ been wrong once, reporting a correct database as broken.
     they are watching; store them lower-case, the way step 5's cron secret is.
     Re-run `supabase/004_cron.sql` afterwards if the two watchers' jobs are not
     already scheduled — it upserts on the job name.
-14. Run `supabase/012_excursion.sql`, `supabase/013_ff_calendar.sql` and
-    `supabase/014_stops.sql`, all safe to re-run.
-15. Run `supabase/verify.sql` and read it against 001–014. Nothing is set up
+14. Run `supabase/012_excursion.sql`, `supabase/013_ff_calendar.sql`,
+    `supabase/014_stops.sql` and `supabase/015_commitments.sql`, all safe to
+    re-run.
+15. Run `supabase/verify.sql` and read it against 001–015. Nothing is set up
     until that agrees.
 
 ---

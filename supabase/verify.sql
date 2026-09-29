@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 80 checks above them, silently, leaving a
+-- HTTP responses and threw away all 81 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -349,6 +349,14 @@ from (values
    (select data_type from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_notes' and column_name = 'kind'),
    'text'),
+
+  -- 015. Without it every remember() of a commitment is refused by the
+  -- constraint, and she is told it did not save — so he is asked to repeat a
+  -- commitment that can never be kept, and nothing holds his trades against it.
+  ('eugenia_notes accepts a commitment',
+   (select (pg_get_constraintdef(oid) like '%commitment%')::text
+      from pg_constraint where conname = 'eugenia_notes_kind_check'),
+   'true'),
 
   -- Without this the read's `superseded_by=is.null` filter is a 400 from
   -- PostgREST on every turn, which notesBlock() swallows — so she loses her

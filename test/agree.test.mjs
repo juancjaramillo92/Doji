@@ -800,18 +800,58 @@ test('the rule that decides how a term is pitched is in her context, not fetchab
   }
 });
 
-test('the note kinds are the same two words in the tool and the constraint', () => {
+test('the note kinds are the same three words in the tool and the constraint', () => {
   const offered = [...EUGENIA_TS.matchAll(/NOTE_KINDS = \[([^\]]*)\]/g)]
     .flatMap(m => [...m[1].matchAll(/'([a-z]+)'/g)].map(k => k[1])).sort();
-  const enforced = [...(EUGENIA_SQL.match(/kind in \(([^)]*)\)/i)?.[1] ?? '')
-    .matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort();
+  /* THE LAST DECLARATION, read across every numbered file in order, because
+     that is the one Postgres holds: 003 created the constraint with two words
+     and 015 recreates it with three. Read from 003 alone, this compared the
+     tool against a constraint the database no longer has. */
+  const declared = [...NUMBERED.matchAll(/eugenia_notes_kind_check\s+check \(kind in \(([^)]*)\)/gi)];
+  assert.ok(declared.length >= 2,
+    `found ${declared.length} declarations of eugenia_notes_kind_check — the reader has gone blind`);
+  const enforced = [...declared[declared.length - 1][1].matchAll(/'([a-z]+)'/g)]
+    .map(m => m[1]).sort();
 
-  assert.deepEqual(offered, ['fact', 'instruction'],
+  assert.deepEqual(offered, ['commitment', 'fact', 'instruction'],
     'the kinds the tool offers have changed — say so here, and check the constraint');
   assert.deepEqual(enforced, offered,
-    'the tool and the check constraint no longer offer the same kinds');
+    'the tool and the check constraint no longer offer the same kinds — a kind ' +
+    'the constraint refuses is a remember() that vanishes, reported to nobody');
 });
 
+
+/* ─── A commitment is only worth having if something checks it ──────────────
+   Three halves, and each is silent without the others. `/notes` hands him the
+   audit — its argument DEFAULTS, so a call site that stops reading commitments
+   still answers, correctly formatted, minus the one list he would look for.
+   SYSTEM tells her to record one and to say so when a trade breaks it.
+   CONSOLIDATE is the only place a commitment whose week is over gets retired
+   with how it went; without it they pile up in her window for ever, each one
+   still being "held against" trades it was never about.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a commitment is recorded, audited, held against his trades and retired', () => {
+  const at = EUGENIA_TS.indexOf("text.trim().toLowerCase() === '/notes'");
+  assert.ok(at > -1, 'the /notes branch is no longer where this reads it');
+  const branch = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('return;', at));
+  assert.match(branch, /readNotes\('commitment'\)/,
+    '/notes no longer reads his commitments — the audit still answers, minus them');
+  assert.match(branch, /notesList\([^)]*promised\)/,
+    '/notes reads his commitments and does not hand them to notesList');
+
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+  assert.match(bodies.SYSTEM, /kind='commitment'/,
+    'SYSTEM no longer tells her how to record a commitment');
+  assert.match(bodies.SYSTEM, /WHEN A CLOSED TRADE BREAKS ONE, SAY SO/,
+    'SYSTEM no longer has her say when a trade broke a commitment — recorded ' +
+    'and never checked, it is a promise nobody holds him to');
+  assert.match(bodies.CONSOLIDATE, /HOLD THE DAY AGAINST WHAT HE COMMITTED TO/,
+    'the nightly pass no longer checks the day against his commitments or ' +
+    'retires the ones whose period is over');
+});
 
 /* ─── Who the database and Gmail think they are calling ─────────────────────
    A function's name is in its directory, in the Deno.serve URL Supabase derives

@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 611 tests, six suites
+npm test      # 614 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -599,7 +599,9 @@ code you write near it:
 ### Her memory, which has five lifetimes
 
 A turn rolls inside a morning. A note about him outlives twenty of those, which
-is what `kind` is for. What he UNDERSTANDS outlives both, which is
+is what `kind` is for — and `commitment`, the third kind, is read the other way
+round from the other two: what HE said he would do, held against his trades
+rather than obeyed, and retired by the nightly pass with how it went. What he UNDERSTANDS outlives both, which is
 `eugenia_channels`. `eugenia_thesis` is one row rewritten nightly — a reading
 that is only ever current, the opposite of a note and why it is not append-only.
 `eugenia_loops` holds what she flagged and what she asked until it closes.
