@@ -1666,9 +1666,11 @@ them would resend a stale copy as history for the next six briefings.
 
 **She sees your week without being asked.** The last seven New York days of
 trades go in with the briefing, so *"you have not traded since Tuesday"* costs
-no tool round. Mentioned only when there is something real to say, in a clause,
-never as a verdict — most mornings the right amount to say about your trading is
-nothing.
+no tool round. Mentioned only when there is something real to say, in a clause.
+The one verdict that earns a line in the morning is a closed trade from yesterday
+that broke one of your rules or repeated a mistake she has seen before — one
+plain sentence, then back to the market. Most mornings the right amount to say
+about your trading is nothing.
 
 ### The pulse
 
@@ -1825,7 +1827,9 @@ briefing; asked of three sentences they would demand a chain, complain about
 length, and rewrite a good message into a bad one. `TRIM` asks the writing
 questions and nothing else — off the same `WRITING` the writer was given — and is
 handed no notes and no channel map, because it is not judging whether a term was
-built. It runs on Sonnet.
+built. It **is** handed what you have on right now, because her read on price is
+allowed and a read while you are in a position is not, and a gate cannot tell
+those apart without the block that says which. It runs on Sonnet.
 
 **The trade event stays out, and the reason first given for it was wrong.** It
 said there was no composed prose to trim. Both branches do decide *whether to
@@ -1834,10 +1838,10 @@ nothing — but the one that speaks then calls the model with the conversation
 window, her notes and two tools, and writes two sentences. That is composed
 prose by any reading.
 
-What exempts it is the gate's own shape. `TRIM` **rewrites**, and it is handed
-nothing but the draft: it cannot know this message reaches him while he is in a
-position, and the one thing that must never happen on this path is a sentence
-that reads as an instruction. That is a failure already seen once here — a gate
+What exempts it is the gate's own shape. `TRIM` **rewrites**, and this message
+reaches him while he is in a position or has just breached his day. The one thing
+that must never happen on this path is a sentence that reads as an instruction,
+and a gate paraphrasing a citation of his rule is how one becomes an order. That is a failure already seen once here — a gate
 not told the no-direction rule could take a compliant message and hand back one
 that broke it. `TRADE_EVENT` is also the most constrained prompt in the file —
 two sentences, the fact then the rule, no greeting, `NOTHING` as an explicit way
@@ -2324,10 +2328,11 @@ but a voice note forwarded to anyone else carries no such context, and that is
 worth knowing before forwarding one.
 
 **A chart** she can now see, and the prohibitions do not move an inch because she
-can. She may describe what is on it and take it as context; she may not say
-whether a setup is valid or a level will hold, and the prompt says so in those
-words, because a picture is the most tempting place in this system to give a
-verdict on a trade.
+can. She may describe what is on it and take it as context; on a trade not yet
+taken she may not say whether a setup is valid or a level will hold, and the
+prompt says so in those words, because a picture is the most tempting place in
+this system to give a signal. A chart of a trade that has closed she judges the
+way she judges the journal.
 
 **And when it produces no words, she says which of four things happened.** They
 were one sentence: a rejected key, a wrong URL, an unsupported format and
@@ -2519,11 +2524,10 @@ minutes old, and that figure would be both the most anchoring number in the bloc
 and the one staleness gets most wrong. Entry and mark are given as what they are,
 labelled, and she can subtract them if he asks.
 
-A run of losses is governed separately and by the same idea as the briefing's
-chain: she may never hand him a tally, because a scoreboard is read as the
-verdict she did not write. She raises a run only when she can say what the trades
-have **in common**, and then says the common thing rather than the count. A
-breach of one of his own rules is not withheld — that is his document deciding.
+A run of losses is named — *"that is three this week"* is a fact he should hear
+— and then either explained by what the trades have **in common** or admitted as
+not yet explained, which is information too. A breach of one of his own rules
+inside the run leads, because that is his document deciding.
 
 ### Search that survives a rephrasing
 
@@ -3692,18 +3696,37 @@ hid itself, nothing was logged, and why it was blank became unknowable — the s
 mistake `readTrades` is written against on her side of the wire, in the same
 words: **an empty answer is only an answer when something was read.**
 
-### What she will not do
+### What she will not do, and what she may
 
-In the prompt rather than left to taste: no forward price-action opinions, no
-signals or entries, no verdict on a trade, and never more than one question at
-a time.
+In the prompt rather than left to taste: **no signals** — no entry, no level to
+buy or sell at, no stop, no target, nothing about what to do with a position —
+and never more than one question at a time. No instruction note can widen that;
+one that narrows it (*"keep your read to yourself"*) is obeyed.
 
-**The line is between describing the world and predicting it**, and she is
-allowed the first half of that deliberately. *"A December cut is about 70%
-priced"* is a fact about today. *"A 0.4% core print is not in the price"* is a
-statement about expectations. Both are hers to say, and saying them is most of
-what stops the briefing reading like a wire feed. *"That would send gold lower"*
-is not, and never becomes so.
+**Most of what she says is what the market is pricing.** *"A December cut is
+about 70% priced"* is a fact about today. *"A 0.4% core print is not in the
+price"* is a statement about expectations. Saying them is most of what stops the
+briefing reading like a wire feed.
+
+**She may also give her read, fenced three ways.** Which way today's news leans
+for gold, said as *her read* (*"my read is this print is bad news for gold"*),
+with what would prove her wrong in the same breath, and with no level in it —
+the moment a read has a price in it, it is a signal. One per message at most, in
+the briefing or a conversation; the pulse, the release and move looks and the
+trade event carry none, because they land at moments she did not choose. **And
+none at all while you are in a position**, where a view on price is advice about
+the trade however it is worded. *"That will send gold lower"* stays out: that is
+a forecast dressed as a fact. Both gates carry the same fence and are handed
+what you have on, so the pass that runs last neither lets a tip through nor cuts
+a read that obeyed it.
+
+**She judges trades, the decision and never the result.** A closed trade gets a
+plain verdict and, where there is one, the lesson — measured against your rules
+and the plan you entered with, not the P&L. A loss taken inside your rules was a
+good trade; a win that broke one was a bad trade that paid. Judged on the result
+she would be praising luck and punishing discipline. Blunt, not cruel: once, and
+about the trade rather than about you. A trade still open gets no verdict — that
+waits for the close.
 
 ---
 

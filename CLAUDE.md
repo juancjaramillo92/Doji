@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 609 tests, six suites
+npm test      # 611 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -458,21 +458,30 @@ code you write near it:
 ### What she is, and what she may never do
 
 - **The prohibitions live in `prompt.ts`, and they are the product.** AND
-  NOTHING ASSERTED THE MAIN ONE WAS THERE. *No calls on where price goes* is
-  the line between a market analyst and a signal service, it is enforced by
-  nothing but the sentence itself, and deleting it from `SYSTEM` broke no test
-  — what came back would have read like a better briefing. `agree.test.mjs`
-  reads for it now in `SYSTEM`, `CRITIC`, `TRIM`, `MOVE` and `TRADE_EVENT`.
-  THE TWO GATES NEED IT AS MUCH AS THE WRITER, for a reason that is theirs
-  alone: they do not approve, they REWRITE, so one that has not been told the
-  rule can take a compliant message and hand back one that breaks it — and it
-  runs LAST, so nothing after it disagrees. `RELEASE` and `CONSOLIDATE` are
-  out by design: `SYSTEM` is the system prompt on every call, so they inherit
-  it. No signals,
-  no verdict on a trade, one question at a time. The line she may cross is narrow
-  and deliberate: *what the market is pricing* and *what would surprise it* are
-  facts about today and are hers to say; what price will do never is. Widening
-  that is a product decision, not a prompt tweak.
+  NOTHING ASSERTED THE MAIN ONE WAS THERE. *No signal* is the line between a
+  market analyst and a signal service, it is enforced by nothing but the
+  sentence itself, and deleting it from `SYSTEM` broke no test — what came back
+  would have read like a better briefing. `agree.test.mjs` reads for the line
+  on price in `SYSTEM`, `CRITIC`, `TRIM`, `MOVE` and `TRADE_EVENT`. THE TWO
+  GATES NEED IT AS MUCH AS THE WRITER, for a reason that is theirs alone: they
+  do not approve, they REWRITE, so one that has not been told the rule can take
+  a compliant message and hand back one that breaks it — and it runs LAST, so
+  nothing after it disagrees. `RELEASE` and `CONSOLIDATE` are out by design:
+  `SYSTEM` is the system prompt on every call, so they inherit it.
+
+  SHE HOLDS A VIEW AND JUDGES A TRADE, AND BOTH ARE FENCED RATHER THAN BANNED.
+  That was his product decision, and the README carries what each fence is.
+  What constrains code: the read's fence is three halves — labelled as hers,
+  what would prove it wrong, no level — plus NONE WHILE HE IS IN A POSITION, and
+  all four live in `SYSTEM`, `CRITIC` and `TRIM`, because a gate missing one
+  either lets a tip through or cuts every read that obeyed it. The fourth half
+  is why both gates are now handed `positionsBlock()`: a rule about whether he
+  is in a position, restated in a gate that cannot see the position, is the
+  critic's old failure with his notes. The verdict is measured against his
+  rules and the plan he entered with, never the P&L, and waits for the close.
+  `MOVE`, `RELEASE` and `TRADE_EVENT` keep the flat ban — they land at moments
+  she did not choose. Signals — an entry, a stop, a target, what to do with a
+  position — stay forbidden outright, and no instruction note can reach them.
 - **The briefing is prose and must stay prose, with ONE relaxation that is his
   and is written down.** Numbered sections with headings are a report however
   plain the words inside them, and reintroducing scaffolding to "organise" the
@@ -865,10 +874,10 @@ compounds.
   `postTradeEvent` stays out, being reached from the position it would be told
   about.
 
-  A RUN OF LOSSES IS A TALLY AND A TALLY IS A VERDICT. She may never hand him the
-  count — only what the trades have in common, which is the briefing's own rule
-  about a cause with no chain under it. A breach of one of his rules is not the
-  same thing and is never withheld: that is his document deciding.
+  A RUN OF LOSSES IS NAMED, AND THEN EXPLAINED OR ADMITTED UNEXPLAINED. The
+  count is a fact he should hear; what the trades have in common is the finding,
+  and saying she cannot find one yet is information too. A breach of one of his
+  rules inside the run leads: that is his document deciding.
 
 - **`TradeRow` is a copy of the view's column list and has a test.** Its own
   comment calls it the row `eugenia_trades` serves, and every rule in
@@ -1225,7 +1234,8 @@ compounds.
   `TRIM` IS NOT `CRITIC` WITH A SHORTER PROMPT, and the README says why each
   of the briefing's four checks would ruin three sentences. What constrains code
   here: `TRIM` reads the same `WRITING` the writer was given rather than a copy,
-  it is handed no notes and no channel map, and it runs on Sonnet because
+  it is handed no notes and no channel map but IS handed `positionsBlock()`,
+  since the line on price turns on it, and it runs on Sonnet because
   checking a message against a stated rule is the bounded half of the split the
   models are chosen on.
 
@@ -1233,10 +1243,11 @@ compounds.
   prose to trim* was written of a path that calls `ask` with history, notes and
   two tools and writes two sentences. What is true is the half about the
   DECISION: both branches decide whether to speak before any model call, so an
-  ordinary fill costs nothing. What exempts the PROSE is that `TRIM` rewrites
-  and is handed only the draft, so it cannot know this one reaches a man who is
-  in a position — and a sentence that reads as an instruction is the single
-  thing that must never happen here. `TRADE_EVENT` is the most constrained
+  ordinary fill costs nothing. What exempts the PROSE is that `TRIM` rewrites,
+  and this one reaches a man who is in a position or has just breached his day
+  — a gate paraphrasing a citation of his rule is how one becomes an order, and
+  a sentence that reads as an instruction is the single thing that must never
+  happen here. `TRADE_EVENT` is the most constrained
   prompt in the file besides, so little of what `TRIM` checks is reachable in
   two sentences. An exemption is only worth a row while the reason in it is
   true.
