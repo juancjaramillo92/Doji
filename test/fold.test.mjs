@@ -3625,6 +3625,48 @@ test('the audit still works before any of the newer memory exists', () => {
   assert.ok(!/The story I am carrying/.test(out));
 });
 
+/* ─── What he committed to, which she holds his trades against ──────────────
+   A commitment is read the opposite way to an instruction — she does not obey
+   it, she checks him against it — so it is its own kind with its own window.
+   Both renderings have to carry it: hers, or nothing is ever held against it;
+   his, or he cannot see what she thinks he promised. Driven through the real
+   read rather than handed a list, because the kind the block ASKS for is the
+   half a rendering test cannot reach.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('his audit shows what he committed to, between what he told her and what she noticed', () => {
+  const out = notesList(
+    [{ id: 1, note: 'stop mentioning the ten-year' }],
+    [{ id: 2, note: 'he trades the London open' }],
+    [{ channel: 'dollar', state: 'used', evidence: null, moved_on: null }],
+    [], null,
+    [{ id: 3, note: 'this week I stop after two losses' }]);
+  assert.match(out, /What you have committed to, newest first:\n\[3\] this week I stop after two losses/);
+  assert.ok(out.indexOf('[1]') < out.indexOf('[3]') && out.indexOf('[3]') < out.indexOf('[2]'),
+    'a commitment is neither an instruction to her nor her observation, and ' +
+    'reads between the two');
+
+  // A memory holding only a commitment is not an empty one.
+  const only = notesList([], [], [], [], null, [{ id: 3, note: 'no Friday afternoons' }]);
+  assert.doesNotMatch(only, /have not kept any notes/);
+});
+
+test('the notes she is handed carry his commitments, asked for by their kind', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const kind = String(url).match(/kind=eq\.(\w+)/)?.[1];
+    const rows = { commitment: [{ id: 9, note: 'this week I stop after two losses' }] }[kind] ?? [];
+    return new Response(JSON.stringify(rows), {
+      status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const out = await notesBlock();
+    assert.match(out, /What he has committed to/,
+      'notesBlock no longer reads commitments, so nothing is ever held against one');
+    assert.match(out, /\[9\] this week I stop after two losses/);
+  } finally { globalThis.fetch = realFetch; }
+});
+
 test('the nightly pass gets a retry hour, and it is inside the same day', () => {
   // 23:00 New York is still the day the pass is filed under, which is what makes
   // "did tonight's pass run" a question with an answer.

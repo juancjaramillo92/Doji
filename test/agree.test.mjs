@@ -800,18 +800,58 @@ test('the rule that decides how a term is pitched is in her context, not fetchab
   }
 });
 
-test('the note kinds are the same two words in the tool and the constraint', () => {
+test('the note kinds are the same three words in the tool and the constraint', () => {
   const offered = [...EUGENIA_TS.matchAll(/NOTE_KINDS = \[([^\]]*)\]/g)]
     .flatMap(m => [...m[1].matchAll(/'([a-z]+)'/g)].map(k => k[1])).sort();
-  const enforced = [...(EUGENIA_SQL.match(/kind in \(([^)]*)\)/i)?.[1] ?? '')
-    .matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort();
+  /* THE LAST DECLARATION, read across every numbered file in order, because
+     that is the one Postgres holds: 003 created the constraint with two words
+     and 015 recreates it with three. Read from 003 alone, this compared the
+     tool against a constraint the database no longer has. */
+  const declared = [...NUMBERED.matchAll(/eugenia_notes_kind_check\s+check \(kind in \(([^)]*)\)/gi)];
+  assert.ok(declared.length >= 2,
+    `found ${declared.length} declarations of eugenia_notes_kind_check — the reader has gone blind`);
+  const enforced = [...declared[declared.length - 1][1].matchAll(/'([a-z]+)'/g)]
+    .map(m => m[1]).sort();
 
-  assert.deepEqual(offered, ['fact', 'instruction'],
+  assert.deepEqual(offered, ['commitment', 'fact', 'instruction'],
     'the kinds the tool offers have changed — say so here, and check the constraint');
   assert.deepEqual(enforced, offered,
-    'the tool and the check constraint no longer offer the same kinds');
+    'the tool and the check constraint no longer offer the same kinds — a kind ' +
+    'the constraint refuses is a remember() that vanishes, reported to nobody');
 });
 
+
+/* ─── A commitment is only worth having if something checks it ──────────────
+   Three halves, and each is silent without the others. `/notes` hands him the
+   audit — its argument DEFAULTS, so a call site that stops reading commitments
+   still answers, correctly formatted, minus the one list he would look for.
+   SYSTEM tells her to record one and to say so when a trade breaks it.
+   CONSOLIDATE is the only place a commitment whose week is over gets retired
+   with how it went; without it they pile up in her window for ever, each one
+   still being "held against" trades it was never about.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a commitment is recorded, audited, held against his trades and retired', () => {
+  const at = EUGENIA_TS.indexOf("text.trim().toLowerCase() === '/notes'");
+  assert.ok(at > -1, 'the /notes branch is no longer where this reads it');
+  const branch = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('return;', at));
+  assert.match(branch, /readNotes\('commitment'\)/,
+    '/notes no longer reads his commitments — the audit still answers, minus them');
+  assert.match(branch, /notesList\([^)]*promised\)/,
+    '/notes reads his commitments and does not hand them to notesList');
+
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+  assert.match(bodies.SYSTEM, /kind='commitment'/,
+    'SYSTEM no longer tells her how to record a commitment');
+  assert.match(bodies.SYSTEM, /WHEN A CLOSED TRADE BREAKS ONE, SAY SO/,
+    'SYSTEM no longer has her say when a trade broke a commitment — recorded ' +
+    'and never checked, it is a promise nobody holds him to');
+  assert.match(bodies.CONSOLIDATE, /HOLD THE DAY AGAINST WHAT HE COMMITTED TO/,
+    'the nightly pass no longer checks the day against his commitments or ' +
+    'retires the ones whose period is over');
+});
 
 /* ─── Who the database and Gmail think they are calling ─────────────────────
    A function's name is in its directory, in the Deno.serve URL Supabase derives
@@ -2980,7 +3020,7 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
    anyone can see.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the critic is handed his notes and the map it is asked to enforce', () => {
+test('the critic is handed his notes, the map and the desk it is asked to enforce', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -2995,26 +3035,26 @@ test('the critic is handed his notes and the map it is asked to enforce', () => 
      it goes to the shared gate() now rather than straight into an ask(). */
   const content = body.match(/`([\s\S]*?)`/);
   assert.ok(content, 'critique() no longer builds its message from a template literal');
-  for (const block of ['notes', 'channels']) {
+  for (const block of ['notes', 'channels', 'desk']) {
     assert.match(content[1], new RegExp(`\\$\\{${block}\\}`),
       `the critic's message no longer carries ${block} — it is asked to judge the ` +
-      `briefing against his instructions and the ladder while holding neither, and ` +
-      `it answers anyway`);
+      `briefing against his instructions, the ladder and whether he is in a ` +
+      `position while holding none of them, and it answers anyway`);
   }
 
   /* AND THE DRAFT STAYS LAST. The prompt names it at the end of the message and
      the blocks are prose that reads exactly like a briefing; put the draft first
      and "return the briefing itself and nothing else" points at his notes. */
-  assert.ok(content[1].indexOf('${draft}') > content[1].indexOf('${channels}'),
+  assert.ok(content[1].indexOf('${draft}') > content[1].indexOf('${desk}'),
     'the draft is no longer the last thing in the critic message — the prompt says ' +
     'it is at the end, and the blocks above it read like prose it could return');
 
-  // And postBriefing hands over the two it has already awaited, rather than the
-  // critic opening two reads of its own on the far side of a briefing.
+  // And postBriefing hands over the three it has already awaited, rather than
+  // the critic opening reads of its own on the far side of a briefing.
   const brief = src.slice(src.indexOf('async function postBriefing('));
-  assert.match(brief.slice(0, brief.indexOf('\n}')), /critique\(draft,\s*notes,\s*channels\)/,
-    'postBriefing no longer passes the notes and the map it already holds into ' +
-    'critique() — the critic is back to judging his instructions without them');
+  assert.match(brief.slice(0, brief.indexOf('\n}')), /critique\(draft,\s*notes,\s*channels,\s*desk\)/,
+    'postBriefing no longer passes the notes, the map and the desk it already ' +
+    'holds into critique() — the critic is back to judging without them');
 });
 
 /* ─── The senses, and the copies they add ────────────────────────────────────
@@ -3848,11 +3888,12 @@ test('every column the cost meter writes is a column the table has', () => {
   }
 });
 
-/* ─── The prohibition that is the product ────────────────────────────────────
-   No calls on where price goes. It is the line between a market analyst and a
-   signal service, it is stated in the file rather than enforced by anything,
-   and until now nothing asserted it was there at all — deleting it from SYSTEM
-   broke no test, and what came back would have read like a better briefing.
+/* ─── The line on price is the product ───────────────────────────────────────
+   No signal, and no view on where price goes except one fenced three ways. It
+   is the line between a market analyst and a signal service, it is stated in
+   the file rather than enforced by anything, and for a long time nothing
+   asserted it was there at all — deleting it from SYSTEM broke no test, and
+   what came back would have read like a better briefing.
 
    THE TWO GATES NEED IT AS MUCH AS THE WRITER DOES, and for a reason that is
    theirs alone: they do not merely approve, they REWRITE. A gate that has not
@@ -3865,7 +3906,7 @@ test('every column the cost meter writes is a column the table has', () => {
    must carry it rather than requiring it everywhere.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('no prompt that writes or rewrites may lose the no-direction prohibition', () => {
+test('no prompt that writes or rewrites may lose the line on price', () => {
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
       .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
@@ -3876,16 +3917,98 @@ test('no prompt that writes or rewrites may lose the no-direction prohibition', 
   for (const who of ['SYSTEM', 'CRITIC', 'TRIM', 'MOVE', 'TRADE_EVENT']) {
     assert.ok(bodies[who], `prompt.ts no longer exports ${who}`);
     assert.match(bodies[who], SAYS,
-      `${who} no longer forbids a call on where price goes. That line is the ` +
-      `difference between a market analyst and a signal service, nothing else ` +
-      `in this repository enforces it, and a gate that has not been told it ` +
-      `rewrites a compliant message into one that breaks it`);
+      `${who} no longer says anything about a call on where price goes. That ` +
+      `line is the difference between a market analyst and a signal service, ` +
+      `nothing else in this repository enforces it, and a gate that has not ` +
+      `been told it rewrites a compliant message into one that breaks it`);
   }
 
   // And the two that send nothing he reads as analysis are deliberately out:
   // CONSOLIDATE writes memory, RELEASE runs under SYSTEM like every caller.
   assert.ok(bodies.CONSOLIDATE && bodies.RELEASE,
     'prompt.ts no longer exports CONSOLIDATE or RELEASE');
+});
+
+/* ─── Her read is allowed because it is fenced, and the fence is three copies ─
+   She may say which way today's news leans for gold. What keeps that from
+   being a tip is the fence around it: labelled as HER read, carrying what would
+   prove it wrong, naming no level — and never given while he is in a position,
+   where a view on price is advice about the trade however it is worded.
+
+   The fence is sentences and nothing else, so a copy that drops one half is
+   silent: the writer loses it and a read with a level in it goes out, or a gate
+   loses it and CUTS every compliant read, which is the gate overruling the
+   writer on a rule it no longer holds. Each half is read in the writer and in
+   both gates for that reason.
+
+   THE OPEN-POSITION HALF NEEDS AN INPUT AS WELL AS A SENTENCE. A gate asked
+   whether he is in a position must be handed the block that says so, or it
+   answers from nothing — which is the critic's old failure with his notes,
+   arriving on a new rule.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('her read on price is fenced in the writer and in both gates', () => {
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+
+  const FENCE = {
+    'labelled as hers':         /YOUR READ|labelled as your read|labelled as yours/i,
+    'what would prove it wrong': /what would prove (?:you|it) wrong/i,
+    'no level':                  /no level|names no level|every level out/i,
+    'none while he is in one':   /position (?:is )?open|shows an open position/i,
+  };
+  for (const who of ['SYSTEM', 'CRITIC', 'TRIM']) {
+    for (const [half, says] of Object.entries(FENCE)) {
+      assert.match(bodies[who], says,
+        `${who} no longer carries "${half}" — the read she is allowed is only ` +
+        `allowed inside that fence, and a copy without it either lets a tip ` +
+        `through or cuts every read that obeyed it`);
+    }
+  }
+
+  // Both gates are handed what he has on, on every path that runs one.
+  for (const gate of ['critique', 'trim']) {
+    const at = EUGENIA_TS.indexOf(`async function ${gate}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${gate}()`);
+    const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+    assert.match(body, /\$\{desk\}/,
+      `${gate}() no longer puts his open positions in front of the gate, which ` +
+      `is asked whether a view was given while he was in one`);
+  }
+  const calls = [...EUGENIA_TS.matchAll(/await trim\(([^)]*)\)/g)].map(m => m[1]);
+  assert.ok(calls.length >= 4, `read ${calls.length} calls to trim() — the reader has gone blind`);
+  for (const args of calls) {
+    assert.match(args, /,\s*desk$/,
+      `trim(${args}) is not handed the desk — that gate cannot tell a compliant ` +
+      `read from one given while he is in a position`);
+  }
+});
+
+/* ─── A verdict judges the decision, and waits for the close ─────────────────
+   She may call a trade bad. What makes that coaching rather than a scoreboard
+   is the measure: his rules and the plan he entered with, never the P&L —
+   judged on the result she praises luck and punishes discipline. And it waits
+   for the close, because a verdict on a live trade is advice about it. The
+   critic restates the second half, since it runs last and rewrites.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a verdict judges the decision rather than the result, and never an open trade', () => {
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+
+  assert.match(bodies.SYSTEM, /JUDGE THE DECISION, NEVER THE RESULT/,
+    'SYSTEM no longer says a verdict is measured against his rules rather than ' +
+    'the P&L — a coach judging by the result praises luck and punishes discipline');
+  for (const who of ['SYSTEM', 'CRITIC']) {
+    assert.match(bodies[who], /verdict on a trade that is still open/i,
+      `${who} no longer keeps a verdict off an open trade, where it is advice ` +
+      `about the position however it is worded`);
+  }
+  // And the message that reaches him mid-trade stays verdict-free outright.
+  assert.match(bodies.TRADE_EVENT, /say whether the trade is good/,
+    'TRADE_EVENT no longer forbids judging the trade he is in');
 });
 
 /* ─── diagnose.sql counts itself too ─────────────────────────────────────────
@@ -5385,7 +5508,7 @@ test('the three gated paths remember what the gate returned, not the draft', () 
     assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
     const body = src.slice(at, src.indexOf('\n}', at));
 
-    assert.match(body, /const sent = await trim\(said\);/,
+    assert.match(body, /const sent = await trim\(said, desk\);/,
       `${fn} no longer binds the revision — inlined into sayAloud it cannot ` +
       'also be the thing that is stored');
     assert.match(body, /await sayAloud\(sent\)/,
@@ -6327,13 +6450,15 @@ test('an unexplained move is silence, and opens no thread', () => {
    that speaks calls `ask` with history, notes and two tools and writes two
    sentences. The half that is true is about the decision, not about the prose.
 
-   What actually exempts it is that TRIM REWRITES and is handed only the draft,
-   so it cannot know this message reaches a man who is in a position — and the
-   one thing that must never happen here is a sentence that reads as an
-   instruction. That is the shape already learned once, when a gate that had
-   not been told the no-direction rule could hand back a message breaking it.
-   TRADE_EVENT is also the most constrained prompt in the file, so almost
-   nothing TRIM checks is reachable inside two sentences.
+   What actually exempts it is that TRIM REWRITES, and this is the one message
+   where a rewrite can do harm and has almost nothing to improve. It reaches a
+   man who is in a position or has just breached his day, and the one thing
+   that must never happen there is a sentence that reads as an instruction — a
+   gate paraphrasing a citation of his rule is how one becomes an order. That
+   is the shape already learned once, when a gate that had not been told the
+   no-direction rule could hand back a message breaking it. TRADE_EVENT is also
+   the most constrained prompt in the file, so almost nothing TRIM checks is
+   reachable inside two sentences.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* THE CENSUS, AND IT EXISTS BECAUSE EVERY OTHER CHECK HERE IS VERTICAL. They
@@ -6355,10 +6480,10 @@ const SENDS = {
   postMove:       { gate: 'trim',     carries: 'sent' },
   handleMessage:  { gate: 'trim',     carries: 'answer' },
   postTradeEvent: { gate: null,       carries: 'said',
-                    why: 'TRIM REWRITES AND IS HANDED ONLY THE DRAFT, so it ' +
-                         'cannot know this one reaches a man who is in a ' +
-                         'position — and the single thing that must not happen ' +
-                         'here is a sentence that reads as an instruction. ' +
+                    why: 'TRIM REWRITES, and this one reaches a man who is ' +
+                         'in a position or has just breached his day — the ' +
+                         'single thing that must not happen here is a gate ' +
+                         'paraphrasing a citation of his rule into an order. ' +
                          'TRADE_EVENT is the most constrained prompt in the ' +
                          'file: two sentences, the fact then the rule, no ' +
                          'greeting, and NOTHING as an explicit way out, so ' +

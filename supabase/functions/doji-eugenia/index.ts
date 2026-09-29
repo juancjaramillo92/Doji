@@ -273,11 +273,13 @@ const TRADES_TOOL = {
    never know in September that he has been working on holding his stop since
    August.
 
-   TWO KINDS, AND THEY ARE NOT INTERCHANGEABLE. A `fact` is something about him
-   she noticed. An `instruction` is something he TOLD her — "stop mentioning the
-   ten-year", "too long" — and it is the only channel he has for correcting her:
-   no settings page, no feedback button, and the conversation window forgets by
-   morning.
+   THREE KINDS, AND THEY ARE NOT INTERCHANGEABLE. A `fact` is something about
+   him she noticed. An `instruction` is something he TOLD her — "stop mentioning
+   the ten-year", "too long" — and it is the only channel he has for correcting
+   her: no settings page, no feedback button, and the conversation window
+   forgets by morning. A `commitment` is something he told her HE would do —
+   "this week I stop after two losses" — and it is read the opposite way to an
+   instruction: she does not obey it, she holds his trades against it.
 
    They are one table because they are the same shape and the same lifecycle,
    and they are read SEPARATELY because they are not the same size. Notes arrive
@@ -286,14 +288,14 @@ const TRADES_TOOL = {
    observations — silently, and after she had told him it stuck, which is the
    one failure this feature cannot have.
 
-   APPEND-ONLY, and read newest-first. Superseding either means writing a newer
-   one, which is also how a person's memory works and is what lets him change
+   APPEND-ONLY, and read newest-first. Superseding any of them means writing a
+   newer one, which is also how a person's memory works and is what lets him change
    his mind about an instruction with nothing to delete.
 
    Still not a writer to `trades`. eugenia_turns and eugenia_notes are hers;
    the journal remains one read through a view with no write path in the file.
    ───────────────────────────────────────────────────────────────────────── */
-export const NOTE_KINDS = ['fact', 'instruction'] as const;
+export const NOTE_KINDS = ['fact', 'instruction', 'commitment'] as const;
 export const NOTE_MAX = 200;
 
 const NOTES_TOOL = {
@@ -304,7 +306,10 @@ const NOTES_TOOL = {
     "explanation landed; never today's price or today's data, which are stale " +
     "tomorrow. Use kind='instruction' for something he has told you to do or stop " +
     "doing, in his own words: those are standing, and every later message obeys " +
-    "them. Record a fact silently; acknowledge an instruction in four words or fewer.",
+    "them. Use kind='commitment' for something he has said HE will do or stop " +
+    "doing, in his own words and with its period if he gave one: those are what " +
+    "his trades are held against. Record a fact silently; acknowledge an " +
+    "instruction or a commitment in four words or fewer.",
   input_schema: {
     type: "object",
     properties: {
@@ -312,7 +317,8 @@ const NOTES_TOOL = {
       kind: {
         type: "string",
         enum: NOTE_KINDS,
-        description: "'fact' for something you noticed about him; 'instruction' for something he told you.",
+        description: "'fact' for something you noticed about him; 'instruction' for something he " +
+          "told you to do; 'commitment' for something he said he would do.",
       },
       supersedes: {
         type: "integer",
@@ -750,14 +756,14 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
 
     if (kept.length < text.length) {
       return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". ` +
-             (k === 'instruction'
+             (k !== 'fact'
                ? 'Say it back to him shorter and check that is still what he meant.'
                : 'Write it shorter next time.');
     }
     return "Remembered.";
   } catch (err) {
     console.error("doji-eugenia: note not written —", err instanceof Error ? err.message : err);
-    return k === 'instruction'
+    return k !== 'fact'
       ? "That did NOT save. Tell him it did not stick and that he will have to say it again."
       : "That did not save. Carry on and do not mention it.";
   }
@@ -893,10 +899,11 @@ async function readTrades(days: unknown): Promise<string> {
    rows of JSON, on the way to a number — which is the single most error-prone
    thing she does and the place a wrong answer is least visible.
 
-   THIS IS NOT A VERDICT ON A TRADE and does not become one. It reports whether
-   a row satisfies a predicate HE wrote down. "Two entries were 41 minutes apart
-   and R-12 allows fifteen" is a fact about his rule; what it MEANT is his to
-   say, and the prohibitions are untouched.
+   THIS IS NOT A VERDICT ON A TRADE, IT IS WHAT ONE STANDS ON. It reports
+   whether a row satisfies a predicate HE wrote down. "Two entries were 41
+   minutes apart and R-12 allows fifteen" is a fact about his rule, and the
+   prompt has her state it before any judgment of her own, so he always holds
+   the half he can check.
 
    Thirteen rules and not one more. §7's Evaluable column decides the set, and
    the five marked `judgment` stay out — an approximation of one would be worse
@@ -2666,13 +2673,17 @@ export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
    invite her to weigh an instruction against her own observation. */
 export async function notesBlock(): Promise<string> {
   try {
-    const [told, noticed] = await Promise.all([
-      readNotes('instruction'), readNotes('fact'),
+    const [told, promised, noticed] = await Promise.all([
+      readNotes('instruction'), readNotes('commitment'), readNotes('fact'),
     ]);
     const list = (ns: Note[]) => `\n· ` + ns.map(noteLine).join("\n· ");
     return (told.length
              ? `\n\nWhat he has told you to do, newest first. These are not optional and a` +
                ` later one replaces an earlier one:${list(told)}`
+             : "")
+         + (promised.length
+             ? `\n\nWhat he has committed to, newest first. Hold his trades against these` +
+               ` and say so plainly when one broke one:${list(promised)}`
              : "")
          + (noticed.length
              ? `\n\nWhat you have noticed about him, newest first:${list(noticed)}`
@@ -2713,7 +2724,8 @@ type Channel = { channel: string; state: string; evidence: string | null; moved_
    database precisely so nothing can quietly drop a row, and an audit that
    silently omits half of what it audits is the defect it exists to prevent. */
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
-                          loops: Loop[] = [], story: Thesis | null = null): string {
+                          loops: Loop[] = [], story: Thesis | null = null,
+                          promised: Note[] = []): string {
   const list = (ns: Note[]) => ns.map(noteLine).join("\n");
   /* RENDERED FOR HIM RATHER THAN REUSING loopsList, which is the same reason
      the channel map is rendered here rather than by appending channelsBlock():
@@ -2727,9 +2739,10 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
         : "";
     };
   return [
-    told.length    ? `What you have told me, newest first:\n${list(told)}`  : "",
-    noticed.length ? `What I have noticed, newest first:\n${list(noticed)}` : "",
-    told.length || noticed.length ? "" : "I have not kept any notes yet, jefe.",
+    told.length     ? `What you have told me, newest first:\n${list(told)}`         : "",
+    promised.length ? `What you have committed to, newest first:\n${list(promised)}` : "",
+    noticed.length  ? `What I have noticed, newest first:\n${list(noticed)}`        : "",
+    told.length || promised.length || noticed.length ? "" : "I have not kept any notes yet, jefe.",
     open('watch',    "What I flagged and am still watching:"),
     open('question', "What I asked you and have not had back:"),
     story ? `The story I am carrying${story.moved_on ? `, last moved ${civilDay(story.moved_on)}` : ""}:\n${story.thesis}` : "",
@@ -3458,8 +3471,8 @@ export function keepDraft(draft: string, revised: string): boolean {
   return t.length < draft.length / 3 || t.length > draft.length * 2;
 }
 
-async function critique(draft: string, notes: string, channels: string): Promise<string> {
-  return await gate(draft, `${CRITIC}${notes}${channels}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
+async function critique(draft: string, notes: string, channels: string, desk: string): Promise<string> {
+  return await gate(draft, `${CRITIC}${notes}${channels}${desk}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
 }
 
 /* THE SAME GATE ON THE MESSAGES THE CRITIC NEVER REACHED. `CRITIC` runs on the
@@ -3474,6 +3487,11 @@ async function critique(draft: string, notes: string, channels: string): Promise
    is handed no notes and no channel map, because it is not judging whether a
    term was built — only whether the sentences obey the rules she writes by.
 
+   IT IS HANDED WHAT HE HAS ON, AND THAT IS THE ONE INPUT IT NEEDS. Her read on
+   price is allowed and a view while he is in a position is not, so the gate
+   cannot tell a compliant message from a breaking one without the block that
+   says which it is. Every caller already awaited it for the writer.
+
    AND WHAT IT RETURNS IS WHAT GETS REMEMBERED, WHICH IS WHY THE THREE CALLERS
    BIND IT. The draft is what `ask()` produced; the revision is what he read.
    Storing the draft files a message he never saw as her own words, and hands it
@@ -3482,8 +3500,8 @@ async function critique(draft: string, notes: string, channels: string): Promise
    through the door this gate opened. The briefing never had it: it stores what
    `critique` returned. The three that GAINED a gate kept storing the draft for
    as long as they had one. */
-async function trim(draft: string): Promise<string> {
-  return await gate(draft, `${TRIM}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
+async function trim(draft: string, desk: string): Promise<string> {
+  return await gate(draft, `${TRIM}${desk}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
 }
 
 /* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
@@ -3545,7 +3563,7 @@ async function postBriefing(due: Brief): Promise<Response> {
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
-  const brief = await critique(draft, notes, channels);
+  const brief = await critique(draft, notes, channels, desk);
 
   /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT, and it matters more
      now that the cap is off. The prompt holds the market half near nine hundred
@@ -3932,7 +3950,7 @@ async function postPulse(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
-  const sent = await trim(said);
+  const sent = await trim(said, desk);
   await sayAloud(sent);
   await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: sent }]);
   return json({ ok: true, pulse: "sent" });
@@ -4069,7 +4087,7 @@ async function postRelease(): Promise<Response> {
   const named = due.map(r => r.name).join(", ");
   if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
-  const sent = await trim(said);
+  const sent = await trim(said, desk);
   await sayAloud(sent);
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
@@ -4405,7 +4423,7 @@ async function postMove(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
-  const sent = await trim(said);
+  const sent = await trim(said, desk);
   await sayAloud(sent);
   await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
                   { role: 'assistant', content: sent }]);
@@ -4641,7 +4659,7 @@ async function handleMessage(update: any): Promise<void> {
 
     /* A CHART, AND THE LINE IT MAY NOT CROSS IS IN THE PROMPT RATHER THAN HERE.
        She can describe what is on it and take it as context for the journal;
-       she cannot say whether a setup is valid, which would be a verdict on a
+       she cannot say whether a setup is valid, which would be a signal on a
        trade he has not taken yet and is the one prohibition an image makes
        tempting to break. Largest size last, which is Telegram's ordering. */
     const photo = Array.isArray(msg.photo) && msg.photo.length ? msg.photo[msg.photo.length - 1] : null;
@@ -4691,10 +4709,11 @@ async function handleMessage(update: any): Promise<void> {
         // Everything she keeps that he cannot otherwise see belongs in the one
         // place he goes to check what she is keeping — an audit that omits two
         // of the five things it audits is the defect it exists to prevent.
-        const [told, noticed, channels, loops, story] = await Promise.all([
+        const [told, noticed, channels, loops, story, promised] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
+          readNotes('commitment'),
         ]);
-        await say(notesList(told, noticed, channels, loops, story));
+        await say(notesList(told, noticed, channels, loops, story, promised));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —",
           err instanceof Error ? err.message : err);
@@ -4784,7 +4803,7 @@ async function handleMessage(update: any): Promise<void> {
          beside the send. Cleared first, the ping stops and three silent seconds
          pass before anything lands, so she reads as having finished and then
          said nothing. */
-      answer = await trim(draft);
+      answer = await trim(draft, desk);
     } finally {
       // Stopped the moment there is something to send, not after sending it —
       // otherwise a ping fires between the message landing and the write, and
