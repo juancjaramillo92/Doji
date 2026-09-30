@@ -1246,16 +1246,17 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
   const line = String(note ?? "").trim().slice(0, NOTE_MAX);
   if (line) patch.note = line;
 
-  /* A COMMA INSIDE A FILTER VALUE IS A LIST SEPARATOR TO PostgREST, and these
-     names carry them — `US retail sales (August, advance)` is the row that
-     started this, and unquoted it would filter on `US retail sales (August`
-     and match nothing at all. Double-quoted, with any quote in the name
-     escaped, so the miss cannot come from the punctuation. */
-  const quoted = encodeURIComponent(`"${called.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+  /* THE NAME GOES OUT AS ITSELF, ENCODED AND NOTHING ELSE. An `eq` value is
+     read whole — PostgREST splits on a comma only inside `in.(…)`, and strips
+     double quotes only there — so wrapping this one in quotes made them part of
+     the name compared. Every call missed from the day that went in: six on one
+     core PCE, each answered with `core PCE` as what was on file. Encoded because
+     `&`, `#` and `%` do mean something in a URL, and a release is named by
+     whoever writes the calendar. */
   const at_ = when.toISOString();
 
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?at=eq.${at_}&name=eq.${quoted}`, {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?at=eq.${at_}&name=eq.${encodeURIComponent(called)}`, {
       method: "PATCH", headers: sbHeaders("return=representation"),
       body: JSON.stringify(patch),
     });

@@ -977,6 +977,17 @@ compounds.
   contradictory priors. A filter matching nothing is a 200 with an empty body —
   `planned`'s failure exactly — so it reads the names back and says them.
 
+  AND FOR A FORTNIGHT IT MATCHED NOTHING AT ALL, UNDER A GREEN TEST. The name
+  went out wrapped in double quotes, on the belief that a comma splits an `eq`
+  value; PostgREST reads a top-level `eq` whole and strips quotes only inside
+  `in.(…)`, so the quotes were compared as part of the name. The fold test's
+  stub answered every PATCH with a matched row whatever the URL said, and the
+  test beside it asserted the quotes — a test supplying the answer, holding the
+  code to the defect. It surfaced only because SHE said so: six calls on one
+  core PCE, each told the name was not on file and then read it back. The stub
+  now filters the way PostgREST does, and a filter value in this file goes out
+  as `encodeURIComponent(value)` and nothing else.
+
   AND `updated_at` MAY NOT MOVE ON A MARK. `markLooked` writes `looked_at`
   alone, and an unconditional touch made the column say when a row was last
   HANDLED where its own comment claims it says which of two contradictory rows
@@ -1450,8 +1461,12 @@ compounds.
   the policy, which never needed the attribution: a cheaper caller that does
   not answer is not cheaper, and any move is ONE caller at a time with `rounds`
   read afterwards. A SUCCESSFUL TURN'S `detail` IS NOW ITS CLIENT-TOOL TALLY,
-  because `rounds` said how many and never on what — do not raise the cap or
-  move a model again until those rows say where the rounds go.
+  because `rounds` said how many and never on what — and the first look it
+  recorded answered the question: `record_actual×6` in seven rounds, every
+  call refused by the quoted filter described under the event spine. That
+  filter went in with the tool, so it accounts for the jump without the model.
+  It does not clear the model either, since nothing has run a cheaper model
+  against a working tool. Read `rounds` after the fix before anything else.
 
   `trim` STAYS ON SONNET because it is handed an EMPTY tool array and so cannot
   reach the cap — that is the shape a cheaper model is safe on here, and the

@@ -3618,6 +3618,18 @@ name `record_actual` cannot match costs a round and says so; so does each
 `get_market`; so does a model calling one tool per round instead of batching
 them. Those are different repairs, and the tally is what tells them apart.
 
+**The first look it recorded named the cause.** On 30 September the release look
+took seven rounds and its detail read `record_actual×6`, and she told him why in
+the message itself: the tool said nothing at that time was called `core PCE`,
+then listed `core PCE` as what was on file. The tool had wrapped the name in
+double quotes to protect a comma, and PostgREST reads an `eq` value whole — it
+strips quotes only inside an `in.(…)` list — so the quotes became part of the
+name it compared, and no call had matched since the tool shipped on 16
+September. That accounts for the jump in rounds with no help from the model. The
+name now goes out as itself, URL-encoded, and the test's stand-in database
+filters the way PostgREST does; the old one answered every write as a match,
+which is how a test asserting the quotes stayed green through all of it.
+
 `trim` stays on Sonnet, and the distinction is the whole of why: it is handed
 `CRITIC_TOOLS`, which is empty — one request, no loop to run out of — so it
 cannot reach the cap whatever a model's appetite for rounds. That is the shape a

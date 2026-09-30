@@ -2237,15 +2237,26 @@ const LANDED = { at: new Date(Date.now() - 600_000).toISOString(), name: 'CPI',
    reading cannot settle.
    ─────────────────────────────────────────────────────────────────────────── */
 
-// Every request record_actual made, with the answer it gave. `answers` is the
-// queue of what fetch returns, in order: the PATCH first, then the read.
-async function actualWrites(input, answers) {
+/* Every request record_actual made, with the answer it gave, against `onFile` —
+   the calendar as it stands. THE STUB FILTERS THE WAY PostgREST DOES, and that
+   is the point of it. It used to answer every PATCH with a matched row whatever
+   the URL said, and the test beside it asserted the name went out wrapped in
+   double quotes: so the suite held the tool to a filter that could never match,
+   and went green while every print for a fortnight was recorded nowhere. A top-
+   level `eq` value is taken whole — PostgREST's `pSingleVal` is `many anyChar`
+   — and quotes are stripped only inside an `in.(…)` list. So each filter here
+   is split off the raw query, decoded, and compared literally. */
+async function actualWrites(input, onFile) {
   const realFetch = globalThis.fetch, realErr = console.error;
   const sent = [];
   globalThis.fetch = async (url, init) => {
     sent.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null });
-    const next = answers.shift() ?? [];
-    return { ok: true, status: 200, json: async () => next };
+    const eq = Object.fromEntries(String(url).split('?')[1].split('&')
+      .map(p => p.split('=')).filter(([, v]) => v.startsWith('eq.'))
+      .map(([k, v]) => [k, decodeURIComponent(v.slice(3))]));
+    const hits = onFile.filter(r => +new Date(r.at) === +new Date(eq.at)
+                                 && (!('name' in eq) || r.name === eq.name));
+    return { ok: true, status: 200, json: async () => hits };
   };
   console.error = () => {};
   try {
@@ -2260,7 +2271,7 @@ const RETAIL = { at: '2026-09-16T12:30:00Z', name: 'US retail sales (August, adv
                  actual: '+1.2% m/m; control group +1.4%', note: 'well above consensus' };
 
 test('the actual is patched onto the row and never posted as a new one', async () => {
-  const { said, sent } = await actualWrites(RETAIL, [[{ id: 1 }]]);
+  const { said, sent } = await actualWrites(RETAIL, [RETAIL]);
   assert.equal(sent.length, 1, 'a second request went out after a write that landed');
   assert.equal(sent[0].method, 'PATCH',
     'record_actual is not a PATCH, so a name a shade off the one it was handed mints a row again');
@@ -2276,20 +2287,28 @@ test('only the two columns a look owns are written', async () => {
      reach the database with them. */
   const { sent } = await actualWrites(
     { ...RETAIL, consensus: '+0.3% m/m', prior: '-0.5% m/m (Jul, revised)', importance: 'low' },
-    [[{ id: 1 }]]);
+    [RETAIL]);
   assert.deepEqual(Object.keys(sent[0].body).sort(), ['actual', 'note'],
     'a look can write a column the briefing owns again');
 });
 
-test('a name carrying a comma is quoted, or it filters on half of itself', async () => {
-  // PostgREST reads a bare comma in a filter value as a list separator, and the
-  // row that started all of this is called `US retail sales (August, advance)`.
-  // Unquoted, the filter asks for `US retail sales (August` and matches nothing
-  // — which presents as her paraphrasing rather than as a broken URL.
-  const { sent } = await actualWrites(RETAIL, [[{ id: 1 }]]);
-  const name = decodeURIComponent(sent[0].url.split('name=eq.')[1]);
-  assert.equal(name, '"US retail sales (August, advance)"',
-    'the name is not double-quoted, so every release with a comma in it writes nothing');
+test('the name she was handed matches the row it names, whatever it is spelled with', async () => {
+  /* THE NAME GOES OUT AS ITSELF. It was wrapped in double quotes on the belief
+     that a comma splits an `eq` value, which is true only inside `in.(…)`, and
+     the quotes were then compared as part of the name. On 30 September she
+     filed `core PCE` six times, was told six times that nothing by that name was
+     on file, and was read `core PCE` back as what was — and said so to him.
+     Every punctuation a release name carries, including the ones that DO mean
+     something in a URL. */
+  for (const name of ['core PCE', 'US retail sales (August, advance)', 'S&P Global PMI',
+                      'Fed "dot plot"', '#1 jobs report: 100%']) {
+    const row = { ...RETAIL, name };
+    const { said, sent } = await actualWrites(row, [row]);
+    assert.match(said, /Recorded against/,
+      `"${name}" is on file and the filter did not match it — she is told it is not ` +
+      `there, reads it back, and the print is recorded nowhere`);
+    assert.equal(sent.length, 1, `"${name}" needed a second request`);
+  }
 });
 
 test('a name that matches nothing answers with the names on file', async () => {
@@ -2297,7 +2316,7 @@ test('a name that matches nothing answers with the names on file', async () => {
      like a write that landed. Answered with what is actually there, the next
      round has what it needs instead of leaving a second row behind. */
   const { said, sent } = await actualWrites({ ...RETAIL, name: 'retail sales' },
-    [[], [{ name: 'US retail sales (August, advance)' }, { name: 'jobless claims' }]]);
+    [RETAIL, { ...RETAIL, name: 'jobless claims' }]);
   assert.equal(sent.length, 2, 'nothing was read back, so she is told nothing and files again');
   assert.equal(sent[1].method, undefined, 'the fallback is not a read');
   assert.match(said, /US retail sales \(August, advance\)/);
@@ -2305,14 +2324,14 @@ test('a name that matches nothing answers with the names on file', async () => {
 });
 
 test('nothing on file at that time is said plainly and nothing is written', async () => {
-  const { said, sent } = await actualWrites(RETAIL, [[], []]);
+  const { said, sent } = await actualWrites(RETAIL, []);
   assert.equal(sent.filter(r => r.method === 'PATCH').length, 1);
   assert.match(said, /Nothing is on file/);
 });
 
 test('a release without a readable time or a figure writes nothing at all', async () => {
   for (const bad of [{ ...RETAIL, at: 'whenever' }, { ...RETAIL, name: '  ' }, { ...RETAIL, actual: '' }]) {
-    const { sent } = await actualWrites(bad, [[{ id: 1 }]]);
+    const { sent } = await actualWrites(bad, [RETAIL]);
     assert.equal(sent.length, 0, `${JSON.stringify(bad)} reached the database`);
   }
 });
