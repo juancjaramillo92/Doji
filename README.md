@@ -1577,6 +1577,11 @@ plain words still read as hard, and no rule was being broken. The rules now:
   retail sales, jobless claims, the ten-year.
 - **Use the word you would text.** *Dearer fuel* fails that; *expensive fuel*
   passes. So does *makes gold a harder sell* over *stiffer competition for gold*.
+- **No figures of speech.** *The relief in gold has been contained rather than
+  clean* obeys every countable rule and still has to be decoded; *gold has only
+  risen a little* does not. The rule carries that example and four more from
+  her own messages, because a worked example moved her register where a
+  description did not.
 - **A paragraph is three or four sentences.** Sixteen easy sentences in one block
   is still a wall. The critic COUNTS this one as its last step, and every
   em-dash with it, rather than reading for it among the rest: three briefings in

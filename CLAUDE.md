@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 615 tests, six suites
+npm test      # 616 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -556,7 +556,10 @@ code you write near it:
   where it ignores an adjective, and one example in `WRITING` teaches the writer
   and both gates at once. It is the STANDARD rather than a taste of his, which
   is the rule it sits next to — and that adjacency is worth checking against
-  before anything else goes in there.
+  before anything else goes in there. THE SECOND ONE IS `NO FIGURES OF SPEECH`,
+  and its example is the sentence he pointed at rather than one written for the
+  rule: every word short, every countable rule obeyed, and still a thing to
+  decode. A rule for judgement lands through an example or not at all.
 
   A PARAGRAPH IS BOUNDED TOO, at three or four sentences. Sixteen easy sentences
   arrived in one unbroken block, which reads as a wall however short each one

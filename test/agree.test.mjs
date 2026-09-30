@@ -3947,6 +3947,28 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
    arriving on a new rule.
    ─────────────────────────────────────────────────────────────────────────── */
 
+test('the writing rules ban a figure of speech, with his own example of one beside it', () => {
+  /* EVERY WORD SHORT AND THE SENTENCE STILL A PUZZLE. "The relief in gold has
+     been contained rather than clean" obeys every countable rule in WRITING and
+     reached him as something to decode — the pulse of 30 September. NO
+     PUNCHLINES covered a clever line at the END of a paragraph and said nothing
+     about one in the middle. The example is the case he pointed at, because a
+     worked example is what moved her register when a description did not; and
+     it lives in WRITING, so the writer and both gates read it at once. */
+  const writing = EUGENIA_PROMPT.match(/export const WRITING = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(writing, /NO FIGURES OF SPEECH/, 'WRITING no longer bans figures of speech');
+  assert.match(writing, /contained rather than clean" makes him work out that it means "that mix is why gold has only risen a little"/,
+    'the figure-of-speech rule has lost its worked example — the description alone is what failed');
+
+  /* AND THE MESSAGE CAME AT ALL BECAUSE THE LOOK BEFORE IT REPORTED ONE NUMBER.
+     Core PCE's monthly figure went at 08:37; the yearly rate falling 3.3 to 3.0
+     and spending up 0.9% in the same report went at 10:00, from the pulse,
+     under "things the 8:30 note missed". */
+  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(release, /A RELEASE IS A REPORT, NOT ONE NUMBER\. Read everything that came out at that time/,
+    'RELEASE no longer asks for the whole report — the pulse is left to finish it');
+});
+
 test('the critic counts paragraphs and dashes last, after everything that can add them', () => {
   /* THE TWO COUNTABLE RULES THAT DID NOT LAND. Three briefings in a row went
      through the critic with six-sentence paragraphs, two with an em-dash aside,
