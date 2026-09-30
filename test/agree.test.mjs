@@ -3035,7 +3035,7 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
      it goes to the shared gate() now rather than straight into an ask(). */
   const content = body.match(/`([\s\S]*?)`/);
   assert.ok(content, 'critique() no longer builds its message from a template literal');
-  for (const block of ['notes', 'channels', 'desk']) {
+  for (const block of ['notes', 'channels', 'desk', 'story']) {
     assert.match(content[1], new RegExp(`\\$\\{${block}\\}`),
       `the critic's message no longer carries ${block} — it is asked to judge the ` +
       `briefing against his instructions, the ladder and whether he is in a ` +
@@ -3045,15 +3045,15 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
   /* AND THE DRAFT STAYS LAST. The prompt names it at the end of the message and
      the blocks are prose that reads exactly like a briefing; put the draft first
      and "return the briefing itself and nothing else" points at his notes. */
-  assert.ok(content[1].indexOf('${draft}') > content[1].indexOf('${desk}'),
+  assert.ok(content[1].indexOf('${draft}') > content[1].indexOf('${story}'),
     'the draft is no longer the last thing in the critic message — the prompt says ' +
     'it is at the end, and the blocks above it read like prose it could return');
 
   // And postBriefing hands over the three it has already awaited, rather than
   // the critic opening reads of its own on the far side of a briefing.
   const brief = src.slice(src.indexOf('async function postBriefing('));
-  assert.match(brief.slice(0, brief.indexOf('\n}')), /critique\(draft,\s*notes,\s*channels,\s*desk\)/,
-    'postBriefing no longer passes the notes, the map and the desk it already ' +
+  assert.match(brief.slice(0, brief.indexOf('\n}')), /critique\(draft,\s*notes,\s*channels,\s*desk,\s*story\)/,
+    'postBriefing no longer passes the notes, the map, the desk and the story it already ' +
     'holds into critique() — the critic is back to judging without them');
 });
 
@@ -3947,6 +3947,27 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
    arriving on a new rule.
    ─────────────────────────────────────────────────────────────────────────── */
 
+test('both gates check the message against the story, and the story states a direction', () => {
+  /* "OCTOBER RATE CUT ODDS", TWICE, IN A WEEK THE FED HAD JUST HIKED — inside
+     messages whose own reasoning was about a hike. A slip rather than a gap in
+     what she knew, and neither gate could catch it: both judge how she writes
+     and were handed nothing saying which way things are going. One rule, held
+     by both, the way WRITING is; and it is only as good as the story, so the
+     nightly pass is told to write the direction into it. */
+  const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1];
+  assert.match(body('AGAINST_THE_STORY'), /says "cut" where the story says "hike"/,
+    'AGAINST_THE_STORY no longer names the slip it exists for');
+  for (const gate of ['CRITIC', 'TRIM']) {
+    assert.ok(body(gate).includes('${AGAINST_THE_STORY}'),
+      `${gate} no longer carries the check against the story — it can pass a "cut" ` +
+      `in a week the story says "hike", and it runs last`);
+  }
+  assert.match(body('CONSOLIDATE').replace(/\s+/g, ' '),
+    /Say the direction plainly: which way the central bank last moved and which way the market is betting next/,
+    'the nightly pass is no longer told to write the direction into the story, so ' +
+    'the gates check against a story that may never say it');
+});
+
 test('the writing rules ban a figure of speech, with his own example of one beside it', () => {
   /* EVERY WORD SHORT AND THE SENTENCE STILL A PUZZLE. "The relief in gold has
      been contained rather than clean" obeys every countable rule in WRITING and
@@ -4023,10 +4044,14 @@ test('her read on price is fenced in the writer and in both gates', () => {
   const calls = [...EUGENIA_TS.matchAll(/await trim\(([^)]*)\)/g)].map(m => m[1]);
   assert.ok(calls.length >= 4, `read ${calls.length} calls to trim() — the reader has gone blind`);
   for (const args of calls) {
-    assert.match(args, /,\s*desk$/,
-      `trim(${args}) is not handed the desk — that gate cannot tell a compliant ` +
-      `read from one given while he is in a position`);
+    assert.match(args, /,\s*desk,\s*story$/,
+      `trim(${args}) is not handed the desk and the story — that gate cannot tell ` +
+      `a compliant read from one given while he is in a position, nor a "cut" ` +
+      `from the "hike" the story says`);
   }
+  const trimBody = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function trim('));
+  assert.match(trimBody.slice(0, trimBody.indexOf('\n}')), /\$\{story\}/,
+    'trim() takes the story and never puts it in front of the gate');
 });
 
 /* ─── A verdict judges the decision, and waits for the close ─────────────────
@@ -5569,7 +5594,7 @@ test('the three gated paths remember what the gate returned, not the draft', () 
     assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
     const body = src.slice(at, src.indexOf('\n}', at));
 
-    assert.match(body, /const sent = await trim\(said, desk\);/,
+    assert.match(body, /const sent = await trim\(said, desk, story\);/,
       `${fn} no longer binds the revision — inlined into sayAloud it cannot ` +
       'also be the thing that is stored');
     assert.match(body, /await sayAloud\(sent\)/,

@@ -141,7 +141,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 616 tests, six suites
+npm test      # 617 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1256,7 +1256,9 @@ compounds.
   of the briefing's four checks would ruin three sentences. What constrains code
   here: `TRIM` reads the same `WRITING` the writer was given rather than a copy,
   it is handed no notes and no channel map but IS handed `positionsBlock()`,
-  since the line on price turns on it, and it runs on Sonnet because
+  since the line on price turns on it, and `thesisBlock()`, which is the only
+  thing either gate can check a DIRECTION against — `AGAINST_THE_STORY`, held
+  once for both the way `WRITING` is, and it runs on Sonnet because
   checking a message against a stated rule is the bounded half of the split the
   models are chosen on.
 

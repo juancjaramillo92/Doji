@@ -3472,8 +3472,9 @@ export function keepDraft(draft: string, revised: string): boolean {
   return t.length < draft.length / 3 || t.length > draft.length * 2;
 }
 
-async function critique(draft: string, notes: string, channels: string, desk: string): Promise<string> {
-  return await gate(draft, `${CRITIC}${notes}${channels}${desk}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
+async function critique(draft: string, notes: string, channels: string, desk: string,
+                        story: string): Promise<string> {
+  return await gate(draft, `${CRITIC}${notes}${channels}${desk}${story}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
 }
 
 /* THE SAME GATE ON THE MESSAGES THE CRITIC NEVER REACHED. `CRITIC` runs on the
@@ -3488,10 +3489,12 @@ async function critique(draft: string, notes: string, channels: string, desk: st
    is handed no notes and no channel map, because it is not judging whether a
    term was built — only whether the sentences obey the rules she writes by.
 
-   IT IS HANDED WHAT HE HAS ON, AND THAT IS THE ONE INPUT IT NEEDS. Her read on
-   price is allowed and a view while he is in a position is not, so the gate
+   IT IS HANDED WHAT HE HAS ON, AND THE STORY SHE HAS BEEN CARRYING. Her read
+   on price is allowed and a view while he is in a position is not, so the gate
    cannot tell a compliant message from a breaking one without the block that
-   says which it is. Every caller already awaited it for the writer.
+   says which it is. And the story is what says which way things are going, the
+   one fact a gate checks rather than a way of writing. Every caller already
+   awaited both for the writer.
 
    AND WHAT IT RETURNS IS WHAT GETS REMEMBERED, WHICH IS WHY THE THREE CALLERS
    BIND IT. The draft is what `ask()` produced; the revision is what he read.
@@ -3501,8 +3504,8 @@ async function critique(draft: string, notes: string, channels: string, desk: st
    through the door this gate opened. The briefing never had it: it stores what
    `critique` returned. The three that GAINED a gate kept storing the draft for
    as long as they had one. */
-async function trim(draft: string, desk: string): Promise<string> {
-  return await gate(draft, `${TRIM}${desk}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
+async function trim(draft: string, desk: string, story: string): Promise<string> {
+  return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
 }
 
 /* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
@@ -3564,7 +3567,7 @@ async function postBriefing(due: Brief): Promise<Response> {
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
-  const brief = await critique(draft, notes, channels, desk);
+  const brief = await critique(draft, notes, channels, desk, story);
 
   /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT, and it matters more
      now that the cap is off. The prompt holds the market half near nine hundred
@@ -3951,7 +3954,7 @@ async function postPulse(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
 
-  const sent = await trim(said, desk);
+  const sent = await trim(said, desk, story);
   await sayAloud(sent);
   await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: sent }]);
   return json({ ok: true, pulse: "sent" });
@@ -4088,7 +4091,7 @@ async function postRelease(): Promise<Response> {
   const named = due.map(r => r.name).join(", ");
   if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
 
-  const sent = await trim(said, desk);
+  const sent = await trim(said, desk, story);
   await sayAloud(sent);
   // Stored, unlike a quiet one: this is a thing he read, and a follow-up
   // question about it needs the exchange it follows.
@@ -4424,7 +4427,7 @@ async function postMove(): Promise<Response> {
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
-  const sent = await trim(said, desk);
+  const sent = await trim(said, desk, story);
   await sayAloud(sent);
   await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
                   { role: 'assistant', content: sent }]);
@@ -4804,7 +4807,7 @@ async function handleMessage(update: any): Promise<void> {
          beside the send. Cleared first, the ping stops and three silent seconds
          pass before anything lands, so she reads as having finished and then
          said nothing. */
-      answer = await trim(draft, desk);
+      answer = await trim(draft, desk, story);
     } finally {
       // Stopped the moment there is something to send, not after sending it —
       // otherwise a ping fires between the message landing and the write, and

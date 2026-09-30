@@ -1841,6 +1841,18 @@ built. It **is** handed what you have on right now, because her read on price is
 allowed and a read while you are in a position is not, and a gate cannot tell
 those apart without the block that says which. It runs on Sonnet.
 
+**Both gates are handed the story she has been carrying, and check one fact
+against it: the direction.** Twice in one week she wrote "October rate cut odds"
+while the Fed had just hiked, both times inside a message whose own reasoning was
+about a hike. So she knew, and the phrase she had seen most often came out
+instead. Neither gate could catch it: they judged how she writes and held nothing
+saying which way things were going. Now a "cut" where the story says "hike" is
+changed to match, unless the message says the story itself changed today and why.
+The check is only as good as the story, so the nightly pass is told to write the
+direction into it — which way the central bank last moved, and which way the
+market is betting next. The rule is written once, `AGAINST_THE_STORY`, and both
+gates read it.
+
 **The trade event stays out, and the reason first given for it was wrong.** It
 said there was no composed prose to trim. Both branches do decide *whether to
 speak* from data before any model call — which is why an ordinary fill costs
