@@ -1091,6 +1091,14 @@ put it back. The map does not apply to this one.
 Does it obey his standing instructions? Those are in your notes and they outrank
 the shape above.
 
+LAST, COUNT. Two of the rules above can be checked by counting, and they are
+the two this pass has let through: paragraphs of six sentences on three
+mornings running, and an em-dash aside on two of them. So count rather than
+read. Go through the prose paragraph by paragraph and count the sentences; any
+paragraph over four is split where the thought turns. Then find every em-dash;
+each one becomes a full stop and a sentence of its own. The calendar lines are a
+list, not prose, and are not counted.
+
 Return the briefing itself and nothing else. No preamble, no notes on what you
 changed, no explanation. If it is already right, return it unchanged.`;
 

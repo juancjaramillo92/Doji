@@ -3947,6 +3947,28 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
    arriving on a new rule.
    ─────────────────────────────────────────────────────────────────────────── */
 
+test('the critic counts paragraphs and dashes last, after everything that can add them', () => {
+  /* THE TWO COUNTABLE RULES THAT DID NOT LAND. Three briefings in a row went
+     through the critic with six-sentence paragraphs, two with an em-dash aside,
+     and the verdict row read `revised` every time. Both rules were in the
+     `WRITING` it is handed, among a dozen judgement calls. A count is a
+     different act from a reading, so it is asked for as one, and LAST — every
+     check above it can add a clause, and a count taken before the chain is
+     completed is a count of a paragraph that no longer exists. */
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
+  const count = critic.indexOf('LAST, COUNT.');
+  assert.ok(count > -1, 'CRITIC no longer asks for the count as a step of its own');
+  const step = critic.slice(count).replace(/\s+/g, ' ');
+  assert.match(step, /count the sentences; any paragraph over four is split/,
+    'the count step no longer bounds a paragraph at four sentences');
+  assert.match(step, /every em-dash; each one becomes a full stop/,
+    'the count step no longer removes the em-dash aside');
+  for (const earlier of ['${WRITING}', 'Is the chain complete', 'standing instructions']) {
+    assert.ok(critic.indexOf(earlier) > -1 && critic.indexOf(earlier) < count,
+      `the count comes before "${earlier}", which can add a clause after it`);
+  }
+});
+
 test('her read on price is fenced in the writer and in both gates', () => {
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
