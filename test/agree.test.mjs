@@ -4031,6 +4031,23 @@ test('a verdict judges the decision rather than the result, and never an open tr
   // And the message that reaches him mid-trade stays verdict-free outright.
   assert.match(bodies.TRADE_EVENT, /say whether the trade is good/,
     'TRADE_EVENT no longer forbids judging the trade he is in');
+
+  /* THE FACT ALONE IS WHERE SHE STOPPED. The first two briefings under the
+     coaching rules named the breach — 52 minutes, R-12 allows fifteen, marked
+     compliant — and went back to the market with no verdict and no lesson,
+     with a note beside them already recording it as a repeat. The writer is
+     told the verdict is not optional and the briefing slot makes room for three
+     sentences; the critic, which runs last, adds a missing verdict and may not
+     cut one for length. Any one of those gone and the fact-only line returns. */
+  assert.match(bodies.SYSTEM, /THE VERDICT IS NOT OPTIONAL/,
+    'SYSTEM no longer says a breach needs a verdict after it, and she goes back to ' +
+    'stating the fact and stopping');
+  assert.match(bodies.SYSTEM, /the fact, your verdict, the lesson/,
+    'the briefing slot no longer makes room for the verdict and the lesson');
+  assert.match(bodies.CRITIC, /A breach with no verdict after it is half written/,
+    'the critic no longer adds a verdict a breach was left without');
+  assert.match(bodies.CRITIC, /never the verdict on his trading/,
+    'the critic may cut the verdict for length again');
 });
 
 /* ─── diagnose.sql counts itself too ─────────────────────────────────────────

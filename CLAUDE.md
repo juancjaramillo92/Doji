@@ -479,6 +479,11 @@ code you write near it:
   is in a position, restated in a gate that cannot see the position, is the
   critic's old failure with his notes. The verdict is measured against his
   rules and the plan he entered with, never the P&L, and waits for the close.
+  AND SHE STOPPED AT THE FACT — the first two briefings named a breach and went
+  back to the market, a note beside them already calling it a repeat — so the
+  verdict is stated as NOT OPTIONAL in `SYSTEM`, the briefing slot holds three
+  sentences, and `CRITIC` adds a missing verdict and may not cut one for length.
+  A gate that cuts it for length is the teaching block's failure again.
   `MOVE`, `RELEASE` and `TRADE_EVENT` keep the flat ban — they land at moments
   she did not choose. Signals — an entry, a stop, a target, what to do with a
   position — stay forbidden outright, and no instruction note can reach them.
