@@ -38,7 +38,7 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
-  calendarWindow, foldBars } from '../supabase/functions/doji-tradingview/index.ts';
+  calendarWindow, foldBars, foldHeadlines } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
@@ -53,7 +53,7 @@ import {
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, awaitingActual,
-  aroundList, aroundBlock,
+  aroundList, aroundBlock, headlinesList, headlinesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -738,6 +738,64 @@ test('a market that will not read is a sentence telling her not to reach for a s
     assert.match(await aroundBlock(), /could not be read just now/);
     globalThis.fetch = async () => new Response(JSON.stringify(AROUND), { status: 200 });
     assert.match(await aroundBlock(), /Dollar index 102\.16/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+});
+
+/* ─── What the wires said ────────────────────────────────────────────────────
+   Four headlines from the 1 October probe, fields as served — and the Reuters
+   gold story put on the dollar's feed as well, since a story on both feeds is
+   the overlap the fold exists to remove. */
+const H = (id, published, title, name) => ({ id, published, title, provider: { name }, paywall: true });
+const GOLD_NEWS = { data: { headlines: [
+  H('tag:reuters.com,2026:newsml_L1N45N0PD:0', 1790869666,
+    'Gold holds steady as firm dollar, yields counter easing Fed rate hike bets', 'Reuters'),
+  H('DJN_DN20261001005012:0', 1790861220, 'Comex Gold Delivery Intentions Breakdown - Oct 1', 'Dow Jones Newswires'),
+] }, success: true };
+const DXY_NEWS = { data: { headlines: [
+  H('macenews:ed8cb4683094b:0', 1790876280,
+    "FED GOV JEFFERSON/CHARLOTTESVILLE: 'EXPECT INFLATION TO BE ELEVATED IN THE SHORT RUN BEFORE RESUMING ITS DECLINE TOWARD OUR 2% GOAL'",
+    'Mace News'),
+  H('tag:reuters.com,2026:newsml_L6N45N0VX:0', 1790873546,
+    'Yields fall after US 10-year hits highest since 2002; stocks, euro also decline', 'Reuters'),
+  H('tag:reuters.com,2026:newsml_L1N45N0PD:0', 1790869666,
+    'Gold holds steady as firm dollar, yields counter easing Fed rate hike bets', 'Reuters'),
+] }, success: true };
+
+test('two feeds fold to one list of headlines, a story on both counted once, newest first', () => {
+  const folded = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
+  assert.equal(folded.length, 4, 'the story carried by both feeds was counted twice');
+  assert.deepEqual(folded.map(h => h.published), [
+    '2026-10-01T17:38:00.000Z', '2026-10-01T16:52:26.000Z', '2026-10-01T15:47:46.000Z', '2026-10-01T13:27:00.000Z']);
+  assert.deepEqual(folded[0], { id: 'macenews:ed8cb4683094b:0', source: 'Mace News', feed: 'TVC:DXY',
+    published: '2026-10-01T17:38:00.000Z', title: DXY_NEWS.data.headlines[0].title });
+  assert.equal(folded.find(h => h.id.endsWith('L1N45N0PD:0')).feed, 'TVC:GOLD');
+});
+
+test('the move look is handed the last hour of headlines and says so, and says when a feed failed', () => {
+  const headlines = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
+  const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T17:45:00Z'));
+  assert.match(out, /Headlines in the last hour, from TradingView's gold and dollar feeds — titles only/);
+  assert.match(out, /· 13:38 ET, Mace News: FED GOV JEFFERSON/);
+  assert.match(out, /· 12:52 ET, Reuters: Yields fall after US 10-year hits highest since 2002/);
+  // The morning's gold story is not an explanation for a move a quarter-hour old.
+  assert.doesNotMatch(out, /Gold holds steady/);
+  assert.ok(out.indexOf('13:38') < out.indexOf('12:52'), 'the headlines are not newest first');
+
+  assert.match(headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T21:00:00Z')),
+    /No headline on gold's or the dollar's TradingView feeds in the last hour\./);
+  assert.match(headlinesList({ headlines: [], missing: [{ symbol: 'TVC:DXY' }] }, Date.now()),
+    /One of the two feeds could not be read\./);
+});
+
+test('headlines that will not read send her to search, and never take the look down', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  globalThis.fetch = async () => new Response('not json', { status: 502 });
+  try {
+    assert.match(await headlinesBlock(), /could not be read just now; search for what moved it/);
   } finally {
     globalThis.fetch = realFetch;
     console.error = realErr;

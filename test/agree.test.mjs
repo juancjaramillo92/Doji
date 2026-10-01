@@ -6262,7 +6262,7 @@ test('the market around gold reaches both paths that explain gold against it, an
   for (const fn of ['postBriefing', 'postMove']) {
     const b = body(fn);
     assert.match(b, /aroundBlock\(\)/, `${fn} no longer reads the market around gold`);
-    assert.match(b, /\baround \+ notes/, `${fn} reads the market around gold and never hands it to her`);
+    assert.match(b, /\baround \+ /, `${fn} reads the market around gold and never hands it to her`);
   }
   /* THE SYMBOLS LIVE IN doji-tradingview ALONE, beside their names. A renderer
      holding its own list is a list that can name a symbol nothing reads. */
@@ -6275,6 +6275,19 @@ test('the market around gold reaches both paths that explain gold against it, an
     'SYSTEM no longer asks her to say what a market figure is measured from');
   assert.doesNotMatch(system, /finance\.yahoo\.com/,
     'SYSTEM still sends her to a page for the dollar or the ten-year she is now handed');
+});
+
+test('the move look reads the wires before it searches, and claims no more than a title', () => {
+  // headlinesList is pure and driven in fold.test.mjs; the call site is not.
+  const at = EUGENIA_TS.indexOf('async function postMove(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /headlinesBlock\(\)/, 'the move look no longer reads the headlines');
+  assert.match(body, /\+ wires \+/, 'the move look reads the headlines and never hands them to her');
+  const move = EUGENIA_PROMPT.match(/export const MOVE = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(move, /read them first, and where one explains the move, cite it with its time and its source/,
+    'MOVE no longer sends her to the headlines before a search');
+  assert.match(move, /never what the article goes on to say/,
+    'MOVE no longer stops her claiming what a paywalled story says from its title');
 });
 
 test('the calendar is filed before the briefing reads it and before the look decides', () => {

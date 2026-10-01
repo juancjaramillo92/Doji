@@ -3113,6 +3113,7 @@ export function aroundList(answer: { market: Around[]; missing: { name: string }
 }
 
 const TV_MARKET = `${SB_URL}/functions/v1/doji-tradingview?market=1`;
+const TV_NEWS = `${SB_URL}/functions/v1/doji-tradingview?news=1`;
 
 export async function aroundBlock(): Promise<string> {
   try {
@@ -3123,6 +3124,48 @@ export async function aroundBlock(): Promise<string> {
   } catch (err) {
     console.error("doji-eugenia: market around gold unavailable —", err instanceof Error ? err.message : err);
     return NO_AROUND;
+  }
+}
+
+/* ─── What the wires said ──────────────────────────────────────────────────
+   Gold's and the dollar's headlines, handed to the move look: a move with
+   nothing on the calendar behind it is the one look that has to find its own
+   explanation, and it used to start from a web search with no idea what had
+   crossed the wires in the minutes before. On 1 October the Fed vice chair's
+   remarks were on the dollar's feed within minutes of his saying them.
+
+   THE LAST HOUR, AND THE BLOCK SAYS SO — a headline from the morning is not
+   an explanation for a move a quarter of an hour old, and a window left
+   unsaid is one she fills in herself. Titles only, with their time and their
+   source, because most stories are paywalled and a title is all that was read:
+   she is told not to claim what the article says. */
+const WIRES_MIN = 60;
+
+type Headline = { title: string; source: string; published: string };
+
+export function headlinesList(answer: { headlines: Headline[]; missing: { symbol: string }[] }, now = Date.now()): string {
+  const recent = answer.headlines.filter(h => {
+    const age = now - Date.parse(h.published);
+    return age >= 0 && age <= WIRES_MIN * 60_000;
+  });
+  const gap = answer.missing.length ? " One of the two feeds could not be read." : "";
+  if (!recent.length) {
+    return `\n\nNo headline on gold's or the dollar's TradingView feeds in the last hour.${gap}`;
+  }
+  return `\n\nHeadlines in the last hour, from TradingView's gold and dollar feeds — titles only, ` +
+    `most stories are paywalled:\n` +
+    recent.map(h => `· ${nyTime(h.published)} ET, ${h.source}: ${h.title}`).join("\n") + gap;
+}
+
+export async function headlinesBlock(): Promise<string> {
+  try {
+    const res = await fetch(TV_NEWS, { headers: { "x-doji-key": CRON_SECRET } });
+    const answer = await res.json();
+    if (!res.ok || !answer.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    return headlinesList(answer);
+  } catch (err) {
+    console.error("doji-eugenia: headlines unavailable —", err instanceof Error ? err.message : err);
+    return "\n\nThe headlines could not be read just now; search for what moved it.";
   }
 }
 
@@ -4363,9 +4406,9 @@ async function postMove(): Promise<Response> {
 
   await markPrice(spot.bid, true);
 
-  const [notes, map, story, loops, ahead, desk, around] = await Promise.all([
+  const [notes, map, story, loops, ahead, desk, around, wires] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), aheadToday(),
-    positionsBlock(), aroundBlock(),
+    positionsBlock(), aroundBlock(), headlinesBlock(),
   ]);
   // The window is STATED FROM THE MARK rather than asserted as a quarter of an
   // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
@@ -4383,7 +4426,7 @@ async function postMove(): Promise<Response> {
       ? `\nStill ahead today: ` +
         ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
       : "") +
-    around + notes + map + story + loops + desk;
+    around + wires + notes + map + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'move look', RELEASE_TOOLS);

@@ -1255,9 +1255,13 @@ explains it. Below is where it is and what it did, and the market around gold
 beside it: whether the dollar or yields moved with it is often the explanation,
 and it is already in front of you.
 
-Find out what moved it. Search — a headline, a central bank line, a bid in the
-dollar or in yields, a large print somewhere you were not watching. Fetch the page
-if the detail matters.
+Find out what moved it. The last hour's headlines from gold's and the dollar's
+feeds are below, with their times: read them first, and where one explains the
+move, cite it with its time and its source. They are titles only, so say what
+the headline says and never what the article goes on to say. Search when they
+do not explain it — a central bank line, a bid in the dollar or in yields, a
+large print somewhere you were not watching. Fetch the page if the detail
+matters.
 
 THEN DECIDE, AND THE DEFAULT IS SILENCE. Reply with the single word NOTHING — no
 punctuation, no explanation — unless you found what moved it.
