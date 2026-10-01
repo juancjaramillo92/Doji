@@ -885,7 +885,7 @@ const called = (text) =>
 
 test('every function a caller names is a function that exists', () => {
   assert.deepEqual(DEPLOYED,
-    ['doji-email-sync', 'doji-eugenia', 'doji-gladys', 'doji-mcp-sync'],
+    ['doji-email-sync', 'doji-eugenia', 'doji-gladys', 'doji-mcp-sync', 'doji-tradingview'],
     'a function was added or removed — say so here, and check every caller');
 
   for (const { path, text } of CALLERS) {
@@ -5722,7 +5722,7 @@ test('the poller answers its debug flags before it writes anything', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  const write = src.indexOf('const data = await mcpCall(sid, "get_deals", dealArgs)');
+  const write = src.indexOf('const data = await mcpCall(session, "get_deals", dealArgs)');
   assert.ok(write > -1, 'the poller no longer folds the deals it was about to write');
 
   for (const [flag, marker] of [['raw', 'if (raw) {'], ['tools', 'if (tools) {']]) {
@@ -5784,8 +5784,39 @@ test('the poller can call nothing that would place, move or close a trade', () =
   // Nowhere in the file may a destructive name appear as a call, whatever the
   // array says — the probes call tools directly and must not be a way round it.
   for (const t of destructive) {
-    assert.ok(!new RegExp(`mcpPost\\(sid, "${t}"|mcpCall\\(sid, "${t}"|name: "${t}"`).test(src),
+    assert.ok(!new RegExp(`mcpPost\\(session, "${t}"|mcpCall\\(session, "${t}"|name: "${t}"`).test(src),
       `doji-mcp-sync calls ${t} somewhere, bypassing the allow-list entirely`);
+  }
+});
+
+/* ─── TradingView calls nothing yet, and nothing that writes ever ────────────
+   Its security contract says no tool is called: the function signs in and
+   lists, and `tools/list` is a method that names none. That is enforced here
+   rather than trusted, and the second half outlives the first. When the first
+   reader arrives it brings an allow-list, and this test becomes the poller's
+   shape above. The destructive names stay banned from every request whatever
+   the list says.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('doji-tradingview calls no tool, and can name none that writes to his account', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+
+  const banned = src.match(/export const DESTRUCTIVE_TOOLS = \[([\s\S]*?)\] as const;/);
+  assert.ok(banned, 'doji-tradingview no longer names the destructive tools');
+  const destructive = [...banned[1].matchAll(/"(\w+)"/g)].map(m => m[1]);
+  assert.ok(destructive.length >= 3,
+    `only ${destructive.length} destructive tools named — the documentation names three`);
+
+  assert.doesNotMatch(src, /tools\/call/,
+    'doji-tradingview makes a tools/call with no allow-list beside it — its ' +
+    'contract says no tool is called, and the first one must arrive with a list');
+
+  const rest = src.replace(banned[0], '');
+  for (const t of destructive) {
+    assert.ok(!rest.includes(`"${t}"`),
+      `doji-tradingview names ${t} as a string outside DESTRUCTIVE_TOOLS — the ` +
+      `one way that name becomes a request`);
   }
 });
 
@@ -5799,7 +5830,7 @@ test('every tool the poller may call is one it actually calls or probes', () => 
     .matchAll(/"(\w+)"/g)].map(m => m[1]);
 
   for (const t of allowed) {
-    assert.match(src, new RegExp(`(mcpPost|mcpCall)\\(sid, "${t}"`),
+    assert.match(src, new RegExp(`(mcpPost|mcpCall)\\(session, "${t}"`),
       `ALLOWED_TOOLS permits ${t} and nothing in the file ever calls it`);
   }
 });
@@ -6001,7 +6032,7 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
     'ever — the healthy steady state, whether or not anything was written');
   assert.match(body, /\(\(await patch\.json\(\)\) as unknown\[\]\)\.length > 0/,
     'the excursion count is taken from the call rather than the rows written');
-  assert.match(src, /excursions = await fillExcursions\(sid\)/,
+  assert.match(src, /excursions = await fillExcursions\(session\)/,
     'the poll no longer calls fillExcursions, so best_price is never written ' +
     'and R-04 is unknown on every trade for ever');
 });

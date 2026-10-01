@@ -38,7 +38,8 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
+  SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -242,57 +243,15 @@ export const DESTRUCTIVE_TOOLS = [
 ] as const;
 
 /* ─── MCP transport ────────────────────────────────────────────────────────
-   Streamable HTTP. Three things make it fiddlier than a REST call: a session
-   must be opened with `initialize` and its Mcp-Session-Id echoed on every later
-   call; sessions expire within minutes, so each invocation opens a fresh one
-   rather than caching; and responses arrive as Server-Sent Events, so the JSON
-   is wrapped in `event: message\ndata: {...}` framing that has to be peeled off.
+   The handshake and the SSE framing are in _shared, because TradingView speaks
+   the same transport; what is this function's own is the endpoint and the
+   token, which is all the headers below carry.
    ───────────────────────────────────────────────────────────────────────── */
 const MCP_HEADERS = {
   "Authorization": `Bearer ${MCP_TOKEN}`,
   "Content-Type": "application/json",
   "Accept": "application/json, text/event-stream",
 };
-
-// Walks the data: frames from the END BACKWARDS and returns the last one that
-// actually parses. Taking the final line unconditionally meant a trailing
-// keepalive or a second event surfaced as a SyntaxError inside a generic 500 —
-// which pg_cron's net.http_post discards, so it reported to nobody.
-export function parseSse(body: string): any {
-  const frames = body.split("\n")
-    .filter(l => l.startsWith("data:"))
-    .map(l => l.slice(5).trim())
-    .filter(Boolean);
-
-  for (let i = frames.length - 1; i >= 0; i--) {
-    try { return JSON.parse(frames[i]); } catch { /* try the one before */ }
-  }
-  return JSON.parse(body.trim());   // no SSE framing at all — plain JSON body
-}
-
-async function mcpInit(): Promise<string> {
-  const res = await fetch(MCP_URL, {
-    method: "POST", headers: MCP_HEADERS,
-    body: JSON.stringify({
-      jsonrpc: "2.0", id: 1, method: "initialize",
-      params: {
-        protocolVersion: "2025-06-18", capabilities: {},
-        clientInfo: { name: "doji-sync", version: "3" },
-      },
-    }),
-  });
-  const sid = res.headers.get("mcp-session-id");
-  // Does not echo the response body — it can carry auth detail.
-  if (!res.ok || !sid) throw new Error(`MCP initialize failed (HTTP ${res.status})`);
-
-  // The spec requires this notification before normal calls are accepted.
-  await fetch(MCP_URL, {
-    method: "POST",
-    headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
-    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
-  });
-  return sid;
-}
 
 /* The request and nothing else, so the body cTrader sent can be had whole as
    well as unwrapped. mcpCall wants the deals inside it; ?raw=1 wants the frame,
@@ -302,12 +261,12 @@ async function mcpInit(): Promise<string> {
 
    The allow-list check lives here rather than in mcpCall, because here is the
    only place a tool name becomes a request. */
-async function mcpPost(sid: string, tool: AllowedTool, args: Record<string, unknown>): Promise<string> {
+async function mcpPost(session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
 
   const res = await fetch(MCP_URL, {
     method: "POST",
-    headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
+    headers: session,
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
   });
   // Checked here, so ?raw=1 cannot hand back a 401 body under a 200 and have it
@@ -317,8 +276,8 @@ async function mcpPost(sid: string, tool: AllowedTool, args: Record<string, unkn
   return res.text();
 }
 
-async function mcpCall(sid: string, tool: AllowedTool, args: Record<string, unknown>) {
-  const envelope = parseSse(await mcpPost(sid, tool, args));
+async function mcpCall(session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>) {
+  const envelope = parseSse(await mcpPost(session, tool, args));
   if (envelope.error) throw new Error(`MCP ${tool}: ${envelope.error.message}`);
 
   // Tool results arrive as a text block whose body is itself a JSON document,
@@ -762,10 +721,10 @@ export function bestPrice(bars: Bar[], direction: string, entryMs: number, close
    asked for sixteen, which proves the shape and nothing about the ceiling. */
 const BAR_CHUNK_MS = 4 * 3600_000;
 
-async function readBars(sid: string, from: number, to: number): Promise<Bar[]> {
+async function readBars(session: Record<string, string>, from: number, to: number): Promise<Bar[]> {
   const bars: Bar[] = [];
   for (let at = from; at < to; at += BAR_CHUNK_MS) {
-    const got = await mcpCall(sid, "get_trendbars", {
+    const got = await mcpCall(session, "get_trendbars", {
       symbolId: SYMBOL_IDS[0], period: "M_1",
       fromTimestamp: String(at), toTimestamp: String(Math.min(at + BAR_CHUNK_MS, to) - MINUTE),
     });
@@ -791,7 +750,7 @@ async function readBars(sid: string, from: number, to: number): Promise<Bar[]> {
    writer from ever mattering. Counted on the answer, for writePlan's reason. */
 const EXCURSIONS_PER_POLL = 3;
 
-async function fillExcursions(sid: string): Promise<number> {
+async function fillExcursions(session: Record<string, string>): Promise<number> {
   const res = await fetch(
     `${SB_URL}/rest/v1/trades?select=id,direction,entry_time,fill_time` +
     `&best_price=is.null&exit_price=not.is.null&fill_time=not.is.null` +
@@ -808,7 +767,7 @@ async function fillExcursions(sid: string): Promise<number> {
   let wrote = 0;
   for (const t of due) {
     const span = barSpan(t.entry, t.close) as { from: number; to: number };
-    const best = bestPrice(await readBars(sid, span.from, span.to), t.direction, t.entry, t.close);
+    const best = bestPrice(await readBars(session, span.from, span.to), t.direction, t.entry, t.close);
     if (best === null) continue;
     const patch = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${t.id}&best_price=is.null`, {
       method: "PATCH", headers: sbHeaders("return=representation"),
@@ -886,7 +845,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const from     = to - hours * 3600_000;               // what gets written
     const foldFrom = to - foldHours(hours) * 3600_000;    // what gets read
 
-    const sid = await mcpInit();
+    const session = await mcpInit(MCP_URL, MCP_HEADERS, { name: "doji-sync", version: "3" });
 
     /* ?tools=1 — WHAT THE BROKER ACTUALLY OFFERS, which is a question this
        repository has had to answer by reading its own allow-list and hoping.
@@ -910,7 +869,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     if (tools) {
       const listed = await fetch(MCP_URL, {
         method: "POST",
-        headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
+        headers: session,
         body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
       });
       // Checked for the reason mcpPost checks: a 401 body under a 200 would
@@ -940,7 +899,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        are the whole question, and a fold written before seeing them would be
        the guess this repository keeps paying for. */
     if (posns) {
-      const body = await mcpPost(sid, "get_positions", {});
+      const body = await mcpPost(session, "get_positions", {});
       return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 
@@ -976,14 +935,14 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     if (market || marketRaw) {
       if (marketRaw) {
         const [spot, bars] = await Promise.all([
-          mcpPost(sid, "get_spot_prices", { symbolId: SYMBOL_IDS }),
-          mcpPost(sid, "get_trendbars", barArgs),
+          mcpPost(session, "get_spot_prices", { symbolId: SYMBOL_IDS }),
+          mcpPost(session, "get_trendbars", barArgs),
         ]);
         return new Response(`--- get_spot_prices ---\n${spot}\n--- get_trendbars D_1 by range ---\n${bars}`,
           { headers: { "Content-Type": "text/plain; charset=utf-8" } });
       }
 
-      const quoted = await mcpCall(sid, "get_spot_prices", { symbolId: SYMBOL_IDS });
+      const quoted = await mcpCall(session, "get_spot_prices", { symbolId: SYMBOL_IDS });
       const spot = foldSpot((quoted.prices ?? [])[0]);
       // Said rather than served empty: a price this function could not read is
       // not a price of zero, and a briefing opening on one would be a confident
@@ -1025,7 +984,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       const parts: string[] = [];
       for (const w of windows) {
         const began = Date.now();
-        const body = await mcpPost(sid, "get_trendbars", {
+        const body = await mcpPost(session, "get_trendbars", {
           symbolId: SYMBOL_IDS[0], period: "M_1",
           fromTimestamp: String(w.from), toTimestamp: String(w.from + 15 * 60_000),
         }).catch((err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
@@ -1055,11 +1014,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        half of what is being looked at — parsing it away would hide the layer
        the question is usually about. */
     if (raw) {
-      const body = await mcpPost(sid, "get_deals", dealArgs);
+      const body = await mcpPost(session, "get_deals", dealArgs);
       return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 
-    const data = await mcpCall(sid, "get_deals", dealArgs);
+    const data = await mcpCall(session, "get_deals", dealArgs);
 
     /* TRUNCATION IS DATA LOSS, SO IT IS AN ERROR — AND IT IS CHECKED BEFORE
        ANYTHING IS WRITTEN.
@@ -1148,7 +1107,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
             .map(f => ({ id: f.row.id, at: f.closedAt })), to);
 
     if (target) {
-      const account = await mcpCall(sid, "get_balance", {});
+      const account = await mcpCall(session, "get_balance", {});
       // cTrader scales money by a per-account moneyDigits rather than by a
       // fixed convention. It reads 2 here — the same hundredths as commission
       // and volume — but reading it costs one line and removes the assumption.
@@ -1171,7 +1130,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        leaves one trade in the state every historical row is already in. */
     let planned = 0, stops = 0;
     try {
-      const open = await mcpCall(sid, "get_positions", {});
+      const open = await mcpCall(session, "get_positions", {});
       const plans = openPlans(open.positions ?? []);
       // Sequential rather than parallel: these are single-row PATCHes against
       // one table and there are never more than a handful — R-10 permits one
@@ -1192,7 +1151,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        null, which is where every trade started. */
     let excursions = 0;
     try {
-      excursions = await fillExcursions(sid);
+      excursions = await fillExcursions(session);
     } catch (err) {
       console.error("doji-mcp-sync: excursion not recorded —",
         err instanceof Error ? err.message : err);

@@ -78,7 +78,7 @@ jobs:
       # of them cannot silently fall behind the others.
       #
       # --no-verify-jwt duplicates what supabase/config.toml already says, and
-      # deliberately. All four functions authorise their own callers in code,
+      # deliberately. All five functions authorise their own callers in code,
       # and if either mechanism stops being honoured on its own, a deploy that
       # quietly turned JWT verification back on would break the live Telegram
       # webhooks and the cron poller at once. Two statements of one setting is

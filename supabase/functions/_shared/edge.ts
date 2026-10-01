@@ -8,7 +8,7 @@
 // `presented === expected` returns the same answer to every assertion anyone
 // would think to write while leaking the secret through timing.
 //
-// THIS FILE SERVES NOTHING, which is what makes it importable. The four
+// THIS FILE SERVES NOTHING, which is what makes it importable. The five
 // function modules each call Deno.serve at their top level, so importing one
 // from another would start that function's server inside the caller. A module
 // with no Deno.serve has no such problem, and `_shared/` is the Supabase
@@ -16,9 +16,9 @@
 // imports it.
 //
 // What is NOT here is anything that closes over one function's own
-// configuration — a bot token, a whitelist, a schedule. sbHeaders and telegram
-// are here because their configuration is an argument rather than a capture:
-// every caller passes what differs and shares the rest.
+// configuration — a bot token, a whitelist, a schedule. sbHeaders, mcpInit and
+// telegram are here because their configuration is an argument rather than a
+// capture: every caller passes what differs and shares the rest.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Every Deno touch in this repo goes through here, so the function modules
@@ -129,6 +129,61 @@ export async function heartbeat(who: "poller" | "email", failure?: unknown) {
       method: "PATCH", headers: sbHeaders(), body: JSON.stringify(body), keepalive: true,
     });
   } catch { /* a monitor may not break the thing it monitors */ }
+}
+
+/* ─── MCP over streamable HTTP ─────────────────────────────────────────────
+   Two servers speak it here — cTrader to the poller, TradingView to its own
+   function — and the endpoint and the token are arguments, so each binds its
+   own and the handshake is written once.
+
+   Three things make it fiddlier than a REST call: a session is opened with
+   `initialize`, and a server that assigns one an Mcp-Session-Id must have it
+   echoed on every later call; sessions expire within minutes, so each
+   invocation opens a fresh one rather than caching; and responses arrive as
+   Server-Sent Events, so the JSON is wrapped in `event: message\ndata: {...}`
+   framing that has to be peeled off.
+   ───────────────────────────────────────────────────────────────────────── */
+// Walks the data: frames from the END BACKWARDS and returns the last one that
+// actually parses. Taking the final line unconditionally meant a trailing
+// keepalive or a second event surfaced as a SyntaxError inside a generic 500 —
+// which pg_cron's net.http_post discards, so it reported to nobody.
+export function parseSse(body: string): any {
+  const frames = body.split("\n")
+    .filter(l => l.startsWith("data:"))
+    .map(l => l.slice(5).trim())
+    .filter(Boolean);
+
+  for (let i = frames.length - 1; i >= 0; i--) {
+    try { return JSON.parse(frames[i]); } catch { /* try the one before */ }
+  }
+  return JSON.parse(body.trim());   // no SSE framing at all — plain JSON body
+}
+
+/* THE HEADERS EVERY LATER CALL OF THE SESSION CARRIES, rather than the id,
+   because the id is the server's to give. The spec says a server MAY assign
+   one: cTrader always does, and TradingView had not been asked before this was
+   written. Refusing a server that assigns none would have read as TradingView
+   being down on the first call ever made to it. */
+export async function mcpInit(url: string, headers: Record<string, string>,
+                              clientInfo: { name: string; version: string }) {
+  const res = await fetch(url, {
+    method: "POST", headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "initialize",
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo },
+    }),
+  });
+  // Does not echo the response body — it can carry auth detail.
+  if (!res.ok) throw new Error(`MCP initialize failed (HTTP ${res.status})`);
+  const sid = res.headers.get("mcp-session-id");
+  const session: Record<string, string> = sid ? { ...headers, "Mcp-Session-Id": sid } : headers;
+
+  // The spec requires this notification before normal calls are accepted.
+  await fetch(url, {
+    method: "POST", headers: session,
+    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
+  });
+  return session;
 }
 
 /* ─── Telegram ─────────────────────────────────────────────────────────────

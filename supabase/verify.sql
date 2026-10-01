@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 81 checks above them, silently, leaving a
+-- HTTP responses and threw away all 84 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -614,6 +614,23 @@ from (values
    (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'ff_calendar_replace'),
    '1'),
+
+  -- ─── 016, the TradingView sign-in ───────────────────────────────────────
+  -- THE ONE ROW HERE THAT HOLDS A LIVE CREDENTIAL, so a missing wall is not a
+  -- card showing nothing but his TradingView account readable with the
+  -- publishable key. RLS with no policy, and the table grant asked of the role
+  -- by oid — to_regclass answers null on a database without 016, so the row
+  -- comes back false there rather than raising.
+  ('RLS on tradingview_auth',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.tradingview_auth')),
+   'true'),
+  ('no policy on tradingview_auth',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.tradingview_auth')),
+   '0'),
+  ('neither public role holds a grant on tradingview_auth',
+   (select (has_table_privilege('anon', to_regclass('public.tradingview_auth'), 'select')
+         or has_table_privilege('authenticated', to_regclass('public.tradingview_auth'), 'select'))::text),
+   'false'),
 
   -- THE TWO VAULT NAMES THE WATCHER READS, and they are the third and fourth
   -- pair in this system that is one value under two spellings. Postgres

@@ -72,6 +72,7 @@ supabase/012_excursion.sql              how far a trade ran in his favour
 supabase/013_ff_calendar.sql            Forex Factory's week, which R-14 is judged against
 supabase/014_stops.sql                  every stop and target a position carried, which R-19 reads
 supabase/015_commitments.sql            what he committed to, as a third kind of note
+supabase/016_tradingview.sql            the TradingView sign-in, one row
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -83,6 +84,7 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/strategy.ts              what he decided; she cannot write it
   doji-eugenia/journal.ts               the app's arithmetic, ported so she can reach it
   doji-eugenia/adherence.ts             the thirteen rules a journal row can answer
+supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 scripts/backup-memory.mjs               the paged read behind the weekly copy
 test/                                   node:test suites — see Tests
@@ -210,6 +212,10 @@ came back, and posts to Telegram itself rather than through the function it
 watches; `pace` speaks before a briefing runs out of wall clock, because
 afterwards there is nothing left to speak with. `diagnose.sql` reads all three
 in one grid. See **Deployment**.
+
+**A fifth function holds the TradingView sign-in and writes nowhere but its own
+row.** It is how the calendar and the market around gold will reach her, through
+a credential she never holds. See **TradingView**.
 
 ---
 
@@ -1243,6 +1249,102 @@ permanent costs a thread sitting in the queue, which is visible and harmless.
 
 The alerts are also the early warning if the MCP token is ever misused, so leave
 the notifications on regardless of whether you read them.
+
+---
+
+## TradingView
+
+**`doji-tradingview` holds the TradingView sign-in, and nothing else here does.**
+What TradingView adds is the half of the market the broker cannot serve: the
+economic calendar as data rather than as a page Eugenia transcribes, and the
+dollar and the yields that gold is priced against. Every read of it will come
+through this function. Today it does two things, signing in and saying what
+TradingView offers, and **it calls no tool yet.** What the endpoint offers and
+what each tool takes is read with `?tools=1` before anything is written against
+it. That is the order the poller's `?market=raw` and `?positions=1` set, and it
+is how the poller's two price scales were found rather than guessed.
+
+**A function of its own, for the poller's reason and one more.** The endpoint
+that serves the calendar and the quotes also serves `create_alert`,
+`delete_alert` and `delete_watchlist` on the same credential. None of them can
+trade, but all of them are his account, so the token stays out of Eugenia
+exactly as the cTrader token does. And the sign-in ends in a callback that a
+browser reaches carrying no secret, which has no place in the function that is
+her Telegram webhook.
+
+**Connecting it.** It needs the Essential plan or above; trials carry no MCP
+access. It needs no new secret either: it checks `DOJI_CRON_SECRET` and writes
+with `SB_SECRET_KEY`.
+
+1. Run `supabase/016_tradingview.sql`. It is safe to re-run.
+2. Let the deploy workflow ship the function from `main`.
+3. Ask it to start a sign-in:
+
+   ```
+   curl -s -H "x-doji-key: <DOJI_CRON_SECRET>" \
+     "https://<project>.supabase.co/functions/v1/doji-tradingview?connect=1"
+   ```
+
+   The answer carries `open_this`, the sign-in address. It also says how the
+   function registered itself (`registered_by`), which scopes it asked for
+   (`scopes_asked`) and which ones TradingView offers (`scopes_supported`). If a
+   read-only scope is on that list, it is worth knowing: a token that cannot
+   delete anything would make the function's allow-list a second wall rather
+   than the only one. Asking again starts over, and the sign-in it replaces
+   stops working at once. Dynamic registration mints a new client each time,
+   and an old refresh token kept beside a new client would fail on first use.
+4. Open `open_this` in a browser, sign in to TradingView and approve. The
+   browser comes back to `/callback` carrying `code` and `state`, or `error` if
+   the sign-in was refused, and the page says whether it connected. It also
+   says whether TradingView issued a refresh token. Without one, the sign-in
+   ends when the first access token does.
+5. Ask what TradingView offers:
+
+   ```
+   curl -s -H "x-doji-key: <DOJI_CRON_SECRET>" \
+     "https://<project>.supabase.co/functions/v1/doji-tradingview?tools=1"
+   ```
+
+   That answer is what the next readers are written against: every tool's name,
+   its input schema and its `readOnlyHint`.
+
+**How the sign-in is found.** It is OAuth 2.1 as MCP specifies it, and it is
+discovered rather than configured. The only TradingView address in the file is
+the endpoint itself. Its 401 points at its metadata, the metadata names the
+authorisation server, and that server's metadata names the rest. The function
+registers itself whichever way the server offers. It prefers a client metadata
+document: the `client_id` is the URL `/client` serves, and the server reads who
+Doji is from there. Otherwise it uses dynamic registration. A server that
+offers neither stops `?connect=1` with an error listing what it did advertise.
+It is a public client, so PKCE with S256 carries the proof, and a server that
+does not advertise S256 is refused. `/client` and `/callback` are the only two
+paths that answer without the secret, because neither caller can hold it.
+`/callback` acts only on a `state` that `?connect=1` stored, compares it in
+constant time, and clears it once the sign-in lands.
+
+**The tokens live in a table, which the poller's contract says a token never
+does.** An OAuth server may rotate the refresh token on every use, and a
+function cannot rewrite its own Edge secrets. A token kept there would survive
+exactly one refresh. So it is one row in `tradingview_auth`: RLS on, no policy,
+revoked from both public roles, and `verify.sql` asks all three. A refresh that
+brings no new refresh token keeps the one it had. Storing the absence would end
+the connection at the next expiry with nothing to say why, and a test drives
+two refreshes against a rotating server to hold that. The table is not in the
+memory backup and must not be, because a live refresh token in a workflow
+artefact is the account.
+
+**One caller refreshes at a time today, because only a person calls this.** A
+server that rotates may treat a refresh token presented twice as stolen and
+revoke the whole sign-in, and two scheduled readers refreshing in the same
+second would present it twice. The first scheduled caller has to serialise the
+refresh. That is a condition on adding one, not a defect in what is here.
+
+**What this does not touch.** `ff_calendar` stays as it is. R-14 is defined on
+Forex Factory's red folder, so moving the rule to TradingView's rating would be
+a change to his rule, made deliberately and on its own, not a side effect of a
+new source. Gold's own price is still read from the broker. Whether
+TradingView's is better is a measurement rather than a preference, and it waits
+on the quote tool's shape.
 
 ---
 
@@ -3934,15 +4036,16 @@ the same rule.** `.github/workflows/deploy-functions.yml` runs
 `supabase/functions/**` or `supabase/config.toml`. It needs one repository
 secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
 
-All four functions go on each run rather than only the changed one, so none of
+All five functions go on each run rather than only the changed one, so none of
 them can drift apart from the others. `adherence.ts` ships inside
 `doji-eugenia` the way `prompt.ts` and `strategy.ts` do — it is a module of that
-function, not a fifth one. `verify_jwt` lives in
+function, not a sixth one. `verify_jwt` lives in
 `supabase/config.toml` rather than in a dashboard toggle, which is what makes
 the committed file the whole description of how a function is deployed.
 
 **`supabase/functions/_shared/edge.ts` holds one definition of each primitive**
-— `env`, `secretMatches`, `json`, `sbHeaders`, `telegram`, `nyDate` and `nyClock` —
+— `env`, `secretMatches`, `json`, `sbHeaders`, `mcpInit`, `parseSse`, `telegram`,
+`nyDate` and `nyClock` —
 bundled into every function that imports it. The test is not "could this be
 shared" but **"are there two copies nothing can compare"**, and `secretMatches`
 is why: the function exists to be *constant-time*, so a copy quietly rewritten
@@ -3974,7 +4077,7 @@ keeps an upsert directive off a `PATCH` — the poller's private copy had
 `resolution=merge-duplicates` baked in and sent it on the balance write, where
 it means nothing.
 
-What is deliberately **not** shared is the entry point. All four authorise their
+What is deliberately **not** shared is the entry point. All five authorise their
 own callers with the same shape — refuse if a secret is unset, match one, match
 the other, 401 — and extracting that into a router would put the one check
 worth reading behind a helper. Authorisation stays visible in the file being
@@ -3987,7 +4090,7 @@ green ticks, one red, and the broken code already live. A failing step inside
 the deploy job is the only ordering that actually holds anything back. It is
 also what makes `_shared/` safe to depend on: the suite imports it by the same
 relative path the functions use, so an extraction that does not resolve fails
-the job instead of shipping four broken functions at once.
+the job instead of shipping five broken functions at once.
 
 **This is worth the machinery for one reason.** The poller and Gladys were
 pasted into the dashboard by hand, and nothing tied the running code to the
@@ -3996,7 +4099,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `013_ff_calendar.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `016_tradingview.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4313,7 +4416,9 @@ been wrong once, reporting a correct database as broken.
 14. Run `supabase/012_excursion.sql`, `supabase/013_ff_calendar.sql`,
     `supabase/014_stops.sql` and `supabase/015_commitments.sql`, all safe to
     re-run.
-15. Run `supabase/verify.sql` and read it against 001–015. Nothing is set up
+15. Run `supabase/016_tradingview.sql` and connect TradingView — see
+    **TradingView**.
+16. Run `supabase/verify.sql` and read it against 001–016. Nothing is set up
     until that agrees.
 
 ---
@@ -4387,7 +4492,7 @@ tidy.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches` and `nyClock`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget`, `parseSse` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the thirteen rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches`, `nyClock` and `parseSse`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the thirteen rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `test/golden.test.mjs` | the snapshot, and the only suite that asserts on what nothing else NAMES: the real page booted against a fixed fixture set on a frozen clock, with every derived value and every panel's markup compared byte for byte against `test/golden.json`. The others test named things; a refactor breaks unnamed ones — an attribute order, a class that stopped being emitted, a label whose whitespace collapsed. Its fixtures earn their place by mutation rather than by looking realistic, and the one to keep in mind is the pair entered and closed in opposite orders, because an ordering rule proved by rows that cannot disagree is the audit's own blind spot. It also SWEEPS `Dates.session` across six windows around both US and both EU changeovers rather than sampling it, since New York and London do not change on the same date and a spot check in July gets the right answer under almost any mistake in those tables. Regenerate with `GOLDEN=write npm test`, deliberately, in the same commit as the behaviour change and never to make a red run go away — a golden file regenerated on failure costs what it always cost and proves nothing |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
@@ -4401,7 +4506,7 @@ tidy.
 markup, so it cannot see pixels — a renderer that emits correct HTML with broken
 CSS passes. The Supabase client is a recording stand-in, so `load` and `save`
 are exercised but realtime and the auth paths are not. `mcpInit`, `mcpCall` and
-`upsert` reach the network on their first line and are not exported. The xlsx
+`upsert` reach the network on their first line and no test drives them. The xlsx
 export runs against a recording SheetJS stand-in — `loadXLSX()` returns at once
 when `window.XLSX` is already there, so every line the app owns is exercised and
 the rows it hands over are asserted; what SheetJS then writes from them, and the
