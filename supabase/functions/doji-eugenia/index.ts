@@ -65,8 +65,9 @@ const ANTHROPIC_KEY  = env("ANTHROPIC_API_KEY");
    every other time in this system is kept in. Sunday 17:00 is also the gold
    open, so the week's first briefing lands exactly as the market does.
 
-   Returns which briefing is due, or null. The two answers differ only in their
-   salutation, but they are the whole reason this is not a boolean.
+   Returns which briefing is due, or null. The two answers differ in their
+   salutation and in their calendar — Sunday's is the week it opens — and that
+   is the whole reason this is not a boolean.
    ───────────────────────────────────────────────────────────────────────── */
 export type Brief = 'weekday' | 'sunday';
 
@@ -3124,13 +3125,23 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
    morning forward, tomorrow's 08:30 and today's are two identical-looking lines,
    and last night's 20:00 read as tonight's — `due` on a release that had already
    happened, where the prompt forbids describing a print as still to come. Today
-   stays bare, or the date is noise on nearly every line. */
-export function calendarList(rows: Release[], now = Date.now()): string {
+   stays bare, or the date is noise on nearly every line.
+
+   AND THE WEEKDAY IS SAID, NOT LEFT TO HER. The week the Sunday briefing opens
+   is laid out a day per label, and a model turning "2 Oct" into a Friday is a
+   calendar sum done in its head — the kind that comes out a day off and reads
+   as certain. */
+const weekday = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC', weekday: 'long',
+}).format(new Date(`${iso}T12:00:00Z`));
+
+export function calendarList(rows: Release[], now = Date.now(),
+                             heading = "The calendar around now, as TradingView lists it"): string {
   if (!rows.length) return "";
   const today = nyDate(new Date(now));
   const lines = rows.map(r => {
     const day = nyDate(new Date(r.at));
-    const head = `· ${nyTime(r.at)} ET` + (day === today ? "" : ` on ${civilDay(day)}`) +
+    const head = `· ${nyTime(r.at)} ET` + (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`) +
                  ` ${r.name}`;
     if (r.actual) {
       return `${head} — LANDED at ${r.actual}` +
@@ -3141,7 +3152,7 @@ export function calendarList(rows: Release[], now = Date.now()): string {
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");
   });
-  return `\n\nThe calendar around now, as TradingView lists it:\n${lines.join("\n")}`;
+  return `\n\n${heading}:\n${lines.join("\n")}`;
 }
 
 export async function calendarBlock(): Promise<string> {
@@ -3149,6 +3160,37 @@ export async function calendarBlock(): Promise<string> {
     return calendarList(await readCalendar());
   } catch (err) {
     console.error("doji-eugenia: calendar unavailable —", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
+
+/* ─── The week ahead, for the briefing that opens it ───────────────────────
+   THE SUNDAY BRIEFING WAS THE WEEKDAY ONE WITH ANOTHER GREETING, AND IT COULD
+   NOT SEE THE WEEK IT OPENS. Its calendar reached CAL_AHEAD, which is Monday
+   evening, and the week was filed by the nightly pass at 22:00 — five hours
+   after the one message that is about it. So a Thursday CPI or a Friday payrolls
+   reached the Sunday briefing only if a search happened to turn it up.
+
+   THE WEEK, AND HIGH ONLY. Seven days of everything medium is most of a page
+   and none of it moves gold alone; the releases TradingView rates high are the
+   ones R-14 stands him aside for, and the ones the week turns on. Medium still
+   reaches him, in each morning's own calendar. It replaces the rolling calendar
+   on a Sunday rather than sitting beside it, because the week already holds
+   every high release the rolling window would and the same print twice is two
+   lines she reads as two things. */
+export function weekQuery(now: number): string {
+  const to = new Date(now + 7 * 86_400_000).toISOString();
+  return `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+         `&importance=eq.${HIGH}&at=gte.${new Date(now).toISOString()}&at=lte.${to}` +
+         `&order=at.asc&limit=40`;
+}
+
+export async function weekBlock(now = Date.now()): Promise<string> {
+  try {
+    const rows = await readRows<Release>('Week', `${SB_URL}/rest/v1/${weekQuery(now)}`);
+    return calendarList(rows, now, "The week ahead, every release TradingView rates high");
+  } catch (err) {
+    console.error("doji-eugenia: week unavailable —", err instanceof Error ? err.message : err);
     return "";
   }
 }
@@ -3725,8 +3767,11 @@ async function gate(draft: string, asked: string, label: string): Promise<string
 
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
-  // Filed before the reads, so the calendar she is handed is this morning's.
-  await filed();
+  /* Filed before the reads, so the calendar she is handed is this morning's —
+     and on a Sunday the whole week, which the nightly pass would otherwise file
+     five hours after the one briefing that is about it. The week holds every
+     row the rolling window would. */
+  await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   /* EVERY READ THE BRIEFING NEEDS, AT ONCE. They are independent and they are
      all small, and run one after another they were a round trip each before the
      first token was asked for. Promise.all is the same argument the tool
@@ -3734,7 +3779,8 @@ async function postBriefing(due: Brief): Promise<Response> {
      price, since that one leaves the project for the broker. */
   const [price, around, notes, channels, trades, breaches, story, health, loops, calendar, desk] = await Promise.all([
     marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), breachesBlock(),
-    thesisBlock(), healthBlock(), loopsBlock(), calendarBlock(), positionsBlock(),
+    thesisBlock(), healthBlock(), loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(),
+    positionsBlock(),
   ]);
 
   const asked = (due === 'sunday'

@@ -6324,6 +6324,27 @@ test('the release look is handed the release\'s own record, and told to read aga
   assert.match(rows.slice(0, rows.indexOf('\n}')), /'ticker'/, 'calendarRows no longer files the ticker');
 });
 
+/* ─── The briefing that opens the week ───────────────────────────────────────
+   weekBlock is driven in fold.test.mjs. Whether a Sunday reads it, whether she
+   is told what to do with it, and whether the critic counts a week's list
+   against the words are not — and a critic that does would cut the prose to
+   make room for the week every Sunday, running last. */
+test('the Sunday briefing reads the week, is told it is about the week, and the critic does not count it', () => {
+  const at = EUGENIA_TS.indexOf('async function postBriefing(');
+  const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(brief, /due === 'sunday' \? weekBlock\(\) : calendarBlock\(\)/,
+    'the Sunday briefing no longer reads the week, so it sees only to Monday evening');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
+  assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
+  assert.match(system, /not\s+a look back at his week/,
+    'SYSTEM no longer rules out a weekly review, which he decided against');
+  assert.match(system, /week's calendar is a list of the week\s+and is not counted/,
+    'SYSTEM counts the week\'s list against the words');
+  assert.match(critic, /a week's calendar,\s+which the briefing that opens the week carries, is not counted/,
+    'CRITIC counts the week\'s list against the words, and it runs last');
+});
+
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
   /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
      neither can see whether anything calls them. A briefing that reads before
@@ -6336,9 +6357,14 @@ test('the calendar is filed before the briefing reads it and before the look dec
     return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
   };
   const brief = body('postBriefing');
-  assert.ok(brief.indexOf('await filed()') > -1 &&
-            brief.indexOf('await filed()') < brief.indexOf('calendarBlock()'),
-    'the briefing reads the calendar before it files it');
+  /* AND ON A SUNDAY THE WEEK, which the nightly pass files five hours after
+     the one briefing about it — so a Sunday that filed only the rolling window
+     would read a week that is not there yet, and say nothing past Monday. */
+  const files = brief.search(/await \(due === 'sunday' \? filedWeek\(weekOf\(new Date\(\)\)\) : filed\(\)\)/);
+  assert.ok(files > -1, 'the briefing no longer files the week on a Sunday and the day otherwise');
+  for (const read of ['calendarBlock()', 'weekBlock()']) {
+    assert.ok(brief.indexOf(read) > files, `the briefing reads ${read} before it files it`);
+  }
   const look = body('postRelease');
   const order = ['await filed()', 'await pendingRelease()', 'awaitingActual(due', 'await markLooked('];
   const at = order.map(s => look.indexOf(s));

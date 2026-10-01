@@ -1738,6 +1738,21 @@ the prose around it did, which is the whole argument for it. The relaxation is
 narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
 no mechanism goes in it. That slot is where a second chain hides.
 
+**On Sunday the briefing is about the week it opens** (`weekBlock`). It was the
+weekday briefing with another greeting, and it could not see the week: its
+calendar reached Monday evening, and the week was filed by the nightly pass at
+22:00, five hours after the one briefing about it. So Sunday files the whole week
+first (`filedWeek`, the nightly pass's own filing, which holds every row the
+rolling window would) and is handed every release TradingView rates high for the
+seven days ahead, in place of the rolling calendar rather than beside it. High
+only, because seven days of medium is most of a page and none of it moves gold
+alone; medium still reaches each morning's own calendar. The first paragraph is
+where the story stands as the market opens, the teaching block walks the one
+release most likely to move it, and the calendar slot is the week, a day label
+per line. The week's list is not counted toward the length, in `SYSTEM` and in
+`CRITIC`. It is deliberately not a look back at his week: his trades get what
+they get every morning.
+
 It used to be seven numbered sections with impact emoji, and plain-Englishing
 the words inside them did not help — **seven numbered sections with headings
 *are* a report**, whatever the vocabulary. The scaffolding was doing the

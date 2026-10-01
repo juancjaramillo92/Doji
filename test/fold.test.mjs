@@ -54,7 +54,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
-  sinceBriefing, breachesList, breachesBlock,
+  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -3863,10 +3863,10 @@ test('a calendar line from another day names the day, and today stays bare', () 
   ], Date.parse('2026-09-24T12:02:00Z'));
   assert.match(out, /· 08:30 ET jobless claims — due/,
     'today\'s release carries a date it does not need');
-  assert.match(out, /· 08:30 ET on 25 Sept? durable goods/,
+  assert.match(out, /· 08:30 ET on Friday 25 Sept? durable goods/,
     'tomorrow\'s 08:30 reads exactly like today\'s — she can brief it as due this morning');
-  assert.match(out, /· 10:00 ET on 25 Sept? Michigan expectations/);
-  assert.match(out, /· 20:00 ET on 23 Sept? FOMC minutes/,
+  assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
+  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
 });
 
@@ -5247,7 +5247,7 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
 
 const BLOCKS = {
   marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock,
-  healthBlock, loopsBlock, calendarBlock, positionsBlock,
+  healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
 };
 
 test('every block degrades to nothing when its read fails, and never throws', async () => {
@@ -5314,6 +5314,39 @@ test('every block says something when its read succeeds', async () => {
 const closed = (id, open_day, entry_time, fill_time, extra = {}) => trade({
   id, open_day, entry_time, fill_time, entry_price: 3400, exit_price: 3395,
   pnl: -10, net_pnl: -10, ...extra,
+});
+
+/* ─── The week the Sunday briefing opens ─────────────────────────────────────
+   Driven against a database that answers, from Sunday 17:00 New York: the
+   question is whether Friday's payrolls reaches her, and a query asserted on
+   alone would not say whether the rendering names its day. */
+test('the Sunday briefing is handed the week ahead, high releases only, each with its day', async () => {
+  const sunday = Date.parse('2026-09-27T21:00:00Z');
+  const q = weekQuery(sunday);
+  assert.match(q, /importance=eq\.high/, 'the week reads every importance, which is most of a page');
+  assert.match(q, /at=gte\.2026-09-27T21:00:00\.000Z/, 'the week does not start now');
+  assert.match(q, /at=lte\.2026-10-04T21:00:00\.000Z/, 'the week does not reach the next Sunday, so Friday is cut off');
+  assert.match(q, /order=at\.asc/, 'the week is not in the order it happens');
+
+  const rows = [
+    { id: 1, at: '2026-09-30T12:15:00Z', name: 'ADP Nonfarm Employment Change (Sep)', importance: 'high',
+      consensus: '50K', prior: '54K', actual: null, note: null },
+    { id: 2, at: '2026-10-02T12:30:00Z', name: 'Nonfarm Payrolls (Sep)', importance: 'high',
+      consensus: '45K', prior: '22K', actual: null, note: null },
+  ];
+  const realFetch = globalThis.fetch;
+  let asked = '';
+  globalThis.fetch = async (url) => {
+    asked = String(url);
+    return new Response(JSON.stringify(rows), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const out = await weekBlock(sunday);
+    assert.match(asked, /eugenia_calendar\?/, 'the week is not read from her calendar');
+    assert.match(out, /The week ahead/, 'the week arrives under the rolling calendar\'s heading');
+    assert.match(out, /Nonfarm Payrolls \(Sep\)[^\n]*due, 45K expected/, 'Friday\'s payrolls does not reach the Sunday briefing');
+    assert.match(out, / on Friday 2 Oct Nonfarm Payrolls/, 'a release later in the week does not name its day');
+  } finally { globalThis.fetch = realFetch; }
 });
 
 test('sinceBriefing keeps closed trades from the last briefing on, and the hold that closed after it', () => {
