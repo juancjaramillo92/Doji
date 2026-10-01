@@ -142,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 633 tests, six suites
+npm test      # 630 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -933,68 +933,58 @@ compounds.
 
 ### Her senses, which are data rather than a clock
 
-- **The event spine.** The briefing files the day's calendar with `log_calendar`;
-  a quarter-hourly cron job (`?release=1`, its own job in `004_cron.sql`) looks at
-  anything `high` that has landed
-  and is not yet `looked_at`. That column is stamped BEFORE the look, for the
-  reason the briefing marker is: a look that generates and fails to write would
-  repeat every fifteen minutes, each one billed.
+- **The event spine.** The calendar is FILED FOR HER from TradingView —
+  `fileCalendar`, keyed on TradingView's id (018), called by the briefing before
+  it reads and by the quarter-hourly job (`?release=1`, its own job in
+  `004_cron.sql`) before it looks at anything `high` that has landed and is not
+  yet `looked_at`. That column is stamped BEFORE the look, for the reason the
+  briefing marker is: a look that generates and fails to write would repeat
+  every fifteen minutes, each one billed.
 
-  ONE LOOK PER RELEASE TIME, NOT PER ROW, AND THE DIFFERENCE IS A FEEDBACK
-  LOOP. The key is `(at, name)` and the name is free text, so one print arrives
-  as four or five rows; each high one fired its own look, and the release look
-  holds `log_calendar`, so filing the actual under a slightly different name
-  INSERTED a row that was then unlooked and fired in its turn. Five messages for
-  one CPI, and the two apologies that surfaced it were duplicate looks
-  reconciling against the conversation window rather than her catching an error.
-  `dueRelease` is pure and takes the earliest release time with no mark on it;
-  `pendingRelease` therefore READS `looked_at` rather than filtering on it, and
-  `markLooked` takes every id in the group — that call site is the half no pure
-  test can reach, so `agree.test.mjs` reads it.
+  SHE TYPED IT IN BEFORE THAT, AND THE TYPING WAS THE FAULT. The key was
+  `(at, name)` over a name the model wrote, so one print arrived as four or five
+  rows, each high one fired its own look, and a look filing its actual under a
+  name a shade off INSERTED the next one. ONE WRITE MAY CREATE A ROW NOW, and
+  `agree.test.mjs` reads that it is the one keyed on `tv_id`: a second writer is
+  how one print becomes two rows under two names, silently.
 
-  AND THE WRITE IS BOUNDED BY THE WINDOW SHE IS HANDED, `CAL_BACK`/`CAL_AHEAD`,
-  which is where the duplicates actually came from. She filed four and five days
-  ahead against a block that reaches one day, so every morning re-filed the same
-  release under wording it could not see and had no way to match. Nothing reads
-  past that window, so those rows had no consumer at all. The count of what was
-  refused goes back in the tool's answer: a bound she cannot see is one she
-  files against for ever.
+  ONE LOOK PER RELEASE TIME, NOT PER ROW, all the same — the 08:30 slot is most
+  of a report. `dueRelease` is pure and takes the earliest release time with no
+  mark on it; `pendingRelease` therefore READS `looked_at` rather than filtering
+  on it, and `markLooked` takes every id in the group — that call site is the
+  half no pure test can reach, so `agree.test.mjs` reads it. AND THE LOOK WAITS
+  FOR THE NUMBER: `awaitingActual` leaves a group with a figure missing for the
+  next quarter-hour, for half an hour at most, and never for a speech, which
+  has no figure coming. It must run before `markLooked` — marked first, a print
+  waiting on its actual is looked at never — and `agree.test.mjs` reads the
+  order.
 
-  AND THE WINDOW HAS A FLOOR AS WELL AS A CEILING, which is the half nobody had
-  checked. It must carry the 08:00 briefing past tomorrow's 10:00, because
-  `aheadToday` can only warn about what is filed and every trade opened before
-  tomorrow's briefing reads today's filing. At twenty-four hours it stopped at
-  08:00 and the London session was blind to the 08:30 print every morning.
-  `fold.test.mjs` derives the briefing hour and `CAL_AHEAD` from the source and
-  asserts the reach, so narrowing the window "back to a day" fails the suite.
-  The wider window is safe for the duplicates only because READ and WRITE are
-  one constant — anything filed that far out is inside the next briefing's
-  window too — and `calendarList` names the day on every line that is not
-  today's; split the constant or drop the day and both failures come back.
+  THE WINDOW HAS A FLOOR AS WELL AS A CEILING, `CAL_BACK`/`CAL_AHEAD`. It must
+  carry the 08:00 briefing past tomorrow's 10:00, because `aheadToday` can only
+  warn about what is filed. At twenty-four hours it stopped at 08:00 and the
+  London session was blind to the 08:30 print every morning. `fold.test.mjs`
+  derives the briefing hour and `CAL_AHEAD` from the source and asserts the
+  reach, so narrowing the window "back to a day" fails the suite. READ and
+  WRITE are one constant, and `calendarList` names the day on every line that
+  is not today's.
 
-  `log_calendar` IS THE SECOND BOUNDARY HERE THAT UPSERTS, and it now follows
-  the rule `emailRow` already states: an absent key and a null key mean opposite
-  things under `merge-duplicates`. One row, two writers, the briefing filing the
-  consensus and the release look coming back with the actual — sending every
-  column each time erased the comparison the table exists for, invisibly. Only
-  what she sent is written, and rows go up grouped by the columns they carry
-  because PostgREST refuses a bulk insert that mixes them. It is a second job rather than a
-  faster one because every hourly predicate tests `hour ===` — a `*/15` on the
-  existing job runs four briefings a morning.
+  THE FILING FOLLOWS THE RULE `emailRow` STATES: an absent key and a null key
+  mean opposite things under `merge-duplicates`. A figure TradingView has not
+  published is LEFT OUT of the row, because `record_actual` can still have
+  written one by hand, and a filing sending `actual: null` erases it fifteen
+  minutes later. Rows go up grouped by the columns they carry because PostgREST
+  refuses a bulk insert that mixes them. Every filing is an `eugenia_runs` row
+  under `calendar`, both outcomes. It is a second job rather than a faster one
+  because every hourly predicate tests `hour ===` — a `*/15` on the existing
+  job runs four briefings a morning.
 
-  AND THE LOOK NO LONGER HOLDS THAT TOOL AT ALL, WHICH IS WHERE THE ROWS WERE
-  STILL COMING FROM. Deduplicating the LOOK left the WRITE alone: on 16
-  September it was handed `US retail sales (August, advance)`, marked that row
-  at 12:35:00 and filed the print under `retail sales` at 12:36:15 — an insert,
-  because the key is `(at, name)` over a name the model writes. The actual
-  landed on a row with no consensus and the consensus stayed on a row with no
-  actual. `RELEASE` had said *the same time and name* since the tool was
-  written, so this is the instruction-shaped guarantee failing in the file that
-  says instructions fail here. `ACTUAL_TOOL` replaces it in `RELEASE_TOOLS` and
-  `recordActual` is a PATCH with no insert path at any spelling; it cannot write
-  `consensus` or `prior`, which is how that release came to hold two
-  contradictory priors. A filter matching nothing is a 200 with an empty body —
-  `planned`'s failure exactly — so it reads the names back and says them.
+  `record_actual` IS THE FALLBACK, AND IT CANNOT INSERT. On 16 September a look
+  was handed `US retail sales (August, advance)` and filed the print under
+  `retail sales` — an insert, the actual on a row with no consensus. So it is a
+  PATCH with no insert path at any spelling, and it cannot write `consensus` or
+  `prior`, which are TradingView's. A filter matching nothing is a 200 with an
+  empty body — `planned`'s failure exactly — so it reads the names back and
+  says them.
 
   AND FOR A FORTNIGHT IT MATCHED NOTHING AT ALL, UNDER A GREEN TEST. The name
   went out wrapped in double quotes, on the belief that a comma splits an `eq`
@@ -1474,8 +1464,8 @@ compounds.
 
   AND THE TWO FAILURES DO NOT ESTABLISH WHAT THEY WERE WRITTEN DOWN AS. They
   were recorded as proof that the round budget on a tool-heavy caller is a
-  property of the MODEL — but `record_actual` replaced `log_calendar` in the
-  release look eighty minutes before the model changed, the model was reverted,
+  property of the MODEL — but `record_actual` became the release look's tool
+  eighty minutes before the model changed, the model was reverted,
   and the rounds stayed at seven to ten where they had been two or three. A
   confounded pair is not evidence for either half, and this is the conclusion
   a future cheaper-model proposal would have been refused on. What survives is

@@ -3409,7 +3409,9 @@ const VERIFY = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 
 test('verify.sql asks about every table, policy and index the files declare', () => {
   const tables = [...NUMBERED.matchAll(/create table (?:if not exists )?public\.(\w+)/g)].map(m => m[1]);
   const policies = [...NUMBERED.matchAll(/create policy (\w+) on/g)].map(m => m[1]);
-  const indexes = [...NUMBERED.matchAll(/create index (?:if not exists )?(\w+)/g)].map(m => m[1]);
+  // `unique` too: a reader matching `create index` alone was blind to the one
+  // kind of index a write depends on, which is how 018's would have gone unasked.
+  const indexes = [...NUMBERED.matchAll(/create (?:unique )?index (?:if not exists )?(\w+)/g)].map(m => m[1]);
   assert.ok(tables.length >= 8 && indexes.length >= 8,
     `read ${tables.length} tables and ${indexes.length} indexes — the reader has gone blind`);
 
@@ -3566,21 +3568,16 @@ test('the importance a release may carry is the one the table accepts', () => {
 
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const offered = src.match(/importance: \{ type: "string", enum: \[([^\]]+)\]/);
-  assert.ok(offered, 'the log_calendar tool no longer declares an importance enum');
-  assert.deepEqual([...offered[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
-    'log_calendar offers an importance the table refuses, or the reverse');
 
-  /* AND FOREX FACTORY'S FOLDERS MAP ONTO THE SAME THREE. ffRated writes these
-     values into her rows, so one the table refuses is a 400 on every filing
-     it touched — caught by logCalendar and reported to her as "did not save". */
-  const mapped = src.match(/const FF_IMPORTANCE[^=]*= \{([^}]+)\}/);
-  assert.ok(mapped, 'FF_IMPORTANCE no longer maps Forex Factory folders to importance');
-  assert.deepEqual([...mapped[1].matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort(), declared,
-    "a Forex Factory folder maps to an importance the table refuses, or one is unreachable");
-  const ranked = src.match(/const RANK = \[([^\]]+)\]/);
-  assert.deepEqual([...ranked[1].matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort(), declared,
-    'ffRated ranks importances the table does not have');
+  /* TRADINGVIEW'S THREE LEVELS MAP ONTO THE SAME THREE, and that map is what
+     writes them now. One the table refuses is a 400 on every quarter-hourly
+     filing it touches, recorded as a failed `calendar` run and nothing else. */
+  const tv = readFileSync(
+    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+  const mapped = tv.match(/const IMPORTANCE[^=]*= \{([^}]+)\}/);
+  assert.ok(mapped, "doji-tradingview no longer maps TradingView's importance to her words");
+  assert.deepEqual([...mapped[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
+    "TradingView's importance maps to one the table refuses, or one is unreachable");
 
   /* AND THE ONE THAT WAKES HER IS ONE OF THEM. The event spine selects on
      importance='high', so a rename on either side leaves a spine that matches
@@ -6156,22 +6153,6 @@ test('the nightly pass fetches Forex Factory, meters both outcomes, and check_ru
     'the poll no longer records stop moves, so trade_stops stops growing and R-19 goes unknown');
 });
 
-test('what she files takes Forex Factory\'s rating before it is written', () => {
-  /* ffRated is driven in fold.test.mjs and cannot see whether logCalendar
-     calls it — or calls it AFTER the upsert, which writes her rating and then
-     computes Forex Factory's for nothing. So the body is read, in order. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function logCalendar(');
-  const body = src.slice(at, src.indexOf('\n}', at));
-  const rated = body.indexOf('ffRated(rows');
-  const read = body.indexOf('ratingsQuery(');
-  const write = body.indexOf('eugenia_calendar?on_conflict');
-  assert.ok(read > -1 && rated > -1, 'logCalendar no longer takes Forex Factory\'s rating');
-  assert.ok(read < rated && rated < write,
-    'Forex Factory\'s rating is taken after the rows are written, so hers is what lands');
-});
-
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {
   /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. So the market
      read is deliberately not hers to make: doji-mcp-sync holds
@@ -6206,28 +6187,31 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
     'the market read presents no secret, so the poller will refuse it 401');
 });
 
-/* ─── A look may fill a release in and may never file one ────────────────────
-   The release look held `log_calendar`, whose key is (at, name) over a name the
-   model writes. On 16 September it was handed
-   `US retail sales (August, advance)`, marked that row at 12:35:00, and filed
-   the print under `retail sales` at 12:36:15 — an INSERT. The actual landed on
-   a row with no consensus, the consensus stayed on a row with no actual, and
-   the comparison the table exists for was gone with nothing failing.
+/* ─── Only the TradingView filing makes a calendar row ───────────────────────
+   An upsert keyed on a name the model writes once filed a print under
+   `retail sales` beside the row it had been handed as
+   `US retail sales (August, advance)` — an INSERT, the actual on a row with no
+   consensus and the consensus on a row with no actual, and nothing failed. The
+   prompt had said *the same time and name* since the tool was written, which is
+   the evidence that an instruction cannot carry this.
 
-   The RELEASE prompt had said *the same time and name* since the tool was
-   written. That is the evidence, rather than an argument, that this cannot be
-   carried by an instruction — so the tool array is the guarantee now, and these
-   read for it. Every one of them is silent when it breaks: a look that can
-   upsert again still answers, still sends a correct message, and leaves a
-   second row behind that nobody is looking at.
+   So the guarantee is structural and read here: one write in the file can
+   create a row, it is keyed on TradingView's id, and what she is handed can
+   only PATCH. Each is silent when it breaks — a second writer still answers and
+   leaves a row behind that nobody is looking at.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the release look is handed no tool that can file a calendar row', () => {
+test('one write makes a calendar row, keyed on the id, and she holds none', () => {
+  const inserts = [...EUGENIA_TS.matchAll(/eugenia_calendar\?on_conflict=([\w,]+)/g)].map(m => m[1]);
+  assert.deepEqual(inserts, ['tv_id'],
+    'a second write can create a calendar row, or the filing no longer keys on the ' +
+    "id — either way one print can become two rows under two names again");
+  const at = EUGENIA_TS.indexOf('export async function fileCalendar(');
+  assert.ok(at > -1 && EUGENIA_TS.indexOf('eugenia_calendar?on_conflict', at) <
+    EUGENIA_TS.indexOf('\n}', at), 'the one upsert is no longer inside fileCalendar');
+
   const array = EUGENIA_TS.match(/const RELEASE_TOOLS = \[([^\]]*)\]/)?.[1];
   assert.ok(array, 'RELEASE_TOOLS is no longer an array literal, so nothing here can read it');
-  assert.doesNotMatch(array, /CALENDAR_TOOL/,
-    'the release look can upsert the calendar again — it will mint the row it was ' +
-    'looking at, under a name a shade off the one it was handed');
   assert.match(array, /ACTUAL_TOOL/,
     'the release look has no way to record what a release printed, so the table ' +
     'keeps a consensus for ever and never the number');
@@ -6248,9 +6232,33 @@ test('the release prompt asks for the tool the release look actually has', () =>
   assert.ok(release, 'the RELEASE prompt is no longer readable from here');
   assert.match(release, /record_actual/,
     'the release prompt names no tool for the number, so the look reads the print and files nothing');
-  assert.doesNotMatch(release, /log_calendar/,
-    'the release prompt still names log_calendar, which that path is no longer given — ' +
-    'she is being asked for a tool that answers "there is no tool called that here"');
+});
+
+test('the calendar is filed before the briefing reads it and before the look decides', () => {
+  /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
+     neither can see whether anything calls them. A briefing that reads before
+     it files hands her yesterday's calendar; a look that decides before it
+     files never sees the actual the filing would have landed, and waits out
+     the half hour on every print. */
+  const body = (name) => {
+    const at = EUGENIA_TS.indexOf(`async function ${name}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
+    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  };
+  const brief = body('postBriefing');
+  assert.ok(brief.indexOf('await filed()') > -1 &&
+            brief.indexOf('await filed()') < brief.indexOf('calendarBlock()'),
+    'the briefing reads the calendar before it files it');
+  const look = body('postRelease');
+  const order = ['await filed()', 'await pendingRelease()', 'awaitingActual(due', 'await markLooked('];
+  const at = order.map(s => look.indexOf(s));
+  assert.ok(at.every(i => i > -1), `postRelease no longer does all of: ${order.join(', ')}`);
+  assert.deepEqual([...at].sort((a, b) => a - b), at,
+    'the release look files, reads, waits for the number and marks, in that order — ' +
+    'marked before it waits, a print waiting on its actual is looked at never');
+  const run = body('filed');
+  assert.equal((run.match(/recordRun\(\{ caller: 'calendar'/g) ?? []).length, 2,
+    'the filing no longer records both outcomes — a calendar that stopped moving looks like a quiet week');
 });
 
 test('the release look is handed the stamp its tool takes', () => {

@@ -1014,220 +1014,139 @@ async function readStats(days: unknown): Promise<string> {
 }
 
 /* ─── What lands today ─────────────────────────────────────────────────────
-   She has searched for the day's calendar every morning, read it once and
-   thrown it away — which cost two different things. A print at 08:30 is
-   knowable at 08:00, so the quarter-hour after it could have been a look at
-   what actually happened rather than a fixed 10:00 pulse whose usual answer is
-   silence. And `actual` against `consensus` with her own line beside it is a
-   series that is worth nothing today and a great deal in June.
+   A print at 08:30 is knowable at 08:00, so the quarter-hour after it can be a
+   look at what actually happened rather than a fixed 10:00 pulse whose usual
+   answer is silence. And `actual` against `consensus` is a series that is worth
+   nothing today and a great deal in June.
 
-   ONE TOOL WRITES BOTH HALVES, because they are the same row at two moments:
-   the briefing files what is coming, the release look fills in what it printed.
-   Upserted on (at, name) so the second write updates rather than duplicates.
+   FILED FOR HER, FROM TRADINGVIEW, AND NO LONGER BY HER. She searched for the
+   day's calendar every morning and typed it in, and most of what went wrong with
+   this table came from the typing. The key was (at, name) over a name the model
+   wrote, so one CPI arrived as five rows under five spellings. Her importance
+   came off a search page and had to be corrected by Forex Factory's folder. And
+   she filed days ahead of anything that read the rows. TradingView keeps an id
+   for every release and states its forecast, prior, actual and importance as
+   data, so the row's key is that id (018) and nothing she writes can mint a
+   second one.
+
+   TWO CALLERS FILE IT: the briefing, before it reads the calendar, and the
+   quarter-hourly release job, before it looks for a print — which is also how
+   an actual lands within fifteen minutes of TradingView publishing it. The read
+   goes through doji-tradingview, which holds the sign-in; she presents the cron
+   secret she already has, as she does for the price.
    ───────────────────────────────────────────────────────────────────────── */
-const CALENDAR_MAX = 12;
-
 /* A ROLLING WINDOW RATHER THAN A CIVIL DAY, and it is the simpler correct
-   answer as well as the cheaper one. What a briefing wants is "what just landed
-   and what is coming", which straddles midnight in exactly the way a civil-day
-   filter handles worst — the Sunday 17:00 briefing is about a week that has not
-   started yet. Twelve hours back and a day and a morning forward covers both
-   without any boundary arithmetic to get wrong.
+   answer. What a briefing wants is "what just landed and what is coming", which
+   straddles midnight in exactly the way a civil-day filter handles worst — the
+   Sunday 17:00 briefing is about a week that has not started yet.
 
-   AND IT BOUNDS THE WRITE AS WELL AS THE READ NOW, which is what stops the
-   duplicates rather than stopping them speaking. She was filing releases four
-   and five days out — and the block she is handed reaches a day, so she could
-   not see what she had already filed for those mornings. `on_conflict` merges
-   on an exact (at, name) match and nothing reproduces its own wording across
-   five days, so one CPI arrived as `August CPI`, `core CPI`,
-   `US CPI (core CPI)`, `US CPI (August)` and `headline CPI`: five rows laid
-   down by four different turns, each blind to the last.
-
-   Nothing reads past this window either — `readCalendar` stops at this one,
-   `aheadToday` at eight hours, `pendingRelease` looks only backwards — so a row
-   beyond it has no consumer and exists purely to become a duplicate. She may
-   file what she can see, and she sees what she may file: one constant, both
-   sides.
-
-   AND A DAY WAS FOUR HOURS SHORT OF THE TRADE IT EXISTS FOR. `aheadToday` asks
-   what is pending against a position the moment it opens, and it can only find
-   what is filed. At a day forward, the 08:00 briefing reached 08:00 tomorrow and
-   stopped — so tomorrow's 08:30 and 10:00 prints, the biggest there are, were
-   not on file until tomorrow's OWN briefing, and every trade opened before it
-   checked an empty calendar, found nothing pending, and said nothing. On 25
-   September an entry at about 07:38 did exactly that against the 10:00 Michigan
-   print, while the entry at 09:38 was warned about the same release. The London
-   session is that window every day. Twenty-eight hours carries the weekday
-   briefing past tomorrow's 10:00; Sunday's at 17:00 already reached Monday
-   morning. Nothing about the duplicates changes, because anything filed this far
-   ahead is inside the NEXT briefing's window too — she sees it again before she
-   could re-file it — and `calendarList` names the day of every line that is not
-   today's, since at this width two different mornings have an 08:30 each. */
+   THE FLOOR IS THE HALF TO KEEP. `aheadToday` asks what is pending against a
+   position the moment it opens, and it can only find what is filed. At a day
+   forward, the 08:00 briefing reached 08:00 tomorrow and stopped, so tomorrow's
+   08:30 and 10:00 prints were not on file until tomorrow's own briefing; on 25
+   September an entry at about 07:38 checked an empty calendar against the 10:00
+   Michigan print. Twenty-eight hours carries the weekday briefing past
+   tomorrow's 10:00. The filing is quarter-hourly now, so the window moves with
+   the clock, and the read and the write are still one constant: what is filed
+   is what `readCalendar` hands her, and `calendarList` names the day of every
+   line that is not today's. */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
-const CALENDAR_TOOL = {
-  name: "log_calendar",
-  description:
-    "Record what is scheduled today and tomorrow morning, and what it printed. Call " +
-    "it in the briefing with everything on the calendar — the time in UTC, the name, the " +
-    "consensus and the prior — and call it again once a number has landed to fill " +
-    "in the actual and one line on what it meant. Recording a release with " +
-    "importance 'high' is also what wakes you to look at it after it lands, so a " +
-    "print worth reacting to must be filed as high. Forex Factory's rating is the " +
-    "one he reads: a USD red folder at that exact minute files it as high, and " +
-    "where only USD releases are listed then, their rating replaces yours. The " +
-    "answer says when that happened. Filing the same time and name " +
-    "twice updates the row rather than adding one — so if the release is already " +
-    "in the calendar you were handed, file it under that exact name.",
-  input_schema: {
-    type: "object",
-    properties: {
-      releases: {
-        type: "array",
-        description: `Up to ${CALENDAR_MAX} entries.`,
-        items: {
-          type: "object",
-          properties: {
-            at:         { type: "string", description: "When it lands, ISO 8601 in UTC, e.g. 2026-09-03T12:30:00Z." },
-            name:       { type: "string", description: "What it is, as a person would say it — 'core CPI', 'nonfarm payrolls'." },
-            importance: { type: "string", enum: ["high", "medium", "low"],
-                          description: "high is a number that can move gold on its own." },
-            consensus:  { type: "string", description: "What is expected, with its unit. Optional." },
-            prior:      { type: "string", description: "Last time's figure, with its unit. Optional." },
-            actual:     { type: "string", description: "What it printed, once it has. Optional." },
-            note:       { type: "string", description: `One line on what it meant, once it has landed. Optional, at most ${NOTE_MAX} characters.` },
-          },
-          required: ["at", "name", "importance"],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ["releases"],
-    additionalProperties: false,
-  },
-} as const;
+const TV_CALENDAR = `${SB_URL}/functions/v1/doji-tradingview?calendar=1`;
 
-/* A BOUNDARY, so everything below coerces rather than trusts: the array arrives
-   from the model. A row whose `at` will not parse is dropped rather than
-   written — an unparseable timestamp in this table is a look that fires at the
-   wrong moment or never, and both are worse than the row's absence. */
-async function logCalendar(releases: unknown): Promise<string> {
-  const list = Array.isArray(releases) ? releases.slice(0, CALENDAR_MAX) : [];
-  if (!list.length) return "Nothing to record.";
+// What doji-tradingview's `foldCalendar` answers, one release each.
+interface TvEvent {
+  id: string; at: string; title: string; importance: string; timed: boolean;
+  period: string | null; consensus: string | null; prior: string | null; actual: string | null;
+}
 
-  const now = Date.now();
-  let unseen = 0;
+/* WHAT IS FILED, AND WHAT IS LEFT OUT OF EACH ROW.
 
-  let rows = list.map((r: any) => {
-    const at = new Date(String(r?.at ?? ""));
-    if (isNaN(+at) || !String(r?.name ?? "").trim()) return null;
-    // Outside what she is handed, so she cannot check it against what is
-    // already there — see the window above. Counted rather than dropped in
-    // silence: a bound she cannot see is a bound she files against for ever.
-    if (+at < now - CAL_BACK * 3600_000 || +at > now + CAL_AHEAD * 3600_000) {
-      unseen++;
-      return null;
-    }
-    const importance = ['high', 'medium', 'low'].includes(String(r?.importance)) ? String(r.importance) : 'high';
-    const text = (v: unknown) => {
-      const s = String(v ?? "").trim();
-      return s ? s.slice(0, NOTE_MAX) : null;
-    };
-    /* ONLY THE FIGURES SHE ACTUALLY SENT, and under `merge-duplicates` that is
-       the difference between filling a row in and emptying it. This is the
-       second write that matters: the briefing files what is coming and the
-       release look comes back for the same row with the actual — and it is not
-       asked to repeat the consensus, because it already has it. Sent as an
-       explicit null, that second write ERASED the consensus and the prior it
-       exists to be compared against, on every release, with nothing failing.
-       `emailRow` states the rule this was missing: an absent key and a null key
-       mean opposite things here. */
-    const given: Record<string, string> = {};
-    for (const k of ['consensus', 'prior', 'actual', 'note'] as const) {
-      const v = text(r?.[k]);
-      if (v) given[k] = v;
-    }
-    return {
-      at: at.toISOString(), name: String(r.name).trim().slice(0, NOTE_MAX), importance,
-      ...given, source: 'briefing',
-    };
-  }).filter(Boolean);
+   Releases only, and medium and above. `timed` false is a marker rather than a
+   print — a summit filed at midnight — and nothing that counts minutes before a
+   release may count it. Low is mortgage rates, rig counts and bill auctions:
+   filed, every one of them would be in front of her on every request and none
+   would move gold on its own.
 
-  const beyond = unseen
-    ? ` ${unseen} ${unseen === 1 ? 'was' : 'were'} outside the day this calendar covers` +
-      ` and ${unseen === 1 ? 'was' : 'were'} not recorded — file those on the morning they land.`
-    : "";
-  if (!rows.length) {
-    return unseen
-      ? `Nothing recorded.${beyond}`
-      : "None of those had a readable time, so nothing was recorded.";
-  }
+   A FIGURE TRADINGVIEW HAS NOT PUBLISHED IS LEFT OUT, NOT SENT AS NULL. An
+   absent key and a null key mean opposite things under `merge-duplicates`,
+   which `emailRow` states: the release look can still record an actual TradingView has not published yet,
+   and a quarter-hourly filing sending `actual: null` would erase it fifteen
+   minutes later. `note` is hers and is never named here.
 
-  /* FOREX FACTORY RATES A USD RELEASE, NOT HER. Her importance came off a
-     search page, and on 25 September she filed as high a print he read as
-     medium — the correction she asked him to keep making. He reads the folder,
-     so where Forex Factory lists a USD release at the same minute, its rating
-     wins — under the one-way rule ffRated states. Matched on the instant and
-     never the name: the name is free text, and a match on it is the duplicates
-     problem again. Anything it does not list keeps hers. A read that fails
-     leaves her ratings standing rather than the filing unsaved. */
-  let rerated = 0;
-  try {
-    const times = rows.map(r => r!.at).sort();
-    const rated = await readRows<{ at: string; impact: string; country: string }>('Ratings',
-      `${SB_URL}/rest/v1/${ratingsQuery(times[0], times[times.length - 1])}`);
-    ({ rows, changed: rerated } = ffRated(rows as { at: string; importance: string }[], rated));
-  } catch (err) {
-    console.error("doji-eugenia: Forex Factory ratings unavailable —",
-      err instanceof Error ? err.message : err);
-  }
+   The period goes into the name, because "Core PCE Price Index MoM (Aug)" says
+   which month a reader is being told about and the title alone does not. */
+export function calendarRows(events: TvEvent[], now: number) {
+  return events
+    .filter(e => e.timed && e.importance !== 'low')
+    .filter(e => {
+      const at = Date.parse(e.at);
+      return at >= now - CAL_BACK * 3600_000 && at <= now + CAL_AHEAD * 3600_000;
+    })
+    .map(e => {
+      const row: Record<string, string> = {
+        tv_id: e.id, at: new Date(e.at).toISOString(),
+        name: e.period ? `${e.title} (${e.period})` : e.title,
+        importance: e.importance, source: 'tradingview',
+      };
+      for (const k of ['consensus', 'prior', 'actual'] as const) if (e[k] !== null) row[k] = e[k]!;
+      return row;
+    });
+}
 
-  /* AND THE ROWS GO UP IN GROUPS THAT CARRY THE SAME KEYS, which is what makes
-     the omission above reach the database at all: PostgREST refuses a bulk
-     insert whose objects do not all name the same columns. A briefing filing
-     twelve releases sends two or three requests; a release look filling one
-     actual sends one. Grouping is also the safe shape if that rule ever
-     relaxes — a lenient server writes exactly the same rows. */
+// Exported so a test can drive the write: which rows go up together is the
+// half that decides whether a missing figure reaches the database at all.
+export async function fileCalendar(now: number): Promise<number> {
+  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const res = await fetch(
+    `${TV_CALENDAR}&from=${day(now - CAL_BACK * 3600_000)}&to=${day(now + CAL_AHEAD * 3600_000)}`,
+    { headers: { "x-doji-key": CRON_SECRET } });
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok || !answer.ok) throw new Error(`TradingView calendar: ${answer.error ?? `HTTP ${res.status}`}`);
+  const rows = calendarRows(answer.events, now);
+
+  /* IN GROUPS THAT CARRY THE SAME KEYS, which is what makes leaving a figure
+     out reach the database at all: PostgREST refuses a bulk insert whose
+     objects do not all name the same columns. */
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
-    const shape = Object.keys(row!).sort().join(",");
+    const shape = Object.keys(row).sort().join(",");
     (groups.get(shape) ?? groups.set(shape, []).get(shape)!).push(row);
   }
+  for (const batch of groups.values()) {
+    const put = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?on_conflict=tv_id`, {
+      method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
+      body: JSON.stringify(batch),
+    });
+    if (!put.ok) throw new Error(`calendar not written (HTTP ${put.status})`);
+  }
+  return rows.length;
+}
 
+/* NEVER TAKES ITS CALLER DOWN, AND BOTH OUTCOMES ARE A ROW. A briefing with no
+   fresh calendar still has yesterday's filing and her search; a filing that
+   failed and left only a console line is the embedding sweep's lesson again —
+   a calendar that silently stopped moving looks exactly like a quiet week. */
+async function filed(now = Date.now()): Promise<void> {
   try {
-    for (const batch of groups.values()) {
-      const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?on_conflict=at,name`, {
-        method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
-        body: JSON.stringify(batch),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    }
-    const swapped = rerated
-      ? ` ${rerated} took Forex Factory's rating for the USD release at that minute rather than yours.`
-      : "";
-    return `Recorded ${rows.length}.${swapped}${beyond}`;
+    await recordRun({ caller: 'calendar', ok: true, detail: `${await fileCalendar(now)} filed` });
   } catch (err) {
-    console.error("doji-eugenia: calendar not written —", err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    const why = err instanceof Error ? err.message : String(err);
+    console.error("doji-eugenia: calendar not filed —", why);
+    await recordRun({ caller: 'calendar', ok: false, detail: why.slice(0, 500) });
   }
 }
 
-/* THE ACTUAL GOES TO THE ROW THAT WAS LOOKED AT, AND AN UPSERT COULD NOT PROMISE
-   THAT. The release look held `log_calendar`, whose key is (at, name) over a
-   name the model writes — so on 16 September it was handed
-   `US retail sales (August, advance)`, marked that row at 12:35:00, and filed
-   the print under `retail sales` at 12:36:15. An INSERT. The actual landed on a
-   row with no consensus and the consensus stayed on a row with no actual, which
-   is the single comparison this table exists to hold, and nothing failed. The
-   prompt had said *the same time and name* since the day the tool was written:
-   an instruction standing where a guarantee belongs, failing the way they all
-   fail here.
+/* THE FALLBACK FOR A PRINT TRADINGVIEW HAS NOT PUBLISHED, and it goes to the
+   row that was looked at or nowhere. An upsert keyed on a name the model writes
+   once filed a print under `retail sales` beside the row it had been handed as
+   `US retail sales (August, advance)` — an INSERT, the actual on a row with no
+   consensus and the consensus on a row with no actual, and nothing failed.
 
    So this one CANNOT INSERT. A PATCH and nothing else, over the two columns a
-   look owns — which makes it structural rather than remembered: a look can no
-   longer mint a row under any spelling, and it can no longer write `consensus`
-   or `prior`, the briefing's columns, which is how that same release ended up
-   holding two contradictory priors.
+   look owns — which makes it structural rather than remembered: a look cannot
+   mint a row under any spelling, and it cannot write `consensus` or `prior`,
+   which are TradingView's.
 
    AND A NAME THAT MATCHES NOTHING ANSWERS WITH THE NAMES ON FILE, because a
    PATCH filtered to nothing is a 200 with an empty body — silence that reads
@@ -1263,11 +1182,10 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if ((await res.json()).length) return `Recorded against ${called}.`;
 
-    // Bounded like every other read here, and by the same number a single call
-    // may file: a release time holding more names than one briefing could have
-    // written is not a list worth reading back to her.
+    // Bounded like every other read here: the 08:30 slot holds most of a
+    // report, and a list longer than that is not worth reading back to her.
     const standing = await readRows<Release>('Release',
-      `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=${CALENDAR_MAX}`);
+      `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
     return standing.length
       ? `Nothing at that time is called "${called}". On file: ` +
         `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
@@ -1724,13 +1642,11 @@ const CHAT_TOOLS = [
   NOTES_TOOL,
   SEARCH_TOOL,
   STRATEGY_TOOL,
-  CALENDAR_TOOL,
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
-/* NOT `CALENDAR_TOOL`, AND THAT IS THE WHOLE OF THE FIX ABOVE. A look that can
-   upsert by (at, name) can mint the row it was looking at, under a name a shade
-   off the one it was handed. It files an actual and nothing else. */
+// A look files an actual and nothing else: `record_actual` is a PATCH that
+// cannot mint the row it was looking at.
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* The critic reads a draft and returns a draft. Giving it a tool would let it
@@ -1910,7 +1826,6 @@ export async function serve(name: string, input: any): Promise<string> {
     case STRATEGY_TOOL.name: return readStrategy(input.section);
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
-    case CALENDAR_TOOL.name: return await logCalendar(input.releases);
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -1979,7 +1894,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   let rounds = 0;
   /* WHAT THE ROUNDS WERE SPENT ON, because a count of them could not say. The
      release look went from two or three rounds to seven, eight and nine on the
-     morning `record_actual` replaced `log_calendar`, and one of those mornings
+     morning `record_actual` became its tool, and one of those mornings
      took six rounds with no search at all — rounds spent on her own tools, and
      nothing recorded which. A name `record_actual` could not match costs a
      round and says so; so does each `get_market`, and a model that calls one
@@ -3072,7 +2987,7 @@ export function calendarList(rows: Release[], now = Date.now()): string {
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");
   });
-  return `\n\nThe calendar around now, as you filed it:\n${lines.join("\n")}`;
+  return `\n\nThe calendar around now, as TradingView lists it:\n${lines.join("\n")}`;
 }
 
 export async function calendarBlock(): Promise<string> {
@@ -3548,6 +3463,8 @@ async function gate(draft: string, asked: string, label: string): Promise<string
 
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
+  // Filed before the reads, so the calendar she is handed is this morning's.
+  await filed();
   /* EVERY READ THE BRIEFING NEEDS, AT ONCE. They are independent and they are
      all small, and run one after another they were a round trip each before the
      first token was asked for. Promise.all is the same argument the tool
@@ -3818,51 +3735,6 @@ async function postConsolidation(): Promise<Response> {
                     : json({ ok: true, skipped: "nothing said" });
 }
 
-/* Her calendar's words for Forex Factory's folders. Holiday is not a release
-   and rates nothing. */
-const FF_IMPORTANCE: Record<string, string> = { High: 'high', Medium: 'medium', Low: 'low' };
-const RANK = ['low', 'medium', 'high'];
-
-/* Pure, so the match can be driven. Several USD releases at one minute — CPI
-   and core CPI — rate the minute by the highest of them, which is the folder
-   he sees first. Returns how many it changed, so she can be told.
-
-   A MINUTE IS NOT AN EVENT, and matching on one is only safe in one direction.
-   At 05:15 on 25 September Forex Factory listed the Bank of England governor,
-   red, beside a Fed member it rated low — so her "Bailey speaks" would have
-   been demoted to low by a speech she never filed. A USD red folder at the
-   minute raises her rating whatever else shares it, because that is a print
-   worth waking for; anything lower replaces hers only when every release at
-   that minute is USD, since otherwise the row she filed may be the other one. */
-export function ffRated<T extends { at: string; importance: string }>(
-  rows: T[], rated: { at: string; impact: string; country: string }[],
-): { rows: T[]; changed: number } {
-  const best = new Map<number, string>(), shared = new Set<number>();
-  for (const r of rated) {
-    const at = +new Date(r.at);
-    if (r.country !== RED.country) { shared.add(at); continue; }
-    const imp = FF_IMPORTANCE[r.impact], was = best.get(at);
-    if (imp && (!was || RANK.indexOf(imp) > RANK.indexOf(was))) best.set(at, imp);
-  }
-  let changed = 0;
-  return {
-    rows: rows.map(r => {
-      const at = +new Date(r.at), ff = best.get(at);
-      if (!ff || ff === r.importance || (ff !== 'high' && shared.has(at))) return r;
-      changed++;
-      return { ...r, importance: ff };
-    }),
-    changed,
-  };
-}
-
-// Every release over the minutes being filed — every currency, because which
-// others share a minute is what decides whether a USD rating may lower hers.
-export function ratingsQuery(from: string, to: string): string {
-  return `ff_calendar?select=at,impact,country` +
-         `&at=gte.${from}&at=lte.${to}&order=at.desc&limit=500`;
-}
-
 /* ─── Forex Factory's week ─────────────────────────────────────────────────
    The export Forex Factory publishes for programs, rather than the calendar
    page: a page is laid out for a reader and read by program breaks the day the
@@ -3992,27 +3864,17 @@ const RELEASE_ROWS = 40;
 
 /* ONE LOOK PER RELEASE TIME, WHICH IS NOT WHAT ONE ROW PER LOOK GAVE.
 
-   The unique key is (at, name) and the name is free text the model writes, so
-   `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
-   print to a person. Every one of them marked `high` fired its own look, its
-   own model call and its own message — five for a single CPI on 11 September,
-   at 12:35, 12:50, 13:05, 13:20 and 13:35.
-
-   AND IT FED ITSELF, which is why it could not settle. The release look also
-   holds log_calendar; filing the actual under a name a shade different from the
-   one it was handed INSERTS rather than updates, and that new row is then
-   unlooked and fires in its turn. What reached him as two apologies in two days
-   was never her catching an error — it was a duplicate look arriving at the
-   same print with better information and reconciling against the message still
-   sitting in the conversation window. The loop ended only because
-   RELEASE_STALE_H ran out.
+   One time holds several rows: the 08:30 slot is most of a report, and while
+   she typed the calendar `PPI`, `US PPI` and `US PPI (August)` were three rows
+   and one print. Every one of them marked `high` fired its own look, its own
+   model call and its own message — five for a single CPI on 11 September, at
+   12:35, 12:50, 13:05, 13:20 and 13:35.
 
    So the question this asks is about the TIME rather than the row: the earliest
    release time nothing has looked at yet, and then every high row standing at
-   it. A row minted at 08:35 under a new name shares 12:30 with rows already
-   marked, so it cannot open a second look — and where two genuinely different
-   numbers land together, one message covers both, which is how a person reads
-   "the 8:30 data" anyway.
+   it. Where several numbers land together one message covers them, which is
+   how a person reads "the 8:30 data" anyway, and a row arriving later at a time
+   already marked cannot open a second look.
 
    Exported and pure because the decision is the whole of it, and a query that
    returns the right rows proves nothing about which of them get looked at. */
@@ -4047,6 +3909,21 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
 // EVERY ROW AT THAT TIME, not the one the message happens to name: the others
 // are the same print under another spelling, and one left unmarked is the next
 // hour's duplicate look.
+/* THE LOOK WAITS FOR THE NUMBER, AND NOT FOR EVER. TradingView publishes an
+   actual a minute or two after the print, and a look that runs first spends a
+   web search finding what the next filing would have handed it. So a due group
+   with a figure still missing is left for the next quarter-hour — unmarked,
+   since the mark is what makes a look happen once — until half an hour has
+   passed, and then it looks anyway with `record_actual` as its fallback. A
+   speech has no figure to wait for: no consensus and no prior means nothing
+   is coming, and it is looked at on time. */
+const ACTUAL_WAIT_MIN = 30;
+
+export function awaitingActual(due: Release[], now: number): boolean {
+  return due.some(r => !r.actual && (r.consensus || r.prior)) &&
+         now - Date.parse(due[0].at) < ACTUAL_WAIT_MIN * 60_000;
+}
+
 async function markLooked(ids: number[]): Promise<void> {
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=in.(${ids.join(',')})`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
@@ -4056,8 +3933,10 @@ async function markLooked(ids: number[]): Promise<void> {
 }
 
 async function postRelease(): Promise<Response> {
+  await filed();
   const due = await pendingRelease();
   if (!due.length) return json({ ok: true, skipped: "nothing has landed unlooked" });
+  if (awaitingActual(due, Date.now())) return json({ ok: true, skipped: "waiting for TradingView's actual" });
 
   await markLooked(due.map(r => r.id));
 
@@ -4074,6 +3953,7 @@ async function postRelease(): Promise<Response> {
      calendar holds, not being handed a fact. */
   const landed = due.map(r =>
     `· ${r.name}` +
+    (r.actual ? ` — printed ${r.actual}` : " — not yet published") +
     (r.consensus ? `, ${r.consensus} expected` : "") +
     (r.prior ? `, after ${r.prior}` : "")).join("\n");
   /* THE UTC STAMP, BECAUSE THE TOOL TAKES IT AND THE HEADING IS IN ET. She was
@@ -4411,7 +4291,7 @@ async function postMove(): Promise<Response> {
   const asked = MOVE +
     `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
-    `Nothing high-impact you filed has printed in the last hour.` +
+    `Nothing high-impact on the calendar has printed in the last hour.` +
     // The session said the one way it is said anywhere, which matters most on
     // this path: it is the one that fires in the evening, the only hours when
     // the broker's session and the calendar day disagree.

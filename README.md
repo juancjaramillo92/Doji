@@ -74,6 +74,7 @@ supabase/014_stops.sql                  every stop and target a position carried
 supabase/015_commitments.sql            what he committed to, as a third kind of note
 supabase/016_tradingview.sql            the TradingView sign-in, one row
 supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
+supabase/018_calendar_tradingview.sql   her calendar keyed by TradingView's id
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -469,7 +470,7 @@ be single-sourced at run time:
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, and one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys` and two in `doji-eugenia` — every one stating `hourCycle: 'h23'`, because `hour12: false` leaves the choice to the locale and a locale resolving to h24 renders midnight as hour 24. Harmless in the two `hourIn` ports, where 24 fails `h < close` as 0 fails `h >= open`; wrong in `nyParts` and `nyWall`, which compare the hour against 17 and feed it to `Date.UTC` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, which closes Friday and opens Sunday on it, and `ROLL_HOUR` in `index.ts`, which decides whether a quote is describing the night or the evening — one boundary, and a disagreement is a window labelled wrong for an hour a day |
 | the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
-| the **importance a release may carry** | the `log_calendar` enum, the check constraint, the `importance=eq.high` the event spine selects on, and `FF_IMPORTANCE` and `RANK`, which carry Forex Factory's folders into it — a rename on any side is a spine that files everything and wakes for nothing, or a filing refused whole |
+| the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, which carries TradingView's 1, 0 and −1 into her words, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing, or a quarter-hourly filing refused whole |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
@@ -1259,9 +1260,10 @@ the notifications on regardless of whether you read them.
 What TradingView adds is the half of the market the broker cannot serve: the
 economic calendar as data rather than as a page Eugenia transcribes, and the
 dollar and the yields that gold is priced against. Every read of it will come
-through this function. **Nothing she is handed comes from it yet.** `?tools=1`
-said what the endpoint offers, and `?probe=` says what each useful tool returns,
-raw; the readers she is handed get written against those answers. That is the
+through this function. **Her calendar is the first thing she is handed from
+it** — see **The event spine**. `?tools=1` said what the endpoint offers, and
+`?probe=` says what each useful tool returns, raw; each reader is written
+against those answers. That is the
 order the poller's `?market=raw` and `?positions=1` set, and it is how the
 poller's two price scales were found rather than guessed. It earned its keep on
 the first call: the tool names TradingView serves (`mcp-tv-get-economic-calendar`)
@@ -1890,89 +1892,70 @@ Every schedule above fires at an hour someone chose in advance. So a print at
 whose default answer is silence — the one moment of the day when something
 genuinely happened was the moment she was least likely to speak.
 
-**She files the calendar she reads.** `log_calendar` records what is scheduled —
-the time in UTC, the name, the consensus, the prior — and the briefing calls it
-every morning before writing a word. A **quarter-hourly job** then asks one
-question: **which release time has landed and not yet been looked at?** If there
-is one she searches for what those printed, files the actuals, and decides
-whether it is worth saying.
+**The calendar is filed for her, from TradingView.** `fileCalendar` reads
+`doji-tradingview?calendar=1` for the days around now, through the cron secret
+she already holds, and upserts every timed US release rated medium or above into
+`eugenia_calendar` under TradingView's own id (`018_calendar_tradingview.sql`).
+Each row carries the time, the name with its period (*Core PCE Price Index MoM
+(Aug)*), the importance, the consensus and the prior, and the actual once it
+prints. Two callers file it: the briefing, before it reads the calendar, and a
+**quarter-hourly job** before it asks one question: **which release time has
+landed and not yet been looked at?** If there is one she reads what those
+printed and decides whether it is worth saying. Low-rated items (mortgage rates,
+rig counts, bill auctions) are not filed, because every one would be in front
+of her on every request and none moves gold on its own. Every filing is a row
+in `eugenia_runs` under `calendar`, failed or not, because a calendar that
+quietly stopped moving looks exactly like a quiet week.
 
-**What she rates is checked against what he reads.** Her importance comes off a
-search page, and on 25 September she filed as high a print Forex Factory had
-medium. So `log_calendar` reads Forex Factory's calendar for the minutes she is
-filing and `ffRated` corrects her — **one way only**, because a minute is not an
-event: a USD red folder at the minute makes it high whatever else shares it, and
-a lower USD rating replaces hers only when every release listed then is USD. At
-05:15 on the 25th the Bank of England governor, red, shared a minute with a Fed
-member rated low, and matching on the minute alone would have demoted her Bailey
-row for a speech she never filed. Matched on the instant, never the name — the
-name is free text, which is the duplicates problem below. The answer tells her
-how many were changed, and a read that fails leaves hers standing.
+**She used to type it in, and most of what went wrong here came from the
+typing.** The key was `(at, name)` over a name the model wrote, so one CPI
+arrived as `August CPI`, `core CPI`, `US CPI (core CPI)`, `US CPI (August)` and
+`headline CPI`: five rows laid down by four turns across five days. Her
+importance came off a search page and had to be corrected against Forex
+Factory's folder. TradingView keeps an id for every release, so one release is
+one row whatever it is called, and nothing she can call is able to create one.
+What she had filed for the days ahead was deleted when 018 was applied, since
+TradingView's rows for the same releases arrive under other names; what had
+already printed stays, as the history this table exists to grow.
 
-**The question is about the time rather than the row, because one print is not
-one row.** The unique key is `(at, name)` and the name is free text she writes,
-so `PPI`, `US PPI` and `US PPI (August)` are three rows to the database and one
-number to a person — and each one marked `high` used to fire its own look, its
-own model call and its own message. Five for a single CPI on 11 September. It
-also fed itself: the release look held `log_calendar` too, so filing the actual
-under a name a shade different from the one it was handed **inserted** rather
-than updated, and that new row was then unlooked and fired in its turn. What
-arrived as two apologies in two days was never her catching an error — it was a
-duplicate look reaching the same print with better information and reconciling
-against the message still sitting in the conversation window. `dueRelease` takes
-the earliest release time nothing has looked at and every high row standing at
-it; a row minted at 08:35 shares that time and cannot open a second look, and
-where two genuinely different numbers land together one message covers both. `looked_at` is what makes that once-only; it is stamped **before** the
-look for the reason the briefing marker is, since a look that generates and fails
-to write would otherwise repeat every fifteen minutes, each one a billed call.
+**A figure TradingView has not published is left out of the row, never sent as
+null.** `merge-duplicates` writes exactly the keys a payload names, so a filing
+carrying `actual: null` would erase an actual the release look recorded by hand
+fifteen minutes later. Rows go up grouped by the columns they carry, because
+PostgREST refuses a bulk insert whose objects do not all name the same ones.
 
-**The same row is written twice, so a figure she does not send must not erase
-the one already there.** The briefing files what is coming and the release look
-comes back with what it printed — and `merge-duplicates` updates exactly the
-columns the payload names, so a second write carrying `consensus: null` erased
-the very figure the actual exists to be compared against, on every release, with
-nothing failing and the row still well formed. Only the figures she actually
-sends are written. Rows go up grouped by the columns they carry, because
-PostgREST refuses a bulk insert whose objects do not all name the same ones — a
-briefing filing a mixed calendar is two or three requests, a release look filling
-one actual is one.
+**The look waits for the number, and not for ever.** TradingView publishes an
+actual a minute or two after the print. A due group still missing a figure is
+left unmarked for the next quarter-hour until thirty minutes have passed
+(`awaitingActual`), and then it looks anyway. A speech has no consensus and no
+prior and is looked at on time, since nothing is coming.
+
+**The question is about the time rather than the row.** The 08:30 slot is most
+of a report, and while she typed the calendar each spelling of one print fired
+its own look, its own model call and its own message — five for a single CPI on
+11 September. `dueRelease` takes the earliest release time nothing has looked at
+and every high row standing at it, so several numbers landing together are one
+message, which is how a person reads "the 8:30 data" anyway. `looked_at` is what
+makes that once-only; it is stamped **before** the look for the reason the
+briefing marker is, since a look that generates and fails to write would
+otherwise repeat every fifteen minutes, each one a billed call.
 
 It is a second schedule rather than a faster one, because the four hourly
 predicates all test `hour ===` and a `*/15` job would have run four briefings
 every morning. `?release=1` is its door and the way to exercise a look by hand.
 
-**And she may only file what she can see**, which is what stops the duplicates
-rather than stopping them speaking. She was filing releases four and five days
-out, while the calendar block she is handed reaches one day — so she could not
-check a new entry against what was already there, and `on_conflict` merges only
-on an exact `(at, name)` match. One CPI arrived as `August CPI`, `core CPI`,
-`US CPI (core CPI)`, `US CPI (August)` and `headline CPI`: five rows laid down
-by four different turns across five days, each blind to the last. Nothing reads
-past that window either — the block stops at a day, the pending look at eight
-hours — so a row beyond it had no consumer at all and existed only to become a
-duplicate. `log_calendar` refuses one now and says how many it refused, because
-a bound she cannot see is a bound she files against for ever.
-
-**A look fills a release in and cannot file one.** Closing the loop above stopped
-the duplicate look; it did not stop the duplicate row, because `log_calendar` was
-still on that path. On 16 September the look was handed
-`US retail sales (August, advance)`, marked that row at 12:35:00, searched, and
-filed the print under `retail sales` at 12:36:15 — an insert. The actual landed
-on a row with no consensus, the consensus stayed on a row with no actual, and the
-one comparison this table exists to hold was gone with nothing failing. The
-`RELEASE` prompt had said *the same time and name* since the day the tool was
-written, which is the whole argument against carrying this in an instruction.
-
-So the release look is given `record_actual` instead, and it is a **PATCH and
-nothing else**: it matches an entry on `(at, name)`, writes `actual` and `note`,
-and has no insert path at any spelling. It cannot touch `consensus` or `prior`
-either — the briefing's columns, and how that same release came to hold
-`+0.5% m/m (Jul)` on one row and `-0.5% m/m (Jul, revised)` on the other. A name
+**A look fills a release in and cannot file one.** Where TradingView has not yet
+published a figure, the look searches for it and records it with
+`record_actual`, a **PATCH and nothing else**. It matches an entry on `(at,
+name)`, writes `actual` and `note`, and has no insert path at any spelling. An
+upsert keyed on a name the model writes was once handed `US retail sales
+(August, advance)` and filed the print under `retail sales` — an insert, the
+actual on a row with no consensus and the consensus on a row with no actual. It
+cannot touch `consensus` or `prior` either, which are TradingView's. A name
 matching nothing is a 200 with an empty body, which reads exactly like a write,
-so it answers with the names actually on file and the next round writes to one of
-them. The look is handed the UTC stamp beside the ET heading, because the tool
-matches on the instant and asking her to convert is a conversion standing where
-an input belongs.
+so it answers with the names actually on file. The look is handed the UTC stamp
+beside the ET heading, because the tool matches on the instant and asking her to
+convert is a conversion standing where an input belongs.
 
 **And the row records when its content was last written.** Two writers hours
 apart on one row means `created_at` says only when each was first seen — so when
@@ -2591,7 +2574,7 @@ is the only dataset here that compounds.
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
-| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | her `log_calendar` tool, filled in by `record_actual` |
+| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar`, and an actual TradingView has not published by `record_actual` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 
 Turns roll over in a morning, so without notes she could never know in September
@@ -3800,7 +3783,7 @@ Opus in the measured week had never come near the cap.
 **What those two failures were first read as establishing, they do not.** They
 were written down as proof that *the round budget on a tool-heavy caller is a
 property of the model* — but two changes landed that night, not one. At 23:16
-`record_actual` replaced `log_calendar` in the release look; at 00:35 the look
+`record_actual` became the release look's tool for the number; at 00:35 the look
 moved to Sonnet. The model was reverted at 12:41 and the rounds did not come
 back: before that night the look took two or three, and back on Opus it took
 10, 8, 5, 9, 9, 7 and 8. The change that was not reverted is the one still
@@ -4201,7 +4184,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `017_tradingview_lease.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `018_calendar_tradingview.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4519,8 +4502,9 @@ been wrong once, reporting a correct database as broken.
     `supabase/014_stops.sql` and `supabase/015_commitments.sql`, all safe to
     re-run.
 15. Run `supabase/016_tradingview.sql` and `supabase/017_tradingview_lease.sql`,
-    and connect TradingView — see **TradingView**.
-16. Run `supabase/verify.sql` and read it against 001–017. Nothing is set up
+    and connect TradingView — see **TradingView** — then
+    `supabase/018_calendar_tradingview.sql`.
+16. Run `supabase/verify.sql` and read it against 001–018. Nothing is set up
     until that agrees.
 
 ---

@@ -397,23 +397,19 @@ what a print actually came in at — and search when you are working out what to
 be precise about. Good pages to fetch:
 
 - gold: https://www.kitco.com/price/precious-metals
-- the day's calendar: https://www.forexfactory.com/calendar
 - the dollar: https://finance.yahoo.com/quote/DX-Y.NYB
 - the ten-year: https://finance.yahoo.com/quote/%5ETNX
 
-FILE THE DAY'S CALENDAR WITH log_calendar, every briefing, before you write it.
-Everything scheduled: the time in UTC, the name, the consensus and the prior.
-Today's, and tomorrow's up to noon New York as well — he can open a trade
-before tomorrow's briefing exists, and a release you have not filed yet is one
-nothing can warn him is coming. Talk about today; file both.
-This is not bookkeeping — filing a release as high importance is what wakes you
-to look at it after it lands, so a number that could move gold on its own has to
-go in as high or you will never see it print. It is also the only record any of
-this leaves: in a year it is how core CPI has run against expectations for twelve
-months with your own line beside each one, which no search can give you back.
+THE CALENDAR IS FILED FOR YOU, from TradingView, before every briefing and every
+quarter hour: the time, the name, the consensus, the prior, its importance, and
+the actual once it prints. You do not file it. A release rated high is what
+wakes you to look at it after it lands. It is also the only record any of this
+leaves: in a year it is how core CPI has run against expectations for twelve
+months, with your line beside each one. Today's and tomorrow morning's are both
+on it. Talk about today.
 
-WHAT YOU ALREADY FILED COMES BACK TO YOU. The calendar around now is in your
-context with each entry marked due or LANDED. A landed one is history and is
+The calendar around now is in your context with each entry marked due or
+LANDED. A landed one is history and is
 described as what happened; a due one is what is coming. Never write about a
 number that has already printed as though it were still ahead.
 
@@ -895,7 +891,7 @@ Whether today already rules out an entry: the day's losses against his limit
 (R-11), a full-stop loss already taken (R-03), how many entries today has
 (R-12), a holiday (R-16). Whether something is already open (R-10), and whether
 the trade would have to cross the Friday close (R-15). Read today from
-check_rules, get_trades and the calendar you filed, never from memory. Whether
+check_rules, get_trades and the calendar you are handed, never from memory. Whether
 the setup is the right kind of level is a judgment rule and his to answer. You
 may ask him which step of the sequence it passed.
 
@@ -1187,18 +1183,20 @@ changed, no explanation. If it is already right, return it unchanged.`;
 // ═══════════════════════════════════════════════════════════════════════════
 // THE LOOK AFTER A NUMBER LANDS — the first thing here that is not a clock
 // ───────────────────────────────────────────────────────────────────────────
-// She filed the calendar in the morning; this fires off it once the print is
+// It fires off the calendar TradingView files once a print rated high is
 // past. The default is silence for the pulse's reason exactly: a number landing
 // where everyone expected it is not news, and an extra message is only extra
 // while a swallowed one is invisible.
 // ═══════════════════════════════════════════════════════════════════════════
-export const RELEASE = `A release you filed this morning has just landed. Find out
-what it actually printed and decide whether it is worth telling him.
+export const RELEASE = `A release on your calendar has just landed, and what it
+printed is beside it once TradingView has published the number. Decide whether
+it is worth telling him.
 
-Search for the number, and fetch the page if the figure matters. Then call
-record_actual with the time and name exactly as they are listed above, the actual
-filled in, and one line on what it meant — that fills in the entry you already
-filed, which is what makes this a record rather than a message.
+Where a figure says it is not yet published, search for it and fetch the page if
+it matters, then call record_actual with the time and name exactly as they are
+listed above and the actual filled in. Either way you may add one line on what it
+meant with record_actual, which is what makes this a record rather than a
+message.
 
 THEN DECIDE. Reply with the single word NOTHING — no punctuation, no explanation
 — unless it genuinely matters: it came in away from what was expected, or the
@@ -1240,8 +1238,8 @@ Only where he owns the channel do you say what changed and stop.`;
 // on this path, since a search will always return something. An unexplained move
 // is a real finding and open_loop is where it goes.
 // ═══════════════════════════════════════════════════════════════════════════
-export const MOVE = `Gold has just moved sharply and nothing you filed on today's
-calendar explains it. Below is where it is and what it did.
+export const MOVE = `Gold has just moved sharply and nothing on today's calendar
+explains it. Below is where it is and what it did.
 
 Find out what moved it. Search — a headline, a central bank line, a bid in the
 dollar or in yields, a large print somewhere you were not watching. Fetch the page
