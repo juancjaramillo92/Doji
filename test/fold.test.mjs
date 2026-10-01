@@ -38,7 +38,7 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
-  calendarWindow } from '../supabase/functions/doji-tradingview/index.ts';
+  calendarWindow, foldBars } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
@@ -53,6 +53,7 @@ import {
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, awaitingActual,
+  aroundList, aroundBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -676,6 +677,71 @@ test('the calendar folds to what her calendar holds, and no more', () => {
 test('a calendar answer that is not ok is a refusal, not an empty day', () => {
   assert.throws(() => foldCalendar({ status: 'error', error: 'upstream' }), /upstream/);
   assert.throws(() => foldCalendar({ status: 'ok' }), /calendar/);
+});
+
+/* ─── The market around gold ─────────────────────────────────────────────────
+   The bars are the 1 October probe's, verbatim: the dollar index's last two
+   15-minute bars and the real yield's last three days. */
+const DXY_BARS = { bars: [
+  { c: 102.081, h: 102.103, l: 101.997, o: 102.102, t: 1790875800, v: null },
+  { c: 102.16, h: 102.164, l: 102.081, o: 102.082, t: 1790876700, v: null }], success: true };
+const DFII10_BARS = { bars: [
+  { c: 2.83, h: 2.83, l: 2.83, o: 2.83, t: 1790294400, v: null },
+  { c: 2.9, h: 2.9, l: 2.9, o: 2.9, t: 1790553600, v: null },
+  { c: 2.91, h: 2.91, l: 2.91, o: 2.91, t: 1790640000, v: null }], success: true };
+
+test('bars fold to a span — where the first opened and where the last stands, each with its time', () => {
+  assert.deepEqual(foldBars(DXY_BARS),
+    { from: 102.102, since: '2026-10-01T17:30:00.000Z', last: 102.16, at: '2026-10-01T17:45:00.000Z' });
+  // Daily, and the weekend between: the span runs from Friday to Tuesday.
+  assert.deepEqual(foldBars(DFII10_BARS),
+    { from: 2.83, since: '2026-09-25T00:00:00.000Z', last: 2.91, at: '2026-09-29T00:00:00.000Z' });
+  assert.throws(() => foldBars({ bars: [], success: true }), /no bars/);
+});
+
+const AROUND = {
+  ok: true,
+  market: [
+    { name: 'Dollar index', unit: '', daily: false, from: 101.95, since: '2026-09-30T18:00:00.000Z',
+      last: 102.16, at: '2026-10-01T17:45:00.000Z' },
+    { name: 'Ten-year Treasury yield', unit: '%', daily: false, from: 5.18, since: '2026-09-30T18:00:00.000Z',
+      last: 5.243, at: '2026-10-01T17:45:00.000Z' },
+    { name: 'Ten-year real yield (TIPS)', unit: '%', daily: true, from: 2.83, since: '2026-09-25T00:00:00.000Z',
+      last: 2.91, at: '2026-09-29T00:00:00.000Z' },
+  ],
+  missing: [{ name: 'VIX' }],
+};
+
+test('every line of the market says what its number is measured from, and computes no change', () => {
+  const out = aroundList(AROUND, Date.parse('2026-10-01T18:00:00Z'));
+  assert.match(out, /· Dollar index 102\.16, from 101\.95 at 14:00 ET on 30 Sept? \(latest bar 13:45 ET\)/);
+  assert.match(out, /· Ten-year Treasury yield 5\.243%, from 5\.18% at 14:00 ET on 30 Sept?/);
+  // The real yield is dated, never timed, and says it is behind.
+  assert.match(out, /· Ten-year real yield \(TIPS\) 2\.91% on 29 Sept?, from 2\.83% on 25 Sept? — a daily series, a day or more behind/);
+  // A symbol TradingView would not serve is named rather than left out.
+  assert.match(out, /Not read just now: VIX\./);
+  /* NO DIRECTION WORD, because none is computed: a change with its sign worked
+     out here is a figure with its window stripped, which is how an evening's
+     move was once called the day's. */
+  assert.doesNotMatch(out, /\b(up|down|rose|fell)\b/);
+  assert.match(out, /hourly bars rather than live ticks/);
+});
+
+test('a market that will not read is a sentence telling her not to reach for a search', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: false, error: 'not connected' }), { status: 500 });
+    assert.match(await aroundBlock(), /could not be read just now\. Do not quote the dollar or yields from a search/);
+    // An answer with nothing in it is the same: zero lines is not a market.
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, market: [], missing: [] }), { status: 200 });
+    assert.match(await aroundBlock(), /could not be read just now/);
+    globalThis.fetch = async () => new Response(JSON.stringify(AROUND), { status: 200 });
+    assert.match(await aroundBlock(), /Dollar index 102\.16/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
 });
 
 test('the calendar window is whole days, at most a month, inside the data', () => {

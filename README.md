@@ -151,6 +151,7 @@ firing the moment a position opens or closes.
  │           price  ×4/h   │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
  │ trades    opened/closed │        │ the broker's price, via the poller │
+ │                         │        │ calendar, market   via TradingView │
  └────────────┬────────────┘        └─────────────────┬──────────────────┘
               └───────────────┬───────────────────────┘
                               ▼
@@ -1357,6 +1358,23 @@ calendar without being a release. A summit was rated high and filed at midnight
 under the indicator `Calendar`, and nothing that counts minutes before a print
 may count it. The paragraph of description each event carries is dropped, since
 she would pay for every one of them on every request.
+
+**`?market=1` is the market around gold, as bars.** The dollar index, the two-
+and ten-year yields, the ten-year real yield, silver, US crude, the S&P 500 and
+the VIX. The quote batch was the natural read, and it refused on every probe:
+the forex scanner's 429, then the CFD scanner's. The OHLCV read answered for
+every symbol, its last bar inside the current quarter hour. So each symbol is
+twenty-five hourly bars, a day's span with the current hour on the end, folded
+by `foldBars` to where the first bar opened and where the last one stands, each
+with its time. The real yield is FRED's daily series, a day or more behind, so
+it is read in days and marked `daily`. The symbols, their spoken names and
+their units live in one list, `MARKET`; a symbol that fails is named in
+`missing` rather than dropped. Eugenia renders it with `aroundList`, which
+states every line as a level beside the level at a stated time and computes
+no change, because a move served without its window is how an evening's move
+was once called the day's. It is handed to the briefing and the move look, and
+a read that fails is a sentence telling her not to quote the dollar or yields
+from a search.
 
 **A refusal can arrive marked as success.** The quote batch refused with
 TradingView's own 429 inside a result marked `isError: false`, with `success:

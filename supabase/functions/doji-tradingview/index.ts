@@ -471,6 +471,66 @@ export function foldCalendar(answer: any) {
   }));
 }
 
+/* ─── The market around gold ───────────────────────────────────────────────
+   The dollar, the yields and the rest of what gold is priced against, as bars.
+   The quote batch would have been the natural read and it refused on every
+   probe — the forex scanner's 429, then the CFD scanner's — while the OHLCV
+   read answered for every symbol, its last bar opened inside the current
+   quarter hour. So the market is read as bars: hourly, twenty-five of them, a
+   day's span with the current hour on the end.
+
+   THE REAL YIELD IS DAILY, AND IT IS A DAY OR MORE BEHIND. FRED publishes the
+   ten-year TIPS yield once a day after the fact, so its bars are days and the
+   newest one is dated — and it is the one figure here that must never read as
+   live. `daily` is what says so to whoever renders it.
+
+   THE NAMES ARE HERE, ONCE, beside the symbols they name: this list is the
+   whole of what is read, and a renderer holding its own copy of the names is
+   a list that can name a symbol nothing reads. */
+const MARKET = [
+  { symbol: "TVC:DXY",     name: "Dollar index",              unit: "" },
+  { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
+  { symbol: "TVC:US10Y",   name: "Ten-year Treasury yield",   unit: "%" },
+  { symbol: "FRED:DFII10", name: "Ten-year real yield (TIPS)", unit: "%", daily: true },
+  { symbol: "TVC:SILVER",  name: "Silver",                    unit: "$" },
+  { symbol: "TVC:USOIL",   name: "US crude oil",              unit: "$" },
+  { symbol: "SP:SPX",      name: "S&P 500",                   unit: "" },
+  { symbol: "TVC:VIX",     name: "VIX",                       unit: "" },
+];
+
+/* A SPAN, NOT A CHANGE: where the first bar opened and where the last one
+   stands, each with its time. A change computed here would be a number with
+   no window attached, and a figure that arrives without saying what it is
+   measured from is how a briefing came to call an evening's move the day's.
+   The last bar is still forming, so its close is "now" to within the hour and
+   its time is when that hour began. */
+export function foldBars(answer: any) {
+  const bars = answer.bars;
+  if (!Array.isArray(bars) || !bars.length) throw new Error("no bars");
+  const iso = (t: number) => new Date(t * 1000).toISOString();
+  const first = bars[0], last = bars[bars.length - 1];
+  return { from: first.o, since: iso(first.t), last: last.c, at: iso(last.t) };
+}
+
+/* One at a time, for the poller's reason: six bar reads in parallel once came
+   back as one 504 that took the other five with it, and which symbol cannot be
+   read is half of the answer. A symbol that fails is named, not dropped. */
+async function readMarket() {
+  const session = await tvSession();
+  const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
+  for (const m of MARKET) {
+    const tool = "mcp-tv-get-ohlcv";
+    try {
+      const bars = foldBars(unwrap(parseSse(await tvPost(session, tool,
+        { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 })), tool));
+      market.push({ ...m, daily: !!m.daily, ...bars });
+    } catch (err) {
+      missing.push({ symbol: m.symbol, name: m.name, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return { ok: true, market, missing };
+}
+
 /* ─── The probes ───────────────────────────────────────────────────────────
    What each read RETURNS, raw, before anything folds it. Each answers a
    question a reader cannot be written without:
@@ -499,8 +559,7 @@ export function foldCalendar(answer: any) {
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
-const AROUND = ["TVC:DXY", "TVC:US02Y", "TVC:US10Y", "FRED:DFII10", "TVC:SILVER", "TVC:USOIL",
-                "SP:SPX", "TVC:VIX"];
+const AROUND = MARKET.map(m => m.symbol);
 
 const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
   calendar: () => [
@@ -610,6 +669,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
+    // ?market=1 — the market around gold, folded. Every symbol is fixed above.
+    if (url.searchParams.get("market") === "1") return json(await readMarket());
+
     const asked = url.searchParams.get("probe");
     if (asked) {
       if (!(asked in PROBES)) {
@@ -618,7 +680,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

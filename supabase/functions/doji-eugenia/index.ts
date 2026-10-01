@@ -3068,6 +3068,64 @@ export async function calendarBlock(): Promise<string> {
   }
 }
 
+/* ─── The market around gold ───────────────────────────────────────────────
+   The dollar, the yields, the real yield, silver, oil, the S&P and the VIX,
+   read through doji-tradingview as bars and handed to the two paths that
+   explain gold against them: the briefing, and the move look. Every briefing
+   walks a chain through real yields and the dollar, and until this she quoted
+   both off a search page.
+
+   EVERY LINE SAYS WHAT ITS NUMBER IS MEASURED FROM, and no change is computed
+   to be said without it. `quoteLine` exists because a move served bare read as
+   "on the day" at 20:57 about a session under four hours old; so each line is
+   a level now beside the level at a stated time, and the window is inside the
+   sentence rather than beside it. The latest bar's time is given too, since a
+   bar is not a tick. The real yield is a daily series published after the
+   fact, and its line says so and gives dates, never times.
+
+   NEVER THROWS, for marketBlock's reason, and a failed read is a sentence: a
+   briefing without these lines will reach for a search page, and she is told
+   not to. A symbol TradingView would not serve is named, not left out — an
+   absent line reads as one nobody thought to ask for. */
+type Around = {
+  name: string; unit: string; daily: boolean;
+  from: number; since: string; last: number; at: string;
+};
+
+const NO_AROUND =
+  "\n\nThe market around gold could not be read just now. Do not quote the dollar " +
+  "or yields from a search; say you do not have them.";
+
+export function aroundList(answer: { market: Around[]; missing: { name: string }[] }, now = Date.now()): string {
+  const today = nyDate(new Date(now));
+  const figure = (v: number, unit: string) => unit === "%" ? `${v}%` : unit === "$" ? `$${v}` : `${v}`;
+  const when = (iso: string) => {
+    const day = nyDate(new Date(iso));
+    return `${nyTime(iso)} ET` + (day === today ? "" : ` on ${civilDay(day)}`);
+  };
+  const lines = answer.market.map(m => m.daily
+    ? `· ${m.name} ${figure(m.last, m.unit)} on ${civilDay(m.at.slice(0, 10))}, from ` +
+      `${figure(m.from, m.unit)} on ${civilDay(m.since.slice(0, 10))} — a daily series, a day or more behind`
+    : `· ${m.name} ${figure(m.last, m.unit)}, from ${figure(m.from, m.unit)} at ${when(m.since)}` +
+      ` (latest bar ${when(m.at)})`);
+  if (answer.missing.length) lines.push(`· Not read just now: ${answer.missing.map(m => m.name).join(", ")}.`);
+  return `\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n${lines.join("\n")}`;
+}
+
+const TV_MARKET = `${SB_URL}/functions/v1/doji-tradingview?market=1`;
+
+export async function aroundBlock(): Promise<string> {
+  try {
+    const res = await fetch(TV_MARKET, { headers: { "x-doji-key": CRON_SECRET } });
+    const answer = await res.json();
+    if (!res.ok || !answer.ok || !answer.market?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    return aroundList(answer);
+  } catch (err) {
+    console.error("doji-eugenia: market around gold unavailable —", err instanceof Error ? err.message : err);
+    return NO_AROUND;
+  }
+}
+
 /* ─── What he has on, and where his day stands ─────────────────────────────
    THE ONE THING SHE COULD NOT SEE. Every other block is about the market or
    about what he understands, and none of them said whether he is exposed right
@@ -3546,8 +3604,8 @@ async function postBriefing(due: Brief): Promise<Response> {
      first token was asked for. Promise.all is the same argument the tool
      dispatch makes: a batch should cost its slowest member — which here is the
      price, since that one leaves the project for the broker. */
-  const [price, notes, channels, trades, story, health, loops, calendar, desk] = await Promise.all([
-    marketBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
+  const [price, around, notes, channels, trades, story, health, loops, calendar, desk] = await Promise.all([
+    marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
     healthBlock(), loopsBlock(), calendarBlock(), positionsBlock(),
   ]);
 
@@ -3556,7 +3614,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped being written, everything after it
     // is computed over rows that may be missing, and she is told to lead with it.
-    + health + price + notes + channels + trades + story + loops + calendar + desk;
+    + health + price + around + notes + channels + trades + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
@@ -4305,9 +4363,9 @@ async function postMove(): Promise<Response> {
 
   await markPrice(spot.bid, true);
 
-  const [notes, map, story, loops, ahead, desk] = await Promise.all([
+  const [notes, map, story, loops, ahead, desk, around] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), aheadToday(),
-    positionsBlock(),
+    positionsBlock(), aroundBlock(),
   ]);
   // The window is STATED FROM THE MARK rather than asserted as a quarter of an
   // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
@@ -4325,7 +4383,7 @@ async function postMove(): Promise<Response> {
       ? `\nStill ahead today: ` +
         ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
       : "") +
-    notes + map + story + loops + desk;
+    around + notes + map + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'move look', RELEASE_TOOLS);
