@@ -50,13 +50,6 @@ export const TABLES = [
   ['eugenia_loops',    'id'],
   ['eugenia_calendar', 'id'],
   ['eugenia_feedback', 'id'],
-  /* FOREX FACTORY'S WEEKS, which have no other source either: the export is
-     only ever the current week, so the calendar R-14 is judged against exists
-     nowhere but here once the week has turned. Its key is three columns, so it
-     is ordered by all three — by `at` alone, two releases at one instant could
-     be served on both pages of a boundary or on neither. */
-  ['ff_calendar',      ['at', 'country', 'title']],
-  ['ff_weeks',         'week'],
   // Every stop and target a position carried. The broker reports only the final
   // stop once a position closes, so the moves R-19 is judged on are kept here
   // and nowhere else.

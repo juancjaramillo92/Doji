@@ -69,12 +69,12 @@ supabase/009_dispatch.sql               what pg_net sent, and what came back
 supabase/010_pace.sql                   how much of its clock a briefing spends
 supabase/011_trades_grants.sql          which columns the app may write
 supabase/012_excursion.sql              how far a trade ran in his favour
-supabase/013_ff_calendar.sql            Forex Factory's week, which R-14 is judged against
 supabase/014_stops.sql                  every stop and target a position carried, which R-19 reads
 supabase/015_commitments.sql            what he committed to, as a third kind of note
 supabase/016_tradingview.sql            the TradingView sign-in, one row
 supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
 supabase/018_calendar_tradingview.sql   her calendar keyed by TradingView's id
+supabase/019_calendar_weeks.sql         the weeks R-14 can judge; Forex Factory dropped
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -92,7 +92,7 @@ scripts/backup-memory.mjs               the paged read behind the weekly copy
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-.github/workflows/backup-memory.yml     the weekly copy of the ten tables nothing else holds
+.github/workflows/backup-memory.yml     the weekly copy of the eight tables nothing else holds
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -616,11 +616,10 @@ policy that would let it. The copy has to be taken with the secret key, from
 outside the browser.
 
 **`scripts/backup-memory.mjs` is that copy, and `.github/workflows/backup-memory.yml`
-runs it every Sunday evening.** It reads the ten tables that have no other
+runs it every Sunday evening.** It reads the eight tables that have no other
 source — the channel map, the notes, the turns, the thesis, the open loops, the
-calendar and the feedback, Forex Factory's weeks as R-14 was judged against
-them, since the export only ever serves the current one, and every stop and
-target a position carried, which the broker forgets once it closes — and writes
+calendar and the feedback, and every stop and target a position carried, which
+the broker forgets once it closes — and writes
 one JSON document as a build artifact.
 `eugenia_runs` is deliberately out: it is the cost meter, by far the largest
 table, and every row in it is a fact about a model call rather than about him.
@@ -1420,12 +1419,12 @@ Three tests drive it against a stub that filters the way PostgREST does: two
 refreshes against a rotating server, two callers at once, and a caller that wins
 the lease after someone else renewed.
 
-**What this does not touch.** `ff_calendar` stays as it is. R-14 is defined on
-Forex Factory's red folder, so moving the rule to TradingView's rating would be
-a change to his rule, made deliberately and on its own, not a side effect of a
-new source. Gold's own price is still read from the broker. Whether
-TradingView's is better is a measurement rather than a preference, and it waits
-on the quote tool's shape.
+**Gold's own price is still read from the broker, and that was measured.** The
+gold probe read both in the same second: cTrader's bid at 4162.17 and
+TradingView's Pepperstone feed at 4162.45, off a one-minute bar that had opened
+two seconds earlier. TradingView's feed is the same broker's price and is live,
+not better. The broker's is the price his stops and fills happen on, so it
+stays; what TradingView adds is everything around gold.
 
 ---
 
@@ -2253,22 +2252,25 @@ against each other, because a rule marked `journal` and never implemented is a
 check she cites that nobody runs, and one marked `judgment` and implemented
 anyway starts reporting `pass` for something nothing stored can see.
 
-**R-14 is the one rule judged against something other than the journal: Forex
-Factory's calendar.** He defined high impact as the red folder there, USD only, and
-the floor as thirty minutes, so the rule reads the rating he reads rather than
-Eugenia's, which comes off a search page and is the thing she asked to be corrected
-on. Forex Factory publishes a weekly export for programs — the current week, Sunday
-to Saturday, and nothing else — so the nightly pass fetches it and
-`ff_calendar_replace` swaps that week's rows in one transaction: a release moved or
-retitled mid-week must not stay at its old time and fail an entry against a print
-that never happened then. `ffEvents` refuses the whole file on one bad row, because
-a dropped row could be the red folder. The history is only what the pass kept, and
-**a week it missed is not a quiet week** — both would have no releases stored, and
-every entry in the missed one would pass — so `ff_weeks` records each week a fetch
-landed for and an entry outside one is `unknown`. The fetch is metered as
-`caller: 'forexfactory'` in `eugenia_runs`, both outcomes. The calendar's history
-exists nowhere else, so the weekly backup carries both tables, paging
-`ff_calendar` by all three columns of its key.
+**R-14 and R-19 are judged against TradingView's calendar.** He defined high
+impact, at v1.20 of the strategy, as a US release TradingView rates high, so one
+calendar serves the briefing, the trade-event warning and the rules. The rows are
+the ones `eugenia_calendar` already holds under TradingView's id; what she typed
+in before 018 carries no id, was never a rating he chose, and is not read.
+**A week nobody fetched is not a quiet week.** Both have no releases stored, and
+every entry in the unfetched one would pass, so `calendar_weeks`
+(`019_calendar_weeks.sql`) records each week a whole-week fetch landed for, and
+an entry outside one is `unknown`. Two things mark a week, and both go through
+`fileWeek`, which writes the week's rows first and the mark only after:
+- **the nightly pass,** which files the current week;
+- **the history door,** `?history=YYYY-MM-DD` on `doji-eugenia`, which walks
+  every week from that date, up to two years a run. It answers first and works
+  behind the 200 like every other door, so its result is read off
+  `eugenia_runs`: one row per week under `calendar week`, both outcomes.
+
+The quarter-hourly filing sees a rolling day and a half and marks nothing.
+TradingView's data goes back to 2003, so the weeks already traded can be judged.
+Forex Factory's export only ever held the current one.
 
 **`unknown` is not a pass**, and the code says so rather than the prompt: the
 verdict is the worst outcome present, and an empty population is `unknown`. A
@@ -3609,14 +3611,25 @@ any position whose first recorded stop is later than the print it is judged at.
 Deploying the poller first costs the same way the plan did — the read is a `400`
 the step swallows, and `stops` in the poller's answer reads `0`.
 
-### Applying 013, which is Forex Factory's week
+### Applying 019, which is the weeks R-14 can judge
 
-`013_ff_calendar.sql` creates `ff_calendar` and `ff_weeks` and the function that
-fills both. **Safe to re-run.** Nothing reads it until the nightly pass has fetched
-once, so R-14 answers `unknown` on every trade until 22:00 New York the day it is
-applied, and on every trade from before that for good — the export has no history.
-`eugenia_runs` rows with `caller = 'forexfactory'` say what each night fetched, or
-why it could not.
+`019_calendar_weeks.sql` creates `calendar_weeks` and drops Forex Factory's two
+tables and its function. **Safe to re-run.** R-14 answers `unknown` on every trade
+until a week is marked, so run the history door once from his first trade.
+`select min(open_day) from trades` gives the date:
+
+```sql
+select net.http_get(
+  url := 'https://<project>.supabase.co/functions/v1/doji-eugenia?history=2026-01-05',
+  headers := jsonb_build_object('x-doji-key',
+    (select decrypted_secret from vault.decrypted_secrets where name = 'doji_cron_secret')),
+  timeout_milliseconds := 10000
+) as request_id;
+```
+
+Each week lands as a `calendar week` row in `eugenia_runs`, with how many
+releases it filed, or why it could not. A history longer than two years is a
+second run from where the first stopped.
 
 ### Programmatic tool calls need their container
 
@@ -3952,7 +3965,7 @@ word *buy* left out.
 Give her the entry, stop and target you are about to use and she says which of
 your rules the plan meets and which it breaks: the target and stop distances
 (R-01, R-02), the reward against the risk at entry against the 1:1.5 the
-pre-trade sequence asks for (R-08), a red-folder release inside R-14's thirty
+pre-trade sequence asks for (R-08), a release rated high inside R-14's thirty
 minutes, whether the day already rules out an entry (R-03, R-11, R-12, R-16),
 something already open (R-10), and the Friday close (R-15). Whether the setup is
 the right kind of level is a judgment rule and stays yours. **The levels stay
@@ -4184,7 +4197,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `018_calendar_tradingview.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `019_calendar_weeks.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4498,13 +4511,13 @@ been wrong once, reporting a correct database as broken.
     they are watching; store them lower-case, the way step 5's cron secret is.
     Re-run `supabase/004_cron.sql` afterwards if the two watchers' jobs are not
     already scheduled — it upserts on the job name.
-14. Run `supabase/012_excursion.sql`, `supabase/013_ff_calendar.sql`,
-    `supabase/014_stops.sql` and `supabase/015_commitments.sql`, all safe to
-    re-run.
+14. Run `supabase/012_excursion.sql`, `supabase/014_stops.sql` and
+    `supabase/015_commitments.sql`, all safe to re-run.
 15. Run `supabase/016_tradingview.sql` and `supabase/017_tradingview_lease.sql`,
     and connect TradingView — see **TradingView** — then
-    `supabase/018_calendar_tradingview.sql`.
-16. Run `supabase/verify.sql` and read it against 001–018. Nothing is set up
+    `supabase/018_calendar_tradingview.sql` and `supabase/019_calendar_weeks.sql`,
+    and walk the history door once — see **Applying 019**.
+16. Run `supabase/verify.sql` and read it against 001–019. Nothing is set up
     until that agrees.
 
 ---

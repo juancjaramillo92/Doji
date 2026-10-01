@@ -38,7 +38,7 @@ import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // and imported rather than inlined for the reason balanceTarget and foldHours
 // are exported in the app: it is the part that has to be testable.
 import {
-  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, RED,
+  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, weekOf,
   type TradeRow, type Standing, type Stop,
 } from "./adherence.ts";
 // The app's own arithmetic over the journal — a win rate, the money split, the
@@ -848,12 +848,14 @@ function windowStart(days: unknown, now: number, back: number): string {
 }
 
 /* R-14's two reads, over the same window check_rules reads the trades in. The
-   releases are the red folder only — RED is the rule's, imported rather than
-   typed here — and a day early, because a UTC midnight bound would drop the
-   evening before a New York one. The weeks go back a further seven, since an
-   entry on the window's first day sits in a week that began before it. */
+   releases are TradingView's rated high — HIGH is the rule's, imported rather
+   than typed here — and only rows carrying TradingView's id: what she typed in
+   before 018 is kept for its notes and was never a rating he chose. A day
+   early, because a UTC midnight bound would drop the evening before a New York
+   one. The weeks go back a further seven, since an entry on the window's first
+   day sits in a week that began before it. */
 export function releasesQuery(days: unknown, now = Date.now()): string {
-  return `ff_calendar?select=at&country=eq.${RED.country}&impact=eq.${RED.impact}` +
+  return `eugenia_calendar?select=at&importance=eq.${HIGH}&tv_id=not.is.null` +
          `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=500`;
 }
 
@@ -865,7 +867,7 @@ export function stopsQuery(days: unknown, now = Date.now()): string {
 }
 
 export function weeksQuery(days: unknown, now = Date.now()): string {
-  return `ff_weeks?select=week&week=gte.${windowStart(days, now, 7)}` +
+  return `calendar_weeks?select=week&week=gte.${windowStart(days, now, 7)}` +
          `&order=week.desc&limit=60`;
 }
 
@@ -1076,12 +1078,12 @@ interface TvEvent {
 
    The period goes into the name, because "Core PCE Price Index MoM (Aug)" says
    which month a reader is being told about and the title alone does not. */
-export function calendarRows(events: TvEvent[], now: number) {
+export function calendarRows(events: TvEvent[], from: number, to: number) {
   return events
     .filter(e => e.timed && e.importance !== 'low')
     .filter(e => {
       const at = Date.parse(e.at);
-      return at >= now - CAL_BACK * 3600_000 && at <= now + CAL_AHEAD * 3600_000;
+      return at >= from && at <= to;
     })
     .map(e => {
       const row: Record<string, string> = {
@@ -1094,20 +1096,19 @@ export function calendarRows(events: TvEvent[], now: number) {
     });
 }
 
-// Exported so a test can drive the write: which rows go up together is the
-// half that decides whether a missing figure reaches the database at all.
-export async function fileCalendar(now: number): Promise<number> {
-  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-  const res = await fetch(
-    `${TV_CALENDAR}&from=${day(now - CAL_BACK * 3600_000)}&to=${day(now + CAL_AHEAD * 3600_000)}`,
-    { headers: { "x-doji-key": CRON_SECRET } });
+const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+async function readTvCalendar(from: string, to: string): Promise<TvEvent[]> {
+  const res = await fetch(`${TV_CALENDAR}&from=${from}&to=${to}`, { headers: { "x-doji-key": CRON_SECRET } });
   const answer = await res.json().catch(() => ({}));
   if (!res.ok || !answer.ok) throw new Error(`TradingView calendar: ${answer.error ?? `HTTP ${res.status}`}`);
-  const rows = calendarRows(answer.events, now);
+  return answer.events;
+}
 
-  /* IN GROUPS THAT CARRY THE SAME KEYS, which is what makes leaving a figure
-     out reach the database at all: PostgREST refuses a bulk insert whose
-     objects do not all name the same columns. */
+/* IN GROUPS THAT CARRY THE SAME KEYS, which is what makes leaving a figure out
+   reach the database at all: PostgREST refuses a bulk insert whose objects do
+   not all name the same columns. */
+async function upsertCalendar(rows: Record<string, string>[]): Promise<number> {
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
     const shape = Object.keys(row).sort().join(",");
@@ -1123,10 +1124,78 @@ export async function fileCalendar(now: number): Promise<number> {
   return rows.length;
 }
 
+// Exported so a test can drive the write: which rows go up together is the
+// half that decides whether a missing figure reaches the database at all.
+export async function fileCalendar(now: number): Promise<number> {
+  const from = now - CAL_BACK * 3600_000, to = now + CAL_AHEAD * 3600_000;
+  return upsertCalendar(calendarRows(await readTvCalendar(utcDay(from), utcDay(to)), from, to));
+}
+
+/* A WHOLE WEEK, AND THEN THE MARK THAT SAYS SO — the coverage R-14 and R-19
+   read (019). `week` is a Sunday in New York, `weekOf`'s key. TradingView is
+   asked in UTC days, so the read runs to the next Sunday and keeps only what
+   `weekOf` files under this week: the Saturday-evening hours a New York week
+   ends on are the next UTC day. The mark goes down only after the rows did,
+   so a failure in between leaves the week unknown rather than covered and
+   empty — the direction every gap in this system has to fail in. */
+export async function fileWeek(week: string, now = Date.now()): Promise<number> {
+  const next = utcDay(Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000);
+  const rows = calendarRows(await readTvCalendar(week, next), 0, Infinity)
+    .filter(r => weekOf(new Date(r.at)) === week);
+  const filed = await upsertCalendar(rows);
+  const res = await fetch(`${SB_URL}/rest/v1/calendar_weeks?on_conflict=week`, {
+    method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify([{ week, fetched_at: new Date(now).toISOString() }]),
+  });
+  if (!res.ok) throw new Error(`week ${week} filed and not marked (HTTP ${res.status}) — has 019 been applied?`);
+  return filed;
+}
+
 /* NEVER TAKES ITS CALLER DOWN, AND BOTH OUTCOMES ARE A ROW. A briefing with no
    fresh calendar still has yesterday's filing and her search; a filing that
    failed and left only a console line is the embedding sweep's lesson again —
    a calendar that silently stopped moving looks exactly like a quiet week. */
+/* The week's own meter, kept apart from the quarter-hourly one so a row says
+   which of the two writers it is about — the nightly week and the history door
+   are the only things that mark a week covered. */
+async function filedWeek(week: string): Promise<void> {
+  try {
+    await recordRun({ caller: 'calendar week', ok: true, detail: `${week}: ${await fileWeek(week)} filed` });
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    console.error(`doji-eugenia: week ${week} not filed —`, why);
+    await recordRun({ caller: 'calendar week', ok: false, detail: `${week}: ${why}`.slice(0, 500) });
+  }
+}
+
+/* THE WEEKS FROM A DATE TO NOW, AT MOST TWO YEARS OF THEM. Anchored at noon UTC
+   on the Sunday, which is a Sunday in New York in both halves of the year, so
+   stepping a week never crosses a clock change into the wrong day. The bound
+   keeps one run inside the worker's wall clock at a TradingView call a week;
+   a longer history is a second run from where the first stopped. Pure, so the
+   walk is driven rather than trusted. */
+const HISTORY_WEEKS = 104;
+
+export function historyWeeks(start: string, now: number): string[] | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || isNaN(Date.parse(start))) return null;
+  const weeks: string[] = [];
+  for (let at = Date.parse(`${weekOf(new Date(`${start}T12:00:00Z`))}T12:00:00Z`);
+       weeks.length < HISTORY_WEEKS && at <= now; at += 7 * 86_400_000) {
+    weeks.push(weekOf(new Date(at)));
+  }
+  return weeks;
+}
+
+/* One week at a time, for `?bars=raw`'s reason: each week's failure is its own
+   row in `eugenia_runs`, which is where this door's answer is read — it runs
+   behind the 200 like every other, so the response says nothing. */
+async function postHistory(start: string): Promise<Response> {
+  const weeks = historyWeeks(start, Date.now());
+  if (!weeks) return json({ ok: false, error: "history takes a date, YYYY-MM-DD" }, 400);
+  for (const week of weeks) await filedWeek(week);
+  return json({ ok: true, weeks: weeks.length });
+}
+
 async function filed(now = Date.now()): Promise<void> {
   try {
     await recordRun({ caller: 'calendar', ok: true, detail: `${await fileCalendar(now)} filed` });
@@ -3208,6 +3277,13 @@ async function postScheduled(url: URL): Promise<Response> {
        every hour for the one night a year it had something to do. */
     if (url.searchParams.get("embed") === "1")       { job = 'embed';       return await postEmbed(); }
 
+    /* THE CALENDAR'S HISTORY, AND NO CRON JOB CALLS IT EITHER. R-14 and R-19
+       can judge only weeks a whole-week fetch landed for, and the nightly pass
+       starts from the week it first runs in — so the weeks he has already
+       traded are walked once, by hand, from the date given. */
+    const history = url.searchParams.get("history");
+    if (history) { job = 'history'; return await postHistory(history); }
+
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
       return await postBriefing(briefDue(now) ?? briefKind(now));
@@ -3712,72 +3788,21 @@ async function postConsolidation(): Promise<Response> {
     await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
   }
 
-  /* AND FOREX FACTORY'S WEEK, which R-14 is judged against. Nightly for the
-     sweep's reason — this job already runs every night, weekends included —
-     and wrapped for the same one: a calendar that will not load must not
-     report itself as a pass that failed. The export is always the current
-     week, so a missed night costs nothing the next night does not recover,
-     and a missed week is what `ff_weeks` exists to say. */
-  try {
-    const filed = await refreshCalendar();
-    console.log(`doji-eugenia: calendar — ${filed} events filed`);
-    await recordRun({ caller: 'forexfactory', ok: true, detail: `${filed} events filed` });
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: calendar not refreshed —", why);
-    await recordRun({ caller: 'forexfactory', ok: false, detail: why.slice(0, 500) });
-  }
+  /* AND THE WEEK, WHOLE, which R-14 and R-19 are judged against. The
+     quarter-hourly filing only ever sees a rolling day and a half, so it marks
+     no week covered; this is what does. Nightly for the sweep's reason — this
+     job already runs every night, weekends included, and on a Sunday night it
+     is already the coming week — and wrapped for the same one: a calendar that
+     will not load must not take the pass down with it. A missed night costs
+     nothing the next night does not recover, and a missed week is what
+     `calendar_weeks` exists to say. */
+  await filedWeek(weekOf(new Date()));
 
   /* ONE EXIT, and it is what the test asserts rather than the branch shape: a
      second `return` in this function is how the meters got skipped the first
      time, and it would be again. */
   return day.length ? json({ ok: true, consolidated: day.length })
                     : json({ ok: true, skipped: "nothing said" });
-}
-
-/* ─── Forex Factory's week ─────────────────────────────────────────────────
-   The export Forex Factory publishes for programs, rather than the calendar
-   page: a page is laid out for a reader and read by program breaks the day the
-   layout moves. It is the current week, Sunday to Saturday, in New York time
-   with the offset written on every date — so an instant parses straight to UTC
-   and no clock change can move it.
-
-   A BOUNDARY, AND IT REFUSES THE WHOLE FILE RATHER THAN A ROW. A dropped row
-   could be the red folder, and a week filed without its one release passes
-   every entry before it — the failure R-14 exists to catch, reported as
-   compliance. Refused, the week is simply not filed, and its trades read
-   unknown. Kept whole otherwise: which folder counts is the rule's. */
-const FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-
-export interface FfEvent {
-  at: string; country: string; title: string; impact: string;
-  forecast: string; previous: string;
-}
-
-export function ffEvents(body: unknown): FfEvent[] {
-  if (!Array.isArray(body)) throw new Error("the Forex Factory export is not a list");
-  return body.map((e: any, i: number) => {
-    const at = new Date(String(e?.date ?? ''));
-    const text = (k: string) => typeof e?.[k] === 'string' ? e[k].trim() : '';
-    if (isNaN(+at) || !text('title') || !text('country') || !text('impact')) {
-      throw new Error(`Forex Factory event ${i} is missing a date, title, currency or impact`);
-    }
-    return { at: at.toISOString(), country: text('country'), title: text('title'),
-             impact: text('impact'), forecast: text('forecast'), previous: text('previous') };
-  });
-}
-
-// Replaces the fetched week in one transaction, and says how many it filed.
-async function refreshCalendar(): Promise<number> {
-  const got = await fetch(FF_URL);
-  if (!got.ok) throw new Error(`Forex Factory export refused (HTTP ${got.status})`);
-  const events = ffEvents(await got.json());
-
-  const res = await fetch(`${SB_URL}/rest/v1/rpc/ff_calendar_replace`, {
-    method: "POST", headers: sbHeaders(), body: JSON.stringify({ events }),
-  });
-  if (!res.ok) throw new Error(`Calendar write failed (HTTP ${res.status}): ${await res.text()}`);
-  return Number(await res.json());
 }
 
 /* THE ONE CLAIM IN THIS SYSTEM THAT HAD NO METER.

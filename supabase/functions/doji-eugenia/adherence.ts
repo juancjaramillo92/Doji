@@ -575,30 +575,30 @@ function r13(rows: TradeRow[]): RuleResult {
 
 /* ─── R-14 ─────────────────────────────────────────────────────────────────
    No entries in the hours before a high-impact release. §7: no entry in the
-   30 minutes before a USD red-folder release on Forex Factory; an entry with
-   one later that day but further off is unknown.
+   30 minutes before a US release TradingView rates high; an entry with one
+   later that day but further off is unknown.
 
    BOTH NUMBERS ARE HIS, and the second is a floor rather than the rule. §6
    calls the stand-aside open-ended — a 10 a.m. print can cost the New York
    morning from the open — so thirty minutes is the part no reading of it can
    excuse, and a release further ahead the same day leaves the entry to his
-   judgement: unknown, never pass. RED is what counts as high impact, stated
-   here because it is the rule's decision; the query that reads the calendar
-   imports it rather than typing it again.
+   judgement: unknown, never pass. HIGH is what counts as high impact, stated
+   here because it is the rule's decision — his, as of v1.20 — and the query
+   that reads the calendar imports it rather than typing it again.
 
-   A WEEK NOBODY FETCHED IS NOT A QUIET WEEK. The export is only ever the
-   current week, so the calendar holds what the nightly pass kept, and a week
-   it missed has no releases in the table for the same reason a quiet one
-   does. `weeks` is the evidence of a fetch; an entry outside one is unknown.
+   A WEEK NOBODY FETCHED IS NOT A QUIET WEEK. A week with no releases stored
+   and a week never asked for read the same, and every entry in the second
+   would pass. `weeks` is the evidence of a whole-week fetch, written only
+   after that week's releases were; an entry outside one is unknown.
    After the print is not checked: he stands aside through it by judgement,
    and set no number for it. */
 export const NEWS_MIN = 30;
-export const RED = { country: 'USD', impact: 'High' };
+export const HIGH = 'high';
 
 export interface Calendar { releases: string[]; weeks: Set<string> }
 
-// The Sunday, New York, that the Forex Factory week holding `at` began on —
-// the key ff_weeks is written under.
+// The Sunday, New York, that the week holding `at` began on — the key
+// calendar_weeks is written under.
 export function weekOf(at: Date): string {
   const w = nyWall(at);
   const d = new Date(Date.UTC(w.y, w.m - 1, w.d - w.wd));
@@ -617,7 +617,7 @@ function r14(rows: TradeRow[], cal: Calendar): RuleResult {
     if (prints.some(p => p > e && p - e <= NEWS_MIN * 60_000)) fail.push(t.id);
     else (ahead.length ? unknown : pass).push(t.id);
   }
-  return result('R-14', `entries in the ${NEWS_MIN} minutes before a USD red-folder release`,
+  return result('R-14', `entries in the ${NEWS_MIN} minutes before a US release rated high`,
                 pass, fail, unknown);
 }
 
@@ -729,7 +729,7 @@ function r18(rows: TradeRow[], now: number): RuleResult {
 /* ─── R-19 ─────────────────────────────────────────────────────────────────
    A print landing on a position inherited from an earlier session: in profit,
    stop to break-even; losing, tighten; the target never moves; never wider.
-   §7: judged at the first USD red folder inside the position's span whose
+   §7: judged at the first high-rated US release inside the position's span whose
    session is not the one it was opened in, against the stop and target in
    force then.
 
@@ -788,7 +788,7 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
     if (atEntry) pass.push(t.id);
     else (now === was ? fail : unknown).push(t.id);
   }
-  return result('R-19', 'positions from an earlier session a USD red folder landed on, judged on the stop and target in force at the print',
+  return result('R-19', 'positions from an earlier session a high-rated release landed on, judged on the stop and target in force at the print',
                 pass, fail, unknown);
 }
 

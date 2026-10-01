@@ -142,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 630 tests, six suites
+npm test      # 633 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1591,7 +1591,7 @@ and what could not be verified.
 
 ## Her memory is backed up from outside the browser
 
-`scripts/backup-memory.mjs` is the only copy of the ten tables that have no
+`scripts/backup-memory.mjs` is the only copy of the eight tables that have no
 other source. It is run weekly by `.github/workflows/backup-memory.yml` and can
 be run by hand for a durable copy; the README carries the mechanics. The part to
 be careful with is the PAGING: PostgREST caps a response at its own `max-rows`
