@@ -1376,6 +1376,16 @@ was once called the day's. It is handed to the briefing and the move look, and
 a read that fails is a sentence telling her not to quote the dollar or yields
 from a search.
 
+**`?news=1` is gold's and the dollar's headlines, for the move look.** A move
+with nothing on the calendar behind it is the one look that has to find its own
+explanation, and it used to start from a web search. `foldHeadlines` merges the
+two feeds — a story carried by both is one headline — newest first, each with
+its title, source and time. Eugenia's `headlinesList` hands her the last hour
+and says it is the last hour; she is told to read them before she searches, to
+cite a headline with its time and source, and never to claim what a paywalled
+story says beyond its title. A feed that fails is said, and a read that fails
+sends her back to her search.
+
 **A refusal can arrive marked as success.** The quote batch refused with
 TradingView's own 429 inside a result marked `isError: false`, with `success:
 false` in the payload. `unwrap` checks both, and a test holds it to that real

@@ -531,6 +531,44 @@ async function readMarket() {
   return { ok: true, market, missing };
 }
 
+/* ─── The headlines ────────────────────────────────────────────────────────
+   Gold's own feed and the dollar's, which between them carried everything the
+   1 October probe needed to explain the afternoon: Reuters on gold against
+   yields, and the Fed vice chair's lines within minutes of his saying them.
+   Titles only — most stories are paywalled, and a title with its time and its
+   source is what a move is explained from. The two feeds overlap, so a story
+   on both is one headline; newest first. */
+const FEEDS = [{ symbol: "TVC:GOLD", limit: 15 }, { symbol: "TVC:DXY", limit: 10 }];
+
+export function foldHeadlines(answers: { symbol: string; answer: any }[]) {
+  const seen = new Map<string, { id: string; title: string; source: string; published: string; feed: string }>();
+  for (const { symbol, answer } of answers) {
+    for (const h of answer.data?.headlines ?? []) {
+      if (seen.has(h.id)) continue;
+      seen.set(h.id, {
+        id: h.id, title: h.title, source: h.provider?.name ?? "",
+        published: new Date(h.published * 1000).toISOString(), feed: symbol,
+      });
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.published < b.published ? 1 : -1);
+}
+
+async function readHeadlines() {
+  const session = await tvSession();
+  const tool = "mcp-tv-get-news";
+  const answers: { symbol: string; answer: any }[] = [], missing: Record<string, string>[] = [];
+  for (const f of FEEDS) {
+    try {
+      answers.push({ symbol: f.symbol,
+        answer: unwrap(parseSse(await tvPost(session, tool, { symbol: f.symbol, limit: f.limit })), tool) });
+    } catch (err) {
+      missing.push({ symbol: f.symbol, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return { ok: true, headlines: foldHeadlines(answers), missing };
+}
+
 /* ─── The probes ───────────────────────────────────────────────────────────
    What each read RETURNS, raw, before anything folds it. Each answers a
    question a reader cannot be written without:
@@ -578,10 +616,8 @@ const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
     ["mcp-tv-get-symbol-data-batch", { symbols: GOLD }],
     ["mcp-tv-get-ohlcv", { symbol: GOLD[0], interval: "1m", count: 3 }],
   ],
-  news: () => [
-    ["mcp-tv-get-news", { symbol: "TVC:GOLD", limit: 10 }],
-    ["mcp-tv-get-news", { symbol: "TVC:DXY", limit: 5 }],
-  ],
+  news: () => FEEDS.map(f => ["mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }] as
+    [AllowedTool, Record<string, unknown>]),
   econ: () => [
     ["mcp-tv-get-economic-symbols", { country: "US", category: "prce" }],
     ["mcp-tv-get-economic-symbols", { country: "US", category: "mny" }],
@@ -671,6 +707,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
     // ?market=1 — the market around gold, folded. Every symbol is fixed above.
     if (url.searchParams.get("market") === "1") return json(await readMarket());
+    // ?news=1 — gold's and the dollar's headlines, folded. Both feeds are fixed.
+    if (url.searchParams.get("news") === "1") return json(await readHeadlines());
 
     const asked = url.searchParams.get("probe");
     if (asked) {
@@ -680,7 +718,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
