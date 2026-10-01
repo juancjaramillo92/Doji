@@ -1246,16 +1246,25 @@ async function filed(now = Date.now()): Promise<void> {
    exactly like a write, the shape `planned` was repaired for in the poller. She
    is handed the names in the message and quoting one is the whole job; when she
    paraphrases anyway the next round has what it needs instead of a second row. */
+/* A SPEECH HAS NO FIGURE, SO THE FIGURE CANNOT BE THE PRICE OF THE LINE. The
+   look after a release is told it may add one line on what it meant whichever
+   way it decides, and a speech rated high is looked at the moment it lands —
+   so the one record a Chair's press conference could leave was refused here
+   for want of a number nothing will ever print. Either half may come alone;
+   an absent key is left as it was, which is `emailRow`'s rule, so a line
+   written after the figure never erases it. */
 async function recordActual(at: unknown, name: unknown, actual: unknown, note: unknown): Promise<string> {
   const when = new Date(String(at ?? ""));
   const called = String(name ?? "").trim();
   const printed = String(actual ?? "").trim().slice(0, NOTE_MAX);
-  if (isNaN(+when) || !called || !printed) {
-    return "That needs the release's time in UTC, its name exactly as the calendar lists it, and what it printed.";
+  const line = String(note ?? "").trim().slice(0, NOTE_MAX);
+  if (isNaN(+when) || !called || !(printed || line)) {
+    return "That needs the release's time in UTC, its name exactly as the calendar lists it, " +
+           "and what it printed, or for a speech one line on what was said.";
   }
 
-  const patch: Record<string, string> = { actual: printed };
-  const line = String(note ?? "").trim().slice(0, NOTE_MAX);
+  const patch: Record<string, string> = {};
+  if (printed) patch.actual = printed;
   if (line) patch.note = line;
 
   /* THE NAME GOES OUT AS ITSELF, ENCODED AND NOTHING ELSE. An `eq` value is
@@ -1292,19 +1301,20 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
 const ACTUAL_TOOL = {
   name: "record_actual",
   description:
-    "Fill in what a release printed, on the entry already filed for it. Give the " +
-    "time in UTC and the name exactly as the list you were handed spells it. This " +
-    "updates that entry and can never add a second one, so a name that matches " +
-    "nothing writes nothing and tells you what is on file instead.",
+    "Fill in what a release printed, on the entry already filed for it, or for a " +
+    "speech, which prints nothing, one line on what was said. Give the time in " +
+    "UTC and the name exactly as the list you were handed spells it. This updates " +
+    "that entry and can never add a second one, so a name that matches nothing " +
+    "writes nothing and tells you what is on file instead.",
   input_schema: {
     type: "object",
     properties: {
       at:     { type: "string", description: "When it landed, ISO 8601 in UTC, as the entry was filed." },
       name:   { type: "string", description: "The entry's name, copied exactly from the list you were given." },
-      actual: { type: "string", description: "What it printed, with its unit." },
-      note:   { type: "string", description: `One line on what it meant. Optional, at most ${NOTE_MAX} characters.` },
+      actual: { type: "string", description: "What it printed, with its unit. Left out for a speech." },
+      note:   { type: "string", description: `One line on what it meant, or for a speech what was said. At most ${NOTE_MAX} characters.` },
     },
-    required: ["at", "name", "actual"],
+    required: ["at", "name"],
     additionalProperties: false,
   },
 } as const;
@@ -3170,7 +3180,7 @@ export function calendarList(rows: Release[], now = Date.now(),
              (r.consensus ? ` against ${r.consensus} expected` : "") +
              (r.note ? `. ${r.note}` : "");
     }
-    if (Date.parse(r.at) <= now) return `${head} — PAST, no figure on file`;
+    if (Date.parse(r.at) <= now) return `${head} — PAST, no figure on file` + (r.note ? `. ${r.note}` : "");
     return `${head} — due` +
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");

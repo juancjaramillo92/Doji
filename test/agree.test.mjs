@@ -6338,6 +6338,14 @@ test('the briefing is handed the rules his trades broke, and told to take them f
     'the briefing evaluates the rules through a reader check_rules does not use');
 });
 
+test('the release look is told a speech is recorded by its line alone', () => {
+  // record_actual takes a line without a figure (driven in fold.test.mjs);
+  // a look not told so still searches for a number a speech will never print.
+  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
+  assert.match(release, /A speech prints no figure: leave the actual out and give the line alone/,
+    'RELEASE no longer tells her how to record a speech, so it leaves no record');
+});
+
 test('the release look is handed the release\'s own record, and told to read against it', () => {
   // recordList is pure and driven in fold.test.mjs; whether the look reads it is not.
   const at = EUGENIA_TS.indexOf('async function postRelease(');

@@ -2042,6 +2042,16 @@ so it answers with the names actually on file. The look is handed the UTC stamp
 beside the ET heading, because the tool matches on the instant and asking her to
 convert is a conversion standing where an input belongs.
 
+**A speech is recorded by its line alone.** A speech TradingView rates high is
+looked at the moment it lands, and the look is told it may add one line on what
+it meant either way — but the tool demanded a figure, and a speech prints none,
+so a Chair's press conference left no record at all. Either half may come
+alone now, and an absent key is left as it was, so a line written after the
+figure never erases it. A past row with no figure shows its line, which is the
+only thing in the calendar saying what was said. Speakers rated medium get no
+look, and covering them would mean web search in the nightly pass, which has
+nothing to research by design; the next briefing searches them when they matter.
+
 **And the row records when its content was last written.** Two writers hours
 apart on one row means `created_at` says only when each was first seen — so when
 duplicates disagreed about what a number printed at, nothing could say which
