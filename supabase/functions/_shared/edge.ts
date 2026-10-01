@@ -136,11 +136,12 @@ export async function heartbeat(who: "poller" | "email", failure?: unknown) {
    function — and the endpoint and the token are arguments, so each binds its
    own and the handshake is written once.
 
-   Three things make it fiddlier than a REST call: a session must be opened with
-   `initialize` and its Mcp-Session-Id echoed on every later call; sessions
-   expire within minutes, so each invocation opens a fresh one rather than
-   caching; and responses arrive as Server-Sent Events, so the JSON is wrapped
-   in `event: message\ndata: {...}` framing that has to be peeled off.
+   Three things make it fiddlier than a REST call: a session is opened with
+   `initialize`, and a server that assigns one an Mcp-Session-Id must have it
+   echoed on every later call; sessions expire within minutes, so each
+   invocation opens a fresh one rather than caching; and responses arrive as
+   Server-Sent Events, so the JSON is wrapped in `event: message\ndata: {...}`
+   framing that has to be peeled off.
    ───────────────────────────────────────────────────────────────────────── */
 // Walks the data: frames from the END BACKWARDS and returns the last one that
 // actually parses. Taking the final line unconditionally meant a trailing
@@ -158,8 +159,13 @@ export function parseSse(body: string): any {
   return JSON.parse(body.trim());   // no SSE framing at all — plain JSON body
 }
 
+/* THE HEADERS EVERY LATER CALL OF THE SESSION CARRIES, rather than the id,
+   because the id is the server's to give. The spec says a server MAY assign
+   one: cTrader always does, and TradingView had not been asked before this was
+   written. Refusing a server that assigns none would have read as TradingView
+   being down on the first call ever made to it. */
 export async function mcpInit(url: string, headers: Record<string, string>,
-                              clientInfo: { name: string; version: string }): Promise<string> {
+                              clientInfo: { name: string; version: string }) {
   const res = await fetch(url, {
     method: "POST", headers,
     body: JSON.stringify({
@@ -167,17 +173,17 @@ export async function mcpInit(url: string, headers: Record<string, string>,
       params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo },
     }),
   });
-  const sid = res.headers.get("mcp-session-id");
   // Does not echo the response body — it can carry auth detail.
-  if (!res.ok || !sid) throw new Error(`MCP initialize failed (HTTP ${res.status})`);
+  if (!res.ok) throw new Error(`MCP initialize failed (HTTP ${res.status})`);
+  const sid = res.headers.get("mcp-session-id");
+  const session: Record<string, string> = sid ? { ...headers, "Mcp-Session-Id": sid } : headers;
 
   // The spec requires this notification before normal calls are accepted.
   await fetch(url, {
-    method: "POST",
-    headers: { ...headers, "Mcp-Session-Id": sid },
+    method: "POST", headers: session,
     body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
   });
-  return sid;
+  return session;
 }
 
 /* ─── Telegram ─────────────────────────────────────────────────────────────
