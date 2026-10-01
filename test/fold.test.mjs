@@ -52,7 +52,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, awaitingActual,
+  releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -2766,6 +2766,41 @@ test('the history walks Sundays in New York from the date given, through a clock
     'one run walked past the two years its wall clock was sized for');
   assert.equal(historyWeeks('last March', Date.now()), null);
   assert.equal(historyWeeks('2026-13-40', Date.now()), null);
+});
+
+/* THE WALK IS REPLAYED, NOT ASSUMED. TradingView refuses a burst of calendar
+   reads and the first year walked turned twenty-three weeks into refusals in a
+   second and a half. A refused week is asked again after the pause; twice
+   refused, the walk ends there rather than spending the rest of the run on the
+   same answer. */
+test('the history asks a refused week again once, and a second refusal ends the walk', async () => {
+  const reads = [], runs = [];
+  const refusals = new Map([['2026-09-13', 1], ['2026-09-20', 2]]);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u.includes('doji-tradingview')) {
+      const week = u.match(/from=([\d-]+)/)[1];
+      reads.push(week);
+      if (refusals.get(week)) {
+        refusals.set(week, refusals.get(week) - 1);
+        return new Response(JSON.stringify({ ok: false, error: 'Rate limit exceeded' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
+    }
+    if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
+    return new Response('', { status: 201 });
+  };
+  try {
+    await postHistory('2026-09-06', 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(reads, ['2026-09-06', '2026-09-13', '2026-09-13', '2026-09-20', '2026-09-20'],
+    'the walk did not retry a refused week once, or carried on past a second refusal');
+  assert.deepEqual(runs.map(r => r.ok), [true, false, true, false, false],
+    'an attempt went unrecorded — both outcomes are a row');
+  assert.match(runs.at(-1).detail, /^2026-09-20: /, 'the last row does not name the week to resume from');
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {
