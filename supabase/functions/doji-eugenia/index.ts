@@ -1159,22 +1159,25 @@ export async function fileWeek(week: string, now = Date.now()): Promise<number> 
 /* The week's own meter, kept apart from the quarter-hourly one so a row says
    which of the two writers it is about — the nightly week and the history door
    are the only things that mark a week covered. */
-async function filedWeek(week: string): Promise<void> {
+async function filedWeek(week: string): Promise<boolean> {
   try {
     await recordRun({ caller: 'calendar week', ok: true, detail: `${week}: ${await fileWeek(week)} filed` });
+    return true;
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     console.error(`doji-eugenia: week ${week} not filed —`, why);
     await recordRun({ caller: 'calendar week', ok: false, detail: `${week}: ${why}`.slice(0, 500) });
+    return false;
   }
 }
 
 /* THE WEEKS FROM A DATE TO NOW, AT MOST TWO YEARS OF THEM. Anchored at noon UTC
    on the Sunday, which is a Sunday in New York in both halves of the year, so
    stepping a week never crosses a clock change into the wrong day. The bound
-   keeps one run inside the worker's wall clock at a TradingView call a week;
-   a longer history is a second run from where the first stopped. Pure, so the
-   walk is driven rather than trusted. */
+   keeps one run inside the worker's wall clock — a second a week, and a
+   `HISTORY_PAUSE_MS` each time TradingView refuses; a longer history is a
+   second run from where the first stopped. Pure, so the walk is driven rather
+   than trusted. */
 const HISTORY_WEEKS = 104;
 
 export function historyWeeks(start: string, now: number): string[] | null {
@@ -1189,11 +1192,27 @@ export function historyWeeks(start: string, now: number): string[] | null {
 
 /* One week at a time, for `?bars=raw`'s reason: each week's failure is its own
    row in `eugenia_runs`, which is where this door's answer is read — it runs
-   behind the 200 like every other, so the response says nothing. */
-async function postHistory(start: string): Promise<Response> {
+   behind the 200 like every other, so the response says nothing.
+
+   A REFUSED WEEK IS ASKED AGAIN ONCE, AFTER A PAUSE, AND A SECOND REFUSAL ENDS
+   THE WALK. TradingView refuses past about thirty calendar reads a minute and
+   says to retry in half of one: the first year walked filed thirty-one weeks
+   and then wrote twenty-three refusals in a second and a half, every one of
+   them a week the run had been asked for and could have filed by waiting. The
+   pause is a constant rather than the figure in the refusal, which is prose in
+   someone else's error. Twice refused, the rest would meet the same answer, so
+   the walk stops and its last row names the week to start the next run from.
+   Exported with the pause as a parameter so the sequence is driven. */
+const HISTORY_PAUSE_MS = 35_000;
+
+export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
   const weeks = historyWeeks(start, Date.now());
   if (!weeks) return json({ ok: false, error: "history takes a date, YYYY-MM-DD" }, 400);
-  for (const week of weeks) await filedWeek(week);
+  for (const week of weeks) {
+    if (await filedWeek(week)) continue;
+    await new Promise(r => setTimeout(r, pause));
+    if (!await filedWeek(week)) break;
+  }
   return json({ ok: true, weeks: weeks.length });
 }
 

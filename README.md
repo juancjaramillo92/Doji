@@ -2306,6 +2306,9 @@ an entry outside one is `unknown`. Two things mark a week, and both go through
   every week from that date, up to two years a run. It answers first and works
   behind the 200 like every other door, so its result is read off
   `eugenia_runs`: one row per week under `calendar week`, both outcomes.
+  TradingView refuses past about thirty reads a minute, so a refused week is
+  asked again once after a pause; refused twice, the walk stops, and its last
+  row names the week to start the next run from.
 
 The quarter-hourly filing sees a rolling day and a half and marks nothing.
 TradingView's data goes back to 2003, so the weeks already traded can be judged.
@@ -3667,8 +3670,9 @@ select net.http_get(
 ```
 
 Each week lands as a `calendar week` row in `eugenia_runs`, with how many
-releases it filed, or why it could not. A history longer than two years is a
-second run from where the first stopped.
+releases it filed, or why it could not. A history longer than two years, or a
+walk that met TradingView's refusal twice running, is a second run from the
+week its last row names.
 
 ### Applying 020, which is each release's series
 
