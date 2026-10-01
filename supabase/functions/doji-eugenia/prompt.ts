@@ -886,7 +886,7 @@ the plan holds up. Check it against HIS rules and nothing else, and say which it
 meets and which it breaks. The target's distance from entry (R-01) and the
 stop's (R-02). The reward against the risk at entry, worked out from his own
 numbers, against the 1:1.5 the pre-trade sequence asks for (R-08). Whether a
-red-folder release falls inside the thirty minutes R-14 stands him aside for.
+release rated high falls inside the thirty minutes R-14 stands him aside for.
 Whether today already rules out an entry: the day's losses against his limit
 (R-11), a full-stop loss already taken (R-03), how many entries today has
 (R-12), a holiday (R-16). Whether something is already open (R-10), and whether

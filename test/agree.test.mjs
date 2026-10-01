@@ -4442,6 +4442,9 @@ const BY_HAND = {
                'this forces a pulse out of that schedule',
   consolidate: 'the same door for the nightly pass, which is how a missed ' +
                'night is made up without waiting for the next one',
+  history:     'the weeks he has already traded, walked once from the date ' +
+               'given so R-14 and R-19 can judge them — the nightly pass only ' +
+               'ever files the week it runs in',
 };
 
 test('every door the function reads is opened by a cron job or by a person', () => {
@@ -6120,20 +6123,22 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
     'and R-04 is unknown on every trade for ever');
 });
 
-test('the nightly pass fetches Forex Factory, meters both outcomes, and check_rules reads it', () => {
-  /* ffEvents and r14 are driven in fold.test.mjs, and neither can see whether
-     anything calls them. A pass that stopped fetching leaves every week
-     unfetched, R-14 unknown on every trade, and nothing anywhere erroring — so
+test("the nightly pass files the week, meters both outcomes, and check_rules reads it", () => {
+  /* fileWeek and r14 are driven in fold.test.mjs, and neither can see whether
+     anything calls them. A pass that stopped filing the week leaves every week
+     unmarked, R-14 unknown on every trade, and nothing anywhere erroring — so
      the call sites are read, along with both meters and the calendar handed
      to the rules. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const at = src.indexOf('async function postConsolidation(');
   const pass = src.slice(at, src.indexOf('\n}', at));
-  assert.match(pass, /await refreshCalendar\(\)/,
-    'the nightly pass no longer fetches the calendar R-14 is judged against');
-  assert.match(pass, /caller: 'forexfactory', ok: true/, 'the calendar fetch records no success');
-  assert.match(pass, /caller: 'forexfactory', ok: false/, 'the calendar fetch records no failure');
+  assert.match(pass, /await filedWeek\(weekOf\(new Date\(\)\)\)/,
+    'the nightly pass no longer files the week R-14 is judged against');
+  const meter = src.slice(src.indexOf('async function filedWeek('));
+  const week = meter.slice(0, meter.indexOf('\n}'));
+  assert.match(week, /caller: 'calendar week', ok: true/, 'the week filing records no success');
+  assert.match(week, /caller: 'calendar week', ok: false/, 'the week filing records no failure');
 
   const check = src.slice(src.indexOf('async function checkAdherence('));
   const body = check.slice(0, check.indexOf('\n}'));
@@ -6206,9 +6211,20 @@ test('one write makes a calendar row, keyed on the id, and she holds none', () =
   assert.deepEqual(inserts, ['tv_id'],
     'a second write can create a calendar row, or the filing no longer keys on the ' +
     "id — either way one print can become two rows under two names again");
-  const at = EUGENIA_TS.indexOf('export async function fileCalendar(');
-  assert.ok(at > -1 && EUGENIA_TS.indexOf('eugenia_calendar?on_conflict', at) <
-    EUGENIA_TS.indexOf('\n}', at), 'the one upsert is no longer inside fileCalendar');
+  // Inside upsertCalendar, and reached only from the two TradingView filings —
+  // a found-nowhere index would satisfy a bare `<`, so each position is required.
+  const at = EUGENIA_TS.indexOf('async function upsertCalendar(');
+  const upsert = EUGENIA_TS.indexOf('eugenia_calendar?on_conflict');
+  assert.ok(at > -1 && upsert > at && upsert < EUGENIA_TS.indexOf('\n}', at),
+    'the one upsert is no longer inside upsertCalendar');
+  const calls = (EUGENIA_TS.match(/upsertCalendar\(/g) ?? []).length - 1;
+  assert.equal(calls, 2, `upsertCalendar is called ${calls} times — something other than the two filings writes rows`);
+  for (const fn of ['fileCalendar', 'fileWeek']) {
+    const from = EUGENIA_TS.indexOf(`export async function ${fn}(`);
+    const body = EUGENIA_TS.slice(from, EUGENIA_TS.indexOf('\n}', from));
+    assert.ok(from > -1 && body.includes('upsertCalendar(') && body.includes('calendarRows('),
+      `${fn} no longer files through calendarRows and upsertCalendar`);
+  }
 
   const array = EUGENIA_TS.match(/const RELEASE_TOOLS = \[([^\]]*)\]/)?.[1];
   assert.ok(array, 'RELEASE_TOOLS is no longer an array literal, so nothing here can read it');

@@ -41,7 +41,7 @@
    was ever reachable: §0 below its summary is get_strategy-only. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.19";
+export const VERSION = "v1.20";
 
 /* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
    paragraph she holds on every turn and the paragraph get_strategy serves are
@@ -114,12 +114,12 @@ counts as kept just because nothing contradicted it.
 | R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
 | R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry more than 15 min after the prior \`fill_time\` is a \`fail\`, within 15 min is \`unknown\` | §5 | v1.10 |
 | R-13 | The sizing rung moves only between months, never inside one | month | \`followed_rules\` | journal | one distinct \`size_oz\` per calendar month, over rows carrying one | §5 | v1.10 |
-| R-14 | No entries in the hours before a high-impact release; resume only once the volatility has passed and the news has confirmed something | trade | \`followed_rules\` | journal | no \`entry_time\` in the 30 minutes before a USD red-folder release on Forex Factory; a release later that day but further off is \`unknown\`, as is an entry in a week the calendar was not fetched | §6 | v1.11 |
+| R-14 | No entries in the hours before a high-impact release; resume only once the volatility has passed and the news has confirmed something | trade | \`followed_rules\` | journal | no \`entry_time\` in the 30 minutes before a US release TradingView rates high; a release later that day but further off is \`unknown\`, as is an entry in a week the calendar was not fetched | §6 | v1.20 |
 | R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market holiday | §5 | v1.11 |
 | R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
 | R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | journal | no closed trade without a broker alert (\`net_pnl\` null — cTrader sends none for a hand close), except one closing at the Friday close; a close under an hour old is \`unknown\` | §6 | v1.13 |
-| R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | journal | at the first USD red folder inside a position's span whose session is not the one it opened in, the stop in force (\`trade_stops\`) is at break-even or better, and neither wider than first seen nor untouched; the target unmoved. Tightened short of break-even is \`unknown\`, as is a position whose stop history starts after the print | §6 | v1.13 |
+| R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | journal | at the first US release TradingView rates high inside a position's span whose session is not the one it opened in, the stop in force (\`trade_stops\`) is at break-even or better, and neither wider than first seen nor untouched; the target unmoved. Tightened short of break-even is \`unknown\`, as is a position whose stop history starts after the print | §6 | v1.13 |
 
 Call get_strategy for the reasoning behind any of this.`;
 
@@ -129,7 +129,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.18
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.19
 
 ### Summary
 
@@ -1169,8 +1169,9 @@ step that can never be the step you stopped at breaks the one claim R-08 makes.
   from the New York open onward. A stated "two hours" would be a number invented
   for him, and he would breach it constantly without having broken anything.
   **What he did fix is the floor: never in the thirty minutes before one**, and
-  high impact means **the red folder on Forex Factory, USD only** — his reading,
-  and the one he checks. The rest of the window stays his judgement.
+  high impact means **a US release TradingView rates high** — his decision, so
+  that one calendar serves the briefing, the warnings and this rule. The rest
+  of the window stays his judgement.
 - **At the print.** Stand aside through the immediate volatility.
 - **After.** Entries resume once the move has settled and **the news has confirmed
   something** — the release read as a condition on whether price is behaving
@@ -1397,10 +1398,10 @@ one-directional and named: an alert the sync lost would read as a hand close, an
 the failure names the trade so it can be looked up in Gmail.
 
 **R-19 is \`journal\` since v1.19, and it must stay narrow.** Two things made it
-checkable: Forex Factory's calendar says a print was pending (R-14), and
+checkable: TradingView's calendar says a print was pending (R-14), and
 \`trade_stops\` keeps every stop and target the poller saw a position carry, where
 the row keeps only the first and the broker only the last. The population is a
-position a USD red folder landed on in a session later than the one it opened in —
+position a high-rated US release landed on in a session later than the one it opened in —
 the one path the rule is written for. Read generally it turns "there is news later"
 into a reason to touch any position, which is the same door §7 already flags on
 R-03's sweep exception.
@@ -1505,17 +1506,17 @@ calendar month means the rung moved mid-month.
 **R-14 IS \`journal\` ON THE HALF HE GAVE A NUMBER TO.** The standing-aside window is
 open-ended — a 10 a.m. print can cost the New York morning from the open — and a
 fixed window written for him would flag him constantly. He set the floor himself at
-v1.17: thirty minutes, before a USD red-folder release on Forex Factory. An entry
-inside it is a breach. An entry with a red folder later the same day but further off
+v1.17: thirty minutes, and since v1.20 before a US release TradingView rates high.
+An entry inside it is a breach. An entry with one later the same day but further off
 is \`unknown\` rather than \`pass\`, because the rest of the window is his judgement;
 one with nothing ahead that day passes. **After the print is not checked** — he
 stands aside through it by judgement and set no number for it.
 
-**The calendar is Forex Factory's, fetched nightly, and only ever the current
-week.** So the rule sees nothing before the first fetch, and a week the fetch
-missed is \`unknown\` rather than quiet — a week with no releases stored and a week
-nobody fetched would otherwise read the same, and every entry in the second would
-pass.
+**The calendar is TradingView's, fetched a whole week at a time** — nightly for
+the current week, and once by hand for the weeks already traded, since its data
+goes back to 2003. A week no whole-week fetch landed for is \`unknown\` rather
+than quiet: a week with no releases stored and a week nobody fetched would
+otherwise read the same, and every entry in the second would pass.
 
 **R-15 is fully checkable in one half and not at all in the other.** A position open
 across the Friday close is unambiguous. Whether a Friday close-out was the rule
@@ -1650,8 +1651,8 @@ missing \`net_pnl\` says the position was closed by hand (R-18), and the timing 
 whether that was at the Friday close — so a hand close then is R-15 firing. What no
 row says is why a Friday exit that was an order filling happened to land then.
 
-**How long before a release he stood aside.** Whether a red folder was within
-thirty minutes of an entry is answerable now, off Forex Factory's calendar (R-14);
+**How long before a release he stood aside.** Whether a high-rated release was
+within thirty minutes of an entry is answerable now, off TradingView's calendar (R-14);
 the rest of the window is open-ended by his own description, and no row says
 whether he waited long enough before it.
 
@@ -2053,8 +2054,8 @@ once per day, and the only exception to R-03. Past fifteen minutes it is a new i
 inside it, indistinguishable in the data from a revenge trade.
 
 **High-impact release.** A scheduled economic print or decision capable of moving gold
-sharply — NFP, CPI, PCE, FOMC. **For R-14, the red folder on Forex Factory, USD
-only**, which is his definition and the rating he reads. §3 covers what each is. R-14 keeps him out before one
+sharply — NFP, CPI, PCE, FOMC. **For R-14, a US release TradingView rates high**,
+which is his definition. §3 covers what each is. R-14 keeps him out before one
 and lets him back in once the volatility has passed and the news has confirmed
 something. R-19 covers the leftover case where one lands on a position he is already
 in.
@@ -2094,6 +2095,7 @@ it stays as written, because correcting the record would falsify it.
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
 | v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.20 | [decide] | **High impact is a US release TradingView rates high**, for R-14 and R-19 alike — one calendar for the briefing, the warnings and the rules, where two had been read. TradingView's ratings differ from Forex Factory's folders in places (it rates average hourly earnings and jobless claims medium, and a summit high), so a past verdict can move; a calendar marker with no release time is not a release and counts for neither rule. Its data goes back to 2003, so the weeks already traded are fetched once and R-14 stops reading them as unfetched. | His decision, to stop reading the same calendar from two services |
 | v1.19 | [decide] | **R-19 made checkable.** \`trade_stops\` records every stop and target the poller sees a position carry, one row per change, where the row keeps the first and the broker only the last; with Forex Factory's calendar saying a print was pending, R-19 moves to \`journal\`. Judged at the first USD red folder landing on a position opened in an earlier session: break-even or better passes, an untouched or wider stop fails, a moved target fails, a stop tightened short of break-even is \`unknown\` — right if the trade was losing, wrong if winning, and no row holds which. | His go-ahead, after asking which rules still had holes |
 | v1.18 | [decide] | **R-09 retired** — *only operate in obvious trends and cycles*. A line from a book he read while learning, never one he traded by, so it goes rather than being made checkable; its ID is not reused. §4's bias chart and §4.2's failure mode no longer lean on it. | His decision |
 | v1.17 | [decide] | **R-14 made checkable on the floor he set.** High impact is **the red folder on Forex Factory, USD only**, and **no entry in the thirty minutes before one**; the rest of the stand-aside stays open-ended and his. R-14 moves to \`journal\`: an entry inside the thirty minutes fails, one with a red folder later that day but further off is \`unknown\`, one with none ahead passes. The calendar is Forex Factory's own export, fetched nightly and kept, so the rule sees nothing before the first fetch and reads a missed week as \`unknown\` rather than quiet. Nothing after the print is checked — he set no number for it. | His definitions, asked for while making R-14 checkable |

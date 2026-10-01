@@ -52,7 +52,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  ffEvents, releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, awaitingActual,
+  releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, awaitingActual,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -61,7 +61,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, RED, weekOf, STOP_GRACE_MIN,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, HIGH, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -1801,15 +1801,15 @@ test('the backup names every table that has no other source', async () => {
   const asked = [];
   const stub = async (u) => { asked.push(u); return { ok: true, json: async () => [] }; };
   const out = await backup('https://x', 'k', stub);
-  // A three-column key is ordered by all three, or a page boundary between two
-  // releases at one instant can serve a row twice or not at all.
-  assert.ok(asked.includes('https://x/rest/v1/ff_calendar?select=*&order=at.asc,country.asc,title.asc'),
-    'ff_calendar is not paged by its whole key');
+  // A key of several columns is ordered by all of them, or a page boundary
+  // between two rows sharing the first can serve one twice or not at all.
+  assert.ok(asked.includes('https://x/rest/v1/trade_stops?select=*&order=id.asc,seen_at.asc'),
+    'trade_stops is not paged by its whole key');
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
   for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
                    'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
-                   'ff_calendar', 'ff_weeks', 'trade_stops']) {
+                   'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
   // The cost meter is deliberately out: every row is about a model call rather
@@ -2497,17 +2497,17 @@ test('a release without a readable time or a figure writes nothing at all', asyn
 const FOLDED = foldCalendar(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar'));
 const OCT1_3PM = Date.parse('2026-10-01T15:00:00Z');
 
-test('only releases rated medium and above, inside the window, are filed', () => {
-  const rows = calendarRows(FOLDED, OCT1_3PM);
-  // Claims and a Fed speech this morning, payrolls tomorrow. Not the four lows,
+test('only releases rated medium and above, inside the bounds, are filed', () => {
+  const rows = calendarRows(FOLDED, 0, Infinity);
+  // Claims and a Fed speech on the 1st, payrolls on the 2nd. Not the four lows,
   // and not the summit, which is on the calendar without being a release.
   assert.deepEqual(rows.map(r => r.tv_id).sort(), ['396934', '396953', '421425']);
-  // A day and a half later this morning's claims are outside the twelve hours back.
-  assert.ok(!calendarRows(FOLDED, Date.parse('2026-10-02T20:00:00Z')).some(r => r.tv_id === '396934'));
+  assert.deepEqual(calendarRows(FOLDED, Date.parse('2026-10-02T00:00:00Z'), Infinity).map(r => r.tv_id),
+    ['396953']);
 });
 
 test('a figure TradingView has not published is left out of the row, never sent as null', () => {
-  const by = Object.fromEntries(calendarRows(FOLDED, OCT1_3PM).map(r => [r.tv_id, r]));
+  const by = Object.fromEntries(calendarRows(FOLDED, 0, Infinity).map(r => [r.tv_id, r]));
   assert.deepEqual(by['396934'], {
     tv_id: '396934', at: '2026-10-01T12:30:00.000Z', name: 'Initial Jobless Claims (Sep/26)',
     importance: 'medium', source: 'tradingview', consensus: '200K', prior: '198K', actual: '197K',
@@ -2547,6 +2547,76 @@ test('the filing goes up in groups that carry the same columns, keyed on the id'
     assert.equal(new Set(w.rows.map(r => Object.keys(r).sort().join(','))).size, 1);
     assert.ok(w.rows.every(r => Object.values(r).every(v => v !== null)));
   }
+});
+
+test('the quarter-hourly filing keeps to twelve hours back and twenty-eight ahead', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => String(url).includes('doji-tradingview')
+    ? new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 })
+    : new Response('', { status: 201 });
+  try {
+    // A day and a half on, the 1st's claims and speech are past the twelve hours back.
+    assert.equal(await fileCalendar(Date.parse('2026-10-02T20:00:00Z')), 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+/* A WEEK IS MARKED COVERED BY A WHOLE-WEEK FETCH, AND ONLY AFTER ITS ROWS. A
+   mark standing in front of rows that never landed is a covered week with no
+   releases in it, which R-14 passes every entry in — the failure the coverage
+   exists to stop, arriving through the thing that writes it. */
+async function weekWrites(week, failRows = false) {
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).includes('doji-tradingview')) {
+      sent.push({ read: String(url) });
+      return new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 });
+    }
+    sent.push({ url: String(url), rows: JSON.parse(init.body) });
+    return new Response('', { status: failRows && String(url).includes('eugenia_calendar') ? 500 : 201 });
+  };
+  try {
+    return { filed: await fileWeek(week, Date.parse('2026-10-03T03:00:00Z')).catch(e => e), sent };
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+test('a week is fetched whole, filed, and only then marked covered', async () => {
+  const { filed, sent } = await weekWrites('2026-09-27');
+  assert.equal(filed, 3);
+  // Asked to the next Sunday in UTC days, since a New York week ends a UTC day late.
+  assert.match(sent[0].read, /from=2026-09-27&to=2026-10-04$/);
+  const marks = sent.filter(s => s.url?.includes('calendar_weeks'));
+  assert.equal(marks.length, 1);
+  assert.match(marks[0].url, /calendar_weeks\?on_conflict=week$/);
+  assert.deepEqual(marks[0].rows, [{ week: '2026-09-27', fetched_at: '2026-10-03T03:00:00.000Z' }]);
+  assert.equal(sent.at(-1), marks[0], 'the week was marked before its rows were written');
+  // The summit's week is the one before, and it is not a release besides.
+  assert.ok(sent.filter(s => s.rows && !s.url.includes('calendar_weeks')).flatMap(s => s.rows)
+    .every(r => weekOf(new Date(r.at)) === '2026-09-27'));
+});
+
+test('a week whose rows did not land is not marked covered', async () => {
+  const { filed, sent } = await weekWrites('2026-09-27', true);
+  assert.ok(filed instanceof Error);
+  assert.ok(!sent.some(s => s.url?.includes('calendar_weeks')),
+    'a week was marked covered with its releases refused — R-14 would pass every entry in it');
+});
+
+test('the history walks Sundays in New York from the date given, through a clock change', () => {
+  // A Thursday starts its own week; the walk stops at now.
+  assert.deepEqual(historyWeeks('2026-09-24', Date.parse('2026-10-01T15:00:00Z')),
+    ['2026-09-20', '2026-09-27']);
+  // US clocks go back on 1 November 2026, and the walk does not slip a day.
+  assert.deepEqual(historyWeeks('2026-10-25', Date.parse('2026-11-12T15:00:00Z')),
+    ['2026-10-25', '2026-11-01', '2026-11-08']);
+  assert.equal(historyWeeks('2024-01-01', Date.parse('2026-10-01T15:00:00Z')).length, 104,
+    'one run walked past the two years its wall clock was sized for');
+  assert.equal(historyWeeks('last March', Date.now()), null);
+  assert.equal(historyWeeks('2026-13-40', Date.now()), null);
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {
@@ -2981,33 +3051,10 @@ test('R-18 reads a close with no broker alert as a hand close, and spares the Fr
   assert.deepEqual([open.passed, open.failed, open.unresolved], [0, 0, 0]);
 });
 
-/* ─── R-14, against Forex Factory's own week ───────────────────────────────
-   The export below is the one he downloaded on 25 Sep 2026, unchanged — which
-   is why its week holds no USD red folder at all, and why the fixture of
-   releases further down is built rather than read.
-   ─────────────────────────────────────────────────────────────────────────── */
-const FF = JSON.parse(readFileSync(new URL('./fixtures/ff-calendar-thisweek.json', import.meta.url), 'utf8'));
+/* ─── R-14, against the calendar TradingView rates ──────────────────────── */
 
-test("Forex Factory's export parses to UTC instants, and one bad row refuses the file", () => {
-  const events = ffEvents(FF);
-  assert.equal(events.length, FF.length);
-  // `2026-09-24T08:30:00-04:00` is 12:30 UTC — the offset is on the date, so
-  // no clock change can move it.
-  const claims = events.find(e => e.title === 'Unemployment Claims');
-  assert.deepEqual([claims.at, claims.country, claims.impact],
-                   ['2026-09-24T12:30:00.000Z', 'USD', 'Medium']);
-  // The week he read: plenty of high impact, and none of it USD.
-  assert.ok(events.some(e => e.impact === RED.impact));
-  assert.equal(events.filter(e => e.country === RED.country && e.impact === RED.impact).length, 0);
-
-  /* A DROPPED ROW COULD BE THE RED FOLDER, so the whole file is refused and
-     the week is simply not filed — its trades read unknown, never pass. */
-  assert.throws(() => ffEvents([...FF.slice(0, 3), { ...FF[3], date: 'soon' }]), /event 3/);
-  assert.throws(() => ffEvents({ events: FF }), /not a list/);
-});
-
-test('an instant files under the Sunday its Forex Factory week began, in New York', () => {
-  // The export's first event is Sunday 19:00 New York, which is Monday UTC.
+test('an instant files under the Sunday its week began, in New York', () => {
+  // Sunday 19:00 New York is Monday UTC, and still the week that began that Sunday.
   assert.equal(weekOf(new Date('2026-09-20T23:00:00Z')), '2026-09-20');
   assert.equal(weekOf(new Date('2026-09-26T14:00:00Z')), '2026-09-20');   // Saturday
   // Saturday 21:00 New York is Sunday 01:00 UTC, and still the old week.
@@ -3015,7 +3062,7 @@ test('an instant files under the Sunday its Forex Factory week began, in New Yor
   assert.equal(weekOf(new Date('2026-09-27T05:00:00Z')), '2026-09-27');
 });
 
-test('R-14 fails an entry in the thirty minutes before a red folder, and nothing else', () => {
+test('R-14 fails an entry in the thirty minutes before a release rated high, and nothing else', () => {
   const cpi = '2026-10-14T12:30:00Z';                      // 08:30 New York
   const cal = { releases: [cpi], weeks: new Set(['2026-10-11']) };
   const at = (iso, id = 'PIDx') => trade({ id, entry_time: iso, open_day: '2026-10-14' });
@@ -3037,7 +3084,7 @@ test('R-14 fails an entry in the thirty minutes before a red folder, and nothing
   assert.equal(rr([at('2026-10-13T13:00:00Z')]).verdict, 'pass');
 
   /* A WEEK NOBODY FETCHED LOOKS EXACTLY LIKE A QUIET ONE, which is the whole
-     reason ff_weeks exists: the same CPI entry, with the week unfetched, is
+     reason calendar_weeks exists: the same CPI entry, with the week unfetched, is
      unknown rather than the pass an empty calendar would hand it. */
   assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set() }).verdict, 'unknown');
   assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set(['2026-10-11']) }).verdict, 'pass');
@@ -3046,11 +3093,13 @@ test('R-14 fails an entry in the thirty minutes before a red folder, and nothing
   assert.equal(NEWS_MIN, 30);
 });
 
-test("R-14's reads cover the trades' window, the red folder only, newest first", () => {
+test("R-14's reads cover the trades' window, TradingView's high-rated releases only, newest first", () => {
   const now = Date.parse('2026-10-20T15:00:00Z');
   const since = tradesQuery(30, now).match(/open_day=gte\.([\d-]+)/)[1];
   const rel = releasesQuery(30, now), wk = weeksQuery(30, now);
-  assert.match(rel, new RegExp(`country=eq\\.${RED.country}&impact=eq\\.${RED.impact}`));
+  assert.match(rel, new RegExp(`^eugenia_calendar\\?select=at&importance=eq\\.${HIGH}&tv_id=not\\.is\\.null`));
+  // What she typed in before 018 carries no id and was never a rating he chose.
+  assert.match(wk, /^calendar_weeks\?select=week/);
   // A day earlier than the trades, and a week earlier for the weeks.
   assert.ok(rel.match(/at=gte\.([\d-]+)/)[1] < since);
   assert.ok(wk.match(/week=gte\.([\d-]+)/)[1] <= new Date(Date.parse(since) - 7 * 864e5).toISOString().slice(0, 10));
