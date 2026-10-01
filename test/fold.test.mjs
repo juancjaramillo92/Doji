@@ -53,7 +53,7 @@ import {
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, awaitingActual,
-  aroundList, aroundBlock, headlinesList, headlinesBlock,
+  aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -800,6 +800,30 @@ test('headlines that will not read send her to search, and never take the look d
     globalThis.fetch = realFetch;
     console.error = realErr;
   }
+});
+
+/* ─── How a release usually goes ─────────────────────────────────────────── */
+
+test("a release's record is listed oldest first, as printed, and never scored", () => {
+  const out = recordList('Core PCE Price Index MoM (Sep)', [
+    { at: '2026-08-29T12:30:00.000Z', name: 'Core PCE Price Index MoM (Jul)', consensus: '0.2%', actual: '0.1%' },
+    { at: '2026-09-30T12:30:00.000Z', name: 'Core PCE Price Index MoM (Aug)', consensus: '0.3%', actual: '0.2%' },
+    { at: '2026-07-31T12:30:00.000Z', name: 'Core PCE Price Index MoM (Jun)', consensus: null, actual: '0.3%' },
+  ].slice(0, 2));
+  assert.match(out, /How Core PCE Price Index MoM \(Sep\) has printed against expectations, the last 2 times:/);
+  assert.ok(out.indexOf('(Jul)') < out.indexOf('(Aug)'), 'the record does not read oldest first');
+  assert.match(out, /· 29 Aug, Core PCE Price Index MoM \(Jul\): 0\.1% against 0\.2% expected/);
+  // A missing consensus is said, not left to read as a figure.
+  assert.match(recordList('x', [{ at: '2026-07-31T12:30:00.000Z', name: 'x (Jun)', consensus: null, actual: '0.3%' }]),
+    /x \(Jun\): 0\.3%, no consensus on file/);
+  assert.doesNotMatch(out, /\b(above|below|beat|miss)\b/, 'the record is scored rather than listed');
+  assert.equal(recordList('x', []), '');
+});
+
+test('the record reads one series, newest first, before the release, printed ones only', () => {
+  const q = recordQuery('ECONOMICS:USCPCEPIMM', '2026-10-30T12:30:00.000Z');
+  assert.match(q, /^eugenia_calendar\?select=at,name,consensus,actual&ticker=eq\.ECONOMICS%3AUSCPCEPIMM&/);
+  assert.match(q, /&at=lt\.2026-10-30T12:30:00\.000Z&actual=not\.is\.null&order=at\.desc&limit=12$/);
 });
 
 test('the calendar window is whole days, at most a month, inside the data', () => {
@@ -2635,6 +2659,7 @@ test('a figure TradingView has not published is left out of the row, never sent 
   assert.deepEqual(by['396934'], {
     tv_id: '396934', at: '2026-10-01T12:30:00.000Z', name: 'Initial Jobless Claims (Sep/26)',
     importance: 'medium', source: 'tradingview', consensus: '200K', prior: '198K', actual: '197K',
+    ticker: 'ECONOMICS:USIJC',
   });
   // Payrolls has not printed: present-and-null would erase an actual the
   // release look recorded by hand fifteen minutes before the next filing.

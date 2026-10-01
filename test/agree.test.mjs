@@ -6290,6 +6290,19 @@ test('the move look reads the wires before it searches, and claims no more than 
     'MOVE no longer stops her claiming what a paywalled story says from its title');
 });
 
+test('the release look is handed the release\'s own record, and told to read against it', () => {
+  // recordList is pure and driven in fold.test.mjs; whether the look reads it is not.
+  const at = EUGENIA_TS.indexOf('async function postRelease(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /recordBlock\(due\)/, 'the release look no longer reads the track record');
+  assert.match(body, /\brecord \+ notes/, 'the release look reads the record and never hands it to her');
+  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
+  assert.match(release, /READ IT AGAINST ITS OWN RECORD/, 'RELEASE no longer asks her to use the record');
+  // And the filing writes the series, or the record stays empty for ever.
+  const rows = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export function calendarRows('));
+  assert.match(rows.slice(0, rows.indexOf('\n}')), /'ticker'/, 'calendarRows no longer files the ticker');
+});
+
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
   /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
      neither can see whether anything calls them. A briefing that reads before

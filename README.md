@@ -75,6 +75,7 @@ supabase/016_tradingview.sql            the TradingView sign-in, one row
 supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
 supabase/018_calendar_tradingview.sql   her calendar keyed by TradingView's id
 supabase/019_calendar_weeks.sql         the weeks R-14 can judge; Forex Factory dropped
+supabase/020_calendar_ticker.sql        which series a release belongs to
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -1957,6 +1958,16 @@ left unmarked for the next quarter-hour until thirty minutes have passed
 (`awaitingActual`), and then it looks anyway. A speech has no consensus and no
 prior and is looked at on time, since nothing is coming.
 
+**And the look reads a release against its own record.** Each filed row carries
+TradingView's `ticker` (`020_calendar_ticker.sql`), the series a release belongs
+to, where the id names one release only. The release look is handed the last
+twelve prints of each series in the group, oldest first, each as printed against
+what was expected (`recordList`, read by `recordQuery`). They are listed, never
+scored: the figures are text, and a surprise worked out by parsing "0.2%" into a
+sign is a chance to get every unit backwards. Reading the record is her job.
+`RELEASE` asks her to say whether a miss runs the way the series has been
+missing, or is the first the other way in a long time.
+
 **The question is about the time rather than the row.** The 08:30 slot is most
 of a report, and while she typed the calendar each spelling of one print fired
 its own look, its own model call and its own message — five for a single CPI on
@@ -3659,6 +3670,15 @@ Each week lands as a `calendar week` row in `eugenia_runs`, with how many
 releases it filed, or why it could not. A history longer than two years is a
 second run from where the first stopped.
 
+### Applying 020, which is each release's series
+
+`020_calendar_ticker.sql` adds `ticker` to `eugenia_calendar` and the index the
+track record reads. **Safe to re-run.** Rows filed before it carry no ticker
+until a filing writes them again, and the history door re-files every week it
+walks. So walk it from a year back, `?history=` with a date twelve months ago,
+and the release look has a year of each series behind it from the next print
+on.
+
 ### Programmatic tool calls need their container
 
 `web_search_20260209` does dynamic filtering, and **that runs code execution on
@@ -4225,7 +4245,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `019_calendar_weeks.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `020_calendar_ticker.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4543,9 +4563,10 @@ been wrong once, reporting a correct database as broken.
     `supabase/015_commitments.sql`, all safe to re-run.
 15. Run `supabase/016_tradingview.sql` and `supabase/017_tradingview_lease.sql`,
     and connect TradingView — see **TradingView** — then
-    `supabase/018_calendar_tradingview.sql` and `supabase/019_calendar_weeks.sql`,
-    and walk the history door once — see **Applying 019**.
-16. Run `supabase/verify.sql` and read it against 001–019. Nothing is set up
+    `supabase/018_calendar_tradingview.sql`, `supabase/019_calendar_weeks.sql` and
+    `supabase/020_calendar_ticker.sql`, and walk the history door once from a
+    year back — see **Applying 019** and **Applying 020**.
+16. Run `supabase/verify.sql` and read it against 001–020. Nothing is set up
     until that agrees.
 
 ---

@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 84 checks above them, silently, leaving a
+-- HTTP responses and threw away all 85 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -636,6 +636,13 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_calendar'
        and column_name = 'tv_id'),
    '1'),
+  -- 020. Without it every filing names a column that is not there and the
+  -- calendar stops moving — a failed `calendar` run and nothing else.
+  ('eugenia_calendar has its series ticker',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_calendar'
+       and column_name = 'ticker'),
+   '1'),
   ('neither public role holds a grant on tradingview_auth',
    (select (has_table_privilege('anon', to_regclass('public.tradingview_auth'), 'select')
          or has_table_privilege('authenticated', to_regclass('public.tradingview_auth'), 'select'))::text),
@@ -762,13 +769,13 @@ from (values
    (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
       from pg_indexes where schemaname = 'public' and indexname in (
         'dispatch_job_at','dispatch_unsettled',
-        'eugenia_calendar_at','eugenia_calendar_tv_id','eugenia_loops_open',
+        'eugenia_calendar_at','eugenia_calendar_ticker','eugenia_calendar_tv_id','eugenia_loops_open',
         'eugenia_notes_embedding','eugenia_notes_kind_id_desc','eugenia_notes_search',
         'eugenia_notes_trgm','eugenia_runs_at_desc','eugenia_runs_caller_at',
         'eugenia_turns_embedding','eugenia_turns_id_desc','eugenia_turns_search',
         'eugenia_turns_trgm','trades_user_open_day')),
    'dispatch_job_at,dispatch_unsettled,' ||
-   'eugenia_calendar_at,eugenia_calendar_tv_id,eugenia_loops_open,' ||
+   'eugenia_calendar_at,eugenia_calendar_ticker,eugenia_calendar_tv_id,eugenia_loops_open,' ||
    'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
    'eugenia_notes_trgm,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
    'eugenia_turns_embedding,eugenia_turns_id_desc,eugenia_turns_search,' ||

@@ -1060,6 +1060,7 @@ const TV_CALENDAR = `${SB_URL}/functions/v1/doji-tradingview?calendar=1`;
 interface TvEvent {
   id: string; at: string; title: string; importance: string; timed: boolean;
   period: string | null; consensus: string | null; prior: string | null; actual: string | null;
+  ticker: string | null;
 }
 
 /* WHAT IS FILED, AND WHAT IS LEFT OUT OF EACH ROW.
@@ -1091,7 +1092,7 @@ export function calendarRows(events: TvEvent[], from: number, to: number) {
         name: e.period ? `${e.title} (${e.period})` : e.title,
         importance: e.importance, source: 'tradingview',
       };
-      for (const k of ['consensus', 'prior', 'actual'] as const) if (e[k] !== null) row[k] = e[k]!;
+      for (const k of ['consensus', 'prior', 'actual', 'ticker'] as const) if (e[k] !== null) row[k] = e[k]!;
       return row;
     });
 }
@@ -3013,7 +3014,7 @@ export async function loopsBlock(): Promise<string> {
 type Release = {
   id: number; at: string; name: string; importance: string;
   consensus: string | null; prior: string | null; actual: string | null; note: string | null;
-  looked_at?: string | null;
+  looked_at?: string | null; ticker?: string | null;
 };
 
 
@@ -4020,7 +4021,7 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
      mark that makes the rest of the group skippable and hand back the
      duplicates one at a time, which is the behaviour this replaced. */
   const rows = await readRows<Release>('Release',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at` +
+    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
     `&importance=eq.high` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
     `&order=at.asc&limit=${RELEASE_ROWS}`);
@@ -4050,6 +4051,49 @@ export function awaitingActual(due: Release[], now: number): boolean {
          now - Date.parse(due[0].at) < ACTUAL_WAIT_MIN * 60_000;
 }
 
+/* ─── How it usually goes ──────────────────────────────────────────────────
+   The last twelve prints of the same series, each with what was expected, so a
+   release that has just landed is read against its own record: core PCE below
+   consensus for six months running is less of a surprise than its size alone
+   says, and one above it for the first time in a year is more of one. The
+   series is TradingView's `ticker` (020), which ties this month's release to
+   every month before it where the id names one release only.
+
+   LISTED, NOT SCORED. The figures are text — "0.2%", "197K" — and a surprise
+   worked out here would be a parse of text into a sign, with every unit a
+   chance to get it backwards; the record is put in front of her as it stands,
+   and reading it is the judgement she is there for. Oldest first, read
+   newest-first and reversed, as every bounded read here is. */
+const RECORD = 12;
+
+export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'consensus' | 'actual'>[]): string {
+  if (!rows.length) return "";
+  return `\n\nHow ${name} has printed against expectations, the last ${rows.length} times:\n` +
+    rows.map(r => `· ${civilDay(r.at.slice(0, 10))}, ${r.name}: ${r.actual}` +
+      (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file")).join("\n");
+}
+
+export function recordQuery(ticker: string, before: string): string {
+  return `eugenia_calendar?select=at,name,consensus,actual&ticker=eq.${encodeURIComponent(ticker)}` +
+         `&at=lt.${before}&actual=not.is.null&order=at.desc&limit=${RECORD}`;
+}
+
+/* One read per series in the group, and a read that fails costs its block and
+   nothing else: the look still has the print in front of it. */
+async function recordBlock(due: Release[]): Promise<string> {
+  const series = [...new Map(due.filter(r => r.ticker).map(r => [r.ticker!, r])).values()];
+  const parts = await Promise.all(series.map(async r => {
+    try {
+      const rows = await readRows<Release>('Record', `${SB_URL}/rest/v1/${recordQuery(r.ticker!, r.at)}`);
+      return recordList(r.name, rows.reverse());
+    } catch (err) {
+      console.error("doji-eugenia: track record unavailable —", err instanceof Error ? err.message : err);
+      return "";
+    }
+  }));
+  return parts.join("");
+}
+
 async function markLooked(ids: number[]): Promise<void> {
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=in.(${ids.join(',')})`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
@@ -4070,8 +4114,8 @@ async function postRelease(): Promise<Response> {
   // built and cannot know which those are without it. Asking her to teach from
   // a ladder she is not handed is the shape the nightly pass was already fixed
   // for: an instruction that outruns its inputs.
-  const [notes, channels, story, loops, desk] = await Promise.all([
-    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(),
+  const [notes, channels, story, loops, desk, record] = await Promise.all([
+    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(), recordBlock(due),
   ]);
   /* ONE TIME, AND EVERY ROW STANDING AT IT. Where the same print was filed
      under several names the lines repeat with different figures against them,
@@ -4089,7 +4133,7 @@ async function postRelease(): Promise<Response> {
   const asked = RELEASE +
     `\n\nWhat landed at ${nyTime(due[0].at)} ET — ${new Date(due[0].at).toISOString()} in UTC, ` +
     `which is what record_actual takes:\n${landed}` +
-    notes + channels + story + loops + desk;
+    record + notes + channels + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
                          'medium', 'release look', RELEASE_TOOLS);

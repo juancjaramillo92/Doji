@@ -1210,6 +1210,11 @@ listed above and the actual filled in. Either way you may add one line on what i
 meant with record_actual, which is what makes this a record rather than a
 message.
 
+READ IT AGAINST ITS OWN RECORD. Where the last prints of the same release are
+below it, each with what was expected, use them: a miss in the direction it has
+missed for months is less of a surprise than its size says, and the first miss
+the other way in a year is more of one. Say which it is in one sentence.
+
 THEN DECIDE. Reply with the single word NOTHING — no punctuation, no explanation
 — unless it genuinely matters: it came in away from what was expected, or the
 reaction contradicted the number, or it changes the story you have been carrying.
