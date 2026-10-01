@@ -1258,17 +1258,21 @@ the notifications on regardless of whether you read them.
 What TradingView adds is the half of the market the broker cannot serve: the
 economic calendar as data rather than as a page Eugenia transcribes, and the
 dollar and the yields that gold is priced against. Every read of it will come
-through this function. Today it does two things, signing in and saying what
-TradingView offers, and **it calls no tool yet.** What the endpoint offers and
-what each tool takes is read with `?tools=1` before anything is written against
-it. That is the order the poller's `?market=raw` and `?positions=1` set, and it
-is how the poller's two price scales were found rather than guessed.
+through this function. **Nothing she is handed comes from it yet.** `?tools=1`
+said what the endpoint offers, and `?probe=` says what each useful tool returns,
+raw; the readers she is handed get written against those answers. That is the
+order the poller's `?market=raw` and `?positions=1` set, and it is how the
+poller's two price scales were found rather than guessed. It earned its keep on
+the first call: the tool names TradingView serves (`mcp-tv-get-economic-calendar`)
+are not the ones its documentation gives.
 
 **A function of its own, for the poller's reason and one more.** The endpoint
-that serves the calendar and the quotes also serves `create_alert`,
-`delete_alert` and `delete_watchlist` on the same credential. None of them can
-trade, but all of them are his account, so the token stays out of Eugenia
-exactly as the cTrader token does. And the sign-in ends in a callback that a
+that serves the calendar and the quotes also serves, on the same credential,
+eleven tools that change his account: alerts created, updated, paused, resumed
+and deleted (`mcp-tv-delete-alert` among them), and watchlists created, renamed,
+edited and deleted (`mcp-watchlist-delete-watchlist`). None of them can trade,
+but all of them are his account, so the token stays out of Eugenia exactly as
+the cTrader token does. And the sign-in ends in a callback that a
 browser reaches carrying no secret, which has no place in the function that is
 her Telegram webhook.
 
@@ -1307,6 +1311,47 @@ with `SB_SECRET_KEY`.
 
    That answer is what the next readers are written against: every tool's name,
    its input schema and its `readOnlyHint`.
+
+**Without a terminal, the SQL editor makes the same call.** `pg_net` is what the
+cron jobs use, and the secret comes straight out of Vault, so it is never copied
+anywhere:
+
+```sql
+select net.http_get(
+  url := 'https://<project>.supabase.co/functions/v1/doji-tradingview?probe=gold',
+  headers := jsonb_build_object('x-doji-key',
+    (select decrypted_secret from vault.decrypted_secrets where name = 'doji_cron_secret')),
+  timeout_milliseconds := 60000
+) as request_id;
+```
+
+and a few seconds later, with the number it returned:
+`select status_code, content from net._http_response where id = <request_id>;`
+
+**What it may read is TradingView's own answer, not a list typed here.** The
+`?tools=1` capture is kept whole in `test/fixtures/tradingview-tools-list.json`:
+35 tools, 24 marked `readOnlyHint`. `ALLOWED_TOOLS` names six of those 24, and
+`agree.test.mjs` holds every name on it against the capture. It also derives the
+eleven that write from the same file, and fails if any of them is named in the
+function at all, so a twelfth in a fresh capture is banned without anyone adding
+it. One of the eleven reads like a read: `mcp-watchlist-get-active-watchlist`
+activates a watchlist, or creates one, when none is active. The technical
+rating, analyst forecasts and the screener are read-only and stay off the list
+anyway, because each is a signal by another name; fundamentals, filings,
+earnings and dividends are about companies, and gold is not one.
+
+**`?probe=` is fixed, and nothing in the request reaches a tool.** It picks one
+of six and every argument is written in the function. Each call's failure is its
+own answer, as `?bars=raw`'s are:
+
+| `?probe=` | what it asks |
+|---|---|
+| `calendar` | the next three days of US events, and the past week at high importance, to see whether a release that printed carries its actual beside the forecast and the prior |
+| `quotes` | which symbols resolve for the dollar, the two- and ten-year yields, the real yield, silver, oil, the S&P and the VIX, and what a quote carries |
+| `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
+| `news` | headlines for gold and the dollar, and what one carries |
+| `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
+| `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 
 **How the sign-in is found.** It is OAuth 2.1 as MCP specifies it, and it is
 discovered rather than configured. The only TradingView address in the file is
