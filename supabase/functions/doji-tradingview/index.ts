@@ -15,16 +15,23 @@
 // a browser reaches carrying no secret, which has no place in the function that
 // is her Telegram webhook.
 //
-// IT CALLS NO TOOL YET, AND THAT IS THE ORDER RATHER THAN AN OMISSION. What this
-// endpoint offers and what each tool takes is read with ?tools=1 before anything
-// is written against it — the poller's ?market=raw and ?positions=1 were how its
-// two scales were found, and a reader written first would have been the guess
-// this repository keeps paying for. The first tool this calls arrives with an
-// allow-list beside it.
+// NOTHING SHE READS COMES FROM HERE YET, AND THAT IS THE ORDER RATHER THAN AN
+// OMISSION. ?tools=1 said what the endpoint offers — and its tool names were not
+// the ones TradingView's documentation gives, which is the whole case for
+// reading before writing. ?probe= now says what each useful tool RETURNS, raw,
+// and the readers she is handed get written against those answers: the poller's
+// ?market=raw and ?positions=1 were how its two scales were found, and a reader
+// written first would have been the guess this repository keeps paying for.
 //
 // SECURITY CONTRACT
-//   1. No tool is called. `tools/list` is a method and names none.
-//   2. ?connect=1 and ?tools=1 present DOJI_CRON_SECRET on x-doji-key.
+//   1. ALLOWED_TOOLS is a hardcoded list of read tools, and tvPost() is the only
+//      place a tool name becomes a request and refuses anything else. Every name
+//      on it carries readOnlyHint in the listing TradingView served, which is
+//      kept whole in test/fixtures/tradingview-tools-list.json and is what the
+//      test holds the list against — not a second list typed here.
+//   2. ?connect=1, ?tools=1 and ?probe= present DOJI_CRON_SECRET on x-doji-key.
+//      No value from the request reaches a tool: ?probe= picks one of a fixed
+//      set, and every argument is written below.
 //   3. /client and /callback are public because they must be: TradingView's
 //      authorisation server fetches the first, and its sign-in redirects a
 //      browser to the second. /callback acts only on a `state` that ?connect=1
@@ -56,14 +63,6 @@ const CLIENT = {
   response_types: ["code"],
   token_endpoint_auth_method: "none",
 };
-
-/* THE THREE TRADINGVIEW SERVES THAT WRITE TO HIS ACCOUNT, as its own
-   documentation names them, and named before any tool is called so the first
-   allow-list arrives with a test already holding it against them. The same
-   documentation lists eight alert tools and eight watchlist tools, so these are
-   the ones named rather than all there are; ?tools=1's `readOnlyHint` is what
-   finishes the list. */
-export const DESTRUCTIVE_TOOLS = ["create_alert", "delete_alert", "delete_watchlist"] as const;
 
 const plain = (body: string, status = 200) =>
   new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -308,6 +307,122 @@ async function callback(url: URL): Promise<Response> {
       `Run ?connect=1 again and send ?tools=1's answer with this message.`);
 }
 
+/* ─── The reads ────────────────────────────────────────────────────────────
+   EVERY ONE READ-ONLY, AND THE LIST IS THE ONLY THING THAT MAKES THAT TRUE.
+   ?tools=1 established that the same credential serves eleven tools that change
+   his account — alerts created, updated, paused, resumed and deleted, and
+   watchlists created, renamed, edited and deleted — and one that reads as a read
+   and is not: `mcp-watchlist-get-active-watchlist` activates a watchlist, or
+   creates one, when none is active, and carries no readOnlyHint for that reason.
+
+   What is NOT here is as deliberate. The technical rating, analyst forecasts and
+   the screener are read-only and are also a signal by another name, which is
+   the line her prompt exists to hold; fundamentals, filings, earnings and
+   dividends are about companies, and gold is not one. */
+const ALLOWED_TOOLS = [
+  "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-symbol-data-batch",
+  "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols",
+] as const;
+type AllowedTool = typeof ALLOWED_TOOLS[number];
+
+async function tvSession() {
+  return mcpInit(TV_URL, {
+    Authorization: `Bearer ${await accessToken()}`,
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  }, { name: "doji", version: "1" });
+}
+
+// The allow-list check lives here because here is the only place a tool name
+// becomes a request — the poller's mcpPost, for the poller's reason.
+async function tvPost(session: Record<string, string>, tool: AllowedTool,
+                      args: Record<string, unknown>): Promise<string> {
+  if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
+  const res = await fetch(TV_URL, {
+    method: "POST", headers: session,
+    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
+  });
+  if (!res.ok) throw new Error(`MCP ${tool}: HTTP ${res.status}`);
+  return res.text();
+}
+
+/* ─── The probes ───────────────────────────────────────────────────────────
+   What each read RETURNS, raw, before anything folds it. Each answers a
+   question a reader cannot be written without:
+
+     calendar   the shape of an event, and whether a release that has printed
+                carries its actual beside the forecast and the prior — the
+                week behind is asked at high importance for that reason
+     quotes     which symbols resolve, for the dollar, the yields, the real
+                yield and the metals, and what a quote carries
+     gold       the broker and TradingView read in the same second, which is
+                the only way "which gold price is better" is a measurement —
+                and the last minute bars, which say how stale a TradingView
+                quote is
+     news       what a headline carries, and whether gold's own feed is the
+                place to explain a move from
+     econ       which ECONOMICS: series exist for prices and money, the actual
+                releases a calendar entry would be judged against
+     search     the names a real yield and gold's feeds go by, for whatever
+                the quotes probe could not resolve
+
+   Every argument is written here and none is read from the request. */
+const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
+const AROUND = ["TVC:DXY", "TVC:US02Y", "TVC:US10Y", "FRED:DFII10", "TVC:SILVER", "TVC:USOIL",
+                "SP:SPX", "TVC:VIX"];
+
+const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
+  calendar: () => [
+    ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(0), date_to: day(2) }],
+    ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(-7), date_to: day(0), min_importance: 1 }],
+  ],
+  quotes: () => [
+    ["mcp-tv-get-symbol-data-batch", { symbols: [...GOLD, ...AROUND] }],
+  ],
+  gold: () => [
+    ["mcp-tv-get-symbol-data-batch", { symbols: GOLD }],
+    ["mcp-tv-get-ohlcv", { symbol: GOLD[0], interval: "1m", count: 3 }],
+  ],
+  news: () => [
+    ["mcp-tv-get-news", { symbol: "TVC:GOLD", limit: 10 }],
+    ["mcp-tv-get-news", { symbol: "TVC:DXY", limit: 5 }],
+  ],
+  econ: () => [
+    ["mcp-tv-get-economic-symbols", { country: "US", category: "prce" }],
+    ["mcp-tv-get-economic-symbols", { country: "US", category: "mny" }],
+  ],
+  search: () => [
+    ["mcp-tv-search-symbols", { query: "XAUUSD", type_filter: "forex" }],
+    ["mcp-tv-search-symbols", { query: "10 year TIPS" }],
+    ["mcp-tv-search-symbols", { query: "real yield" }],
+  ],
+};
+
+/* ONE AT A TIME, AND EACH ONE'S FAILURE IS ITS OWN ANSWER, for the poller's
+   ?bars=raw reason: which call TradingView refuses, and why, is half of what a
+   probe asks. The gold probe also reads the broker's quote through the poller —
+   the door Eugenia already uses, with the secret she already presents — timed
+   beside TradingView's so the two prices are of the same second. */
+async function probe(name: string): Promise<string> {
+  const session = await tvSession();
+  const parts: string[] = [`--- read at ${new Date().toISOString()} ---`];
+  if (name === "gold") {
+    const broker = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?market=1`,
+      { headers: { "x-doji-key": CRON_SECRET } })
+      .then(r => r.text(), (err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+    parts.push(`--- broker, via doji-mcp-sync?market=1, at ${new Date().toISOString()} ---\n${broker}`);
+  }
+  for (const [tool, args] of PROBES[name]()) {
+    const began = Date.now();
+    const body = await tvPost(session, tool, args)
+      .catch((err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+    parts.push(`--- ${tool} ${JSON.stringify(args)}, ${Date.now() - began} ms ---\n${body}`);
+  }
+  return parts.join("\n");
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing — the file loads under plain
 // Node, where Deno.serve does not exist.
@@ -336,11 +451,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        written against. A METHOD, so no tool name becomes a request. Text rather
        than JSON for the poller's reason: the framing is part of what is read. */
     if (url.searchParams.get("tools") === "1") {
-      const session = await mcpInit(TV_URL, {
-        Authorization: `Bearer ${await accessToken()}`,
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      }, { name: "doji", version: "1" });
+      const session = await tvSession();
       const listed = await fetch(TV_URL, {
         method: "POST", headers: session,
         body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
@@ -351,7 +462,15 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await listed.text());
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1 or ?tools=1" }, 400);
+    const asked = url.searchParams.get("probe");
+    if (asked) {
+      if (!(asked in PROBES)) {
+        return json({ ok: false, error: `no such probe — one of ${Object.keys(PROBES).join(", ")}` }, 400);
+      }
+      return plain(await probe(asked));
+    }
+
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

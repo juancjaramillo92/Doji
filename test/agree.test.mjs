@@ -5789,34 +5789,60 @@ test('the poller can call nothing that would place, move or close a trade', () =
   }
 });
 
-/* ─── TradingView calls nothing yet, and nothing that writes ever ────────────
-   Its security contract says no tool is called: the function signs in and
-   lists, and `tools/list` is a method that names none. That is enforced here
-   rather than trusted, and the second half outlives the first. When the first
-   reader arrives it brings an allow-list, and this test becomes the poller's
-   shape above. The destructive names stay banned from every request whatever
-   the list says.
+/* ─── TradingView reads, and the list of what it may read is TradingView's ────
+   The poller's destructive five are typed into the poller because cTrader's
+   listing was never kept. TradingView's is: `?tools=1`'s answer is a fixture,
+   whole, so the eleven tools that change his account are DERIVED from its
+   `readOnlyHint` rather than copied — a twelfth arriving in a fresh capture is
+   banned without anyone remembering to add it. Three halves, each one the
+   poller's: every permitted tool is read-only on TradingView's own listing,
+   the one place a name becomes a request still consults the list, and no tool
+   that writes is named anywhere in the file, whatever the list says.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('doji-tradingview calls no tool, and can name none that writes to his account', () => {
+test('doji-tradingview may call only what TradingView itself marks read-only', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+  const listed = JSON.parse(readFileSync(
+    new URL('./fixtures/tradingview-tools-list.json', import.meta.url), 'utf8')).result.tools;
+  const reads = listed.filter(t => t.annotations?.readOnlyHint === true).map(t => t.name);
+  const writes = listed.filter(t => t.annotations?.readOnlyHint !== true).map(t => t.name);
+  // A capture that stopped parsing, or a field renamed, would make both lists
+  // empty and every assertion below vacuous.
+  assert.ok(reads.length >= 20 && writes.length >= 11,
+    `${reads.length} read and ${writes.length} write tools in the capture — the reader has gone blind`);
 
-  const banned = src.match(/export const DESTRUCTIVE_TOOLS = \[([\s\S]*?)\] as const;/);
-  assert.ok(banned, 'doji-tradingview no longer names the destructive tools');
-  const destructive = [...banned[1].matchAll(/"(\w+)"/g)].map(m => m[1]);
-  assert.ok(destructive.length >= 3,
-    `only ${destructive.length} destructive tools named — the documentation names three`);
+  const allowed = [...src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/)[1]
+    .matchAll(/"([\w-]+)"/g)].map(m => m[1]);
+  assert.ok(allowed.length >= 3, `only ${allowed.length} tools on the allow-list — the reader has gone blind`);
+  for (const t of allowed) {
+    assert.ok(reads.includes(t),
+      `ALLOWED_TOOLS permits ${t}, which TradingView's own listing does not mark read-only ` +
+      `— or which it does not serve at all`);
+  }
 
-  assert.doesNotMatch(src, /tools\/call/,
-    'doji-tradingview makes a tools/call with no allow-list beside it — its ' +
-    'contract says no tool is called, and the first one must arrive with a list');
+  assert.match(src, /if \(!ALLOWED_TOOLS\.includes\(tool\)\) throw/,
+    'tvPost no longer enforces the allow-list, so the array is decoration');
+  assert.equal(src.match(/tools\/call/g)?.length, 1,
+    'tools/call appears somewhere other than tvPost — a second way for a name to become a request');
 
-  const rest = src.replace(banned[0], '');
-  for (const t of destructive) {
-    assert.ok(!rest.includes(`"${t}"`),
-      `doji-tradingview names ${t} as a string outside DESTRUCTIVE_TOOLS — the ` +
-      `one way that name becomes a request`);
+  for (const t of writes) {
+    assert.ok(!src.includes(`"${t}"`),
+      `doji-tradingview names ${t}, which changes his account, as a string — the one ` +
+      `way that name becomes a request`);
+  }
+});
+
+test('every tool doji-tradingview may call is one a probe or a reader calls', () => {
+  // The poller's rule: a permitted name nothing reaches is a widening with no
+  // feature behind it, and that is the shape a write would arrive in.
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+  const allowed = [...src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/)[1]
+    .matchAll(/"([\w-]+)"/g)].map(m => m[1]);
+  const body = src.slice(src.indexOf('as const;', src.indexOf('const ALLOWED_TOOLS')));
+  for (const t of allowed) {
+    assert.ok(body.includes(`"${t}"`), `ALLOWED_TOOLS permits ${t} and nothing in the file ever calls it`);
   }
 });
 
