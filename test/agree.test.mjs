@@ -6140,14 +6140,14 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
   assert.match(week, /caller: 'calendar week', ok: true/, 'the week filing records no success');
   assert.match(week, /caller: 'calendar week', ok: false/, 'the week filing records no failure');
 
-  const check = src.slice(src.indexOf('async function checkAdherence('));
+  const check = src.slice(src.indexOf('async function readRules('));
   const body = check.slice(0, check.indexOf('\n}'));
   assert.match(body, /releasesQuery\(days\)/, 'check_rules no longer reads the releases');
   assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
-  assert.match(body, /checkRules\(rows, Date\.now\(\), \{/,
+  assert.match(body, /checkRules\(kept, Date\.now\(\), \{/,
     'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
   assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
-  assert.match(body, /\}, stops\)\);/,
+  assert.match(body, /\}, stops\);/,
     'check_rules hands the rules no stop history, so R-19 is unknown on every trade');
 
   /* AND THE POLLER WRITES THE HISTORY, inside the step that already read the
@@ -6288,6 +6288,27 @@ test('the move look reads the wires before it searches, and claims no more than 
     'MOVE no longer sends her to the headlines before a search');
   assert.match(move, /never what the article goes on to say/,
     'MOVE no longer stops her claiming what a paywalled story says from its title');
+});
+
+/* ─── What broke since the last briefing ─────────────────────────────────────
+   `breachesBlock` is driven in fold.test.mjs; whether the briefing reads it is
+   not, and a briefing without it still arrives and still mentions his trades —
+   judged by eye, over "yesterday", which is the arrangement it replaced. */
+test('the briefing is handed the rules his trades broke, and told to take them from there', () => {
+  const at = EUGENIA_TS.indexOf('async function postBriefing(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at))
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  assert.ok(reaches(body, 'breachesBlock'),
+    'the briefing no longer reads what his trades broke, so a Friday breach is never raised');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /closed trade since\s+your last briefing/,
+    'SYSTEM judges "yesterday" again, which on a Monday is Sunday');
+  assert.match(system, /never call a rule broken that it does not list/,
+    'SYSTEM no longer holds her to the computed breaches, so she reads them off the rows');
+  // One reader for the tool and the block, so the two cannot be fed differently.
+  const block = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export async function breachesBlock('));
+  assert.match(block.slice(0, block.indexOf('\n}')), /readRules\(/,
+    'the briefing evaluates the rules through a reader check_rules does not use');
 });
 
 test('the release look is handed the release\'s own record, and told to read against it', () => {

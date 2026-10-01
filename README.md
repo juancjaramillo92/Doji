@@ -1887,11 +1887,23 @@ them would resend a stale copy as history for the next six briefings.
 **She sees your week without being asked.** The last seven New York days of
 trades go in with the briefing, so *"you have not traded since Tuesday"* costs
 no tool round. Mentioned only when there is something real to say, in a clause.
-The one verdict that earns a line in the morning is a closed trade from yesterday
-that broke one of your rules or repeated a mistake she has seen before — the
-fact, her verdict and the lesson in three short sentences, saying so if it is not
-the first time, then back to the market. Most mornings the right amount to say
+The one verdict that earns a line in the morning is a closed trade since the last
+briefing that broke one of your rules or repeated a mistake she has seen before —
+the fact, her verdict and the lesson in three short sentences, saying so if it is
+not the first time, then back to the market. Most mornings the right amount to say
 about your trading is nothing.
+
+**Which rules broke is computed, not read off the rows** (`breachesBlock`). It was
+"yesterday", and on a Monday yesterday is Sunday, so a rule Friday's trades broke
+was never raised unless you asked. The window is now every closed trade since the
+last briefing that went out — Sunday's evening briefing covers Friday — plus any
+trade that CLOSED since then, which is a Friday hold closed on Monday, R-15's
+whole case, open on both briefings either side of the weekend. The rules are
+`check_rules`' own evaluation over that set (`readRules`, one reader for both),
+so she is handed the failures rather than working them out by eye, and told so
+when nothing broke. Closed trades only: a verdict on an open one is a hard
+prohibition. Narrowing the set can lose a day-level failure on a partial day and
+cannot invent one. Your commitments are still hers to hold the trades against.
 
 ### The pulse
 

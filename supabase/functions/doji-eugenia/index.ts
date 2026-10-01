@@ -39,7 +39,7 @@ import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // are exported in the app: it is the part that has to be testable.
 import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, weekOf,
-  type TradeRow, type Standing, type Stop,
+  type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 // The app's own arithmetic over the journal — a win rate, the money split, the
 // realised reward-to-risk, the session and setup breakdowns. Pure and imported
@@ -934,23 +934,36 @@ const CHECK_TOOL = {
   },
 } as const;
 
+/* THE FOUR READS THE RULES STAND ON, AND THE EVALUATION, in one place for
+   both of the things that evaluate: the tool, and the briefing's own block. Fed
+   two ways, R-14 could be judged against a calendar in one and against nothing
+   in the other, and nobody would see which. `keep` narrows the trades and
+   nothing else, so the calendar and the stop history are the same either way.
+   Null when nothing was kept, which is not a pass. */
+async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true): Promise<RuleResult[] | null> {
+  const [rows, releases, weeks, moves] = await Promise.all([
+    readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
+    readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
+    readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
+    readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
+  ]);
+  const kept = rows.filter(keep);
+  if (!kept.length) return null;
+  const stops = new Map<string, Stop[]>();
+  for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
+  return checkRules(kept, Date.now(), {
+    releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
+  }, stops);
+}
+
 /* NEVER THROWS, for the reason every other tool here does not — it runs inside
    the loop and an exception costs the answer being written. The read is the one
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const [rows, releases, weeks, moves] = await Promise.all([
-      readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
-      readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
-      readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
-      readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
-    ]);
-    if (!rows.length) return "No trades in that window, so there is nothing to check.";
-    const stops = new Map<string, Stop[]>();
-    for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
-    return adherenceList(checkRules(rows, Date.now(), {
-      releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
-    }, stops));
+    const results = await readRules(days);
+    if (!results) return "No trades in that window, so there is nothing to check.";
+    return adherenceList(results);
   } catch (err) {
     console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
@@ -2872,6 +2885,58 @@ export async function tradesBlock(): Promise<string> {
   return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
+/* ─── What his trades broke since the last briefing ────────────────────────
+   THE BRIEFING JUDGED "YESTERDAY", AND A WEEK HAS A DAY NO YESTERDAY REACHES.
+   On a Monday yesterday is Sunday, so a rule Friday's trades broke was never
+   raised unless he asked — R-11, R-12 and R-14 all fail on the day the trade
+   is taken, and Friday is a day. Since the last briefing that actually went
+   out is the window that covers every closed trade once, whichever day the
+   last one was and whether a morning in between failed.
+
+   AND WHICH RULES BROKE IS COMPUTED, NOT READ OFF THE ROWS. The prompt tells
+   her doing that by eye over a list of trades is where she will be wrong, and
+   the briefing was the one place still asking her to. §8 also calls a rule his
+   own marker says he followed, and the row says he did not, the most valuable
+   signal the system produces, with no moment where it fires by default; this
+   is that moment, and it is only ever a sentence when something broke.
+
+   CLOSED TRADES ONLY, because a verdict on an open one is a hard prohibition,
+   and a block that names one invites it. A trade counts if its day began on or
+   after the last briefing's, or it closed after that briefing — the second
+   half is the Friday hold that closed on Monday, which is R-15's whole case
+   and was open on both briefings either side of the weekend. Narrowing the
+   population can lose a day-level failure on a partial day; it cannot invent
+   one, which is the direction a gap here has to fail in. */
+const BREACH_DAYS = 7;
+
+export function sinceBriefing(t: TradeRow, at: string): boolean {
+  if (!isBroker(t) || isOpen(t)) return false;
+  return (t.open_day ?? '') >= nyDate(new Date(at)) ||
+         (!!t.fill_time && Date.parse(t.fill_time) >= Date.parse(at));
+}
+
+export function breachesList(results: RuleResult[] | null): string {
+  if (!results) return "";
+  const broke = results.filter(r => r.verdict === 'fail');
+  if (!broke.length) {
+    return "\n\nNo closed trade since your last briefing broke a rule a row can check.";
+  }
+  return `\n\nRules his closed trades broke since your last briefing, computed from the rows:\n` +
+         adherenceList(broke);
+}
+
+export async function breachesBlock(): Promise<string> {
+  try {
+    const [last] = await readRows<{ created_at: string }>('Briefing marker',
+      `${SB_URL}/rest/v1/${briefedQuery()}`);
+    const at = last?.created_at ?? new Date(Date.now() - 86_400_000).toISOString();
+    return breachesList(await readRules(BREACH_DAYS, t => sinceBriefing(t, at)));
+  } catch (err) {
+    console.error("doji-eugenia: breaches unavailable —", err instanceof Error ? err.message : err);
+    return "\n\nWhich rules his recent trades broke could not be checked just now. Say nothing about a broken rule rather than working it out from the rows.";
+  }
+}
+
 /* ─── The running story, the open threads, and the day's calendar ──────────
    Three reads and three renderings, and they are together because they are one
    idea: a briefing that starts from nothing writes a briefing that could have
@@ -3667,9 +3732,9 @@ async function postBriefing(due: Brief): Promise<Response> {
      first token was asked for. Promise.all is the same argument the tool
      dispatch makes: a batch should cost its slowest member — which here is the
      price, since that one leaves the project for the broker. */
-  const [price, around, notes, channels, trades, story, health, loops, calendar, desk] = await Promise.all([
-    marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
-    healthBlock(), loopsBlock(), calendarBlock(), positionsBlock(),
+  const [price, around, notes, channels, trades, breaches, story, health, loops, calendar, desk] = await Promise.all([
+    marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), breachesBlock(),
+    thesisBlock(), healthBlock(), loopsBlock(), calendarBlock(), positionsBlock(),
   ]);
 
   const asked = (due === 'sunday'
@@ -3677,7 +3742,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped being written, everything after it
     // is computed over rows that may be missing, and she is told to lead with it.
-    + health + price + around + notes + channels + trades + story + loops + calendar + desk;
+    + health + price + around + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);

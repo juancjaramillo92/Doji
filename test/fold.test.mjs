@@ -54,6 +54,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
+  sinceBriefing, breachesList, breachesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -5245,7 +5246,7 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
    ─────────────────────────────────────────────────────────────────────────── */
 
 const BLOCKS = {
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock,
 };
 
@@ -5303,4 +5304,67 @@ test('every block says something when its read succeeds', async () => {
         `only asks whether it threw`);
     }
   } finally { globalThis.fetch = realFetch; console.error = realErr; }
+});
+
+/* ─── What broke since the last briefing ─────────────────────────────────────
+   Driven through the real block, against a database that answers, because the
+   window is the decision and a pure test of `sinceBriefing` alone would be
+   handed the marker rather than reading it. Friday is the case it exists for:
+   on a Monday "yesterday" was Sunday, so a Friday breach was never raised. */
+const closed = (id, open_day, entry_time, fill_time, extra = {}) => trade({
+  id, open_day, entry_time, fill_time, entry_price: 3400, exit_price: 3395,
+  pnl: -10, net_pnl: -10, ...extra,
+});
+
+test('sinceBriefing keeps closed trades from the last briefing on, and the hold that closed after it', () => {
+  const sunday = '2026-09-27T21:00:00Z';  // 17:00 New York
+  assert.ok(sinceBriefing(closed('PID1', '2026-09-28', '2026-09-28T13:00:00Z', '2026-09-28T14:00:00Z'), sunday),
+    'a trade taken and closed after the last briefing is not judged');
+  assert.ok(!sinceBriefing(closed('PID2', '2026-09-25', '2026-09-25T13:00:00Z', '2026-09-25T14:00:00Z'), sunday),
+    'a trade the previous briefing already covered is judged again');
+  assert.ok(sinceBriefing(closed('PID3', '2026-09-25', '2026-09-25T19:00:00Z', '2026-09-28T14:00:00Z'), sunday),
+    'a Friday hold that closed on Monday is judged by neither briefing — R-15\'s whole case');
+  assert.ok(!sinceBriefing(closed('PID4', '2026-09-28', '2026-09-28T13:00:00Z', null, { exit_price: null }), sunday),
+    'an open trade reaches the verdict block, and a verdict on it is a hard prohibition');
+  assert.ok(!sinceBriefing(closed('T-5', '2026-09-28', null, null), sunday),
+    'a pre-sync row is judged as a closed broker trade');
+});
+
+test('breachesList names only what broke, and says so when nothing did', () => {
+  const r = (rule, verdict, ids = []) => ({ rule, verdict, passed: 1, failed: verdict === 'fail' ? 1 : 0,
+    unresolved: 0, ids, why: 'because' });
+  assert.equal(breachesList(null), '', 'no closed trade in the window still produced a sentence');
+  assert.match(breachesList([r('R-01', 'pass'), r('R-14', 'unknown')]), /No closed trade since your last briefing broke/,
+    'a window with nothing broken says nothing, and she is left to work it out from the rows');
+  const out = breachesList([r('R-01', 'pass'), r('R-12', 'fail', ['PID9']), r('R-14', 'unknown')]);
+  assert.match(out, /R-12: FAIL/, 'a broken rule is not named');
+  assert.match(out, /PID9/, 'the trade that broke it is not named, so he cannot check it');
+  assert.doesNotMatch(out, /R-01|R-14/, 'a rule that did not break is in the list of breaches');
+});
+
+test('the briefing is handed what Friday broke on Sunday, and what the weekend hold broke on Monday', async () => {
+  const friday = [
+    closed('PID11', '2026-09-25', '2026-09-25T12:40:00Z', '2026-09-25T12:50:00Z'),
+    closed('PID12', '2026-09-25', '2026-09-25T13:40:00Z', '2026-09-25T13:50:00Z'),
+    closed('PID13', '2026-09-25', '2026-09-25T15:40:00Z', '2026-09-25T15:50:00Z'),
+  ];
+  const held = closed('PID14', '2026-09-25', '2026-09-25T19:00:00Z', '2026-09-28T11:00:00Z');
+  const realFetch = globalThis.fetch;
+  const serve = (marker, trades) => async (url) => {
+    const table = String(url).match(/rest\/v1\/(\w+)/)?.[1];
+    const body = table === 'eugenia_turns' ? [{ created_at: marker }]
+               : table === 'eugenia_trades' ? trades : [];
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    globalThis.fetch = serve('2026-09-25T12:00:00Z', friday);   // Friday's 08:00 briefing
+    const sunday = await breachesBlock();
+    assert.match(sunday, /R-12: FAIL/, 'three entries on Friday never reach Sunday\'s briefing');
+    assert.match(sunday, /R-12: FAIL[^\n]*2026-09-25/, 'the day that broke R-12 is not named, so he cannot check it');
+
+    globalThis.fetch = serve('2026-09-27T21:00:00Z', [...friday, held]);   // Sunday's 17:00 briefing
+    const monday = await breachesBlock();
+    assert.match(monday, /R-15: FAIL/, 'a hold across the Friday close never reaches a briefing');
+    assert.doesNotMatch(monday, /R-12/, 'Monday judges Friday\'s entries a second time');
+  } finally { globalThis.fetch = realFetch; }
 });
