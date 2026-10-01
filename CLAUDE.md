@@ -513,8 +513,8 @@ code you write near it:
   — `NAMED AND NOTHING MORE` — and no mechanism, which is the rule the reshape
   had to carry across and nearly did not.
 - **ONE CHAIN PER BRIEFING, AND IT IS A BREADTH RULE RATHER THAN A LENGTH ONE.**
-  Every scheduled thing that matters still gets named — he needs the week — but
-  only one gets its mechanism walked. Nine subjects each carrying a clause of
+  Every scheduled thing that matters still gets named — he needs the day, and
+  on Sunday the week — but only one gets its mechanism walked. Nine subjects each carrying a clause of
   chain is a survey, and it drifts there because every clause looks justified on
   its own. It took two stored instruction notes failing to land to find it: the
   notes were read every turn and outranked by `cut words and never events`, which

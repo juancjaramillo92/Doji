@@ -6364,6 +6364,10 @@ test('the Sunday briefing reads the week, is told it is about the week, and the 
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
   const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
   assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
+  assert.match(system, /Today's releases and nothing else/,
+    'the weekday calendar lists more than its own day again, so tomorrow arrives twice');
+  assert.match(system, /the one briefing that lists more than its own day/,
+    'SYSTEM no longer says Sunday is the exception to the day-only calendar');
   assert.match(system, /not\s+a look back at his week/,
     'SYSTEM no longer rules out a weekly review, which he decided against');
   assert.match(system, /week's calendar is a list of the week\s+and is not counted/,

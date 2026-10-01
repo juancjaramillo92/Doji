@@ -1744,7 +1744,9 @@ Five slots. What happened, in two or three sentences with the conclusion first;
 calendar; one context line; one thing worth noticing.
 
 **The calendar is the one place the prose rule is deliberately relaxed** — a plain
-day label and one line per item, times in ET, one fact each. It reads better than
+day label and one line per item, times in ET, one fact each. On a weekday it is
+that day's releases and nothing more; tomorrow's belong to tomorrow's briefing.
+Sunday's is the week, below. It reads better than
 the prose around it did, which is the whole argument for it. The relaxation is
 narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
 no mechanism goes in it. That slot is where a second chain hides.
@@ -2142,9 +2144,9 @@ the message above it — *"this message looks fine as is…"* — and that went 
 was stored as hers. Every other trim that fortnight stayed within a tenth.
 
 **One chain per briefing, not one per event.** Every scheduled thing that
-matters still gets named — he needs the week — but only one of them gets its
-mechanism walked. Nine subjects each carrying a clause of chain is not a
-thorough briefing, it is a survey, and it drifts there precisely because every
+matters still gets named — he needs the day, and on Sunday the week — but only
+one of them gets its mechanism walked. Nine subjects each carrying a clause of
+chain is not a thorough briefing, it is a survey, and it drifts there precisely because every
 clause looks justified on its own. The round-up slot now says so itself: named
 and nothing more, no mechanism at all. `CRITIC` holds the same rule, because the
 critic runs last and a rule loosened in one place and left standing in the other
