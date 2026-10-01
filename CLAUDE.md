@@ -142,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 625 tests, six suites
+npm test      # 627 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -486,7 +486,17 @@ code you write near it:
   sentences, and `CRITIC` adds a missing verdict and may not cut one for length.
   A gate that cuts it for length is the teaching block's failure again.
   `MOVE`, `RELEASE` and `TRADE_EVENT` keep the flat ban — they land at moments
-  she did not choose. Signals — an entry, a stop, a target, what to do with a
+  she did not choose.
+
+  TWO THINGS A COACH DOES SIT INSIDE THE LINE, AND HE DECIDED BOTH when the
+  rule was put to him. A level price has already printed is a fact, and the
+  gates said *a level ... comes out* without saying forward, so a gate could
+  cut today's high as a call. Its limit is the half that matters: never in the
+  paragraph with her read. And a plan he has not taken is checked against his
+  rules when he asks, and the levels stay his. Every rule it cites must be one
+  §7 marks `journal`, or R-08's arithmetic, and `agree.test.mjs` reads the
+  citations against the table, because a judgment rule cited there has her
+  pronouncing on what no row can see. Signals — an entry, a stop, a target, what to do with a
   position — stay forbidden outright, and no instruction note can reach them.
 - **The briefing is prose and must stay prose, with ONE relaxation that is his
   and is written down.** Numbered sections with headings are a report however
