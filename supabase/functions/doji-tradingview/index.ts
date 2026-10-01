@@ -19,9 +19,10 @@
 // said what the endpoint offers — and its tool names were not the ones
 // TradingView's documentation gives, which is the whole case for reading before
 // writing. ?probe= says what each useful tool RETURNS, raw, and ?calendar=1,
-// ?market=1 and ?news=1 were written against those answers: the poller's
-// ?market=raw and ?positions=1 were how its two scales were found, and a reader
-// written first would have been the guess this repository keeps paying for.
+// ?market=1, ?news=1 and ?rates=1 were written against those answers: the
+// poller's ?market=raw and ?positions=1 were how its two scales were found, and
+// a reader written first would have been the guess this repository keeps
+// paying for.
 //
 // SECURITY CONTRACT
 //   1. ALLOWED_TOOLS is a hardcoded list of read tools, and tvPost() is the only
@@ -41,7 +42,7 @@
 // Deploy:  supabase functions deploy doji-tradingview --no-verify-jwt
 // Secrets: DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, SB_URL, SB_KEY } from "../_shared/edge.ts";
+import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, nyDate, SB_URL, SB_KEY } from "../_shared/edge.ts";
 
 const TV_URL = "https://mcp.tradingview.com/mcp";
 
@@ -569,6 +570,171 @@ async function readHeadlines() {
   return { ok: true, headlines: foldHeadlines(answers), missing };
 }
 
+/* ─── What the market prices for the Fed ───────────────────────────────────
+   Thirty-day fed funds futures, read the way CME's FedWatch reads them, so the
+   odds she quotes are worked out from prices rather than copied off a page that
+   once called a hike a cut. A contract settles on the month's average overnight
+   rate, so its price is 100 less that average; a month with a meeting averages
+   the rate before the decision and the rate after it, weighted by the days each
+   held, and whichever of the two a neighbouring month supplies, the other falls
+   out of the price.
+
+   NAMED MONTHS, NEVER THE CONTINUOUS ONES. The fedfunds probe showed `ZQ1!`
+   rolling to the next month before the current one ends and `ZQ3!` refused
+   outright, so a continuous name is a month nobody chose.
+
+   THE MEETING DATES ARE A TABLE, AND THE CALENDAR CHECKS IT. TradingView's
+   calendar reaches a month ahead and the odds need three meetings, so the dates
+   are the Fed's published schedule — 2027's is tentative until each preceding
+   meeting confirms it. A table is true until the year nobody extends it, so a
+   test fails half a year before it runs out. And a meeting moved at short
+   notice is what a table cannot know, so every read asks the calendar which
+   decisions it lists, and a date the table does not hold refuses the whole
+   answer: odds worked out against the wrong meeting are a confident wrong
+   number, and none is better. The decision day is the second of the two. */
+export const FOMC = [
+  "2026-10-28", "2026-12-09",
+  "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
+  "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08",
+];
+const MEETINGS_AHEAD = 3;
+const MONTH_CODES = "FGHJKMNQUVXZ";
+
+const shift = (ym: string, by: number) => {
+  const d = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5)) - 1 + by, 1));
+  return d.toISOString().slice(0, 7);
+};
+const daysIn = (ym: string) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5)), 0)).getUTCDate();
+export const zq = (ym: string) => `CBOT:ZQ${MONTH_CODES[Number(ym.slice(5)) - 1]}${ym.slice(0, 4)}`;
+
+/* The table's LAST date is a boundary rather than a meeting to price: what
+   follows it is unknown, and the month after a meeting is read as clear of one
+   when the table says so. */
+const ahead = (today: string, meetings: string[]) =>
+  meetings.slice(0, -1).filter(d => d >= today).slice(0, MEETINGS_AHEAD);
+
+/* For each meeting, its own month and the neighbour that pins one end of it:
+   the month after if no meeting falls in it — CME's preference, since backing
+   the rate before out of a late meeting divides by most of the month rather
+   than by the few days after it — else the month before if that one is clear. */
+export function contractMonths(today: string, meetings = FOMC): string[] {
+  const meets = new Set(meetings.map(d => d.slice(0, 7)));
+  const months = new Set<string>();
+  for (const date of ahead(today, meetings)) {
+    const ym = date.slice(0, 7), next = shift(ym, 1), prev = shift(ym, -1);
+    months.add(ym);
+    if (!meets.has(next)) months.add(next);
+    else if (!meets.has(prev)) months.add(prev);
+  }
+  return [...months].sort();
+}
+
+/* Two outcomes either side of the move priced, as FedWatch splits a meeting:
+   seven basis points is a 28% chance of a quarter point and 72% of none. */
+export function oddsOf(bp: number) {
+  const quarters = Math.abs(bp) / 25, whole = Math.floor(quarters), part = quarters - whole;
+  const sign = bp < 0 ? -1 : 1;
+  return [
+    { bp: sign * whole * 25, chance: Math.round((1 - part) * 100) },
+    { bp: sign * (whole + 1) * 25, chance: Math.round(part * 100) },
+  ];
+}
+
+const round = (v: number, places: number) => Math.round(v * 10 ** places) / 10 ** places;
+
+/* Prices in, by month; out, each meeting ahead with the rate before it, the rate
+   after it, the move between them, and the move since the rate now.
+
+   A NEIGHBOURING MEETING PINS AN END AS WELL AS A CLEAR MONTH DOES, because the
+   rate between two decisions is one rate whichever months it spans. So where
+   neither neighbouring month is clear, or the one that is was not read — the
+   month before has EXPIRED by the first of the month, which is exactly when a
+   December meeting is closest — the meeting is solved off the one beside it,
+   in either direction, until nothing more resolves. A meeting that still has
+   no end pinned is named in `unread` rather than dropped. The move since now
+   is measured from the first meeting's rate before, and has no base without it. */
+export function foldRates(prices: Record<string, number>, today: string, meetings = FOMC) {
+  const meets = new Set(meetings.map(d => d.slice(0, 7)));
+  const rate = (ym: string) => ym in prices ? 100 - prices[ym] : undefined;
+  const list = ahead(today, meetings).map(date => {
+    const ym = date.slice(0, 7);
+    return { date, ym, d: Number(date.slice(8)), n: daysIn(ym), avg: rate(ym),
+             before: undefined as number | undefined, after: undefined as number | undefined };
+  });
+  for (let changed = true; changed;) {
+    changed = false;
+    list.forEach((m, i) => {
+      if (m.before !== undefined || m.avg === undefined) return;
+      const next = shift(m.ym, 1), prev = shift(m.ym, -1);
+      const after = meets.has(next) ? list[i + 1]?.before : rate(next);
+      const before = meets.has(prev) ? list[i - 1]?.after : rate(prev);
+      if (after !== undefined) {
+        m.after = after;
+        m.before = (m.n * m.avg - (m.n - m.d) * after) / m.d;
+      } else if (before !== undefined && m.d < m.n) {
+        m.before = before;
+        m.after = (m.n * m.avg - m.d * before) / (m.n - m.d);
+      } else return;
+      changed = true;
+    });
+  }
+  const now = list[0]?.before;
+  const priced: Record<string, unknown>[] = [], unread: string[] = [];
+  for (const { date, before, after } of list) {
+    if (before === undefined || after === undefined) { unread.push(date); continue; }
+    const move = (after - before) * 100;
+    priced.push({
+      date, before: round(before, 4), after: round(after, 4), move_bp: round(move, 1),
+      total_bp: now === undefined ? null : round((after - now) * 100, 1), odds: oddsOf(move),
+    });
+  }
+  return { meetings: priced, unread };
+}
+
+/* A decision on TradingView's calendar that the table does not hold. A table
+   date the calendar does not list is not the same evidence — a gap in a feed
+   is not a moved meeting — so only this direction refuses. */
+export function unlisted(listed: string[], meetings = FOMC): string[] {
+  return listed.filter(d => !meetings.includes(d));
+}
+
+/* One at a time, for readMarket's reason. A contract that fails is named, and
+   a calendar that cannot be read leaves the table unchecked and says so with a
+   null, rather than costing the odds. */
+async function readRates() {
+  const session = await tvSession();
+  const today = nyDate(new Date());
+  const prices: Record<string, number> = {};
+  const contracts: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
+  for (const ym of contractMonths(today)) {
+    const tool = "mcp-tv-get-ohlcv", symbol = zq(ym);
+    try {
+      const bars = foldBars(unwrap(parseSse(await tvPost(session, tool, { symbol, interval: "1D", count: 2 })), tool));
+      prices[ym] = bars.last;
+      contracts.push({ symbol, price: bars.last, at: bars.at });
+    } catch (err) {
+      missing.push({ symbol, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  let calendar: string[] | null = null;
+  try {
+    const tool = "mcp-tv-get-economic-calendar";
+    const events = foldCalendar(unwrap(parseSse(await tvPost(session, tool,
+      { countries: "US", date_from: today,
+        date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) })), tool));
+    calendar = events.filter((e: { title: string }) => /interest rate decision/i.test(e.title))
+      .map((e: { at: string }) => nyDate(new Date(e.at)));
+  } catch (err) {
+    console.error("doji-tradingview: calendar unread for the meeting check —", err instanceof Error ? err.message : err);
+  }
+  const moved = unlisted(calendar ?? []);
+  if (moved.length) {
+    return { ok: false, error: `TradingView's calendar lists a Fed decision on ${moved.join(", ")}, ` +
+                               `which the table of meetings does not hold`, calendar };
+  }
+  return { ok: true, today, ...foldRates(prices, today), contracts, missing, calendar };
+}
+
 /* ─── The probes ───────────────────────────────────────────────────────────
    What each read RETURNS, raw, before anything folds it. Each answers a
    question a reader cannot be written without:
@@ -720,6 +886,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     if (url.searchParams.get("market") === "1") return json(await readMarket());
     // ?news=1 — gold's and the dollar's headlines, folded. Both feeds are fixed.
     if (url.searchParams.get("news") === "1") return json(await readHeadlines());
+    // ?rates=1 — what fed funds futures price for the meetings ahead. The
+    // contracts follow from the date and the table; nothing is read from the request.
+    if (url.searchParams.get("rates") === "1") return json(await readRates());
 
     const asked = url.searchParams.get("probe");
     if (asked) {
@@ -729,7 +898,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1, ?rates=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
