@@ -21,13 +21,14 @@ table — the app, and three Edge Functions: `doji-mcp-sync` (the cTrader poller
 `doji-gladys` (the Telegram journal bot). Journal columns and broker columns
 never meet; that single idea is what the whole design rests on. Eugenia, the
 market bot, would be the fifth writer and is not: she owns only her own
-conversation and her own notes.
+conversation and her own notes. `doji-tradingview` is the fifth function and
+writes only its own sign-in row.
 
 **A function is named after who it is** — `doji-gladys`, `doji-eugenia` — and so
 are its secrets: `GLADYS_BOT_TOKEN`, `EUGENIA_BOT_TOKEN`. `TELEGRAM_CHAT_ID` is
 the one exception and earns it, being the only value the two bots share. The two
 ingestion functions are named for the channel they read, which is the only thing
-that distinguishes them.
+that distinguishes them, and so is `doji-tradingview`.
 
 ---
 
@@ -141,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 617 tests, six suites
+npm test      # 624 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -149,7 +150,7 @@ needs, stated in `package.json`'s `engines` and ENFORCED by `engine-strict=true`
 in `.npmrc`: without that, `npm ci` installs on any version and the floor is a
 note. Six suites, and the script globs `test/*.test.mjs` one level, so a test
 in a subfolder silently would not run. `fold.test.mjs` covers the pure logic
-of all four Edge Functions, of `_shared` and of `adherence.ts`; `app.test.mjs`
+of all five Edge Functions, of `_shared` and of `adherence.ts`; `app.test.mjs`
 boots `index.html` in jsdom with a recording Supabase stand-in that answers
 per-table, so a query for her calendar cannot be served the trades; `agree.test.mjs` holds the duplicated
 vocabularies together; `parse.test.mjs` runs the Apps Script in a `vm` with the
@@ -426,7 +427,7 @@ code you write near it:
   That guard is also why the shared primitives live in `_shared/edge.ts` and not
   in one of the functions: importing a module that serves at its top level would
   start that function inside the caller.
-- **Do not extract the entry point.** All four functions authorise their callers
+- **Do not extract the entry point.** All five functions authorise their callers
   with the same four lines, and that is the one shape that must stay readable in
   the file being edited rather than behind a helper.
 - **The `COLUMNS` map is the whole guarantee.** It holds the same four names as

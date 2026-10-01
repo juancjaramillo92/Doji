@@ -37,6 +37,8 @@ import {
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
+import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken }
+  from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
@@ -495,6 +497,88 @@ test('parseSse walks back past a trailing keepalive instead of throwing', () => 
 
 test('parseSse accepts a plain JSON body with no framing at all', () => {
   assert.deepEqual(parseSse('{"ok":3}'), { ok: 3 });
+});
+
+/* ─── TradingView: the sign-in ───────────────────────────────────────────── */
+
+test('the PKCE challenge is the one RFC 7636 states for its own verifier', async () => {
+  assert.equal(await pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
+               'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+});
+
+test("the server's 401 is read for where its metadata is and what scope to ask", () => {
+  assert.deepEqual(
+    challenge('Bearer resource_metadata="https://tv.example/.well-known/oauth-protected-resource/mcp", scope="read"'),
+    { metadata: 'https://tv.example/.well-known/oauth-protected-resource/mcp', scope: 'read' });
+  // Either half may be missing, and a missing one must read as absent rather
+  // than as a string, or the well-known fallback is never tried.
+  assert.deepEqual(challenge('Bearer realm="mcp"'), { metadata: undefined, scope: undefined });
+  assert.deepEqual(challenge(null), { metadata: undefined, scope: undefined });
+});
+
+test('the well-known paths insert before the path, then fall back to the origin', () => {
+  assert.deepEqual(wellKnown('https://mcp.tradingview.com/mcp', 'oauth-protected-resource'), [
+    'https://mcp.tradingview.com/.well-known/oauth-protected-resource/mcp',
+    'https://mcp.tradingview.com/.well-known/oauth-protected-resource',
+  ]);
+  // An issuer with no path has one candidate per name, not the same one twice.
+  assert.deepEqual(wellKnown('https://auth.example/', 'oauth-authorization-server', 'openid-configuration'), [
+    'https://auth.example/.well-known/oauth-authorization-server',
+    'https://auth.example/.well-known/openid-configuration',
+  ]);
+});
+
+test('a token answer with no stated expiry is never treated as fresh', () => {
+  const fields = tokenFields({ access_token: 'a' }, 0, 'r');
+  assert.equal(fields.expires_at, null);
+  assert.equal(fresh(fields, 0), false);
+});
+
+test('a token is fresh until a minute before it expires, and not after', () => {
+  const auth = { access_token: 'a', expires_at: new Date(10 * 60_000).toISOString() };
+  assert.equal(fresh(auth, 8 * 60_000), true);
+  assert.equal(fresh(auth, 9 * 60_000), false);
+  assert.equal(fresh({ ...auth, access_token: null }, 0), false);
+});
+
+/* THE SEQUENCE, BECAUSE THE FAILURE IS IN THE SECOND STEP. A server that
+   rotates kills each refresh token the moment it answers, so what has to be
+   proved is that the NEXT refresh presents the one it was just given — and a
+   server that does not rotate sends none, which must not be stored as null.
+   Driven through accessToken against a stub that is both PostgREST and the
+   token endpoint, so the row it reads is the row the last refresh wrote. */
+test('two refreshes against a rotating server each present the token the last one stored', async () => {
+  let row = {
+    id: 'current', client_id: 'c', token_endpoint: 'https://auth.example/token', resource: 'r',
+    access_token: 'old', refresh_token: 'R1', expires_at: new Date(0).toISOString(),
+  };
+  const presented = [];
+  const issue = [{ access_token: 'A2', refresh_token: 'R2', expires_in: 0 },
+                 { access_token: 'A3', expires_in: 3600 }];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (url === row.token_endpoint) {
+      const form = new URLSearchParams(init.body);
+      presented.push(form.get('refresh_token'));
+      return new Response(JSON.stringify(issue[presented.length - 1]), { status: 200 });
+    }
+    if (init.method === 'POST') row = { ...row, ...JSON.parse(init.body) };
+    return new Response(JSON.stringify([row]), { status: 200 });
+  };
+  try {
+    assert.equal(await accessToken(), 'A2');
+    assert.equal(row.refresh_token, 'R2');
+    // expires_in 0 is stale on arrival, so the second call refreshes again.
+    assert.equal(await accessToken(), 'A3');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(presented, ['R1', 'R2']);
+  assert.equal(row.refresh_token, 'R2', 'a refresh that sent no new token erased the one that works');
+  // And the third call is served from the row, without asking the server.
+  globalThis.fetch = async () => new Response(JSON.stringify([row]), { status: 200 });
+  try { assert.equal(await accessToken(), 'A3'); } finally { globalThis.fetch = realFetch; }
+  assert.equal(presented.length, 2);
 });
 
 /* ─── Market hours ───────────────────────────────────────────────────────── */

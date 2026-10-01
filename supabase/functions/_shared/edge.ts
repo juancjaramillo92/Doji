@@ -8,7 +8,7 @@
 // `presented === expected` returns the same answer to every assertion anyone
 // would think to write while leaking the secret through timing.
 //
-// THIS FILE SERVES NOTHING, which is what makes it importable. The four
+// THIS FILE SERVES NOTHING, which is what makes it importable. The five
 // function modules each call Deno.serve at their top level, so importing one
 // from another would start that function's server inside the caller. A module
 // with no Deno.serve has no such problem, and `_shared/` is the Supabase

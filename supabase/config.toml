@@ -1,10 +1,10 @@
 # Deploy settings for the Edge Functions, kept here rather than in dashboard
 # toggles nobody re-opens.
 #
-# verify_jwt = false on all four: the platform gateway checks nothing, and each
-# function authorises its own caller in code before doing any work — the poller
-# and the email writer on their own secret, each bot on whichever of its two
-# secrets the caller presents. That check is visible in the file being read,
+# verify_jwt = false on all five: the platform gateway checks nothing, and each
+# function authorises its own caller in code before doing any work — the poller,
+# the email writer and the TradingView sign-in on their own secret, each bot on
+# whichever of its two secrets the caller presents. That check is visible in the file being read,
 # which a dashboard switch is not.
 project_id = "gujhyogvkzjgnrodyuse"
 
@@ -18,4 +18,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.doji-email-sync]
+verify_jwt = false
+
+[functions.doji-tradingview]
 verify_jwt = false

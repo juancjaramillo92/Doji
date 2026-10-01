@@ -885,7 +885,7 @@ const called = (text) =>
 
 test('every function a caller names is a function that exists', () => {
   assert.deepEqual(DEPLOYED,
-    ['doji-email-sync', 'doji-eugenia', 'doji-gladys', 'doji-mcp-sync'],
+    ['doji-email-sync', 'doji-eugenia', 'doji-gladys', 'doji-mcp-sync', 'doji-tradingview'],
     'a function was added or removed — say so here, and check every caller');
 
   for (const { path, text } of CALLERS) {
@@ -5786,6 +5786,37 @@ test('the poller can call nothing that would place, move or close a trade', () =
   for (const t of destructive) {
     assert.ok(!new RegExp(`mcpPost\\(session, "${t}"|mcpCall\\(session, "${t}"|name: "${t}"`).test(src),
       `doji-mcp-sync calls ${t} somewhere, bypassing the allow-list entirely`);
+  }
+});
+
+/* ─── TradingView calls nothing yet, and nothing that writes ever ────────────
+   Its security contract says no tool is called: the function signs in and
+   lists, and `tools/list` is a method that names none. That is enforced here
+   rather than trusted, and the second half outlives the first. When the first
+   reader arrives it brings an allow-list, and this test becomes the poller's
+   shape above. The destructive names stay banned from every request whatever
+   the list says.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('doji-tradingview calls no tool, and can name none that writes to his account', () => {
+  const src = readFileSync(
+    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+
+  const banned = src.match(/export const DESTRUCTIVE_TOOLS = \[([\s\S]*?)\] as const;/);
+  assert.ok(banned, 'doji-tradingview no longer names the destructive tools');
+  const destructive = [...banned[1].matchAll(/"(\w+)"/g)].map(m => m[1]);
+  assert.ok(destructive.length >= 3,
+    `only ${destructive.length} destructive tools named — the documentation names three`);
+
+  assert.doesNotMatch(src, /tools\/call/,
+    'doji-tradingview makes a tools/call with no allow-list beside it — its ' +
+    'contract says no tool is called, and the first one must arrive with a list');
+
+  const rest = src.replace(banned[0], '');
+  for (const t of destructive) {
+    assert.ok(!rest.includes(`"${t}"`),
+      `doji-tradingview names ${t} as a string outside DESTRUCTIVE_TOOLS — the ` +
+      `one way that name becomes a request`);
   }
 });
 
