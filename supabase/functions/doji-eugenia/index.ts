@@ -3140,6 +3140,15 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
    happened, where the prompt forbids describing a print as still to come. Today
    stays bare, or the date is noise on nearly every line.
 
+   AND A ROW WITH NO FIGURE IS NOT DUE ONCE ITS TIME HAS GONE. `due` was
+   whatever lacked an actual, which is every speech, all day — Barkin at 12:30
+   still read as coming at four — and every print whose number TradingView has
+   not published yet. On 1 October it was also her own pre-018 rows for that
+   morning's claims and ISM, beside TradingView's landed copies: one release
+   listed twice, once as landed and once as still ahead, and she said so. A
+   past row says it is past and that no figure is on file, which is true of all
+   three and claims nothing about which.
+
    AND THE WEEKDAY IS SAID, NOT LEFT TO HER. The week the Sunday briefing opens
    is laid out a day per label, and a model turning "2 Oct" into a Friday is a
    calendar sum done in its head — the kind that comes out a day off and reads
@@ -3161,6 +3170,7 @@ export function calendarList(rows: Release[], now = Date.now(),
              (r.consensus ? ` against ${r.consensus} expected` : "") +
              (r.note ? `. ${r.note}` : "");
     }
+    if (Date.parse(r.at) <= now) return `${head} — PAST, no figure on file`;
     return `${head} — due` +
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");

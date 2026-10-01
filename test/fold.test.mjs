@@ -3876,7 +3876,7 @@ test('a calendar line from another day names the day, and today stays bare', () 
   assert.match(out, /· 08:30 ET on Friday 25 Sept? durable goods/,
     'tomorrow\'s 08:30 reads exactly like today\'s — she can brief it as due this morning');
   assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
-  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes/,
+  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes — PAST, no figure on file/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
 });
 

@@ -1986,7 +1986,12 @@ Factory's folder. TradingView keeps an id for every release, so one release is
 one row whatever it is called, and nothing she can call is able to create one.
 What she had filed for the days ahead was deleted when 018 was applied, since
 TradingView's rows for the same releases arrive under other names; what had
-already printed stays, as the history this table exists to grow.
+already printed stays, as the history this table exists to grow. On the day 018
+went in, that meant the morning's claims and ISM were each listed twice, her copy
+beside TradingView's, until they aged out of the window — and hers, carrying no
+actual, read as still **due** hours after the print. `calendarList` marks a row
+with no figure **PAST** once its time has gone, which is also every speech, all
+day, and every print whose number has not reached the calendar yet.
 
 **A figure TradingView has not published is left out of the row, never sent as
 null.** `merge-duplicates` writes exactly the keys a payload names, so a filing
