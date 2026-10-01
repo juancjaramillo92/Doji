@@ -37,8 +37,8 @@ import {
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
-import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken }
-  from '../supabase/functions/doji-tradingview/index.ts';
+import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
+  calendarWindow } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
@@ -541,44 +541,152 @@ test('a token is fresh until a minute before it expires, and not after', () => {
   assert.equal(fresh({ ...auth, access_token: null }, 0), false);
 });
 
-/* THE SEQUENCE, BECAUSE THE FAILURE IS IN THE SECOND STEP. A server that
-   rotates kills each refresh token the moment it answers, so what has to be
-   proved is that the NEXT refresh presents the one it was just given — and a
-   server that does not rotate sends none, which must not be stored as null.
-   Driven through accessToken against a stub that is both PostgREST and the
-   token endpoint, so the row it reads is the row the last refresh wrote. */
-test('two refreshes against a rotating server each present the token the last one stored', async () => {
-  let row = {
-    id: 'current', client_id: 'c', token_endpoint: 'https://auth.example/token', resource: 'r',
-    access_token: 'old', refresh_token: 'R1', expires_at: new Date(0).toISOString(),
-  };
+/* A STUB THAT IS BOTH POSTGREST AND THE TOKEN ENDPOINT, and that FILTERS the
+   way PostgREST does. A stub answering every PATCH with the row is how the
+   release look's quoted filter matched nothing for a fortnight under a green
+   test, so the lease's `or=(refreshing_until.is.null,refreshing_until.lt.…)` is
+   evaluated against the row here and a PATCH it excludes answers an empty
+   array. `onRead` lets a test change the row behind a read, which is how
+   another caller's renewal is simulated without a second runtime. */
+function authServer(row, issue, onRead = () => {}) {
   const presented = [];
-  const issue = [{ access_token: 'A2', refresh_token: 'R2', expires_in: 0 },
-                 { access_token: 'A3', expires_in: 3600 }];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init = {}) => {
+  const fetch = async (url, init = {}) => {
     if (url === row.token_endpoint) {
       const form = new URLSearchParams(init.body);
       presented.push(form.get('refresh_token'));
+      await new Promise(r => setTimeout(r, 20));
       return new Response(JSON.stringify(issue[presented.length - 1]), { status: 200 });
     }
-    if (init.method === 'POST') row = { ...row, ...JSON.parse(init.body) };
-    return new Response(JSON.stringify([row]), { status: 200 });
+    if (init.method === 'PATCH') {
+      const lapse = decodeURIComponent(url).match(/refreshing_until\.lt\.([^)]+)\)/);
+      const free = row.refreshing_until === null || (lapse && row.refreshing_until < lapse[1]);
+      if (!free) return new Response('[]', { status: 200 });
+      row = { ...row, ...JSON.parse(init.body) };
+      return new Response(JSON.stringify([row]), { status: 200 });
+    }
+    if (init.method === 'POST') {
+      row = { ...row, ...JSON.parse(init.body) };
+      return new Response('', { status: 201 });
+    }
+    const seen = row;
+    onRead();
+    return new Response(JSON.stringify([seen]), { status: 200 });
   };
-  try {
+  return { fetch, presented, row: () => row, set: (r) => { row = { ...row, ...r }; } };
+}
+
+const STALE = {
+  id: 'current', client_id: 'c', token_endpoint: 'https://auth.example/token', resource: 'r',
+  access_token: 'old', refresh_token: 'R1', expires_at: new Date(0).toISOString(), refreshing_until: null,
+};
+
+async function withFetch(stub, run) {
+  const real = globalThis.fetch;
+  globalThis.fetch = stub;
+  try { return await run(); } finally { globalThis.fetch = real; }
+}
+
+/* THE SEQUENCE, BECAUSE THE FAILURE IS IN THE SECOND STEP. A server that
+   rotates kills each refresh token the moment it answers, so what has to be
+   proved is that the NEXT refresh presents the one it was just given — and a
+   server that does not rotate sends none, which must not be stored as null. */
+test('two refreshes against a rotating server each present the token the last one stored', async () => {
+  const server = authServer({ ...STALE }, [{ access_token: 'A2', refresh_token: 'R2', expires_in: 0 },
+                                          { access_token: 'A3', expires_in: 3600 }]);
+  await withFetch(server.fetch, async () => {
     assert.equal(await accessToken(), 'A2');
-    assert.equal(row.refresh_token, 'R2');
+    assert.equal(server.row().refresh_token, 'R2');
     // expires_in 0 is stale on arrival, so the second call refreshes again.
     assert.equal(await accessToken(), 'A3');
-  } finally {
-    globalThis.fetch = realFetch;
-  }
-  assert.deepEqual(presented, ['R1', 'R2']);
-  assert.equal(row.refresh_token, 'R2', 'a refresh that sent no new token erased the one that works');
-  // And the third call is served from the row, without asking the server.
-  globalThis.fetch = async () => new Response(JSON.stringify([row]), { status: 200 });
-  try { assert.equal(await accessToken(), 'A3'); } finally { globalThis.fetch = realFetch; }
-  assert.equal(presented.length, 2);
+    // And the third is served from the row, without asking the server.
+    assert.equal(await accessToken(), 'A3');
+  });
+  assert.deepEqual(server.presented, ['R1', 'R2']);
+  assert.equal(server.row().refresh_token, 'R2', 'a refresh that sent no new token erased the one that works');
+  assert.equal(server.row().refreshing_until, null, 'the lease was not released with the token');
+});
+
+/* TWO CALLERS, ONE STALE TOKEN, ONE RENEWAL. The briefing and the release look
+   can both find the token stale in the same second; a server that rotates may
+   revoke the sign-in on seeing a refresh token twice. */
+test('two callers finding the token stale at once renew it once and share it', async () => {
+  const server = authServer({ ...STALE }, [{ access_token: 'A2', refresh_token: 'R2', expires_in: 3600 }]);
+  const got = await withFetch(server.fetch, () => Promise.all([accessToken(), accessToken()]));
+  assert.deepEqual(got, ['A2', 'A2']);
+  assert.deepEqual(server.presented, ['R1'], 'the refresh token was presented twice');
+  assert.equal(server.row().refreshing_until, null);
+});
+
+/* AND THE ROW IS READ AGAIN ONCE THE LEASE IS HELD. Here another caller renews
+   between this one's first read and its lease: the token it first read is now
+   spent, and presenting it is the double presentation again. */
+test('a caller that wins the lease after someone else renewed presents nothing', async () => {
+  let server;
+  server = authServer({ ...STALE }, [], () => server.set({
+    access_token: 'A2', refresh_token: 'R2', expires_at: new Date(Date.now() + 3600_000).toISOString(),
+  }));
+  assert.equal(await withFetch(server.fetch, () => accessToken()), 'A2');
+  assert.deepEqual(server.presented, [], 'the spent refresh token was presented after someone else renewed');
+});
+
+/* ─── TradingView: what a tool answered ─────────────────────────────────── */
+
+const TV_CALENDAR = JSON.parse(readFileSync(
+  new URL('./fixtures/tradingview-calendar.json', import.meta.url), 'utf8'));
+
+test('a refusal inside a result marked isError false is a refusal', () => {
+  // The quote batch's own answer on 1 October, verbatim: the envelope reports
+  // nothing wrong and the payload says it was refused.
+  const refused = JSON.parse('{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":' +
+    '"{\\"error\\":\\"tradingview api: https://scanner.tradingview.com/forex/scan?label-product=tv-mcp: 429: \\",\\"success\\":false}"}],' +
+    '"structuredContent":{"error":"tradingview api: https://scanner.tradingview.com/forex/scan?label-product=tv-mcp: 429: ","success":false},"isError":false}}');
+  assert.throws(() => unwrap(refused, 'mcp-tv-get-symbol-data-batch'), /429/);
+  assert.equal(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar').status, 'ok');
+});
+
+test('the calendar folds to what her calendar holds, and no more', () => {
+  const events = foldCalendar(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar'));
+  const by = Object.fromEntries(events.map(e => [e.id, e]));
+  assert.equal(events.length, 8);
+
+  assert.deepEqual(by['396934'], {
+    id: '396934', at: '2026-10-01T12:30:00.000Z', title: 'Initial Jobless Claims', country: 'US',
+    importance: 'medium', timed: true, period: 'Sep/26',
+    consensus: '200K', prior: '198K', actual: '197K', ticker: 'ECONOMICS:USIJC',
+  });
+  // No consensus is not a consensus of zero — and a consensus of zero is one.
+  assert.equal(by['421425'].consensus, null);
+  assert.equal(by['421425'].period, null);
+  assert.equal(by['397905'].consensus, '0%');
+  assert.equal(by['397905'].prior, '-0.1%');
+  assert.equal(by['396941'].actual, '64B cf');
+  assert.equal(by['397784'].prior, '$6.748T');
+  assert.equal(by['397784'].actual, null);
+  assert.equal(by['398554'].ticker, null);
+  assert.equal(by['396953'].importance, 'high');
+  assert.equal(by['396953'].consensus, '90K');
+  // On the calendar, rated high, and not a release: nothing counts minutes to it.
+  assert.equal(by['421335'].importance, 'high');
+  assert.equal(by['421335'].timed, false);
+  assert.equal(by['396953'].timed, true);
+  // The paragraph each event carries is not paid for on every request.
+  assert.ok(events.every(e => !('comment' in e)));
+});
+
+test('a calendar answer that is not ok is a refusal, not an empty day', () => {
+  assert.throws(() => foldCalendar({ status: 'error', error: 'upstream' }), /upstream/);
+  assert.throws(() => foldCalendar({ status: 'ok' }), /calendar/);
+});
+
+test('the calendar window is whole days, at most a month, inside the data', () => {
+  assert.deepEqual(calendarWindow('2026-10-01', '2026-10-03'), { date_from: '2026-10-01', date_to: '2026-10-03' });
+  assert.deepEqual(calendarWindow('2026-10-01', '2026-10-01'), { date_from: '2026-10-01', date_to: '2026-10-01' });
+  assert.ok(calendarWindow('2026-09-01', '2026-10-02'), 'thirty-one days is allowed');
+  assert.equal(calendarWindow('2026-09-01', '2026-10-03'), null);
+  assert.equal(calendarWindow('2026-10-03', '2026-10-01'), null);
+  assert.equal(calendarWindow('2003-08-31', '2003-09-02'), null);
+  assert.equal(calendarWindow('2026-10-01T00:00:00Z', '2026-10-02'), null);
+  assert.equal(calendarWindow('2026-10-01', null), null);
 });
 
 /* ─── Market hours ───────────────────────────────────────────────────────── */

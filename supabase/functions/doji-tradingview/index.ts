@@ -41,7 +41,7 @@
 // Deploy:  supabase functions deploy doji-tradingview --no-verify-jwt
 // Secrets: DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { env, secretMatches, json, sbHeaders, mcpInit, SB_URL, SB_KEY } from "../_shared/edge.ts";
+import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, SB_URL, SB_KEY } from "../_shared/edge.ts";
 
 const TV_URL = "https://mcp.tradingview.com/mcp";
 
@@ -202,7 +202,7 @@ async function connect() {
 interface Auth {
   client_id: string; token_endpoint: string; resource: string;
   access_token: string | null; refresh_token: string | null; expires_at: string | null;
-  pending_state: string | null; pending_verifier: string | null;
+  pending_state: string | null; pending_verifier: string | null; refreshing_until: string | null;
 }
 
 async function readAuth(): Promise<Auth | null> {
@@ -260,25 +260,68 @@ async function tokenRequest(auth: Auth, grant: Record<string, string>) {
   return answer;
 }
 
-/* ONLY ONE CALLER REFRESHES AT A TIME TODAY BECAUSE ONLY A PERSON CALLS THIS.
-   A server that rotates may treat a refresh token presented twice as stolen and
-   revoke the whole sign-in, and two scheduled readers refreshing in the same
-   second would present it twice. The first scheduled caller has to serialise
-   this, and that is a condition on adding one rather than a defect in this.
+/* ONE RENEWAL AT A TIME, AND THE LEASE IN 017 IS HOW. A server that rotates
+   may treat a refresh token presented twice as stolen and revoke the whole
+   sign-in, and the briefing and the release look can find the token stale in
+   the same second. So a renewal is taken by a PATCH filtered on the lease being
+   empty or lapsed — the filter is evaluated inside the UPDATE, `balance`'s
+   arbitration — and a PATCH that matched nothing is a caller that waits for the
+   token the holder writes.
 
-   Exported so a test can drive two refreshes against a server that rotates —
-   the sequence, rather than tokenFields handed one answer, is what shows the
-   second refresh presenting the token the first one was given. */
+   THE ROW IS READ AGAIN ONCE THE LEASE IS HELD, and that is the half that is
+   easy to drop. Between the first read and the lease, another caller can have
+   renewed and released: the refresh token from the first read is then the one
+   just spent, and presenting it is the double presentation the lease exists to
+   stop. */
+const LEASE_MS = 30_000;
+const LEASE_POLL_MS = 250, LEASE_POLLS = 40;
+
+async function takeLease(): Promise<boolean> {
+  const now = new Date().toISOString();
+  const res = await fetch(`${SB_URL}/rest/v1/tradingview_auth?id=eq.current` +
+    `&or=(refreshing_until.is.null,refreshing_until.lt.${encodeURIComponent(now)})`, {
+    method: "PATCH", headers: sbHeaders("return=representation"),
+    body: JSON.stringify({ refreshing_until: new Date(Date.now() + LEASE_MS).toISOString() }),
+  });
+  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has 017 been applied?`);
+  return (await res.json()).length > 0;
+}
+
+/* Exported so a test can drive the real sequence — two refreshes against a
+   server that rotates, and two callers finding the token stale at once —
+   rather than tokenFields handed one answer. */
 export async function accessToken(): Promise<string> {
-  const auth = await readAuth();
-  if (auth && fresh(auth, Date.now())) return auth.access_token!;
-  if (!auth?.refresh_token) throw new Error("TradingView is not connected — run ?connect=1 and sign in");
+  for (let poll = 0; ; poll++) {
+    const auth = await readAuth();
+    if (auth && fresh(auth, Date.now())) return auth.access_token!;
+    if (!auth?.refresh_token) throw new Error("TradingView is not connected — run ?connect=1 and sign in");
 
-  const next = tokenFields(
-    await tokenRequest(auth, { grant_type: "refresh_token", refresh_token: auth.refresh_token }),
-    Date.now(), auth.refresh_token);
-  await saveAuth(next);
-  return next.access_token;
+    if (await takeLease()) {
+      const held = (await readAuth())!;
+      try {
+        if (fresh(held, Date.now())) {
+          await saveAuth({ refreshing_until: null });
+          return held.access_token!;
+        }
+        const next = tokenFields(
+          await tokenRequest(held, { grant_type: "refresh_token", refresh_token: held.refresh_token! }),
+          Date.now(), held.refresh_token);
+        // The token and the release are one write, so no caller can see the
+        // lease free and the old token still standing.
+        await saveAuth({ ...next, refreshing_until: null });
+        return next.access_token;
+      } catch (err) {
+        // Released so the next caller can try rather than wait out the lapse;
+        // if the release fails too, the lease lapses on its own.
+        await saveAuth({ refreshing_until: null }).catch(() => {});
+        throw err;
+      }
+    }
+    if (poll >= LEASE_POLLS) {
+      throw new Error("another caller is renewing the TradingView sign-in and has not finished");
+    }
+    await new Promise(r => setTimeout(r, LEASE_POLL_MS));
+  }
 }
 
 async function callback(url: URL): Promise<Response> {
@@ -344,6 +387,88 @@ async function tvPost(session: Record<string, string>, tool: AllowedTool,
   });
   if (!res.ok) throw new Error(`MCP ${tool}: HTTP ${res.status}`);
   return res.text();
+}
+
+/* WHAT A TOOL ANSWERED, OR WHY IT DID NOT, and the second is the trap. The
+   quote batch refused with TradingView's own scanner 429 and said so INSIDE a
+   result marked `isError: false` — `success: false` in the payload, beside an
+   envelope reporting nothing wrong. A reader checking the envelope alone takes
+   a refusal for an empty answer. `structuredContent` is read rather than the
+   text block, which carries the same payload a second time as a string. */
+export function unwrap(envelope: any, tool: string): any {
+  if (envelope.error) throw new Error(`TradingView ${tool}: ${envelope.error.message}`);
+  const result = envelope.result;
+  const answer = result?.structuredContent ?? JSON.parse(result?.content?.[0]?.text ?? "null");
+  if (result?.isError || !answer || answer.success === false) {
+    throw new Error(`TradingView ${tool}: ${answer?.error || "no answer"}`);
+  }
+  return answer;
+}
+
+/* ─── The calendar ─────────────────────────────────────────────────────────
+   The day's releases as data, which is what Eugenia files instead of a page she
+   transcribes. Each event carries an id TradingView keeps — the key her
+   calendar never had, and the reason one print arrived as five rows under five
+   names — and its forecast, prior and actual as numbers with a unit and a
+   scale, which become the text her calendar holds.
+
+   US ONLY, because every rule that reads a release is about USD; the tool
+   takes other countries and nothing here has a use for them yet.
+
+   THE WINDOW IS DAYS, VALIDATED, AND THE ONE REQUEST VALUE THAT REACHES A TOOL
+   — the poller's `?hours=` is the precedent, clamped where this is refused.
+   Dates and nothing else, because TradingView rejects other formats and an
+   inclusive day is what it was seen to honour; at most 31 days, which is as far
+   forward as it serves and long enough that a history is walked a month at a
+   time; and nothing before 2003-09-01, where its data starts. */
+const CALENDAR_DAYS = 31;
+const CALENDAR_FIRST = "2003-09-01";
+
+export function calendarWindow(from: string | null, to: string | null) {
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (!from || !to || !day.test(from) || !day.test(to)) return null;
+  const span = (Date.parse(to) - Date.parse(from)) / 86_400_000;
+  if (!(span >= 0) || span > CALENDAR_DAYS || from < CALENDAR_FIRST) return null;
+  return { date_from: from, date_to: to };
+}
+
+/* A figure as her calendar holds it: text, with its unit, because "0.2%",
+   "197K" and "$6.748T" are what a person reads and the column is text for that
+   reason. A null stays null — no consensus is not a consensus of zero. */
+export function figure(value: number | null, unit?: string, scale?: string): string | null {
+  if (value === null || value === undefined) return null;
+  const n = `${value}${scale ?? ""}`;
+  if (unit === "%") return `${n}%`;
+  if (unit === "$") return `$${n}`;
+  return unit ? `${n} ${unit}` : n;
+}
+
+const IMPORTANCE: Record<number, string> = { 1: "high", 0: "medium", [-1]: "low" };
+
+/* `timed` IS FALSE FOR WHAT IS ON THE CALENDAR WITHOUT BEING A RELEASE. A
+   summit was rated high and filed at midnight with `indicator: "Calendar"` —
+   no print, no minute, nothing a thirty-minute window before it could mean.
+   Kept rather than dropped, because it is still news; marked, so nothing that
+   counts minutes counts it. The long `comment` each event carries is dropped:
+   it is a paragraph per release, and every one of them would be paid for on
+   every request she makes. */
+export function foldCalendar(answer: any) {
+  if (answer.status !== "ok" || !Array.isArray(answer.result)) {
+    throw new Error(`TradingView calendar: ${answer.error || `status ${answer.status}`}`);
+  }
+  return answer.result.map((e: any) => ({
+    id: String(e.id),
+    at: e.date,
+    title: e.title,
+    country: e.country,
+    importance: IMPORTANCE[e.importance] ?? "low",
+    timed: e.indicator !== "Calendar",
+    period: e.period || null,
+    consensus: figure(e.forecast, e.unit, e.scale),
+    prior: figure(e.previous, e.unit, e.scale),
+    actual: figure(e.actual, e.unit, e.scale),
+    ticker: e.ticker ?? null,
+  }));
 }
 
 /* ─── The probes ───────────────────────────────────────────────────────────
@@ -471,6 +596,20 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await listed.text());
     }
 
+    /* ?calendar=1&from=YYYY-MM-DD&to=YYYY-MM-DD — the reader, folded. The
+       caller filters by the minute; this answers in whole days. */
+    if (url.searchParams.get("calendar") === "1") {
+      const window = calendarWindow(url.searchParams.get("from"), url.searchParams.get("to"));
+      if (!window) {
+        return json({ ok: false, error: `from and to are YYYY-MM-DD, at most ${CALENDAR_DAYS} days ` +
+                      `apart, and not before ${CALENDAR_FIRST}` }, 400);
+      }
+      const session = await tvSession();
+      const answer = unwrap(parseSse(await tvPost(session, "mcp-tv-get-economic-calendar",
+        { countries: "US", ...window })), "mcp-tv-get-economic-calendar");
+      return json({ ok: true, events: foldCalendar(answer) });
+    }
+
     const asked = url.searchParams.get("probe");
     if (asked) {
       if (!(asked in PROBES)) {
@@ -479,7 +618,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
