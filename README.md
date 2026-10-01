@@ -1406,7 +1406,7 @@ the same payload a second time as a string.
 calendar probe, one for each shape the fold has to handle.
 
 **`?probe=` is fixed, and nothing in the request reaches a tool.** It picks one
-of six and every argument is written in the function. Each call's failure is its
+of seven and every argument is written in the function. Each call's failure is its
 own answer, as `?bars=raw`'s are:
 
 | `?probe=` | what it asks |
@@ -1417,6 +1417,7 @@ own answer, as `?bars=raw`'s are:
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
+| `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price meeting odds would be worked out from, where she now searches a page for them |
 
 **How the sign-in is found.** It is OAuth 2.1 as MCP specifies it, and it is
 discovered rather than configured. The only TradingView address in the file is

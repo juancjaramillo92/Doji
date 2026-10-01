@@ -592,6 +592,11 @@ async function readHeadlines() {
                 releases a calendar entry would be judged against
      search     the names a real yield and gold's feeds go by, for whatever
                 the quotes probe could not resolve
+     fedfunds   whether thirty-day fed funds futures answer, under the
+                continuous names and under named contract months, and what a
+                bar of them carries: the price the meeting odds she now
+                searches for would be worked out from, read where the dollar
+                and the yields already are
 
    Every argument is written here and none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -626,6 +631,12 @@ const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
     ["mcp-tv-search-symbols", { query: "XAUUSD", type_filter: "forex" }],
     ["mcp-tv-search-symbols", { query: "10 year TIPS" }],
     ["mcp-tv-search-symbols", { query: "real yield" }],
+  ],
+  fedfunds: () => [
+    ["mcp-tv-search-symbols", { query: "30 day fed funds" }],
+    ...["CBOT:ZQ1!", "CBOT:ZQ2!", "CBOT:ZQ3!", "CBOT:ZQV2026", "CBOT:ZQX2026", "CBOT:ZQZ2026"]
+      .map(symbol => ["mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 3 }] as
+        [AllowedTool, Record<string, unknown>]),
   ],
 };
 
