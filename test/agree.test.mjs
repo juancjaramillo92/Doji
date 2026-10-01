@@ -6250,6 +6250,33 @@ test('the release prompt asks for the tool the release look actually has', () =>
     'the release prompt names no tool for the number, so the look reads the print and files nothing');
 });
 
+test('the market around gold reaches both paths that explain gold against it, and only from one list', () => {
+  /* aroundList is pure and driven in fold.test.mjs, and cannot see whether
+     anything calls it. A briefing that stopped reading the market still reads
+     well — and walks its chain through real yields off a search page again. */
+  const body = (name) => {
+    const at = EUGENIA_TS.indexOf(`async function ${name}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
+    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  };
+  for (const fn of ['postBriefing', 'postMove']) {
+    const b = body(fn);
+    assert.match(b, /aroundBlock\(\)/, `${fn} no longer reads the market around gold`);
+    assert.match(b, /\baround \+ notes/, `${fn} reads the market around gold and never hands it to her`);
+  }
+  /* THE SYMBOLS LIVE IN doji-tradingview ALONE, beside their names. A renderer
+     holding its own list is a list that can name a symbol nothing reads. */
+  assert.doesNotMatch(EUGENIA_TS, /"(?:TVC|FRED|SP):[A-Z0-9]+"/,
+    'doji-eugenia names a TradingView symbol — the list it renders is doji-tradingview\'s');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /THE MARKET AROUND GOLD IS HANDED TO YOU TOO/,
+    'SYSTEM no longer says the market around gold is handed to her, so she searches for it');
+  assert.match(system, /say the window the line gives/,
+    'SYSTEM no longer asks her to say what a market figure is measured from');
+  assert.doesNotMatch(system, /finance\.yahoo\.com/,
+    'SYSTEM still sends her to a page for the dollar or the ten-year she is now handed');
+});
+
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
   /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
      neither can see whether anything calls them. A briefing that reads before

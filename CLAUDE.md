@@ -142,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 633 tests, six suites
+npm test      # 637 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -384,6 +384,12 @@ fixable one: it captures `innerHTML`, which is the DOM re-serialised, so `"` and
   `marketBlock` and `postMove` for `quoteLine`, so a fourth caller rendering
   its own quote is the way this comes back. Dropping either breaks nothing and
   the message still reads as a working price.
+
+  `aroundList` IS THE SAME RULE FOR EVERYTHING AROUND GOLD, and it computes no
+  change at all: each line is a level beside the level at a stated time, so the
+  window cannot be dropped from a number that was never produced. A direction
+  word worked out there is the failure `quoteLine` was built against, arriving
+  for the dollar instead of for gold, and `fold.test.mjs` refuses one.
 
 - **Eugenia reads a price through the poller and must never hold the broker
   token.** The endpoint that serves a quote also serves `create_order`, so the
