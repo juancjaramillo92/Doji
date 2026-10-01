@@ -38,7 +38,8 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
-  calendarWindow, foldBars, foldHeadlines } from '../supabase/functions/doji-tradingview/index.ts';
+  calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq,
+} from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
@@ -54,7 +55,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
-  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock,
+  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -816,6 +817,113 @@ test('headlines that will not read send her to search, and never take the look d
   globalThis.fetch = async () => new Response('not json', { status: 502 });
   try {
     assert.match(await headlinesBlock(), /could not be read just now; search for what moved it/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+});
+
+/* ─── What the market prices for the Fed ────────────────────────────────────
+   The three prices the fedfunds probe read on 1 October. October holds a
+   meeting on the 28th and November none, so November's price IS the rate after
+   it, and the rate before falls out of October's average over 28 days at one
+   rate and 3 at the other: (31 × 3.8825 − 3 × 3.945) / 28 = 3.87580. December
+   meets on the 9th and January meets too, so the clear month that pins it is
+   November, before it: (31 × 4.085 − 9 × 3.945) / 22 = 4.14227. Worked here
+   from the prices rather than read back from the fold. */
+const ZQ_PROBE = { '2026-10': 96.1175, '2026-11': 96.055, '2026-12': 95.915 };
+
+test('fed funds futures are read as FedWatch reads them, meeting by meeting', () => {
+  const { meetings, unread } = foldRates(ZQ_PROBE, '2026-10-01');
+  const [oct, dec] = meetings;
+  assert.equal(oct.date, '2026-10-28');
+  assert.equal(oct.before, 3.8758, 'the rate before October is not backed out of its own average');
+  assert.equal(oct.after, 3.945, 'the clear month after October is not taken as the rate after it');
+  assert.deepEqual(oct.odds, [{ bp: 0, chance: 72 }, { bp: 25, chance: 28 }]);
+  assert.equal(dec.before, oct.after, 'December does not start where October left off');
+  assert.equal(dec.after, 4.1423);
+  assert.equal(dec.move_bp, 19.7);
+  assert.equal(dec.total_bp, 26.6, 'the move since now is not measured from the rate before October');
+  assert.deepEqual(unread, ['2027-01-27'], 'a meeting whose months were not read is dropped rather than named');
+});
+
+/* A CONTRACT EXPIRES ON THE LAST DAY OF ITS MONTH, so on 1 December the clear
+   November that pins December may not answer — the morning a December
+   meeting is closest. January is pinned by a clear February, and the rate
+   between the two decisions is one rate, so January's rate before IS
+   December's rate after and the meeting still resolves. */
+test('a meeting with no clear month read beside it is solved off the meeting after it', () => {
+  const prices = { '2026-12': 95.95, '2027-01': 95.80, '2027-02': 95.79, '2027-03': 95.75 };
+  const { meetings, unread } = foldRates(prices, '2026-12-01');
+  assert.deepEqual(unread, []);
+  const [dec, jan] = meetings;
+  assert.equal(dec.after, jan.before, 'December is not solved off January');
+  // (31 × 4.05 − 22 × after) / 9, with after = (31 × 4.20 − 4 × 4.21) / 27
+  const after = (31 * 4.20 - 4 * 4.21) / 27;
+  assert.equal(dec.before, Math.round((31 * 4.05 - 22 * after) / 9 * 1e4) / 1e4);
+});
+
+test('the contracts are named months, each meeting with the clear one beside it', () => {
+  assert.deepEqual(contractMonths('2026-10-01'), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02']);
+  assert.deepEqual(['2026-10', '2026-11', '2027-01'].map(zq), ['CBOT:ZQV2026', 'CBOT:ZQX2026', 'CBOT:ZQF2027']);
+  // The table's last date is a boundary, never a meeting to price.
+  assert.ok(!contractMonths(FOMC.at(-2)).includes(FOMC.at(-1).slice(0, 7)),
+    'the last meeting in the table is priced against a month the table cannot say is clear');
+});
+
+test('the odds are the two outcomes either side of the move priced', () => {
+  assert.deepEqual(oddsOf(6.9), [{ bp: 0, chance: 72 }, { bp: 25, chance: 28 }]);
+  assert.deepEqual(oddsOf(-30), [{ bp: -25, chance: 80 }, { bp: -50, chance: 20 }]);
+});
+
+/* THE TABLE IS TRUE UNTIL THE YEAR NOBODY EXTENDS IT, so this fails half a year
+   before it runs out rather than on the morning it does — on the real clock,
+   because the clock is the thing it is about. Every decision is the second day
+   of a Tuesday–Wednesday meeting, which is what catches the first day typed. */
+test('the table of Fed meetings reaches half a year ahead, and every date is a decision day', () => {
+  const left = (Date.parse(FOMC.at(-1)) - Date.now()) / 86_400_000;
+  assert.ok(left > 182, `the table of FOMC meetings ends ${FOMC.at(-1)}; add the Fed's next published year`);
+  assert.deepEqual(FOMC, [...FOMC].sort());
+  for (const d of FOMC) assert.equal(new Date(`${d}T12:00:00Z`).getUTCDay(), 3, `${d} is not a Wednesday`);
+});
+
+test('a decision the calendar lists and the table does not refuses the odds; a gap in the feed does not', () => {
+  assert.deepEqual(unlisted(['2026-10-28']), []);
+  assert.deepEqual(unlisted([]), [], 'a calendar listing nothing is taken as a moved meeting');
+  assert.deepEqual(unlisted(['2026-10-21']), ['2026-10-21']);
+});
+
+/* ─── Where the speculators stand ───────────────────────────────────────────
+   The two reports the CFTC served for gold through pg_net, as strings because
+   that is how they arrive. Net 135,699 − 8,310 = 127,389; the week's change is
+   the long side's −6,695 less the short side's −968. */
+const COT = [
+  { report_date_as_yyyy_mm_dd: '2026-09-22T00:00:00.000', m_money_positions_long_all: '135699',
+    m_money_positions_short_all: '8310', change_in_m_money_long_all: '-6695', change_in_m_money_short_all: '-968' },
+  { report_date_as_yyyy_mm_dd: '2026-09-15T00:00:00.000', m_money_positions_long_all: '142394',
+    m_money_positions_short_all: '9278', change_in_m_money_long_all: '1210', change_in_m_money_short_all: '-311' },
+];
+
+test('positioning is dated, netted, and set against its own range', () => {
+  const out = positioningList(COT);
+  assert.match(out, /taken Tuesday 22 Sept?/, 'the count does not say which day it was taken');
+  assert.match(out, /Net long 127,389 contracts \(135,699 long, 8,310 short\), down 5,727/);
+  assert.match(out, /Over the 2 weeks to then, net ranged from long 127,389 on 22 Sept? to long 133,116 on 15 Sept?/);
+  const short = [{ ...COT[0], m_money_positions_long_all: '1000', m_money_positions_short_all: '4000' }];
+  assert.match(positioningList(short), /Net short 3,000/, 'a net short reads as a negative long');
+  assert.throws(() => positioningList([{ ...COT[0], m_money_positions_long_all: 'n/a' }]), /no readable report/);
+  // The dataset leaves a null field out of the row rather than sending it.
+  const { change_in_m_money_short_all, ...partial } = COT[0];
+  assert.throws(() => positioningList([partial]), /no readable report/);
+  assert.throws(() => positioningList([]), /no readable report/);
+});
+
+test('positioning that will not read is a sentence, and never takes the briefing down', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  globalThis.fetch = async () => new Response('[]', { status: 200 });
+  try {
+    assert.match(await positioningBlock(), /could not be read just now; do not quote it from a search/);
   } finally {
     globalThis.fetch = realFetch;
     console.error = realErr;

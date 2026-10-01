@@ -1360,14 +1360,17 @@ const MARKET_TOOL = {
    not, so asked why gold fell she had a web search and nothing else, against
    her own rule never to quote those from one. The same two reads the move look
    makes, through the function that holds the TradingView sign-in, with the
-   headlines wider because a question is about the morning. */
+   headlines wider because a question is about the morning — and the
+   speculators' weekly count, which only the Sunday briefing is otherwise
+   handed, because "is gold crowded" is a question asked on a Wednesday. */
 const AROUND_TOOL = {
   name: "get_around",
   description:
     "The market around gold, from TradingView: the dollar index, the two- and " +
     "ten-year yields, the real yield, silver, oil, the S&P 500 and the VIX, each a " +
     "level now beside the level at a stated time; and gold's and the dollar's " +
-    "headlines from the last six hours, titles only. Use it whenever you are about " +
+    "headlines from the last six hours, titles only; and the CFTC's weekly count of " +
+    "where the speculators stand in gold futures. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
     "crossed the wires, and quote those from here rather than from a search. " +
     "Every line says what it is measured from; say that window, never 'today'. " +
@@ -1951,7 +1954,8 @@ export async function serve(name: string, input: any): Promise<string> {
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
     case AROUND_TOOL.name:
-      return (await Promise.all([aroundBlock(), headlinesBlock(WIRES_CHAT_MIN)])).join("").trim();
+      return (await Promise.all([aroundBlock(), headlinesBlock(WIRES_CHAT_MIN), positioningBlock()]))
+        .join("").trim();
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -3355,6 +3359,73 @@ export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
   }
 }
 
+/* ─── Where the speculators stand ──────────────────────────────────────────
+   The CFTC's weekly count of COMEX gold futures held by managed money — the
+   hedge funds and commodity funds whose crowding is why a drop can run further
+   than its news. Read straight from the CFTC's public dataset, which needs no
+   credential, so it is the one market read here that does not pass through
+   another function.
+
+   A TUESDAY COUNT RELEASED AT THE END OF THE WEEK, AND THE LINE CARRIES ITS
+   DATE. It is days old the moment it lands, and a shutdown has stopped it for
+   weeks before, so the date is what tells her how old it is rather than a
+   staleness rule here guessing for her. The year's range goes beside it
+   because a net long means nothing alone — crowded is a statement about where
+   it sits against its own past.
+
+   THE SUNDAY BRIEFING AND get_around, AND NOT THE MOVE LOOK. It changes once a
+   week, so a weekday briefing would carry the same lines five mornings running;
+   and it cannot say why gold moved in the last quarter hour, which is the only
+   thing the move look asks — handed to it, it is the plausible cause that path
+   is told not to invent. Never throws, for aroundBlock's reason. */
+const COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json" +
+  "?cftc_contract_market_code=088691&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52" +
+  "&$select=report_date_as_yyyy_mm_dd,m_money_positions_long_all,m_money_positions_short_all," +
+  "change_in_m_money_long_all,change_in_m_money_short_all";
+
+// Every figure arrives as a string, which is the dataset's choice and not a
+// failure; one that does not parse is, and the whole answer goes with it.
+type Cot = {
+  report_date_as_yyyy_mm_dd: string;
+  m_money_positions_long_all: string; m_money_positions_short_all: string;
+  change_in_m_money_long_all: string; change_in_m_money_short_all: string;
+};
+
+export function positioningList(rows: Cot[]): string {
+  const read = rows.map(r => ({
+    day: r.report_date_as_yyyy_mm_dd.slice(0, 10),
+    long: Number(r.m_money_positions_long_all), short: Number(r.m_money_positions_short_all),
+    change: Number(r.change_in_m_money_long_all) - Number(r.change_in_m_money_short_all),
+  }));
+  if (!read.length || !read.every(r => [r.long, r.short, r.change].every(Number.isFinite))) {
+    throw new Error("no readable report");
+  }
+  const n = (v: number) => v.toLocaleString('en-US');
+  const net = (r: { long: number; short: number }) => r.long - r.short;
+  const side = (v: number) => `${v >= 0 ? "long" : "short"} ${n(Math.abs(v))}`;
+  const [latest] = read;
+  const low = read.reduce((a, b) => net(b) < net(a) ? b : a);
+  const high = read.reduce((a, b) => net(b) > net(a) ? b : a);
+  return `\n\nWhere the speculators stand in COMEX gold futures — the CFTC's count of ` +
+    `managed money (hedge funds and commodity funds), taken ${weekday(latest.day)} ` +
+    `${civilDay(latest.day)} and released later that week:\n` +
+    `· Net ${side(net(latest))} contracts (${n(latest.long)} long, ${n(latest.short)} short), ` +
+    `${latest.change >= 0 ? "up" : "down"} ${n(Math.abs(latest.change))} on the week before.\n` +
+    `· Over the ${read.length} weeks to then, net ranged from ${side(net(low))} on ` +
+    `${civilDay(low.day)} to ${side(net(high))} on ${civilDay(high.day)}.`;
+}
+
+export async function positioningBlock(): Promise<string> {
+  try {
+    const res = await fetch(COT_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return positioningList(await res.json());
+  } catch (err) {
+    console.error("doji-eugenia: positioning unavailable —", err instanceof Error ? err.message : err);
+    return "\n\nWhere the speculators stand could not be read just now; do not quote it from a search.";
+  }
+}
+
 /* ─── What he has on, and where his day stands ─────────────────────────────
    THE ONE THING SHE COULD NOT SEE. Every other block is about the market or
    about what he understands, and none of them said whether he is exposed right
@@ -3848,18 +3919,19 @@ async function postBriefing(due: Brief): Promise<Response> {
      first token was asked for. Promise.all is the same argument the tool
      dispatch makes: a batch should cost its slowest member — which here is the
      price, since that one leaves the project for the broker. */
-  const [price, around, notes, channels, trades, breaches, story, health, loops, calendar, desk] = await Promise.all([
-    marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), breachesBlock(),
-    thesisBlock(), healthBlock(), loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(),
-    positionsBlock(),
-  ]);
+  const [price, around, crowd, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
+    await Promise.all([
+      marketBlock(), aroundBlock(), due === 'sunday' ? positioningBlock() : "", notesBlock(),
+      channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(), loopsBlock(),
+      due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(),
+    ]);
 
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
     // `health` first: if the journal stopped being written, everything after it
     // is computed over rows that may be missing, and she is told to lead with it.
-    + health + price + around + notes + channels + trades + breaches + story + loops + calendar + desk;
+    + health + price + around + crowd + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);

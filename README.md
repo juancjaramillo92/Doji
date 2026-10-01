@@ -1397,6 +1397,49 @@ where the shorter one stops inside it the block says how far back it reaches;
 a line from another day names the day. No TradingView tool was added: the
 function serves the same `?market=1` and `?news=1` it already did.
 
+**`?rates=1` is what fed funds futures price for the next three Fed meetings.**
+It reads them the way CME's FedWatch does, so the odds come from prices rather
+than from a page. One such page once called a hike a cut. A thirty-day contract
+settles on the month's average overnight rate, so its price is 100 less that
+average. A month with a meeting averages the rate before the decision and the
+rate after it, weighted by the days each held. A neighbour pins one of the two
+and the price gives the other. The month after is preferred where no meeting
+falls in it, then the month before. Where neither is clear, or the clear one has
+expired, the meeting is solved off the meeting beside it: the rate between two
+decisions is one rate, whichever months it spans. Contracts are named months
+(`CBOT:ZQV2026`), never `ZQ1!`, which the `fedfunds` probe showed rolling early.
+For each meeting, `foldRates` returns:
+
+- the rate before and the rate after
+- the move in basis points
+- the move since the rate now
+- `odds`, the two outcomes either side of the move, as FedWatch splits a meeting
+
+A meeting that cannot be solved is named in `unread`. The dates are `FOMC`, the
+Fed's published schedule with the decision day of each meeting. A test fails
+half a year before the table runs out and checks that every date is a
+Wednesday. The table's last date is a boundary and is never priced, because the
+month after it is unknown. Each read also asks TradingView's calendar for the
+month's rate decisions. A decision the table does not hold refuses the whole
+answer, since odds worked out against a moved meeting are a confident wrong
+number. A table date the calendar does not list is a gap in a feed, not a moved
+meeting, and does not refuse. Eugenia does not read it yet. It is checked
+against FedWatch first.
+
+**Where the speculators stand is read straight from the CFTC.** It is the
+weekly Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
+`088691`), and it needs no credential, so Eugenia reads it herself rather than
+through this function. `positioningList` gives the managed-money net, its long
+and short sides, and the week's change. It sets these against the net's range
+over the past 52 weeks, because crowded only means something against its own
+past. It also gives the Tuesday the count was taken, because it is days old
+when it is released and a shutdown has stopped it for weeks. Two readers get
+it: the Sunday briefing and `get_around`. A weekday briefing would carry the
+same lines five mornings running. The move look is left out because a weekly
+count cannot be the cause of a quarter-hour move, and offering it there is the
+plausible cause that path is told not to invent. She is told to use it as
+background, in one sentence at most, and never as a reason to trade.
+
 **A refusal can arrive marked as success.** The quote batch refused with
 TradingView's own 429 inside a result marked `isError: false`, with `success:
 false` in the payload. `unwrap` checks both, and a test holds it to that real

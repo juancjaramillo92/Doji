@@ -6403,6 +6403,37 @@ test('a reply can read the market around gold, and is told to before searching f
     'the conversation reads the move look\'s last hour of headlines, not the morning');
 });
 
+/* ─── Where the speculators stand ────────────────────────────────────────────
+   positioningList is pure and driven in fold.test.mjs; who is handed it is
+   three call sites no test can drive. The Sunday briefing and get_around carry
+   it. A weekday briefing would carry the same weekly count five mornings
+   running, and the move look would be handed a plausible cause for a
+   quarter-hour move that it cannot be — the one thing that path is told not to
+   invent. Both of those are an ordinary edit away, and both read as her being
+   better informed. */
+test('the speculators\' weekly count reaches the Sunday briefing and a conversation, and nothing else', () => {
+  const body = (name) => {
+    const at = EUGENIA_TS.indexOf(`async function ${name}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
+    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  };
+  const calls = [...EUGENIA_TS.matchAll(/(?<!function )positioningBlock\(\)/g)].length;
+  assert.equal(calls, 2, `positioningBlock() is called ${calls} times — a new reader was given the weekly count`);
+  assert.match(body('postBriefing'), /due === 'sunday' \? positioningBlock\(\) : ""/,
+    'the weekday briefing carries the weekly count, the same lines five mornings running');
+  assert.match(body('postBriefing'), /\+ around \+ crowd \+/, 'the Sunday briefing reads the count and never hands it over');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /positioningBlock\(\)/,
+    'a conversation asked whether gold is crowded has nothing but a search to answer from');
+  assert.doesNotMatch(body('postMove'), /positioningBlock/,
+    'the move look is handed a weekly count as the cause of a quarter-hour move');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /WHERE THE SPECULATORS STAND COMES ON SUNDAY AND FROM get_around/,
+    'SYSTEM no longer says what the count is for, so it reads as news');
+  assert.match(system, /never\s+a reason to trade, and never a call on where price goes/,
+    'the count lost the line that keeps it from reading as a signal');
+});
+
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
   /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
      neither can see whether anything calls them. A briefing that reads before
