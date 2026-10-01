@@ -73,6 +73,7 @@ supabase/013_ff_calendar.sql            Forex Factory's week, which R-14 is judg
 supabase/014_stops.sql                  every stop and target a position carried, which R-19 reads
 supabase/015_commitments.sql            what he committed to, as a third kind of note
 supabase/016_tradingview.sql            the TradingView sign-in, one row
+supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -1340,6 +1341,30 @@ rating, analyst forecasts and the screener are read-only and stay off the list
 anyway, because each is a signal by another name; fundamentals, filings,
 earnings and dividends are about companies, and gold is not one.
 
+**`?calendar=1&from=YYYY-MM-DD&to=YYYY-MM-DD` is the reader,** and the one door
+where a request value reaches a tool. That follows the poller's `?hours=`, but
+refused rather than clamped. `from` and `to` are whole days only, because TradingView rejects other
+formats and was seen to treat a day as inclusive. At most 31 days, which is as
+far forward as it serves and long enough to walk a history a month at a time.
+Nothing before 2003-09-01, where its data starts. US only, because every rule
+that reads a release is about USD. Each event comes back as its permanent `id`,
+the minute it lands, its title, its importance (`high`, `medium` or `low` from
+TradingView's 1, 0 and −1), its period, the consensus, prior and actual as text
+with their unit (`200K`, `0.2%`, `$6.748T`), and its `ticker`. No consensus
+stays null; a consensus of zero is `0%`. `timed` is false for what is on the
+calendar without being a release. A summit was rated high and filed at midnight
+under the indicator `Calendar`, and nothing that counts minutes before a print
+may count it. The paragraph of description each event carries is dropped, since
+she would pay for every one of them on every request.
+
+**A refusal can arrive marked as success.** The quote batch refused with
+TradingView's own 429 inside a result marked `isError: false`, with `success:
+false` in the payload. `unwrap` checks both, and a test holds it to that real
+answer. It reads `structuredContent` rather than the text block, which carries
+the same payload a second time as a string.
+`test/fixtures/tradingview-calendar.json` is eight events cut from the 1 October
+calendar probe, one for each shape the fold has to handle.
+
 **`?probe=` is fixed, and nothing in the request reaches a tool.** It picks one
 of six and every argument is written in the function. Each call's failure is its
 own answer, as `?bars=raw`'s are:
@@ -1378,11 +1403,20 @@ two refreshes against a rotating server to hold that. The table is not in the
 memory backup and must not be, because a live refresh token in a workflow
 artefact is the account.
 
-**One caller refreshes at a time today, because only a person calls this.** A
-server that rotates may treat a refresh token presented twice as stolen and
-revoke the whole sign-in, and two scheduled readers refreshing in the same
-second would present it twice. The first scheduled caller has to serialise the
-refresh. That is a condition on adding one, not a defect in what is here.
+**One renewal at a time, by a lease.** A server that rotates may treat a
+refresh token presented twice as stolen and revoke the whole sign-in, and the
+briefing and the release look can find the token stale in the same second. So a
+renewal first takes the lease `017_tradingview_lease.sql` adds, with a PATCH
+filtered on it being empty or lapsed. That is `balance`'s arbitration: Postgres
+evaluates the filter inside the UPDATE, so there is no read to lose a race
+against. A caller that does not get the lease waits for the token the holder
+writes. The holder reads the row again once it has the lease, because another
+caller may have renewed in between, and the refresh token it first read would
+then be the one just spent. The new token and the release are one write. A
+holder that dies leaves a lease that lapses on its own after thirty seconds.
+Three tests drive it against a stub that filters the way PostgREST does: two
+refreshes against a rotating server, two callers at once, and a caller that wins
+the lease after someone else renewed.
 
 **What this does not touch.** `ff_calendar` stays as it is. R-14 is defined on
 Forex Factory's red folder, so moving the rule to TradingView's rating would be
@@ -4167,7 +4201,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `016_tradingview.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `017_tradingview_lease.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4484,9 +4518,9 @@ been wrong once, reporting a correct database as broken.
 14. Run `supabase/012_excursion.sql`, `supabase/013_ff_calendar.sql`,
     `supabase/014_stops.sql` and `supabase/015_commitments.sql`, all safe to
     re-run.
-15. Run `supabase/016_tradingview.sql` and connect TradingView — see
-    **TradingView**.
-16. Run `supabase/verify.sql` and read it against 001–016. Nothing is set up
+15. Run `supabase/016_tradingview.sql` and `supabase/017_tradingview_lease.sql`,
+    and connect TradingView — see **TradingView**.
+16. Run `supabase/verify.sql` and read it against 001–017. Nothing is set up
     until that agrees.
 
 ---
