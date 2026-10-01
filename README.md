@@ -1423,8 +1423,22 @@ month after it is unknown. Each read also asks TradingView's calendar for the
 month's rate decisions. A decision the table does not hold refuses the whole
 answer, since odds worked out against a moved meeting are a confident wrong
 number. A table date the calendar does not list is a gap in a feed, not a moved
-meeting, and does not refuse. Eugenia does not read it yet. It is checked
-against FedWatch first.
+meeting, and does not refuse.
+
+**Eugenia reads it in the briefing and through `get_around`.** It was checked
+against FedWatch on 1 October. On FedWatch's own prices, the October odds came
+out identical (24.9%) and December within a point. The 18:00 read differed by
+two or three points, which is the bars being hours apart rather than the
+arithmetic. `ratesList` states the first meeting as odds. Later meetings are
+stated as basis points priced in all by then, with the share at that meeting.
+That is because FedWatch shows a later meeting as the chance of each range by
+then, every path summed, while the fold's odds are that meeting's own given the
+one before. Both are right, but they are different numbers, so a chance quoted
+for December would read as wrong beside the screen he checks it on. She is told
+to quote rate odds from here and never from a search, to say they are futures
+pricing rather than her forecast, and that they run at least fifteen minutes
+behind. A refused or failed read is a sentence telling her she does not have
+them.
 
 **Where the speculators stand is read straight from the CFTC.** It is the
 weekly Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
@@ -1460,7 +1474,7 @@ own answer, as `?bars=raw`'s are:
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
-| `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price meeting odds would be worked out from, where she now searches a page for them |
+| `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 
 **How the sign-in is found.** It is OAuth 2.1 as MCP specifies it, and it is
 discovered rather than configured. The only TradingView address in the file is

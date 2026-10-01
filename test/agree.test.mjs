@@ -6421,7 +6421,7 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
   assert.equal(calls, 2, `positioningBlock() is called ${calls} times — a new reader was given the weekly count`);
   assert.match(body('postBriefing'), /due === 'sunday' \? positioningBlock\(\) : ""/,
     'the weekday briefing carries the weekly count, the same lines five mornings running');
-  assert.match(body('postBriefing'), /\+ around \+ crowd \+/, 'the Sunday briefing reads the count and never hands it over');
+  assert.match(body('postBriefing'), /\+ rates \+ crowd \+/, 'the Sunday briefing reads the count and never hands it over');
   const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
   assert.match(served.slice(0, served.indexOf('case ', 5)), /positioningBlock\(\)/,
     'a conversation asked whether gold is crowded has nothing but a search to answer from');
@@ -6432,6 +6432,26 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
     'SYSTEM no longer says what the count is for, so it reads as news');
   assert.match(system, /never\s+a reason to trade, and never a call on where price goes/,
     'the count lost the line that keeps it from reading as a signal');
+});
+
+/* THE RATE ODDS GO TO THE BRIEFING AND A CONVERSATION. ratesList is pure and
+   driven in fold.test.mjs; whether anything reads it is two call sites, and
+   the prompt paragraph is what tells her a later meeting is never a chance —
+   the half that keeps her figure matching his FedWatch screen. */
+test('the rate odds reach the briefing and a conversation, said the way FedWatch shows them', () => {
+  const at = EUGENIA_TS.indexOf('async function postBriefing(');
+  const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.equal([...EUGENIA_TS.matchAll(/(?<!function )ratesBlock\(\)/g)].length, 2,
+    'ratesBlock() is called somewhere other than the briefing and get_around');
+  assert.match(brief, /aroundBlock\(\), ratesBlock\(\),/, 'the briefing no longer reads the rate odds');
+  assert.match(brief, /\+ around \+ rates \+/, 'the briefing reads the rate odds and never hands them over');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /ratesBlock\(\)/,
+    'a conversation asked about the Fed has nothing but a search to answer from');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /WHAT THE FUTURES PRICE FOR THE FED COMES IN THE BRIEFING/);
+  assert.match(system, /never turn those into a chance/,
+    'she may quote a later meeting as its own odds, which FedWatch does not show');
 });
 
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
