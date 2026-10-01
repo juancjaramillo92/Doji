@@ -52,7 +52,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  ffEvents, releasesQuery, weeksQuery, ffRated, ratingsQuery, stopsQuery,
+  ffEvents, releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, awaitingActual,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -2327,12 +2327,10 @@ test('every other message is not this command', () => {
 });
 
 /* ─── One look per release time, because one print is not one row ────────────
-   The unique key is (at, name) and the name is free text she writes, so `PPI`,
-   `US PPI` and `US PPI (August)` are three rows and one print. Each one marked
-   high fired its own look, its own model call and its own message — and the
-   release look holds log_calendar, so filing the actual under a slightly
-   different name MINTED THE NEXT ONE. The two apologies that started this were
-   duplicate looks arriving at the same number with better information.
+   While she typed the calendar, `PPI`, `US PPI` and `US PPI (August)` were
+   three rows and one print, and each one marked high fired its own look, its
+   own model call and its own message. A time holds several rows still — the
+   08:30 slot is most of a report — so one look covers the time.
 
    The fixture is the real morning, names and timestamps as the table holds
    them: five high rows for one CPI at 12:30 on 11 September.
@@ -2377,46 +2375,8 @@ test('nothing standing unlooked is no look at all', () => {
   assert.deepEqual(dueRelease(CPI_MORNING.map(r => ({ ...r, looked_at: 'x' }))), []);
 });
 
-/* ─── A figure she does not send must not erase the one already there ────────
-   THE SAME ROW IS WRITTEN TWICE BY DESIGN — the briefing files what is coming,
-   the release look comes back with what it printed — and `merge-duplicates`
-   updates exactly the columns the payload names. Sent as an explicit null, the
-   second write erased the consensus and the prior that the whole table exists
-   to compare an actual against, on every release, with nothing failing and the
-   row still looking well formed.
-
-   `emailRow` states the rule this was missing, in a comment, about the other
-   boundary in this repository that upserts: an absent key and a null key mean
-   opposite things here.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-// Every body logCalendar posted, parsed. SB_URL is "" under Node.
-async function calendarWrites(releases) {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  const sent = [];
-  globalThis.fetch = async (url, init) => {
-    sent.push({ url: String(url), rows: JSON.parse(init.body) });
-    return { ok: true, status: 201, json: async () => [] };
-  };
-  console.error = () => {};
-  try {
-    return { said: await serve('log_calendar', { releases }), sent };
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
-}
-
-// RELATIVE, BECAUSE THE RULE IT IS TESTED AGAINST READS THE CLOCK. Pinned to a
-// date, this fixture passed for two days and then aged out of the window
-// log_calendar now enforces — a test that starts failing on a Tuesday for a
-// reason that has nothing to do with the code.
-const LANDED = { at: new Date(Date.now() - 600_000).toISOString(), name: 'CPI',
-                 importance: 'high', actual: '+0.4% m/m', note: 'headline in line' };
-
 /* ─── The actual goes to the row that was looked at ──────────────────────────
-   The release look held `log_calendar`, whose key is (at, name) over a name the
-   model writes — so on 16 September it was handed
+   An upsert keyed on a name the model writes was once handed
    `US retail sales (August, advance)`, marked that row at 12:35:00 and filed
    the print under `retail sales` at 12:36:15. An INSERT, silently: the actual
    landed on a row with no consensus and the consensus stayed on a row with no
@@ -2528,82 +2488,89 @@ test('a release without a readable time or a figure writes nothing at all', asyn
   }
 });
 
-test('a release beyond the day she is handed is not filed', async () => {
-  /* THE DUPLICATES CAME FROM HERE, and from four different turns rather than
-     from the release look: `August CPI` was laid down on the Sunday, `core CPI`
-     half an hour later, `US CPI (core CPI)` on the Monday, `US CPI (August)` on
-     the Thursday — five days of filing the same Friday morning, each turn blind
-     to the last because the block she is handed reaches one day and
-     `on_conflict` merges only on an exact name.
+/* ─── The calendar TradingView files ─────────────────────────────────────────
+   Driven off the same fixture doji-tradingview's fold is tested against, folded
+   by that fold — so the two halves of the read are held together rather than
+   each against a hand-written copy of the other.
+   ─────────────────────────────────────────────────────────────────────────── */
 
-     Nothing reads past the window either, so the row had no consumer at all. */
-  const far = new Date(Date.now() + 5 * 86_400_000).toISOString();
-  const { sent, said } = await calendarWrites([
-    { at: far, name: 'FOMC decision', importance: 'high' },
-  ]);
-  assert.equal(sent.length, 0, 'a release five days out was written, so it will be filed again tomorrow');
-  assert.match(said, /not recorded/, 'the drop is silent, so she files against the bound for ever');
+const FOLDED = foldCalendar(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar'));
+const OCT1_3PM = Date.parse('2026-10-01T15:00:00Z');
+
+test('only releases rated medium and above, inside the window, are filed', () => {
+  const rows = calendarRows(FOLDED, OCT1_3PM);
+  // Claims and a Fed speech this morning, payrolls tomorrow. Not the four lows,
+  // and not the summit, which is on the calendar without being a release.
+  assert.deepEqual(rows.map(r => r.tv_id).sort(), ['396934', '396953', '421425']);
+  // A day and a half later this morning's claims are outside the twelve hours back.
+  assert.ok(!calendarRows(FOLDED, Date.parse('2026-10-02T20:00:00Z')).some(r => r.tv_id === '396934'));
 });
 
-test('and the day she is handed is filed', async () => {
-  // The bound must not swallow the ordinary case: a briefing files this morning
-  // and tomorrow's open, and the release look comes back minutes after a print.
-  for (const [when, label] of [[6 * 3600_000, 'this evening'],
-                               [20 * 3600_000, "tomorrow's open"],
-                               [-600_000, 'the print ten minutes ago']]) {
-    const at = new Date(Date.now() + when).toISOString();
-    const { sent } = await calendarWrites([{ at, name: 'CPI', importance: 'high' }]);
-    assert.equal(sent.length, 1, `${label} was refused`);
+test('a figure TradingView has not published is left out of the row, never sent as null', () => {
+  const by = Object.fromEntries(calendarRows(FOLDED, OCT1_3PM).map(r => [r.tv_id, r]));
+  assert.deepEqual(by['396934'], {
+    tv_id: '396934', at: '2026-10-01T12:30:00.000Z', name: 'Initial Jobless Claims (Sep/26)',
+    importance: 'medium', source: 'tradingview', consensus: '200K', prior: '198K', actual: '197K',
+  });
+  // Payrolls has not printed: present-and-null would erase an actual the
+  // release look recorded by hand fifteen minutes before the next filing.
+  assert.ok(!('actual' in by['396953']), 'an unpublished actual is sent, and would erase one recorded by hand');
+  assert.equal(by['396953'].consensus, '90K');
+  // A speech has no figure of any kind, and names none.
+  for (const k of ['consensus', 'prior', 'actual']) assert.ok(!(k in by['421425']), `a speech names ${k}`);
+  assert.ok(Object.values(by).every(r => !('note' in r)), 'a filing names note, which is hers');
+});
+
+test('the filing goes up in groups that carry the same columns, keyed on the id', async () => {
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).includes('doji-tradingview')) {
+      sent.push({ read: String(url) });
+      return new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 });
+    }
+    sent.push({ url: String(url), rows: JSON.parse(init.body) });
+    return new Response('', { status: 201 });
+  };
+  try {
+    assert.equal(await fileCalendar(OCT1_3PM), 3);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  // The read asks for whole days covering the window: twelve hours back from
+  // 15:00 is still the 1st, and twenty-eight forward is the 2nd.
+  assert.match(sent[0].read, /calendar=1&from=2026-10-01&to=2026-10-02$/);
+  const writes = sent.slice(1);
+  assert.equal(writes.length, 3, 'three column sets went up in fewer requests, which PostgREST refuses');
+  for (const w of writes) {
+    assert.match(w.url, /eugenia_calendar\?on_conflict=tv_id$/);
+    assert.equal(new Set(w.rows.map(r => Object.keys(r).sort().join(','))).size, 1);
+    assert.ok(w.rows.every(r => Object.values(r).every(v => v !== null)));
   }
 });
 
-test('the release look fills in the actual and names no other column', async () => {
-  const { sent } = await calendarWrites([LANDED]);
-  assert.equal(sent.length, 1);
-  const [row] = sent[0].rows;
-  assert.equal(row.actual, '+0.4% m/m');
-  // THE WHOLE POINT. Present-and-null is an erasure; absent is "leave it".
-  assert.ok(!('consensus' in row),
-    'the row names consensus, so this write nulls the figure the briefing filed ' +
-    'and the actual has nothing left to be compared against');
-  assert.ok(!('prior' in row), 'the row names prior, which this write does not know');
-});
-
-test('a figure she did send is still written', async () => {
-  // The omission must not become a silent refusal to record anything optional.
-  const { sent } = await calendarWrites([{ ...LANDED, consensus: '+0.4% expected' }]);
-  assert.equal(sent[0].rows[0].consensus, '+0.4% expected');
-});
-
-test('rows carrying different columns go up as separate requests', async () => {
-  /* PostgREST refuses a bulk insert whose objects do not all name the same
-     columns, so without this the omission above turns a briefing into a 400 —
-     which logCalendar swallows into "that did not save", and the day's calendar
-     silently stops being filed. A briefing files a mix on any ordinary day. */
-  const soon = new Date(Date.now() + 3600_000).toISOString();
-  const later = new Date(Date.now() + 5 * 3600_000).toISOString();
-  const { sent, said } = await calendarWrites([
-    { at: soon,  name: 'CPI', importance: 'high', consensus: '3.4% y/y' },
-    { at: later, name: 'Michigan sentiment', importance: 'medium' },
-    { at: soon,  name: 'claims', importance: 'medium', prior: '206k' },
-  ]);
-  assert.equal(sent.length, 3, 'rows with three different column sets went up together');
-  for (const { rows } of sent) {
-    const shapes = new Set(rows.map(r => Object.keys(r).sort().join(',')));
-    assert.equal(shapes.size, 1, 'a request mixes column sets and PostgREST will refuse it');
+test('a calendar TradingView refused is an error, not an empty day', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ ok: false, error: 'TradingView calendar: 429' }), { status: 500 });
+  try {
+    await assert.rejects(fileCalendar(OCT1_3PM), /429/);
+  } finally {
+    globalThis.fetch = realFetch;
   }
-  assert.match(said, /Recorded 3\./, 'the count reports the rows, not the requests');
 });
 
-test('rows carrying the same columns still share one request', async () => {
-  // The grouping is not one request per row: a briefing filing a uniform
-  // calendar should still cost a single write.
-  const { sent } = await calendarWrites([
-    { at: new Date(Date.now() + 3600_000).toISOString(), name: 'CPI', importance: 'high', consensus: 'a' },
-    { at: new Date(Date.now() + 5 * 3600_000).toISOString(), name: 'Michigan', importance: 'high', consensus: 'b' },
-  ]);
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].rows.length, 2);
+test('the release look waits for a missing figure, but not past half an hour, and never for a speech', () => {
+  const at = '2026-10-02T12:30:00.000Z';
+  const payrolls = { id: 1, at, name: 'Non Farm Payrolls (Sep)', importance: 'high',
+                     consensus: '90K', prior: '162K', actual: null, note: null };
+  const t = (min) => Date.parse(at) + min * 60_000;
+  assert.equal(awaitingActual([payrolls], t(5)), true);
+  assert.equal(awaitingActual([payrolls], t(31)), false, 'it waited past half an hour');
+  assert.equal(awaitingActual([{ ...payrolls, actual: '120K' }], t(5)), false);
+  assert.equal(awaitingActual([{ ...payrolls, consensus: null, prior: null }], t(5)), false,
+    'it waited for a figure a speech will never have');
+  // One missing figure in the group holds the group: one look covers the time.
+  assert.equal(awaitingActual([{ ...payrolls, actual: '120K' }, payrolls], t(5)), true);
 });
 
 /* ─── The email boundary ─────────────────────────────────────────────────────
@@ -3037,49 +3004,6 @@ test("Forex Factory's export parses to UTC instants, and one bad row refuses the
      the week is simply not filed — its trades read unknown, never pass. */
   assert.throws(() => ffEvents([...FF.slice(0, 3), { ...FF[3], date: 'soon' }]), /event 3/);
   assert.throws(() => ffEvents({ events: FF }), /not a list/);
-});
-
-test("Forex Factory's rating replaces hers at the same minute, and nowhere else", () => {
-  // Her calendar as she filed it on the 25th, beside the whole week he read.
-  const ff = ffEvents(FF);
-  const mine = [
-    { at: '2026-09-25T14:00:00.000Z', name: 'Michigan sentiment', importance: 'high' },   // FF: USD Medium, alone
-    { at: '2026-09-24T12:30:00.000Z', name: 'jobless claims', importance: 'medium' },     // FF: USD Medium
-    { at: '2026-09-25T09:15:00.000Z', name: 'Bailey speaks', importance: 'high' },        // FF: GBP High, USD Low
-  ];
-  const { rows, changed } = ffRated(mine, ff);
-  assert.equal(changed, 1);
-  assert.equal(rows[0].importance, 'medium', 'the print he read as medium stayed filed as high');
-  assert.equal(rows[1], mine[1], 'a rating that already agreed was rewritten');
-  /* THE ONE THE FIRST VERSION GOT WRONG, off this very file: a Fed member
-     rated low shares Bailey's minute, and demoting her Bailey row to low for a
-     speech she never filed is exactly what a match on the minute does. */
-  assert.equal(rows[2].importance, 'high', "a USD speech demoted her Bank of England row by sharing its minute");
-
-  /* THE HIGHEST FOLDER AT A MINUTE RATES IT, both ways round — CPI is red and
-     core CPI beside it may not be, and he sees the red one first. */
-  const cpi = [{ at: '2026-10-14T12:30:00Z', impact: 'Medium', country: 'USD' },
-               { at: '2026-10-14T12:30:00Z', impact: 'High', country: 'USD' }];
-  const low = [{ at: '2026-10-14T12:30:00.000Z', name: 'CPI', importance: 'low' }];
-  assert.equal(ffRated(low, cpi).rows[0].importance, 'high');
-  assert.equal(ffRated(low, [...cpi].reverse()).rows[0].importance, 'high');
-  // A red folder raises hers even with another currency at the minute.
-  const withCad = [...cpi, { at: '2026-10-14T12:30:00Z', impact: 'Medium', country: 'CAD' }];
-  assert.equal(ffRated(low, withCad).rows[0].importance, 'high');
-  // A USD release alone at its minute lowers hers.
-  const high = [{ at: '2026-10-14T12:30:00.000Z', name: 'Richmond Fed', importance: 'high' }];
-  assert.equal(ffRated(high, [{ at: '2026-10-14T12:30:00Z', impact: 'Low', country: 'USD' }]).rows[0].importance, 'low');
-  // A holiday rates nothing.
-  assert.equal(ffRated(low, [{ at: '2026-10-14T12:30:00Z', impact: 'Holiday', country: 'USD' }]).changed, 0);
-});
-
-test('the ratings read takes every currency over the minutes filed, newest first', () => {
-  const q = ratingsQuery('2026-09-24T12:30:00.000Z', '2026-09-25T14:00:00.000Z');
-  // Every currency: which others share a minute decides whether USD may lower hers.
-  assert.doesNotMatch(q, /country=eq/);
-  assert.match(q, /select=at,impact,country/);
-  assert.match(q, /at=gte\.2026-09-24T12:30:00\.000Z&at=lte\.2026-09-25T14:00:00\.000Z/);
-  assert.match(q, /order=at\.desc&limit=\d+/);
 });
 
 test('an instant files under the Sunday its Forex Factory week began, in New York', () => {
@@ -4982,7 +4906,6 @@ const TOOL_CALLS = [
   ['get_strategy',  { section: '§4.1' }],
   ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
   ['get_market',    {}],
-  ['log_calendar',  { releases: [{ at: '2026-09-07T12:30:00Z', name: 'CPI', importance: 'high' }] }],
   ['record_actual', { at: '2026-09-07T12:30:00Z', name: 'CPI', actual: '+0.3% m/m' }],
   ['set_thesis',    { thesis: 'a reading' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
