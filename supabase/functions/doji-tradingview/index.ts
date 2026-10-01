@@ -591,7 +591,8 @@ async function readHeadlines() {
    notice is what a table cannot know, so every read asks the calendar which
    decisions it lists, and a date the table does not hold refuses the whole
    answer: odds worked out against the wrong meeting are a confident wrong
-   number, and none is better. The decision day is the second of the two. */
+   number, and none is better. The decision day is the second of the two.
+   Eugenia's briefing and get_around read it. */
 export const FOMC = [
   "2026-10-28", "2026-12-09",
   "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
@@ -760,9 +761,9 @@ async function readRates() {
                 the quotes probe could not resolve
      fedfunds   whether thirty-day fed funds futures answer, under the
                 continuous names and under named contract months, and what a
-                bar of them carries: the price the meeting odds she now
-                searches for would be worked out from, read where the dollar
-                and the yields already are
+                bar of them carries: the price ?rates=1 works the meeting
+                odds out from, read where the dollar and the yields already
+                are
 
    Every argument is written here and none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);

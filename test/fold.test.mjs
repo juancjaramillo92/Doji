@@ -55,7 +55,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
-  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock,
+  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -891,6 +891,52 @@ test('a decision the calendar lists and the table does not refuses the odds; a g
   assert.deepEqual(unlisted(['2026-10-28']), []);
   assert.deepEqual(unlisted([]), [], 'a calendar listing nothing is taken as a moved meeting');
   assert.deepEqual(unlisted(['2026-10-21']), ['2026-10-21']);
+});
+
+/* What ?rates=1 answered live on 1 October at the 18:00 bar, cut to what
+   Eugenia reads. FedWatch shows a later meeting as the chance of each range BY
+   THEN — December at 20.6/61.3/18.1 that morning — and the fold's odds for it
+   are December's own, given October: a different number for the same pricing.
+   So a later meeting is said in basis points priced, which both agree on, and a
+   chance for it beside his screen would read as a mistake. */
+const RATES = {
+  meetings: [
+    { date: '2026-10-28', move_bp: 6.6, total_bp: 6.6, odds: [{ bp: 0, chance: 73 }, { bp: 25, chance: 27 }] },
+    { date: '2026-12-09', move_bp: 19, total_bp: 25.7, odds: [{ bp: 0, chance: 24 }, { bp: 25, chance: 76 }] },
+    { date: '2027-01-27', move_bp: 9.2, total_bp: 35.1, odds: [{ bp: 0, chance: 63 }, { bp: 25, chance: 37 }] },
+  ],
+  unread: [],
+};
+
+test('the first meeting is said as odds and the later ones as what is priced by then', () => {
+  const out = ratesList(RATES);
+  assert.match(out, /· 28 Oct: 73% no change, 27% a quarter-point hike/);
+  assert.match(out, /· 9 Dec: 26 basis points of hikes priced in all by then, 19 of them at this meeting/);
+  assert.match(out, /· 27 Jan: 35 basis points of hikes priced in all by then, 9 of them at this meeting/);
+  assert.doesNotMatch(out, /76%|37%/, 'a later meeting is said as its own odds, which FedWatch does not show');
+  assert.match(out, /at least\s+fifteen minutes behind/, 'the block does not say the bars are delayed');
+
+  const cut = ratesList({ meetings: [{ ...RATES.meetings[0], odds: [{ bp: -25, chance: 60 }, { bp: -50, chance: 40 }] },
+    { ...RATES.meetings[1], total_bp: -30.4 }], unread: ['2027-01-27'] });
+  assert.match(cut, /60% a quarter-point cut, 40% a 50bp cut/);
+  assert.match(cut, /30 basis points of cuts priced in all by then/);
+  assert.match(cut, /Not read just now: 27 Jan\./, 'a meeting the fold could not solve is dropped rather than named');
+});
+
+test('odds refused or unreadable are a sentence, and never take the briefing down', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  console.error = () => {};
+  try {
+    // Meetings carried alongside, so it is the refusal that decides and not their absence.
+    globalThis.fetch = async () => Response.json({ ok: false, error: 'the calendar lists a decision on 2026-10-21',
+                                                  meetings: RATES.meetings, unread: [] });
+    assert.match(await ratesBlock(), /could not be read just now\. Do not quote rate\s+odds from a search/);
+    globalThis.fetch = async () => new Response('not json', { status: 502 });
+    assert.match(await ratesBlock(), /could not be read just now/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
 });
 
 /* ─── Where the speculators stand ───────────────────────────────────────────

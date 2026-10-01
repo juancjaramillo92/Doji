@@ -1360,16 +1360,18 @@ const MARKET_TOOL = {
    not, so asked why gold fell she had a web search and nothing else, against
    her own rule never to quote those from one. The same two reads the move look
    makes, through the function that holds the TradingView sign-in, with the
-   headlines wider because a question is about the morning — and the
-   speculators' weekly count, which only the Sunday briefing is otherwise
-   handed, because "is gold crowded" is a question asked on a Wednesday. */
+   headlines wider because a question is about the morning. The briefing's
+   rate odds too, and the speculators' weekly count, which only the Sunday
+   briefing is otherwise handed, because "is gold crowded" is a question asked
+   on a Wednesday. */
 const AROUND_TOOL = {
   name: "get_around",
   description:
     "The market around gold, from TradingView: the dollar index, the two- and " +
     "ten-year yields, the real yield, silver, oil, the S&P 500 and the VIX, each a " +
     "level now beside the level at a stated time; and gold's and the dollar's " +
-    "headlines from the last six hours, titles only; and the CFTC's weekly count of " +
+    "headlines from the last six hours, titles only; what fed funds futures price for " +
+    "the next three Fed meetings; and the CFTC's weekly count of " +
     "where the speculators stand in gold futures. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
     "crossed the wires, and quote those from here rather than from a search. " +
@@ -1954,8 +1956,8 @@ export async function serve(name: string, input: any): Promise<string> {
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
     case AROUND_TOOL.name:
-      return (await Promise.all([aroundBlock(), headlinesBlock(WIRES_CHAT_MIN), positioningBlock()]))
-        .join("").trim();
+      return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(WIRES_CHAT_MIN),
+                                 positioningBlock()])).join("").trim();
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -3291,6 +3293,55 @@ export async function aroundBlock(): Promise<string> {
   }
 }
 
+/* ─── What the market prices for the Fed ───────────────────────────────────
+   The odds fed funds futures put on the next three meetings, worked out in
+   doji-tradingview the way CME's FedWatch works them — and checked against
+   FedWatch on 1 October, where on its own prices the October odds came out
+   identical and December within a point. She searched a page for these before,
+   and a page twice gave her "cut" in a week the Fed had hiked.
+
+   THE FIRST MEETING GETS ITS ODDS AND THE REST GET WHAT IS PRICED BY THEN,
+   because that is where the two ways of stating odds part. FedWatch shows a
+   later meeting as the chance of each RANGE by then, every path to it summed;
+   the fold's odds for it are that meeting's own, given the one before. Both
+   are right and they are different numbers, so a chance quoted for December
+   would read as wrong beside the screen he checks it on. The first meeting is
+   the same both ways, and basis points priced by a date are what both agree on.
+
+   NEVER THROWS, for aroundBlock's reason, and a read refused because the
+   calendar named a meeting the table does not hold is a failed read like any
+   other: odds against a moved meeting are the wrong number. */
+type Priced = { date: string; move_bp: number; total_bp: number | null; odds: { bp: number; chance: number }[] };
+
+export function ratesList(answer: { meetings: Priced[]; unread: string[] }): string {
+  const move = (bp: number) => bp === 0 ? "no change"
+    : `a ${Math.abs(bp) === 25 ? "quarter-point" : `${Math.abs(bp)}bp`} ${bp > 0 ? "hike" : "cut"}`;
+  const bps = (bp: number) => `${Math.abs(Math.round(bp))} basis points of ${bp < 0 ? "cuts" : "hikes"}`;
+  const lines = answer.meetings.map((m, i) => `· ${civilDay(m.date)}: ` + (i === 0
+    ? [...m.odds].sort((a, b) => b.chance - a.chance).map(o => `${o.chance}% ${move(o.bp)}`).join(", ")
+    : m.total_bp === null
+      ? `${bps(m.move_bp)} priced at this meeting`
+      : `${bps(m.total_bp)} priced in all by then, ${Math.abs(Math.round(m.move_bp))} of them at this meeting`));
+  if (answer.unread.length) lines.push(`· Not read just now: ${answer.unread.map(civilDay).join(", ")}.`);
+  return `\n\nWhat fed funds futures price for the next Fed meetings, worked out as CME's FedWatch ` +
+    `works them, from daily bars at least fifteen minutes behind:\n${lines.join("\n")}`;
+}
+
+const TV_RATES = `${SB_URL}/functions/v1/doji-tradingview?rates=1`;
+
+export async function ratesBlock(): Promise<string> {
+  try {
+    const res = await fetch(TV_RATES, { headers: { "x-doji-key": CRON_SECRET } });
+    const answer = await res.json();
+    if (!res.ok || !answer.ok || !answer.meetings?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    return ratesList(answer);
+  } catch (err) {
+    console.error("doji-eugenia: rate odds unavailable —", err instanceof Error ? err.message : err);
+    return "\n\nWhat the futures price for the Fed could not be read just now. Do not quote rate " +
+      "odds from a search; say you do not have them.";
+  }
+}
+
 /* ─── What the wires said ──────────────────────────────────────────────────
    Gold's and the dollar's headlines, handed to the move look: a move with
    nothing on the calendar behind it is the one look that has to find its own
@@ -3919,9 +3970,9 @@ async function postBriefing(due: Brief): Promise<Response> {
      first token was asked for. Promise.all is the same argument the tool
      dispatch makes: a batch should cost its slowest member — which here is the
      price, since that one leaves the project for the broker. */
-  const [price, around, crowd, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
+  const [price, around, rates, crowd, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
     await Promise.all([
-      marketBlock(), aroundBlock(), due === 'sunday' ? positioningBlock() : "", notesBlock(),
+      marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", notesBlock(),
       channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(), loopsBlock(),
       due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(),
     ]);
@@ -3931,7 +3982,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped being written, everything after it
     // is computed over rows that may be missing, and she is told to lead with it.
-    + health + price + around + crowd + notes + channels + trades + breaches + story + loops + calendar + desk;
+    + health + price + around + rates + crowd + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
