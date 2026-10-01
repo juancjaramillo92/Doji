@@ -2603,6 +2603,22 @@ test('only the two columns a look owns are written', async () => {
     'a look can write a column the briefing owns again');
 });
 
+test('a speech is recorded by its line alone, and a line never erases a figure', async () => {
+  /* A speech prints nothing, so a tool that demanded the figure refused the one
+     record a Chair's press conference could leave. Either half may come alone,
+     and an absent key is left as it was: a line written after the figure must
+     not send `actual` at all. */
+  const POWELL = { at: '2026-10-29T18:30:00Z', name: 'Fed Chair Powell Speaks' };
+  const speech = await actualWrites({ ...POWELL, note: 'Said a December hike is not the base case.' }, [POWELL]);
+  assert.match(speech.said, /Recorded against/, 'a speech with no figure is still refused');
+  assert.deepEqual(Object.keys(speech.sent[0].body), ['note'],
+    'a line alone sent an actual with it, which erases a figure written earlier');
+
+  const neither = await actualWrites(POWELL, [POWELL]);
+  assert.equal(neither.sent.length, 0, 'a call with nothing to record still reached the database');
+  assert.match(neither.said, /for a speech one line/, 'she is not told a line alone is enough for a speech');
+});
+
 test('the name she was handed matches the row it names, whatever it is spelled with', async () => {
   /* THE NAME GOES OUT AS ITSELF. It was wrapped in double quotes on the belief
      that a comma splits an `eq` value, which is true only inside `in.(…)`, and
@@ -2640,8 +2656,9 @@ test('nothing on file at that time is said plainly and nothing is written', asyn
   assert.match(said, /Nothing is on file/);
 });
 
-test('a release without a readable time or a figure writes nothing at all', async () => {
-  for (const bad of [{ ...RETAIL, at: 'whenever' }, { ...RETAIL, name: '  ' }, { ...RETAIL, actual: '' }]) {
+test('a release without a readable time, or with nothing to record, writes nothing at all', async () => {
+  for (const bad of [{ ...RETAIL, at: 'whenever' }, { ...RETAIL, name: '  ' },
+                     { ...RETAIL, actual: '', note: '  ' }]) {
     const { sent } = await actualWrites(bad, [RETAIL]);
     assert.equal(sent.length, 0, `${JSON.stringify(bad)} reached the database`);
   }
@@ -3878,6 +3895,15 @@ test('a calendar line from another day names the day, and today stays bare', () 
   assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
   assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes — PAST, no figure on file/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
+});
+
+test('a past speech carries the line written about it', () => {
+  // The line is the only record a speech leaves; a PAST row that dropped it
+  // would hand her the time and the name and nothing of what was said.
+  const out = calendarList([{ id: 0, at: '2026-10-01T19:30:00Z', name: 'Fed Williams Speaks',
+    importance: 'high', consensus: null, prior: null, actual: null,
+    note: 'No urgency to hike again after September.' }], Date.parse('2026-10-01T22:00:00Z'));
+  assert.match(out, /Fed Williams Speaks — PAST, no figure on file\. No urgency to hike again/);
 });
 
 test('the calendar filed at the weekday briefing reaches the next morning\'s prints', () => {

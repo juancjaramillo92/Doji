@@ -1243,7 +1243,8 @@ Where a figure says it is not yet published, search for it and fetch the page if
 it matters, then call record_actual with the time and name exactly as they are
 listed above and the actual filled in. Either way you may add one line on what it
 meant with record_actual, which is what makes this a record rather than a
-message.
+message. A speech prints no figure: leave the actual out and give the line alone,
+saying what was said.
 
 READ IT AGAINST ITS OWN RECORD. Where the last prints of the same release are
 below it, each with what was expected, use them: a miss in the direction it has
