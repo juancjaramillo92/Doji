@@ -507,7 +507,7 @@ code you write near it:
 - **The briefing is prose and must stay prose, with ONE relaxation that is his
   and is written down.** Numbered sections with headings are a report however
   plain the words inside them, and reintroducing scaffolding to "organise" the
-  prose is still the move to refuse. The CALENDAR slot is the exception: a bold
+  prose is still the move to refuse. The CALENDAR slot is the exception: a plain
   day label and one line per item, because he read a draft of it beside the prose
   and the list was the half that was instantly readable. It holds times and names
   — `NAMED AND NOTHING MORE` — and no mechanism, which is the rule the reshape
@@ -1565,9 +1565,10 @@ compounds.
   audit, which is a rendered table and unlistenable; the apologies, which are
   failure notices rather than messages she wrote; and the short operational
   lines. And the markdown is
-  stripped on the way to the vendor, because the calendar slot carries a bold
-  label per line — the one place the prose rule is relaxed, for a reader's eye,
-  and `**Today:**` read aloud is a gamble on what an asterisk becomes.
+  stripped on the way to the vendor although the prompt asks for none: no
+  parse mode is sent, so a bold label is asterisks on the screen, and the
+  calendar list is where a model writes one anyway. `**Today:**` read aloud is
+  a gamble on what an asterisk becomes.
 
   THE PROMPT IS TOLD NO LENGTH. It carried the cap, so that an answer over it was
   one she chose rather than one silently left unspoken. With no cap, a number

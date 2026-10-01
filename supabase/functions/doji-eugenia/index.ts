@@ -2508,12 +2508,12 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        /* WITHOUT THE MARKS THAT ARE FOR THE EYE. The calendar slot is a list
-           with a bold day label on each line, which is the one place the prose
-           rule is relaxed because he reads it — and `**Today:**` read aloud is
-           a gamble on what the vendor does with an asterisk. Stripped here
-           rather than written differently, because the text message wants them
-           and this is the only reader that does not. */
+        /* WITHOUT MARKS SHE WAS TOLD NOT TO WRITE. The prompt says plain text,
+           because Telegram is sent no parse mode and renders an asterisk as an
+           asterisk — but this text is model-written, and a model trained on
+           markdown reaches for a bold label in exactly the slot that is a list.
+           `**Today:**` read aloud is a gamble on what the vendor does with an
+           asterisk, so the boundary strips what the instruction only asks for. */
         model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",

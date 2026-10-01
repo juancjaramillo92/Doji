@@ -15,11 +15,11 @@
 // a browser reaches carrying no secret, which has no place in the function that
 // is her Telegram webhook.
 //
-// NOTHING SHE READS COMES FROM HERE YET, AND THAT IS THE ORDER RATHER THAN AN
-// OMISSION. ?tools=1 said what the endpoint offers — and its tool names were not
-// the ones TradingView's documentation gives, which is the whole case for
-// reading before writing. ?probe= now says what each useful tool RETURNS, raw,
-// and the readers she is handed get written against those answers: the poller's
+// EVERY READER WAS WRITTEN AFTER ITS PROBE, AND THAT ORDER IS THE RULE. ?tools=1
+// said what the endpoint offers — and its tool names were not the ones
+// TradingView's documentation gives, which is the whole case for reading before
+// writing. ?probe= says what each useful tool RETURNS, raw, and ?calendar=1,
+// ?market=1 and ?news=1 were written against those answers: the poller's
 // ?market=raw and ?positions=1 were how its two scales were found, and a reader
 // written first would have been the guess this repository keeps paying for.
 //

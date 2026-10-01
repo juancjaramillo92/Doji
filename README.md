@@ -1732,7 +1732,7 @@ Five slots. What happened, in two or three sentences with the conclusion first;
 **why that matters for gold**, walked link by link, one sentence per step; the
 calendar; one context line; one thing worth noticing.
 
-**The calendar is the one place the prose rule is deliberately relaxed** — a bold
+**The calendar is the one place the prose rule is deliberately relaxed** — a plain
 day label and one line per item, times in ET, one fact each. It reads better than
 the prose around it did, which is the whole argument for it. The relaxation is
 narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
@@ -2457,11 +2457,11 @@ paragraph preference so each part is a whole thought. The only number left is
 what the speech vendor accepts in one request, and it is a chunk size rather
 than a gate. The prompt is told no length at all.
 
-**The markdown is stripped on the way to the vendor.** The calendar slot carries
-a bold day label per line — the one place the prose rule is relaxed, and it is
-relaxed for a reader's eye. `**Today:**` read aloud is a gamble on what an
-asterisk becomes, so the marks come off for the one reader that does not want
-them.
+**The markdown is stripped on the way to the vendor.** She is told plain text —
+Telegram is sent no parse mode, so a bold label arrives as asterisks — but the
+text is model-written, and the calendar slot is a list where a model reaches for
+one anyway. `**Today:**` read aloud is a gamble on what an asterisk becomes, so
+the boundary takes off what the instruction only asks for.
 
 `TTS_URL` and `TTS_KEY` are optional on the same terms as `STT_*`; `TTS_VOICE`
 and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,
@@ -4833,14 +4833,17 @@ voice note came back as a voice note: the transcript reached her, the text lande
 first, and the audio arrived as a playable bubble rather than a file attachment,
 which is the `opus` question settled by the only thing that could settle it.
 
-**`web_fetch` grounds a number on a page that has to stay fetchable.** The four
-sources are named in the prompt because the tool only fetches URLs already in the
-conversation. It is bounded at both ends — `max_uses` for how many pages and
+**`web_fetch` grounds a number she was not handed.** The tool only fetches URLs
+already in the conversation, so what it reaches is a page a search turned up — a
+figure deeper in a report than the calendar carries, what an official actually
+said. Never gold's price or the market lines: those are handed to her, and a
+second copy off a page is a second number that disagrees with his screen, so no
+price page is named in the prompt any more. It is bounded at both ends — `max_uses` for how many pages and
 `max_content_tokens` for how large one may be. Only the first was written for a
 while, and one long thread can put more into a turn than the rest of the briefing
-put together, re-sent on every round after it. A page that moves or starts refusing bots degrades to search, which
-is what she did before — quietly, and with no signal that the number in the
-opening line came from prose rather than from the instrument.
+put together, re-sent on every round after it. A page that refuses bots
+degrades to search, with no signal that the figure came from prose rather than
+from the page it is on.
 
 **The session seam.** Fills the poller never reached have no `entry_time`, so
 their session derives from close time rather than entry time. Flag it whenever
