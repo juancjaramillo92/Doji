@@ -4012,6 +4012,66 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
   }
 });
 
+/* ─── Two things a coach does, inside the line ───────────────────────────────
+   His decision, after the signal rule was put to him: keep it, and let her do
+   two things it had been read as forbidding. A level price has already printed
+   is a FACT and may be named, but never in the paragraph that holds her read,
+   because a level beside a direction is an entry with the verb left out. And a
+   plan he has not taken may be checked against HIS rules when he asks, with
+   the levels staying his.
+
+   Each is sentences in three places, like the fence above, and each fails
+   silently when a copy drops its half: a gate missing the observed-level
+   clause cuts "today's high was 4,193" as a forward call, and a gate missing
+   the limit lets the level-beside-a-read through, and it runs last. The plan
+   check cites rules by number, and a number naming a judgment rule would have
+   her pronounce on the one thing §7 says no row can see, so each cited rule
+   is read against the strategy's own table.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a printed level may be named, never beside her read, in the writer and both gates', () => {
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+  for (const who of ['SYSTEM', 'CRITIC', 'TRIM']) {
+    assert.match(bodies[who], /level price has already printed/i,
+      `${who} no longer says a printed level is a fact, so it reads "today's high" as a forward call`);
+    assert.match(bodies[who], /same paragraph as (?:your|the|a) read/i,
+      `${who} no longer keeps a printed level out of the paragraph that holds her read — ` +
+      `side by side, the two are an entry`);
+  }
+});
+
+test('a plan he gives her is checked against his rules, and the levels stay his', () => {
+  const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1]
+    .replace(/\s+/g, ' ');
+  const system = body('SYSTEM');
+  const at = system.indexOf('WHEN HE ASKS YOU TO CHECK A TRADE HE HAS NOT TAKEN');
+  assert.ok(at > -1, 'SYSTEM no longer tells her how to check a plan he has not taken');
+  const section = system.slice(at, system.indexOf('WHEN HE SENDS A CHART', at));
+  assert.match(section, /THE LEVELS STAY HIS\. Never suggest a different entry, stop or target/,
+    'the plan check no longer forbids her offering levels of her own — that is the signal, by another door');
+
+  const trim = body('TRIM');
+  assert.match(trim, /check of a plan he gave you against his own rules stays/,
+    'TRIM no longer keeps a plan check, so the gate on every reply can cut the one she was asked for');
+  assert.match(trim, /A level YOU offer in place of his/,
+    'TRIM no longer removes a level she offers in place of his');
+
+  // Every rule cited is one a journal row can answer, or R-08, whose step 4 is
+  // arithmetic on the numbers he gave.
+  const rows = [...ALWAYS.matchAll(/^\| (R-\d+) \|.*\| (journal|judgment) \|/gm)];
+  const journal = new Set(rows.filter(m => m[2] === 'journal').map(m => m[1]));
+  assert.ok(journal.size >= 10, `read ${journal.size} journal rules out of §7 — the reader has gone blind`);
+  const cited = [...new Set(section.match(/R-\d+/g))];
+  assert.ok(cited.length >= 8, `the plan check cites ${cited.length} rules — the reader has gone blind`);
+  for (const r of cited) {
+    assert.ok(journal.has(r) || r === 'R-08',
+      `the plan check cites ${r}, which §7 does not mark journal — she would be ` +
+      `pronouncing on a judgment rule no row can see`);
+  }
+});
+
 test('her read on price is fenced in the writer and in both gates', () => {
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
