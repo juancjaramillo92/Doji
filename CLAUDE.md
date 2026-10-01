@@ -142,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 652 tests, six suites
+npm test      # 654 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -513,8 +513,8 @@ code you write near it:
   — `NAMED AND NOTHING MORE` — and no mechanism, which is the rule the reshape
   had to carry across and nearly did not.
 - **ONE CHAIN PER BRIEFING, AND IT IS A BREADTH RULE RATHER THAN A LENGTH ONE.**
-  Every scheduled thing that matters still gets named — he needs the week — but
-  only one gets its mechanism walked. Nine subjects each carrying a clause of
+  Every scheduled thing that matters still gets named — he needs the day, and
+  on Sunday the week — but only one gets its mechanism walked. Nine subjects each carrying a clause of
   chain is a survey, and it drifts there because every clause looks justified on
   its own. It took two stored instruction notes failing to land to find it: the
   notes were read every turn and outranked by `cut words and never events`, which

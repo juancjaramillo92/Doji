@@ -4009,6 +4009,25 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
   }
 });
 
+test('TRIM counts too, last, because the short messages broke the rule the critic fixed', () => {
+  /* The critic's count took the briefing to no paragraph over four. TRIM was
+     never given it, and the reply and the move look the same week carried
+     paragraphs of five to seven. Last for the critic's reason: the mechanism
+     check above it can add a clause. */
+  const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)[1];
+  const count = trim.indexOf('LAST, COUNT.');
+  assert.ok(count > -1, 'TRIM no longer counts, so a reply goes out with paragraphs of seven');
+  const step = trim.slice(count).replace(/\s+/g, ' ');
+  assert.match(step, /count the sentences; any paragraph over four is split/,
+    'TRIM\'s count no longer bounds a paragraph at four sentences');
+  assert.match(step, /every em-dash; each one becomes a full stop/,
+    'TRIM\'s count no longer removes the em-dash aside');
+  for (const earlier of ['${WRITING}', 'DO NOT CUT THE MECHANISM']) {
+    assert.ok(trim.indexOf(earlier) > -1 && trim.indexOf(earlier) < count,
+      `TRIM counts before "${earlier}", which can change a paragraph after it`);
+  }
+});
+
 /* ─── Two things a coach does, inside the line ───────────────────────────────
    His decision, after the signal rule was put to him: keep it, and let her do
    two things it had been read as forbidding. A level price has already printed
@@ -6345,6 +6364,10 @@ test('the Sunday briefing reads the week, is told it is about the week, and the 
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
   const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
   assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
+  assert.match(system, /Today's releases and nothing else/,
+    'the weekday calendar lists more than its own day again, so tomorrow arrives twice');
+  assert.match(system, /the one briefing that lists more than its own day/,
+    'SYSTEM no longer says Sunday is the exception to the day-only calendar');
   assert.match(system, /not\s+a look back at his week/,
     'SYSTEM no longer rules out a weekly review, which he decided against');
   assert.match(system, /week's calendar is a list of the week\s+and is not counted/,
@@ -6652,7 +6675,7 @@ test('every model the map names belongs to a caller that exists', () => {
     // one body, so their labels are arguments to it rather than literals beside
     // an effort — invisible to the reader above, and a model row keyed on one of
     // them would have read as naming nothing.
-    ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'\)/g)].map(m => m[1]),
+    ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'(?:,\s*\w+)?\)/g)].map(m => m[1]),
   ]);
   assert.ok(labels.size >= 5,
     `only ${labels.size} caller labels read out of the file — the reader has gone blind`);
@@ -6700,7 +6723,7 @@ test('no caller that runs a tool loop is on the cheaper model', () => {
       new RegExp(`ask\\([\\s\\S]{0,400}?'(?:high|medium|low)',\\s*'${label}',\\s*(\\w+)`));
     if (direct) return direct[1];
     // Through gate(): its own ask() names the array every caller of it gets.
-    if (new RegExp(`gate\\([\\s\\S]{0,200}?'${label}'\\)`).test(EUGENIA_TS)) {
+    if (new RegExp(`gate\\([\\s\\S]{0,200}?'${label}'(?:,\\s*\\w+)?\\)`).test(EUGENIA_TS)) {
       const at = EUGENIA_TS.indexOf('async function gate(');
       return EUGENIA_TS.slice(at).match(/'medium', label, (\w+)/)?.[1];
     }
@@ -6902,7 +6925,7 @@ test('the two gates share the half that makes a gate safe', () => {
     const i = body.indexOf(from);
     return i < 0 ? null : (body.slice(i).match(/return [^;]+;/) ?? [])[0];
   };
-  assert.equal(firstReturn('if (keepDraft(draft, revised))'), 'return draft;',
+  assert.equal(firstReturn('if (keepDraft(draft, revised, most))'), 'return draft;',
     'a gate no longer overrules a failed revision, so a critic that returns an ' +
     'apology sends the apology');
   assert.equal(firstReturn('} catch'), 'return draft;',
@@ -6954,6 +6977,12 @@ test('keepDraft is relative, because it now reads three-sentence messages', () =
     'overruled on every message it ever checks');
   assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
     'keepDraft no longer scales with the draft it is judging');
+  /* AND TRIM'S CEILING IS ITS OWN. Held at the call, because keepDraft is pure
+     and driven in fold.test.mjs, and a trim that stops passing it falls back to
+     twice the draft — the ceiling its own notes once got through under. */
+  const at = EUGENIA_TS.indexOf('async function trim(');
+  assert.match(EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at)), /'trim', TRIM_MOST\)/,
+    'TRIM is judged by the critic\'s ceiling again, so its notes on a message can reach him with it');
 });
 
 /* ─── Which model ran, which the log line said and the row did not ───────────

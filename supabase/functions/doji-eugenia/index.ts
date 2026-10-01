@@ -3140,6 +3140,15 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
    happened, where the prompt forbids describing a print as still to come. Today
    stays bare, or the date is noise on nearly every line.
 
+   AND A ROW WITH NO FIGURE IS NOT DUE ONCE ITS TIME HAS GONE. `due` was
+   whatever lacked an actual, which is every speech, all day — Barkin at 12:30
+   still read as coming at four — and every print whose number TradingView has
+   not published yet. On 1 October it was also her own pre-018 rows for that
+   morning's claims and ISM, beside TradingView's landed copies: one release
+   listed twice, once as landed and once as still ahead, and she said so. A
+   past row says it is past and that no figure is on file, which is true of all
+   three and claims nothing about which.
+
    AND THE WEEKDAY IS SAID, NOT LEFT TO HER. The week the Sunday briefing opens
    is laid out a day per label, and a model turning "2 Oct" into a Friday is a
    calendar sum done in its head — the kind that comes out a day off and reads
@@ -3161,6 +3170,7 @@ export function calendarList(rows: Release[], now = Date.now(),
              (r.consensus ? ` against ${r.consensus} expected` : "") +
              (r.note ? `. ${r.note}` : "");
     }
+    if (Date.parse(r.at) <= now) return `${head} — PAST, no figure on file`;
     return `${head} — due` +
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");
@@ -3724,10 +3734,22 @@ export const feedbackKeyboard = (day: string) => ({
 
    A third is the same judgement made scale-free. On a briefing it is stricter
    than the four hundred ever was; on a short message it still catches the
-   apology, which is the shape it exists for. */
-export function keepDraft(draft: string, revised: string): boolean {
+   apology, which is the shape it exists for.
+
+   THE CEILING IS EACH GATE'S OWN, BECAUSE ONLY ONE OF THEM MAY ADD. The critic
+   puts back a missing link or a missing verdict, so a briefing can legitimately
+   grow; twice the draft is where that stops being an edit. `TRIM` checks how a
+   short message is written and is told to change nothing else, so it cuts and
+   swaps words and never builds. Twice was its ceiling too, and on 30 September
+   it returned 852 characters for a 541-character reply — its own notes on the
+   message ("this message looks fine as is…") above the message itself, sent to
+   him and stored as hers. Every other revision it made that fortnight sat
+   within a tenth of the draft. */
+export const TRIM_MOST = 1.25;
+
+export function keepDraft(draft: string, revised: string, most = 2): boolean {
   const t = revised.trim();
-  return t.length < draft.length / 3 || t.length > draft.length * 2;
+  return t.length < draft.length / 3 || t.length > draft.length * most;
 }
 
 async function critique(draft: string, notes: string, channels: string, desk: string,
@@ -3763,7 +3785,7 @@ async function critique(draft: string, notes: string, channels: string, desk: st
    `critique` returned. The three that GAINED a gate kept storing the draft for
    as long as they had one. */
 async function trim(draft: string, desk: string, story: string): Promise<string> {
-  return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
+  return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }
 
 /* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
@@ -3781,11 +3803,11 @@ async function trim(draft: string, desk: string, story: string): Promise<string>
    different repairs, and a gate paid for on every message whose effect cannot
    be seen is the cheap-half meter again. One verdict per gated message, on
    every outcome including the one that threw, so the rows count the messages. */
-async function gate(draft: string, asked: string, label: string): Promise<string> {
+async function gate(draft: string, asked: string, label: string, most?: number): Promise<string> {
   const caller = `${label} verdict`;
   try {
     const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS);
-    if (keepDraft(draft, revised)) {
+    if (keepDraft(draft, revised, most)) {
       await recordRun({ caller, ok: true, chars: draft.length,
                         detail: `kept the draft — revision ${revised.trim().length} vs draft ${draft.length}` });
       return draft;

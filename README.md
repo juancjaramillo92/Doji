@@ -1744,7 +1744,9 @@ Five slots. What happened, in two or three sentences with the conclusion first;
 calendar; one context line; one thing worth noticing.
 
 **The calendar is the one place the prose rule is deliberately relaxed** — a plain
-day label and one line per item, times in ET, one fact each. It reads better than
+day label and one line per item, times in ET, one fact each. On a weekday it is
+that day's releases and nothing more; tomorrow's belong to tomorrow's briefing.
+Sunday's is the week, below. It reads better than
 the prose around it did, which is the whole argument for it. The relaxation is
 narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
 no mechanism goes in it. That slot is where a second chain hides.
@@ -1823,7 +1825,9 @@ plain words still read as hard, and no rule was being broken. The rules now:
   is still a wall. The critic COUNTS this one as its last step, and every
   em-dash with it, rather than reading for it among the rest: three briefings in
   a row went through it with six-sentence paragraphs while the verdict row read
-  `revised` every time.
+  `revised` every time. It worked: the next briefing had none over four. `TRIM`
+  counts the same way now, as its last step too, because the short messages that
+  week still carried paragraphs of five to seven.
 - **Four to six numbers in the whole briefing**, and a number that cannot be said
   to *mean* something is one of the ones to cut. Fourteen true figures is a page
   he skims; four he remembers by lunch.
@@ -1982,7 +1986,12 @@ Factory's folder. TradingView keeps an id for every release, so one release is
 one row whatever it is called, and nothing she can call is able to create one.
 What she had filed for the days ahead was deleted when 018 was applied, since
 TradingView's rows for the same releases arrive under other names; what had
-already printed stays, as the history this table exists to grow.
+already printed stays, as the history this table exists to grow. On the day 018
+went in, that meant the morning's claims and ISM were each listed twice, her copy
+beside TradingView's, until they aged out of the window — and hers, carrying no
+actual, read as still **due** hours after the print. `calendarList` marks a row
+with no figure **PAST** once its time has gone, which is also every speech, all
+day, and every print whose number has not reached the calendar yet.
 
 **A figure TradingView has not published is left out of the row, never sent as
 null.** `merge-duplicates` writes exactly the keys a payload names, so a filing
@@ -2132,10 +2141,17 @@ or three sentences and often under 400 to begin with, so that floor overrules
 every revision there is — and a gate overruled every time looks exactly like a
 gate that agreed with the draft.
 
+**And its ceiling is each gate's own.** The critic may put back a missing link or
+a missing verdict, so a briefing can grow, up to twice the draft. `TRIM` only
+cuts and swaps words, so it may grow a quarter (`TRIM_MOST`). At twice, a
+541-character reply came back at 852 on 30 September with `TRIM`'s own notes on
+the message above it — *"this message looks fine as is…"* — and that went out and
+was stored as hers. Every other trim that fortnight stayed within a tenth.
+
 **One chain per briefing, not one per event.** Every scheduled thing that
-matters still gets named — he needs the week — but only one of them gets its
-mechanism walked. Nine subjects each carrying a clause of chain is not a
-thorough briefing, it is a survey, and it drifts there precisely because every
+matters still gets named — he needs the day, and on Sunday the week — but only
+one of them gets its mechanism walked. Nine subjects each carrying a clause of
+chain is not a thorough briefing, it is a survey, and it drifts there precisely because every
 clause looks justified on its own. The round-up slot now says so itself: named
 and nothing more, no mechanism at all. `CRITIC` holds the same rule, because the
 critic runs last and a rule loosened in one place and left standing in the other
