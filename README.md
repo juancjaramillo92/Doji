@@ -1347,7 +1347,7 @@ own answer, as `?bars=raw`'s are:
 | `?probe=` | what it asks |
 |---|---|
 | `calendar` | the next three days of US events, and the past week at high importance, to see whether a release that printed carries its actual beside the forecast and the prior |
-| `quotes` | which symbols resolve for the dollar, the two- and ten-year yields, the real yield, silver, oil, the S&P and the VIX, and what a quote carries |
+| `quotes` | whether the quote batch answers for the dollar, the two- and ten-year yields, the real yield, silver, oil, the S&P and the VIX with no forex symbol in it — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |

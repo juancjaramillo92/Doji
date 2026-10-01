@@ -353,8 +353,12 @@ async function tvPost(session: Record<string, string>, tool: AllowedTool,
      calendar   the shape of an event, and whether a release that has printed
                 carries its actual beside the forecast and the prior — the
                 week behind is asked at high importance for that reason
-     quotes     which symbols resolve, for the dollar, the yields, the real
-                yield and the metals, and what a quote carries
+     quotes     whether the quote batch answers for the dollar, the yields,
+                the metals and the indices once no forex symbol is in it —
+                it refused twice with the forex scanner's 429, and the whole
+                batch failed with it — and each one's last bars from the OHLCV
+                read, which answered where the batch did not, with the bar
+                times saying how fresh each feed is
      gold       the broker and TradingView read in the same second, which is
                 the only way "which gold price is better" is a measurement —
                 and the last minute bars, which say how stale a TradingView
@@ -379,7 +383,12 @@ const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
     ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(-7), date_to: day(0), min_importance: 1 }],
   ],
   quotes: () => [
-    ["mcp-tv-get-symbol-data-batch", { symbols: [...GOLD, ...AROUND] }],
+    ["mcp-tv-get-symbol-data-batch", { symbols: AROUND }],
+    // The real yield is a daily series, so it is asked for in days; a 15m bar
+    // of it would be its own refusal and answer nothing.
+    ...AROUND.filter(s => s !== "FRED:DFII10")
+      .map(symbol => ["mcp-tv-get-ohlcv", { symbol, interval: "15m", count: 2 }] as [AllowedTool, Record<string, unknown>]),
+    ["mcp-tv-get-ohlcv", { symbol: "FRED:DFII10", interval: "1D", count: 3 }],
   ],
   gold: () => [
     ["mcp-tv-get-symbol-data-batch", { symbols: GOLD }],
