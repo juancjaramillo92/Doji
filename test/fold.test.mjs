@@ -27,11 +27,11 @@ import { readFileSync } from 'node:fs';
 // is now one of it. That this import resolves is also what proves every
 // function's `../_shared/edge.ts` resolves — the same file, the same path
 // shape — which is the check standing between a bad extraction and a deploy.
-import { secretMatches, nyClock, nyDate, marketOpen } from '../supabase/functions/_shared/edge.ts';
+import { secretMatches, nyClock, nyDate, marketOpen, parseSse } from '../supabase/functions/_shared/edge.ts';
 
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
-  lookbackFor, foldHours, balanceTarget, parseSse,
+  lookbackFor, foldHours, balanceTarget,
   fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 

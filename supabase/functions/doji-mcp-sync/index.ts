@@ -38,7 +38,8 @@
 // scope is what lets this file be imported under plain Node without throwing
 // before a single assertion runs; test/fold.test.mjs is what uses it.
 import {
-  env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
+  SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -242,57 +243,15 @@ export const DESTRUCTIVE_TOOLS = [
 ] as const;
 
 /* ─── MCP transport ────────────────────────────────────────────────────────
-   Streamable HTTP. Three things make it fiddlier than a REST call: a session
-   must be opened with `initialize` and its Mcp-Session-Id echoed on every later
-   call; sessions expire within minutes, so each invocation opens a fresh one
-   rather than caching; and responses arrive as Server-Sent Events, so the JSON
-   is wrapped in `event: message\ndata: {...}` framing that has to be peeled off.
+   The handshake and the SSE framing are in _shared, because TradingView speaks
+   the same transport; what is this function's own is the endpoint and the
+   token, which is all the headers below carry.
    ───────────────────────────────────────────────────────────────────────── */
 const MCP_HEADERS = {
   "Authorization": `Bearer ${MCP_TOKEN}`,
   "Content-Type": "application/json",
   "Accept": "application/json, text/event-stream",
 };
-
-// Walks the data: frames from the END BACKWARDS and returns the last one that
-// actually parses. Taking the final line unconditionally meant a trailing
-// keepalive or a second event surfaced as a SyntaxError inside a generic 500 —
-// which pg_cron's net.http_post discards, so it reported to nobody.
-export function parseSse(body: string): any {
-  const frames = body.split("\n")
-    .filter(l => l.startsWith("data:"))
-    .map(l => l.slice(5).trim())
-    .filter(Boolean);
-
-  for (let i = frames.length - 1; i >= 0; i--) {
-    try { return JSON.parse(frames[i]); } catch { /* try the one before */ }
-  }
-  return JSON.parse(body.trim());   // no SSE framing at all — plain JSON body
-}
-
-async function mcpInit(): Promise<string> {
-  const res = await fetch(MCP_URL, {
-    method: "POST", headers: MCP_HEADERS,
-    body: JSON.stringify({
-      jsonrpc: "2.0", id: 1, method: "initialize",
-      params: {
-        protocolVersion: "2025-06-18", capabilities: {},
-        clientInfo: { name: "doji-sync", version: "3" },
-      },
-    }),
-  });
-  const sid = res.headers.get("mcp-session-id");
-  // Does not echo the response body — it can carry auth detail.
-  if (!res.ok || !sid) throw new Error(`MCP initialize failed (HTTP ${res.status})`);
-
-  // The spec requires this notification before normal calls are accepted.
-  await fetch(MCP_URL, {
-    method: "POST",
-    headers: { ...MCP_HEADERS, "Mcp-Session-Id": sid },
-    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
-  });
-  return sid;
-}
 
 /* The request and nothing else, so the body cTrader sent can be had whole as
    well as unwrapped. mcpCall wants the deals inside it; ?raw=1 wants the frame,
@@ -886,7 +845,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const from     = to - hours * 3600_000;               // what gets written
     const foldFrom = to - foldHours(hours) * 3600_000;    // what gets read
 
-    const sid = await mcpInit();
+    const sid = await mcpInit(MCP_URL, MCP_HEADERS, { name: "doji-sync", version: "3" });
 
     /* ?tools=1 — WHAT THE BROKER ACTUALLY OFFERS, which is a question this
        repository has had to answer by reading its own allow-list and hoping.
