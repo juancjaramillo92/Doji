@@ -41,7 +41,7 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
   calendarWindow, foldBars, foldHeadlines } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
-  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
+  chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
@@ -54,6 +54,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
+  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -790,6 +791,25 @@ test('the move look is handed the last hour of headlines and says so, and says w
     /One of the two feeds could not be read\./);
 });
 
+/* A conversation reads six hours, and six hours is a span a feed read to a
+   fixed number of headlines may not hold. Folded, the fixture's dollar feed
+   stops at 12:52 New York while its gold feed reaches 09:27, so before 12:52
+   only one feed was read — and a block that did not say so would hand her a
+   quiet dollar where there was an unread one. */
+test('the conversation reads six hours of headlines, names another day, and says where a feed stops', () => {
+  const headlines = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
+  const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T18:00:00Z'), 6 * 60);
+  assert.match(out, /Headlines in the last 6 hours/, 'the span is not the one that was read');
+  assert.match(out, /Gold holds steady/, 'a headline from earlier in the six hours is dropped');
+  assert.match(out, /feeds reach back only to 12:52 ET/,
+    'a feed that stops inside the span is presented as a quiet one');
+
+  const next = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-02T05:00:00Z'), 12 * 60);
+  assert.match(next, /ET on Thursday 1 Oct/, 'a headline from yesterday reads as today\'s');
+  assert.doesNotMatch(headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T17:45:00Z')),
+    /on Thursday/, 'a headline from today carries a date it does not need');
+});
+
 test('headlines that will not read send her to search, and never take the look down', async () => {
   const realFetch = globalThis.fetch, realErr = console.error;
   console.error = () => {};
@@ -1261,15 +1281,6 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
   // Every hour of one weekday: exactly one of the twenty-four is the hour.
   const due = [...Array(24)].filter((_, h) => briefDue(new Date(Date.UTC(2026, 7, 19, h, 0))));
   assert.equal(due.length, 1);
-});
-
-test('the salutation matches the time of day the briefing lands', () => {
-  /* PUNCTUATED FOR THE EAR. The full stop ends it, so the voice does not draw
-     `jefesito` out; and there is no comma before the name, because a comma is a
-     rest to a voice and it split one breath into two. The vocative comma is the
-     correct-looking edit, and refusing it is half of what this asserts. */
-  assert.equal(greeting('weekday'), 'Buenos días jefesito.');
-  assert.equal(greeting('sunday'),  'Buenas tardes jefesito.');
 });
 
 /* ─── Eugenia: the pulse ─────────────────────────────────────────────────────
@@ -3862,10 +3873,10 @@ test('a calendar line from another day names the day, and today stays bare', () 
   ], Date.parse('2026-09-24T12:02:00Z'));
   assert.match(out, /· 08:30 ET jobless claims — due/,
     'today\'s release carries a date it does not need');
-  assert.match(out, /· 08:30 ET on 25 Sept? durable goods/,
+  assert.match(out, /· 08:30 ET on Friday 25 Sept? durable goods/,
     'tomorrow\'s 08:30 reads exactly like today\'s — she can brief it as due this morning');
-  assert.match(out, /· 10:00 ET on 25 Sept? Michigan expectations/);
-  assert.match(out, /· 20:00 ET on 23 Sept? FOMC minutes/,
+  assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
+  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
 });
 
@@ -5139,6 +5150,7 @@ const TOOL_CALLS = [
   ['get_strategy',  { section: '§4.1' }],
   ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
   ['get_market',    {}],
+  ['get_around',    {}],
   ['record_actual', { at: '2026-09-07T12:30:00Z', name: 'CPI', actual: '+0.3% m/m' }],
   ['set_thesis',    { thesis: 'a reading' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
@@ -5146,9 +5158,8 @@ const TOOL_CALLS = [
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH, because a list typed by hand is a
-   family that can quietly lose a member. Thirteen tools are driven here
-   against four refusals; a fourteenth added to `serve` and not added above
-   would be undriven, and this test would go on passing — which is the same
+   family that can quietly lose a member. Every tool is driven here against
+   four refusals; one added to `serve` and not added above would be undriven, and this test would go on passing — which is the same
    fault as a path with no heartbeat and a door with no cron job, arriving in
    the one place that thought it was exhaustive. The names are resolved through
    the `*_TOOL` constants rather than read off the `case` labels, because a
@@ -5245,8 +5256,8 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
    ─────────────────────────────────────────────────────────────────────────── */
 
 const BLOCKS = {
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
-  healthBlock, loopsBlock, calendarBlock, positionsBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock,
+  healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
 };
 
 test('every block degrades to nothing when its read fails, and never throws', async () => {
@@ -5303,4 +5314,100 @@ test('every block says something when its read succeeds', async () => {
         `only asks whether it threw`);
     }
   } finally { globalThis.fetch = realFetch; console.error = realErr; }
+});
+
+/* ─── What broke since the last briefing ─────────────────────────────────────
+   Driven through the real block, against a database that answers, because the
+   window is the decision and a pure test of `sinceBriefing` alone would be
+   handed the marker rather than reading it. Friday is the case it exists for:
+   on a Monday "yesterday" was Sunday, so a Friday breach was never raised. */
+const closed = (id, open_day, entry_time, fill_time, extra = {}) => trade({
+  id, open_day, entry_time, fill_time, entry_price: 3400, exit_price: 3395,
+  pnl: -10, net_pnl: -10, ...extra,
+});
+
+/* ─── The week the Sunday briefing opens ─────────────────────────────────────
+   Driven against a database that answers, from Sunday 17:00 New York: the
+   question is whether Friday's payrolls reaches her, and a query asserted on
+   alone would not say whether the rendering names its day. */
+test('the Sunday briefing is handed the week ahead, high releases only, each with its day', async () => {
+  const sunday = Date.parse('2026-09-27T21:00:00Z');
+  const q = weekQuery(sunday);
+  assert.match(q, /importance=eq\.high/, 'the week reads every importance, which is most of a page');
+  assert.match(q, /at=gte\.2026-09-27T21:00:00\.000Z/, 'the week does not start now');
+  assert.match(q, /at=lte\.2026-10-04T21:00:00\.000Z/, 'the week does not reach the next Sunday, so Friday is cut off');
+  assert.match(q, /order=at\.asc/, 'the week is not in the order it happens');
+
+  const rows = [
+    { id: 1, at: '2026-09-30T12:15:00Z', name: 'ADP Nonfarm Employment Change (Sep)', importance: 'high',
+      consensus: '50K', prior: '54K', actual: null, note: null },
+    { id: 2, at: '2026-10-02T12:30:00Z', name: 'Nonfarm Payrolls (Sep)', importance: 'high',
+      consensus: '45K', prior: '22K', actual: null, note: null },
+  ];
+  const realFetch = globalThis.fetch;
+  let asked = '';
+  globalThis.fetch = async (url) => {
+    asked = String(url);
+    return new Response(JSON.stringify(rows), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const out = await weekBlock(sunday);
+    assert.match(asked, /eugenia_calendar\?/, 'the week is not read from her calendar');
+    assert.match(out, /The week ahead/, 'the week arrives under the rolling calendar\'s heading');
+    assert.match(out, /Nonfarm Payrolls \(Sep\)[^\n]*due, 45K expected/, 'Friday\'s payrolls does not reach the Sunday briefing');
+    assert.match(out, / on Friday 2 Oct Nonfarm Payrolls/, 'a release later in the week does not name its day');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('sinceBriefing keeps closed trades from the last briefing on, and the hold that closed after it', () => {
+  const sunday = '2026-09-27T21:00:00Z';  // 17:00 New York
+  assert.ok(sinceBriefing(closed('PID1', '2026-09-28', '2026-09-28T13:00:00Z', '2026-09-28T14:00:00Z'), sunday),
+    'a trade taken and closed after the last briefing is not judged');
+  assert.ok(!sinceBriefing(closed('PID2', '2026-09-25', '2026-09-25T13:00:00Z', '2026-09-25T14:00:00Z'), sunday),
+    'a trade the previous briefing already covered is judged again');
+  assert.ok(sinceBriefing(closed('PID3', '2026-09-25', '2026-09-25T19:00:00Z', '2026-09-28T14:00:00Z'), sunday),
+    'a Friday hold that closed on Monday is judged by neither briefing — R-15\'s whole case');
+  assert.ok(!sinceBriefing(closed('PID4', '2026-09-28', '2026-09-28T13:00:00Z', null, { exit_price: null }), sunday),
+    'an open trade reaches the verdict block, and a verdict on it is a hard prohibition');
+  assert.ok(!sinceBriefing(closed('T-5', '2026-09-28', null, null), sunday),
+    'a pre-sync row is judged as a closed broker trade');
+});
+
+test('breachesList names only what broke, and says so when nothing did', () => {
+  const r = (rule, verdict, ids = []) => ({ rule, verdict, passed: 1, failed: verdict === 'fail' ? 1 : 0,
+    unresolved: 0, ids, why: 'because' });
+  assert.equal(breachesList(null), '', 'no closed trade in the window still produced a sentence');
+  assert.match(breachesList([r('R-01', 'pass'), r('R-14', 'unknown')]), /No closed trade since your last briefing broke/,
+    'a window with nothing broken says nothing, and she is left to work it out from the rows');
+  const out = breachesList([r('R-01', 'pass'), r('R-12', 'fail', ['PID9']), r('R-14', 'unknown')]);
+  assert.match(out, /R-12: FAIL/, 'a broken rule is not named');
+  assert.match(out, /PID9/, 'the trade that broke it is not named, so he cannot check it');
+  assert.doesNotMatch(out, /R-01|R-14/, 'a rule that did not break is in the list of breaches');
+});
+
+test('the briefing is handed what Friday broke on Sunday, and what the weekend hold broke on Monday', async () => {
+  const friday = [
+    closed('PID11', '2026-09-25', '2026-09-25T12:40:00Z', '2026-09-25T12:50:00Z'),
+    closed('PID12', '2026-09-25', '2026-09-25T13:40:00Z', '2026-09-25T13:50:00Z'),
+    closed('PID13', '2026-09-25', '2026-09-25T15:40:00Z', '2026-09-25T15:50:00Z'),
+  ];
+  const held = closed('PID14', '2026-09-25', '2026-09-25T19:00:00Z', '2026-09-28T11:00:00Z');
+  const realFetch = globalThis.fetch;
+  const serve = (marker, trades) => async (url) => {
+    const table = String(url).match(/rest\/v1\/(\w+)/)?.[1];
+    const body = table === 'eugenia_turns' ? [{ created_at: marker }]
+               : table === 'eugenia_trades' ? trades : [];
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    globalThis.fetch = serve('2026-09-25T12:00:00Z', friday);   // Friday's 08:00 briefing
+    const sunday = await breachesBlock();
+    assert.match(sunday, /R-12: FAIL/, 'three entries on Friday never reach Sunday\'s briefing');
+    assert.match(sunday, /R-12: FAIL[^\n]*2026-09-25/, 'the day that broke R-12 is not named, so he cannot check it');
+
+    globalThis.fetch = serve('2026-09-27T21:00:00Z', [...friday, held]);   // Sunday's 17:00 briefing
+    const monday = await breachesBlock();
+    assert.match(monday, /R-15: FAIL/, 'a hold across the Friday close never reaches a briefing');
+    assert.doesNotMatch(monday, /R-12/, 'Monday judges Friday\'s entries a second time');
+  } finally { globalThis.fetch = realFetch; }
 });

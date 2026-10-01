@@ -1387,6 +1387,16 @@ cite a headline with its time and source, and never to claim what a paywalled
 story says beyond its title. A feed that fails is said, and a read that fails
 sends her back to her search.
 
+**A conversation reads both through `get_around`.** The briefing and the move
+look were handed the dollar, the yields and the wires and a reply was not, so
+asked why gold fell she had a web search and nothing else, against her own rule
+never to quote those from one. `get_around` serves `aroundBlock` and six hours
+of headlines rather than one, since a question is about the morning. Six hours
+is a span the feeds, each read to a fixed number of headlines, may not hold, so
+where the shorter one stops inside it the block says how far back it reaches;
+a line from another day names the day. No TradingView tool was added: the
+function serves the same `?market=1` and `?news=1` it already did.
+
 **A refusal can arrive marked as success.** The quote batch refused with
 TradingView's own 429 inside a result marked `isError: false`, with `success:
 false` in the payload. `unwrap` checks both, and a test holds it to that real
@@ -1620,8 +1630,9 @@ A daily XAU/USD briefing, a quieter look later in the morning, a look at any
 number that actually lands, a word when a position opens into one, and a
 conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 second is the gold open, so the week's first briefing lands exactly as the
-market does. She opens with `Buenos días jefesito.` in the morning and `Buenas
-tardes jefesito.` on Sunday evening.
+market does. She says hello her own way — Spanish or English, whatever fits the
+hour and the market — inside the first paragraph, and goes straight to the
+number.
 
 Reply to her and she answers — by typing, by voice, or by sending a chart.
 `supabase/003_eugenia.sql` holds her memory and her read of the journal,
@@ -1732,11 +1743,26 @@ Five slots. What happened, in two or three sentences with the conclusion first;
 **why that matters for gold**, walked link by link, one sentence per step; the
 calendar; one context line; one thing worth noticing.
 
-**The calendar is the one place the prose rule is deliberately relaxed** — a bold
+**The calendar is the one place the prose rule is deliberately relaxed** — a plain
 day label and one line per item, times in ET, one fact each. It reads better than
 the prose around it did, which is the whole argument for it. The relaxation is
 narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
 no mechanism goes in it. That slot is where a second chain hides.
+
+**On Sunday the briefing is about the week it opens** (`weekBlock`). It was the
+weekday briefing at another hour, and it could not see the week: its
+calendar reached Monday evening, and the week was filed by the nightly pass at
+22:00, five hours after the one briefing about it. So Sunday files the whole week
+first (`filedWeek`, the nightly pass's own filing, which holds every row the
+rolling window would) and is handed every release TradingView rates high for the
+seven days ahead, in place of the rolling calendar rather than beside it. High
+only, because seven days of medium is most of a page and none of it moves gold
+alone; medium still reaches each morning's own calendar. The first paragraph is
+where the story stands as the market opens, the teaching block walks the one
+release most likely to move it, and the calendar slot is the week, a day label
+per line. The week's list is not counted toward the length, in `SYSTEM` and in
+`CRITIC`. It is deliberately not a look back at his week: his trades get what
+they get every morning.
 
 It used to be seven numbered sections with impact emoji, and plain-Englishing
 the words inside them did not help — **seven numbered sections with headings
@@ -1887,11 +1913,23 @@ them would resend a stale copy as history for the next six briefings.
 **She sees your week without being asked.** The last seven New York days of
 trades go in with the briefing, so *"you have not traded since Tuesday"* costs
 no tool round. Mentioned only when there is something real to say, in a clause.
-The one verdict that earns a line in the morning is a closed trade from yesterday
-that broke one of your rules or repeated a mistake she has seen before — the
-fact, her verdict and the lesson in three short sentences, saying so if it is not
-the first time, then back to the market. Most mornings the right amount to say
+The one verdict that earns a line in the morning is a closed trade since the last
+briefing that broke one of your rules or repeated a mistake she has seen before —
+the fact, her verdict and the lesson in three short sentences, saying so if it is
+not the first time, then back to the market. Most mornings the right amount to say
 about your trading is nothing.
+
+**Which rules broke is computed, not read off the rows** (`breachesBlock`). It was
+"yesterday", and on a Monday yesterday is Sunday, so a rule Friday's trades broke
+was never raised unless you asked. The window is now every closed trade since the
+last briefing that went out — Sunday's evening briefing covers Friday — plus any
+trade that CLOSED since then, which is a Friday hold closed on Monday, R-15's
+whole case, open on both briefings either side of the weekend. The rules are
+`check_rules`' own evaluation over that set (`readRules`, one reader for both),
+so she is handed the failures rather than working them out by eye, and told so
+when nothing broke. Closed trades only: a verdict on an open one is a hard
+prohibition. Narrowing the set can lose a day-level failure on a partial day and
+cannot invent one. Your commitments are still hers to hold the trades against.
 
 ### The pulse
 
@@ -2457,11 +2495,11 @@ paragraph preference so each part is a whole thought. The only number left is
 what the speech vendor accepts in one request, and it is a chunk size rather
 than a gate. The prompt is told no length at all.
 
-**The markdown is stripped on the way to the vendor.** The calendar slot carries
-a bold day label per line — the one place the prose rule is relaxed, and it is
-relaxed for a reader's eye. `**Today:**` read aloud is a gamble on what an
-asterisk becomes, so the marks come off for the one reader that does not want
-them.
+**The markdown is stripped on the way to the vendor.** She is told plain text —
+Telegram is sent no parse mode, so a bold label arrives as asterisks — but the
+text is model-written, and the calendar slot is a list where a model reaches for
+one anyway. `**Today:**` read aloud is a gamble on what an asterisk becomes, so
+the boundary takes off what the instruction only asks for.
 
 `TTS_URL` and `TTS_KEY` are optional on the same terms as `STT_*`; `TTS_VOICE`
 and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,
@@ -2528,22 +2566,17 @@ Nothing in the suite can see it, because the suite never calls the vendor. If
 the tempo is unchanged, that is the first thing to suspect, and the fallback is
 to ask for pace in `TTS_STYLE` instead.
 
-**The greeting opens the first paragraph rather than standing as its own, and
-that is what makes it quick.** On a line of its own it was a one-line paragraph,
-so every rule about a paragraph's last sentence landed on hello: *let only the
-last sentence really land*, *take a full breath at a blank line*. Telling the
-voice it was exempt only put an instruction against the text, and the text won.
-Two more things converged on the same last word — it carried no full stop, so
-nothing said *jefesito* was finished, and *slow across a name* read what she
-calls him as a name to slow on. So it ends on a full stop now, joined to the
-briefing by a space, and the voice slows only for a name he has to catch.
-
-**Two tidy edits would each undo it, and both look correct.** On its own line
-the greeting looks neater and sounds worst, so a test reads the call site for
-the space. And written Spanish puts a comma before the name — `Buenos días,
-jefesito.` — which shipped and opened a long gap between the two halves of a
-greeting anyone says in one breath: to a voice a comma is a rest. The greeting
-test asserts the exact string, so the comma cannot come back quietly.
+**The hello is hers, and no longer scripted.** It was a fixed `Buenos días
+jefesito.` put in front of every briefing by code, and it was the line that
+sounded worst: the same words every morning, with a tempo and pauses that three
+rounds of punctuation and voice instructions never fixed. She now opens with a
+greeting of her own, in one breath, inside the first paragraph. On a line of its
+own a hello is read aloud as a paragraph, with every rule about a paragraph's
+closing breath landing on it, which is how the old one dragged. `CRITIC` runs
+last, so it is told the hello is hers and stays as written, that the
+first-sentence test applies to the sentence after it, and that a split never
+leaves it on its own. A test reads the call site, so nothing gets put back in
+front of the briefing.
 
 **The audio is requested as OGG/Opus, and this is the one thing on the path that
 would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
@@ -4644,7 +4677,7 @@ tidy.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches`, `nyClock` and `parseSse`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `greeting`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the thirteen rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
+| `test/fold.test.mjs` | a real `get_deals` response, folded and cross-checked against the real email for the trade they share; `_shared`'s `secretMatches`, `nyClock` and `parseSse`; the poller's `foldPosition`, `nyDay`, `ozFromVolume`, `usdFromCents`, the two windows, `balanceTarget` and `marketOpen`; `doji-email-sync`'s `emailRow` and `answerFor`; Gladys's `parseCallback`, `renderMessage`, `answered` and `staysOpen`, and the two halves of the redraw agreeing on every before-state; Eugenia's `briefDue`, `pulseDue`, `retryDue` — including Sunday's own three hours and that it answers `'sunday'` rather than `'weekday'` — `briefKind`, `dueNow`, `isSilent`, `briefingMarker`, `briefedQuery`, `notesList`, `channelsList`, `chunk`, `tradesQuery`, `repliedQuery`, `openOnUser`, `nowBlock`, `withClock` and `dateTurns`; the whole of `adherence.ts` — every one of the thirteen rules driven in both directions, the holiday calendar including Good Friday and the Saturday observance, `nyInstant` in both halves of the year, and the three-verdict rule that makes an empty population `unknown`; and Eugenia's `thesisLine`, `loopsList`, `calendarList`, `keepDraft`, `parseFeedback`, `stamped`, `apologyFor` and `sweepLine` — the last driven through all three of its states, including the drained archive that must accuse nobody |
 | `test/app.test.mjs` | completeness, `Data.load`, `Data.save` and `Data.replace`, the price-based scratch rule and aggregate inheritance, win rate, the money split, `averages` bucketing on the label rather than the sign, the week and backup-key boundaries, `rangeStats`' half-open range, filing day, sessions, both `Data` indexes, every render step, the three-state discipline answer in every surface that reads it — the compliance bar, the log's ticks, the form's pre-selection, what a save writes back and what the export carries — the xlsx export's figures against the app's own derivations, the journal form, and the dashboard card — that it hides itself when there is nothing, that a landed release is never drawn as one still to come, that her prose is escaped before it reaches `innerHTML`, that a failed read is reported rather than mistaken for a quiet day, and that it never reads her notes |
 | `test/golden.test.mjs` | the snapshot, and the only suite that asserts on what nothing else NAMES: the real page booted against a fixed fixture set on a frozen clock, with every derived value and every panel's markup compared byte for byte against `test/golden.json`. The others test named things; a refactor breaks unnamed ones — an attribute order, a class that stopped being emitted, a label whose whitespace collapsed. Its fixtures earn their place by mutation rather than by looking realistic, and the one to keep in mind is the pair entered and closed in opposite orders, because an ordering rule proved by rows that cannot disagree is the audit's own blind spot. It also SWEEPS `Dates.session` across six windows around both US and both EU changeovers rather than sampling it, since New York and London do not change on the same date and a spot check in July gets the right answer under almost any mistake in those tables. Regenerate with `GOLDEN=write npm test`, deliberately, in the same commit as the behaviour change and never to make a red run go away — a golden file regenerated on failure costs what it always cost and proves nothing |
 | `supabase/verify.sql` | run by hand against the live database, and the only check on it — one query, one row per fact. Its errors are fatal to the rest of the file, so nothing in it may raise on a wrong database: ask about a function by oid or through `to_regprocedure`, never by a written-out signature. A stale one raised 42883 and hid the eleven checks below it for two releases — among them a trigger count 005 had made wrong, which is why rows here name what they expect rather than counting it |
@@ -4833,14 +4866,17 @@ voice note came back as a voice note: the transcript reached her, the text lande
 first, and the audio arrived as a playable bubble rather than a file attachment,
 which is the `opus` question settled by the only thing that could settle it.
 
-**`web_fetch` grounds a number on a page that has to stay fetchable.** The four
-sources are named in the prompt because the tool only fetches URLs already in the
-conversation. It is bounded at both ends — `max_uses` for how many pages and
+**`web_fetch` grounds a number she was not handed.** The tool only fetches URLs
+already in the conversation, so what it reaches is a page a search turned up — a
+figure deeper in a report than the calendar carries, what an official actually
+said. Never gold's price or the market lines: those are handed to her, and a
+second copy off a page is a second number that disagrees with his screen, so no
+price page is named in the prompt any more. It is bounded at both ends — `max_uses` for how many pages and
 `max_content_tokens` for how large one may be. Only the first was written for a
 while, and one long thread can put more into a turn than the rest of the briefing
-put together, re-sent on every round after it. A page that moves or starts refusing bots degrades to search, which
-is what she did before — quietly, and with no signal that the number in the
-opening line came from prose rather than from the instrument.
+put together, re-sent on every round after it. A page that refuses bots
+degrades to search, with no signal that the figure came from prose rather than
+from the page it is on.
 
 **The session seam.** Fills the poller never reached have no `entry_time`, so
 their session derives from close time rather than entry time. Flag it whenever

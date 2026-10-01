@@ -39,7 +39,7 @@ import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // are exported in the app: it is the part that has to be testable.
 import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, weekOf,
-  type TradeRow, type Standing, type Stop,
+  type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 // The app's own arithmetic over the journal — a win rate, the money split, the
 // realised reward-to-risk, the session and setup breakdowns. Pure and imported
@@ -65,8 +65,9 @@ const ANTHROPIC_KEY  = env("ANTHROPIC_API_KEY");
    every other time in this system is kept in. Sunday 17:00 is also the gold
    open, so the week's first briefing lands exactly as the market does.
 
-   Returns which briefing is due, or null. The two answers differ only in their
-   salutation, but they are the whole reason this is not a boolean.
+   Returns which briefing is due, or null. The two answers differ in what she
+   is asked and in their calendar — Sunday's is the week it opens — and that is
+   the whole reason this is not a boolean.
    ───────────────────────────────────────────────────────────────────────── */
 export type Brief = 'weekday' | 'sunday';
 
@@ -124,8 +125,8 @@ export function retryDue(now: Date): Brief | null {
    this HOUR owes and was being answered with a constant. `?force=1` read
    `briefDue(now) ?? 'weekday'`, so the door that exists for the hour a briefing
    did NOT arrive could not produce a Sunday one outside the single hour it was
-   already due — forcing it on a Sunday evening sent Buenos dias and a weekday
-   shape into a market that had just opened for the week. */
+   already due — forcing it on a Sunday evening sent a weekday briefing into a
+   market that had just opened for the week. */
 export const briefKind = (now: Date): Brief =>
   nyClock(now).wd === 0 ? 'sunday' : 'weekday';
 
@@ -186,16 +187,6 @@ export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
   return pulseDue(now) ? 'pulse' : null;
 }
 
-// Buenos días before the week, buenas tardes for the Sunday open — which is
-// the evening, and the only briefing that is not a morning one.
-//
-// PUNCTUATED FOR THE EAR, BECAUSE IT IS HEARD RATHER THAN READ. The full stop
-// is what tells the voice `jefesito` is finished; without one it drew the last
-// syllable out. And there is deliberately no comma before the name, though
-// written Spanish puts one there: to a voice a comma is a rest, and it opened a
-// long gap inside a greeting anyone says in one breath.
-export const greeting = (brief: Brief) =>
-  brief === 'sunday' ? 'Buenas tardes jefesito.' : 'Buenos días jefesito.';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
    THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
@@ -934,23 +925,36 @@ const CHECK_TOOL = {
   },
 } as const;
 
+/* THE FOUR READS THE RULES STAND ON, AND THE EVALUATION, in one place for
+   both of the things that evaluate: the tool, and the briefing's own block. Fed
+   two ways, R-14 could be judged against a calendar in one and against nothing
+   in the other, and nobody would see which. `keep` narrows the trades and
+   nothing else, so the calendar and the stop history are the same either way.
+   Null when nothing was kept, which is not a pass. */
+async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true): Promise<RuleResult[] | null> {
+  const [rows, releases, weeks, moves] = await Promise.all([
+    readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
+    readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
+    readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
+    readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
+  ]);
+  const kept = rows.filter(keep);
+  if (!kept.length) return null;
+  const stops = new Map<string, Stop[]>();
+  for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
+  return checkRules(kept, Date.now(), {
+    releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
+  }, stops);
+}
+
 /* NEVER THROWS, for the reason every other tool here does not — it runs inside
    the loop and an exception costs the answer being written. The read is the one
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const [rows, releases, weeks, moves] = await Promise.all([
-      readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
-      readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
-      readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
-      readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
-    ]);
-    if (!rows.length) return "No trades in that window, so there is nothing to check.";
-    const stops = new Map<string, Stop[]>();
-    for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
-    return adherenceList(checkRules(rows, Date.now(), {
-      releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
-    }, stops));
+    const results = await readRules(days);
+    if (!results) return "No trades in that window, so there is nothing to check.";
+    return adherenceList(results);
   } catch (err) {
     console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
@@ -1341,6 +1345,26 @@ const MARKET_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
+/* THE MARKET AROUND GOLD, IN A CONVERSATION. The briefing and the move look
+   are handed the dollar, the yields, the real yield and the wires; a reply was
+   not, so asked why gold fell she had a web search and nothing else, against
+   her own rule never to quote those from one. The same two reads the move look
+   makes, through the function that holds the TradingView sign-in, with the
+   headlines wider because a question is about the morning. */
+const AROUND_TOOL = {
+  name: "get_around",
+  description:
+    "The market around gold, from TradingView: the dollar index, the two- and " +
+    "ten-year yields, the real yield, silver, oil, the S&P 500 and the VIX, each a " +
+    "level now beside the level at a stated time; and gold's and the dollar's " +
+    "headlines from the last six hours, titles only. Use it whenever you are about " +
+    "to say what the dollar, yields or anything else around gold did, or what " +
+    "crossed the wires, and quote those from here rather than from a search. " +
+    "Every line says what it is measured from; say that window, never 'today'. " +
+    "Like get_market, it says nothing about where price goes next.",
+  input_schema: { type: "object", properties: {}, additionalProperties: false },
+} as const;
+
 /* The fields of that answer this file actually reads. The poller folds pipettes
    out of the quote and settles the scale before it is served, so everything
    here is a display price — see the poller, where that asymmetry is named. */
@@ -1725,6 +1749,7 @@ const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
   MARKET_TOOL,
+  AROUND_TOOL,
   TRADES_TOOL,
   STATS_TOOL,
   CHECK_TOOL,
@@ -1915,6 +1940,8 @@ export async function serve(name: string, input: any): Promise<string> {
     case STRATEGY_TOOL.name: return readStrategy(input.section);
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
+    case AROUND_TOOL.name:
+      return (await Promise.all([aroundBlock(), headlinesBlock(WIRES_CHAT_MIN)])).join("").trim();
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -2508,12 +2535,12 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        /* WITHOUT THE MARKS THAT ARE FOR THE EYE. The calendar slot is a list
-           with a bold day label on each line, which is the one place the prose
-           rule is relaxed because he reads it — and `**Today:**` read aloud is
-           a gamble on what the vendor does with an asterisk. Stripped here
-           rather than written differently, because the text message wants them
-           and this is the only reader that does not. */
+        /* WITHOUT MARKS SHE WAS TOLD NOT TO WRITE. The prompt says plain text,
+           because Telegram is sent no parse mode and renders an asterisk as an
+           asterisk — but this text is model-written, and a model trained on
+           markdown reaches for a bold label in exactly the slot that is a list.
+           `**Today:**` read aloud is a gamble on what the vendor does with an
+           asterisk, so the boundary strips what the instruction only asks for. */
         model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
@@ -2872,6 +2899,58 @@ export async function tradesBlock(): Promise<string> {
   return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
+/* ─── What his trades broke since the last briefing ────────────────────────
+   THE BRIEFING JUDGED "YESTERDAY", AND A WEEK HAS A DAY NO YESTERDAY REACHES.
+   On a Monday yesterday is Sunday, so a rule Friday's trades broke was never
+   raised unless he asked — R-11, R-12 and R-14 all fail on the day the trade
+   is taken, and Friday is a day. Since the last briefing that actually went
+   out is the window that covers every closed trade once, whichever day the
+   last one was and whether a morning in between failed.
+
+   AND WHICH RULES BROKE IS COMPUTED, NOT READ OFF THE ROWS. The prompt tells
+   her doing that by eye over a list of trades is where she will be wrong, and
+   the briefing was the one place still asking her to. §8 also calls a rule his
+   own marker says he followed, and the row says he did not, the most valuable
+   signal the system produces, with no moment where it fires by default; this
+   is that moment, and it is only ever a sentence when something broke.
+
+   CLOSED TRADES ONLY, because a verdict on an open one is a hard prohibition,
+   and a block that names one invites it. A trade counts if its day began on or
+   after the last briefing's, or it closed after that briefing — the second
+   half is the Friday hold that closed on Monday, which is R-15's whole case
+   and was open on both briefings either side of the weekend. Narrowing the
+   population can lose a day-level failure on a partial day; it cannot invent
+   one, which is the direction a gap here has to fail in. */
+const BREACH_DAYS = 7;
+
+export function sinceBriefing(t: TradeRow, at: string): boolean {
+  if (!isBroker(t) || isOpen(t)) return false;
+  return (t.open_day ?? '') >= nyDate(new Date(at)) ||
+         (!!t.fill_time && Date.parse(t.fill_time) >= Date.parse(at));
+}
+
+export function breachesList(results: RuleResult[] | null): string {
+  if (!results) return "";
+  const broke = results.filter(r => r.verdict === 'fail');
+  if (!broke.length) {
+    return "\n\nNo closed trade since your last briefing broke a rule a row can check.";
+  }
+  return `\n\nRules his closed trades broke since your last briefing, computed from the rows:\n` +
+         adherenceList(broke);
+}
+
+export async function breachesBlock(): Promise<string> {
+  try {
+    const [last] = await readRows<{ created_at: string }>('Briefing marker',
+      `${SB_URL}/rest/v1/${briefedQuery()}`);
+    const at = last?.created_at ?? new Date(Date.now() - 86_400_000).toISOString();
+    return breachesList(await readRules(BREACH_DAYS, t => sinceBriefing(t, at)));
+  } catch (err) {
+    console.error("doji-eugenia: breaches unavailable —", err instanceof Error ? err.message : err);
+    return "\n\nWhich rules his recent trades broke could not be checked just now. Say nothing about a broken rule rather than working it out from the rows.";
+  }
+}
+
 /* ─── The running story, the open threads, and the day's calendar ──────────
    Three reads and three renderings, and they are together because they are one
    idea: a briefing that starts from nothing writes a briefing that could have
@@ -3059,13 +3138,23 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
    morning forward, tomorrow's 08:30 and today's are two identical-looking lines,
    and last night's 20:00 read as tonight's — `due` on a release that had already
    happened, where the prompt forbids describing a print as still to come. Today
-   stays bare, or the date is noise on nearly every line. */
-export function calendarList(rows: Release[], now = Date.now()): string {
+   stays bare, or the date is noise on nearly every line.
+
+   AND THE WEEKDAY IS SAID, NOT LEFT TO HER. The week the Sunday briefing opens
+   is laid out a day per label, and a model turning "2 Oct" into a Friday is a
+   calendar sum done in its head — the kind that comes out a day off and reads
+   as certain. */
+const weekday = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC', weekday: 'long',
+}).format(new Date(`${iso}T12:00:00Z`));
+
+export function calendarList(rows: Release[], now = Date.now(),
+                             heading = "The calendar around now, as TradingView lists it"): string {
   if (!rows.length) return "";
   const today = nyDate(new Date(now));
   const lines = rows.map(r => {
     const day = nyDate(new Date(r.at));
-    const head = `· ${nyTime(r.at)} ET` + (day === today ? "" : ` on ${civilDay(day)}`) +
+    const head = `· ${nyTime(r.at)} ET` + (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`) +
                  ` ${r.name}`;
     if (r.actual) {
       return `${head} — LANDED at ${r.actual}` +
@@ -3076,7 +3165,7 @@ export function calendarList(rows: Release[], now = Date.now()): string {
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");
   });
-  return `\n\nThe calendar around now, as TradingView lists it:\n${lines.join("\n")}`;
+  return `\n\n${heading}:\n${lines.join("\n")}`;
 }
 
 export async function calendarBlock(): Promise<string> {
@@ -3084,6 +3173,37 @@ export async function calendarBlock(): Promise<string> {
     return calendarList(await readCalendar());
   } catch (err) {
     console.error("doji-eugenia: calendar unavailable —", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
+
+/* ─── The week ahead, for the briefing that opens it ───────────────────────
+   THE SUNDAY BRIEFING WAS THE WEEKDAY ONE AT ANOTHER HOUR, AND IT COULD NOT
+   SEE THE WEEK IT OPENS. Its calendar reached CAL_AHEAD, which is Monday
+   evening, and the week was filed by the nightly pass at 22:00 — five hours
+   after the one message that is about it. So a Thursday CPI or a Friday payrolls
+   reached the Sunday briefing only if a search happened to turn it up.
+
+   THE WEEK, AND HIGH ONLY. Seven days of everything medium is most of a page
+   and none of it moves gold alone; the releases TradingView rates high are the
+   ones R-14 stands him aside for, and the ones the week turns on. Medium still
+   reaches him, in each morning's own calendar. It replaces the rolling calendar
+   on a Sunday rather than sitting beside it, because the week already holds
+   every high release the rolling window would and the same print twice is two
+   lines she reads as two things. */
+export function weekQuery(now: number): string {
+  const to = new Date(now + 7 * 86_400_000).toISOString();
+  return `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+         `&importance=eq.${HIGH}&at=gte.${new Date(now).toISOString()}&at=lte.${to}` +
+         `&order=at.asc&limit=40`;
+}
+
+export async function weekBlock(now = Date.now()): Promise<string> {
+  try {
+    const rows = await readRows<Release>('Week', `${SB_URL}/rest/v1/${weekQuery(now)}`);
+    return calendarList(rows, now, "The week ahead, every release TradingView rates high");
+  } catch (err) {
+    console.error("doji-eugenia: week unavailable —", err instanceof Error ? err.message : err);
     return "";
   }
 }
@@ -3158,31 +3278,57 @@ export async function aroundBlock(): Promise<string> {
    an explanation for a move a quarter of an hour old, and a window left
    unsaid is one she fills in herself. Titles only, with their time and their
    source, because most stories are paywalled and a title is all that was read:
-   she is told not to claim what the article says. */
+   she is told not to claim what the article says.
+
+   A CONVERSATION ASKS ABOUT THE MORNING, NOT THE LAST QUARTER HOUR, so
+   `get_around` reads six hours. And six hours is a span the feeds may not
+   hold — each is read to a fixed number of headlines — so where the shorter
+   of the two stops inside the span, the block says how far back it reaches:
+   a quiet stretch and an unread one look the same otherwise. A story both
+   feeds carry is folded under the first, so a feed's reach can read as
+   stopping later than it did and never earlier: it says less was read, which
+   is the direction to be wrong in. A line from another day names it,
+   `calendarList`'s rule. */
 const WIRES_MIN = 60;
+const WIRES_CHAT_MIN = 6 * 60;
 
-type Headline = { title: string; source: string; published: string };
+type Headline = { title: string; source: string; published: string; feed: string };
 
-export function headlinesList(answer: { headlines: Headline[]; missing: { symbol: string }[] }, now = Date.now()): string {
+export function headlinesList(answer: { headlines: Headline[]; missing: { symbol: string }[] },
+                              now = Date.now(), minutes = WIRES_MIN): string {
+  const span = minutes === 60 ? "the last hour" : `the last ${minutes / 60} hours`;
+  const today = nyDate(new Date(now));
+  const when = (ms: number) => {
+    const day = nyDate(new Date(ms));
+    return `${nyTime(new Date(ms).toISOString())} ET` +
+           (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`);
+  };
   const recent = answer.headlines.filter(h => {
     const age = now - Date.parse(h.published);
-    return age >= 0 && age <= WIRES_MIN * 60_000;
+    return age >= 0 && age <= minutes * 60_000;
   });
   const gap = answer.missing.length ? " One of the two feeds could not be read." : "";
   if (!recent.length) {
-    return `\n\nNo headline on gold's or the dollar's TradingView feeds in the last hour.${gap}`;
+    return `\n\nNo headline on gold's or the dollar's TradingView feeds in ${span}.${gap}`;
   }
-  return `\n\nHeadlines in the last hour, from TradingView's gold and dollar feeds — titles only, ` +
+  const oldest = new Map<string, number>();
+  for (const h of answer.headlines) {
+    oldest.set(h.feed, Math.min(oldest.get(h.feed) ?? Infinity, Date.parse(h.published)));
+  }
+  const reach = Math.max(...oldest.values());
+  const short = now - reach < minutes * 60_000
+    ? ` The feeds reach back only to ${when(reach)}, so nothing earlier in that span was read.` : "";
+  return `\n\nHeadlines in ${span}, from TradingView's gold and dollar feeds — titles only, ` +
     `most stories are paywalled:\n` +
-    recent.map(h => `· ${nyTime(h.published)} ET, ${h.source}: ${h.title}`).join("\n") + gap;
+    recent.map(h => `· ${when(Date.parse(h.published))}, ${h.source}: ${h.title}`).join("\n") + gap + short;
 }
 
-export async function headlinesBlock(): Promise<string> {
+export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
   try {
     const res = await fetch(TV_NEWS, { headers: { "x-doji-key": CRON_SECRET } });
     const answer = await res.json();
     if (!res.ok || !answer.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
-    return headlinesList(answer);
+    return headlinesList(answer, Date.now(), minutes);
   } catch (err) {
     console.error("doji-eugenia: headlines unavailable —", err instanceof Error ? err.message : err);
     return "\n\nThe headlines could not be read just now; search for what moved it.";
@@ -3660,16 +3806,20 @@ async function gate(draft: string, asked: string, label: string): Promise<string
 
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
-  // Filed before the reads, so the calendar she is handed is this morning's.
-  await filed();
+  /* Filed before the reads, so the calendar she is handed is this morning's —
+     and on a Sunday the whole week, which the nightly pass would otherwise file
+     five hours after the one briefing that is about it. The week holds every
+     row the rolling window would. */
+  await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   /* EVERY READ THE BRIEFING NEEDS, AT ONCE. They are independent and they are
      all small, and run one after another they were a round trip each before the
      first token was asked for. Promise.all is the same argument the tool
      dispatch makes: a batch should cost its slowest member — which here is the
      price, since that one leaves the project for the broker. */
-  const [price, around, notes, channels, trades, story, health, loops, calendar, desk] = await Promise.all([
-    marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), thesisBlock(),
-    healthBlock(), loopsBlock(), calendarBlock(), positionsBlock(),
+  const [price, around, notes, channels, trades, breaches, story, health, loops, calendar, desk] = await Promise.all([
+    marketBlock(), aroundBlock(), notesBlock(), channelsBlock(), tradesBlock(), breachesBlock(),
+    thesisBlock(), healthBlock(), loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(),
+    positionsBlock(),
   ]);
 
   const asked = (due === 'sunday'
@@ -3677,7 +3827,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped being written, everything after it
     // is computed over rows that may be missing, and she is told to lead with it.
-    + health + price + around + notes + channels + trades + story + loops + calendar + desk;
+    + health + price + around + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
@@ -3705,10 +3855,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   const stored = Date.now();
-  // A space, not a blank line. On a line of its own the greeting is a one-line
-  // paragraph, and every TTS_STYLE rule about a paragraph's last sentence and
-  // its closing breath lands on hello — which is how it came out slowest.
-  await sayAloud(`${greeting(due)} ${brief}`, feedbackKeyboard(nyDate(new Date())));
+  await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
      written one row for the draft and one for the critic — what each of them

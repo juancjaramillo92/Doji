@@ -5603,18 +5603,26 @@ test('the text is sent only when the audio did not land', () => {
     'message under the voice note to carry it any more');
 });
 
-test('the greeting opens the first paragraph rather than standing as its own', () => {
-  /* THE HALF `greeting()` CANNOT SEE. On a line of its own the greeting is a
-     one-line paragraph, and every TTS_STYLE rule about a paragraph's last
-     sentence and its closing breath lands on hello — it came out the slowest
-     thing in the message. Putting it back on its own line is the tidy-looking
-     edit, it breaks nothing here, and the only symptom is how it sounds. */
+test('the briefing goes out as she wrote it, hello included, and the hello is hers', () => {
+  /* A SCRIPTED HELLO WAS PREPENDED IN CODE, and it was the line he heard worst:
+     the same words every morning, said with a tempo nothing in the text could
+     fix. The hello is hers now. Two things would quietly undo that — a
+     greeting put back on the front of the briefing, and a critic that, running
+     last, treats her hello as an opening that is true on any morning and cuts
+     it or strands it on a line of its own, where it is read as a paragraph. */
   const at = EUGENIA_TS.indexOf('async function postBriefing(');
   assert.ok(at > -1, 'doji-eugenia no longer has postBriefing()');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
-  assert.match(body, /sayAloud\(`\$\{greeting\(due\)\} \$\{brief\}`/,
-    'the greeting is no longer joined to the briefing by a space — on its own ' +
-    'line it is a paragraph, and the paragraph rules slow it to a crawl');
+  assert.match(body, /sayAloud\(brief, /,
+    'something is put in front of the briefing again — the hello is hers to say');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
+  assert.match(system, /SAY HELLO YOUR OWN WAY, THEN THE NUMBER/, 'SYSTEM no longer asks for her own hello');
+  assert.match(system, /never a line of its own/, 'SYSTEM no longer keeps the hello inside the first paragraph');
+  assert.match(critic, /hello it opens with is hers and stays as written/,
+    'CRITIC can cut her hello as an opening true on any morning, and it runs last');
+  assert.match(critic, /a split never\s+leaves it on its own/,
+    'CRITIC can split the first paragraph after the hello, leaving it to be read as a paragraph');
 });
 
 test('every message she writes goes out through sayAloud', () => {
@@ -6140,14 +6148,14 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
   assert.match(week, /caller: 'calendar week', ok: true/, 'the week filing records no success');
   assert.match(week, /caller: 'calendar week', ok: false/, 'the week filing records no failure');
 
-  const check = src.slice(src.indexOf('async function checkAdherence('));
+  const check = src.slice(src.indexOf('async function readRules('));
   const body = check.slice(0, check.indexOf('\n}'));
   assert.match(body, /releasesQuery\(days\)/, 'check_rules no longer reads the releases');
   assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
-  assert.match(body, /checkRules\(rows, Date\.now\(\), \{/,
+  assert.match(body, /checkRules\(kept, Date\.now\(\), \{/,
     'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
   assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
-  assert.match(body, /\}, stops\)\);/,
+  assert.match(body, /\}, stops\);/,
     'check_rules hands the rules no stop history, so R-19 is unknown on every trade');
 
   /* AND THE POLLER WRITES THE HISTORY, inside the step that already read the
@@ -6290,6 +6298,27 @@ test('the move look reads the wires before it searches, and claims no more than 
     'MOVE no longer stops her claiming what a paywalled story says from its title');
 });
 
+/* ─── What broke since the last briefing ─────────────────────────────────────
+   `breachesBlock` is driven in fold.test.mjs; whether the briefing reads it is
+   not, and a briefing without it still arrives and still mentions his trades —
+   judged by eye, over "yesterday", which is the arrangement it replaced. */
+test('the briefing is handed the rules his trades broke, and told to take them from there', () => {
+  const at = EUGENIA_TS.indexOf('async function postBriefing(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at))
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  assert.ok(reaches(body, 'breachesBlock'),
+    'the briefing no longer reads what his trades broke, so a Friday breach is never raised');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /closed trade since\s+your last briefing/,
+    'SYSTEM judges "yesterday" again, which on a Monday is Sunday');
+  assert.match(system, /never call a rule broken that it does not list/,
+    'SYSTEM no longer holds her to the computed breaches, so she reads them off the rows');
+  // One reader for the tool and the block, so the two cannot be fed differently.
+  const block = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export async function breachesBlock('));
+  assert.match(block.slice(0, block.indexOf('\n}')), /readRules\(/,
+    'the briefing evaluates the rules through a reader check_rules does not use');
+});
+
 test('the release look is handed the release\'s own record, and told to read against it', () => {
   // recordList is pure and driven in fold.test.mjs; whether the look reads it is not.
   const at = EUGENIA_TS.indexOf('async function postRelease(');
@@ -6301,6 +6330,46 @@ test('the release look is handed the release\'s own record, and told to read aga
   // And the filing writes the series, or the record stays empty for ever.
   const rows = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export function calendarRows('));
   assert.match(rows.slice(0, rows.indexOf('\n}')), /'ticker'/, 'calendarRows no longer files the ticker');
+});
+
+/* ─── The briefing that opens the week ───────────────────────────────────────
+   weekBlock is driven in fold.test.mjs. Whether a Sunday reads it, whether she
+   is told what to do with it, and whether the critic counts a week's list
+   against the words are not — and a critic that does would cut the prose to
+   make room for the week every Sunday, running last. */
+test('the Sunday briefing reads the week, is told it is about the week, and the critic does not count it', () => {
+  const at = EUGENIA_TS.indexOf('async function postBriefing(');
+  const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(brief, /due === 'sunday' \? weekBlock\(\) : calendarBlock\(\)/,
+    'the Sunday briefing no longer reads the week, so it sees only to Monday evening');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
+  assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
+  assert.match(system, /not\s+a look back at his week/,
+    'SYSTEM no longer rules out a weekly review, which he decided against');
+  assert.match(system, /week's calendar is a list of the week\s+and is not counted/,
+    'SYSTEM counts the week\'s list against the words');
+  assert.match(critic, /a week's calendar,\s+which the briefing that opens the week carries, is not counted/,
+    'CRITIC counts the week\'s list against the words, and it runs last');
+});
+
+/* ─── The market around gold, in a conversation ──────────────────────────────
+   serve() is driven for get_around in fold.test.mjs. Whether the conversation
+   can call it is the tool array, and whether she knows to is the prompt: a
+   tool in neither place is a reply that searches for the dollar, against the
+   rule that it never be quoted from a search. */
+test('a reply can read the market around gold, and is told to before searching for it', () => {
+  const chat = EUGENIA_TS.match(/const CHAT_TOOLS = \[([\s\S]*?)\];/);
+  assert.ok(chat, 'doji-eugenia no longer defines CHAT_TOOLS');
+  assert.match(chat[1], /\bAROUND_TOOL\b/, 'a reply cannot read the dollar or the yields, so it searches for them');
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const AROUND_TOOL = {'));
+  assert.match(tool.slice(0, tool.indexOf('} as const;')), /name: "get_around"/);
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /IN A CONVERSATION, get_around READS THE SAME LINES/,
+    'SYSTEM no longer tells her the conversation can read the market around gold');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /headlinesBlock\(WIRES_CHAT_MIN\)/,
+    'the conversation reads the move look\'s last hour of headlines, not the morning');
 });
 
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
@@ -6315,9 +6384,14 @@ test('the calendar is filed before the briefing reads it and before the look dec
     return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
   };
   const brief = body('postBriefing');
-  assert.ok(brief.indexOf('await filed()') > -1 &&
-            brief.indexOf('await filed()') < brief.indexOf('calendarBlock()'),
-    'the briefing reads the calendar before it files it');
+  /* AND ON A SUNDAY THE WEEK, which the nightly pass files five hours after
+     the one briefing about it — so a Sunday that filed only the rolling window
+     would read a week that is not there yet, and say nothing past Monday. */
+  const files = brief.search(/await \(due === 'sunday' \? filedWeek\(weekOf\(new Date\(\)\)\) : filed\(\)\)/);
+  assert.ok(files > -1, 'the briefing no longer files the week on a Sunday and the day otherwise');
+  for (const read of ['calendarBlock()', 'weekBlock()']) {
+    assert.ok(brief.indexOf(read) > files, `the briefing reads ${read} before it files it`);
+  }
   const look = body('postRelease');
   const order = ['await filed()', 'await pendingRelease()', 'awaitingActual(due', 'await markLooked('];
   const at = order.map(s => look.indexOf(s));
