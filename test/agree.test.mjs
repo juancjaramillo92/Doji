@@ -6345,6 +6345,25 @@ test('the Sunday briefing reads the week, is told it is about the week, and the 
     'CRITIC counts the week\'s list against the words, and it runs last');
 });
 
+/* ─── The market around gold, in a conversation ──────────────────────────────
+   serve() is driven for get_around in fold.test.mjs. Whether the conversation
+   can call it is the tool array, and whether she knows to is the prompt: a
+   tool in neither place is a reply that searches for the dollar, against the
+   rule that it never be quoted from a search. */
+test('a reply can read the market around gold, and is told to before searching for it', () => {
+  const chat = EUGENIA_TS.match(/const CHAT_TOOLS = \[([\s\S]*?)\];/);
+  assert.ok(chat, 'doji-eugenia no longer defines CHAT_TOOLS');
+  assert.match(chat[1], /\bAROUND_TOOL\b/, 'a reply cannot read the dollar or the yields, so it searches for them');
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const AROUND_TOOL = {'));
+  assert.match(tool.slice(0, tool.indexOf('} as const;')), /name: "get_around"/);
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /IN A CONVERSATION, get_around READS THE SAME LINES/,
+    'SYSTEM no longer tells her the conversation can read the market around gold');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /headlinesBlock\(WIRES_CHAT_MIN\)/,
+    'the conversation reads the move look\'s last hour of headlines, not the morning');
+});
+
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
   /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
      neither can see whether anything calls them. A briefing that reads before

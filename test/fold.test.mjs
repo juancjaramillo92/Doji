@@ -791,6 +791,25 @@ test('the move look is handed the last hour of headlines and says so, and says w
     /One of the two feeds could not be read\./);
 });
 
+/* A conversation reads six hours, and six hours is a span a feed read to a
+   fixed number of headlines may not hold. Folded, the fixture's dollar feed
+   stops at 12:52 New York while its gold feed reaches 09:27, so before 12:52
+   only one feed was read — and a block that did not say so would hand her a
+   quiet dollar where there was an unread one. */
+test('the conversation reads six hours of headlines, names another day, and says where a feed stops', () => {
+  const headlines = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
+  const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T18:00:00Z'), 6 * 60);
+  assert.match(out, /Headlines in the last 6 hours/, 'the span is not the one that was read');
+  assert.match(out, /Gold holds steady/, 'a headline from earlier in the six hours is dropped');
+  assert.match(out, /feeds reach back only to 12:52 ET/,
+    'a feed that stops inside the span is presented as a quiet one');
+
+  const next = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-02T05:00:00Z'), 12 * 60);
+  assert.match(next, /ET on Thursday 1 Oct/, 'a headline from yesterday reads as today\'s');
+  assert.doesNotMatch(headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T17:45:00Z')),
+    /on Thursday/, 'a headline from today carries a date it does not need');
+});
+
 test('headlines that will not read send her to search, and never take the look down', async () => {
   const realFetch = globalThis.fetch, realErr = console.error;
   console.error = () => {};
@@ -5140,6 +5159,7 @@ const TOOL_CALLS = [
   ['get_strategy',  { section: '§4.1' }],
   ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
   ['get_market',    {}],
+  ['get_around',    {}],
   ['record_actual', { at: '2026-09-07T12:30:00Z', name: 'CPI', actual: '+0.3% m/m' }],
   ['set_thesis',    { thesis: 'a reading' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
@@ -5147,9 +5167,8 @@ const TOOL_CALLS = [
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH, because a list typed by hand is a
-   family that can quietly lose a member. Thirteen tools are driven here
-   against four refusals; a fourteenth added to `serve` and not added above
-   would be undriven, and this test would go on passing — which is the same
+   family that can quietly lose a member. Every tool is driven here against
+   four refusals; one added to `serve` and not added above would be undriven, and this test would go on passing — which is the same
    fault as a path with no heartbeat and a door with no cron job, arriving in
    the one place that thought it was exhaustive. The names are resolved through
    the `*_TOOL` constants rather than read off the `case` labels, because a

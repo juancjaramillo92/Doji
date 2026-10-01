@@ -1355,6 +1355,26 @@ const MARKET_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
+/* THE MARKET AROUND GOLD, IN A CONVERSATION. The briefing and the move look
+   are handed the dollar, the yields, the real yield and the wires; a reply was
+   not, so asked why gold fell she had a web search and nothing else, against
+   her own rule never to quote those from one. The same two reads the move look
+   makes, through the function that holds the TradingView sign-in, with the
+   headlines wider because a question is about the morning. */
+const AROUND_TOOL = {
+  name: "get_around",
+  description:
+    "The market around gold, from TradingView: the dollar index, the two- and " +
+    "ten-year yields, the real yield, silver, oil, the S&P 500 and the VIX, each a " +
+    "level now beside the level at a stated time; and gold's and the dollar's " +
+    "headlines from the last six hours, titles only. Use it whenever you are about " +
+    "to say what the dollar, yields or anything else around gold did, or what " +
+    "crossed the wires, and quote those from here rather than from a search. " +
+    "Every line says what it is measured from; say that window, never 'today'. " +
+    "Like get_market, it says nothing about where price goes next.",
+  input_schema: { type: "object", properties: {}, additionalProperties: false },
+} as const;
+
 /* The fields of that answer this file actually reads. The poller folds pipettes
    out of the quote and settles the scale before it is served, so everything
    here is a display price — see the poller, where that asymmetry is named. */
@@ -1739,6 +1759,7 @@ const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
   MARKET_TOOL,
+  AROUND_TOOL,
   TRADES_TOOL,
   STATS_TOOL,
   CHECK_TOOL,
@@ -1929,6 +1950,8 @@ export async function serve(name: string, input: any): Promise<string> {
     case STRATEGY_TOOL.name: return readStrategy(input.section);
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
+    case AROUND_TOOL.name:
+      return (await Promise.all([aroundBlock(), headlinesBlock(WIRES_CHAT_MIN)])).join("").trim();
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -3265,31 +3288,57 @@ export async function aroundBlock(): Promise<string> {
    an explanation for a move a quarter of an hour old, and a window left
    unsaid is one she fills in herself. Titles only, with their time and their
    source, because most stories are paywalled and a title is all that was read:
-   she is told not to claim what the article says. */
+   she is told not to claim what the article says.
+
+   A CONVERSATION ASKS ABOUT THE MORNING, NOT THE LAST QUARTER HOUR, so
+   `get_around` reads six hours. And six hours is a span the feeds may not
+   hold — each is read to a fixed number of headlines — so where the shorter
+   of the two stops inside the span, the block says how far back it reaches:
+   a quiet stretch and an unread one look the same otherwise. A story both
+   feeds carry is folded under the first, so a feed's reach can read as
+   stopping later than it did and never earlier: it says less was read, which
+   is the direction to be wrong in. A line from another day names it,
+   `calendarList`'s rule. */
 const WIRES_MIN = 60;
+const WIRES_CHAT_MIN = 6 * 60;
 
-type Headline = { title: string; source: string; published: string };
+type Headline = { title: string; source: string; published: string; feed: string };
 
-export function headlinesList(answer: { headlines: Headline[]; missing: { symbol: string }[] }, now = Date.now()): string {
+export function headlinesList(answer: { headlines: Headline[]; missing: { symbol: string }[] },
+                              now = Date.now(), minutes = WIRES_MIN): string {
+  const span = minutes === 60 ? "the last hour" : `the last ${minutes / 60} hours`;
+  const today = nyDate(new Date(now));
+  const when = (ms: number) => {
+    const day = nyDate(new Date(ms));
+    return `${nyTime(new Date(ms).toISOString())} ET` +
+           (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`);
+  };
   const recent = answer.headlines.filter(h => {
     const age = now - Date.parse(h.published);
-    return age >= 0 && age <= WIRES_MIN * 60_000;
+    return age >= 0 && age <= minutes * 60_000;
   });
   const gap = answer.missing.length ? " One of the two feeds could not be read." : "";
   if (!recent.length) {
-    return `\n\nNo headline on gold's or the dollar's TradingView feeds in the last hour.${gap}`;
+    return `\n\nNo headline on gold's or the dollar's TradingView feeds in ${span}.${gap}`;
   }
-  return `\n\nHeadlines in the last hour, from TradingView's gold and dollar feeds — titles only, ` +
+  const oldest = new Map<string, number>();
+  for (const h of answer.headlines) {
+    oldest.set(h.feed, Math.min(oldest.get(h.feed) ?? Infinity, Date.parse(h.published)));
+  }
+  const reach = Math.max(...oldest.values());
+  const short = now - reach < minutes * 60_000
+    ? ` The feeds reach back only to ${when(reach)}, so nothing earlier in that span was read.` : "";
+  return `\n\nHeadlines in ${span}, from TradingView's gold and dollar feeds — titles only, ` +
     `most stories are paywalled:\n` +
-    recent.map(h => `· ${nyTime(h.published)} ET, ${h.source}: ${h.title}`).join("\n") + gap;
+    recent.map(h => `· ${when(Date.parse(h.published))}, ${h.source}: ${h.title}`).join("\n") + gap + short;
 }
 
-export async function headlinesBlock(): Promise<string> {
+export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
   try {
     const res = await fetch(TV_NEWS, { headers: { "x-doji-key": CRON_SECRET } });
     const answer = await res.json();
     if (!res.ok || !answer.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
-    return headlinesList(answer);
+    return headlinesList(answer, Date.now(), minutes);
   } catch (err) {
     console.error("doji-eugenia: headlines unavailable —", err instanceof Error ? err.message : err);
     return "\n\nThe headlines could not be read just now; search for what moved it.";

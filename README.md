@@ -1387,6 +1387,16 @@ cite a headline with its time and source, and never to claim what a paywalled
 story says beyond its title. A feed that fails is said, and a read that fails
 sends her back to her search.
 
+**A conversation reads both through `get_around`.** The briefing and the move
+look were handed the dollar, the yields and the wires and a reply was not, so
+asked why gold fell she had a web search and nothing else, against her own rule
+never to quote those from one. `get_around` serves `aroundBlock` and six hours
+of headlines rather than one, since a question is about the morning. Six hours
+is a span the feeds, each read to a fixed number of headlines, may not hold, so
+where the shorter one stops inside it the block says how far back it reaches;
+a line from another day names the day. No TradingView tool was added: the
+function serves the same `?market=1` and `?news=1` it already did.
+
 **A refusal can arrive marked as success.** The quote batch refused with
 TradingView's own 429 inside a result marked `isError: false`, with `success:
 false` in the payload. `unwrap` checks both, and a test holds it to that real
