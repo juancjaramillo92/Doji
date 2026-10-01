@@ -65,9 +65,9 @@ const ANTHROPIC_KEY  = env("ANTHROPIC_API_KEY");
    every other time in this system is kept in. Sunday 17:00 is also the gold
    open, so the week's first briefing lands exactly as the market does.
 
-   Returns which briefing is due, or null. The two answers differ in their
-   salutation and in their calendar — Sunday's is the week it opens — and that
-   is the whole reason this is not a boolean.
+   Returns which briefing is due, or null. The two answers differ in what she
+   is asked and in their calendar — Sunday's is the week it opens — and that is
+   the whole reason this is not a boolean.
    ───────────────────────────────────────────────────────────────────────── */
 export type Brief = 'weekday' | 'sunday';
 
@@ -125,8 +125,8 @@ export function retryDue(now: Date): Brief | null {
    this HOUR owes and was being answered with a constant. `?force=1` read
    `briefDue(now) ?? 'weekday'`, so the door that exists for the hour a briefing
    did NOT arrive could not produce a Sunday one outside the single hour it was
-   already due — forcing it on a Sunday evening sent Buenos dias and a weekday
-   shape into a market that had just opened for the week. */
+   already due — forcing it on a Sunday evening sent a weekday briefing into a
+   market that had just opened for the week. */
 export const briefKind = (now: Date): Brief =>
   nyClock(now).wd === 0 ? 'sunday' : 'weekday';
 
@@ -187,16 +187,6 @@ export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
   return pulseDue(now) ? 'pulse' : null;
 }
 
-// Buenos días before the week, buenas tardes for the Sunday open — which is
-// the evening, and the only briefing that is not a morning one.
-//
-// PUNCTUATED FOR THE EAR, BECAUSE IT IS HEARD RATHER THAN READ. The full stop
-// is what tells the voice `jefesito` is finished; without one it drew the last
-// syllable out. And there is deliberately no comma before the name, though
-// written Spanish puts one there: to a voice a comma is a rest, and it opened a
-// long gap inside a greeting anyone says in one breath.
-export const greeting = (brief: Brief) =>
-  brief === 'sunday' ? 'Buenas tardes jefesito.' : 'Buenos días jefesito.';
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
    THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
@@ -3188,8 +3178,8 @@ export async function calendarBlock(): Promise<string> {
 }
 
 /* ─── The week ahead, for the briefing that opens it ───────────────────────
-   THE SUNDAY BRIEFING WAS THE WEEKDAY ONE WITH ANOTHER GREETING, AND IT COULD
-   NOT SEE THE WEEK IT OPENS. Its calendar reached CAL_AHEAD, which is Monday
+   THE SUNDAY BRIEFING WAS THE WEEKDAY ONE AT ANOTHER HOUR, AND IT COULD NOT
+   SEE THE WEEK IT OPENS. Its calendar reached CAL_AHEAD, which is Monday
    evening, and the week was filed by the nightly pass at 22:00 — five hours
    after the one message that is about it. So a Thursday CPI or a Friday payrolls
    reached the Sunday briefing only if a search happened to turn it up.
@@ -3865,10 +3855,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   const stored = Date.now();
-  // A space, not a blank line. On a line of its own the greeting is a one-line
-  // paragraph, and every TTS_STYLE rule about a paragraph's last sentence and
-  // its closing breath lands on hello — which is how it came out slowest.
-  await sayAloud(`${greeting(due)} ${brief}`, feedbackKeyboard(nyDate(new Date())));
+  await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
      written one row for the draft and one for the critic — what each of them

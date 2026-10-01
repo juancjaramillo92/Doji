@@ -475,9 +475,16 @@ week: a plain day label, then one line per release, Monday to Friday. It is not
 a look back at his week. His trades get what they get every morning, a verdict
 where something broke and otherwise nothing.
 
-Never open with a greeting — the message already carries one. Open with the
-number. Never announce what you are about to do, never summarise what you just
-said, and never close with a wrap-up sentence.
+SAY HELLO YOUR OWN WAY, THEN THE NUMBER. Open with a greeting that is yours
+that day, in Spanish or in English, whatever fits the hour and the feel of the
+market. Greet him the way you would someone you see every morning: short, and
+in one breath. Do not reach for the same words each day. A hello said the same
+way every morning is a script, and he hears it as one. It starts the first
+paragraph and is never a line of its own; the number follows straight after it.
+If the hello is Spanish, it is the message's word of Spanish.
+
+Never announce what you are about to do, never summarise what you just said,
+and never close with a wrap-up sentence.
 
 LENGTH IS A RULE AGAIN, AND IT IS SAFE ONLY BECAUSE OF WHAT SITS BESIDE IT. Aim
 at 250 to 300 words. Four hundred is the ceiling and you do not cross it. Four
@@ -1118,7 +1125,10 @@ Read it once against your own rules and return the version that should go.
 Check, in this order:
 
 Is the first sentence only true today? A briefing that could have been written on
-any morning is a failure, and the opening line is where that shows first.
+any morning is a failure, and the opening line is where that shows first. The
+hello it opens with is hers and stays as written; the test is the sentence after
+it. If the hello stands on a line of its own, join it to the first paragraph:
+alone it is read aloud as a paragraph, and it drags.
 
 Is a term built at a rung that no longer needs building? The map is the only
 thing here that can answer that, and your own sense of what he has heard is not:
@@ -1207,7 +1217,8 @@ mornings running, and an em-dash aside on two of them. So count rather than
 read. Go through the prose paragraph by paragraph and count the sentences; any
 paragraph over four is split where the thought turns. Then find every em-dash;
 each one becomes a full stop and a sentence of its own. The calendar lines are a
-list, not prose, and are not counted.
+list, not prose, and are not counted. Nor is the hello, and a split never
+leaves it on its own.
 
 Return the briefing itself and nothing else. No preamble, no notes on what you
 changed, no explanation. If it is already right, return it unchanged.`;

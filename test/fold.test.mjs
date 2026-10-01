@@ -41,7 +41,7 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
   calendarWindow, foldBars, foldHeadlines } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
-  greeting, chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
+  chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
@@ -1281,15 +1281,6 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
   // Every hour of one weekday: exactly one of the twenty-four is the hour.
   const due = [...Array(24)].filter((_, h) => briefDue(new Date(Date.UTC(2026, 7, 19, h, 0))));
   assert.equal(due.length, 1);
-});
-
-test('the salutation matches the time of day the briefing lands', () => {
-  /* PUNCTUATED FOR THE EAR. The full stop ends it, so the voice does not draw
-     `jefesito` out; and there is no comma before the name, because a comma is a
-     rest to a voice and it split one breath into two. The vocative comma is the
-     correct-looking edit, and refusing it is half of what this asserts. */
-  assert.equal(greeting('weekday'), 'Buenos días jefesito.');
-  assert.equal(greeting('sunday'),  'Buenas tardes jefesito.');
 });
 
 /* ─── Eugenia: the pulse ─────────────────────────────────────────────────────

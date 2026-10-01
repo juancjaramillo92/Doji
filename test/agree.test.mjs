@@ -5603,18 +5603,26 @@ test('the text is sent only when the audio did not land', () => {
     'message under the voice note to carry it any more');
 });
 
-test('the greeting opens the first paragraph rather than standing as its own', () => {
-  /* THE HALF `greeting()` CANNOT SEE. On a line of its own the greeting is a
-     one-line paragraph, and every TTS_STYLE rule about a paragraph's last
-     sentence and its closing breath lands on hello — it came out the slowest
-     thing in the message. Putting it back on its own line is the tidy-looking
-     edit, it breaks nothing here, and the only symptom is how it sounds. */
+test('the briefing goes out as she wrote it, hello included, and the hello is hers', () => {
+  /* A SCRIPTED HELLO WAS PREPENDED IN CODE, and it was the line he heard worst:
+     the same words every morning, said with a tempo nothing in the text could
+     fix. The hello is hers now. Two things would quietly undo that — a
+     greeting put back on the front of the briefing, and a critic that, running
+     last, treats her hello as an opening that is true on any morning and cuts
+     it or strands it on a line of its own, where it is read as a paragraph. */
   const at = EUGENIA_TS.indexOf('async function postBriefing(');
   assert.ok(at > -1, 'doji-eugenia no longer has postBriefing()');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
-  assert.match(body, /sayAloud\(`\$\{greeting\(due\)\} \$\{brief\}`/,
-    'the greeting is no longer joined to the briefing by a space — on its own ' +
-    'line it is a paragraph, and the paragraph rules slow it to a crawl');
+  assert.match(body, /sayAloud\(brief, /,
+    'something is put in front of the briefing again — the hello is hers to say');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
+  assert.match(system, /SAY HELLO YOUR OWN WAY, THEN THE NUMBER/, 'SYSTEM no longer asks for her own hello');
+  assert.match(system, /never a line of its own/, 'SYSTEM no longer keeps the hello inside the first paragraph');
+  assert.match(critic, /hello it opens with is hers and stays as written/,
+    'CRITIC can cut her hello as an opening true on any morning, and it runs last');
+  assert.match(critic, /a split never\s+leaves it on its own/,
+    'CRITIC can split the first paragraph after the hello, leaving it to be read as a paragraph');
 });
 
 test('every message she writes goes out through sayAloud', () => {
