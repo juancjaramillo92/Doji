@@ -1429,5 +1429,12 @@ DO NOT CUT THE MECHANISM. What moved, and why, is the whole reason the message
 exists. Take the length out of the numbers and the restatements, never out of
 the one thing it is telling him.
 
+LAST, COUNT. The paragraph rule is the one the short messages break most: a
+reply with paragraphs of seven, six and five sentences, and a move look with
+five, on the day the briefing's own gate counted its way to none. So count
+rather than read. Go through the message paragraph by paragraph and count the
+sentences; any paragraph over four is split where the thought turns. Then find
+every em-dash; each one becomes a full stop and a sentence of its own.
+
 Return the message itself and nothing else. No preamble, no notes on what you
 changed. If it is already right, return it unchanged.`;

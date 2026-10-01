@@ -1823,7 +1823,9 @@ plain words still read as hard, and no rule was being broken. The rules now:
   is still a wall. The critic COUNTS this one as its last step, and every
   em-dash with it, rather than reading for it among the rest: three briefings in
   a row went through it with six-sentence paragraphs while the verdict row read
-  `revised` every time.
+  `revised` every time. It worked: the next briefing had none over four. `TRIM`
+  counts the same way now, as its last step too, because the short messages that
+  week still carried paragraphs of five to seven.
 - **Four to six numbers in the whole briefing**, and a number that cannot be said
   to *mean* something is one of the ones to cut. Fourteen true figures is a page
   he skims; four he remembers by lunch.

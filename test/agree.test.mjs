@@ -4009,6 +4009,25 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
   }
 });
 
+test('TRIM counts too, last, because the short messages broke the rule the critic fixed', () => {
+  /* The critic's count took the briefing to no paragraph over four. TRIM was
+     never given it, and the reply and the move look the same week carried
+     paragraphs of five to seven. Last for the critic's reason: the mechanism
+     check above it can add a clause. */
+  const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)[1];
+  const count = trim.indexOf('LAST, COUNT.');
+  assert.ok(count > -1, 'TRIM no longer counts, so a reply goes out with paragraphs of seven');
+  const step = trim.slice(count).replace(/\s+/g, ' ');
+  assert.match(step, /count the sentences; any paragraph over four is split/,
+    'TRIM\'s count no longer bounds a paragraph at four sentences');
+  assert.match(step, /every em-dash; each one becomes a full stop/,
+    'TRIM\'s count no longer removes the em-dash aside');
+  for (const earlier of ['${WRITING}', 'DO NOT CUT THE MECHANISM']) {
+    assert.ok(trim.indexOf(earlier) > -1 && trim.indexOf(earlier) < count,
+      `TRIM counts before "${earlier}", which can change a paragraph after it`);
+  }
+});
+
 /* ─── Two things a coach does, inside the line ───────────────────────────────
    His decision, after the signal rule was put to him: keep it, and let her do
    two things it had been read as forbidding. A level price has already printed
