@@ -3724,10 +3724,22 @@ export const feedbackKeyboard = (day: string) => ({
 
    A third is the same judgement made scale-free. On a briefing it is stricter
    than the four hundred ever was; on a short message it still catches the
-   apology, which is the shape it exists for. */
-export function keepDraft(draft: string, revised: string): boolean {
+   apology, which is the shape it exists for.
+
+   THE CEILING IS EACH GATE'S OWN, BECAUSE ONLY ONE OF THEM MAY ADD. The critic
+   puts back a missing link or a missing verdict, so a briefing can legitimately
+   grow; twice the draft is where that stops being an edit. `TRIM` checks how a
+   short message is written and is told to change nothing else, so it cuts and
+   swaps words and never builds. Twice was its ceiling too, and on 30 September
+   it returned 852 characters for a 541-character reply — its own notes on the
+   message ("this message looks fine as is…") above the message itself, sent to
+   him and stored as hers. Every other revision it made that fortnight sat
+   within a tenth of the draft. */
+export const TRIM_MOST = 1.25;
+
+export function keepDraft(draft: string, revised: string, most = 2): boolean {
   const t = revised.trim();
-  return t.length < draft.length / 3 || t.length > draft.length * 2;
+  return t.length < draft.length / 3 || t.length > draft.length * most;
 }
 
 async function critique(draft: string, notes: string, channels: string, desk: string,
@@ -3763,7 +3775,7 @@ async function critique(draft: string, notes: string, channels: string, desk: st
    `critique` returned. The three that GAINED a gate kept storing the draft for
    as long as they had one. */
 async function trim(draft: string, desk: string, story: string): Promise<string> {
-  return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim');
+  return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }
 
 /* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
@@ -3781,11 +3793,11 @@ async function trim(draft: string, desk: string, story: string): Promise<string>
    different repairs, and a gate paid for on every message whose effect cannot
    be seen is the cheap-half meter again. One verdict per gated message, on
    every outcome including the one that threw, so the rows count the messages. */
-async function gate(draft: string, asked: string, label: string): Promise<string> {
+async function gate(draft: string, asked: string, label: string, most?: number): Promise<string> {
   const caller = `${label} verdict`;
   try {
     const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS);
-    if (keepDraft(draft, revised)) {
+    if (keepDraft(draft, revised, most)) {
       await recordRun({ caller, ok: true, chars: draft.length,
                         detail: `kept the draft — revision ${revised.trim().length} vs draft ${draft.length}` });
       return draft;

@@ -43,7 +43,7 @@ import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, ask,
-  consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft,
+  consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
   quoteWindow, quoteLine, ROLL_HOUR,
@@ -3909,6 +3909,19 @@ test('the critic cannot destroy a briefing it was meant to check', () => {
   assert.equal(keepDraft(draft, 'y'.repeat(2500)), true);
   // An ordinary edit goes through.
   assert.equal(keepDraft(draft, 'y'.repeat(1100)), false);
+});
+
+test('a trim that grows past a quarter is overruled, at the lengths it actually ran', () => {
+  /* 30 September: a 541-character reply came back at 852 with TRIM's own notes
+     on top of it, and went out. Every other trim that fortnight stayed within a
+     tenth — 362 to 382 was the largest growth. The critic may add a link or a
+     verdict, so its ceiling stays at twice. */
+  assert.equal(keepDraft('x'.repeat(541), 'y'.repeat(852), TRIM_MOST), true,
+    'the revision that carried TRIM\'s notes to him still goes through');
+  assert.equal(keepDraft('x'.repeat(362), 'y'.repeat(382), TRIM_MOST), false,
+    'an ordinary trim is overruled');
+  assert.equal(keepDraft('x'.repeat(1675), 'y'.repeat(1694)), false,
+    'the critic adding a verdict is overruled');
 });
 
 test('a tap under a briefing is read strictly or not at all', () => {

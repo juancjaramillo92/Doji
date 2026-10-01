@@ -2132,6 +2132,13 @@ or three sentences and often under 400 to begin with, so that floor overrules
 every revision there is — and a gate overruled every time looks exactly like a
 gate that agreed with the draft.
 
+**And its ceiling is each gate's own.** The critic may put back a missing link or
+a missing verdict, so a briefing can grow, up to twice the draft. `TRIM` only
+cuts and swaps words, so it may grow a quarter (`TRIM_MOST`). At twice, a
+541-character reply came back at 852 on 30 September with `TRIM`'s own notes on
+the message above it — *"this message looks fine as is…"* — and that went out and
+was stored as hers. Every other trim that fortnight stayed within a tenth.
+
 **One chain per briefing, not one per event.** Every scheduled thing that
 matters still gets named — he needs the week — but only one of them gets its
 mechanism walked. Nine subjects each carrying a clause of chain is not a

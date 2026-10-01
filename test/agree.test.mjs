@@ -6652,7 +6652,7 @@ test('every model the map names belongs to a caller that exists', () => {
     // one body, so their labels are arguments to it rather than literals beside
     // an effort — invisible to the reader above, and a model row keyed on one of
     // them would have read as naming nothing.
-    ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'\)/g)].map(m => m[1]),
+    ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'(?:,\s*\w+)?\)/g)].map(m => m[1]),
   ]);
   assert.ok(labels.size >= 5,
     `only ${labels.size} caller labels read out of the file — the reader has gone blind`);
@@ -6700,7 +6700,7 @@ test('no caller that runs a tool loop is on the cheaper model', () => {
       new RegExp(`ask\\([\\s\\S]{0,400}?'(?:high|medium|low)',\\s*'${label}',\\s*(\\w+)`));
     if (direct) return direct[1];
     // Through gate(): its own ask() names the array every caller of it gets.
-    if (new RegExp(`gate\\([\\s\\S]{0,200}?'${label}'\\)`).test(EUGENIA_TS)) {
+    if (new RegExp(`gate\\([\\s\\S]{0,200}?'${label}'(?:,\\s*\\w+)?\\)`).test(EUGENIA_TS)) {
       const at = EUGENIA_TS.indexOf('async function gate(');
       return EUGENIA_TS.slice(at).match(/'medium', label, (\w+)/)?.[1];
     }
@@ -6902,7 +6902,7 @@ test('the two gates share the half that makes a gate safe', () => {
     const i = body.indexOf(from);
     return i < 0 ? null : (body.slice(i).match(/return [^;]+;/) ?? [])[0];
   };
-  assert.equal(firstReturn('if (keepDraft(draft, revised))'), 'return draft;',
+  assert.equal(firstReturn('if (keepDraft(draft, revised, most))'), 'return draft;',
     'a gate no longer overrules a failed revision, so a critic that returns an ' +
     'apology sends the apology');
   assert.equal(firstReturn('} catch'), 'return draft;',
@@ -6954,6 +6954,12 @@ test('keepDraft is relative, because it now reads three-sentence messages', () =
     'overruled on every message it ever checks');
   assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
     'keepDraft no longer scales with the draft it is judging');
+  /* AND TRIM'S CEILING IS ITS OWN. Held at the call, because keepDraft is pure
+     and driven in fold.test.mjs, and a trim that stops passing it falls back to
+     twice the draft — the ceiling its own notes once got through under. */
+  const at = EUGENIA_TS.indexOf('async function trim(');
+  assert.match(EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at)), /'trim', TRIM_MOST\)/,
+    'TRIM is judged by the critic\'s ceiling again, so its notes on a message can reach him with it');
 });
 
 /* ─── Which model ran, which the log line said and the row did not ───────────
