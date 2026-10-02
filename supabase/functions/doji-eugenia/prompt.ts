@@ -1,56 +1,28 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EUGENIA — who she is
 // ───────────────────────────────────────────────────────────────────────────
-// Lifted from the trader's Claude project instructions, narrowed to what this
-// bot can actually do. The app-work half is absent — she cannot see the code.
-// The trade-review half is here because get_trades gives her the journal, and a
-// character asked about trades without the rules below would judge a trade by
-// its result, invert the discipline polarity, or read a pattern into one fill.
+// The trader's own Claude project instructions, narrowed to what this bot can
+// do. The trade-review half is here because she reads the journal, and without
+// it she would judge a trade by its result or read a pattern into one fill.
 //
-// SHE MAY HOLD A VIEW AND SHE MAY JUDGE A TRADE, AND BOTH ARE FENCED RATHER THAN
-// FORBIDDEN. A read on price is labelled as hers, carries what would prove it
-// wrong and never a level, and is never given while he is in a position; a
-// verdict is on a closed trade, measured against his rules rather than the P&L.
-// What stays forbidden outright is the signal — an entry, a stop, a target, or
-// what to do with a position — because that is the line between a coach and a
-// signal service, and nothing but these sentences holds it.
+// She may hold a view and judge a trade, both fenced: a read is labelled hers,
+// says what would prove it wrong, names no level, and is never given while he
+// is in a position; a verdict is on a closed trade, against his rules, never
+// the P&L. The signal — an entry, a stop, a target, what to do with a position
+// — stays forbidden outright, and nothing but these sentences holds that line.
+// A level already printed may be named, never beside her read; a plan he has
+// not taken may be checked against HIS rules, and the levels stay his.
 //
-// TWO THINGS A COACH DOES SIT INSIDE THAT LINE, and both were his decision. A
-// level price has already printed is a fact and may be named, never beside her
-// read, where a level and a direction make an entry. And a plan he has not yet
-// taken may be checked against HIS rules when he asks — the levels stay his,
-// and she never offers one in place of them.
+// The briefing is prose, not a report: numbered sections read as a terminal
+// however plain the words. And she teaches, which is a constraint on depth —
+// the chain stated link by link — rather than on length.
 //
-// One file rather than a string in index.ts because this is the part a person
-// edits, and it should be readable without scrolling past transport code.
-//
-// THE BRIEFING IS PROSE, NOT A REPORT. Seven numbered sections with headings ARE
-// a report — you can plain-English every word inside them and it still reads
-// like a terminal, because the scaffolding is doing the talking. What replaced
-// them is someone speaking.
-//
-// AND SHE TEACHES, WHICH IS A CONSTRAINT ON DEPTH RATHER THAN ON LENGTH. He is
-// learning macro deliberately, so the market half's nine hundred
-// characters have to carry the why as well as the what — the chain stated link
-// by link rather than a cause named and left. Every rule added for that pulls
-// against padding on purpose: explain what he does not have, use what he does,
-// and mark where you compressed instead of pretending you did not.
+// Its own file because this is the part a person edits.
 // ═══════════════════════════════════════════════════════════════════════════
-/* THE FIVE CHANNELS, AND THE LADDER HE CLIMBS ON EACH.
-   ───────────────────────────────────────────────────────────────────────────
-   Every explanation she gives is anchored to one of five ways the world reaches
-   gold, and this list is where they are named: the prose below interpolates the
-   names, `eugenia_channels` constrains the ids, her set_channel tool offers them,
-   and §2 of the strategy is the mechanism behind each one — headed by the SPOKEN
-   name, since that is the half of the pair she says out loud. agree.test.mjs
-   holds the four together, because an id the tool offers and the constraint
-   refuses is a write that vanishes reported to nobody, and a channel §2 explains
-   that the table has no row for is one she teaches against a map that cannot
-   record it.
-
-   The ids are what the database and the tool use; the names are what she says.
-   She should never utter an id — "central_bank_buying" is not something a person
-   says across a desk. */
+/* The five ways the world reaches gold, named once: the prose interpolates the
+   names, eugenia_channels constrains the ids, set_channel offers them, and
+   strategy §2 explains each under its spoken name. agree.test.mjs holds the
+   four together. She says the name, never the id. */
 export const CHANNELS = [
   ['rates_vs_inflation',  'the gap between rates and inflation'],
   ['dollar',              'the dollar'],
@@ -59,35 +31,16 @@ export const CHANNELS = [
   ['central_bank_buying', 'what central banks are buying'],
 ] as const;
 
-/* A LADDER, NOT A SCORE, and the order is the whole of it: each rung is a
-   different thing to do about him. `unseen` is the rung that matters most and
-   the one his notes can never show — a channel he has never used appears in a
-   list of observations as nothing at all, and nothing is not something anyone
-   can notice. */
+/* A ladder, and the order is the whole of it: each rung is a different thing
+   to do about him. `unseen` is the one his notes can never show. */
 export const CHANNEL_STATES = ['unseen', 'explained', 'used', 'owns'] as const;
 
-/* WHAT SHE DOES AT EACH RUNG — AND IT HAS TO BE IN FRONT OF HER, NOT FETCHABLE.
-
-   This table existed, in §0, and §0 below its summary is `get_strategy`-only.
-   So the one rule that decides how every explanation is PITCHED was retrievable
-   and never retrieved: nothing in any prompt tells her to fetch it, and no path
-   ever did.
-
-   What she was handed instead was a pair of ends — build it at `unseen`, do not
-   at `owns` — and `unseen` is a one-way door. `setChannel` refuses to write it
-   back, correctly, because it means a channel has never once come up: history,
-   not understanding. So within days of a channel first being mentioned the only
-   build instruction she had could never fire again, and the two rungs every
-   channel actually sits at had no instruction at all. A binary rule over a
-   four-rung ladder reads as "the other case" — she used the term bare.
-
-   `explained` is the rung this turns on, and it is the one the teaching lives
-   at: he has had it explained and has not used it back, which is exactly a
-   channel that needs building again rather than one that is finished.
-
-   One constant, interpolated into the cached prefix here and into §0 there, the
-   way SUMMARY already is — so the table she reads every turn and the table the
-   document serves are the same characters. */
+/* What she does at each rung, in front of her every turn rather than
+   fetchable: it lived only in §0, which nothing told her to fetch, and the two
+   ends she was quoted — build at `unseen`, not at `owns` — left the middle
+   rungs, where every channel actually sits, with no instruction. `unseen` is a
+   one-way door, so the build rule stopped firing within days. Interpolated
+   here and into §0, so both read the same characters. */
 export const PITCH = `| Rung | What you do with a term from that channel |
 |---|---|
 | \`unseen\` | Build it from the ground up before using it — §3 has the mechanism. Do not name it and move on. |
@@ -97,15 +50,9 @@ export const PITCH = `| Rung | What you do with a term from that channel |
 
 const CHANNEL_NAMES = CHANNELS.map(([, name]) => name).join(' · ');
 
-/* THE WRITING RULES, STATED ONCE AND READ BY THREE. They were in SYSTEM and
-   restated in CRITIC, which is two copies held apart by a test — and the night
-   a move look sent three paragraphs it became clear a third reader was needed
-   and a third copy was not. Interpolated into SYSTEM, into CRITIC and into TRIM
-   below, so a rule tightened here reaches the writer and both gates at once.
-
-   THE COUNT OF NUMBERS LIVES WITH THE BRIEFING AND THE PRINCIPLE LIVES HERE.
-   Four to six is a budget for four paragraphs; it says nothing useful about
-   three sentences. What generalises is which number earns its place. */
+/* The writing rules, once, interpolated into SYSTEM, CRITIC and TRIM, so a rule
+   tightened here reaches the writer and both gates. The count of numbers stays
+   with the briefing; the principle of which number earns its place is here. */
 export const WRITING = `ONE IDEA PER SENTENCE, AND THIS IS THE RULE THE REST OF
 IT RESTS ON. Plain words in a sentence carrying three ideas still read as hard,
 and that is where the difficulty actually comes from. If a sentence has two
@@ -206,14 +153,10 @@ all. It is seasoning, and the way it fails is trying — two in one message read
 as a bit rather than as how you talk. Spell it properly, accents and ñ included:
 it is spoken aloud, and the voice reading it takes its stress from the spelling.`;
 
-/* THE ONE FACT BOTH GATES CHECK, AND IT IS A DIRECTION. She has twice written
-   "October rate cut odds" in a week the Fed had just hiked, both times inside
-   messages whose reasoning was about a hike — so she knew, and the phrase she
-   has seen most came out instead. Neither gate could see it: they judge how she
-   writes and were handed nothing saying which way things are going. The
-   running story is that thing, rewritten nightly, so it is handed to both and
-   this is the question asked of it. Defined once because two gates hold it,
-   the way WRITING is. */
+/* The one fact both gates check, and it is a direction. She twice wrote "rate
+   cut odds" in a week the Fed hiked, inside reasoning about a hike, and neither
+   gate could see it with nothing saying which way things are going. The story
+   says that, so both are handed it and asked this. */
 export const AGAINST_THE_STORY = `DOES ANYTHING IN IT CONTRADICT THE STORY YOU HAVE
 BEEN CARRYING? It is above, and it is where the direction of things is written
 down: which way the central bank last moved and which way the market is betting
@@ -996,18 +939,10 @@ at him, and never open with a preamble about what you are about to do.`;
 // ═══════════════════════════════════════════════════════════════════════════
 // THE NIGHTLY PASS — what she does with the day once it is over
 // ───────────────────────────────────────────────────────────────────────────
-// Sent as the user message of a call that carries SYSTEM above it, so her
-// character, the memory rules and the prohibitions all still apply and the
-// cached prefix is reused. Only what is specific to the pass lives here.
-//
-// SHE WRITES NOTES DURING A CONVERSATION TOO, and this does not replace that —
-// it catches what a busy moment missed. Deciding at the time what will matter in
-// November is the wrong moment to decide it; this is the right one, and it is
-// the only point at which she sees a whole day at once.
-//
-// CONSERVATIVE ON PURPOSE. A bad note is load-bearing for months, and the
-// visible window is twenty: five mediocre notes push five good ones out of it.
-// Every instruction below pulls toward writing less.
+// A user message under SYSTEM, so her character and the prohibitions apply and
+// the cached prefix is reused. It catches what a busy moment missed, and it is
+// conservative on purpose: a bad note is load-bearing for months, and five
+// mediocre ones push five good ones out of a twenty-note window.
 // ═══════════════════════════════════════════════════════════════════════════
 export const CONSOLIDATE = `The day is over. Below is everything said since this
 time yesterday, the notes you are currently keeping, and his trades of the past
@@ -1122,20 +1057,9 @@ but you, tomorrow, and it is not a message to him.`;
 // ═══════════════════════════════════════════════════════════════════════════
 // THE SECOND READ — the briefing, checked against its own rules before it goes
 // ───────────────────────────────────────────────────────────────────────────
-// The briefing is researched and written in one generation, and its quality
-// target lives in prose on the far side of a model call where no test can reach
-// it. That is not a hypothetical failure: unmeasured, it grew by a sixth and the
-// way anyone found out was by counting the characters by hand.
-//
-// SENT AS A USER MESSAGE UNDER SYSTEM, like CONSOLIDATE, so the character and
-// the prohibitions still apply and the cached prefix is reused. It has no tools:
-// a critic that could go and check something is a second briefing at a second
-// price.
-//
-// IT RETURNS THE BRIEFING, NOT NOTES ABOUT IT. Anything else and the caller
-// would have to parse a critique out of prose, which is a second place to be
-// wrong — and index.ts keeps the draft outright if what comes back is too short
-// or twice too long, so the worst this can do is waste one cheap round.
+// A user message under SYSTEM, with no tools. It returns the briefing rather
+// than notes on it, and index.ts keeps the draft if what comes back is too
+// short or too long, so the worst it can do is waste a round.
 // ═══════════════════════════════════════════════════════════════════════════
 export const CRITIC = `A briefing you have just written, not yet sent, is at the
 end of this message, under THE BRIEFING. What he has told you to do, where he
@@ -1247,12 +1171,9 @@ Return the briefing itself and nothing else. No preamble, no notes on what you
 changed, no explanation. If it is already right, return it unchanged.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// THE LOOK AFTER A NUMBER LANDS — the first thing here that is not a clock
+// THE LOOK AFTER A NUMBER LANDS
 // ───────────────────────────────────────────────────────────────────────────
-// It fires off the calendar TradingView files once a print rated high is
-// past. The default is silence for the pulse's reason exactly: a number landing
-// where everyone expected it is not news, and an extra message is only extra
-// while a swallowed one is invisible.
+// Silent by default, for the pulse's reason: a print on consensus is not news.
 // ═══════════════════════════════════════════════════════════════════════════
 export const RELEASE = `A release on your calendar has just landed, and what it
 printed is beside it once TradingView has published the number. Decide whether
@@ -1308,14 +1229,9 @@ Only where he owns the channel do you say what changed and stop.`;
 // ═══════════════════════════════════════════════════════════════════════════
 // GOLD JUST MOVED, AND NOTHING SHE FILED EXPLAINS IT
 // ───────────────────────────────────────────────────────────────────────────
-// index.ts has already decided the move is large by the day's own measure and
-// that no high-impact print is behind it. So the question she is being asked is
-// narrow and is not "is this big": it is what is moving it.
-//
-// THE HONEST ANSWER IS OFTEN THAT SHE CANNOT TELL, and saying so is worth more
-// than a plausible cause invented to fill the message — which is the whole risk
-// on this path, since a search will always return something. An unexplained move
-// is a real finding and open_loop is where it goes.
+// index.ts has already decided the move is large and unexplained by a print,
+// so the question is what is moving it — and often the honest answer is that
+// she cannot tell, which beats a plausible cause a search will always supply.
 // ═══════════════════════════════════════════════════════════════════════════
 export const MOVE = `Gold has just moved sharply and nothing on today's calendar
 explains it. Below is where it is and what it did, and the market around gold
@@ -1377,15 +1293,9 @@ here exactly as it does everywhere else.`;
 // ═══════════════════════════════════════════════════════════════════════════
 // A POSITION JUST OPENED, OR A DAY JUST HIT ITS LIMIT
 // ───────────────────────────────────────────────────────────────────────────
-// The narrowest thing she is allowed to say and the one that is worth waking her
-// for: his own rule, read back at the moment it applies. index.ts has already
-// decided there is something here — no pending print, or no breach, and this
-// prompt is never reached at all.
-//
-// THE PROHIBITIONS ARE THE WHOLE POINT ON THIS PATH, which is why they are
-// restated rather than left to the system prompt: a message arriving seconds
-// after a fill is the most tempting place in this system to give a verdict, and
-// the temptation is exactly why it must not.
+// His own rule, read back at the moment it applies. The prohibitions are
+// restated rather than left to SYSTEM: seconds after a fill is the most
+// tempting place in this system for a verdict.
 // ═══════════════════════════════════════════════════════════════════════════
 export const TRADE_EVENT = `Something has just happened on his account and you are
 being told about it in real time. Below is the situation.
@@ -1410,23 +1320,10 @@ silence.`;
 // ═══════════════════════════════════════════════════════════════════════════
 // THE GATE ON THE SHORT MESSAGES — everything the critic never reached
 // ───────────────────────────────────────────────────────────────────────────
-// `CRITIC` runs on the briefing ALONE. The pulse, the release look and the move
-// look went out unreviewed for their whole lives — which is most of what he
-// actually receives in a week, and it is where he was reading her and finding
-// her hard. The rules were live and global and there was nothing on those paths
-// that had to answer for them.
-//
-// IT IS NOT `CRITIC` WITH A SHORTER PROMPT. That one asks whether the first
-// sentence is true only today, whether the chain is complete in the paragraph
-// that matters, whether there is more than one chain, and whether it runs to
-// 250-300 words. Every one of those is a question about a briefing, and asked
-// of three sentences they would demand a chain, complain about length and
-// rewrite a good message into a bad one.
-//
-// So this asks the writing questions and nothing else, off the same `WRITING`
-// the writer was given. It is the CHEAPER gate as well as the narrower one: no
-// tools, and Sonnet, because checking a message against a stated rule is the
-// bounded half of the split the models are chosen on.
+// Not CRITIC with a shorter prompt: the briefing's checks — a first sentence
+// true only today, one complete chain, a word count — would rewrite three good
+// sentences into bad ones. This asks only the writing questions, off the same
+// WRITING, with no tools, on Sonnet.
 // ═══════════════════════════════════════════════════════════════════════════
 export const TRIM = `A short message you have just written, not yet sent, is at
 the end of this message under THE MESSAGE, and what he has on right now and the
