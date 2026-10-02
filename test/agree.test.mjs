@@ -4464,6 +4464,9 @@ const BY_HAND = {
   history:     'the weeks he has already traded, walked once from the date ' +
                'given so R-14 and R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
+  speak:       'the briefing\'s second worker, opened by postBriefing itself ' +
+               'rather than by a schedule — and by a person re-sending a ' +
+               'briefing that was stored and never reached him',
 };
 
 test('every door the function reads is opened by a cron job or by a person', () => {
@@ -4845,27 +4848,41 @@ test('no numbered SQL file reads into a variable with SELECT … INTO', () => {
   }
 });
 
-test('the delivered row splits what came after the critic, around the right calls', () => {
-  /* THE STRETCH THAT HAD NO ROW. Sunday spent 155s between the critic's row and
-     the delivered one, Monday 20s, and nothing could say whether storing or
-     speaking was the slow half. A stamp on the wrong side of its call still
-     writes a plausible number — so the order is what is read. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const body = src.slice(src.indexOf('async function postBriefing('),
-                         src.indexOf('export const isSilent'));
-  const at = (s) => body.indexOf(s);
+test('the briefing is written in one worker and spoken in another, and never lost between them', () => {
+  /* TWO WORKERS NOW, because they shared one four-hundred-second clock and a
+     voice that stalled on 2 October took the whole briefing with it. What the
+     split must not do is open a third way to lose it — so the order is read:
+     stored BEFORE the hand-off, or the second worker finds nothing to speak;
+     and a hand-off that did not start falls back to speaking HERE, or a refused
+     boot is a briefing he never receives. Nothing in this suite can drive a
+     worker calling itself, so the source is what is read. */
+  const at = (body, s) => body.indexOf(s);
+  const brief = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function postBriefing('),
+                                 EUGENIA_TS.indexOf('async function postSpeak('));
   const order = ['const checked = Date.now()', 'await remember(', 'const stored = Date.now()',
-                 'await sayAloud(', 'const spoken = Date.now()', 'await recordRun('];
-  for (const s of order) assert.ok(at(s) > -1, `postBriefing no longer has ${s}`);
+                 '?speak=${due}', 'if (handed === null)', "caller: `${due} briefing written`",
+                 'await sayAloud(brief, ', "caller: `${due} briefing delivered`"];
+  for (const s of order) assert.ok(at(brief, s) > -1, `postBriefing no longer has ${s}`);
   for (let i = 1; i < order.length; i++) {
-    assert.ok(at(order[i - 1]) < at(order[i]),
-      `postBriefing has ${order[i - 1]} after ${order[i]} — the split would time ` +
-      `the wrong call and still read as a number`);
+    assert.ok(at(brief, order[i - 1]) < at(brief, order[i]),
+      `postBriefing has ${order[i - 1]} after ${order[i]} — stored after the hand-off ` +
+      `the second worker finds nothing, and with no fallback after it a worker that ` +
+      `would not start is a briefing that never arrives`);
   }
-  assert.match(body, /detail: `stored in \$\{[^}]+\}s, `\s*\+ `\$\{heard \? "spoken" : "sent as text"\} in \$\{[^}]+\}s`/,
-    'the delivered row no longer carries the stored/spoken split, or no longer says ' +
-    'whether he got the voice or the text');
+  assert.match(brief, /res\.ok \? null : `HTTP \$\{res\.status\}`/,
+    'the hand-off is taken as started whatever the door answered — a 546 is then ' +
+    'a briefing nobody speaks');
+
+  const speak = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function postSpeak('),
+                                 EUGENIA_TS.indexOf('export const isSilent'));
+  assert.match(speak, /sayAloud\(turn\.content, feedbackKeyboard\(today\), SPEAK_WORKER_MS\)/,
+    'the speaking worker speaks on the one-worker budget, which is the clock it was split off to escape');
+  assert.ok(at(speak, 'await sayAloud(') < at(speak, "caller: `${due} briefing delivered`"),
+    'the delivered row is written before the send — 010 reads it as the statement that he has it');
+  assert.match(speak, /created_at=eq\.\$\{encodeURIComponent\(marker\.created_at\)\}/,
+    'the text is no longer paired with its marker by the instant both were written');
+  assert.match(EUGENIA_TS, /if \(speak\) \{ job = 'speak'; return await postSpeak\(speak\); \}/,
+    'postScheduled no longer opens the speaking worker\'s door');
 });
 
 test('010 says a slow run once, and the week stays visible to diagnose', () => {
@@ -5651,9 +5668,10 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE. A path that calls `say` directly
      still works and still reaches him — it is simply silent, which is the
-     feature not happening on one message rather than failing anywhere. Six:
-     both briefings share a call site, then the pulse, the release look, the
-     trade event, the move look and the reply.
+     feature not happening on one message rather than failing anywhere. Seven:
+     both briefings share two — the speaking worker, and postBriefing's own
+     fallback for the morning that worker will not start — then the pulse, the
+     release look, the trade event, the move look and the reply.
 
      `/notes`, the apologies and the short operational lines keep `say`
      deliberately: a rendered table read aloud is unlistenable and a failure
@@ -5661,8 +5679,8 @@ test('every message she writes goes out through sayAloud', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 6,
-    `${spoken} paths speak where six should — a message she writes that goes ` +
+  assert.equal(spoken, 7,
+    `${spoken} call sites speak where seven should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
 });
 
@@ -6922,6 +6940,14 @@ test('an unexplained move is silence, and opens no thread', () => {
    exemption is a row with a reason in it, never an absence. */
 const SENDS = {
   postBriefing:   { gate: 'critique', carries: 'brief' },
+  postSpeak:      { gate: null,       carries: 'turn.content',
+                    why: 'the briefing\'s second worker: what it speaks is the ' +
+                         'text critique() returned and postBriefing stored, read ' +
+                         'back by its marker — a gate here would be a second ' +
+                         'rewrite of a message already checked, and would make ' +
+                         'what he hears differ from what she remembers',
+                    stored: 'by postBriefing, before the hand-off — this reads ' +
+                            'the stored turn rather than writing one' },
   postPulse:      { gate: 'trim',     carries: 'sent' },
   postRelease:    { gate: 'trim',     carries: 'sent' },
   postMove:       { gate: 'trim',     carries: 'sent' },
@@ -6972,6 +6998,7 @@ test('every censused path gates, speaks and stores the same one text', () => {
     assert.ok(spoken, `${fn} no longer speaks at all`);
     assert.match(spoken[0], new RegExp(`\\b${spec.carries}\\b`),
       `${fn} speaks something other than the text the census says it carries`);
+    if (spec.stored) continue;
     assert.match(body, new RegExp(`role: 'assistant', content: ${spec.carries}\\b`),
       `${fn} stores a text other than the one it sent — her history then holds ` +
       'words he never read, resent as hers for the next six exchanges');

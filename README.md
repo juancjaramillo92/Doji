@@ -2561,15 +2561,43 @@ the text must still go out.
 2 October the briefing was stored at 08:02:23. The speech request then never
 answered, and at 08:06:40, four hundred seconds after boot, the platform shut
 the worker down. A worker that is killed runs no catch. So there was no text, no
-row, no apology and no retry, because the marker had already gone down. Every
-request in `speak()` now carries one budget, `SPEAK_MS`: a hundred and fifty
-seconds for the whole message, not per part, since a per-request limit
-multiplies by the parts. That is the slowest speaking that ever landed (a
-Sunday at 155s, storing included), and it leaves a briefing written in two and a
-half minutes well inside the four hundred with the text still to send. A part
-that has not landed when it runs out has failed like any other, and the text
-goes. `fold.test.mjs` drives that too, against a vendor stub that never settles,
-on a fresh instance of the module read with a key.
+row, no apology and no retry, because the marker had already gone down.
+
+**So the briefing is written in one worker and spoken in another.** Writing and
+speaking shared one four-hundred-second clock, and a slow morning in either was
+taken out of the other. `postBriefing` writes, runs the critic and stores the
+briefing, then opens `?speak=weekday` (or `sunday`) on its own function and
+ends. That door answers before it works, like every scheduled door, and starts
+`postSpeak` on a clock of its own. `postSpeak` finds today's stored briefing by
+its marker, pairs it with its text by the instant both were written (one INSERT,
+one `created_at`), and speaks it. If the second worker will not start, which is
+any non-2xx from the door such as a refused boot, `postBriefing` speaks the
+briefing itself as it did before there were two. Losing the second worker must
+never be losing the briefing.
+
+**Every request in `speak()` carries a budget, and a part that fails gets a
+second attempt.** The budget covers the whole message, not each part, since a
+per-request limit multiplies by the parts.
+
+- **`SPEAK_MS`, 150 seconds,** for the paths that write and speak in one worker,
+  which is everything but the briefing. That is the slowest speaking that ever
+  landed (a Sunday at 155s, storing included).
+- **`SPEAK_WORKER_MS`, 330 seconds,** for the speaking worker, which has nothing
+  else to do.
+- **`ATTEMPT_MS`, 150 seconds per attempt.** A vendor that stalls has stalled on
+  one request, and the next is a fresh connection. So on the speaking worker a
+  stall costs one attempt rather than the voice. On `SPEAK_MS` a stalled first
+  attempt has spent the budget, so only a quick refusal is tried twice there.
+
+A part that has not landed when the budget runs out has failed like any other,
+and the full text goes. `fold.test.mjs` drives both a vendor that never settles
+and one that refuses once and then answers, on a fresh instance of the module
+read with a key.
+
+**`?speak=weekday` is also a repair.** A briefing that was stored and never
+reached him is sent again by opening it by hand, the same way the cron secret
+opens any door. It speaks today's only, since yesterday's would arrive as this
+morning's.
 
 That ordering lives in **`sayAloud`** rather than in six copies of two lines —
 five of which nothing would be guarding, and the failure of getting it backwards
@@ -3498,11 +3526,13 @@ were billed. `postBriefing` adds the briefing's length in characters, and
 the `<brief> briefing delivered` row carries it, which is where a manual run
 reads it now: `?force=1` answers before it works, like everything else a cron
 secret reaches, so its body says `accepted` rather than `chars`. Its `detail`
-splits what came after the critic — `stored in 1s, spoken in 19s`, or `sent as
-text` where the voice did not land — because
-both model calls have rows of their own and that stretch had none: the Sunday
-that took 315s spent 155 of them there, where Monday spent 20, and nothing
-could say whether the embedding or the voice was the slow half.
+splits what came after the critic. The writing worker leaves a `<brief>
+briefing written` row (`stored in 1s, handed to the speaking worker`, with its
+own total in `ms`), and the speaking worker writes the delivered row once he has
+it (`spoken in 19s`, or `sent as text` where the voice did not land). That split
+exists because both model calls have rows of their own and that stretch had
+none: the Sunday that took 315s spent 155 of them there, where Monday spent 20,
+and nothing could say whether the embedding or the voice was the slow half.
 
 None of this changes what she does. It exists because nothing else can see any
 of it: the spend cap on the Anthropic key is a ceiling rather than a meter, web
