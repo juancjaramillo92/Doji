@@ -1611,11 +1611,12 @@ const LOOP_TOOL = {
   description:
     "Keep one open thread. kind='watch' for something odd you flagged that has not " +
     "resolved — a reaction that went the wrong way, a number that does not fit. " +
-    "kind='question' for a question you put to him and have not had an answer to. " +
-    "Both come back to you every briefing until they close, which is what lets you " +
-    "say how something landed rather than never mentioning it again. Open at most " +
-    "one of each in a briefing, and only for something you would actually want " +
-    "back — this is not a diary.",
+    "kind='question' for a question you put to him in a conversation and have not " +
+    "had an answer to. Both come back to you every briefing until they close, which " +
+    "is what lets you say how something landed rather than never mentioning it " +
+    "again. A briefing asks him nothing, so it opens at most one watch and never a " +
+    "question. Open one only for something you would actually want back — this is " +
+    "not a diary.",
   input_schema: {
     type: "object",
     properties: {
@@ -5426,7 +5427,7 @@ async function handleMessage(update: any): Promise<void> {
          shorter for a limit that no longer exists, which is the one thing this
          was changed to stop. */
       const aloud =
-        `\n\nYour answer is sent as text and read back to him aloud, so write it ` +
+        `\n\nYour answer reaches him as a voice note, so write it ` +
         `to be heard: plain sentences, no headings, and nothing that only works ` +
         `on a page. Its length is whatever the answer needs.`;
       const context = text + about + aloud + notes + channels + story + loops + calendar + desk;

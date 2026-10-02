@@ -3804,8 +3804,13 @@ test('the briefing closes without a question to him', () => {
   // repository refuses — and the one a later reader restores the slot from.
   assert.doesNotMatch(EUGENIA_PROMPT, /you may ask it once more, differently/,
     'the re-asking rule survived the slot it belonged to');
-  assert.doesNotMatch(EUGENIA_PROMPT, /at most one of each in a\s+briefing/,
-    'open_loop still promises a question loop the briefing can no longer open');
+  /* BOTH FILES, because the sentence lived in the tool's description in
+     index.ts while this read only prompt.ts — a check that could not fail on
+     the file the defect was in, and the defect stood under it. */
+  for (const [file, text] of [['prompt.ts', EUGENIA_PROMPT], ['index.ts', EUGENIA_TS]]) {
+    assert.doesNotMatch(text, /at most\s*"?\s*\+?\s*"?one of each in a\s+briefing/,
+      `${file}: open_loop still promises a question loop the briefing can no longer open`);
+  }
 });
 
 test('and a reply may still ask, because that is a conversation he is in', () => {
