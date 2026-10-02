@@ -3355,11 +3355,8 @@ async function readMark(): Promise<Mark | null> {
   return row ?? null;
 }
 
-/* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT, which is what makes
-   the window between readings the gap between runs rather than a number anyone
-   chose. Stamped BEFORE the look for markLooked's reason exactly: a look that
-   generates and then fails to write would re-fire on the next run, and on the
-   one after that, each one billed. */
+/* The mark advances every run and looked_at does not, so the window is the gap
+   between runs. Stamped before the look, for markLooked's reason. */
 async function markPrice(bid: number, looked: boolean): Promise<void> {
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_price?id=eq.current`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
@@ -3371,8 +3368,7 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
   if (!res.ok) throw new Error(`Mark write failed (HTTP ${res.status})`);
 }
 
-// Anything high-impact that printed in the last hour, whether or not the
-// release spine has looked at it yet — either way that message is the one he
+// A high print in the last hour, looked at or not: that message is the one he
 // gets about this move.
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
@@ -3384,10 +3380,7 @@ async function explained(now = Date.now()): Promise<Release | null> {
 }
 
 async function postMove(): Promise<Response> {
-  // The weekend quote is Friday's last, so every reading is the same number and
-  // nothing could fire — but it is still a poll and a broker session every
-  // quarter of an hour for two days. The same rule the poller keeps, from the
-  // same definition.
+  // The weekend quote is Friday's last; the poller's rule, the same function.
   if (!marketOpen()) return json({ ok: true, skipped: "market closed" });
 
   const [spot, mark] = await Promise.all([marketQuote(), readMark()]);
@@ -3412,17 +3405,14 @@ async function postMove(): Promise<Response> {
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), aheadToday(),
     positionsBlock(), aroundBlock(), headlinesBlock(),
   ]);
-  // The window is STATED FROM THE MARK rather than asserted as a quarter of an
-  // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
-  // telling her it was fifteen is a wrong fact from the one place that knows.
+  // The window from the mark, not assumed: a missed run makes it longer.
   const since = Math.round((Date.now() - Date.parse(mark.at)) / 60_000);
   const asked = MOVE +
     `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
     `Nothing high-impact on the calendar has printed in the last hour.` +
-    // The session said the one way it is said anywhere, which matters most on
-    // this path: it is the one that fires in the evening, the only hours when
-    // the broker's session and the calendar day disagree.
+    // quoteLine, which names the session window — this path fires in the
+    // evening, when the session and the calendar day disagree.
     `\n\n${quoteLine(spot, new Date())}` +
     (ahead.length
       ? `\nStill ahead today: ` +
@@ -3444,28 +3434,16 @@ async function postMove(): Promise<Response> {
 
 
 /* ─── What he sends that is not typing ─────────────────────────────────────
-   `if (!msg?.text) return` dropped everything that was not typed, and the two
-   things it dropped are the two he is most likely to send from a desk mid
-   session: a voice note and a chart.
-
-   ONE DOWNLOAD FOR BOTH, because Telegram serves them the same way — getFile
-   turns a file_id into a path, and the path is fetched from the file endpoint
-   with the bot token in it. The token is in the URL rather than a header there;
-   that is Telegram's design, and it is why this does not go through the shared
-   `telegram()` helper, which posts JSON to the method endpoint.
+   A voice note and a chart, the two things he sends mid-session, both used to
+   be dropped. One download serves both: getFile, then the file endpoint with
+   the token in the URL — Telegram's design, and why this is not telegram().
    ───────────────────────────────────────────────────────────────────────── */
-// Telegram's own ceiling for a bot download is 20MB. This is far lower on
-// purpose: an image goes into the request as base64, which is a third larger
-// again — so the ceiling that matters is the one on the far side, and a photo
-// Telegram has already compressed is nowhere near either. It is also paid for
-// as input tokens on every round of the turn it appears in.
+// Well under Telegram's 20MB: an image goes in as base64, a third larger, and
+// is paid as input on every round of its turn.
 const FILE_MAX = 3 * 1024 * 1024;
 
-/* THE FOUR THE API ACCEPTS, checked here rather than discovered as a 400 in the
-   middle of a reply. A photo is always JPEG; a DOCUMENT is whatever he attached,
-   and "send it as a file to keep the quality" is the ordinary way a chart
-   arrives as a PNG — or as a BMP, a HEIC or a TIFF, none of which are readable
-   and all of which would otherwise reach the model as an image block. */
+/* The four image types the API reads, checked here rather than met as a 400
+   mid-reply: a chart sent as a file can be a BMP, HEIC or TIFF. */
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 async function tgDownload(fileId: string): Promise<{ bytes: Uint8Array; path: string } | null> {
@@ -3488,10 +3466,8 @@ async function tgDownload(fileId: string): Promise<{ bytes: Uint8Array; path: st
   return { bytes, path };
 }
 
-/* CHUNKED, BECAUSE THE OBVIOUS ONE-LINER BLOWS THE STACK. `btoa(String
-   .fromCharCode(...bytes))` spreads every byte into an argument list, so a
-   photo of any real size is a RangeError rather than a string — and it would
-   throw on the large images and work on every small one used to test it. */
+/* Chunked: spreading every byte into one argument list is a RangeError on any
+   real photo, and works on every small one a test would use. */
 function base64(bytes: Uint8Array): string {
   let out = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -3501,38 +3477,18 @@ function base64(bytes: Uint8Array): string {
 }
 
 /* ─── Hearing him ──────────────────────────────────────────────────────────
-   THE ONE CAPABILITY HERE THAT NEEDS SOMETHING THIS SYSTEM DOES NOT ALREADY
-   HAVE, and it is worth saying plainly rather than burying: the Messages API
-   takes text and images and not audio, and Telegram does not transcribe for
-   bots. So a voice note needs a speech-to-text service, which is a second
-   vendor and a second key.
-
-   Written against the /audio/transcriptions shape — a multipart POST answering
-   with `{ text }` — because that is the one contract every provider in this
-   space implements, so the endpoint is configuration rather than a vendor baked
-   into the file.
-
-   UNSET IS A FIRST-CLASS STATE, not a broken one. With no STT_URL she says she
-   cannot hear it, which is true, and every other path in this file is
-   unaffected — that is why these are not in the 503 check at the entry point
-   beside the secrets that genuinely stop her working. */
+   The Messages API takes no audio and Telegram does not transcribe for bots,
+   so a voice note needs a second vendor. Written to the /audio/transcriptions
+   shape every provider implements, so the endpoint is configuration. Unset is
+   a first-class state — she says she cannot hear it — and not a boot failure.
+   ───────────────────────────────────────────────────────────────────────── */
 const STT_URL   = env("STT_URL");
 const STT_KEY   = env("STT_KEY");
 const STT_MODEL = env("STT_MODEL") || "whisper-1";
 
-/* FOUR REASONS A VOICE NOTE PRODUCES NO WORDS, AND THEY ARE FOUR SENTENCES.
-
-   They were one. `transcribe` returned null for a rejected key, a wrong URL, an
-   unsupported format and genuinely unclear audio alike, so every one of them
-   reached him as "I could not make that out — send it again", and he would send
-   it again, and again. A misconfigured key is not something he can fix by
-   speaking more clearly, and telling him it is wastes his time on the only
-   failure here he is actually able to act on.
-
-   It is the same rule `readTrades` is written on, one layer up: an empty answer
-   is only an answer when something was read. Each line below says whose problem
-   it is and what to do about it, which is the whole difference. A map rather
-   than a chain of ternaries, for the reason APOLOGY and SAID are. */
+/* Four reasons a voice note yields no words, four sentences: a bad key is not
+   fixed by him speaking more clearly, and one message for all four had him
+   resending. Each says whose problem it is. */
 export const VOICE_TROUBLE: Record<string, string> = {
   unconfigured: "I cannot hear voice notes yet, jefe — type it and I will answer.",
   download:     "That voice note would not come through, jefe. Send it again?",
@@ -3540,29 +3496,20 @@ export const VOICE_TROUBLE: Record<string, string> = {
   empty:        "I could not make out any words in that one, jefe. Send it again, or type it?",
 };
 
-// The reason, or the words. A string is what she heard; anything else names
-// which of the four above he is about to be told.
 type Heard = { said: string } | { trouble: keyof typeof VOICE_TROUBLE & string };
 
 async function transcribe(bytes: Uint8Array, name: string, mime: string): Promise<Heard> {
   if (!STT_URL || !STT_KEY) return { trouble: 'unconfigured' };
   try {
     const form = new FormData();
-    /* THE TYPE COMES FROM TELEGRAM RATHER THAN BEING LEFT OFF. It hands over
-       `audio/ogg` for a voice note and we were discarding it — and providers
-       differ in whether they read the format off the part's content type or off
-       the filename, so giving both is what makes this portable across the ones
-       that speak this shape. The extension is Telegram's own (`.oga` for a
-       voice note, whatever the file was for an audio one) rather than a
-       constant, since `msg.audio` is not always ogg. */
+    // Telegram's type and filename both: providers read the format from one or
+    // the other, and msg.audio is not always ogg.
     form.append("file", new Blob([bytes], { type: mime }), name);
     form.append("model", STT_MODEL);
     const res = await fetch(STT_URL, {
       method: "POST", headers: { Authorization: `Bearer ${STT_KEY}` }, body: form,
     });
-    // The body on a failure, truncated: a 400 from one of these services names
-    // the actual complaint — an unsupported extension, a model that does not
-    // exist — and the status alone would send someone looking at the key.
+    // The body names the actual complaint; the status alone points at the key.
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const said = String((await res.json())?.text ?? "").trim();
     return said ? { said } : { trouble: 'empty' };
@@ -3573,12 +3520,8 @@ async function transcribe(bytes: Uint8Array, name: string, mime: string): Promis
 }
 
 /* ─── The tap under a briefing ─────────────────────────────────────────────
-   Answered from here rather than by the model, exactly as /notes is: it is a
-   fact being recorded, and a model call to store one word would be a full turn
-   with the whole memory attached for something a PATCH does.
-
-   answerCallbackQuery is not optional — Telegram spins the button until it
-   arrives, and a tap that never gets one reads as a bot that hung.
+   Answered here, not by the model: one word to store needs a PATCH, not a
+   turn. answerCallbackQuery is not optional, or the button spins.
    ───────────────────────────────────────────────────────────────────────── */
 export function parseFeedback(data: string): { verdict: string; day: string } | null {
   const [tag, verdict, day] = String(data ?? "").split('|');
@@ -3599,8 +3542,7 @@ async function handleFeedback(query: any): Promise<void> {
   }
 
   try {
-    // ONE VERDICT PER DAY, LAST TAP WINS. He may change his mind, and two
-    // contradictory rows for one briefing is a number nobody can read.
+    // One verdict a day; the last tap wins.
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_feedback?on_conflict=on_day`, {
       method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
       body: JSON.stringify([{ on_day: tap.day, verdict: tap.verdict }]),
@@ -3615,47 +3557,28 @@ async function handleFeedback(query: any): Promise<void> {
 
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
 
-/* THE ANSWER IS NOT WRITTEN INSIDE THE RESPONSE, AND IT CANNOT BE.
-
-   Telegram waits about a minute for a webhook to reply and then gives up with
-   "Read timeout expired" and redelivers the update. A briefing is a dozen web
-   searches and a long generation; it does not fit in that window, and the first
-   attempt proved it. Answering late is worse than slow: the redelivery runs the
-   whole thing again, so the trader gets two briefings and pays for two.
-
-   So the entry point answers 200 immediately and hands the work here.
-   EdgeRuntime.waitUntil is what keeps the worker alive past the response —
-   without it the runtime may reclaim it the moment the 200 is sent, killing the
-   generation halfway. Nothing awaits this, so it carries its own error handling
-   and its own apology; there is no response left to put a failure in. */
+/* Not answered inside the response: Telegram waits about a minute, then
+   redelivers, and a long answer would run — and bill — twice. The entry point
+   answers 200 at once; background() keeps the worker alive. Nothing awaits
+   this, so it carries its own error handling and apology. */
 async function handleMessage(update: any): Promise<void> {
   try {
     const msg = update?.message;
-    // Joins, stickers, and anything carrying nothing she can read. Dropped.
+    // Nothing she can read.
     if (!msg) return;
     if (String(msg.chat?.id) !== CHAT_ID) {
       console.error("doji-eugenia: message from unexpected chat");
       return;
     }
 
-    /* WHAT HE ACTUALLY SENT, resolved before anything else looks at it.
-
-       This used to be `if (!msg.text) return`, which silently dropped the two
-       things a trader at a desk is most likely to send: a voice note, because
-       talking is what people do when their hands are busy, and a chart, because
-       he trades charts. Both were invisible failures — no reply, no log, no
-       sign to him that anything had arrived.
-
-       `text` is what gets stored and what the slash commands read. `blocks` is
-       the image, which exists only for the turn being asked. */
+    // What he sent, resolved first: `text` is stored and read by the commands;
+    // `blocks` is an image, for this turn only.
     let text: string = typeof msg.text === 'string' ? msg.text : "";
     const blocks: any[] = [];
 
     const voice = msg.voice ?? msg.audio;
     if (voice?.file_id) {
-      // The download and the transcription both take seconds, so the indicator
-      // starts here rather than after — otherwise the wait for a voice note is
-      // the one that looks most like nothing happening.
+      // Typing from the start: a voice note's wait is the longest.
       await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
       const file = await tgDownload(voice.file_id);
       const heard: Heard = file
@@ -3664,19 +3587,14 @@ async function handleMessage(update: any): Promise<void> {
         : { trouble: 'download' };
 
       if ('trouble' in heard) { await say(VOICE_TROUBLE[heard.trouble]); return; }
-      // Kept as his words with a marker, so a later search for what he said
-      // finds it and the transcript is never passed off as something typed.
+      // Marked, so a transcript is never passed off as typed.
       text = `[voice note] ${heard.said}`;
     }
 
-    /* A CHART, AND THE LINE IT MAY NOT CROSS IS IN THE PROMPT RATHER THAN HERE.
-       She can describe what is on it and take it as context for the journal;
-       she cannot say whether a setup is valid, which would be a signal on a
-       trade he has not taken yet and is the one prohibition an image makes
-       tempting to break. Largest size last, which is Telegram's ordering. */
+    // A chart. Whether a setup on it is valid would be a signal; that line is in
+    // the prompt. Largest size last, Telegram's order.
     const photo = Array.isArray(msg.photo) && msg.photo.length ? msg.photo[msg.photo.length - 1] : null;
-    // A photo is always JPEG; a document carries whatever he attached, and only
-    // the four the API reads are worth downloading.
+    // A photo is JPEG; a document is whatever he attached.
     const docType = String(msg.document?.mime_type ?? "");
     const asImage = photo ?? (IMAGE_TYPES.includes(docType) ? msg.document : null);
     if (asImage?.file_id) {
@@ -3696,31 +3614,18 @@ async function handleMessage(update: any): Promise<void> {
       });
       text = String(msg.caption ?? "").trim() || "Have a look at this chart.";
     }
-    // An attachment that is neither readable audio nor a readable image. Said
-    // rather than dropped: a silent non-answer is what this whole branch exists
-    // to stop, and "I cannot open that" is a complete reply.
+    // Neither readable audio nor image: said, never dropped.
     if (!blocks.length && !text && msg.document) {
       await say(`I cannot open ${docType || 'that kind of file'}, jefe. A screenshot works.`);
       return;
     }
 
     if (!text) return;
-    /* ANSWERED FROM THE DATABASE, NEVER BY THE MODEL, and that is the whole
-       value of it. This is an audit of what she is keeping, so it has to show
-       the rows themselves — asked to list her own notes she could paraphrase
-       one, drop one, or produce a plausible line that is not in the table, and
-       an audit that can do that audits nothing. It also costs no model call. */
+    // /notes is answered from the database, never by the model, which could
+    // paraphrase or drop a row: an audit that can do that audits nothing.
     if (text.trim().toLowerCase() === '/notes') {
       try {
-        // The map goes out with them: it is the half of her memory he has never
-        // been able to see at all, and the half that says what she is missing.
-        // Read here and rendered by notesList, so the whole audit is one
-        // message written to him rather than his half plus hers.
-        //
-        // The open threads and the running story join it for the same reason.
-        // Everything she keeps that he cannot otherwise see belongs in the one
-        // place he goes to check what she is keeping — an audit that omits two
-        // of the five things it audits is the defect it exists to prevent.
+        // Everything she keeps that he cannot otherwise see, in one message.
         const [told, noticed, channels, loops, story, promised] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
           readNotes('commitment'),
@@ -3733,11 +3638,8 @@ async function handleMessage(update: any): Promise<void> {
       }
       return;
     }
-    /* HIS HALF OF THE LADDER, answered from the database like /notes and for the
-       same reason: a rung is a fact, and a model asked to set one could
-       paraphrase which. `setChannel` is reused rather than rewritten, so the
-       one-way door on the bottom rung and the unseeded-table check hold here
-       exactly as they do for the nightly pass. */
+    // /channel, answered from the database through setChannel, so the bottom
+    // rung's one-way door holds here too.
     const wanted = parseChannel(text);
     if (wanted !== null) {
       await say(typeof wanted === 'string'
@@ -3745,29 +3647,21 @@ async function handleMessage(update: any): Promise<void> {
         : await setChannel(wanted.channel, wanted.state, 'he said so'));
       return;
     }
-    // Any other slash command is addressed to Telegram, not to her, and /start
-    // arrives once per install. Answering one costs a full model call with the
-    // notes attached, so it is answered from here instead — Gladys ignores
-    // everything that is not a tap for the same reason.
+    // Any other command — /start — costs no model call.
     if (text.startsWith('/')) {
       await tg("sendMessage", { chat_id: CHAT_ID,
         text: "Aqui estoy, jefe. Just talk to me — or /notes to see what I have kept." });
       return;
     }
 
-    // TELEGRAM'S TYPING INDICATOR LASTS FIVE SECONDS AND CANNOT BE EXTENDED, so
-    // one call at the start leaves a thirty-second answer looking like a dead
-    // bot for twenty-five of them — which is exactly how it was read the first
-    // time it ran long. Re-sent until there is something to send. It makes
-    // nothing faster; it makes the wait legible. Best effort, so a failed ping
-    // is swallowed rather than taking the answer down with it.
+    // The typing indicator lasts five seconds, so it is re-sent until there is
+    // something to send; best effort.
     const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
     typing();
     const keepTyping = setInterval(typing, 4_500);
 
-    // A reply to one of her own messages names it. A text message carries its
-    // words; a voice note does not, and is found by when it was sent. Optional
-    // like the blocks beside it: a failed read costs the quote, never the answer.
+    // A swipe-reply names the message: its text, or for a voice note the turn
+    // found by time. A failed read costs the quote, never the answer.
     const replied = msg.reply_to_message?.from?.is_bot ? msg.reply_to_message : null;
     const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
       : typeof replied.text === 'string' ? Promise.resolve(replied.text)
@@ -3782,23 +3676,15 @@ async function handleMessage(update: any): Promise<void> {
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
         calendarBlock(), positionsBlock(), quoting,
       ]);
-      /* THE MARKER IS STORED, THE QUOTE IS NOT. The nightly pass reads the day's
-         turns, and "too long" with nothing saying under which message is a
-         correction it can only guess at; the opening words are enough to find
-         it there, and are a fact about the message rather than context that
-         goes stale — the `[voice note]` marker's reason. */
+      // A marker with the opening words is stored, so the nightly pass knows
+      // which message "too long" was about; the quote itself is not.
       if (quoted !== null) {
         const words = quoted.trim().split(/\s+/).filter(Boolean);
         const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
         text = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
       }
       const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
-      /* TOLD THAT IT WILL BE HEARD, AND NOT TOLD A LENGTH. The instruction used
-         to carry the cap, so that an answer over it was one she chose rather
-         than one silently left unspoken. There is no cap now — a long answer
-         becomes two voice notes — so a number here would be asking her to write
-         shorter for a limit that no longer exists, which is the one thing this
-         was changed to stop. */
+      // Told it will be heard, and no length: there is no cap to write for.
       const aloud =
         `\n\nYour answer reaches him as a voice note, so write it ` +
         `to be heard: plain sentences, no headings, and nothing that only works ` +
@@ -3807,33 +3693,21 @@ async function handleMessage(update: any): Promise<void> {
       const draft = await ask(
         [...history, {
           role: 'user',
-          // An image rides as a block beside the text; everything else is the
-          // string it always was. The context goes in the text either way, so
-          // the notes reach her whichever shape the turn takes.
+          // An image rides beside the text; the context is in the text either way.
           content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
         }],
         'medium', 'reply');
-      /* GATED INSIDE THE TYPING INDICATOR, which is why it is here rather than
-         beside the send. Cleared first, the ping stops and three silent seconds
-         pass before anything lands, so she reads as having finished and then
-         said nothing. */
+      // Gated while the indicator still runs, or three silent seconds read as
+      // her finishing and saying nothing.
       answer = await trim(draft, desk, story);
     } finally {
-      // Stopped the moment there is something to send, not after sending it —
-      // otherwise a ping fires between the message landing and the write, and
-      // she reads as about to say more.
+      // Stopped before sending, or a ping lands after the message.
       clearInterval(keepTyping);
     }
 
-    // BEFORE THE WRITE, only because the write is the slower of the two and the
-    // audio is the half he is waiting on. The text-then-audio ordering inside
-    // sayAloud is the part that matters and is stated there.
+    // Sent before the write: the message is what he is waiting on.
     await sayAloud(answer);
-    // THE TEXT, NEVER THE BLOCKS. A chart stored as base64 would be a megabyte
-    // of history resent on every turn for the next six exchanges, and the
-    // transcript of a voice note is the part worth searching anyway. What was
-    // SPOKEN is not stored either, for the same reason and more so: it is the
-    // same words, in a megabyte.
+    // The text, never the blocks or the audio: a megabyte resent as history.
     await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
@@ -3843,18 +3717,14 @@ async function handleMessage(update: any): Promise<void> {
   }
 }
 
-// Keeps a promise alive past the response. The catch is not optional: nothing
-// awaits this, so an unhandled rejection is the only trace a failure would
-// otherwise leave.
+// Keeps work alive past the response. The catch matters: nothing awaits it.
 function background(work: Promise<unknown>) {
   const guarded = work.catch(err =>
     console.error("doji-eugenia:", err instanceof Error ? err.message : err));
 
   const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
-  // SAID OUT LOUD, because its absence is otherwise invisible: without it the
-  // worker can be reclaimed the moment the 200 is sent, and the answer dies
-  // mid-generation with no error anywhere. That reads exactly like a model call
-  // that hung, which is the wrong thing to go looking for.
+  // Logged, because without it the worker can be reclaimed at the 200 and the
+  // answer dies mid-generation, reading like a model call that hung.
   if (!waitUntil) {
     console.error("doji-eugenia: EdgeRuntime.waitUntil unavailable — " +
                   "the reply may be killed when this response returns");
@@ -3876,52 +3746,29 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   try {
     if (secretMatches(fromTelegram, WEBHOOK_SECRET)) {
       const update = await req.json();
-      // TWO KINDS OF UPDATE NOW, and the webhook must be registered for both:
-      // allowed_updates = ["message", "callback_query"]. Registered for
-      // "message" alone the taps under a briefing are never delivered, the
-      // button spins, and nothing anywhere reports it — which is exactly the
-      // silent-registration failure Gladys's setWebhook already documents.
-      // Answer first, work after, for both. See handleMessage.
+      // Messages and taps, so the webhook registers both in allowed_updates.
+      // Answer first, work after.
       background(update?.callback_query
         ? handleFeedback(update.callback_query)
         : handleMessage(update));
       return json({ ok: true });
     }
     if (secretMatches(fromCron, CRON_SECRET)) {
-      /* TWO CALLERS BEHIND ONE SECRET, told apart by whether there is a body.
-         The cron jobs post nothing; the trades trigger posts {trade, event}.
-         Read as text and parsed rather than req.json(), because an empty body
-         throws there — and that throw would be every scheduled run. */
+      // Cron posts nothing; the trades trigger posts {trade, event}. Parsed from
+      // text, since req.json() throws on an empty body.
       const raw = (await req.text()).trim();
       const sent = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
       const url  = new URL(req.url);
 
-      /* THE ONE DOOR WHOSE ANSWER IS THE INTERFACE, so it alone still works
-         before it replies. `?embed=1` is called until it answers `left: 0`;
-         handed a 200 up front it would be a loop with nothing to read. It is
-         also the only flag NO cron job calls, which is the same fact from the
-         other side and is what agree.test.mjs holds this against. */
+      // ?embed=1 alone works before answering: it is called until `left: 0`,
+      // and it is the one flag no cron job dispatches — agree.test.mjs holds that.
       if (url.searchParams.get("embed") === "1") return await postScheduled(url);
 
-      /* EVERYTHING SCHEDULED ANSWERS BEFORE IT WORKS, and the reason is a
-         SECOND limit that Pro does not move. The worker's wall clock is 150s
-         free and 400s paid — that one killed the Sunday briefing at 145.4s of
-         drafting, four and a half seconds short. The request idle timeout is
-         150s on EVERY plan: send the caller nothing for that long and the
-         request is closed under you. So a briefing that now completes still
-         hands pg_net a 504, having delivered perfectly.
-
-         That 504 is not cosmetic. It is indistinguishable, in the only table
-         that records dispatches, from a call that never ran — and a monitor
-         that cannot tell a working briefing from a dead one is worse than
-         none. Answering first makes a non-2xx there mean what it says.
-
-         The Telegram half does this to beat a redelivery, which is why the
-         cron half was exempt; this is a different reason arriving at the same
-         shape. `background()` is unchanged and already guards the work.
-
-         The body NAMES the job, because `net._http_response` carries no URL
-         and the flag is otherwise unrecoverable from the row. */
+      /* Everything else answers before it works. The request idle timeout is
+         150s on every plan, so a briefing that completed perfectly still handed
+         pg_net a 504 — indistinguishable in the only dispatch record from a
+         call that never ran. Answering first makes a non-2xx mean what it
+         says. The body names the job, since the response row carries no URL. */
       if (sent?.trade) {
         background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened'))
           .catch(err => jobFailed('trade', err)));
@@ -3932,9 +3779,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
-    // pg_net discards this, so the console and the Telegram message above are
-    // where a failure is reported. postScheduled retries a failed briefing at
-    // 09:00, 10:00 and 11:00; anything reaching here is outside that.
+    // pg_net discards this; only the console sees it.
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
