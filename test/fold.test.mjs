@@ -54,7 +54,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
+  releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
   sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -3614,6 +3614,42 @@ test("R-14's reads cover the trades' window, TradingView's high-rated releases o
   assert.ok(wk.match(/week=gte\.([\d-]+)/)[1] <= new Date(Date.parse(since) - 7 * 864e5).toISOString().slice(0, 10));
   assert.match(rel, /order=at\.desc&limit=\d+/);
   assert.match(wk, /order=week\.desc&limit=\d+/);
+});
+
+test("a full release read covers only the weeks it reached, so R-14 cannot pass an entry for want of a print", async () => {
+  /* The read takes the newest releases first. On a year long enough to fill it,
+     the oldest weeks are still marked fetched in calendar_weeks while their
+     releases never arrived — and an entry in one of them passed R-14 for want of
+     a print. Driven through check_rules, because the guard is in the read. */
+  const day = (n) => new Date(Date.now() - n * 864e5);
+  const entry = day(300);
+  const trade = { id: 'PID1', direction: 'BUY', entry_time: entry.toISOString(),
+    fill_time: new Date(+entry + 30 * 60_000).toISOString(), entry_price: 4000, exit_price: 4030,
+    pnl: 60, open_day: entry.toISOString().slice(0, 10), setup: null, followed_rules: null,
+    followed_sl: null, followed_tp: null, size_oz: 4, net_pnl: 60, planned_sl: null,
+    planned_tp: null, best_price: null };
+  // Every release is in the last few weeks, so none is near the old entry.
+  const recent = (n) => Array.from({ length: n }, (_, i) => ({ at: day(1 + i / 40).toISOString() }));
+  const weeks = [{ week: weekOf(entry) }, { week: weekOf(day(1)) }];
+  const r14 = async (releases) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      const rows = u.includes('eugenia_trades') ? [trade] : u.includes('eugenia_calendar') ? releases
+        : u.includes('calendar_weeks') ? weeks : [];
+      return { ok: true, status: 200, json: async () => rows };
+    };
+    try {
+      return (await serve('check_rules', { days: 365 })).split('\n').find(l => l.startsWith('R-14'));
+    } finally { globalThis.fetch = realFetch; }
+  };
+  assert.match(await r14(recent(RULE_RELEASES - 1)), /^R-14: PASS/,
+    'a read short of its bound covers every week it was handed, and this entry has no print near it');
+  assert.match(await r14(recent(RULE_RELEASES)), /^R-14: UNKNOWN/,
+    'a full read still counts the oldest week as covered, so an entry nothing was read for passes');
+  // The week the oldest release falls in is partial, and is left out too.
+  const edge = [...recent(RULE_RELEASES - 1), { at: entry.toISOString() }];
+  assert.ok(!coveredWeeks([weekOf(entry)], edge).has(weekOf(entry)));
 });
 
 test('R-19 judges the stop in force when a print lands on a position from an earlier session', () => {

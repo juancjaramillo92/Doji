@@ -7173,3 +7173,34 @@ test('a swipe-reply looks forward first and back for the briefing only after', (
     'a reply to the briefing looks only forward from the voice note, and the ' +
     'briefing is the one message stored before it is sent — so it is never found');
 });
+
+/* ─── The short-message gate reads replies too ───────────────────────────────
+   TRIM was written for the messages she starts and told every message it reads
+   that it is two or three sentences. Then the reply joined its callers, and the
+   reply path tells her its length is whatever the answer needs — a plan checked
+   against his rules can run to nine findings. `keepDraft` only refuses a
+   revision under a third of the draft, so a gate cutting a reply to its last
+   three sentences was accepted. The rule names whose length it is. */
+
+test('the short-message gate does not hold a reply to two or three sentences', () => {
+  const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
+  assert.ok(trim, 'prompt.ts no longer exports TRIM');
+  assert.match(trim, /A REPLY TO HIM IS AS LONG AS WHAT HE ASKED NEEDS/,
+    'TRIM no longer says a reply is as long as it needs, and it gates every reply');
+  assert.doesNotMatch(trim, /This is two or three sentences/,
+    'TRIM tells every message it reads that it is two or three sentences, replies included');
+});
+
+/* ─── The trade look is told what happened, not a state that may be false ────
+   It fires on an open and on a close, and it told her on both that he was in a
+   position while reading it. On a close that took his day past R-11 he may hold
+   nothing at all, and she is told so beside the situation she is describing. */
+
+test('the trade look does not tell her he is in a position on a close', () => {
+  const body = EUGENIA_PROMPT.match(/export const TRADE_EVENT = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
+  assert.ok(body, 'prompt.ts no longer exports TRADE_EVENT');
+  assert.doesNotMatch(body, /He is in a position while reading this/,
+    'TRADE_EVENT tells her he is in a position, and it is also sent after a close');
+  assert.match(body, /just opened a position or just closed one/,
+    'TRADE_EVENT no longer says which two things it is sent about');
+});

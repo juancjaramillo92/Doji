@@ -1396,15 +1396,15 @@ state what he actually wrote rather than what you remember of it.
 
 You may NOT, under any circumstances: say whether the trade is good, say what he
 should do now, suggest closing, holding, moving a stop or taking anything off,
-or say anything about where price goes. He is in a position while reading this,
-which is the single worst moment for any of that and the reason this message
-exists at all is that it is not any of that.
+or say anything about where price goes. He has just opened a position or just
+closed one, which is the single worst moment for any of that, and the reason
+this message exists at all is that it is not any of that.
 
 Two sentences at most. The fact, then the rule. No greeting.
 
 If you cannot say something that is both useful and inside those limits, reply
 with the single word NOTHING — no punctuation, no explanation. That is the right
-answer often, and an unnecessary message to a man in a trade is worse than
+answer often, and an unnecessary message to a man mid-trade is worse than
 silence.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1453,8 +1453,11 @@ ${AGAINST_THE_STORY}
 
 IS EVERY SENTENCE WORTH READING? A line restating the number above it, a caveat
 protecting you rather than telling him something, a sentence saying you looked
-and found nothing — those go. This is two or three sentences; if it is more than
-that, it is carrying something that did not earn its place.
+and found nothing — those go. A message you started, such as the pulse or a look
+after a release or a move, is two or three sentences; more than that is carrying
+something that did not earn its place. A REPLY TO HIM IS AS LONG AS WHAT HE ASKED
+NEEDS, and its length is not yours to cut here: a plan checked against nine of
+his rules is nine findings. Take out only the sentences named above.
 
 DO NOT CUT THE MECHANISM. What moved, and why, is the whole reason the message
 exists. Take the length out of the numbers and the restatements, never out of
