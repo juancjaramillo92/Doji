@@ -7173,3 +7173,20 @@ test('a swipe-reply looks forward first and back for the briefing only after', (
     'a reply to the briefing looks only forward from the voice note, and the ' +
     'briefing is the one message stored before it is sent — so it is never found');
 });
+
+/* ─── The short-message gate reads replies too ───────────────────────────────
+   TRIM was written for the messages she starts and told every message it reads
+   that it is two or three sentences. Then the reply joined its callers, and the
+   reply path tells her its length is whatever the answer needs — a plan checked
+   against his rules can run to nine findings. `keepDraft` only refuses a
+   revision under a third of the draft, so a gate cutting a reply to its last
+   three sentences was accepted. The rule names whose length it is. */
+
+test('the short-message gate does not hold a reply to two or three sentences', () => {
+  const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
+  assert.ok(trim, 'prompt.ts no longer exports TRIM');
+  assert.match(trim, /A REPLY TO HIM IS AS LONG AS WHAT HE ASKED NEEDS/,
+    'TRIM no longer says a reply is as long as it needs, and it gates every reply');
+  assert.doesNotMatch(trim, /This is two or three sentences/,
+    'TRIM tells every message it reads that it is two or three sentences, replies included');
+});

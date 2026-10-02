@@ -2161,6 +2161,13 @@ the one path with nothing checking the rule written for it. It is gated INSIDE
 the typing indicator, because clearing the ping first leaves three silent
 seconds in which she reads as having finished and then said nothing.
 
+**A reply is not held to the short messages' length.** `TRIM` told every message
+it read that it was two or three sentences, which was right for the messages she
+starts and wrong for the reply that joined them. A plan checked against his rules
+can be nine findings long, and `keepDraft` refuses only a revision under a third
+of the draft, so a reply cut to its last few sentences was accepted. The length
+line now names the messages it is about.
+
 **And what is remembered is what the gate returned.** The three callers that
 gained a gate went on storing the DRAFT — a message he never read, filed as her
 own words and resent as history for six exchanges, which is the stale copy
