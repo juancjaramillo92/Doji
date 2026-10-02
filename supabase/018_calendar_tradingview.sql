@@ -1,27 +1,18 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — 018: her calendar keyed by TradingView's id
 -- ───────────────────────────────────────────────────────────────────────────
--- The calendar is filed for her now, from TradingView, rather than typed in by
--- her off a search page. Most of what went wrong with this table came from the
--- typing: the key was (at, name) over a name the model wrote, so one CPI arrived
--- as five rows under five spellings, and nothing a later turn wrote could tell
--- which of them it meant. TradingView keeps an id for every release, and that is
--- the key a filing upserts on — one release, one row, whatever it is called.
+-- The calendar is filed from TradingView now rather than typed in by her, and
+-- keyed on TradingView's id: one release, one row, whatever it is called.
 --
--- A UNIQUE INDEX RATHER THAN A CONSTRAINT, and plain rather than partial:
--- PostgREST's `on_conflict=tv_id` needs a unique index it can infer, and the
--- rows she filed before this carry no id. Nulls do not collide.
+-- A plain unique index rather than a constraint or a partial index, because
+-- PostgREST's `on_conflict=tv_id` must infer it; her older rows carry no id,
+-- and nulls do not collide.
 --
--- WHAT SHE FILED FOR THE DAYS AHEAD IS DELETED, because TradingView's rows for
--- the same releases arrive under different names and every pending print would
--- otherwise be listed twice until it had passed. Only the future, and only rows
--- with no id: what already printed is history, and the series this table exists
--- to grow keeps every one of them.
+-- Her own future rows are deleted, or every pending print would be listed
+-- twice under two names. What already printed is history and stays.
 --
--- Safe to re-run: `if not exists`, and a delete that matches nothing once she
--- no longer files.
+-- Safe to re-run.
 -- ═══════════════════════════════════════════════════════════════════════════
-
 alter table public.eugenia_calendar add column if not exists tv_id text;
 
 create unique index if not exists eugenia_calendar_tv_id on public.eugenia_calendar (tv_id);

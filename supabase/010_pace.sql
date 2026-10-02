@@ -1,81 +1,34 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — 010: how much of the worker's clock the briefing is spending
 -- ───────────────────────────────────────────────────────────────────────────
--- RUN AFTER 009. Every statement is `create or replace` or `drop ... if
--- exists`, so this file is safe to re-run in full. It creates no table: what it
--- needs is already recorded.
+-- The cron half answers before it works, so a briefing killed at the wall clock
+-- has already handed pg_net a 200: 009 sees a healthy dispatch, ask() never
+-- reaches its catch, no apology is sent, and each retry dies the same way. So
+-- it is watched from both sides — the pace, a warning while there is still
+-- room, and the absence, a briefing the day owed that never arrived. It posts
+-- to Telegram itself, for 009's reason.
 --
--- THE NUMBER THIS WATCHES IS THE LAST ONE IN THE SYSTEM THAT NOTHING READS.
--- `eugenia_runs.ms` has been written on every model call and every delivered
--- briefing since 005, and it has been read by nobody. Three unattended days
--- put the briefing at 170.6s, 162.3s and 238.7s against a 400s ceiling — sixty
--- per cent used on an ordinary Wednesday, with the duration swinging two to one
--- on work that looks identical from the outside.
---
--- AND THE CROSSING IS THE ONE FAILURE NOTHING HERE CAN REPORT. Since the cron
--- half began answering before it works, a briefing killed at the wall clock
--- hands pg_net an immediate 200: 009's ledger records a healthy dispatch, and
--- `ask()`'s failure row is never written because the process is gone rather
--- than throwing. `postScheduled`'s catch does not run, so no apology is sent.
--- The 09:00, 10:00 and 11:00 retries redo the same too-long work and die the
--- same way. What reaches him is nothing at all, from three monitors that all
--- read green — which is precisely the Sunday that 009 was built after.
---
--- SO IT IS WATCHED FROM BOTH SIDES. The pace is the leading half: a warning
--- while there is still room, because after the crossing there is nothing to
--- warn with. The absence is the lagging half, and it is what actually closes
--- the hole — a briefing this day owed, past the last hour it could still have
--- arrived, with no row saying it did.
---
--- IT LIVES IN POSTGRES FOR 009'S REASON, NOT AS A CONVENIENCE. The thing that
--- fails is the Edge Function, so a watcher that reported it by asking that same
--- function to send a message would share the failure mode of its subject. This
--- one posts to Telegram directly, off the same two Vault names 009 reads.
+-- Run after 009. Safe to re-run in full. Creates no table: eugenia_runs.ms
+-- already holds what it needs.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ─── What there is to say, if anything ─────────────────────────────────────
--- SEPARATED FROM THE SENDING FOR THE REASON `healthLine` AND `sweepLine` ARE:
--- a monitor whose verdict cannot be driven from a test against planted rows is
--- a monitor nobody has ever seen fire. It takes its clock as an argument for
--- the same reason `dispatch_failures` does.
+-- Separate from the sending, and handed its clock, so its verdict can be
+-- driven from planted rows.
 --
--- THE CEILING IS THE PAID WALL CLOCK AND THE SHARE IS THE DECISION. The 400s
--- is the platform's, not ours; three-quarters of it is where this speaks, and
--- the argument for that share is the observed spread rather than taste. The
--- briefing's own swing is 77s between its fastest and slowest ordinary day, so
--- a threshold at 300s cannot be reached by an ordinary heavy morning — and the
--- 100s still left when it fires is more than one whole swing, which is what
--- makes the warning early enough to act on rather than a description of a
--- briefing that is already dying.
+-- It speaks at three-quarters of the 400s paid wall clock: the briefing's
+-- ordinary swing is about 77s, so an ordinary heavy morning cannot reach it,
+-- and the 100s left is more than one swing — early enough to act on.
 --
--- `ms` IS A LOWER BOUND ON THE WALL CLOCK AND NEVER AN OVERSTATEMENT. A row
--- measures one model call, or — on the written and delivered rows — everything
--- one of the briefing's two workers did; the worker's clock started earlier, at
--- the request, and stops later. So
--- a row alone crossing the share means the invocation behind it certainly did,
--- and reading the largest row rather than trying to reassemble an invocation
--- costs only lateness, never a false alarm. There is no invocation id to
--- reassemble one with.
+-- `ms` is a lower bound on the wall clock, which started earlier and stops
+-- later, so the largest single row crossing means the invocation did. There is
+-- no invocation id to reassemble one with; the cost is lateness, never a false
+-- alarm. Seven days, so the window holds a Sunday briefing.
 --
--- SEVEN DAYS, because the week has to contain a Sunday briefing — the longest
--- and rarest of them, and the one whose absence takes seven days to come round
--- again — and because a window that outlives a repair stops reporting the
--- repair.
---
--- AND A RUN IS SAID ONCE, WHICH THE WINDOW ALONE COULD NOT SAY. The only guard
--- was the day, and a run stays in a seven-day window for seven days — so the
--- first Sunday to cross the share, at 315s, was announced at 17:37 and again
--- at 00:37, and would have been every midnight until the next Sunday: the same
--- sentence eight times, which is how a monitor is taught to be swiped away.
--- `since` is when the watcher last spoke, and a run at or before it has been
--- said. diagnose.sql passes nothing, because it shows the week rather than
--- what is left to say. The absence is untouched — it is about a day, and the
--- day guard is what already says it once.
---
--- A SECOND ARGUMENT IS A SECOND FUNCTION, which is why the drop comes first.
--- `create or replace` cannot change an argument list, so the one-argument
--- version would survive beside this one and `pace_line()` would match both —
--- Postgres refuses that as ambiguous, which is 007's overload arriving here.
+-- `since` is when the watcher last spoke, so a run is said once rather than
+-- every day it stays in the window. diagnose.sql passes none. Dropped first,
+-- because a second argument makes a second function and the old one would
+-- leave `pace_line()` ambiguous.
 drop function if exists public.pace_line(timestamptz);
 create or replace function public.pace_line(now_  timestamptz default now(),
                                             since timestamptz default null)
@@ -84,10 +37,7 @@ language plpgsql
 stable
 as $$
 declare
-  -- THE PLATFORM'S PAID WORKER WALL CLOCK, and the only place this file states
-  -- it. The message quotes this rather than spelling the number out again: two
-  -- copies of a ceiling is how a threshold gets moved and the sentence beside it
-  -- keeps naming the old one.
+  -- The paid worker wall clock, stated once; the message quotes it.
   ceiling_ms constant int := 400000;
   speak_at   constant int := ceiling_ms * 3 / 4;
 
@@ -98,22 +48,16 @@ declare
   worst   public.eugenia_runs;
   lines   text[] := '{}';
 begin
-  /* ── THE ABSENCE ──────────────────────────────────────────────────────────
-     Judged only once the day can no longer produce one. The weekday briefing
-     is due at 08:00 and retried at 09:00, 10:00 and 11:00, so a retry that
-     started on the hour and ran the whole ceiling still lands before noon;
-     Sunday's is due at 17:00 and retried to 20:00, so 21:00 is the same
-     bound. Asked any earlier this reports a briefing that is still being
-     written, which is the ordinary-day false alarm that gets a monitor
-     ignored. */
+  /* ── The absence ──────────────────────────────────────────────────────────
+     Judged an hour past the last retry (retryDue's window), when the day can
+     no longer produce one; earlier, it would report a briefing still being
+     written. agree.test.mjs holds these hours against retryDue. */
   owed := case
             when wd between 1 and 5 and hour >= 12 then 'weekday'
             when wd = 0             and hour >= 21 then 'sunday'
           end;
 
-  -- The caller is exactly what postBriefing writes on its way out, and it is
-  -- written only after the briefing has been sent — so its absence is the
-  -- statement that nothing reached him, not that something went wrong.
+  -- postBriefing writes this caller only after the briefing was sent.
   if owed is not null and not exists (
        select 1 from public.eugenia_runs
         where caller = owed || ' briefing delivered'
@@ -124,11 +68,9 @@ begin
       case owed when 'sunday' then 'Sunday open' else 'weekday' end);
   end if;
 
-  /* ── THE PACE ─────────────────────────────────────────────────────────────
-     Failed runs count: a turn that died still spent the clock, and the ones
-     that spend most of it are exactly the ones worth seeing. Rows this
-     watcher writes carry no `ms`, so they fall out of the population here
-     rather than needing to be named out of it. */
+  /* ── The pace ─────────────────────────────────────────────────────────────
+     Failed runs count: a turn that died still spent the clock. This
+     watcher's own rows carry no `ms`, so they fall out unnamed. */
   worst := (select r from public.eugenia_runs r
              where r.ms is not null
                and r.at > now_ - interval '7 days'
@@ -136,12 +78,8 @@ begin
              order by r.ms desc
              limit 1);
 
-  /* EACH FINDING CARRIES ITS OWN CONSEQUENCE, and there is no opening line
-     over the top of them. One was tried and it could only be true of one case:
-     a briefing that never arrived is not "running close to" anything, and a
-     message that describes the wrong half of what it found is the first thing
-     to teach him not to read it. Two sentences that stand alone need no
-     wrapper. */
+  -- Each finding carries its own consequence, with no heading over both: one
+  -- heading cannot be true of a slow briefing and a missing one.
   if worst.ms >= speak_at then
     lines := lines || format(
       'Longest run in the last seven days: %s, %ss against the worker''s %ss '
@@ -160,24 +98,11 @@ end;
 $$;
 
 -- ─── Saying it, at most once a day ─────────────────────────────────────────
--- THE GUARD IS ON THE MESSAGE RATHER THAN ON THE RUN, and the difference is a
--- day where nothing is wrong until noon. A watcher that recorded "checked" at
--- midnight and then refused to speak would be silent on exactly the day the
--- briefing failed to arrive.
---
--- BOTH OUTCOMES, ALWAYS. A meter that records only when it fires reports a
--- watcher that has stopped running as a system with nothing to report, which is
--- the lesson `heartbeat()` learned and the embedding sweep learned again. So a
--- quiet day still leaves one row, and `eugenia_runs` — free text `caller` on
--- purpose — is where it goes rather than a table of its own.
---
--- AND A MESSAGE THAT COULD NOT BE SENT LEAVES NO ROW, which is 009's rule
--- arriving for the same reason. The row IS the guard, so writing one after a
--- Vault name failed to resolve would mark the day as said and swallow the
--- warning for good — repairing the name would then deliver silence. Written
--- only where the post was made; the next hour tries again, and verify.sql is
--- what asks whether both names resolve at all. Found by running it with the
--- name misspelled, which is the only way this half is ever exercised.
+-- The guard is the message rather than the run, or a midnight "checked" would
+-- silence the day the briefing failed to arrive. Both outcomes leave a row in
+-- eugenia_runs, so a quiet day is told apart from a watcher nobody calls. A
+-- message that could not be sent leaves none: the row is the guard, and
+-- writing it then would swallow the warning once the Vault name was repaired.
 create or replace function public.pace_watch(now_ timestamptz default now())
 returns text
 language plpgsql
@@ -214,8 +139,7 @@ begin
     return null;
   end if;
 
-  -- The quiet day's one row, and the only thing that can tell a watcher with
-  -- nothing to say from a watcher nobody is calling.
+  -- The quiet day's one row.
   if said is null and not exists (
        select 1 from public.eugenia_runs
         where caller = 'pace'
@@ -227,8 +151,6 @@ begin
 end;
 $$;
 
--- Reachable by the publishable key otherwise, from the default privileges
--- Supabase grants on the public schema — `revoke ... from public` alone does
--- not take those, which is the mistake 007 exists to have corrected once.
+-- anon and authenticated by name, for 007's reason.
 revoke execute on function public.pace_line(timestamptz, timestamptz) from public, anon, authenticated;
 revoke execute on function public.pace_watch(timestamptz)            from public, anon, authenticated;
