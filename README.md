@@ -2051,6 +2051,13 @@ actual, read as still **due** hours after the print. `calendarList` marks a row
 with no figure **PAST** once its time has gone, which is also every speech, all
 day, and every print whose number has not reached the calendar yet.
 
+**The read is bounded at forty rows, and a full read says it stopped.** It reads
+earliest first, so a day too heavy for the bound loses the furthest-ahead rows —
+tomorrow's, which the next briefing reads and the trade event reads for itself —
+and that end is the right one to lose. What the bound may not do is pass as the
+whole list, so a read that reached it ends with a line telling her later
+releases were not read.
+
 **A figure TradingView has not published is left out of the row, never sent as
 null.** `merge-duplicates` writes exactly the keys a payload names, so a filing
 carrying `actual: null` would erase an actual the release look recorded by hand
@@ -2834,6 +2841,14 @@ look an hour later arrive identically. What is stored is his words behind a
 marker carrying her message's opening, so the nightly pass can tell what a
 correction was about.
 
+**The briefing is found looking back, because it is the one message stored
+before it is sent.** Its marker goes down first and the speaking worker sends it
+seconds to minutes later, so looking forward from the voice note — right for
+every other message — found nothing under the briefing, every time. When the
+forward look is empty, the newest two rows across the speaking worker's budget
+are taken only if they are a briefing and its marker, sharing one instant;
+anything else there gets no quote rather than a wrong one.
+
 `notesBlock()` is therefore load-bearing on **all seven paths**, and its absence
 would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts that the briefing, the pulse, a reply, the
@@ -3124,6 +3139,13 @@ note is a moment and is fairly written in one, but a rung is a judgment across
 days, and moving one on a single exchange is the same error as reading a pattern
 into one fill. Most nights nothing moves, and the prompt says that is the
 honest outcome rather than a wasted run.
+
+**And the loop holds that, not the model's restraint.** A tool set is what a
+caller can run as well as what it is shown: `ask()` answers a name outside the
+set it was handed exactly as it answers an unknown one, and runs nothing. Until
+then every tool in the file was runnable from every path, and *only the nightly
+pass moves a rung* held only for as long as the model never named a tool it had
+not been given.
 
 **It comes back down when he says so, and only then.** *"I have lost this"*,
 *"explain that again"* — the rung drops that night and she does not defend the
@@ -3533,6 +3555,13 @@ day; and the failure whose real symptom is that her memory stops growing was
 described as the one whose symptom is a message that never arrived. `APOLOGY` is
 a word per job, and a test asserts no two of them are the same sentence.
 
+**The trade event reaches the same catch.** It answers before it works like
+everything scheduled, but it is dispatched beside `postScheduled` rather than
+through it, so it had an apology written for it and no path that sent one: a
+read that failed before its model call left a console line and nothing else, on
+the one message with no retry behind it. Both callers now hand a failure to
+`jobFailed`, which writes the `<job> job` row and then apologises, in that order.
+
 ### What a turn cost
 
 `ask()` logs one line per turn — the caller, the rounds it took, the effort, the
@@ -3933,6 +3962,16 @@ call and routes by refusal category, so there is no model list here to go stale.
 A decline before any output is not billed. The `stop_reason === "refusal"` check
 stays and still fires: it is now the case where the whole chain declined.
 
+**Two other stop reasons carry text that is not the answer, and the loop reads
+both.** `pause_turn` is the server's own search loop stopping at ten iterations
+mid-turn — reachable by any caller allowed twelve searches and six fetches — and
+read as an ending it sent whatever preamble came before the pause, or died on
+`no text`. It is resumed by sending the paused response back as it stands, and
+counts as a round, so `MAX_ROUNDS` still bounds it. `max_tokens` is an answer
+cut off, or a tool call dropped half-written; it throws, so the briefing's retry,
+a gate's draft or the apology runs, and the failure row says `cut off at
+max_tokens`.
+
 **And a fallback now says so.** It is invisible by construction — the call
 succeeds, the briefing arrives on time, and the only difference is that another
 model wrote it. `ask()` compares the `model` on each response against the one
@@ -4080,7 +4119,7 @@ an hour**. So the longer window does not simply buy more — it moves the
 break-even from two requests on a prefix to three, and a caller that makes one
 request and is not followed within the hour pays double for a lifetime nothing
 uses. That matters more than it looks, because *the tool array is part of the
-cache key*: five tool sets are five separate prefixes, none readable by another.
+cache key*: each tool set is a separate prefix, none readable by another.
 Which makes *is a second turn likely inside the hour?* a question about the
 **array** rather than about the caller — and the answer came back in one shape:
 
@@ -4106,6 +4145,12 @@ is 10:00 — two hours apart — so the hour those were paying 2× for could nev
 have been read by anything. The window is derived from the tool array now: `1h`
 for `RELEASE_TOOLS`, `5m` for the rest, which is 512,059 tokens a week moving
 off the doubled rate.
+
+**The move look used to share that array, and has its own now.** It bought the
+hour without earning it — two turns, two prefixes written, none inherited — and
+it was handed `record_actual` for a move the calendar has already said no print
+explains. `MOVE_TOOLS` is the release look's set without that tool, at five
+minutes.
 
 `ask()` records both halves — `cached` for the reads, `wrote_1h` and `wrote_5m`
 for the writes, kept apart because their rates differ and a sum of them cannot be

@@ -43,7 +43,8 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
-  notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, ask,
+  notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
+  spokenBriefing, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
@@ -1964,7 +1965,7 @@ test('the window starts exactly the stated number of hours back', () => {
    exactly as well as the right one.
    ───────────────────────────────────────────────────────────────────────── */
 
-const pickTurn = (query, rows) => {
+const pickRows = (query, rows) => {
   const params = new URLSearchParams(query.split('?')[1]);
   const [col, dir] = params.get('order').split('.');
   const kept = rows.filter(r => params.getAll('role').every(v => v === `eq.${r.role}`) &&
@@ -1973,8 +1974,9 @@ const pickTurn = (query, rows) => {
       return op === 'gte' ? r.created_at >= bound : op === 'lte' ? r.created_at <= bound : false;
     }));
   kept.sort((a, b) => (a[col] < b[col] ? -1 : 1) * (dir === 'desc' ? -1 : 1));
-  return kept.slice(0, Number(params.get('limit'))).map(r => r.content);
+  return kept.slice(0, Number(params.get('limit')));
 };
+const pickTurn = (query, rows) => pickRows(query, rows).map(r => r.content);
 
 test('a reply is matched to the message it answers, not to what she said since', () => {
   const sent = Date.UTC(2026, 8, 25, 14, 0, 0) / 1000;
@@ -1990,6 +1992,37 @@ test('a reply is matched to the message it answers, not to what she said since',
   assert.deepEqual(pickTurn(repliedQuery(sent), rows), ['the pulse']);
   // A message that was never stored finds nothing, rather than a turn from later.
   assert.deepEqual(pickTurn(repliedQuery(sent - 3600), rows), []);
+});
+
+test('a reply to the briefing finds it, though it was stored before it was sent', () => {
+  /* THE ONE MESSAGE STORED FIRST. The marker and the text go down together
+     before the speaking worker sends anything, so the voice note he swipes is
+     dated after the row it carries — and looking forward from it found nothing
+     on every briefing. */
+  const sent = Date.UTC(2026, 9, 2, 12, 3, 0) / 1000;
+  const iso = (s) => new Date((sent + s) * 1000).toISOString();
+  const briefing = [
+    { id: 1, role: 'assistant', content: 'last night',          created_at: iso(-36000) },
+    { id: 2, role: 'user',      content: '[weekday briefing]',  created_at: iso(-40) },
+    { id: 3, role: 'assistant', content: 'the briefing',        created_at: iso(-40) },
+  ];
+  assert.deepEqual(pickTurn(repliedQuery(sent), briefing), []);
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), briefing)), 'the briefing');
+
+  // Anything else in the window is a message he is not replying to: a turn
+  // stored without being sent, or one stored between the briefing and the note.
+  const unsent = [...briefing.slice(0, 1),
+    { id: 2, role: 'user',      content: 'what about silver', created_at: iso(-30) },
+    { id: 3, role: 'assistant', content: 'never reached him',  created_at: iso(-30) }];
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), unsent)), null);
+  const between = [...briefing,
+    { id: 4, role: 'user',      content: 'and silver?',        created_at: iso(-10) },
+    { id: 5, role: 'assistant', content: 'silver is quiet',    created_at: iso(-10) }];
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), between)), null);
+  // Paired by the instant the INSERT gave both, never by adjacent ids alone.
+  const unpaired = [briefing[0], briefing[1],
+    { id: 3, role: 'assistant', content: 'another turn', created_at: iso(-35) }];
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), unpaired)), null);
 });
 
 
@@ -2511,6 +2544,80 @@ test('a journal read that 404s never comes back as an empty window', async () =>
 test('an empty window still says it is empty, because that is an answer', async () => {
   const { answered } = await turnWithJournal(200, twoRounds);
   assert.match(answered, /No trades in that window/);
+});
+
+/* ─── A tool set is what a caller can run, not only what it is shown ────────
+   `serve` can run every tool in the file, and the rules that matter are about
+   who may: only the nightly pass moves a rung. Driven through ask() with the
+   reply's set, because the guarantee is the loop refusing, not the set's list.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a tool the caller was not offered is answered as unknown and never runs', async () => {
+  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
+  const db = [], sent = [];
+  const responses = [
+    served('claude-opus-5', { stop_reason: 'tool_use', content: [
+      { type: 'tool_use', id: 'tu_1', name: 'set_channel',
+        input: { channel: 'dollar', state: 'owns', evidence: 'one exchange' } }] }),
+    answers('claude-opus-5'),
+  ];
+  let n = 0;
+  globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
+    ? (db.push(String(url)), { ok: true, status: 200, json: async () => [{}] })
+    : (sent.push(JSON.parse(init.body)), responses[n++]);
+  console.log = () => {};
+  console.error = () => {};
+  try {
+    await ask([{ role: 'user', content: 'I get real rates now' }], 'medium', 'reply');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+    console.error = realErr;
+  }
+  assert.match(sent[1].messages.at(-1).content[0].content, /no tool called "set_channel"/);
+  assert.ok(!db.some(u => u.includes('eugenia_channels')),
+    'a reply moved a rung, which only the nightly pass may do');
+});
+
+/* ─── A paused turn, and a cut-off one ───────────────────────────────────────
+   Two stop reasons that both carry text, and neither text is the answer. A
+   pause is the server's search loop running out of iterations mid-turn; a
+   max_tokens stop is the answer truncated. Driven through ask() for the reason
+   the tests above are: the loop is what has to tell them apart from an ending.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const pausedContent = [
+  { type: 'text', text: 'Let me look at the overnight session.' },
+  { type: 'server_tool_use', id: 'srv_1', name: 'web_search', input: { query: 'gold' } },
+];
+const paused = (model) => served(model, { stop_reason: 'pause_turn', content: pausedContent });
+
+test('a paused turn is resumed, not sent as the answer', async () => {
+  const { sent, lines } = await bodiesOf([paused('claude-opus-5'), answers('claude-opus-5')]);
+  assert.equal(sent.length, 2, 'the paused turn ended the loop, so its preamble was the answer');
+  // Resumed by sending it back as it stands, with nothing after it.
+  assert.deepEqual(sent[1].messages.at(-1), { role: 'assistant', content: pausedContent });
+  assert.match(lines[0], /2 round\(s\)/);
+});
+
+test('a turn cut off at max_tokens fails rather than sending half an answer', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const rows = [];
+  globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
+    ? (rows.push(JSON.parse(init.body)[0]), { ok: true, status: 201 })
+    : served('claude-opus-5', { stop_reason: 'max_tokens',
+        content: [{ type: 'text', text: 'Gold opened the week at' }] });
+  console.error = () => {};
+  try {
+    await assert.rejects(ask([{ role: 'user', content: 'anything' }], 'medium', 'test'),
+      /max_tokens/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].ok, false);
+  assert.match(rows[0].detail, /max_tokens/, 'the failure row does not say why the turn died');
 });
 
 /* ─── What the cache costs, and what stops it being bought twice ─────────────
@@ -5792,4 +5899,24 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
     assert.match(monday, /R-15: FAIL/, 'a hold across the Friday close never reaches a briefing');
     assert.doesNotMatch(monday, /R-12/, 'Monday judges Friday\'s entries a second time');
   } finally { globalThis.fetch = realFetch; }
+});
+
+/* ─── A calendar read that reached its bound says so ─────────────────────────
+   The read keeps the right end — earliest first, so a heavy day loses
+   tomorrow's rows, which the next briefing reads. What it must not do is read
+   as the whole list: cut silently, the last line handed to her looks like the
+   last thing due, and "nothing else today" is a sentence she can then write. */
+
+test('a full calendar read says it stopped, and a short one says nothing', async () => {
+  const realFetch = globalThis.fetch;
+  const at = (i) => new Date(Date.now() + (i + 1) * 60_000).toISOString();
+  const rows = (n) => Array.from({ length: n }, (_, i) =>
+    ({ id: i, at: at(i), name: `release ${i}`, importance: 'medium',
+       consensus: null, prior: null, actual: null, note: null }));
+  const block = async (n) => {
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rows(n) });
+    try { return await calendarBlock(); } finally { globalThis.fetch = realFetch; }
+  };
+  assert.match(await block(40), /The list stops at 40 entries/);
+  assert.doesNotMatch(await block(39), /stops at/);
 });

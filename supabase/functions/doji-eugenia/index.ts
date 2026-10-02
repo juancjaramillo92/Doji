@@ -828,9 +828,14 @@ export function tradesQuery(days: unknown, now = Date.now()): string {
          `&order=open_day.desc,entry_time.desc&limit=400`;
 }
 
+// How many days the model asked for, clamped once: the window it reads and
+// the span the summary says it covers are the same number.
+const windowDays = (days: unknown): number =>
+  Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
+
 // The first civil day of the window, `back` days further out still.
 function windowStart(days: unknown, now: number, back: number): string {
-  const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
+  const n = windowDays(days);
 
   const [y, m, d] = nyDate(new Date(now)).split('-').map(Number);
   const from = new Date(Date.UTC(y, m - 1, d));
@@ -1011,8 +1016,7 @@ const STATS_TOOL = {
 async function readStats(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
-    const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
-    return statsList(journalStats(rows), n);
+    return statsList(journalStats(rows), windowDays(days));
   } catch (err) {
     console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
@@ -1719,8 +1723,8 @@ type Effort = 'medium' | 'high';
    had no way to look at. One database read, no web, and the tool it reaches for
    is the same one every other caller has.
 
-   Both sets are served by the same loop below — a tool set is a list of what
-   may be offered, never of what can be executed. */
+   Both sets are served by the same loop below, which runs only what the set it
+   was handed offers. */
 /* WEB FETCH BESIDE WEB SEARCH, AND IT IS THE GROUNDING HALF.
 
    Search returns somebody's prose about a number. Fetch returns the page the
@@ -1748,9 +1752,9 @@ const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 
 const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6,
                      max_content_tokens: 10000 };
 
-/* FIVE SETS, BECAUSE FIVE JOBS ARE NOT THE SAME CONVERSATION, and a tool set is
-   a list of what may be OFFERED rather than of what can be executed — every one
-   of them is served by the same loop below.
+/* SIX SETS, BECAUSE SIX JOBS ARE NOT THE SAME CONVERSATION, and a set is what a
+   job can run as well as what it is offered: the loop below is shared, and it
+   answers a name outside the set it was handed as it answers an unknown one.
 
    The rule each set follows is the one CONSOLIDATE_TOOLS was written on: never
    send a schema for something this job has no business doing. It is money on
@@ -1758,8 +1762,9 @@ const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 
    and it is a way for a job to do something nobody expected it to. The nightly
    pass gets no web search because a bookkeeping pass has nothing to research;
    the release look gets no memory tools because it is a look at one number, not
-   a conversation; the trade look gets neither, because the only honest thing it
-   can say comes out of his own strategy. */
+   a conversation; the move look gets the release look's set less `record_actual`,
+   because nothing it is told about has printed; the trade look gets neither,
+   because the only honest thing it can say comes out of his own strategy. */
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
@@ -1777,6 +1782,12 @@ const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, C
 // A look files an actual and nothing else: `record_actual` is a PATCH that
 // cannot mint the row it was looking at.
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
+/* ITS OWN ARRAY, AND IT USED TO BORROW THE RELEASE LOOK'S. That handed a look
+   at a move no print explains a tool for filing a print, and — the array being
+   where the cache key starts and what the hour is keyed on — the release look's
+   2× write for an hour it never read back: two turns, two prefixes written,
+   none inherited, in the week the window was measured. */
+const MOVE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* The critic reads a draft and returns a draft. Giving it a tool would let it
    go and check something, which is a second briefing at a second price.
@@ -1924,6 +1935,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
    read before a model changed underneath it. */
 const MAX_ROUNDS = 10;
 
+// What a name with nothing behind it is told, by serve and by the loop alike.
+const unserved = (name: string) =>
+  `There is no tool called "${name}" here. Answer without it and do not mention this.`;
+
 /* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
    ifs because a reader should be able to enumerate what she can do by looking
    at one list. It said "ten of them" while there were thirteen, which is why
@@ -1964,7 +1979,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
-      return `There is no tool called "${name}" here. Answer without it and do not mention this.`;
+      return unserved(name);
   }
 }
 
@@ -1987,6 +2002,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   // model and recorded under another — `label` is already what eugenia_runs
   // stores, and one string deciding both is what keeps the meter answerable.
   const model = modelFor(label);
+  const offered = new Set(tools.map((t: any) => t.name));
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -2088,6 +2104,29 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
     }
 
+    /* A TURN THE SERVER PAUSED HAS NOT ENDED. web_search and web_fetch run in a
+       sampling loop on Anthropic's side, and that loop stops at ten iterations
+       with `pause_turn` — which a caller allowed twelve searches and six
+       fetches can reach in one request. Read as an ending, the paused response
+       was whatever text came before the pause: a preamble sent to him as the
+       briefing, or `no text` and a dead turn. It resumes by being sent back as
+       it stands with nothing after it — the trailing server call is what tells
+       the API to carry on — and it costs a round like any other, which is what
+       bounds it. */
+    if (body.stop_reason === "pause_turn") {
+      convo.push({ role: "assistant", content: body.content });
+      continue;
+    }
+
+    /* AND AN ANSWER CUT OFF IS NOT AN ANSWER. At `max_tokens` the text stops
+       mid-sentence, or a tool call is dropped half-written and the text before
+       it reads as the whole reply. Thrown rather than sent, so each caller's
+       own failure handling runs — the briefing's retry, a gate's draft, the
+       apology — and the row names the reason. */
+    if (body.stop_reason === "max_tokens") {
+      throw new Error("Claude was cut off at max_tokens");
+    }
+
     if (body.stop_reason === "tool_use") {
       convo.push({ role: "assistant", content: body.content });
 
@@ -2106,8 +2145,16 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
          transcript readable and the tests deterministic. */
       const calls = (body.content ?? []).filter((b: any) => b.type === "tool_use");
       for (const c of calls) called[c.name] = (called[c.name] ?? 0) + 1;
+      /* ONLY WHAT THIS CALLER WAS OFFERED, which is what makes a tool set a
+         guarantee rather than a hint. `serve` can run every tool in the file,
+         and the rules that matter most here are about WHO may run one — only
+         the nightly pass moves a rung, rewrites the thesis or closes a thread,
+         and only a look files a print. Those held for as long as the model
+         named nothing it had not been given; a name arriving from outside the
+         set is the model's text, at a boundary, and is answered as unknown. */
       const results = await Promise.all(calls.map(async (b: any) => ({
-        type: "tool_result", tool_use_id: b.id, content: await serve(b.name, b.input ?? {}),
+        type: "tool_result", tool_use_id: b.id,
+        content: offered.has(b.name) ? await serve(b.name, b.input ?? {}) : unserved(b.name),
       })));
 
       // EVERY CALL GETS A RESULT, INCLUDING ONE THIS FUNCTION DOES NOT SERVE —
@@ -2280,16 +2327,44 @@ async function recent(): Promise<Turn[]> {
    he replied to, but a voice note carries no text, and her history dates a turn
    by the day alone — so "too dense" under the 10:00 pulse and under the release
    look an hour later read identically, and the second may already be outside
-   the twelve turns. Every caller stores after it sends, so the turn is the
-   EARLIEST assistant row at or after the send; the newest would be whatever she
-   said since, which is the one message it is certainly not. Five minutes covers
-   a briefing's several voice notes and bounds a message that was never stored.
-   Exported because it is the decision, the same reason dayQuery is. */
+   the twelve turns. Every caller but the briefing stores after it sends, so the
+   turn is the EARLIEST assistant row at or after the send; the newest would be
+   whatever she said since, which is the one message it is certainly not. Five
+   minutes covers a message's several voice notes and bounds one that was never
+   stored. Exported because it is the decision, the same reason dayQuery is. */
+const atSecond = (s: number) => new Date(s * 1000).toISOString();
+
 export function repliedQuery(sent: number): string {
-  const at = (s: number) => new Date(s * 1000).toISOString();
   return `eugenia_turns?select=content&role=eq.assistant` +
-         `&created_at=gte.${at(sent)}&created_at=lte.${at(sent + 300)}` +
+         `&created_at=gte.${atSecond(sent)}&created_at=lte.${atSecond(sent + 300)}` +
          `&order=created_at.asc&limit=1`;
+}
+
+/* AND THE BRIEFING IS THE ONE MESSAGE STORED BEFORE IT IS SENT, which is the
+   rule above failing for the message likeliest to be answered this way. Its
+   marker goes down first, for postBriefing's reason, and the speaking worker
+   sends it seconds to minutes later — so a swipe-reply to the briefing looked
+   forward from the voice note and found nothing, every time.
+
+   Asked only when that look finds nothing, and back across the speaking
+   worker's whole budget. The newest two rows there are taken only if they ARE
+   a briefing and its marker, paired by the instant they share as postSpeak
+   pairs them: anything else in that window is a message he is not replying
+   to, and no quote is the direction to fail in rather than a wrong one. Asked
+   first instead, it would name the briefing under a reply to the answer she
+   gave a minute after it. */
+export function spokenQuery(sent: number): string {
+  return `eugenia_turns?select=role,content,created_at` +
+         `&created_at=gte.${atSecond(sent - SPEAK_WORKER_MS / 1000 - 60)}` +
+         `&created_at=lte.${atSecond(sent)}&order=id.desc&limit=2`;
+}
+
+export function spokenBriefing(rows: (Turn & { created_at: string })[]): string | null {
+  const [text, marker] = rows;
+  return text?.role === 'assistant' && marker?.role === 'user' &&
+         marker.created_at === text.created_at &&
+         [briefingMarker('weekday'), briefingMarker('sunday')].includes(String(marker.content))
+    ? String(text.content) : null;
 }
 
 /* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
@@ -3173,12 +3248,18 @@ type Release = {
 };
 
 
+/* A BOUND, AND IT KEEPS THE RIGHT END: read earliest first, a day too heavy
+   for it loses the furthest-ahead rows — tomorrow's, which the next briefing
+   reads and `aheadToday` reads for itself. What a bound must not do is read as
+   the whole list, so a full read says it stopped. */
+const CAL_ROWS = 40;
+
 async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();
   const to   = new Date(now + CAL_AHEAD * 3600_000).toISOString();
   return readRows<Release>('Calendar',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
-    `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=40`);
+    `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
 // Times in ET because that is the clock the prompt asks her to speak in, and
@@ -3237,7 +3318,11 @@ export function calendarList(rows: Release[], now = Date.now(),
 
 export async function calendarBlock(): Promise<string> {
   try {
-    return calendarList(await readCalendar());
+    const rows = await readCalendar();
+    return calendarList(rows) + (rows.length === CAL_ROWS
+      ? `\n· The list stops at ${CAL_ROWS} entries, so later releases were not read. ` +
+        `Do not say nothing else is due after the last one.`
+      : "");
   } catch (err) {
     console.error("doji-eugenia: calendar unavailable —", err instanceof Error ? err.message : err);
     return "";
@@ -3757,35 +3842,45 @@ async function postScheduled(url: URL): Promise<Response> {
 
     return json({ ok: true, skipped: "nothing due this hour" });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia:", why);
-    /* THE ONLY WAY HE FINDS OUT, and it took a missing briefing to earn this.
-
-       pg_net discards this response, the console is not somewhere anyone looks,
-       and net._http_response is pruned within hours — so a briefing that died
-       at 08:00 was invisible by lunchtime and the way it surfaced was him
-       noticing nothing had arrived. Silence is the worst thing this system can
-       do, and it had three separate ways of doing it.
-
-       AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
-       the half that can fail. ask() records a failed turn, so eugenia_runs
-       could answer "how often does a model call die" — and could say nothing at
-       all about a job that died BEFORE reaching one. Two consolidations died in
-       `turnsSince`, one line into postConsolidation, apologised to him twice and
-       left the table with no row on either night: read afterwards it showed a
-       system that had simply had nothing to do. The apology below is swallowed
-       on failure, deliberately, so a Telegram that is refusing takes the notice
-       with it and leaves nothing anywhere; this is what survives that. `job` is
-       the apology's own vocabulary rather than ask()'s labels, and suffixed so
-       the two can never be confused in a table read months later. */
-    await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
-
-    await tg("sendMessage", {
-      chat_id: CHAT_ID,
-      text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,
-    }).catch(() => {});
-    return json({ ok: false, error: why, job }, 500);
+    return await jobFailed(job, err);
   }
+}
+
+/* HOW A JOB THAT DIED BEHIND A 200 SAYS SO, for both of the callers that answer
+   before they work: everything scheduled, and the trade event. The trade event
+   is the one message with no retry anywhere behind it, and it had `APOLOGY.trade`
+   written for it and no path that ever sent it — a read that failed before its
+   model call reached a console and nothing else, which is the absence this whole
+   function exists to end, on the one path it did not reach. */
+async function jobFailed(job: string, err: unknown): Promise<Response> {
+  const why = err instanceof Error ? err.message : String(err);
+  console.error("doji-eugenia:", why);
+  /* THE ONLY WAY HE FINDS OUT, and it took a missing briefing to earn this.
+
+     pg_net discards this response, the console is not somewhere anyone looks,
+     and net._http_response is pruned within hours — so a briefing that died
+     at 08:00 was invisible by lunchtime and the way it surfaced was him
+     noticing nothing had arrived. Silence is the worst thing this system can
+     do, and it had three separate ways of doing it.
+
+     AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
+     the half that can fail. ask() records a failed turn, so eugenia_runs
+     could answer "how often does a model call die" — and could say nothing at
+     all about a job that died BEFORE reaching one. Two consolidations died in
+     `turnsSince`, one line into postConsolidation, apologised to him twice and
+     left the table with no row on either night: read afterwards it showed a
+     system that had simply had nothing to do. The apology below is swallowed
+     on failure, deliberately, so a Telegram that is refusing takes the notice
+     with it and leaves nothing anywhere; this is what survives that. `job` is
+     the apology's own vocabulary rather than ask()'s labels, and suffixed so
+     the two can never be confused in a table read months later. */
+  await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
+
+  await tg("sendMessage", {
+    chat_id: CHAT_ID,
+    text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,
+  }).catch(() => {});
+  return json({ ok: false, error: why, job }, 500);
 }
 
 /* What postBriefing stores instead of the text it sent. One definition, because
@@ -4921,7 +5016,7 @@ async function postMove(): Promise<Response> {
     around + wires + notes + map + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
-                         'medium', 'move look', RELEASE_TOOLS);
+                         'medium', 'move look', MOVE_TOOLS);
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
@@ -5262,7 +5357,9 @@ async function handleMessage(update: any): Promise<void> {
     const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
       : typeof replied.text === 'string' ? Promise.resolve(replied.text)
       : readRows<{ content: string }>('Replied-to', `${SB_URL}/rest/v1/${repliedQuery(replied.date)}`)
-          .then(([turn]) => turn?.content ?? "", () => "");
+          .then(async ([turn]) => turn?.content ?? spokenBriefing(await readRows<Turn & { created_at: string }>(
+            'Replied-to briefing', `${SB_URL}/rest/v1/${spokenQuery(replied.date)}`)) ?? "")
+          .catch(() => "");
 
     let answer: string;
     try {
@@ -5411,7 +5508,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
          The body NAMES the job, because `net._http_response` carries no URL
          and the flag is otherwise unrecoverable from the row. */
       if (sent?.trade) {
-        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened')));
+        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened'))
+          .catch(err => jobFailed('trade', err)));
         return json({ ok: true, accepted: "trade event" });
       }
       background(postScheduled(url));

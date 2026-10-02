@@ -2091,18 +2091,31 @@ test('a forced briefing asks what the day takes, not a literal', () => {
 test('a scheduled job that dies records it, and records it before it apologises', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function postScheduled(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
-  const body = src.slice(at, src.indexOf('\n}\n', at))
-    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-    .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const bodyOf = (fn) => {
+    const at = src.indexOf(`async function ${fn}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
+    return src.slice(at, src.indexOf('\n}\n', at))
+      .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+      .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  };
 
+  /* BOTH CALLERS THAT ANSWER BEFORE THEY WORK REACH ONE CATCH. The trade event
+     had an apology written for it and no path that sent one: a failure before
+     its model call reached the console and nothing else. */
+  assert.match(bodyOf('postScheduled'), /catch \(err\) \{\s*return await jobFailed\(job, err\);/,
+    'postScheduled no longer hands its failures to jobFailed');
+  const entry = src.slice(src.indexOf('secretMatches(fromCron, CRON_SECRET)'));
+  assert.match(entry, /background\(postTradeEvent\([^;]*\.catch\(err => jobFailed\('trade', err\)\)\)/,
+    'a trade event that dies reaches the console and nothing else — no row, ' +
+    'no apology, and no retry anywhere behind it');
+
+  const body = bodyOf('jobFailed');
   const row = body.indexOf('recordRun(');
   const msg = body.indexOf('tg("sendMessage"');
   assert.ok(row > -1,
     'a scheduled job can die with nothing but an apology behind it, so the one ' +
     'table that survives says the job never ran at all');
-  assert.ok(msg > -1, 'postScheduled no longer tells him a job died');
+  assert.ok(msg > -1, 'a job that died is no longer told to him');
   assert.ok(row < msg,
     'the row is written after the apology, so the case it exists for — a ' +
     'Telegram that is refusing — is still the case that leaves no trace');
@@ -6289,6 +6302,19 @@ test('one write makes a calendar row, keyed on the id, and she holds none', () =
     'keeps a consensus for ever and never the number');
 });
 
+test('the move look has a tool set of its own, with no print to file', () => {
+  /* It borrowed RELEASE_TOOLS, so it carried `record_actual` into a look the
+     calendar has already said no print explains, and it bought the hour the
+     cache window grants that array alone — written on every turn, read on none. */
+  const array = EUGENIA_TS.match(/const MOVE_TOOLS = \[([^\]]*)\]/)?.[1];
+  assert.ok(array, 'the move look no longer has a tool set of its own');
+  assert.doesNotMatch(array, /ACTUAL_TOOL/, 'the move look can file a release figure again');
+  const at = EUGENIA_TS.indexOf('async function postMove(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
+  assert.match(body, /'move look', MOVE_TOOLS\)/,
+    'the move look is handed some other array than its own');
+});
+
 test('record_actual cannot be handed a column the briefing owns', () => {
   const schema = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const ACTUAL_TOOL'));
   const props = schema.slice(0, schema.indexOf('required:'));
@@ -7125,4 +7151,25 @@ test('every run row records the model that answered it', () => {
       'a model call is recorded without naming the model that served it, so the ' +
       'column reads null for ever and the question it exists for is still unanswerable');
   }
+});
+
+/* ─── A swipe-reply, looked up the way each message was stored ───────────────
+   Every message but the briefing is stored after it is sent, so its turn is the
+   first one after the voice note; the briefing is stored before, so its turn is
+   behind it. Both lookups are pure and driven in fold.test.mjs — and the pure
+   half passing proves nothing about the call, which is what this reads: the
+   backward look reached only when the forward one finds nothing, since asked
+   first it names the briefing under a reply to the answer that followed it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a swipe-reply looks forward first and back for the briefing only after', () => {
+  const at = EUGENIA_TS.indexOf('async function handleMessage(');
+  assert.ok(at > -1, 'doji-eugenia no longer has handleMessage()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
+  const forward = body.indexOf('repliedQuery(replied.date)');
+  const back = body.search(/turn\?\.content \?\? spokenBriefing\(await readRows[\s\S]{0,120}spokenQuery\(replied\.date\)/);
+  assert.ok(forward > -1, 'a reply to a voice note no longer looks for the message it answers');
+  assert.ok(back > forward,
+    'a reply to the briefing looks only forward from the voice note, and the ' +
+    'briefing is the one message stored before it is sent — so it is never found');
 });
