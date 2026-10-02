@@ -2186,9 +2186,8 @@ export async function healthBlock(): Promise<string> {
 
 type Loop = { id: number; kind: string; body: string; opened_on: string };
 
-// Twenty of each kind would be a backlog rather than a set of open threads. Ten
-// is more than a fortnight of one-a-briefing, and a list longer than that is
-// itself the finding — she has stopped closing them.
+// Ten is more than a fortnight of one a briefing; a longer list is itself the
+// finding — threads have stopped closing.
 const LOOPS = 10;
 
 async function readLoops(): Promise<Loop[]> {
@@ -2197,10 +2196,8 @@ async function readLoops(): Promise<Loop[]> {
     `&closed_on=is.null&order=id.desc&limit=${LOOPS}`);
 }
 
-/* Pure, so a test can read the shape, and the id is carried for the reason a
-   note's is: a thread she cannot name is a thread she cannot close. The two
-   kinds are labelled separately because they close on different evidence — a
-   watch resolves in the world, a question resolves in him. */
+/* The id carried so a thread can be closed; the kinds apart, because a watch
+   resolves in the world and a question in him. Pure. */
 export function loopsList(rows: Loop[]): string {
   if (!rows.length) return "";
   const of = (kind: string) => rows.filter(r => r.kind === kind);
@@ -2226,10 +2223,9 @@ type Release = {
 };
 
 
-/* A BOUND, AND IT KEEPS THE RIGHT END: read earliest first, a day too heavy
-   for it loses the furthest-ahead rows — tomorrow's, which the next briefing
-   reads and `aheadToday` reads for itself. What a bound must not do is read as
-   the whole list, so a full read says it stopped. */
+/* Read earliest first, so a day too heavy for the bound loses the
+   furthest-ahead rows, which tomorrow's briefing reads anyway. A full read
+   says it stopped. */
 const CAL_ROWS = 40;
 
 async function readCalendar(now = Date.now()): Promise<Release[]> {
@@ -2240,35 +2236,16 @@ async function readCalendar(now = Date.now()): Promise<Release[]> {
     `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
-// Times in ET because that is the clock the prompt asks her to speak in, and
-// the one every scheduled thing in this system is kept in.
+// ET, the clock the prompt has her speak in.
 const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(new Date(iso));
 
-/* A LANDED RELEASE READS DIFFERENTLY FROM A PENDING ONE, and rendering them the
-   same way is how a briefing comes to describe a print that has already
-   happened as something to watch for. `actual` present is the whole test. */
-/* A LINE FROM ANOTHER DAY NAMES THE DAY, `positionsList`'s rule for the same
-   reason: a clock time with no date beside it reads as today's. At a day and a
-   morning forward, tomorrow's 08:30 and today's are two identical-looking lines,
-   and last night's 20:00 read as tonight's — `due` on a release that had already
-   happened, where the prompt forbids describing a print as still to come. Today
-   stays bare, or the date is noise on nearly every line.
-
-   AND A ROW WITH NO FIGURE IS NOT DUE ONCE ITS TIME HAS GONE. `due` was
-   whatever lacked an actual, which is every speech, all day — Barkin at 12:30
-   still read as coming at four — and every print whose number TradingView has
-   not published yet. On 1 October it was also her own pre-018 rows for that
-   morning's claims and ISM, beside TradingView's landed copies: one release
-   listed twice, once as landed and once as still ahead, and she said so. A
-   past row says it is past and that no figure is on file, which is true of all
-   three and claims nothing about which.
-
-   AND THE WEEKDAY IS SAID, NOT LEFT TO HER. The week the Sunday briefing opens
-   is laid out a day per label, and a model turning "2 Oct" into a Friday is a
-   calendar sum done in its head — the kind that comes out a day off and reads
-   as certain. */
+/* Three states, by `actual` and the clock: landed, past with no figure — every
+   speech, and any print not yet published — and due. Rendering a past row as
+   due had her describe a print as still to come. A line from another day names
+   the day, or tomorrow's 08:30 and today's read alike, and the weekday is
+   given rather than left to her arithmetic. */
 const weekday = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC', weekday: 'long',
 }).format(new Date(`${iso}T12:00:00Z`));
@@ -2308,19 +2285,11 @@ export async function calendarBlock(): Promise<string> {
 }
 
 /* ─── The week ahead, for the briefing that opens it ───────────────────────
-   THE SUNDAY BRIEFING WAS THE WEEKDAY ONE AT ANOTHER HOUR, AND IT COULD NOT
-   SEE THE WEEK IT OPENS. Its calendar reached CAL_AHEAD, which is Monday
-   evening, and the week was filed by the nightly pass at 22:00 — five hours
-   after the one message that is about it. So a Thursday CPI or a Friday payrolls
-   reached the Sunday briefing only if a search happened to turn it up.
-
-   THE WEEK, AND HIGH ONLY. Seven days of everything medium is most of a page
-   and none of it moves gold alone; the releases TradingView rates high are the
-   ones R-14 stands him aside for, and the ones the week turns on. Medium still
-   reaches him, in each morning's own calendar. It replaces the rolling calendar
-   on a Sunday rather than sitting beside it, because the week already holds
-   every high release the rolling window would and the same print twice is two
-   lines she reads as two things. */
+   The Sunday briefing's rolling calendar reaches Monday evening, so a Thursday
+   CPI reached it only if a search did. It gets the week instead, high only —
+   the releases R-14 stands him aside for — replacing the rolling list rather
+   than sitting beside it, since one print twice reads as two things.
+   ───────────────────────────────────────────────────────────────────────── */
 export function weekQuery(now: number): string {
   const to = new Date(now + 7 * 86_400_000).toISOString();
   return `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
@@ -2339,24 +2308,16 @@ export async function weekBlock(now = Date.now()): Promise<string> {
 }
 
 /* ─── The market around gold ───────────────────────────────────────────────
-   The dollar, the yields, the real yield, silver, oil, the S&P and the VIX,
-   read through doji-tradingview as bars and handed to the two paths that
-   explain gold against them: the briefing, and the move look. Every briefing
-   walks a chain through real yields and the dollar, and until this she quoted
-   both off a search page.
+   The dollar, yields, real yield, silver, oil, the S&P and the VIX, for the
+   briefing and the move look, which explain gold against them.
 
-   EVERY LINE SAYS WHAT ITS NUMBER IS MEASURED FROM, and no change is computed
-   to be said without it. `quoteLine` exists because a move served bare read as
-   "on the day" at 20:57 about a session under four hours old; so each line is
-   a level now beside the level at a stated time, and the window is inside the
-   sentence rather than beside it. The latest bar's time is given too, since a
-   bar is not a tick. The real yield is a daily series published after the
-   fact, and its line says so and gives dates, never times.
+   Every line is a level now beside the level at a stated time, and no change
+   is computed — quoteLine's lesson, applied here. The latest bar's time is
+   given, a bar not being a tick; the real yield is daily and dated.
 
-   NEVER THROWS, for marketBlock's reason, and a failed read is a sentence: a
-   briefing without these lines will reach for a search page, and she is told
-   not to. A symbol TradingView would not serve is named, not left out — an
-   absent line reads as one nobody thought to ask for. */
+   Never throws, and a failed read is a sentence, or she reaches for a search
+   page. A symbol not served is named: an absent line reads as never asked.
+   ───────────────────────────────────────────────────────────────────────── */
 type Around = {
   name: string; unit: string; daily: boolean;
   from: number; since: string; last: number; at: string;
@@ -2398,23 +2359,13 @@ export async function aroundBlock(): Promise<string> {
 }
 
 /* ─── What the market prices for the Fed ───────────────────────────────────
-   The odds fed funds futures put on the next three meetings, worked out in
-   doji-tradingview the way CME's FedWatch works them — and checked against
-   FedWatch on 1 October, where on its own prices the October odds came out
-   identical and December within a point. She searched a page for these before,
-   and a page twice gave her "cut" in a week the Fed had hiked.
-
-   THE FIRST MEETING GETS ITS ODDS AND THE REST GET WHAT IS PRICED BY THEN,
-   because that is where the two ways of stating odds part. FedWatch shows a
-   later meeting as the chance of each RANGE by then, every path to it summed;
-   the fold's odds for it are that meeting's own, given the one before. Both
-   are right and they are different numbers, so a chance quoted for December
-   would read as wrong beside the screen he checks it on. The first meeting is
-   the same both ways, and basis points priced by a date are what both agree on.
-
-   NEVER THROWS, for aroundBlock's reason, and a read refused because the
-   calendar named a meeting the table does not hold is a failed read like any
-   other: odds against a moved meeting are the wrong number. */
+   Worked out in doji-tradingview as FedWatch works them, and checked against
+   FedWatch on 1 October — a page had twice told her "cut" in a week the Fed
+   hiked. The first meeting gets its odds; later ones get the basis points
+   priced by then, because FedWatch's later odds are cumulative and the fold's
+   are conditional, and a December chance would disagree with the screen he
+   checks. Never throws; a refused read is a failed read.
+   ───────────────────────────────────────────────────────────────────────── */
 type Priced = { date: string; move_bp: number; total_bp: number | null; odds: { bp: number; chance: number }[] };
 
 export function ratesList(answer: { meetings: Priced[]; unread: string[] }): string {
@@ -2447,27 +2398,15 @@ export async function ratesBlock(): Promise<string> {
 }
 
 /* ─── What the wires said ──────────────────────────────────────────────────
-   Gold's and the dollar's headlines, handed to the move look: a move with
-   nothing on the calendar behind it is the one look that has to find its own
-   explanation, and it used to start from a web search with no idea what had
-   crossed the wires in the minutes before. On 1 October the Fed vice chair's
-   remarks were on the dollar's feed within minutes of his saying them.
+   Gold's and the dollar's headlines, for the look at a move nothing on the
+   calendar explains. The last hour for the move look — a morning headline
+   explains nothing a quarter-hour old — and six for a conversation. Titles
+   only: most stories are paywalled.
 
-   THE LAST HOUR, AND THE BLOCK SAYS SO — a headline from the morning is not
-   an explanation for a move a quarter of an hour old, and a window left
-   unsaid is one she fills in herself. Titles only, with their time and their
-   source, because most stories are paywalled and a title is all that was read:
-   she is told not to claim what the article says.
-
-   A CONVERSATION ASKS ABOUT THE MORNING, NOT THE LAST QUARTER HOUR, so
-   `get_around` reads six hours. And six hours is a span the feeds may not
-   hold — each is read to a fixed number of headlines — so where the shorter
-   of the two stops inside the span, the block says how far back it reaches:
-   a quiet stretch and an unread one look the same otherwise. A story both
-   feeds carry is folded under the first, so a feed's reach can read as
-   stopping later than it did and never earlier: it says less was read, which
-   is the direction to be wrong in. A line from another day names it,
-   `calendarList`'s rule. */
+   The feeds are read to a fixed count, so where one stops inside the span the
+   block says how far back it reaches; a story both carry can make a feed look
+   to reach later than it did, never earlier. Another day's line names it.
+   ───────────────────────────────────────────────────────────────────────── */
 const WIRES_MIN = 60;
 const WIRES_CHAT_MIN = 6 * 60;
 
@@ -2515,31 +2454,21 @@ export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
 }
 
 /* ─── Where the speculators stand ──────────────────────────────────────────
-   The CFTC's weekly count of COMEX gold futures held by managed money — the
-   hedge funds and commodity funds whose crowding is why a drop can run further
-   than its news. Read straight from the CFTC's public dataset, which needs no
-   credential, so it is the one market read here that does not pass through
-   another function.
+   The CFTC's weekly count of COMEX gold futures held by managed money, whose
+   crowding is why a drop can outrun its news. Public, no credential. A Tuesday
+   count released days later, so the line carries its date, and the year's
+   range beside it, since crowded is relative to its own past.
 
-   A TUESDAY COUNT RELEASED AT THE END OF THE WEEK, AND THE LINE CARRIES ITS
-   DATE. It is days old the moment it lands, and a shutdown has stopped it for
-   weeks before, so the date is what tells her how old it is rather than a
-   staleness rule here guessing for her. The year's range goes beside it
-   because a net long means nothing alone — crowded is a statement about where
-   it sits against its own past.
-
-   THE SUNDAY BRIEFING AND get_around, AND NOT THE MOVE LOOK. It changes once a
-   week, so a weekday briefing would carry the same lines five mornings running;
-   and it cannot say why gold moved in the last quarter hour, which is the only
-   thing the move look asks — handed to it, it is the plausible cause that path
-   is told not to invent. Never throws, for aroundBlock's reason. */
+   The Sunday briefing and get_around, not the move look: it changes weekly,
+   and handed to a look at a quarter-hour's move it is a plausible cause that
+   path is told not to invent. Never throws.
+   ───────────────────────────────────────────────────────────────────────── */
 const COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json" +
   "?cftc_contract_market_code=088691&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52" +
   "&$select=report_date_as_yyyy_mm_dd,m_money_positions_long_all,m_money_positions_short_all," +
   "change_in_m_money_long_all,change_in_m_money_short_all";
 
-// Every figure arrives as a string, which is the dataset's choice and not a
-// failure; one that does not parse is, and the whole answer goes with it.
+// Strings, as the dataset sends them; one that will not parse refuses all.
 type Cot = {
   report_date_as_yyyy_mm_dd: string;
   m_money_positions_long_all: string; m_money_positions_short_all: string;
@@ -2582,29 +2511,14 @@ export async function positioningBlock(): Promise<string> {
 }
 
 /* ─── What he has on, and where his day stands ─────────────────────────────
-   THE ONE THING SHE COULD NOT SEE. Every other block is about the market or
-   about what he understands, and none of them said whether he is exposed right
-   now — so a briefing could open on an observation about a level while he sat
-   in a position through the print it was describing, and nothing about that
-   read as wrong from anywhere. Six of the seven paths get it, because the
-   message that talks past a live trade is whichever one happens to be next —
-   postTradeEvent is the exception and is reached FROM the position it would
-   otherwise be told about.
+   Whether he is exposed right now, which no other block said — so a briefing
+   could talk about a level he was sitting in a position through. Six paths;
+   postTradeEvent is reached from the position itself.
 
-   ONE READ AND TWO FILTERS, because each half misses the other. An overnight
-   hold is not in today's rows and today's closed trades are not open; either
-   filter alone answers half the question. PostgREST's `or=` asks both at once,
-   and dayStanding does its own civil-day filter over what comes back.
-
-   THE CIVIL DAY IS READ ONCE AND PASSED IN, not taken from the clock at each
-   use. Two reads a few milliseconds apart are the same date every night but
-   one, and on that night the filter would fetch one day while the standing was
-   computed for the next — a wrong day's P&L, once a year, from code that looks
-   right.
-
-   `select=*` rather than the column list, which is the exception here and has a
-   reason: eugenia_trades exists precisely to BE the list of what she may see, so
-   naming the columns again would be a fourth copy of it that nothing compares.
+   One read, two filters, since an overnight hold is not in today's rows and
+   today's closes are not open. The civil day is read once and passed in, or
+   one night a year the filter and the standing straddle midnight. `select=*`
+   because the view IS the list of what she may see.
    ───────────────────────────────────────────────────────────────────────── */
 async function readDesk(day: string): Promise<TradeRow[]> {
   return readRows<TradeRow>('Desk',
