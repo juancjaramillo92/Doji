@@ -2546,6 +2546,39 @@ test('an empty window still says it is empty, because that is an answer', async 
   assert.match(answered, /No trades in that window/);
 });
 
+/* ─── A tool set is what a caller can run, not only what it is shown ────────
+   `serve` can run every tool in the file, and the rules that matter are about
+   who may: only the nightly pass moves a rung. Driven through ask() with the
+   reply's set, because the guarantee is the loop refusing, not the set's list.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a tool the caller was not offered is answered as unknown and never runs', async () => {
+  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
+  const db = [], sent = [];
+  const responses = [
+    served('claude-opus-5', { stop_reason: 'tool_use', content: [
+      { type: 'tool_use', id: 'tu_1', name: 'set_channel',
+        input: { channel: 'dollar', state: 'owns', evidence: 'one exchange' } }] }),
+    answers('claude-opus-5'),
+  ];
+  let n = 0;
+  globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
+    ? (db.push(String(url)), { ok: true, status: 200, json: async () => [{}] })
+    : (sent.push(JSON.parse(init.body)), responses[n++]);
+  console.log = () => {};
+  console.error = () => {};
+  try {
+    await ask([{ role: 'user', content: 'I get real rates now' }], 'medium', 'reply');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+    console.error = realErr;
+  }
+  assert.match(sent[1].messages.at(-1).content[0].content, /no tool called "set_channel"/);
+  assert.ok(!db.some(u => u.includes('eugenia_channels')),
+    'a reply moved a rung, which only the nightly pass may do');
+});
+
 /* ─── A paused turn, and a cut-off one ───────────────────────────────────────
    Two stop reasons that both carry text, and neither text is the answer. A
    pause is the server's search loop running out of iterations mid-turn; a

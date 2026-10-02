@@ -3133,6 +3133,13 @@ days, and moving one on a single exchange is the same error as reading a pattern
 into one fill. Most nights nothing moves, and the prompt says that is the
 honest outcome rather than a wasted run.
 
+**And the loop holds that, not the model's restraint.** A tool set is what a
+caller can run as well as what it is shown: `ask()` answers a name outside the
+set it was handed exactly as it answers an unknown one, and runs nothing. Until
+then every tool in the file was runnable from every path, and *only the nightly
+pass moves a rung* held only for as long as the model never named a tool it had
+not been given.
+
 **It comes back down when he says so, and only then.** *"I have lost this"*,
 *"explain that again"* — the rung drops that night and she does not defend the
 earlier read. Promoting too early is her natural error and he is the only one who

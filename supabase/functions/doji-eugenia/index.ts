@@ -1723,8 +1723,8 @@ type Effort = 'medium' | 'high';
    had no way to look at. One database read, no web, and the tool it reaches for
    is the same one every other caller has.
 
-   Both sets are served by the same loop below — a tool set is a list of what
-   may be offered, never of what can be executed. */
+   Both sets are served by the same loop below, which runs only what the set it
+   was handed offers. */
 /* WEB FETCH BESIDE WEB SEARCH, AND IT IS THE GROUNDING HALF.
 
    Search returns somebody's prose about a number. Fetch returns the page the
@@ -1752,9 +1752,9 @@ const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 
 const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6,
                      max_content_tokens: 10000 };
 
-/* SIX SETS, BECAUSE SIX JOBS ARE NOT THE SAME CONVERSATION, and a tool set is
-   a list of what may be OFFERED rather than of what can be executed — every one
-   of them is served by the same loop below.
+/* SIX SETS, BECAUSE SIX JOBS ARE NOT THE SAME CONVERSATION, and a set is what a
+   job can run as well as what it is offered: the loop below is shared, and it
+   answers a name outside the set it was handed as it answers an unknown one.
 
    The rule each set follows is the one CONSOLIDATE_TOOLS was written on: never
    send a schema for something this job has no business doing. It is money on
@@ -1935,6 +1935,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
    read before a model changed underneath it. */
 const MAX_ROUNDS = 10;
 
+// What a name with nothing behind it is told, by serve and by the loop alike.
+const unserved = (name: string) =>
+  `There is no tool called "${name}" here. Answer without it and do not mention this.`;
+
 /* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
    ifs because a reader should be able to enumerate what she can do by looking
    at one list. It said "ten of them" while there were thirteen, which is why
@@ -1975,7 +1979,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
-      return `There is no tool called "${name}" here. Answer without it and do not mention this.`;
+      return unserved(name);
   }
 }
 
@@ -1998,6 +2002,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   // model and recorded under another — `label` is already what eugenia_runs
   // stores, and one string deciding both is what keeps the meter answerable.
   const model = modelFor(label);
+  const offered = new Set(tools.map((t: any) => t.name));
   const convo: any[] = withClock(messages);
   // Carried forward once seen, and never cleared: the container outlives the
   // round that opened it, and a later request that drops it fails the same way
@@ -2140,8 +2145,16 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
          transcript readable and the tests deterministic. */
       const calls = (body.content ?? []).filter((b: any) => b.type === "tool_use");
       for (const c of calls) called[c.name] = (called[c.name] ?? 0) + 1;
+      /* ONLY WHAT THIS CALLER WAS OFFERED, which is what makes a tool set a
+         guarantee rather than a hint. `serve` can run every tool in the file,
+         and the rules that matter most here are about WHO may run one — only
+         the nightly pass moves a rung, rewrites the thesis or closes a thread,
+         and only a look files a print. Those held for as long as the model
+         named nothing it had not been given; a name arriving from outside the
+         set is the model's text, at a boundary, and is answered as unknown. */
       const results = await Promise.all(calls.map(async (b: any) => ({
-        type: "tool_result", tool_use_id: b.id, content: await serve(b.name, b.input ?? {}),
+        type: "tool_result", tool_use_id: b.id,
+        content: offered.has(b.name) ? await serve(b.name, b.input ?? {}) : unserved(b.name),
       })));
 
       // EVERY CALL GETS A RESULT, INCLUDING ONE THIS FUNCTION DOES NOT SERVE —
