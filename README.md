@@ -2510,6 +2510,11 @@ observance shift that closes the market on Friday 3 July 2026 — because a tabl
 of dates stops being true the year nobody extends it, and that failure looks
 exactly like perfect compliance.
 
+**It holds the banks' holidays as well as the market's**, as R-16 always said:
+Columbus Day and Veterans Day, the two the exchanges trade through, are no-trade
+days since v1.21 of the strategy. Veterans Day follows the Fed's observance — a
+Sunday moves to the Monday, a Saturday is not moved.
+
 ### The second read
 
 The briefing is researched and written in one generation, and its quality target

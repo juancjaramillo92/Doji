@@ -145,15 +145,21 @@ export function nyInstant(y: number, m: number, d: number, hour: number): number
 }
 
 /* ─── R-16's calendar ──────────────────────────────────────────────────────
-   A US market holiday is a known date, which is exactly why §5 calls R-16
-   decidable the day before and checkable afterwards. Computed rather than
+   A US market or bank holiday is a known date, which is exactly why §5 calls
+   R-16 decidable the day before and checkable afterwards. Computed rather than
    listed: a hard-coded table of dates is a rule that silently stops being true
    the year nobody remembers to extend it, and that failure looks like perfect
    compliance.
 
    OBSERVANCE IS PART OF THE RULE. A fixed-date holiday landing on a Saturday is
    observed on the Friday before and on a Sunday the Monday after, so the market
-   is shut on a day the naive date test calls open. */
+   is shut on a day the naive date test calls open.
+
+   BANK HOLIDAYS TOO, because the rule says so and the check used to stop at the
+   market's list. Two days are the banks' alone: Columbus Day and Veterans Day,
+   when the exchanges trade and the money behind them is thin. The Fed moves a
+   Sunday one to the Monday and does not move a Saturday one at all, which is
+   `bankObserved`; a Saturday holds no session either way. */
 const nthWeekday = (y: number, m: number, wd: number, n: number): number => {
   const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   return 1 + ((wd - first + 7) % 7) + (n - 1) * 7;
@@ -186,6 +192,9 @@ const iso = (y: number, m: number, d: number) =>
 
 // Saturday → the Friday before, Sunday → the Monday after. Applied to the fixed
 // dates only; a holiday defined as "the third Monday" can never need it.
+const bankObserved = (y: number, m: number, d: number): string =>
+  iso(y, m, d + (new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 0 ? 1 : 0));
+
 function observed(y: number, m: number, d: number): string {
   const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   const shift = wd === 6 ? -1 : wd === 0 ? 1 : 0;
@@ -202,7 +211,7 @@ function observed(y: number, m: number, d: number): string {
    find to change. */
 export const STRETCH = { from: 24, to: 31 };
 
-export function marketHolidays(y: number): Set<string> {
+export function lowVolumeDays(y: number): Set<string> {
   const gf = easter(y);
   const good = new Date(Date.UTC(y, gf.m - 1, gf.d - 2));
 
@@ -215,6 +224,8 @@ export function marketHolidays(y: number): Set<string> {
     observed(y, 6, 19),                                 // Juneteenth
     observed(y, 7, 4),                                  // Independence Day
     iso(y, 9, nthWeekday(y, 9, 1, 1)),                  // Labor Day
+    iso(y, 10, nthWeekday(y, 10, 1, 2)),                // Columbus Day, banks only
+    bankObserved(y, 11, 11),                            // Veterans Day, banks only
     iso(y, 11, nthWeekday(y, 11, 4, 4)),                // Thanksgiving
     observed(y, 12, 25),                                // Christmas
   ]);
@@ -673,9 +684,9 @@ function r15(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-16 ─────────────────────────────────────────────────────────────────
-   No trading on known low-volume days. §7: no entry_time on a US market
-   holiday. The day is the New York civil one, because that is the day the
-   market was shut on. */
+   No trading on known low-volume days. §7: no entry_time on a US market or
+   bank holiday, or in the Christmas stretch. The day is the New York civil
+   one, because that is the day the market or the banks were shut on. */
 function r16(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [];
   const cache = new Map<number, Set<string>>();
@@ -684,10 +695,10 @@ function r16(rows: TradeRow[]): RuleResult {
     if (!isBroker(t) || !t.entry_time) continue;
     const day = nyDate(new Date(t.entry_time));
     const year = +day.slice(0, 4);
-    if (!cache.has(year)) cache.set(year, marketHolidays(year));
+    if (!cache.has(year)) cache.set(year, lowVolumeDays(year));
     ((cache.get(year) as Set<string>).has(day) ? fail : pass).push(t.id);
   }
-  return result('R-16', 'entries taken on a US market holiday or in the Christmas stretch', pass, fail, []);
+  return result('R-16', 'entries taken on a US market or bank holiday, or in the Christmas stretch', pass, fail, []);
 }
 
 /* ─── R-18 ─────────────────────────────────────────────────────────────────
