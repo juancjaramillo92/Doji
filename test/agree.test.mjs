@@ -2091,18 +2091,31 @@ test('a forced briefing asks what the day takes, not a literal', () => {
 test('a scheduled job that dies records it, and records it before it apologises', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function postScheduled(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
-  const body = src.slice(at, src.indexOf('\n}\n', at))
-    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-    .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const bodyOf = (fn) => {
+    const at = src.indexOf(`async function ${fn}(`);
+    assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
+    return src.slice(at, src.indexOf('\n}\n', at))
+      .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+      .map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  };
 
+  /* BOTH CALLERS THAT ANSWER BEFORE THEY WORK REACH ONE CATCH. The trade event
+     had an apology written for it and no path that sent one: a failure before
+     its model call reached the console and nothing else. */
+  assert.match(bodyOf('postScheduled'), /catch \(err\) \{\s*return await jobFailed\(job, err\);/,
+    'postScheduled no longer hands its failures to jobFailed');
+  const entry = src.slice(src.indexOf('secretMatches(fromCron, CRON_SECRET)'));
+  assert.match(entry, /background\(postTradeEvent\([^;]*\.catch\(err => jobFailed\('trade', err\)\)\)/,
+    'a trade event that dies reaches the console and nothing else — no row, ' +
+    'no apology, and no retry anywhere behind it');
+
+  const body = bodyOf('jobFailed');
   const row = body.indexOf('recordRun(');
   const msg = body.indexOf('tg("sendMessage"');
   assert.ok(row > -1,
     'a scheduled job can die with nothing but an apology behind it, so the one ' +
     'table that survives says the job never ran at all');
-  assert.ok(msg > -1, 'postScheduled no longer tells him a job died');
+  assert.ok(msg > -1, 'a job that died is no longer told to him');
   assert.ok(row < msg,
     'the row is written after the apology, so the case it exists for — a ' +
     'Telegram that is refusing — is still the case that leaves no trace');

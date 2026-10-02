@@ -3533,6 +3533,13 @@ day; and the failure whose real symptom is that her memory stops growing was
 described as the one whose symptom is a message that never arrived. `APOLOGY` is
 a word per job, and a test asserts no two of them are the same sentence.
 
+**The trade event reaches the same catch.** It answers before it works like
+everything scheduled, but it is dispatched beside `postScheduled` rather than
+through it, so it had an apology written for it and no path that sent one: a
+read that failed before its model call left a console line and nothing else, on
+the one message with no retry behind it. Both callers now hand a failure to
+`jobFailed`, which writes the `<job> job` row and then apologises, in that order.
+
 ### What a turn cost
 
 `ask()` logs one line per turn — the caller, the rounds it took, the effort, the

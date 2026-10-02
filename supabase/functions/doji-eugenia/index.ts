@@ -3780,35 +3780,45 @@ async function postScheduled(url: URL): Promise<Response> {
 
     return json({ ok: true, skipped: "nothing due this hour" });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia:", why);
-    /* THE ONLY WAY HE FINDS OUT, and it took a missing briefing to earn this.
-
-       pg_net discards this response, the console is not somewhere anyone looks,
-       and net._http_response is pruned within hours — so a briefing that died
-       at 08:00 was invisible by lunchtime and the way it surfaced was him
-       noticing nothing had arrived. Silence is the worst thing this system can
-       do, and it had three separate ways of doing it.
-
-       AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
-       the half that can fail. ask() records a failed turn, so eugenia_runs
-       could answer "how often does a model call die" — and could say nothing at
-       all about a job that died BEFORE reaching one. Two consolidations died in
-       `turnsSince`, one line into postConsolidation, apologised to him twice and
-       left the table with no row on either night: read afterwards it showed a
-       system that had simply had nothing to do. The apology below is swallowed
-       on failure, deliberately, so a Telegram that is refusing takes the notice
-       with it and leaves nothing anywhere; this is what survives that. `job` is
-       the apology's own vocabulary rather than ask()'s labels, and suffixed so
-       the two can never be confused in a table read months later. */
-    await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
-
-    await tg("sendMessage", {
-      chat_id: CHAT_ID,
-      text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,
-    }).catch(() => {});
-    return json({ ok: false, error: why, job }, 500);
+    return await jobFailed(job, err);
   }
+}
+
+/* HOW A JOB THAT DIED BEHIND A 200 SAYS SO, for both of the callers that answer
+   before they work: everything scheduled, and the trade event. The trade event
+   is the one message with no retry anywhere behind it, and it had `APOLOGY.trade`
+   written for it and no path that ever sent it — a read that failed before its
+   model call reached a console and nothing else, which is the absence this whole
+   function exists to end, on the one path it did not reach. */
+async function jobFailed(job: string, err: unknown): Promise<Response> {
+  const why = err instanceof Error ? err.message : String(err);
+  console.error("doji-eugenia:", why);
+  /* THE ONLY WAY HE FINDS OUT, and it took a missing briefing to earn this.
+
+     pg_net discards this response, the console is not somewhere anyone looks,
+     and net._http_response is pruned within hours — so a briefing that died
+     at 08:00 was invisible by lunchtime and the way it surfaced was him
+     noticing nothing had arrived. Silence is the worst thing this system can
+     do, and it had three separate ways of doing it.
+
+     AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
+     the half that can fail. ask() records a failed turn, so eugenia_runs
+     could answer "how often does a model call die" — and could say nothing at
+     all about a job that died BEFORE reaching one. Two consolidations died in
+     `turnsSince`, one line into postConsolidation, apologised to him twice and
+     left the table with no row on either night: read afterwards it showed a
+     system that had simply had nothing to do. The apology below is swallowed
+     on failure, deliberately, so a Telegram that is refusing takes the notice
+     with it and leaves nothing anywhere; this is what survives that. `job` is
+     the apology's own vocabulary rather than ask()'s labels, and suffixed so
+     the two can never be confused in a table read months later. */
+  await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
+
+  await tg("sendMessage", {
+    chat_id: CHAT_ID,
+    text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,
+  }).catch(() => {});
+  return json({ ok: false, error: why, job }, 500);
 }
 
 /* What postBriefing stores instead of the text it sent. One definition, because
@@ -5434,7 +5444,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
          The body NAMES the job, because `net._http_response` carries no URL
          and the flag is otherwise unrecoverable from the row. */
       if (sent?.trade) {
-        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened')));
+        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened'))
+          .catch(err => jobFailed('trade', err)));
         return json({ ok: true, accepted: "trade event" });
       }
       background(postScheduled(url));
