@@ -4105,7 +4105,7 @@ an hour**. So the longer window does not simply buy more — it moves the
 break-even from two requests on a prefix to three, and a caller that makes one
 request and is not followed within the hour pays double for a lifetime nothing
 uses. That matters more than it looks, because *the tool array is part of the
-cache key*: five tool sets are five separate prefixes, none readable by another.
+cache key*: each tool set is a separate prefix, none readable by another.
 Which makes *is a second turn likely inside the hour?* a question about the
 **array** rather than about the caller — and the answer came back in one shape:
 
@@ -4131,6 +4131,12 @@ is 10:00 — two hours apart — so the hour those were paying 2× for could nev
 have been read by anything. The window is derived from the tool array now: `1h`
 for `RELEASE_TOOLS`, `5m` for the rest, which is 512,059 tokens a week moving
 off the doubled rate.
+
+**The move look used to share that array, and has its own now.** It bought the
+hour without earning it — two turns, two prefixes written, none inherited — and
+it was handed `record_actual` for a move the calendar has already said no print
+explains. `MOVE_TOOLS` is the release look's set without that tool, at five
+minutes.
 
 `ask()` records both halves — `cached` for the reads, `wrote_1h` and `wrote_5m`
 for the writes, kept apart because their rates differ and a sum of them cannot be

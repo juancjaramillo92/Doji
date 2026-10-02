@@ -6302,6 +6302,19 @@ test('one write makes a calendar row, keyed on the id, and she holds none', () =
     'keeps a consensus for ever and never the number');
 });
 
+test('the move look has a tool set of its own, with no print to file', () => {
+  /* It borrowed RELEASE_TOOLS, so it carried `record_actual` into a look the
+     calendar has already said no print explains, and it bought the hour the
+     cache window grants that array alone — written on every turn, read on none. */
+  const array = EUGENIA_TS.match(/const MOVE_TOOLS = \[([^\]]*)\]/)?.[1];
+  assert.ok(array, 'the move look no longer has a tool set of its own');
+  assert.doesNotMatch(array, /ACTUAL_TOOL/, 'the move look can file a release figure again');
+  const at = EUGENIA_TS.indexOf('async function postMove(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
+  assert.match(body, /'move look', MOVE_TOOLS\)/,
+    'the move look is handed some other array than its own');
+});
+
 test('record_actual cannot be handed a column the briefing owns', () => {
   const schema = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const ACTUAL_TOOL'));
   const props = schema.slice(0, schema.indexOf('required:'));

@@ -1752,7 +1752,7 @@ const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 
 const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6,
                      max_content_tokens: 10000 };
 
-/* FIVE SETS, BECAUSE FIVE JOBS ARE NOT THE SAME CONVERSATION, and a tool set is
+/* SIX SETS, BECAUSE SIX JOBS ARE NOT THE SAME CONVERSATION, and a tool set is
    a list of what may be OFFERED rather than of what can be executed — every one
    of them is served by the same loop below.
 
@@ -1762,8 +1762,9 @@ const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 
    and it is a way for a job to do something nobody expected it to. The nightly
    pass gets no web search because a bookkeeping pass has nothing to research;
    the release look gets no memory tools because it is a look at one number, not
-   a conversation; the trade look gets neither, because the only honest thing it
-   can say comes out of his own strategy. */
+   a conversation; the move look gets the release look's set less `record_actual`,
+   because nothing it is told about has printed; the trade look gets neither,
+   because the only honest thing it can say comes out of his own strategy. */
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
@@ -1781,6 +1782,12 @@ const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, C
 // A look files an actual and nothing else: `record_actual` is a PATCH that
 // cannot mint the row it was looking at.
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
+/* ITS OWN ARRAY, AND IT USED TO BORROW THE RELEASE LOOK'S. That handed a look
+   at a move no print explains a tool for filing a print, and — the array being
+   where the cache key starts and what the hour is keyed on — the release look's
+   2× write for an hour it never read back: two turns, two prefixes written,
+   none inherited, in the week the window was measured. */
+const MOVE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* The critic reads a draft and returns a draft. Giving it a tool would let it
    go and check something, which is a second briefing at a second price.
@@ -4986,7 +4993,7 @@ async function postMove(): Promise<Response> {
     around + wires + notes + map + story + loops + desk;
 
   const said = await ask([...await recent(), { role: 'user', content: asked }],
-                         'medium', 'move look', RELEASE_TOOLS);
+                         'medium', 'move look', MOVE_TOOLS);
 
   if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
 
