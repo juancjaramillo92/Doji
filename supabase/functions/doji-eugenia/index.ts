@@ -828,9 +828,14 @@ export function tradesQuery(days: unknown, now = Date.now()): string {
          `&order=open_day.desc,entry_time.desc&limit=400`;
 }
 
+// How many days the model asked for, clamped once: the window it reads and
+// the span the summary says it covers are the same number.
+const windowDays = (days: unknown): number =>
+  Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
+
 // The first civil day of the window, `back` days further out still.
 function windowStart(days: unknown, now: number, back: number): string {
-  const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
+  const n = windowDays(days);
 
   const [y, m, d] = nyDate(new Date(now)).split('-').map(Number);
   const from = new Date(Date.UTC(y, m - 1, d));
@@ -1011,8 +1016,7 @@ const STATS_TOOL = {
 async function readStats(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
-    const n = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
-    return statsList(journalStats(rows), n);
+    return statsList(journalStats(rows), windowDays(days));
   } catch (err) {
     console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
