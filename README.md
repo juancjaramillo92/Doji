@@ -2494,6 +2494,13 @@ never read, which is the quiet week again arriving through the limit: every entr
 in them would pass R-14 for want of a print. So a full read covers only the
 weeks after the one its oldest release falls in.
 
+**The trades read has the same bound and says so.** Every tool over the journal
+reads the newest four hundred trades in its window. A year he traded more than
+that is cut at its oldest end, and `get_trades`, `get_stats` and `check_rules`
+all went on calling the answer the last 365 days. `reachLine` adds one sentence
+when a read comes back full: the day it actually reaches, and that she must say
+so before quoting a figure over the window. On an ordinary window it adds nothing.
+
 The quarter-hourly filing sees a rolling day and a half and marks nothing.
 TradingView's data goes back to 2003, so the weeks already traded can be judged.
 Forex Factory's export only ever held the current one.

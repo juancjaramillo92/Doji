@@ -56,7 +56,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
-  sinceBriefing, breachesList, breachesBlock, postTradeEvent, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
+  sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -6043,4 +6043,31 @@ test('an opened event for a trade already closed says nothing and reads no calen
   const open = await run(row());
   assert.ok(open.asked.some(u => u.includes('eugenia_calendar')),
     'an open position with a print pending never reached the calendar');
+});
+
+/* ─── A trades read that reached its bound ───────────────────────────────────
+   The read takes the newest TRADE_ROWS. A year he traded more than that is cut
+   at its oldest end, and every tool built on it went on calling its answer
+   "the last 365 days". Driven through serve() for all three tools, because the
+   line is appended by each caller and a pure test of the line proves nothing
+   about any of them saying it.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a trades read that hit its bound says how far back it reaches, in every tool built on it', async () => {
+  const rows = (n) => Array.from({ length: n }, (_, i) => ({
+    id: `PID${i}`, direction: 'BUY', entry_time: '2026-06-01T14:00:00Z', fill_time: '2026-06-01T14:30:00Z',
+    entry_price: 4000, exit_price: 4010, pnl: 40, net_pnl: 40, setup: null, followed_rules: null,
+    followed_sl: null, followed_tp: null, size_oz: 4, planned_sl: null, planned_tp: null, best_price: null,
+    // Newest first, as the query orders them, so the last row is the oldest day read.
+    open_day: i === n - 1 ? '2026-02-10' : '2026-06-01',
+  }));
+  const ask = (n, tool) => withFetch(async (url) =>
+    new Response(JSON.stringify(String(url).includes('eugenia_trades') ? rows(n) : []), { status: 200 }),
+    () => serve(tool, { days: 365 }));
+
+  for (const tool of ['get_trades', 'get_stats', 'check_rules']) {
+    assert.match(await ask(TRADE_ROWS, tool), /reaches back only to 2026-02-10, not the whole 365 days/,
+      `${tool} answered a read cut at its bound as though it covered the whole window`);
+    assert.doesNotMatch(await ask(TRADE_ROWS - 1, tool), /stops at its/,
+      `${tool} called a read short of its bound truncated, which is every ordinary window`);
+  }
 });

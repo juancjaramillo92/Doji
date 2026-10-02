@@ -823,9 +823,24 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
    change, when a day is 23 or 25 hours long and "seven days ago" lands on the
    wrong date. So today's New York date is taken first and the days are stepped
    off it — the same way index.html walks to a week or a month boundary. */
+export const TRADE_ROWS = 400;
+
 export function tradesQuery(days: unknown, now = Date.now()): string {
   return `eugenia_trades?open_day=gte.${windowStart(days, now, 0)}` +
-         `&order=open_day.desc,entry_time.desc&limit=400`;
+         `&order=open_day.desc,entry_time.desc&limit=${TRADE_ROWS}`;
+}
+
+/* A FULL READ IS NOT THE WHOLE WINDOW, coveredWeeks' rule for the trades. The
+   read takes the newest TRADE_ROWS, so a year he traded more than that is cut
+   at its oldest end and every answer built on it — a win rate, a rule's
+   counts, the rows themselves — was still labelled "the last 365 days". Said
+   where it happens, with the day the read actually reaches, and nothing at
+   all on an ordinary window. Pure and exported because it is the decision. */
+export function reachLine(rows: { open_day: string | null }[], days: unknown): string {
+  if (rows.length < TRADE_ROWS) return "";
+  return `\nThe read stops at its ${TRADE_ROWS}-trade bound, so this reaches back only to ` +
+         `${rows[rows.length - 1].open_day}, not the whole ${windowDays(days)} days. Say so ` +
+         `before giving any figure over the window.`;
 }
 
 // How many days the model asked for, clamped once: the window it reads and
@@ -900,7 +915,7 @@ export function weeksQuery(days: unknown, now = Date.now()): string {
 async function readTrades(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
-    return rows.length ? JSON.stringify(rows) : "No trades in that window.";
+    return rows.length ? JSON.stringify(rows) + reachLine(rows, days) : "No trades in that window.";
   } catch (err) {
     console.error("doji-eugenia: trades read failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now. Say you cannot see it rather than saying he has not traded.";
@@ -951,8 +966,10 @@ const CHECK_TOOL = {
    two ways, R-14 could be judged against a calendar in one and against nothing
    in the other, and nobody would see which. `keep` narrows the trades and
    nothing else, so the calendar and the stop history are the same either way.
-   Null when nothing was kept, which is not a pass. */
-async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true): Promise<RuleResult[] | null> {
+   Null when nothing was kept, which is not a pass; `reach` is the read's own
+   bound, said beside whatever was evaluated over it. */
+async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
+    Promise<{ results: RuleResult[] | null; reach: string }> {
   const [rows, releases, weeks, moves] = await Promise.all([
     readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
     readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
@@ -960,12 +977,13 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
     readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
   ]);
   const kept = rows.filter(keep);
-  if (!kept.length) return null;
+  const reach = reachLine(rows, days);
+  if (!kept.length) return { results: null, reach };
   const stops = new Map<string, Stop[]>();
   for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
-  return checkRules(kept, Date.now(), {
+  return { results: checkRules(kept, Date.now(), {
     releases: releases.map(r => r.at), weeks: coveredWeeks(weeks.map(w => w.week), releases),
-  }, stops);
+  }, stops), reach };
 }
 
 /* NEVER THROWS, for the reason every other tool here does not — it runs inside
@@ -973,9 +991,9 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const results = await readRules(days);
+    const { results, reach } = await readRules(days);
     if (!results) return "No trades in that window, so there is nothing to check.";
-    return adherenceList(results);
+    return adherenceList(results) + reach;
   } catch (err) {
     console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
@@ -1032,7 +1050,7 @@ const STATS_TOOL = {
 async function readStats(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
-    return statsList(journalStats(rows), windowDays(days));
+    return statsList(journalStats(rows), windowDays(days)) + reachLine(rows, days);
   } catch (err) {
     console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
@@ -3092,7 +3110,8 @@ export async function breachesBlock(): Promise<string> {
     const [last] = await readRows<{ created_at: string }>('Briefing marker',
       `${SB_URL}/rest/v1/${briefedQuery()}`);
     const at = last?.created_at ?? new Date(Date.now() - 86_400_000).toISOString();
-    return breachesList(await readRules(BREACH_DAYS, t => sinceBriefing(t, at)));
+    const { results, reach } = await readRules(BREACH_DAYS, t => sinceBriefing(t, at));
+    return breachesList(results) + reach;
   } catch (err) {
     console.error("doji-eugenia: breaches unavailable —", err instanceof Error ? err.message : err);
     return "\n\nWhich rules his recent trades broke could not be checked just now. Say nothing about a broken rule rather than working it out from the rows.";

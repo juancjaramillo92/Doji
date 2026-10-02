@@ -6262,7 +6262,7 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
   assert.match(body, /checkRules\(kept, Date\.now\(\), \{/,
     'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
   assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
-  assert.match(body, /\}, stops\);/,
+  assert.match(body, /\}, stops\)/,
     'check_rules hands the rules no stop history, so R-19 is unknown on every trade');
 
   /* AND THE POLLER WRITES THE HISTORY, inside the step that already read the
