@@ -63,7 +63,7 @@ import {
   sessionAt, isJournalled, BE,
 } from '../supabase/functions/doji-eugenia/journal.ts';
 import {
-  checkRules, adherenceList, settle, dayStanding, easter, marketHolidays,
+  checkRules, adherenceList, settle, dayStanding, easter, lowVolumeDays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, HIGH, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
@@ -3980,6 +3980,22 @@ test('R-12 separates a late second entry from a sweep it cannot see', () => {
     entry('PIDb', '2026-01-06T10:40:00Z', '2026-01-06T11:00:00Z'),
   ], 'R-12').verdict, 'unknown');
 
+  // A second entry taken before the first closed is a second position, not a
+  // re-entry — and a first still open is the same case.
+  assert.equal(verdictOf([
+    entry('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T10:30:00Z'),
+    entry('PIDb', '2026-01-06T10:20:00Z', '2026-01-06T11:00:00Z'),
+  ], 'R-12').verdict, 'fail', 'a second entry while the first was open reads as a prompt re-entry');
+  assert.equal(verdictOf([
+    entry('PIDa', '2026-01-06T10:00:00Z', null),
+    entry('PIDb', '2026-01-06T10:20:00Z', null),
+  ], 'R-12').verdict, 'fail', 'a second entry beside a position still open reads as undecidable');
+  // Closed with no instant to measure from is still undecidable.
+  assert.equal(verdictOf([
+    trade({ id: 'PIDa', open_day: '2026-01-06', entry_time: '2026-01-06T10:00:00Z', exit_price: 4400 }),
+    entry('PIDb', '2026-01-06T10:40:00Z', '2026-01-06T11:00:00Z'),
+  ], 'R-12').verdict, 'unknown');
+
   // Three is a fail whatever the timing, because the rule permits two.
   assert.equal(verdictOf(['a', 'b', 'c'].map((k, i) =>
     entry('PID' + k, `2026-01-06T1${i}:00:00Z`, `2026-01-06T1${i}:30:00Z`)),
@@ -4022,7 +4038,7 @@ test('R-15 finds the Friday close inside a span, in both halves of the year', ()
                                   new Date('2026-03-07T14:00:00Z')), null);
 });
 
-test('R-16 knows the market holidays, including the ones that move', () => {
+test('R-16 knows the market and bank holidays, including the ones that move', () => {
   const on = (at) => verdictOf([trade({ entry_time: at })], 'R-16').verdict;
 
   // Good Friday 2026 is 3 April — the only moving holiday on the list, and the
@@ -4036,6 +4052,10 @@ test('R-16 knows the market holidays, including the ones that move', () => {
   assert.equal(on(`2026-12-${STRETCH.from}T14:00:00Z`), 'fail');
   assert.equal(on('2026-12-23T14:00:00Z'), 'pass');
   assert.equal(on('2026-07-06T14:00:00Z'), 'pass');
+  // The banks' two, which the market trades through: Columbus Day, and
+  // Veterans Day, a Wednesday in 2026.
+  assert.equal(on('2026-10-12T14:00:00Z'), 'fail');
+  assert.equal(on('2026-11-11T14:00:00Z'), 'fail');
 });
 
 test('easter is right, which is what makes Good Friday right', () => {
@@ -4047,15 +4067,19 @@ test('easter is right, which is what makes Good Friday right', () => {
   assert.deepEqual(easter(2027), { m: 3, d: 28 });
 });
 
-test('the holiday set is the ten the market keeps, and nothing else', () => {
-  const days = marketHolidays(2026);
+test('the holiday set is the ten the market keeps and the two only the banks keep, and nothing else', () => {
+  const days = lowVolumeDays(2026);
   for (const d of ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25',
-                   '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25']) {
-    assert.ok(days.has(d), `${d} is a market holiday and is not in the set`);
+                   '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
+                   '2026-10-12', '2026-11-11']) {
+    assert.ok(days.has(d), `${d} is a market or bank holiday and is not in the set`);
   }
-  for (const d of ['2026-01-02', '2026-03-17', '2026-07-06', '2026-11-25']) {
+  for (const d of ['2026-01-02', '2026-03-17', '2026-07-06', '2026-11-25', '2026-10-13']) {
     assert.ok(!days.has(d), `${d} is an ordinary trading day and the set closes the market on it`);
   }
+  // Veterans Day on a Sunday is kept on the Monday, as the Fed observes it.
+  assert.ok(lowVolumeDays(2029).has('2029-11-12'));
+  assert.ok(!lowVolumeDays(2029).has('2029-11-09'));
 });
 
 test('a New York wall time resolves to the instant it actually is', () => {
