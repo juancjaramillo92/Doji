@@ -54,10 +54,9 @@ create table if not exists public.eugenia_runs (
   id         bigserial primary key,
   at         timestamptz not null default now(),
 
-  -- The caller, exactly as ask()'s label names it: 'weekday briefing',
-  -- 'sunday briefing', 'pulse', 'reply', 'consolidation', 'release look',
-  -- 'trade look', 'critic'. Free text on purpose — a check constraint here
-  -- would turn adding a caller into a migration.
+  -- The caller, exactly as ask()'s label or recordRun's own row names it.
+  -- Free text on purpose — a check constraint here would turn adding a caller
+  -- into a migration, and a list of them in a comment goes stale the same way.
   caller     text not null,
   effort     text,
   rounds     int,
@@ -152,10 +151,10 @@ alter table public.eugenia_runs enable row level security;
 -- she said about each one at the time. It is worth nothing today and a great
 -- deal in June, which is the whole argument for starting it now.
 --
--- SHE WRITES IT AND NOBODY ELSE DOES. The figures come from her web search, so
--- they are as good as the search was — which is why `source` is recorded and
--- why nothing downstream treats these as broker data. They are her notes about
--- the world, in a shape that can be counted.
+-- FILED FROM TRADINGVIEW, AND HER LINE BESIDE IT. 018 keys a row on
+-- TradingView's own id; she writes only `note`, and an `actual` TradingView has
+-- not yet published. `source` says which, and nothing downstream treats these
+-- as broker data.
 create table if not exists public.eugenia_calendar (
   id         bigserial primary key,
 
@@ -203,9 +202,9 @@ create table if not exists public.eugenia_calendar (
   -- each was first seen. A table built to compound has to be adjudicable.
   updated_at timestamptz not null default now(),
 
-  -- One row per release per moment. The poller's upsert shape, for the same
-  -- reason: she re-reads the calendar every morning and must update rather than
-  -- duplicate what she already filed.
+  -- One row per release per moment, from the days she typed the calendar in.
+  -- 018's tv_id is the key a filing upserts on now; this still stands over the
+  -- rows she filed by name.
   constraint eugenia_calendar_unique unique (at, name)
 );
 
@@ -297,8 +296,8 @@ alter table public.eugenia_thesis enable row level security;
 -- ─── What she flagged, and what she asked ──────────────────────────────────
 -- THE LOOPS SHE OPENS AND COULD NEVER CLOSE.
 --
--- Every briefing flags one genuinely odd thing and asks one question, and both
--- were fire-and-forget. The prompt asks her to follow through — *if you flagged
+-- She flags an odd thing and asks him a question, and both were
+-- fire-and-forget. The prompt asks her to follow through — *if you flagged
 -- something odd and it resolved, say so* — with nothing to follow through
 -- WITH: whether Tuesday's oddity ever resolved depended entirely on whether
 -- Tuesday was still inside twelve turns.

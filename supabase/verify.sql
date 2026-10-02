@@ -150,7 +150,7 @@ from (values
    '0'),
 
   /* ─── The journal/broker boundary, asked of the database ─────────────────
-     Until 009 this was a `for` loop in index.html. The policy on `trades`
+     Until 011 this was a `for` loop in index.html. The policy on `trades`
      decides which ROWS a session may write and says nothing about which
      COLUMNS, so the publishable key could set `net_pnl` or `direction` on any
      row it owns and Postgres would take it.
@@ -756,8 +756,8 @@ from (values
    'eugenia_notes_embedding,eugenia_turns_embedding'),
 
   -- ─── And every index the numbered files create ───────────────────────────
-  -- Named in full rather than counted, because fourteen is still fourteen when
-  -- one is renamed and another added — the same reason the trigger row below
+  -- Named in full rather than counted, because a count is still the same count
+  -- when one is renamed and another added — the same reason the trigger row below
   -- lists its five. An index missing here is never an error: the query returns
   -- the same rows off a sequential scan and simply gets slower as the table
   -- grows, which is the one kind of fault that never announces itself.

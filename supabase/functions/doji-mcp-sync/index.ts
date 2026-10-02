@@ -15,7 +15,7 @@
 // the column is what stops that resurrecting it two minutes later.
 //
 // SECURITY CONTRACT
-//   1. ALLOWED_TOOLS is a hardcoded whitelist holding two read tools.
+//   1. ALLOWED_TOOLS is a hardcoded whitelist of read tools.
 //      mcpPost() throws on anything else, and it is the only place a tool name
 //      becomes a request.
 //   2. Every request must present DOJI_CRON_SECRET on the x-doji-key header.
@@ -23,9 +23,9 @@
 //      longer checks anything — authorisation happens here, in code, before any
 //      work begins. See the note at the entry point.
 //   3. No value from the HTTP request reaches an MCP call. The body is never
-//      read. The only request input consulted is three query flags — force,
-//      raw and hours — the first two boolean and the third clamped. No code
-//      path constructs an order.
+//      read. The only request input consulted is the query flags the entry
+//      point reads — each a fixed choice except `hours`, which is
+//      clamped. No code path constructs an order.
 //   4. Tokens live only in Deno.env — never logged, never returned, never
 //      written to the database.
 //
@@ -854,7 +854,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     /* ?tools=1 — WHAT THE BROKER ACTUALLY OFFERS, which is a question this
        repository has had to answer by reading its own allow-list and hoping.
 
-       ALLOWED_TOOLS names the two this function calls. It has never said
+       ALLOWED_TOOLS names the tools this function calls. It has never said
        anything about what EXISTS: the poller needs deals and a balance, so
        those are what it asked for, and whether cTrader also serves a quote, a
        symbol list or an open-position feed was never established either way.

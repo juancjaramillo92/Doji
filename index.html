@@ -2925,8 +2925,8 @@ function disciplineBars(list) {
 
 /* ─── R:R bar ────────────────────────────────────────────────────────────────
    Realised, not planned: average win over average loss from closed P&L. The
-   planned ratio is not recoverable — the broker reports only the FINAL stop, so
-   a stop moved to break-even has overwritten the original risk.
+   plan is on a row only as the poller first saw it, and only on the trades
+   since it began recording one, so a planned ratio is not computed here.
 
    The same head and track as disciplineBar, so the row above the wheel and the
    three below it are one component carrying different figures. Per period, not
@@ -3339,10 +3339,10 @@ function renderRollForward(rows) {
    nothing on this card is the reason anyone opened the app.
    ─────────────────────────────────────────────────────────────────────────── */
 const Watch = {
-  // The same rolling window her own briefing reads, and for the same reason: a
-  // civil-day filter is at its worst exactly where this matters, since Sunday's
-  // 17:00 open is about a week that has not started. Twelve hours back and a day
-  // forward needs no boundary arithmetic to get wrong.
+  // A rolling window, for the reason her briefing reads one: a civil-day filter
+  // is at its worst exactly where this matters, since Sunday's 17:00 open is
+  // about a week that has not started. Twelve hours back and a day forward needs
+  // no boundary arithmetic to get wrong. Hers reaches four hours further ahead.
   BACK_H: 12, AHEAD_H: 24,
 
   when(iso) {

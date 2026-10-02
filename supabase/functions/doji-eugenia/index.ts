@@ -4,9 +4,10 @@
 // The second bot. Gladys collects the journal; Eugenia does macro. Same two-
 // caller shape as doji-gladys, told apart by which secret arrives:
 //
-//   x-doji-key                        the hourly pg_cron job in
-//                                     supabase/003_eugenia.sql — post the
-//                                     briefing if this is one of its hours.
+//   x-doji-key                        the scheduled jobs in
+//                                     supabase/004_cron.sql, the trades
+//                                     trigger in 005, and her own speaking
+//                                     worker — postScheduled reads which.
 //   x-telegram-bot-api-secret-token   Telegram — the trader replied, answer him.
 //
 // SHE OWNS NO COLUMN OF `trades` AND HAS NO WRITE PATH TO IT. She reads the
@@ -2499,24 +2500,15 @@ async function postEmbed(): Promise<Response> {
   return json({ ok: true, notes, turns });
 }
 
-/* ─── And she answers in the channel he used ───────────────────────────────
-   NO SETTING, NO TOGGLE, NO STORED PREFERENCE. He speaks because his hands are
-   busy — driving, at a screen, mid-session — and the whole point is over the
-   moment he has to look at a phone to read the answer. So the rule is the
-   message he sent: a voice note is answered aloud, a typed line is answered in
-   text, and nothing anywhere has to remember which he prefers.
+/* ─── And everything she writes is spoken ──────────────────────────────────
+   He speaks because his hands are busy — driving, at a screen, mid-session —
+   and the point is over the moment he has to look at a phone to read. So every
+   message she composes goes as a voice note, on every path: the briefing he
+   asked to have read to him, the looks, the trade event and a reply.
 
-   IT FALLS OUT THAT NOTHING SCHEDULED EVER SPEAKS. The briefing, the pulse, the
-   release look, the move look and the trade event are not replies to anything —
-   they reach this file by another path entirely — so they stay text without a
-   rule saying so. That is the right answer for the briefing in particular: a
-   fourteen-hundred-character read is something you skim, and audio is the one
-   format you cannot.
-
-   THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE VOICE. It is what
-   remember() stores, what a later search finds, and what he re-reads at a desk;
-   a voice note is none of those. So it is already delivered before this is
-   attempted, which is what makes a failure here cost nothing but the audio.
+   THE TRANSCRIPT IS WHAT IS KEPT, whatever happened on the wire. remember()
+   stores the text, a later search finds the text, and the text is what goes
+   instead when the audio does not land — see sayAloud.
    ───────────────────────────────────────────────────────────────────────── */
 const TTS_URL   = env("TTS_URL") || "https://api.openai.com/v1/audio/speech";
 const TTS_KEY   = env("TTS_KEY");
@@ -2799,7 +2791,7 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
    right while her narration of it is a guess.
 
    A display format with one caller, so it stays here rather than in _shared,
-   the same way Gladys's nyTime does. The trust clause is load-bearing: the
+   the same way Gladys's nyDayTime does. The trust clause is load-bearing: the
    turns above genuinely are from this morning, and without it the freshest
    thing in her context still argues for the wrong answer. */
 // hourCycle rather than hour12: false, which leaves the cycle to the locale and
@@ -3742,14 +3734,15 @@ export function positionsList(
    price she cannot read costs one line, where the outer catch would cost her the
    position itself. Read only when something is open, which on most days is not
    at all. */
-/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` has exactly one
-   writer and it is the EMAIL path — the poller never sets it, on any row. What
-   the poller records when a position closes is `exit_price`, off the broker's
-   own deals, every two minutes.
+/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` is written by the
+   email and by the poller's writeFill — and the poller stamps only the closes
+   its fold window reaches, so a close older than that with no alert behind it
+   carries an `exit_price` and a null `fill_time` for good. What the poller
+   records on every close is `exit_price`, off the broker's own deals.
 
-   So a position that closed without an alert email landing — a manual close,
-   R-15's Friday close-out, a parse that failed, an email that never came — kept
-   `fill_time` null for ever, and this block told him he was in a trade for ever.
+   Read off `fill_time` alone, a position that closed without an alert email
+   landing — a manual close, R-15's Friday close-out, a parse that failed —
+   kept reading as open, and this block told him he was in a trade for ever.
    It did it while citing R-19 and R-15 at him about a position that had not
    existed since Wednesday, which is the worst thing this block can do: it is the
    one place she speaks with his own rules behind her.
@@ -3793,9 +3786,10 @@ export async function positionsBlock(): Promise<string> {
 // it takes — the timeout in the cron job only has to outlast the work. That is
 // the whole difference between this caller and Telegram's.
 //
-// One hourly job, three answers: a briefing hour, a pulse hour, or neither.
-// ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the nightly
-// pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
+// The hourly job asks dueNow which of its schedules this hour owes, if any; the
+// two quarter-hourly senses and the person's repair doors each name theirs with
+// a flag. ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the
+// nightly pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
 // same two jobs: a manual re-run after a failure, and a way to exercise the path
 // without waiting for the hour. ?consolidate=1 is also the only way to SEE what
 // the nightly pass does, since it sends nothing and stores no turn.
@@ -3968,15 +3962,6 @@ async function briefedToday(): Promise<boolean> {
 }
 
 
-/* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
-   eugenia_turns and never read back, so every morning started from nothing and
-   she could not know what she had said the day before, whether it landed, or
-   that she had already explained a term twice this week. Continuity is most of
-   what separates a person from a feed.
-
-   The stored user turn is a marker, not the sent text: the notes and the week's
-   trades are rebuilt fresh every morning, and storing them would resend a stale
-   copy as history for the next six briefings. */
 /* ─── The feedback keyboard ────────────────────────────────────────────────
    An instruction note is the only correction channel he has, and it is a good
    one — but it fires only when something annoys him enough to type. On every
@@ -4135,6 +4120,15 @@ async function gate(draft: string, asked: string, label: string, most?: number):
   }
 }
 
+/* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
+   eugenia_turns and never read back, so every morning started from nothing and
+   she could not know what she had said the day before, whether it landed, or
+   that she had already explained a term twice this week. Continuity is most of
+   what separates a person from a feed.
+
+   The stored user turn is a marker, not the sent text: the notes and the week's
+   trades are rebuilt fresh every morning, and storing them would resend a stale
+   copy as history for the next six briefings. */
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
   /* Filed before the reads, so the calendar she is handed is this morning's —

@@ -155,8 +155,9 @@ export function averages(rows: TradeRow[]): Averages {
 
 /* REALISED, NEVER PLANNED, and the distinction is the whole of what she may say
    about it: average win over average loss, out of trades that closed. The
-   planned ratio is R-08 step 4 and is a number HE runs — nothing records where
-   the target was set, so it is asked and never computed. Null where there is no
+   planned ratio is R-08 step 4 and is a number HE runs — the plan is on a row
+   only as first seen, and only on the trades since 006, so it is not computed
+   here. Null where there is no
    loss to divide by, because a ratio against nothing is not infinity, it is
    unanswerable. */
 export const realisedRR = (a: Averages): number | null =>

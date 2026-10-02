@@ -507,14 +507,14 @@ rests on, tested rather than repeated.
 on `trades` scopes rows to their owner and says nothing about columns, so a
 client signed in as the trader could write any column of its own rows —
 `net_pnl`, `direction`, `fill_time`, every figure the app does not own and
-cannot repair. 009 revokes insert, update and delete on the table and grants
+cannot repair. 011 revokes insert, update and delete on the table and grants
 back update on exactly five columns: `Data.OWNED`'s four, plus `deleted`.
 
 This paragraph used to argue the other way, and the argument is worth keeping
 because two thirds of it were dissolved rather than overruled. It said the grant
 list would be a fifth copy of the boundary *in the one place nothing here can
 test*, and that getting it wrong would *silently break soft delete rather than
-failing loudly*. Both are now false: `agree.test.mjs` reads the grant out of 009
+failing loudly*. Both are now false: `agree.test.mjs` reads the grant out of 011
 and both of `verify.sql`'s lists, holds all three against `Data.OWNED`, and goes
 red on a list that is too narrow, too wide, or drifting in either file. The
 missing-`deleted` case — the exact silent breakage that was predicted — is one

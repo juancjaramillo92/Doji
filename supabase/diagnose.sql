@@ -103,9 +103,10 @@ where table_schema = 'public' and table_name = 'eugenia_trades'
 order by grantee, privilege_type;
 
 -- ─── Triggers ──────────────────────────────────────────────────────────────
--- Expect three on trades: trades_touch_updated_at (BEFORE UPDATE),
--- trades_telegram_on_open (AFTER INSERT) and trades_telegram_on_answer
--- (AFTER UPDATE). Read the WHEN clauses on the last two. On the open,
+-- Expect five on trades — verify.sql names them: trades_touch_updated_at
+-- (BEFORE UPDATE), Gladys's trades_telegram_on_open (AFTER INSERT) and
+-- trades_telegram_on_answer (AFTER UPDATE), and the event spine's
+-- trades_eugenia_opened and trades_eugenia_closed. Read Gladys's WHEN clauses. On the open,
 -- `new.entry_time > now() - interval '01:00:00'` is the guard that stops a
 -- restore from backup messaging the trader once per row in the file. On the
 -- answer, the four journal columns compared with `is distinct from` — `<>` is
@@ -150,8 +151,9 @@ select 'eugenia_turns', count(*) filter (where embedding is null), count(*)
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
 -- Against 004_cron.sql: doji-mcp-sync every two minutes, doji-eugenia hourly,
--- doji-eugenia-spine at 5,20,35,50 past, doji-eugenia-price at 12,27,42,57 and
--- purge-cron-history nightly — five, all active. verify.sql's summary checks the
+-- doji-eugenia-spine at 5,20,35,50 past, doji-eugenia-price at 12,27,42,57,
+-- doji-dispatch-watch every ten minutes, doji-pace-watch at 37 past and
+-- purge-cron-history nightly — all active, and verify.sql holds the count. verify.sql's summary checks the
 -- Vault secret name in the calling jobs; this is where the schedules and the
 -- timeouts are read.
 --
