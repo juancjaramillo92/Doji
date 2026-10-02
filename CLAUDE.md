@@ -364,9 +364,7 @@ fixable one: it captures `innerHTML`, which is the DOM re-serialised, so `"` and
   briefing with *against a previous close of null — up 0 since it* — both
   halves of a confident sentence about the market, wrong. The bid and the range
   are still worth having, so the MOVE goes rather than the quote, and she is
-  told not to reconstruct it. `change_pct` was deleted rather than made honest:
-  it crossed the wire, sat in two interfaces and was asserted in tests, and
-  nothing had ever read it.
+  told not to reconstruct it.
 
   `quoteLine` HAD NEVER BEEN EXECUTED BY A TEST, only read for a substring —
   which is how a line every briefing opens on carried that for its whole life.
