@@ -1,109 +1,48 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — Eugenia: what wakes her, what she measures, and what compounds
 -- ───────────────────────────────────────────────────────────────────────────
--- 003_eugenia.sql gave her a memory. This gives her SENSES and METERS, and the
--- two are the same missing idea seen twice: nothing in this system could wake
--- her except a clock, and nothing could tell her — or anyone — whether any of
--- it was working.
+-- Her meters (eugenia_runs), her calendar, the running story, her open
+-- threads, his taps under a briefing, the price mark, trigram search over her
+-- memory, the trigger that tells her a position opened or closed, and the
+-- three tables the app's card may read.
 --
--- Six tables, and each answers a question none of the existing ones can:
---
---   eugenia_runs      what a turn cost, DURABLY. ask() has logged tokens and
---                     searches from the start, to a console this repository
---                     already decided is not a place facts survive — the same
---                     reasoning that made postScheduled message Telegram on
---                     failure. A meter nobody can read is not a meter.
---   eugenia_calendar  what lands today, and what it printed when it did. The
---                     event spine reads the first half; the second half is the
---                     only dataset here that is worth more every month it runs,
---                     because it is HER record of a print with HER line on it.
---   eugenia_thesis    the running story, rewritten rather than appended. One
---                     row, because a thesis is not a list.
---   eugenia_loops     what she flagged and what she asked, until it closes.
---   eugenia_feedback  whether a briefing landed, which nothing could say.
---
--- Plus a hybrid search, and the trigger that makes a trade something she finds
--- out about in two minutes rather than tomorrow.
---
--- RUN AFTER 003. Every statement here is idempotent — `create table if not
--- exists`, `create or replace`, `on conflict do nothing` — so this file is safe
--- to re-run in full, which 003 is not. That is deliberate: this is the file
--- that will grow.
+-- RUN AFTER 003, AND SAFE TO RE-RUN IN FULL: every statement is `if not
+-- exists`, `or replace` or `on conflict do nothing`. This is the file that
+-- grows. A test asserts it stays re-runnable.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ─── What a turn cost ──────────────────────────────────────────────────────
--- ONE ROW PER MODEL CALL, WRITTEN BY ask() ON ITS WAY OUT.
---
--- Everything this system cannot see is counted where it happens, and that rule
--- was already half-applied: ask() counts tokens because the spend cap on the
--- Anthropic key is a ceiling and not a meter, and postBriefing counts characters
--- because the length target lives in prose past a model call. Both went to
--- console.log — and this repository's own account of pg_net says plainly that
--- nobody reads Edge logs. So the numbers existed and the questions they were
--- collected to answer ("is the briefing drifting long again", "what did last
--- month cost", "how often is fallbacks actually firing") could not be asked.
---
--- APPEND-ONLY AND NEVER READ BY HER. This is not memory; she is not handed it
--- and cannot search it. It is instrumentation, for him and for whoever is
--- debugging — which is why it carries no note, no summary, and no opinion.
---
--- A FAILED TURN IS A ROW TOO. `ok` false with `detail` carrying the error is
--- the only record that a briefing was attempted and died, since the Telegram
--- apology is a message rather than data.
+-- ─── What each call cost ───────────────────────────────────────────────────
+-- One row per model call, plus rows for a delivered briefing, the gates'
+-- verdicts, the nightly meters and a job that died before its first call. A
+-- console line is gone within hours; this is where the meters survive.
+-- Instrumentation for him, never read back into her context.
 create table if not exists public.eugenia_runs (
   id         bigserial primary key,
   at         timestamptz not null default now(),
 
-  -- The caller, exactly as ask()'s label or recordRun's own row names it.
-  -- Free text on purpose — a check constraint here would turn adding a caller
-  -- into a migration, and a list of them in a comment goes stale the same way.
+  -- The caller's label. Free text, so a new caller needs no migration.
   caller     text not null,
   effort     text,
   rounds     int,
 
-  -- Counted apart because they bill apart: web search is $10 per 1,000 and
-  -- does not appear in the token figures at all.
+  -- Searches and fetches are counted apart from tokens and from each other:
+  -- each bills on its own tariff.
   in_tokens  int,
   cached     int,
   out_tokens int,
   searches   int,
-
-  -- THE OTHER HALF OF THE SERVER BILL. `web_search` has been counted since this
-  -- table existed; `web_fetch` sits in the same tool arrays, bills on its own
-  -- tariff, and was tallied nowhere — so every comparison of what a caller
-  -- costs was made against the half of the server spend that had a column.
-  -- Apart from `searches` for wrote_1h/wrote_5m's reason: two tariffs, and
-  -- their sum is not money.
   fetches    int,
 
-  -- WHAT THE CACHE COST TO FILL, which is the one price this table was built
-  -- without. `cached` is a read at a tenth of the input rate and was here from
-  -- the start; a WRITE is 1.25× at five minutes and 2× at an hour, so the
-  -- question the `ttl` in call() is answered with — does the longer lifetime
-  -- earn its doubled price — could not be asked of the meter sitting beside it.
-  --
-  -- TWO COLUMNS BECAUSE THE TWO RATES ARE DIFFERENT and their sum is not money.
-  -- The prefix asks for an hour; the loop's own breakpoint and web search's
-  -- automatic one are both five minutes, so a single figure would mix a price
-  -- with a different price and answer nothing.
+  -- What filling the cache cost. A read (`cached`) is a tenth of the input
+  -- rate; a write is 1.25× at five minutes and 2× at an hour, so the two TTLs
+  -- are kept apart — their sum is not money.
   wrote_1h   int,
   wrote_5m   int,
 
-  -- The briefing's length, which is the one quality target that lives in the
-  -- prompt rather than anywhere a test can reach. Null for callers that do not
-  -- produce a briefing.
   chars      int,
 
-  -- WHICH MODEL RAN. The log line named it and the row did not, so "how many
-  -- rounds does THIS model need on THIS caller" had no answer here — and the
-  -- day a tool-heavy caller changed model it ran out of rounds twice in half an
-  -- hour with nothing able to compare the two. Free text for `caller`'s reason:
-  -- a new model must not need a migration.
+  -- Which model ran, and which answered when `fallbacks` stepped in.
   model      text,
-
-  -- The model that actually answered, when it was not the one asked for.
-  -- `fallbacks: "default"` rescues a decline invisibly; this is where that
-  -- becomes a countable fact rather than a line in a log.
   fell_back  text,
 
   ms         int,
@@ -111,118 +50,64 @@ create table if not exists public.eugenia_runs (
   detail     text
 );
 
--- THE TABLE PREDATES THESE TWO, so the create above is not what puts them on a
--- database that already has one. Idempotent like everything else in this file,
--- and null on every row written before it ran — which is a real state and not a
--- gap: those turns were billed for the writes, nothing counted them, and a zero
--- would say the cache was free rather than unmeasured.
+-- Columns added after the table existed. Null on older rows means unmeasured,
+-- not zero.
 alter table public.eugenia_runs add column if not exists fetches int;
 alter table public.eugenia_runs add column if not exists wrote_1h int;
 alter table public.eugenia_runs add column if not exists wrote_5m int;
-
--- WHICH MODEL RAN, WHICH THE LOG LINE SAID AND THE ROW DID NOT. `rounds` has
--- been written since this table existed and `fell_back` records only a decline,
--- so "how many rounds does THIS model need on THIS caller" had no answer here —
--- and the day a tool-heavy caller changed model it ran out of rounds twice in
--- half an hour with nothing able to compare the two. Free text for `caller`'s
--- reason: a new model must not need a migration.
 alter table public.eugenia_runs add column if not exists model text;
 
--- The only reads are "recently" and "this caller recently".
 create index if not exists eugenia_runs_at_desc on public.eugenia_runs (at desc);
 create index if not exists eugenia_runs_caller_at on public.eugenia_runs (caller, at desc);
 
 alter table public.eugenia_runs enable row level security;
 
--- ─── What lands today, and what it printed ─────────────────────────────────
--- THE EVENT SPINE'S FIRST HALF, AND THE ONLY DATASET THAT COMPOUNDS.
---
--- She has searched the web for the day's calendar every morning since she
--- existed, read it once, and thrown it away. Two things were lost each time.
---
--- The first is a WAKE-UP. A print at 08:30 is knowable at 08:00, so the hour
--- after it is a scheduled look that can be decided from data rather than from a
--- constant — which is what turns a fixed 10:00 pulse into a look at the thing
--- that actually happened. `looked_at` is what makes that fire exactly once.
---
--- The second is HISTORY. `actual` against `consensus` against `prior`, with her
--- own line beside it, is a series no web search can hand back: in a year this
--- says how core CPI has printed against expectations for twelve months AND what
--- she said about each one at the time. It is worth nothing today and a great
--- deal in June, which is the whole argument for starting it now.
---
--- FILED FROM TRADINGVIEW, AND HER LINE BESIDE IT. 018 keys a row on
--- TradingView's own id; she writes only `note`, and an `actual` TradingView has
--- not yet published. `source` says which, and nothing downstream treats these
--- as broker data.
+-- ─── The calendar ──────────────────────────────────────────────────────────
+-- What lands and what it printed. It wakes her after a high-impact print, and
+-- it compounds: in a year it is how each release ran against expectations,
+-- with her line beside each one. Filed from TradingView (018); she writes only
+-- `note`, and an `actual` TradingView has not yet published.
 create table if not exists public.eugenia_calendar (
   id         bigserial primary key,
 
-  -- When it lands, to the minute, in UTC. The event spine compares this against
-  -- now(); everything shown to a person is formatted in New York by the caller,
-  -- the same split every other time in this system uses.
+  -- UTC; everything shown to a person is formatted in New York.
   at         timestamptz not null,
 
   name       text not null,
 
-  -- Only 'high' ever wakes her. The rest are recorded because a briefing that
-  -- mentions them is a briefing that had them, and because "what did the week
-  -- hold" is a question the archive should be able to answer.
+  -- Only 'high' wakes her.
   importance text not null default 'high'
     constraint eugenia_calendar_importance_check check (importance in ('high', 'medium', 'low')),
 
-  -- Text rather than numeric, and deliberately: a consensus is "0.3%", "175K",
-  -- "unchanged at 4.25-4.50%". Forcing a number here would either lose the unit
-  -- or lose the row.
+  -- Text, because a consensus is "0.3%", "175K" or "unchanged at 4.25-4.50%".
   consensus  text,
   prior      text,
   actual     text,
 
-  -- Her line about it, written when the actual lands. One sentence, the same
-  -- budget a note gets and for the same reason.
   note       text
     constraint eugenia_calendar_note_length
       check (note is null or char_length(note) between 1 and 200),
 
   source     text,
 
-  -- WHEN THE POST-RELEASE LOOK RAN. Null means it has not, which is exactly the
-  -- predicate the spine selects on — so a look fires once per release and a
-  -- redeploy, a retry or a second hourly tick cannot repeat it. It is a
-  -- timestamp rather than a boolean because "it fired, at 08:47" is the thing
-  -- worth knowing when one did not arrive.
+  -- When the post-release look ran. Stamped before the look, so a look that
+  -- fails cannot repeat every quarter hour.
   looked_at  timestamptz,
 
   created_at timestamptz not null default now(),
 
-  -- WHICH OF TWO CONTRADICTORY ROWS IS THE LATER ONE, which nothing could
-  -- answer. One release is filed in the morning and written again when it
-  -- prints, so the same row has two ages -- and when duplicates under different
-  -- names disagreed about what a number printed at, `created_at` said only when
-  -- each was first seen. A table built to compound has to be adjudicable.
-  -- One release, one row, is 018's tv_id. The (at, name) key this carried from
-  -- the days she typed the calendar in is 021's to drop.
+  -- Which of two disagreeing rows is the later one. Moved by the trigger below
+  -- on a change to content only. One release, one row, is 018's tv_id; the
+  -- (at, name) key this carried is 021's to drop.
   updated_at timestamptz not null default now()
 );
 
--- The column above has a default for the INSERT; this is what moves it when an
--- UPDATE changes anything a person filed. Named and shaped after `trades_touch`,
--- which does the same job for the same reason in 001.
 alter table public.eugenia_calendar add column if not exists updated_at timestamptz not null default now();
 
--- A MARK IS NOT AN EDIT, AND THE COLUMN ABOVE CLAIMS TO ANSWER WHICH ROW HOLDS
--- THE LATER CONTENT. markLooked stamps looked_at and touches nothing else, so a
--- touch there makes updated_at say when a row was last HANDLED — and on
--- 16 September the row carrying the stale prior was marked at 12:35:00 while the
--- row carrying the actual was written at 12:36:15. It ordered correctly by
--- seventy-five seconds. Reverse the two and updated_at names the stale row as
--- the later one, which is the table saying the opposite of the truth in the one
--- column it has for the question.
---
--- Compared as jsonb less the two bookkeeping columns, rather than as a list of
--- the rest: a column added later is compared without anyone having to remember
--- to add it here, and a list that goes stale fails by quietly ignoring the new
--- column's edits.
+-- A mark is not an edit: stamping looked_at must not move updated_at, or the
+-- column would say when a row was last handled rather than last changed.
+-- Compared as jsonb less the two bookkeeping columns, so a column added later
+-- is compared without anyone remembering to list it.
 create or replace function public.eugenia_calendar_touch()
 returns trigger
 language plpgsql
@@ -239,81 +124,41 @@ create trigger eugenia_calendar_touch_updated_at
   before update on public.eugenia_calendar
   for each row execute function public.eugenia_calendar_touch();
 
--- The briefing's read, and the app card's: today, in order.
 create index if not exists eugenia_calendar_at on public.eugenia_calendar (at desc);
 
 alter table public.eugenia_calendar enable row level security;
 
 -- ─── The running story ─────────────────────────────────────────────────────
--- ONE ROW, REWRITTEN, AND THAT IS THE WHOLE DESIGN.
---
--- Her memory had two timescales and needed three. Turns roll over in a morning;
--- notes are durable facts about HIM. Nothing held what is going on in the
--- MARKET across weeks — so every briefing rebuilt the story from scratch out of
--- a web search, and continuity survived only as long as yesterday stayed inside
--- twelve turns.
---
--- That is why a briefing can read like a feed however good the prose rules are.
--- An analyst carries a thesis — *the market has been trading the December cut
--- since October and the last three prints have chipped at it* — and each morning
--- MOVES it. This is that sentence, and it is handed over with every briefing.
---
--- REWRITTEN RATHER THAN APPENDED, which is the opposite of eugenia_notes and is
--- correct for the opposite reason. A note is a fact that stays true; a thesis is
--- a reading that is only ever current, and a list of superseded readings is an
--- archive of things that are no longer so. The trail is not lost: every briefing
--- that ever stated it is in eugenia_turns and is searchable.
---
--- Same single-row shape as eugenia_channels, and for the same reason — the row
--- IS the current answer, so there is no id to pick and no window to fall out of.
+-- One row, rewritten nightly: a reading that is only ever current, so not a
+-- list. Handed to every briefing, so a morning moves yesterday's story rather
+-- than starting from nothing. Every briefing that stated it is in her turns.
 create table if not exists public.eugenia_thesis (
   id         text primary key
     constraint eugenia_thesis_singleton check (id = 'current'),
 
-  -- Deliberately longer than a note and far shorter than a briefing. A thesis
-  -- that runs to a paragraph has stopped being a thesis.
+  -- Longer than a note, far shorter than a briefing.
   thesis     text not null
     constraint eugenia_thesis_length check (char_length(thesis) between 1 and 600),
 
-  -- The New York civil day it last moved, written by the function for the
-  -- reason moved_on is: now() is UTC and an evening rewrite would file on
-  -- tomorrow. A thesis that has not moved in a fortnight is itself the finding.
+  -- A New York civil day written by the function, for moved_on's reason in 003.
   moved_on   date,
   updated_at timestamptz not null default now()
 );
 
--- Seeded, so the read never has to answer "no row yet" separately from "nothing
--- decided yet". The starting text says exactly what is true on day one.
+-- Seeded, so the read never has to tell "no row" from "nothing decided".
 insert into public.eugenia_thesis (id, thesis) values
   ('current', 'No running thesis yet — this is written by the nightly pass once there is a story to carry.')
 on conflict (id) do nothing;
 
 alter table public.eugenia_thesis enable row level security;
 
--- ─── What she flagged, and what she asked ──────────────────────────────────
--- THE LOOPS SHE OPENS AND COULD NEVER CLOSE.
---
--- She flags an odd thing and asks him a question, and both were
--- fire-and-forget. The prompt asks her to follow through — *if you flagged
--- something odd and it resolved, say so* — with nothing to follow through
--- WITH: whether Tuesday's oddity ever resolved depended entirely on whether
--- Tuesday was still inside twelve turns.
---
--- The question is worse, because it is the part the prompt calls the most
--- valuable thing in the briefing: his answer is evidence about what he actually
--- understands. He answers three hours later, and nothing joins the answer back
--- to what was asked.
---
--- OPEN UNTIL CLOSED, and closing is a decision the nightly pass makes with the
--- day in front of it — the same argument that put note-writing there. `closed_on`
--- null is the whole read filter, exactly as `superseded_by` is for notes.
+-- ─── Open threads ──────────────────────────────────────────────────────────
+-- An odd thing she flagged (`watch`) or a question she asked him in a
+-- conversation (`question`), handed back until the nightly pass closes it.
+-- closed_on null is the whole read filter.
 create table if not exists public.eugenia_loops (
   id         bigserial primary key,
 
-  -- 'watch' is a fact that did not fit the story and might resolve. 'question'
-  -- is one she put to him and has not had back. They are one table because they
-  -- share a shape and a lifecycle, and separate values because what closes them
-  -- is different: a watch resolves in the world, a question resolves in him.
   kind       text not null
     constraint eugenia_loops_kind_check check (kind in ('watch', 'question')),
 
@@ -323,7 +168,7 @@ create table if not exists public.eugenia_loops (
   opened_on  date not null,
   closed_on  date,
 
-  -- What actually happened, written when it closes. Null while open.
+  -- What it turned out to be, written when it closes.
   resolution text
     constraint eugenia_loops_resolution_length
       check (resolution is null or char_length(resolution) between 1 and 200),
@@ -331,34 +176,19 @@ create table if not exists public.eugenia_loops (
   created_at timestamptz not null default now()
 );
 
--- Partial, matching the read exactly: a closed loop is never selected, so it has
--- no business in the index. Same shape as eugenia_notes_kind_id_desc.
+-- Partial, matching the read: a closed thread is never selected.
 create index if not exists eugenia_loops_open
   on public.eugenia_loops (kind, id desc) where closed_on is null;
 
 alter table public.eugenia_loops enable row level security;
 
--- ─── Whether it landed ─────────────────────────────────────────────────────
--- THE SIGNAL THAT ONLY EXISTED WHEN HE WAS ANNOYED ENOUGH TO TYPE.
---
--- An instruction note is the only correction channel he has, and it is a good
--- one — but it fires only when something bothers him enough to say so. On every
--- ordinary morning there is no signal at all, which means the nightly pass
--- judges her own output with no evidence about how any of it landed.
---
--- Two buttons under a briefing is the cheapest real evidence available, and the
--- mechanism is already proven in this system: Gladys has drawn an inline
--- keyboard and answered its taps since she shipped.
---
--- IT IS NOT A SCORE AND MUST NOT BECOME ONE. The pass reads it as one input
--- beside the day's turns; a bot optimising a thumbs-up average would start
--- writing briefings that flatter rather than teach, which is the exact failure
--- the prohibitions exist to prevent.
+-- ─── His taps under a briefing ─────────────────────────────────────────────
+-- One input to the nightly pass, never a score: a bot optimising a thumbs-up
+-- writes briefings that flatter rather than teach.
 create table if not exists public.eugenia_feedback (
   id         bigserial primary key,
 
-  -- The civil day of the briefing being rated, so a tap arriving at lunchtime
-  -- still files against the morning it was about.
+  -- The briefing's day, so a late tap files against the morning it was about.
   on_day     date not null,
 
   verdict    text not null
@@ -366,37 +196,16 @@ create table if not exists public.eugenia_feedback (
 
   created_at timestamptz not null default now(),
 
-  -- ONE VERDICT PER DAY, LAST TAP WINS — handled by the function's upsert. He
-  -- may change his mind; two contradictory rows for one briefing would be a
-  -- number nobody could read.
+  -- One verdict a day; the function's upsert makes the last tap win.
   constraint eugenia_feedback_one_a_day unique (on_day)
 );
 
 alter table public.eugenia_feedback enable row level security;
 
 -- ─── Search that survives a rephrasing ─────────────────────────────────────
--- FULL TEXT ALONE IS KEYWORD MATCHING WEARING THE WORD "SEARCH".
---
--- `websearch_to_tsquery` finds rows containing the words asked for. Ask "what
--- did we conclude about the December cut" and a turn saying *the market has
--- mostly given up on easing this year* is invisible — same subject, no shared
--- stem. The failure is silent, and the prompt makes it worse by telling her an
--- empty result is trustworthy: *if the search comes back empty, that is an
--- answer worth trusting*. A miss becomes a confident "I have no record of it".
---
--- pg_trgm IS THE HALF THAT NEEDS NO NEW VENDOR. Trigram matching catches the
--- rephrasings, the typos and the half-remembered quotes that stemming cannot,
--- and it does it inside Postgres — no embedding provider, no second AI key, no
--- per-write cost, and nothing to backfill. It is not semantic search and this
--- file does not claim it is; it is the reach that was missing, bought with an
--- extension that ships with the database.
---
--- word_similarity RATHER THAN similarity, AND THE DIFFERENCE IS TOTAL HERE.
--- `similarity()` normalises over the union of both trigram sets, so a six-word
--- question against a fourteen-hundred-character briefing scores near zero
--- however well it matches — every long turn would be unreachable. word_similarity
--- scores the query against the BEST MATCHING EXTENT within the target, which is
--- exactly the shape of this problem: a short query, a long document.
+-- Trigram matching catches the typos and half-remembered quotes stemming
+-- cannot, inside Postgres. The search function itself is 007's: redefining it
+-- here would create an overload beside 007's and reopen it to the public keys.
 create extension if not exists pg_trgm;
 
 create index if not exists eugenia_notes_trgm
@@ -404,55 +213,22 @@ create index if not exists eugenia_notes_trgm
 create index if not exists eugenia_turns_trgm
   on public.eugenia_turns using gin (content gin_trgm_ops);
 
--- THE FUNCTION ITSELF LIVES IN 007, and the two indexes above are what this
--- file still owes it. 007 had to DROP the two-argument search to add the query
--- vector — `create or replace function` cannot change an argument list — so a
--- definition here would not replace 007's, it would sit beside it: a
--- two-argument call matches both and Postgres refuses it as ambiguous, and a
--- bare `create` carries `execute` to `anon` and `authenticated` from the
--- schema's default privileges, which is a public entry point to her memory.
--- This file is meant to be applied again as it grows, so anything it recreates
--- has to be something 007 has not since taken over.
-
--- ─── The trade she finds out about in two minutes ──────────────────────────
--- THE SECOND HALF OF THE EVENT SPINE, AND THE ONE WITH A LIVE FEED ALREADY.
---
--- doji-mcp-sync writes a position within two minutes of it opening. Nothing
--- told her — so a trade taken at 10:47 reached her the next morning as one row
--- inside a week of JSON, by which time there is nothing useful left to say.
---
--- SHE STILL GIVES NO VERDICT, and this trigger does not change that. What it
--- buys is the one thing that is both factual and his: a high-impact print
--- pending against a position that is actually open. R-14 and R-19 are HIS rules
--- about exactly that situation, and naming the rule at the moment it applies is
--- citation, not advice. The function stays silent when there is nothing pending,
--- which on most days is the answer.
---
--- pg_net, THE CRON SECRET, AND NO DATABASE POWER — the same shape as the two
--- jobs in 004_cron.sql and Gladys's trigger, read from Vault at call time rather
--- than written into the trigger body. The lower-case Vault spelling is not
--- optional: Postgres compares it case-sensitively, a miss yields null, and
--- Gladys's trigger shipped once reading the upper-case name and went quiet
--- without failing anything.
+-- ─── A position opened or closed ───────────────────────────────────────────
+-- Tells her within two minutes of the poller seeing it. What she may say is his
+-- own rules read back — R-14/R-19 on a print pending against an open position,
+-- R-11 on a close that took the day past its limit — and the function decides
+-- from data before any model call, so the common case costs nothing.
 create or replace function public.trades_eugenia_on_event()
 returns trigger
 language plpgsql
 security definer
-/* EMPTIED, AND EVERY NAME BELOW QUALIFIED, for the reason 002 states about the
-   other security definer trigger on this same table: running as the owner is
-   what makes vault.decrypted_secrets readable, and a search_path that still
-   names a schema someone else can create in is a name this function might
-   resolve somewhere it did not mean to. Two functions with the same privileges
-   on the same table, and only one of them was hardened. */
+-- Emptied and every name qualified, for 002's reason.
 set search_path = ''
 as $$
 declare
   kind text;
   req  bigint;
 begin
-  -- OPENED is an insert the poller made; CLOSED is fill_time arriving. Both are
-  -- facts about the broker's side, and neither can be produced by the app or by
-  -- Gladys, whose writes only ever touch the four journal columns.
   if tg_op = 'INSERT' then
     kind := 'opened';
   else
@@ -466,19 +242,10 @@ begin
                  'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
                                   where name = 'doji_cron_secret')),
     body    := jsonb_build_object('trade', new.id, 'event', kind),
-    -- Longer than the poller's 20s because this may run a model call, shorter
-    -- than the hourly job's 300s because it never runs a briefing. pg_net is
-    -- fire-and-forget either way; the bound only has to outlast the work.
     timeout_milliseconds := 60000
   );
 
-  /* THE LEDGER MUST NOT BE ABLE TO BREAK THE TRIGGER. This fires inside the
-     UPDATE that set the column off, so anything raised here takes the write
-     with it — a tap answering a journal question would fail because a monitor
-     could not record that a message had been sent. That is the trade 008 makes
-     for the same reason and in the same words: a monitor that can fail the work
-     it monitors is worse than none. The message has already been dispatched by
-     the line above; what is at risk is only knowing whether it arrived. */
+  -- Behind its own handler, for 002's reason: this runs inside the write.
   begin
     insert into public.dispatch (id, job) values (req, 'trade-event');
   exception when others then null;
@@ -490,20 +257,16 @@ $$;
 drop trigger if exists trades_eugenia_opened on public.trades;
 drop trigger if exists trades_eugenia_closed on public.trades;
 
--- BROKER ROWS ONLY, AND NEVER A SOFT-DELETED ONE. Pre-sync rows carry client
--- ids and would fire on any historical backfill.
+-- Broker rows only, never a soft-deleted one.
 create trigger trades_eugenia_opened
   after insert on public.trades
   for each row
   when (new.id like 'PID%' and new.deleted = false and new.fill_time is null)
   execute function public.trades_eugenia_on_event();
 
--- `is distinct from`, NEVER `<>`, and this is the same three-state trap
--- trades_telegram_on_answer already documents: fill_time is null on every open
--- position, and `old.fill_time <> new.fill_time` is NULL rather than true on the
--- transition that matters — so the one event this trigger exists for would be
--- the one it never fired on. The poller re-upserts every position in its window
--- every two minutes, so without this clause it would fire on every tick forever.
+-- On the transition only: the poller re-upserts every two minutes and would
+-- fire it on every tick otherwise. `is distinct from`, since `<>` is null
+-- against the null it is moving away from.
 create trigger trades_eugenia_closed
   after update on public.trades
   for each row
@@ -511,44 +274,24 @@ create trigger trades_eugenia_closed
         and old.fill_time is null and new.fill_time is distinct from null)
   execute function public.trades_eugenia_on_event();
 
--- ═══════════════════════════════════════════════════════════════════════════
--- THE MARK SHE MEASURES A MOVE FROM
--- ───────────────────────────────────────────────────────────────────────────
--- The senses above are both events: a print she filed lands, a position opens.
--- Price itself is neither — it is a level that is always there, and "gold moved"
--- is only a fact against a previous reading. This row is that reading.
---
--- ONE ROW, REWRITTEN EVERY QUARTER HOUR, which is what makes the question
--- answerable in one read: `bid` is where gold was at the last look and `at` is
--- when, so the move is a subtraction and the window is the gap between runs
--- rather than a number anyone has to choose.
---
--- `looked_at` IS A SEPARATE COLUMN BECAUSE IT ANSWERS A DIFFERENT QUESTION.
--- The mark advances on every run; `looked_at` advances only when a move was
--- worth waking her for, and it is what keeps a market that trends all afternoon
--- from producing a message every fifteen minutes about the same story.
---
--- Stamped BEFORE the look, exactly as eugenia_calendar.looked_at is: a look that
--- generates and then fails to write would otherwise re-fire on the next run,
--- each one a billed model call.
+-- ─── The mark a move is measured from ──────────────────────────────────────
+-- One row, rewritten every quarter hour: `bid` and `at` are the last reading,
+-- so a move is a subtraction. `looked_at` moves only when a move was worth
+-- waking her for, which keeps a trending afternoon to one message; it is
+-- stamped before the look, for the calendar's reason.
 create table if not exists public.eugenia_price (
   id        text primary key
     constraint eugenia_price_singleton check (id = 'current'),
 
-  -- Display price, two decimals — the poller folds pipettes out of the quote
-  -- before she ever sees it, and this stores what she was shown.
+  -- A display price; the poller converts out of pipettes before she sees it.
   bid       numeric not null,
   at        timestamptz not null default now(),
 
-  -- Null until the first move worth a message. Nothing seeds it, because "she
-  -- has never spoken about a move" is a true thing to say on day one.
   looked_at timestamptz
 );
 
--- Seeded like eugenia_thesis, so the first run has a row to PATCH rather than a
--- missing-row branch that exists for one moment in the life of the database. A
--- zero mark cannot be mistaken for a price: the first look reads it, finds the
--- move absurd against the floor it is measured in, and writes the real one.
+-- Seeded so the first run has a row to PATCH. A zero mark cannot be mistaken
+-- for a price: the first look rejects it and writes the real one.
 insert into public.eugenia_price (id, bid, at)
   values ('current', 0, now())
   on conflict (id) do nothing;
@@ -556,21 +299,10 @@ insert into public.eugenia_price (id, bid, at)
 alter table public.eugenia_price enable row level security;
 
 -- ─── What the app may see ──────────────────────────────────────────────────
--- THE ONE PLACE HER WORK AND THE DASHBOARD MEET, AND IT IS DELIBERATELY NARROW.
---
--- index.html and doji-eugenia have shared a database and nothing else: everything
--- she knows has lived in a Telegram thread. Three things are worth putting on
--- the screen he already opens every morning — what lands today, what the story
--- is, and what is still open — and none of them is private to her.
---
--- NOT eugenia_notes AND NOT eugenia_turns, which stay denied to the publishable
--- key exactly as 003 left them. Her notes are her working memory and his audit
--- of them is /notes, in her own thread, where an answer can be asked about.
---
--- A POLICY RATHER THAN A GRANT-ONLY VIEW. These three tables are single-user and
--- hold no user_id — there is nothing to scope a policy BY — so `using (true)`
--- for authenticated is the honest statement of what is true, rather than a
--- security_invoker view standing in front of tables that deny everyone.
+-- The three tables the dashboard card draws: the calendar, the story, the open
+-- threads. Never her notes or turns, which stay denied to the publishable key.
+-- They hold no user_id, so `using (true)` for a signed-in session is the honest
+-- policy; the grants below keep the verb to SELECT.
 do $$
 begin
   if not exists (select 1 from pg_policies
@@ -593,9 +325,6 @@ begin
   end if;
 end $$;
 
--- SELECT ONLY, AND SAID RATHER THAN ASSUMED. The policies above decide the rows;
--- these grants decide the verbs. The app has no business writing any of this —
--- every one of these tables has exactly one writer, and she is an Edge Function.
 grant select on public.eugenia_calendar to authenticated;
 grant select on public.eugenia_thesis to authenticated;
 grant select on public.eugenia_loops to authenticated;
