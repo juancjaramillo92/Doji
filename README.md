@@ -2834,6 +2834,14 @@ look an hour later arrive identically. What is stored is his words behind a
 marker carrying her message's opening, so the nightly pass can tell what a
 correction was about.
 
+**The briefing is found looking back, because it is the one message stored
+before it is sent.** Its marker goes down first and the speaking worker sends it
+seconds to minutes later, so looking forward from the voice note — right for
+every other message — found nothing under the briefing, every time. When the
+forward look is empty, the newest two rows across the speaking worker's budget
+are taken only if they are a briefing and its marker, sharing one instant;
+anything else there gets no quote rather than a wrong one.
+
 `notesBlock()` is therefore load-bearing on **all seven paths**, and its absence
 would be silent: drop it from one and she carries on ignoring an instruction he
 believes she took. A test asserts that the briefing, the pulse, a reply, the

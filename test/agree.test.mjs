@@ -7139,3 +7139,24 @@ test('every run row records the model that answered it', () => {
       'column reads null for ever and the question it exists for is still unanswerable');
   }
 });
+
+/* ─── A swipe-reply, looked up the way each message was stored ───────────────
+   Every message but the briefing is stored after it is sent, so its turn is the
+   first one after the voice note; the briefing is stored before, so its turn is
+   behind it. Both lookups are pure and driven in fold.test.mjs — and the pure
+   half passing proves nothing about the call, which is what this reads: the
+   backward look reached only when the forward one finds nothing, since asked
+   first it names the briefing under a reply to the answer that followed it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('a swipe-reply looks forward first and back for the briefing only after', () => {
+  const at = EUGENIA_TS.indexOf('async function handleMessage(');
+  assert.ok(at > -1, 'doji-eugenia no longer has handleMessage()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
+  const forward = body.indexOf('repliedQuery(replied.date)');
+  const back = body.search(/turn\?\.content \?\? spokenBriefing\(await readRows[\s\S]{0,120}spokenQuery\(replied\.date\)/);
+  assert.ok(forward > -1, 'a reply to a voice note no longer looks for the message it answers');
+  assert.ok(back > forward,
+    'a reply to the briefing looks only forward from the voice note, and the ' +
+    'briefing is the one message stored before it is sent — so it is never found');
+});

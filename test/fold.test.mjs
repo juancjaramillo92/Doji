@@ -43,7 +43,8 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
-  notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, ask,
+  notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
+  spokenBriefing, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
@@ -1964,7 +1965,7 @@ test('the window starts exactly the stated number of hours back', () => {
    exactly as well as the right one.
    ───────────────────────────────────────────────────────────────────────── */
 
-const pickTurn = (query, rows) => {
+const pickRows = (query, rows) => {
   const params = new URLSearchParams(query.split('?')[1]);
   const [col, dir] = params.get('order').split('.');
   const kept = rows.filter(r => params.getAll('role').every(v => v === `eq.${r.role}`) &&
@@ -1973,8 +1974,9 @@ const pickTurn = (query, rows) => {
       return op === 'gte' ? r.created_at >= bound : op === 'lte' ? r.created_at <= bound : false;
     }));
   kept.sort((a, b) => (a[col] < b[col] ? -1 : 1) * (dir === 'desc' ? -1 : 1));
-  return kept.slice(0, Number(params.get('limit'))).map(r => r.content);
+  return kept.slice(0, Number(params.get('limit')));
 };
+const pickTurn = (query, rows) => pickRows(query, rows).map(r => r.content);
 
 test('a reply is matched to the message it answers, not to what she said since', () => {
   const sent = Date.UTC(2026, 8, 25, 14, 0, 0) / 1000;
@@ -1990,6 +1992,37 @@ test('a reply is matched to the message it answers, not to what she said since',
   assert.deepEqual(pickTurn(repliedQuery(sent), rows), ['the pulse']);
   // A message that was never stored finds nothing, rather than a turn from later.
   assert.deepEqual(pickTurn(repliedQuery(sent - 3600), rows), []);
+});
+
+test('a reply to the briefing finds it, though it was stored before it was sent', () => {
+  /* THE ONE MESSAGE STORED FIRST. The marker and the text go down together
+     before the speaking worker sends anything, so the voice note he swipes is
+     dated after the row it carries — and looking forward from it found nothing
+     on every briefing. */
+  const sent = Date.UTC(2026, 9, 2, 12, 3, 0) / 1000;
+  const iso = (s) => new Date((sent + s) * 1000).toISOString();
+  const briefing = [
+    { id: 1, role: 'assistant', content: 'last night',          created_at: iso(-36000) },
+    { id: 2, role: 'user',      content: '[weekday briefing]',  created_at: iso(-40) },
+    { id: 3, role: 'assistant', content: 'the briefing',        created_at: iso(-40) },
+  ];
+  assert.deepEqual(pickTurn(repliedQuery(sent), briefing), []);
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), briefing)), 'the briefing');
+
+  // Anything else in the window is a message he is not replying to: a turn
+  // stored without being sent, or one stored between the briefing and the note.
+  const unsent = [...briefing.slice(0, 1),
+    { id: 2, role: 'user',      content: 'what about silver', created_at: iso(-30) },
+    { id: 3, role: 'assistant', content: 'never reached him',  created_at: iso(-30) }];
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), unsent)), null);
+  const between = [...briefing,
+    { id: 4, role: 'user',      content: 'and silver?',        created_at: iso(-10) },
+    { id: 5, role: 'assistant', content: 'silver is quiet',    created_at: iso(-10) }];
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), between)), null);
+  // Paired by the instant the INSERT gave both, never by adjacent ids alone.
+  const unpaired = [briefing[0], briefing[1],
+    { id: 3, role: 'assistant', content: 'another turn', created_at: iso(-35) }];
+  assert.equal(spokenBriefing(pickRows(spokenQuery(sent), unpaired)), null);
 });
 
 

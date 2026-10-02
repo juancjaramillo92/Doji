@@ -2303,16 +2303,44 @@ async function recent(): Promise<Turn[]> {
    he replied to, but a voice note carries no text, and her history dates a turn
    by the day alone — so "too dense" under the 10:00 pulse and under the release
    look an hour later read identically, and the second may already be outside
-   the twelve turns. Every caller stores after it sends, so the turn is the
-   EARLIEST assistant row at or after the send; the newest would be whatever she
-   said since, which is the one message it is certainly not. Five minutes covers
-   a briefing's several voice notes and bounds a message that was never stored.
-   Exported because it is the decision, the same reason dayQuery is. */
+   the twelve turns. Every caller but the briefing stores after it sends, so the
+   turn is the EARLIEST assistant row at or after the send; the newest would be
+   whatever she said since, which is the one message it is certainly not. Five
+   minutes covers a message's several voice notes and bounds one that was never
+   stored. Exported because it is the decision, the same reason dayQuery is. */
+const atSecond = (s: number) => new Date(s * 1000).toISOString();
+
 export function repliedQuery(sent: number): string {
-  const at = (s: number) => new Date(s * 1000).toISOString();
   return `eugenia_turns?select=content&role=eq.assistant` +
-         `&created_at=gte.${at(sent)}&created_at=lte.${at(sent + 300)}` +
+         `&created_at=gte.${atSecond(sent)}&created_at=lte.${atSecond(sent + 300)}` +
          `&order=created_at.asc&limit=1`;
+}
+
+/* AND THE BRIEFING IS THE ONE MESSAGE STORED BEFORE IT IS SENT, which is the
+   rule above failing for the message likeliest to be answered this way. Its
+   marker goes down first, for postBriefing's reason, and the speaking worker
+   sends it seconds to minutes later — so a swipe-reply to the briefing looked
+   forward from the voice note and found nothing, every time.
+
+   Asked only when that look finds nothing, and back across the speaking
+   worker's whole budget. The newest two rows there are taken only if they ARE
+   a briefing and its marker, paired by the instant they share as postSpeak
+   pairs them: anything else in that window is a message he is not replying
+   to, and no quote is the direction to fail in rather than a wrong one. Asked
+   first instead, it would name the briefing under a reply to the answer she
+   gave a minute after it. */
+export function spokenQuery(sent: number): string {
+  return `eugenia_turns?select=role,content,created_at` +
+         `&created_at=gte.${atSecond(sent - SPEAK_WORKER_MS / 1000 - 60)}` +
+         `&created_at=lte.${atSecond(sent)}&order=id.desc&limit=2`;
+}
+
+export function spokenBriefing(rows: (Turn & { created_at: string })[]): string | null {
+  const [text, marker] = rows;
+  return text?.role === 'assistant' && marker?.role === 'user' &&
+         marker.created_at === text.created_at &&
+         [briefingMarker('weekday'), briefingMarker('sunday')].includes(String(marker.content))
+    ? String(text.content) : null;
 }
 
 /* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
@@ -5295,7 +5323,9 @@ async function handleMessage(update: any): Promise<void> {
     const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
       : typeof replied.text === 'string' ? Promise.resolve(replied.text)
       : readRows<{ content: string }>('Replied-to', `${SB_URL}/rest/v1/${repliedQuery(replied.date)}`)
-          .then(([turn]) => turn?.content ?? "", () => "");
+          .then(async ([turn]) => turn?.content ?? spokenBriefing(await readRows<Turn & { created_at: string }>(
+            'Replied-to briefing', `${SB_URL}/rest/v1/${spokenQuery(replied.date)}`)) ?? "")
+          .catch(() => "");
 
     let answer: string;
     try {
