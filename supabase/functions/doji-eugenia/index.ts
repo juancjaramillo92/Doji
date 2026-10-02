@@ -2528,6 +2528,22 @@ const TTS_LIMIT = 4000;
    thing to suspect and the fallback is to ask for pace in TTS_STYLE instead. */
 const TTS_SPEED = 1.3;
 
+/* THE VOICE GETS A BUDGET, AND THE TEXT IS WHAT IS LEFT WHEN IT RUNS OUT. Every
+   request in speak() waited for as long as the vendor took, and on 2 October it
+   took longer than the worker had: the briefing was stored at 08:02:23, the
+   speech request never answered, and at 08:06:40 — four hundred seconds after
+   boot — the platform shut the worker down. A worker that is killed runs no
+   catch, so there was no fallback to text, no row, no apology, and no retry,
+   because the marker had already gone down. The one failure the fallback exists
+   for arrived in the only shape it could not see.
+
+   ONE BUDGET FOR THE WHOLE MESSAGE, NOT ONE PER REQUEST, because a long message
+   is several parts and a per-request limit multiplies by them. A hundred and
+   fifty seconds is the slowest speaking that ever landed — a Sunday at 155s,
+   storing included — and it leaves a briefing that took two and a half minutes
+   to write well inside the four hundred with the text still to send. */
+const SPEAK_MS = 150_000;
+
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
    answer he already has and no audio, which is a degraded reply rather than a
@@ -2543,7 +2559,7 @@ const TTS_SPEED = 1.3;
    request succeeds, Telegram accepts the file, and it arrives as an ATTACHMENT
    rather than a voice note, with no waveform and no speed control. Nothing
    errors; the feature just stops being the thing it was for. */
-async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
+async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Promise<boolean> {
   if (!TTS_KEY) return false;
 
   try {
@@ -2561,6 +2577,7 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
       }),
+      signal,
     });
     if (!spoken.ok) throw new Error(`speech HTTP ${spoken.status}`);
 
@@ -2575,7 +2592,7 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
     // what Telegram takes for reply_markup on sendVoice.
     if (keyboard) form.append("reply_markup", JSON.stringify(keyboard));
     const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
-      method: "POST", body: form,
+      method: "POST", body: form, signal,
     });
     const said = await sent.json();
     if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
@@ -2608,19 +2625,23 @@ async function speak(answer: string, keyboard?: unknown): Promise<boolean> {
    message she wrote is a different thing from a line the function printed. */
 // Exported for the one guarantee here that a source read cannot settle: that
 // there is no path on which he gets nothing. With no TTS key every `speak`
-// answers false, which is exactly the shape of a vendor that refused.
-export async function sayAloud(words: string, keyboard?: unknown): Promise<void> {
+// answers false, which is exactly the shape of a vendor that refused. The
+// budget is a parameter for the same reason — so a vendor that never answers
+// can be driven in a test without waiting out SPEAK_MS.
+export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK_MS): Promise<boolean> {
   const parts = chunk(words, TTS_LIMIT);
+  const signal = AbortSignal.timeout(budget);
   let heard = parts.length > 0;
   // Sequentially, because Telegram does not promise ordering across two sends —
   // chunk()'s own reason for the same shape in say(). The keyboard rides on the
   // last part and only the last, which is say()'s rule as well.
   for (const [i, part] of parts.entries()) {
-    if (!await speak(part, i === parts.length - 1 ? keyboard : undefined)) heard = false;
+    if (!await speak(part, i === parts.length - 1 ? keyboard : undefined, signal)) heard = false;
   }
   // ANY part missing, not all of them. A message he heard three quarters of is
   // one he cannot act on, and the text is cheap.
   if (!heard) await say(words, keyboard);
+  return heard;
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -4010,7 +4031,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   const stored = Date.now();
-  await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
+  const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
      written one row for the draft and one for the critic — what each of them
@@ -4030,7 +4051,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     caller: `${due} briefing delivered`, chars: brief.length,
     ms: spoken - opened, ok: true,
     detail: `stored in ${Math.round((stored - checked) / 1000)}s, `
-          + `spoken in ${Math.round((spoken - stored) / 1000)}s`,
+          + `${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - stored) / 1000)}s`,
   });
   return json({ ok: true, brief: due, chars: brief.length });
 }
