@@ -56,7 +56,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
-  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
+  sinceBriefing, breachesList, breachesBlock, postTradeEvent, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -6002,4 +6002,45 @@ test('a full calendar read says it stopped, and a short one says nothing', async
   };
   assert.match(await block(40), /The list stops at 40 entries/);
   assert.doesNotMatch(await block(39), /stops at/);
+});
+
+/* ─── A position opened and closed inside one poll ───────────────────────────
+   The open trigger fires on an insert with no fill_time, and a scalp under two
+   minutes is inserted already carrying its exit price — so the "opened" event
+   arrives about a trade that is over. Driven through the real handler, with a
+   print pending, because that is the only case in which it would have spoken.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('an opened event for a trade already closed says nothing and reads no calendar', async () => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  const row = (o) => ({ id: 'PID9', direction: 'BUY', entry_time: new Date().toISOString(),
+    fill_time: null, entry_price: 4000, exit_price: null, pnl: null, open_day: today,
+    setup: null, followed_rules: null, followed_sl: null, followed_tp: null, size_oz: 4,
+    net_pnl: null, planned_sl: null, planned_tp: null, best_price: null, ...o });
+  const pending = [{ id: 1, at: new Date(Date.now() + 3600_000).toISOString(), name: 'US CPI',
+    importance: 'high', consensus: '0.3%', prior: null, actual: null, note: null }];
+
+  const run = (trade) => {
+    const asked = [];
+    return withFetch(async (url) => {
+      asked.push(String(url));
+      if (String(url).includes('eugenia_trades')) return new Response(JSON.stringify([trade]), { status: 200 });
+      if (String(url).includes('eugenia_calendar')) return new Response(JSON.stringify(pending), { status: 200 });
+      // The model, answering with the silence the prompt allows.
+      if (String(url).includes('anthropic')) return new Response(JSON.stringify(
+        { content: [{ type: 'text', text: 'NOTHING' }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
+      return new Response('[]', { status: 200 });
+    }, async () => ({ said: await (await postTradeEvent('PID9', 'opened')).json(), asked }));
+  };
+
+  const closed = await run(row({ exit_price: 4001, pnl: 3.86 }));
+  assert.equal(closed.said.skipped, 'already closed',
+    'an opened event about a trade already out told him he had just opened it');
+  assert.ok(!closed.asked.some(u => u.includes('eugenia_calendar') || u.includes('anthropic')),
+    'a closed trade still read the calendar or called the model on its opened event');
+
+  // The other side: a position genuinely open, with a print pending, gets past
+  // the guard to the calendar — the guard must not swallow the case it sits in.
+  const open = await run(row());
+  assert.ok(open.asked.some(u => u.includes('eugenia_calendar')),
+    'an open position with a print pending never reached the calendar');
 });

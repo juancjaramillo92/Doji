@@ -4743,7 +4743,10 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
     `&order=at.asc&limit=5`);
 }
 
-async function postTradeEvent(id: string, event: string): Promise<Response> {
+/* Exported so the sequence — read the row, guard, decide — is driven rather
+   than read; every guard here returns before a model call, and a guard that
+   stopped returning reads exactly like one that was never needed. */
+export async function postTradeEvent(id: string, event: string): Promise<Response> {
   const [row] = await readRows<TradeRow>('Trade',
     `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
   // Soft-deleted, or not through the view. Nothing to say and nothing wrong.
@@ -4774,6 +4777,15 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
   let situation: string;
 
   if (event === 'opened') {
+    /* OPENED AND ALREADY CLOSED, which the trigger cannot tell apart. It fires
+       on an insert with no fill_time, and a position opened and closed inside
+       one two-minute poll is inserted with its exit price set and its close
+       instant written a moment later — so this event arrives about a position
+       that no longer exists, and the message it would send opens "he has just
+       opened" with his own R-14 cited against a trade he is out of. The close
+       event that follows is the one that is true. `isOpen` is the same two
+       witnesses the desk reads. */
+    if (!isOpen(row)) return json({ ok: true, trade: id, skipped: "already closed" });
     const ahead = await aheadToday();
     if (!ahead.length) return json({ ok: true, trade: id, said: "nothing pending" });
     situation =

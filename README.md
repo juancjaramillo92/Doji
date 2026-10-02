@@ -2381,6 +2381,14 @@ this morning is filed under yesterday and is skipped with them, which is correct
 R-11 forbids an entry *later* than the breaching loss, and a day that is over can
 have no later entry.
 
+**And "opened" is checked against the row, because the trigger cannot tell.** It
+fires on an insert with no `fill_time`, and a position opened and closed inside
+one two-minute poll is inserted already carrying its exit price, with the close
+instant stamped a moment later. That event arrived about a trade that was over,
+and with a print pending she would have cited R-14 at a position he was out of.
+The opened branch returns unless `isOpen` reads the row as open; the closed
+event that follows is the true one.
+
 **And a move a print explains is not this sense's to report.** The spine is
 already looking at anything high-impact that landed, so a jump at 08:30 on
 payrolls would otherwise reach him twice in ten minutes saying the same thing.
