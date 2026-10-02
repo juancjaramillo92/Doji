@@ -1,51 +1,27 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // THE STRATEGY — his rules, as they stand
 // ───────────────────────────────────────────────────────────────────────────
-// The fourth thing she remembers, and the only one she cannot write. Turns are
-// a window, notes are what she noticed, the archive is searchable — and this is
-// what he has DECIDED, which none of those can be.
+// What he has DECIDED, and the one memory she cannot write. A module rather
+// than a markdown file, because an import is what guarantees it travels with
+// the function. Markdown inside a template literal, so every backtick in it is
+// escaped.
 //
-// A TS module rather than a markdown file, for the reason prompt.ts is one: a
-// function is deployed as its own directory and an import is the one way to be
-// certain a file travels with it. It is markdown inside a template literal, so
-// EVERY BACKTICK IS ESCAPED — a new one written plainly ends the string, and the
-// failure is a build error rather than anything subtle.
+// Two exports, per the document's own retrieval contract: ALWAYS — the summary
+// and the rules table — rides on the cached system prefix, and SECTIONS is what
+// get_strategy serves. All of it on every message would be near a hundred
+// thousand characters.
 //
-// TWO EXPORTS, BECAUSE THE DOCUMENT ASKS FOR TWO. Its own retrieval contract
-// says the summary and the rules table are always in context and everything else
-// is fetched when a conversation needs it. ALWAYS rides on the cached system
-// prefix, so it is paid once rather than per turn; SECTIONS is what get_strategy
-// serves. Loading all of it instead would be close to a hundred thousand
-// characters against every message, competing with the briefing for attention.
-//
-// THE SUMMARY IS WRITTEN ONCE, IN SUMMARY, AND INTERPOLATED INTO BOTH. It used
-// to be typed out twice — in ALWAYS and again in SECTIONS["0"] — which is two
-// hand-maintained copies of the one paragraph she carries on every single turn.
-//
-// §2 AND §3 ARE NOT HIS DECISIONS. Everything else here is what he trades and how
-// he judges it. §3 is the foundation — what inflation is, what the Fed does, how
-// a bond yield works — written to TEACH, bottom-up, assuming nothing. §2 is the
-// five channels, written to be LOOKED UP on a briefing day. Both are researched
-// reference material and both say so where they start. They must use the SPOKEN
-// channel names from prompt.ts, never the database ids.
-//
-// SECTIONS 1 AND 11 DO NOT EXIST AND ARE NOT CITED. A numbering that skips reads
-// as a decision; six holes read as an unfinished document.
+// §2 and §3 are researched reference rather than his decisions, labelled where
+// they start, and use the SPOKEN channel names from prompt.ts. Sections 1 and
+// 11 do not exist and nothing cites them.
 // ═══════════════════════════════════════════════════════════════════════════
-
-/* THE ONE THING THIS FILE TAKES FROM HERS. The pitch table is an instruction to
-   HER about how to talk, so it lives in prompt.ts beside the ladder it acts on
-   and beside the cached prefix that has to carry it — and §0 interpolates the
-   same constant rather than restating it, the way ALWAYS and §0 already share
-   SUMMARY. It was written out twice here and there before, and only this copy
-   was ever reachable: §0 below its summary is get_strategy-only. */
+/* The pitch table is an instruction to HER, so it lives in prompt.ts and §0
+   interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
 export const VERSION = "v1.21";
 
-/* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
-   paragraph she holds on every turn and the paragraph get_strategy serves are
-   the same characters and cannot disagree. */
+/* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
 opened for. Two setups, told apart by method: **Break & Retest trades the
 continuation** through an interior level that has broken and flipped, **Support &
