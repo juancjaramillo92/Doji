@@ -17,7 +17,7 @@
 -- ONE STATEMENT, AND THAT IS THE POINT RATHER THAN A TIDINESS. Ten listings
 -- used to sit below this one, and a SQL editor shows the result of the LAST
 -- statement only — so running this file top to bottom displayed the last ten
--- HTTP responses and threw away all 85 checks above them, silently, leaving a
+-- HTTP responses and threw away all 86 checks above them, silently, leaving a
 -- paragraph at the bottom to explain to someone who had already lost their
 -- result how to go back and select the block by hand. A check that awkward to
 -- run is a check that stops being run. The listings are `diagnose.sql` now, and
@@ -638,6 +638,12 @@ from (values
    '1'),
   -- 020. Without it every filing names a column that is not there and the
   -- calendar stops moving — a failed `calendar` run and nothing else.
+  -- 021. Present, one TradingView row named like one she typed long ago is
+  -- refused with its whole filing batch, every quarter hour.
+  ('the calendar has no key by name',
+   (select count(*)::text from pg_constraint
+     where conname = 'eugenia_calendar_unique'),
+   '0'),
   ('eugenia_calendar has its series ticker',
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_calendar'

@@ -200,12 +200,9 @@ create table if not exists public.eugenia_calendar (
   -- prints, so the same row has two ages -- and when duplicates under different
   -- names disagreed about what a number printed at, `created_at` said only when
   -- each was first seen. A table built to compound has to be adjudicable.
-  updated_at timestamptz not null default now(),
-
-  -- One row per release per moment, from the days she typed the calendar in.
-  -- 018's tv_id is the key a filing upserts on now; this still stands over the
-  -- rows she filed by name.
-  constraint eugenia_calendar_unique unique (at, name)
+  -- One release, one row, is 018's tv_id. The (at, name) key this carried from
+  -- the days she typed the calendar in is 021's to drop.
+  updated_at timestamptz not null default now()
 );
 
 -- The column above has a default for the INSERT; this is what moves it when an

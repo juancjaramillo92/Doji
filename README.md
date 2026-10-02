@@ -76,6 +76,7 @@ supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
 supabase/018_calendar_tradingview.sql   her calendar keyed by TradingView's id
 supabase/019_calendar_weeks.sql         the weeks R-14 can judge; Forex Factory dropped
 supabase/020_calendar_ticker.sql        which series a release belongs to
+supabase/021_calendar_name_key.sql      the calendar's old key by name, dropped
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -3947,6 +3948,15 @@ walks. So walk it from a year back, `?history=` with a date twelve months ago,
 and the release look has a year of each series behind it from the next print
 on.
 
+### Applying 021, which drops the calendar's key by name
+
+`021_calendar_name_key.sql` drops `eugenia_calendar_unique`, the `(at, name)`
+key 005 carried from the days she typed the calendar in. **Safe to re-run.**
+Since 018 one release is one row by TradingView's id, and nothing writes by name.
+The old key could only refuse. A filing goes up as one bulk insert, so one row
+colliding with a name she typed long ago would be refused with every row beside
+it. That would recur every quarter hour, and the calendar would stop moving.
+
 ### Programmatic tool calls need their container
 
 `web_search_20260209` does dynamic filtering, and **that runs code execution on
@@ -4529,7 +4539,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `020_calendar_ticker.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `021_calendar_name_key.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4849,8 +4859,9 @@ been wrong once, reporting a correct database as broken.
     and connect TradingView — see **TradingView** — then
     `supabase/018_calendar_tradingview.sql`, `supabase/019_calendar_weeks.sql` and
     `supabase/020_calendar_ticker.sql`, and walk the history door once from a
-    year back — see **Applying 019** and **Applying 020**.
-16. Run `supabase/verify.sql` and read it against 001–020. Nothing is set up
+    year back — see **Applying 019** and **Applying 020**. Then
+    `supabase/021_calendar_name_key.sql`, safe to re-run.
+16. Run `supabase/verify.sql` and read it against 001–021. Nothing is set up
     until that agrees.
 
 ---
