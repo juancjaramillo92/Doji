@@ -2527,29 +2527,13 @@ async function readDesk(day: string): Promise<TradeRow[]> {
     `&order=entry_time.desc&limit=50`);
 }
 
-/* THE MARK CARRIES ITS AGE AND NO UNREALISED FIGURE IS COMPUTED, which is one
-   decision rather than two. eugenia_price is rewritten quarter-hourly, so the
-   nearest price she holds can be fifteen minutes old — and an unrealised P&L
-   would be both the most anchoring number in this block and the one that
-   staleness gets most wrong. Entry and mark, each labelled as what it is, let
-   her do the subtraction when he asks and leave nothing pre-computed to lean on
-   when he does not.
-
-   A NULL FIELD IS SAID RATHER THAN PRINTED. Every column here is nullable and a
-   journal row he opened by hand carries almost none of them, so an unguarded
-   template puts `from null` in front of her — which reads as a price.
-
-   AND AN ENTRY FROM ANOTHER DAY SAYS WHICH DAY. This read an hour and a minute
-   and nothing else, so a position opened on Monday and still open on Wednesday
-   reached her as `open since 09:15 ET` — a clock time with no date against it,
-   in a block headed by what he has on RIGHT NOW. There is only one way to read
-   that and it is the wrong one. The summary calls his positions "intraday to
-   MULTI-SESSION" and R-15 bounds them at the Friday close rather than at
-   midnight, so a hold spanning days is a shape he trades rather than an edge
-   case — and the failure is a confident wrong fact about his own position,
-   which is the worst place in this block for one. Today stays bare, because
-   naming the date on every intraday fill would bury the one line where it
-   matters. */
+/* The mark carries its age, and no unrealised P&L is computed: the price can be
+   fifteen minutes old, and that figure would be the most anchoring number here
+   and the one staleness gets most wrong. Entry and mark, labelled; she
+   subtracts if asked. A null field is said, never printed — `from null` reads
+   as a price. An entry from another day names the day: his holds run
+   multi-session, and `open since 09:15 ET` on Wednesday for a Monday fill is a
+   confident wrong fact about his own position. Today stays bare. */
 export function positionsList(
   open: TradeRow[], standing: Standing | null, mark: Mark | null, now = Date.now(),
 ): string {
@@ -2563,11 +2547,8 @@ export function positionsList(
     const what = [t.direction, t.size_oz != null ? `${t.size_oz}oz` : null]
       .filter(Boolean).join(" ") || "side and size not recorded";
     const from = t.entry_price != null ? ` from ${t.entry_price}` : "";
-    /* WHICHEVER SIDES WERE SEEN, AND NEVER AN ABSENCE. The poller records each
-       column the first time it sees one, so a stop-only entry now carries its
-       stop — which requiring the pair used to throw away. A null is still not
-       "he set none": it is equally a position the poller never saw open, and
-       nothing here can tell those apart, so the missing half is not named. */
+    // Whichever sides were seen, and never the absence: a null is equally "he
+    // set none" and "never seen open".
     const seen = [
       t.planned_sl != null ? `stop ${t.planned_sl}` : null,
       t.planned_tp != null ? `target ${t.planned_tp}` : null,
@@ -2576,8 +2557,7 @@ export function positionsList(
     return `· ${since} — ${what}${from}${plan}`;
   });
 
-  // Only beside a position: the mark is what she would subtract the entry from,
-  // and on a flat day it is a price with nothing to be a price OF.
+  // Only beside a position; on a flat day it is a price of nothing.
   if (lines.length && mark) {
     lines.push(`· gold was ${mark.bid} ` +
                `${Math.round((now - Date.parse(mark.at)) / 60_000)} minutes ago`);
@@ -2595,41 +2575,19 @@ export function positionsList(
     : "";
 }
 
-/* THE MARK IS CAUGHT SEPARATELY, and that is the point of catching it at all: a
-   price she cannot read costs one line, where the outer catch would cost her the
-   position itself. Read only when something is open, which on most days is not
-   at all. */
-/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` is written by the
-   email and by the poller's writeFill — and the poller stamps only the closes
-   its fold window reaches, so a close older than that with no alert behind it
-   carries an `exit_price` and a null `fill_time` for good. What the poller
-   records on every close is `exit_price`, off the broker's own deals.
-
-   Read off `fill_time` alone, a position that closed without an alert email
-   landing — a manual close, R-15's Friday close-out, a parse that failed —
-   kept reading as open, and this block told him he was in a trade for ever.
-   It did it while citing R-19 and R-15 at him about a position that had not
-   existed since Wednesday, which is the worst thing this block can do: it is the
-   one place she speaks with his own rules behind her.
-
-   Closed on EITHER witness, therefore. Two independent sources see the close and
-   either one is enough — the same shape as `balance` and `direction`, the two
-   columns this schema already arbitrates. A row the poller folded without its
-   entry deal carries a null `exit_price` on a closed trade, and the email
-   catches that one; a close with no email is caught by the poller. Only a row
-   neither has closed is open.
-
-   AND BROKER ROWS ONLY. Pre-sync rows carry client ids, no entry_time and no
-   exit_price, so every one of them read as an open position — permanently, in
-   the same list. `dayStanding` has always filtered them and this never did.
-
-   Exported because it is the decision, and because the filter was the half no
-   test could reach: `positionsList` is pure and was driven from both sides for
-   its whole life, on rows a caller had already decided were open. It renders
-   what it is handed, correctly, and the mistake was upstream of it. */
+/* Open is BOTH witnesses null. fill_time comes from the email and from the
+   poller's writeFill, which stamps only closes its fold window reaches; what
+   the poller records on every close is exit_price. Read off fill_time alone, a
+   close with no alert stayed open for ever, and this block cited R-19 and R-15
+   at him about a position gone since Wednesday. Either witness closes it — the
+   shape balance and direction use. Broker rows only: pre-sync rows carry
+   neither column. Exported because the filter was the half no test reached;
+   positionsList renders correctly whatever it is handed. */
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
 
+// The mark is caught on its own, so a price she cannot read costs one line
+// rather than the position; read only when something is open.
 export async function positionsBlock(): Promise<string> {
   try {
     const day = nyDate(new Date());
@@ -2647,31 +2605,9 @@ export async function positionsBlock(): Promise<string> {
 
 /* ─── The cron half: the briefing, and the quieter second look ───────────── */
 
-// pg_net is fire-and-forget and never retries, so this half may take as long as
-// it takes — the timeout in the cron job only has to outlast the work. That is
-// the whole difference between this caller and Telegram's.
-//
-// The hourly job asks dueNow which of its schedules this hour owes, if any; the
-// two quarter-hourly senses and the person's repair doors each name theirs with
-// a flag. ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the
-// nightly pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
-// same two jobs: a manual re-run after a failure, and a way to exercise the path
-// without waiting for the hour. ?consolidate=1 is also the only way to SEE what
-// the nightly pass does, since it sends nothing and stores no turn.
-// The answer comes back in the response as well as in Telegram, which is what
-// makes a failure readable.
-/* WHAT THE APOLOGY IS ABOUT, and it used to be a lie four times out of five.
-
-   Every scheduled failure said "No briefing, jefe" — including a pulse, the
-   nightly pass, a release look and a trade event. So a consolidation that died
-   at 22:00 reported itself to him as a missing briefing, sending him to look
-   for the wrong thing at the wrong time of day; and the failure whose actual
-   symptom is that her memory stops growing was described as the one whose
-   symptom is a message that never arrived.
-
-   A map rather than a ternary chain, for the reason SAID is one: these are
-   words paired with the job names above them, and a reader should be able to
-   enumerate them. */
+/* The apology names the job. Every failure once said "No briefing", so a
+   nightly pass that died — whose symptom is a memory that stops growing — sent
+   him looking for a missing message. A map, so the words can be enumerated. */
 export const APOLOGY: Record<string, string> = {
   briefing:     "No briefing, jefe — something broke on my side.",
   pulse:        "My second look at the morning broke, jefe. Nothing is wrong with the briefing.",
@@ -2685,37 +2621,32 @@ export const APOLOGY: Record<string, string> = {
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
 
+/* The scheduled half. The hourly job asks dueNow what this hour owes; the
+   data-driven senses and the repair doors each name theirs with a flag.
+   ?force=1, ?pulse=1 and ?consolidate=1 run now whatever the clock says — a
+   re-run after a failure, and the only way to see the nightly pass, which
+   sends nothing. */
 async function postScheduled(url: URL): Promise<Response> {
-  // Named before the work so the catch can say which job died. Defaulted to the
-  // briefing because that is what an unlabelled failure most likely is, and
-  // because the old message is the right one for it.
+  // Named before the work so the catch can say which job died.
   let job = 'briefing';
   try {
     if (url.searchParams.get("pulse") === "1")       { job = 'pulse';       return await postPulse(); }
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
-    /* THE TWO DATA-DRIVEN SENSES, EACH BEHIND ITS OWN DOOR. Their cron jobs
-       call nothing else, which is also how either is exercised by hand without
-       waiting for a print or a move. They are deliberately not folded into
-       dueNow: it decides from the clock, and these decide from a table. */
+    // The data-driven senses, each behind its own door: decided by a table,
+    // not by the clock, so not in dueNow.
     if (url.searchParams.get("release") === "1")     { job = 'release';     return await postRelease(); }
     if (url.searchParams.get("move") === "1")        { job = 'move';        return await postMove(); }
 
-    /* THE BACKFILL, AND NO CRON JOB CALLS IT. The archive is filled in by hand
-       — call it until it answers `left: 0` — and the trickle a failed vendor
-       call leaves behind is swept by the nightly pass, which already runs and
-       already sees the day. A schedule of its own would be a job doing nothing
-       every hour for the one night a year it had something to do. */
+    // The backfill, called by hand until `left: 0`; the nightly pass sweeps
+    // the trickle a failed vendor call leaves.
     if (url.searchParams.get("embed") === "1")       { job = 'embed';       return await postEmbed(); }
 
-    /* THE CALENDAR'S HISTORY, AND NO CRON JOB CALLS IT EITHER. R-14 and R-19
-       can judge only weeks a whole-week fetch landed for, and the nightly pass
-       starts from the week it first runs in — so the weeks he has already
-       traded are walked once, by hand, from the date given. */
+    // The calendar's history, walked once by hand: R-14 and R-19 judge only
+    // weeks a whole-week fetch covered.
     const history = url.searchParams.get("history");
     if (history) { job = 'history'; return await postHistory(history); }
 
-    // The briefing's second half, opened by postBriefing and by a person
-    // re-sending a briefing that was stored and never reached him.
+    // The briefing's speaking worker, or a person re-sending a stored briefing.
     const speak = url.searchParams.get("speak");
     if (speak) { job = 'speak'; return await postSpeak(speak); }
 
@@ -2724,10 +2655,7 @@ async function postScheduled(url: URL): Promise<Response> {
       return await postBriefing(briefDue(now) ?? briefKind(now));
     }
 
-    // Which hours turn on this is dueNow's rule and is stated there once; a
-    // caller deciding when to bother asking would be the same rule again. Both
-    // reads are one row each and neither depends on the other, so they go
-    // together rather than one after the other.
+    // Which hours these matter in is dueNow's rule, stated there once.
     const [briefed, consolidated] = await Promise.all([briefedToday(), consolidatedToday()]);
     const due = dueNow(now, briefed, consolidated);
     if (due === 'pulse')       { job = 'pulse';       return await postPulse(); }
@@ -2740,34 +2668,16 @@ async function postScheduled(url: URL): Promise<Response> {
   }
 }
 
-/* HOW A JOB THAT DIED BEHIND A 200 SAYS SO, for both of the callers that answer
-   before they work: everything scheduled, and the trade event. The trade event
-   is the one message with no retry anywhere behind it, and it had `APOLOGY.trade`
-   written for it and no path that ever sent it — a read that failed before its
-   model call reached a console and nothing else, which is the absence this whole
-   function exists to end, on the one path it did not reach. */
+/* How a job that died behind a 200 says so — everything scheduled, and the
+   trade event, which has no retry behind it. pg_net discards the response and
+   nobody reads the console, so the message is how he finds out. */
 async function jobFailed(job: string, err: unknown): Promise<Response> {
   const why = err instanceof Error ? err.message : String(err);
   console.error("doji-eugenia:", why);
-  /* THE ONLY WAY HE FINDS OUT, and it took a missing briefing to earn this.
-
-     pg_net discards this response, the console is not somewhere anyone looks,
-     and net._http_response is pruned within hours — so a briefing that died
-     at 08:00 was invisible by lunchtime and the way it surfaced was him
-     noticing nothing had arrived. Silence is the worst thing this system can
-     do, and it had three separate ways of doing it.
-
-     AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
-     the half that can fail. ask() records a failed turn, so eugenia_runs
-     could answer "how often does a model call die" — and could say nothing at
-     all about a job that died BEFORE reaching one. Two consolidations died in
-     `turnsSince`, one line into postConsolidation, apologised to him twice and
-     left the table with no row on either night: read afterwards it showed a
-     system that had simply had nothing to do. The apology below is swallowed
-     on failure, deliberately, so a Telegram that is refusing takes the notice
-     with it and leaves nothing anywhere; this is what survives that. `job` is
-     the apology's own vocabulary rather than ask()'s labels, and suffixed so
-     the two can never be confused in a table read months later. */
+  /* The row first, because the message can fail and its catch swallows that:
+     a job that dies before its first model call otherwise leaves no row, and
+     the table reads as a system with nothing to do. `<job> job`, so it is never
+     confused with an ask() label. */
   await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
 
   await tg("sendMessage", {
@@ -2777,21 +2687,13 @@ async function jobFailed(job: string, err: unknown): Promise<Response> {
   return json({ ok: false, error: why, job }, 500);
 }
 
-/* What postBriefing stores instead of the text it sent. One definition, because
-   a retry that could not spot yesterday's shape would send a second briefing
-   every morning. */
+/* What postBriefing stores in place of the text: one definition, or a retry
+   misses yesterday's shape and sends a second briefing. */
 export const briefingMarker = (due: Brief) => `[${due} briefing]`;
 
-/* THE MARKER IS FOUND BY THE DATABASE, NOT BY SCANNING A WINDOW OF TURNS.
-
-   Reading the last thirty user turns and looking for it among them is right on
-   a quiet morning and wrong on a busy one: thirty messages between 08:00 and
-   09:00 push the marker out of that window, the retry concludes no briefing was
-   sent, and generates and sends a second one — a dozen searches at high effort
-   and a duplicate he did not ask for. Filtering on the marker itself is exact
-   whatever was said around it, and returns one row rather than thirty.
-
-   Exported because it is the decision, the same reason tradesQuery is. */
+/* Found by filtering on the marker, not by scanning recent turns: thirty
+   messages in an hour pushed it out of the window and the retry sent a second
+   briefing. Exported because it is the decision. */
 export function briefedQuery(): string {
   const markers = [briefingMarker('weekday'), briefingMarker('sunday')]
     .map(m => `"${encodeURIComponent(m)}"`).join(',');
@@ -2799,21 +2701,10 @@ export function briefedQuery(): string {
          `&order=id.desc&limit=1`;
 }
 
-/* Whether a briefing has already landed today, read off the marker
-   postBriefing stores in place of the sent text. It is written just BEFORE the
-   send, so it exists whenever a briefing was generated — which is the question
-   worth asking here, because the expensive half is the generation and a retry
-   that duplicates it is the failure this guards.
-
-   The day comparison is done HERE, in New York, rather than as a timestamp
-   filter in the query. A `created_at=gte.<date>T00:00:00-05:00` would be an
-   hour wrong for half the year, which is the same mistake briefDue and
-   marketOpen exist to avoid; asking Intl for the civil day of the row is
-   correct in both halves.
-
-   A read failure counts as "yes, already briefed": if the database is unwell
-   the retry cannot check, and sending a second briefing on a guess is worse
-   than skipping one. */
+/* Whether today's briefing was generated — the marker goes down just before
+   the send, and generation is the expensive half. The day is compared in New
+   York here, never as a timestamp filter an hour wrong half the year. A failed
+   read counts as yes: a second briefing on a guess is worse than none. */
 async function briefedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ created_at: string }>('Briefing marker',
@@ -2828,20 +2719,10 @@ async function briefedToday(): Promise<boolean> {
 
 
 /* ─── The feedback keyboard ────────────────────────────────────────────────
-   An instruction note is the only correction channel he has, and it is a good
-   one — but it fires only when something annoys him enough to type. On every
-   ordinary morning there is no signal at all, so the nightly pass judges her
-   own output with no evidence about how any of it landed.
-
-   Two taps is the cheapest real evidence there is, and the mechanism is already
-   proven in this system: Gladys has drawn an inline keyboard and answered its
-   taps since she shipped. `callback_data` stays far under the 64-byte cap for
-   the same reason hers does — it is the entire state a tap carries.
-
-   IT IS NOT A SCORE AND MUST NOT BECOME ONE. The pass reads it as one input
-   beside the day's turns; a bot optimising an average would start writing
-   briefings that flatter rather than teach, which is the failure the
-   prohibitions exist to prevent.
+   Two taps, the cheapest evidence of how a morning landed — an instruction
+   note fires only when something annoys him enough to type. Gladys's
+   mechanism; callback_data far under its 64 bytes. Never a score: a bot
+   optimising an average writes briefings that flatter rather than teach.
    ───────────────────────────────────────────────────────────────────────── */
 export const feedbackKeyboard = (day: string) => ({
   inline_keyboard: [[
@@ -2851,59 +2732,23 @@ export const feedbackKeyboard = (day: string) => ({
 });
 
 /* ─── The second read of the day's one expensive artifact ──────────────────
-   The briefing is researched and written in a single generation, and its
-   quality target lives in prose on the far side of a model call where no test
-   can hold it. That is not a theory about what might go wrong: unmeasured, the
-   briefing grew by a sixth and the way it surfaced was somebody counting the
-   characters by hand.
+   The briefing's quality rules live in prose past a model call, where no test
+   reaches — unmeasured, it grew by a sixth. So it is read once more against
+   them before sending.
 
-   So it is read once more before it is sent, against the rules it was written
-   to — the length, the first sentence being true only today, a term built at a
-   rung that no longer needs it, a chain missing a link. One extra round at
-   medium effort on one artifact a day.
+   The critic is handed his notes and the channel map: asked to enforce his
+   instructions and whether a term was already explained without them, it
+   skipped the first and answered the second from the paragraph in front of
+   it — cutting the build-up the writer had just been told to include. Both are
+   already awaited; agree.test.mjs holds the call site.
 
-   IT IS HANDED HIS NOTES AND THE MAP, AND IT WAS ASKED TO ENFORCE THEM WITHOUT
-   THEM. Its last check is whether the briefing obeys his standing instructions,
-   which are in notes it was never given, and its second was whether a term had
-   already been explained — a fact about last week that a reader of one message
-   cannot possibly hold. Both read as working rules and neither could fire: the
-   first was skipped, and the second was answered from the only evidence in the
-   room, which is the mechanism sitting in the paragraph being judged. So the
-   pass that runs LAST cut the build-up the writer had just been told to put in,
-   every morning, and what he read was the term bare — the exact failure the
-   ladder exists to prevent, arriving after the ladder had been obeyed.
-
-   Both blocks are already awaited in postBriefing, so this costs no read and no
-   round trip. `agree.test.mjs` holds the call site, because a critic missing
-   them still returns a briefing and the briefing still looks right.
-
-   IT CANNOT MAKE THINGS WORSE, AND THAT IS ENFORCED RATHER THAN TRUSTED. A
-   critic that returns nothing, returns an apology, or returns something twice
-   the length has failed, and the draft it was given is better than whatever it
-   did — so the draft goes out. Same direction as the pulse's `isSilent`: the
-   failure that costs a message is worse than the failure that sends the
-   original one. */
-/* RELATIVE, BECAUSE THE GATE NOW READS THREE-SENTENCE MESSAGES TOO. It was a
-   flat four hundred characters — a briefing that came back shorter than that
-   was an apology, and the draft went instead. Applied to a release look, which
-   is two or three sentences and often under four hundred to begin with, that
-   floor rejects almost every revision there is: the gate would run, be paid
-   for, and be overruled every time, and it would look exactly like a gate that
-   agreed with the draft.
-
-   A third is the same judgement made scale-free. On a briefing it is stricter
-   than the four hundred ever was; on a short message it still catches the
-   apology, which is the shape it exists for.
-
-   THE CEILING IS EACH GATE'S OWN, BECAUSE ONLY ONE OF THEM MAY ADD. The critic
-   puts back a missing link or a missing verdict, so a briefing can legitimately
-   grow; twice the draft is where that stops being an edit. `TRIM` checks how a
-   short message is written and is told to change nothing else, so it cuts and
-   swaps words and never builds. Twice was its ceiling too, and on 30 September
-   it returned 852 characters for a 541-character reply — its own notes on the
-   message ("this message looks fine as is…") above the message itself, sent to
-   him and stored as hers. Every other revision it made that fortnight sat
-   within a tenth of the draft. */
+   It cannot make things worse. keepDraft is relative — a third of the draft
+   catches the apology on a short message as well as a long one, where a flat
+   floor overruled every revision and looked like agreement. The ceiling is
+   each gate's own: the critic may add a missing link or verdict, so twice the
+   draft; TRIM only cuts and swaps, and once returned its own notes above the
+   message at 852 characters for 541.
+   ───────────────────────────────────────────────────────────────────────── */
 export const TRIM_MOST = 1.25;
 
 export function keepDraft(draft: string, revised: string, most = 2): boolean {
@@ -2916,33 +2761,14 @@ async function critique(draft: string, notes: string, channels: string, desk: st
   return await gate(draft, `${CRITIC}${notes}${channels}${desk}${story}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
 }
 
-/* THE SAME GATE ON THE MESSAGES THE CRITIC NEVER REACHED. `CRITIC` runs on the
-   briefing alone, so the pulse, the release look and the move look went out
-   unreviewed for their whole lives — which is most of what he receives in a
-   week, and it is where he was reading her and finding her hard. The rules were
-   live and global on those paths and nothing had to answer for them.
+/* The gate on the messages the critic never reached — most of what he gets in
+   a week. TRIM asks only the writing questions; the briefing's checks would
+   ruin three sentences, and it needs no notes or map. It is handed his
+   position and the story, since a read on price turns on the first and a
+   direction is checked against the second.
 
-   `TRIM` asks the writing questions and nothing else: the briefing's own checks
-   are about a chain, a first sentence true only today and a word count, and
-   asked of three sentences they would rewrite a good message into a bad one. It
-   is handed no notes and no channel map, because it is not judging whether a
-   term was built — only whether the sentences obey the rules she writes by.
-
-   IT IS HANDED WHAT HE HAS ON, AND THE STORY SHE HAS BEEN CARRYING. Her read
-   on price is allowed and a view while he is in a position is not, so the gate
-   cannot tell a compliant message from a breaking one without the block that
-   says which it is. And the story is what says which way things are going, the
-   one fact a gate checks rather than a way of writing. Every caller already
-   awaited both for the writer.
-
-   AND WHAT IT RETURNS IS WHAT GETS REMEMBERED, WHICH IS WHY THE THREE CALLERS
-   BIND IT. The draft is what `ask()` produced; the revision is what he read.
-   Storing the draft files a message he never saw as her own words, and hands it
-   back to her as history for the next six exchanges — the stale-copy failure
-   `remember` already refuses for the notes and the week's trades, arriving
-   through the door this gate opened. The briefing never had it: it stores what
-   `critique` returned. The three that GAINED a gate kept storing the draft for
-   as long as they had one. */
+   What it returns is what is remembered: storing the draft files words he
+   never read as hers, resent as history. The three callers bind it. */
 async function trim(draft: string, desk: string, story: string): Promise<string> {
   return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }
