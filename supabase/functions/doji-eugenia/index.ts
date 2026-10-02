@@ -2773,21 +2773,11 @@ async function trim(draft: string, desk: string, story: string): Promise<string>
   return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }
 
-/* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
-   makes a gate safe is the same for both and is the part that must never be
-   copied: a revision that fails `keepDraft` is overruled, and a gate that
-   THROWS costs nothing at all. Both were stated once and would have been stated
-   twice the moment a second gate existed.
-
-   AND WHAT IT DECIDED IS A ROW, BECAUSE IT WAS A CONSOLE LINE. The first days
-   with a gate on every path showed the paragraph rule broken in nearly every
-   message that passed through one — five, six, seven sentences where `WRITING`
-   says three or four — and nothing could say why. `ask` records that the gate
-   RAN; whether it then sent its revision, sent the draft back untouched, or
-   was overruled by `keepDraft` went to a log nobody reads. Those are three
-   different repairs, and a gate paid for on every message whose effect cannot
-   be seen is the cheap-half meter again. One verdict per gated message, on
-   every outcome including the one that threw, so the rows count the messages. */
+/* One body, because what makes a gate safe must never be copied: a revision
+   keepDraft refuses is overruled, and a gate that throws costs nothing. Every
+   outcome is a verdict row — revised, unchanged, overruled, or failed — since
+   whether a gate changed anything was a console line, and the paragraph rule
+   failed through every gate for days with nothing able to say why. */
 async function gate(draft: string, asked: string, label: string, most?: number): Promise<string> {
   const caller = `${label} verdict`;
   try {
@@ -2811,27 +2801,15 @@ async function gate(draft: string, asked: string, label: string, most?: number):
   }
 }
 
-/* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
-   eugenia_turns and never read back, so every morning started from nothing and
-   she could not know what she had said the day before, whether it landed, or
-   that she had already explained a term twice this week. Continuity is most of
-   what separates a person from a feed.
-
-   The stored user turn is a marker, not the sent text: the notes and the week's
-   trades are rebuilt fresh every morning, and storing them would resend a stale
-   copy as history for the next six briefings. */
+/* The briefing reads its own history, so a morning continues from the last
+   rather than starting from nothing. The stored user turn is a marker, not the
+   sent text, which is rebuilt every morning and would resend stale as history. */
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
-  /* Filed before the reads, so the calendar she is handed is this morning's —
-     and on a Sunday the whole week, which the nightly pass would otherwise file
-     five hours after the one briefing that is about it. The week holds every
-     row the rolling window would. */
+  // Filed before the reads, so she is handed this morning's calendar — and on a
+  // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
-  /* EVERY READ THE BRIEFING NEEDS, AT ONCE. They are independent and they are
-     all small, and run one after another they were a round trip each before the
-     first token was asked for. Promise.all is the same argument the tool
-     dispatch makes: a batch should cost its slowest member — which here is the
-     price, since that one leaves the project for the broker. */
+  // Every read at once: independent and small, so the batch costs its slowest.
   const [price, around, rates, crowd, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
     await Promise.all([
       marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", notesBlock(),
@@ -2842,44 +2820,30 @@ async function postBriefing(due: Brief): Promise<Response> {
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    // `health` first: if the journal stopped being written, everything after it
-    // is computed over rows that may be missing, and she is told to lead with it.
+    // `health` first: if the journal stopped, everything after it may be
+    // missing rows.
     + health + price + around + rates + crowd + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
   const brief = await critique(draft, notes, channels, desk, story);
 
-  /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT, and it matters more
-     now that the cap is off. The prompt holds the market half near nine hundred
-     characters and lets the teaching run — a figure that lives in prose, on the
-     far side of a model call, where no test can hold it. Unmeasured, the
-     briefing once grew by a sixth and the way it surfaced was someone counting
-     by hand. What this number can no longer tell you on its own is WHY it grew:
-     a briefing that built a term and one that padded look the same from here. */
+  // The length lives in prose past a model call, where nothing else sees it.
   console.log(`doji-eugenia: ${due} briefing — ${brief.length} characters`);
 
-  /* THE MARKER GOES DOWN BEFORE THE SEND, and the order is the whole point.
-     Written after, a remember() that fails leaves a briefing delivered, an
-     apology saying none arrived, and no marker — so 09:00, 10:00 and 11:00 each
-     generate and send another one. Four briefings and four times the bill, from
-     one failed insert.
-
-     Written first, the failure mode inverts: a send that fails after the marker
-     lands costs the retry rather than duplicating it, and he is told. Losing a
-     briefing is cheaper than sending four. */
+  /* The marker goes down before the send. After, a failed insert leaves a
+     delivered briefing unmarked and each retry sends another: four briefings
+     from one failure. Before, a failed send costs the retry instead, and he is
+     told. */
   const checked = Date.now();
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   const stored = Date.now();
 
-  /* HANDED TO A SECOND WORKER TO SPEAK, so the voice has a clock of its own —
-     see SPEAK_WORKER_MS. The door answers before it works, so a 2xx here says
-     the worker started and nothing about the voice; postSpeak writes the
-     delivered row once he has it. A worker that would not start — a refused
-     boot, a 546 — is what this checks for, and then the briefing is spoken
-     here, as it was before there were two: losing the second worker must
-     never be losing the briefing. */
+  /* Handed to a second worker to speak, on its own clock. A 2xx says only that
+     it started; postSpeak writes the delivered row. A worker that would not
+     start — a 546 — and the briefing is spoken here instead: losing the second
+     worker must never lose the briefing. */
   const handed = await fetch(`${SB_URL}/functions/v1/doji-eugenia?speak=${due}`, {
     method: "POST", headers: { "x-doji-key": CRON_SECRET },
   }).then(async res => { await res.body?.cancel(); return res.ok ? null : `HTTP ${res.status}`; },
@@ -2894,19 +2858,8 @@ async function postBriefing(due: Brief): Promise<Response> {
 
   const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
 
-  /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
-     written one row for the draft and one for the critic — what each of them
-     cost, which is the question a bill asks. This one says what he actually
-     received and how long the whole thing took, which is the question a reader
-     asks. Keeping them apart is what makes "the critic is costing more than it
-     is worth" and "the briefing is drifting long again" two separate answerable
-     questions rather than one blurred figure.
-
-     AND WHAT CAME AFTER THE CRITIC IS SPLIT, because it was the one stretch no
-     row could see. Both model calls have rows of their own; storing the turn
-     embeds it, and speaking it is a vendor call and an upload per part — so
-     the Sunday that took 315s had 155s between the critic's row and this one,
-     where Monday's took 20, with nothing to say which half it was. */
+  // The artifact's row, apart from the two calls': what he received and how
+  // long it all took, with the stretch after the critic split out.
   const spoken = Date.now();
   await recordRun({
     caller: `${due} briefing delivered`, chars: brief.length,
@@ -2917,21 +2870,12 @@ async function postBriefing(due: Brief): Promise<Response> {
   return json({ ok: true, brief: due, chars: brief.length });
 }
 
-/* THE SECOND WORKER: TODAY'S STORED BRIEFING, SPOKEN ON A CLOCK OF ITS OWN.
-   Found the way the retry finds it — by the marker — and paired with its text
-   by the instant the two were written. They go in as one INSERT and share
-   `created_at` to the microsecond, where a turn written by anything else in
-   between would carry its own; adjacent ids would not be proof of that.
-
-   Today's only, because the door is also a repair a person can open: a
-   briefing that was stored and never reached him is sent again with
-   `?speak=weekday`, and yesterday's would arrive as this morning's.
-
-   THE DELIVERED ROW IS WRITTEN HERE NOW, after the send, because it is the
-   statement that he has it: 010 reads its absence as a briefing that never
-   arrived. `ms` is this worker's own time, and `written` is the other's.
-   Exported so the sequence — find, pair, speak, record — is driven rather than
-   read: the pairing is the half a wrong filter would get silently wrong. */
+/* The second worker: today's stored briefing, found by its marker and paired
+   with its text by the instant they were written in one INSERT — adjacent ids
+   would not prove that. Today's only, since the door is also a person's repair
+   and yesterday's would arrive as this morning's. The delivered row is written
+   here, after the send: 010 reads its absence as a briefing that never came.
+   Exported so find, pair, speak, record is driven. */
 export async function postSpeak(due: string): Promise<Response> {
   if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
   const opened = Date.now();
@@ -2956,58 +2900,26 @@ export async function postSpeak(due: string): Promise<Response> {
   return json({ ok: true, spoke: due, heard });
 }
 
-/* How silence is said, since a tool call cannot express "do not send this".
-
-   The whole reply, not a prefix: told to answer with one word a model will
-   sometimes add a full stop, and "NOTHING." means the same thing. But "Nothing
-   much has changed except gold is up forty" is news wearing the word, so it
-   goes through. Erring toward sending is the right direction — a swallowed
-   message is invisible, an extra one is merely an extra one.
-
-   Exported because a pulse that could never go quiet would message him every
-   weekday whether or not anything happened. */
+/* How silence is said. The whole reply, allowing a full stop; "Nothing much
+   has changed except…" is news and goes through. Err toward sending: a
+   swallowed message is invisible. */
 export const isSilent = (text: string) => /^nothing[.!\s]*$/i.test(text.trim());
 
-/* A quiet look, whose right answer is usually nothing at all.
-
-   Nothing is stored when she stays quiet. Twelve turns is the whole window, and
-   a week of "NOTHING" pairs would push the morning's briefing out of it — the
-   one thing a follow-up question actually needs. */
 /* ─── The nightly pass ─────────────────────────────────────────────────────
-   Twelve turns roll over in a morning. Without this, everything a conversation
-   established is reachable only by search and only if someone thinks to look —
-   so what she KNOWS never grows, however much she has been told.
-
-   A FIXED TWENTY-FOUR HOURS, and no watermark anywhere. The window and the gap
-   between runs are the same length, so a run reads exactly the day that has not
-   been read. A missed night loses that day's distillation and never the day
-   itself: the turns stay in the table and stay searchable, which is precisely
-   what makes a lossy pass safe to run unattended.
-
-   NOTHING IS SENT AND NOTHING IS STORED AS A TURN. Her reply here is a line for
-   the log, not a message — and storing it would spend two of the twelve turns
-   she opens tomorrow on bookkeeping she wrote to herself.
+   Without it, what a conversation established is reachable only by search, and
+   what she knows never grows. A fixed twenty-four hours, no watermark — the
+   window and the gap are the same. Nothing is sent and nothing is stored as a
+   turn, which would spend two of tomorrow's twelve on bookkeeping.
    ───────────────────────────────────────────────────────────────────────── */
 const CONSOLIDATE_HOURS = 24;
 
-// Far more than a real day of conversation, and a bound rather than a working
-// limit — every other read in this file has one (400 trades, twelve turns,
-// twenty notes) and this was the only one that did not. A backfill, a loop, or
-// simply a very long day would otherwise put the whole window into a `high`
-// effort call with nothing to stop it.
+// A bound, not a working limit: a backfill or a very long day must not put an
+// unbounded window into a high-effort call.
 const CONSOLIDATE_TURNS = 200;
 
-/* THE LIMIT HAS TO TAKE THE NEWEST, and it was taking the oldest.
-
-   `order=id.asc&limit=200` reads the FIRST two hundred turns of the window, so
-   the one day the bound bites is the day the pass distils the morning and drops
-   the evening — which is where a late instruction lives, and the only thing in
-   a day that must not be lost. Every other bounded read in this file selects
-   newest-first and reverses, which is also what recent() does; this was the one
-   that did not, and the bound looked identical from the outside either way.
-
-   Exported because it is the decision, the same reason tradesQuery and
-   briefedQuery are. */
+/* Newest first, reversed for reading: the oldest two hundred would distil the
+   morning and drop the evening, where a late instruction lives. Exported
+   because it is the decision. */
 export function dayQuery(hours: number, now = Date.now()): string {
   const from = new Date(now - hours * 3600_000).toISOString();
   return `eugenia_turns?select=role,content,created_at` +
@@ -3017,21 +2929,11 @@ export function dayQuery(hours: number, now = Date.now()): string {
 async function turnsSince(hours: number): Promise<Turn[]> {
   const rows = await readRows<Turn & { created_at: string }>('Day',
     `${SB_URL}/rest/v1/${dayQuery(hours)}`);
-  // Reversed back into the order it is read in: the pass is handed the day
-  // oldest first, and only the SELECT needed to run the other way round.
   return dateTurns(rows.reverse());
 }
 
-/* WHETHER TONIGHT'S PASS HAS ALREADY RUN, read off eugenia_runs rather than off
-   a marker turn — because the pass deliberately stores no turn, and giving it
-   one would spend two of tomorrow's twelve on bookkeeping it wrote to itself.
-   The meter that had to exist anyway turns out to be the exact record the retry
-   needs, which is why the retry could not sensibly have come first.
-
-   A read failure counts as "already run", the same way briefedToday's does and
-   for the same reason: if the database is unwell the retry cannot check, and
-   running a second pass on a guess is worse than skipping one. A skipped pass
-   loses that day's distillation and never the day. */
+/* Whether tonight's pass ran, read off eugenia_runs — the pass stores no turn
+   to mark itself. A failed read counts as yes, for briefedToday's reason. */
 async function consolidatedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ at: string }>('Consolidation marker',
@@ -3045,9 +2947,8 @@ async function consolidatedToday(): Promise<boolean> {
   }
 }
 
-/* What he made of the briefings, which until now nothing could say. Two days,
-   because the pass runs nightly and a tap can arrive late; more than that and
-   she would be reading last week's verdict into tonight's decision. */
+/* His taps on recent briefings: two days, since a tap can arrive late; older
+   would read last week's verdict into tonight. */
 export async function feedbackBlock(): Promise<string> {
   try {
     const from = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
@@ -3067,31 +2968,14 @@ export async function feedbackBlock(): Promise<string> {
 async function postConsolidation(): Promise<Response> {
   const day = await turnsSince(CONSOLIDATE_HOURS);
 
-  /* A day nobody spoke on has nothing to distil, and a call that says so costs
-     a model round to be told what an empty array already said. Recorded all the
-     same: a quiet day is a pass that ran and decided nothing, and without the
-     row the 23:00 retry would run it again to reach the same conclusion.
-
-     IT IS A BRANCH RATHER THAN AN EARLY RETURN, AND THAT IS THE WHOLE POINT OF
-     THE SHAPE. The two meters below are about the SYSTEM rather than about the
-     day — whether the embedding vendor still answers, and where the five
-     channels stand — and behind an early return they were skipped on exactly
-     the nights nothing else happened. Quiet nights are ordinary: two of the
-     last four were `nothing said`. So a dead vendor could have survived every
-     one of them with the meter reporting nothing at all, which is the failure
-     that meter was added to end.
-
-     The census cannot simply move to the top instead: it is taken AFTER the
-     pass because the pass is the only thing that can move a rung, and read
-     before it would record the state the pass was about to change. */
+  /* A silent day skips the model call but still leaves a row, or 23:00 runs it
+     again. A branch, not an early return: the meters below are about the
+     system, and an early return skipped them on exactly the quiet nights. The
+     census still runs after the pass, the only thing that moves a rung. */
   if (day.length) {
 
-  /* THE WEEK GOES IN TOO, and without it the pass was asked to notice something
-     it could not see. What earns a note includes "he has started doing
-     something differently" — a claim about his trading, judged against a
-     transcript that on most days does not mention a trade at all. It is the
-     same read the briefing already makes through the same read-only view, so
-     this buys the evidence for that instruction and no new reach. */
+  // His week too: it is asked to notice what he has started doing
+  // differently, which most days' transcripts never mention.
   const [notes, channels, trades, story, loops, calendar, verdicts, desk] = await Promise.all([
     notesBlock(), channelsBlock(), tradesBlock(),
     thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(),
@@ -3102,9 +2986,7 @@ async function postConsolidation(): Promise<Response> {
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
-  // `high`, and it is the one place that is not a latency decision: this writes
-  // the memory every later briefing reasons from, and a careless note outlives
-  // a careless briefing by months.
+  // High: a careless note outlives a careless briefing by months.
   const said = await ask([{ role: 'user', content: asked }], 'high', 'consolidation',
                          CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
@@ -3115,11 +2997,8 @@ async function postConsolidation(): Promise<Response> {
 
   await recordChannels();
 
-  /* AND THE SWEEP, WHICH IS BOOKKEEPING RATHER THAN PART OF THE PASS. It runs
-     here because this job already runs nightly, so it needs no schedule of its
-     own — and it runs AFTER, wrapped, because a vendor that is down must not
-     report itself to him as a pass that failed. The rows it misses are still
-     waiting tomorrow. */
+  // The embedding sweep, after the pass and wrapped, so a vendor outage never
+  // reads as a failed pass. Both outcomes are a row.
   try {
     const notes = await fillEmbeddings('eugenia_notes', 'note');
     const turns = await fillEmbeddings('eugenia_turns', 'content');
@@ -3132,44 +3011,19 @@ async function postConsolidation(): Promise<Response> {
     await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
   }
 
-  /* AND THE WEEK, WHOLE, which R-14 and R-19 are judged against. The
-     quarter-hourly filing only ever sees a rolling day and a half, so it marks
-     no week covered; this is what does. Nightly for the sweep's reason — this
-     job already runs every night, weekends included, and on a Sunday night it
-     is already the coming week — and wrapped for the same one: a calendar that
-     will not load must not take the pass down with it. A missed night costs
-     nothing the next night does not recover, and a missed week is what
-     `calendar_weeks` exists to say. */
+  // The whole week, which R-14 and R-19 judge against — the quarter-hourly
+  // filing never marks one covered. Wrapped inside filedWeek.
   await filedWeek(weekOf(new Date()));
 
-  /* ONE EXIT, and it is what the test asserts rather than the branch shape: a
-     second `return` in this function is how the meters got skipped the first
-     time, and it would be again. */
+  // One exit: a second return is how the meters got skipped.
   return day.length ? json({ ok: true, consolidated: day.length })
                     : json({ ok: true, skipped: "nothing said" });
 }
 
-/* THE ONE CLAIM IN THIS SYSTEM THAT HAD NO METER.
-
-   Everything else that cannot be seen is counted where it happens and for that
-   exact reason: ask() logs tokens and searches because the spend cap is a
-   ceiling and not a meter, and postBriefing logs the character count because
-   the length target lives in prose past a model call — unmeasured, it grew by a
-   sixth and somebody found out by counting by hand.
-
-   What she is FOR is that his understanding grows, and the map is the designed
-   instrument for it. Nothing ever read that instrument back. A ladder that has
-   stopped moving looks exactly like one that never had to, and the nightly pass
-   is the only thing that can move a rung — so this is the line that says
-   whether it does, taken at the one moment a rung could just have changed.
-
-   AND IT WENT TO A CONSOLE, WHICH IS THE FAILURE eugenia_runs EXISTS FOR. The
-   argument that moved every cost figure off console.log applies here twice
-   over: a ladder is read by comparing nights, and a line that is discarded
-   within hours cannot be compared with anything. A row per night is the series.
-
-   Never throws: the pass has done its work by the time this runs, and a meter
-   must not turn a good night into a 500. */
+/* The meter on what she is for: his understanding growing. A ladder that
+   stopped moving looks like one with no reason to move, and is read by
+   comparing nights, so a row per night is the series — taken after the pass,
+   the one moment a rung could have changed. Never throws. */
 async function recordChannels() {
   try {
     const rungs = channelsList(await readChannels())
@@ -3183,6 +3037,8 @@ async function recordChannels() {
   }
 }
 
+/* The quiet look. Nothing is stored when she stays quiet: empty pairs would
+   push the briefing out of the twelve turns. */
 async function postPulse(): Promise<Response> {
   const [notes, channels, story, loops, calendar, desk] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
