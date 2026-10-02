@@ -3980,6 +3980,22 @@ test('R-12 separates a late second entry from a sweep it cannot see', () => {
     entry('PIDb', '2026-01-06T10:40:00Z', '2026-01-06T11:00:00Z'),
   ], 'R-12').verdict, 'unknown');
 
+  // A second entry taken before the first closed is a second position, not a
+  // re-entry — and a first still open is the same case.
+  assert.equal(verdictOf([
+    entry('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T10:30:00Z'),
+    entry('PIDb', '2026-01-06T10:20:00Z', '2026-01-06T11:00:00Z'),
+  ], 'R-12').verdict, 'fail', 'a second entry while the first was open reads as a prompt re-entry');
+  assert.equal(verdictOf([
+    entry('PIDa', '2026-01-06T10:00:00Z', null),
+    entry('PIDb', '2026-01-06T10:20:00Z', null),
+  ], 'R-12').verdict, 'fail', 'a second entry beside a position still open reads as undecidable');
+  // Closed with no instant to measure from is still undecidable.
+  assert.equal(verdictOf([
+    trade({ id: 'PIDa', open_day: '2026-01-06', entry_time: '2026-01-06T10:00:00Z', exit_price: 4400 }),
+    entry('PIDb', '2026-01-06T10:40:00Z', '2026-01-06T11:00:00Z'),
+  ], 'R-12').verdict, 'unknown');
+
   // Three is a fail whatever the timing, because the rule permits two.
   assert.equal(verdictOf(['a', 'b', 'c'].map((k, i) =>
     entry('PID' + k, `2026-01-06T1${i}:00:00Z`, `2026-01-06T1${i}:30:00Z`)),

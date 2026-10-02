@@ -542,7 +542,14 @@ function r11(rows: TradeRow[]): RuleResult {
    THE FIFTEEN MINUTES IS WHAT MAKES HALF OF THIS CHECKABLE. Nothing on a row
    says an entry was a sweep re-entry — §8 lists it among what is not stored —
    so a prompt second entry is unknown by construction and a late one is a fail
-   whatever it was. Three is a fail either way, since the rule permits two. */
+   whatever it was. Three is a fail either way, since the rule permits two.
+
+   AND A SECOND ENTRY TAKEN WHILE THE FIRST WAS STILL OPEN IS A FAIL, NOT A
+   PROMPT ONE. A re-entry follows the first trade closing; one taken before it
+   closed is a second position, which he does not trade — his words, v1.21. It
+   read as `unknown` because a negative gap is "within fifteen minutes", which
+   is arithmetic answering a question the rule never asked. A first trade still
+   open now is the same case. One closed with no instant stays `unknown`. */
 export const SWEEP_MIN = 15;
 
 function r12(rows: TradeRow[]): RuleResult {
@@ -556,11 +563,11 @@ function r12(rows: TradeRow[]): RuleResult {
     if (entries.length === 1) { pass.push(day); continue; }
 
     const first = entries[0], second = entries[1];
-    if (!first.fill_time) { unknown.push(day); continue; }
+    if (!first.fill_time) { (first.exit_price === null ? fail : unknown).push(day); continue; }
     const apart = (+new Date(second.entry_time as string) - +new Date(first.fill_time)) / 60000;
-    (apart > SWEEP_MIN ? fail : unknown).push(day);
+    (apart > SWEEP_MIN || apart < 0 ? fail : unknown).push(day);
   }
-  return result('R-12', `days with a second entry more than ${SWEEP_MIN} minutes after the first closed, or a third entry at all`,
+  return result('R-12', `days with a second entry taken while the first was open or more than ${SWEEP_MIN} minutes after it closed, or a third entry at all`,
                 pass, fail, unknown);
 }
 
