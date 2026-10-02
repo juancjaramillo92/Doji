@@ -1874,23 +1874,11 @@ export const nowBlock = (now = new Date()) =>
   `\n\n[Right now it is ${nyStamp(now)} in New York. Trust this over anything ` +
   `the conversation above implies about the time or the date.]`;
 
-/* THE CLOCK GOES ON IN ONE PLACE, and it has to. Three callers each appending
-   it is three chances to forget: removing it from the pulse alone left every
-   test green, because the tests called nowBlock directly and nothing proved it
-   reached a message. A caller cannot omit what it does not attach.
-
-   The last user turn, because that is the one being asked. History is dated
-   separately — see dateTurns — and the stored turn is still the raw text, since
-   this runs on a copy the caller never sees. */
-/* A TURN IS SOMETIMES BLOCKS RATHER THAN A SENTENCE, and the clock has to reach
-   both. He can send a chart now, which arrives as an image block beside his
-   text — and string concatenation against an array produces "[object Object]"
-   attached to nothing, which would put the one line telling her what day it is
-   somewhere she cannot read it, silently, on exactly the turns that carry the
-   most context.
-
-   Exported and separate because it is the decision. Appended as a trailing text
-   block so it stays the last thing in the message either way. */
+/* The clock goes on in one place, so no caller can forget it — removing it
+   from one path once left every test green. On the last user turn, a copy;
+   the stored turn stays raw. A turn may be blocks (a chart he sent), where
+   string concatenation gives "[object Object]", so it goes on as a trailing
+   text block. Exported because it is the decision. */
 export function stamped(content: string | any[], now: Date): string | any[] {
   return typeof content === 'string'
     ? content + nowBlock(now)
@@ -1904,14 +1892,9 @@ export function withClock(messages: Turn[], now = new Date()): Turn[] {
     i === last ? { ...m, content: stamped(m.content, now) } : m);
 }
 
-/* HISTORY IS DATED TOO, or "yesterday you said" is a guess across a weekend.
-   The prompt asks her for continuity and now forbids inferring the date from
-   the conversation, which together leave her nothing to reason from unless the
-   turns carry their own. created_at is already on the table and already read by
-   briefedToday.
-
-   The user turn of each pair only: it anchors the exchange, and prefixing her
-   own words back to her reads as though she said them. */
+/* History is dated too, or "yesterday you said" is a guess across a weekend.
+   The user turn of each pair only: prefixing her own words reads as though
+   she wrote the date. */
 const shortDay = (d: Date) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', weekday: 'short', day: 'numeric', month: 'short',
 }).format(d);
@@ -1922,13 +1905,10 @@ export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
     : { role, content });
 }
 
-/* Optional by design: a database blip must cost her the memory, not the
-   briefing. Logged, because a bot that has quietly stopped remembering reads
-   exactly like a bot with nothing to remember.
-
-   The two kinds are labelled differently on purpose. What she noticed is
-   context; what he told her is not, and a list that ran them together would
-   invite her to weigh an instruction against her own observation. */
+/* Optional: a database blip costs her the memory, not the briefing. Logged,
+   because a bot that stopped remembering reads like one with nothing to
+   remember. The kinds are labelled apart, so an instruction is never weighed
+   against an observation. */
 export async function notesBlock(): Promise<string> {
   try {
     const [told, promised, noticed] = await Promise.all([
@@ -1954,42 +1934,20 @@ export async function notesBlock(): Promise<string> {
 
 type Channel = { channel: string; state: string; evidence: string | null; moved_on: string | null };
 
-/* THE SAME ROWS, RENDERED FOR HIM RATHER THAN FOR HER, and the only window he
-   has into any of it.
+/* The same rows rendered for him — his only window into a memory he writes to
+   and could not read. A wrong fact that says he understands something makes
+   her stop explaining it, an absence nobody notices. The ids are how he says
+   which note is wrong.
 
-   Her memory is the one part of this system he can write to and could not read.
-   Notes are the only channel he has for correcting her, a fact is recorded
-   SILENTLY by design, and the acknowledgement for an instruction is four words
-   that scroll away — so the evidence that anything stuck lasts about a morning.
-   A wrong note then fails in the worst available way: a fact saying he
-   understands something he does not makes her STOP explaining it, and the
-   symptom is an absence, which is the hardest thing there is to notice.
-
-   Pure, so a test can read the formatting; the read stays with the caller. The
-   ids are the point rather than decoration — they are how she is told which
-   note to retire, and now how he is.
-
-   THE MAP IS PART OF THIS MESSAGE RATHER THAN APPENDED TO IT, and it has to be.
-   The `/notes` reply used to end with channelsBlock() — which is written for HER
-   context and opens `Where he stands on each channel`, so the one message
-   addressed to him switched into the third person about him halfway through.
-   Rendering the whole audit here fixes that and makes it one pure function
-   instead of a him-facing half glued to a her-facing half.
-
-   It also means a failed channels read now costs the whole `/notes` reply
-   rather than being swallowed. That is the right direction here and the
-   opposite of the rule the blocks follow: this is an AUDIT, answered from the
-   database precisely so nothing can quietly drop a row, and an audit that
-   silently omits half of what it audits is the defect it exists to prevent. */
+   The whole audit is rendered here, in his second person, rather than
+   appending blocks written to her. And a failed read costs the whole reply,
+   which is right for an audit: one that silently omits half of itself is the
+   defect it exists to prevent. Pure; the read stays with the caller. */
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
                           promised: Note[] = []): string {
   const list = (ns: Note[]) => ns.map(noteLine).join("\n");
-  /* RENDERED FOR HIM RATHER THAN REUSING loopsList, which is the same reason
-     the channel map is rendered here rather than by appending channelsBlock():
-     that one opens "What you flagged" and is written to HER about her own
-     threads. Sent to him unchanged it would be the audit addressed to him
-     switching into her voice halfway through. */
+  // Not loopsList, which is written to her about her own threads.
     const open = (kind: string, heading: string) => {
       const rs = loops.filter(l => l.kind === kind);
       return rs.length
@@ -2008,47 +1966,18 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
   ].filter(Boolean).join("\n\n");
 }
 
-/* A CIVIL DAY FORMATTED AS ONE, which shortDay cannot do. `moved_on` is already
-   a New York date written by setChannel, so re-zoning it moves it: new Date
-   ('2026-03-12') is midnight UTC, which is the 11th in New York, and every rung
-   would read a day early. Formatted in UTC off a midday anchor, the date that
-   was stored is the date that is shown. */
+/* A stored New York civil day, shown as itself: re-zoned, `2026-03-12` is
+   midnight UTC and reads as the 11th. Formatted in UTC off a midday anchor. */
 const civilDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC', day: 'numeric', month: 'short',
 }).format(new Date(`${iso}T12:00:00Z`));
 
-/* RENDERED IN THE ORDER prompt.ts DECLARES THEM, not in whatever order the
-   database returns — the list she reads should be the list she was taught, and
-   a stable order is also what stops a rung looking like it moved when it did
-   not. A channel with no row is shown at the bottom rung rather than dropped:
-   the point of this block is that an absence is visible, so a missing row must
-   not be the one thing it hides. Pure, so a test can read the shape.
-
-   AND EVERY RUNG CARRIES THE DAY IT LAST MOVED, which is what stops the map
-   going blind. The ladder only ever climbs — deliberately, since failing to
-   reach for a mechanism once is not the same as having lost it — so over a year
-   every channel he has ever used converges on `owns`, and a census with nothing
-   left at `unseen` has no absence left to show. That is the whole thing it is
-   for. `moved_on` was written by setChannel from the first day and read by
-   nobody: a rung set in March looked exactly like one set last night, which is
-   the difference between a channel he owns and a channel that has gone quiet.
-   Rendering it is the entire fix, and it costs one clause. */
 /* ─── The one rung he can move himself ───────────────────────────────────────
-   THE LADDER COULD ONLY EVER CLIMB ON EVIDENCE HE DOES NOT PRODUCE. A rung
-   moves at the nightly pass, and it moves on him using a term back — so a
-   reader who takes the briefing and rarely answers it sits at `explained` for
-   ever, which is the rung that says restate the mechanism every time you use
-   the word. Weeks of it read as her being unable to stop over-explaining; what
-   it actually was is a census with no way up.
-
-   That stays true of HER reading of him — one exchange is not evidence, and
-   `set_channel` stays out of CHAT_TOOLS. This is not her reading of him. It is
-   him saying where he is, which is the same standing a demotion already has and
-   the only testimony on this subject that was never in doubt.
-
-   Exported and pure because the parse is the whole of it: a command that
-   accepts a rung nothing offers, or silently matches the wrong channel, is a
-   map that quietly stops describing him.
+   The ladder climbs on him using a term back, so a reader who rarely answers
+   sat at `explained` for ever — the rung that restates the mechanism every
+   time. Her reading of him still needs the pass; this is him saying where he
+   is, which has the standing a demotion has. Exported and pure, because the
+   parse is the whole of it.
    ─────────────────────────────────────────────────────────────────────────── */
 export function parseChannel(text: string): { channel: string; state: string } | string | null {
   const words = text.trim().split(/\s+/);
@@ -2059,18 +1988,15 @@ export function parseChannel(text: string): { channel: string; state: string } |
            `<${CHANNEL_STATES.slice(1).join('|')}>.`;
   }
 
-  /* THE RUNG IS THE LAST WORD AND THE CHANNEL IS THE REST, because three of the
-     five spoken names are several words and one of them ends in a rung-shaped
-     word. Splitting the other way round made "what central banks are buying"
-     unnameable. */
+  // The rung is the last word and the channel the rest: three spoken names are
+  // several words long.
   const to = words[words.length - 1].toLowerCase();
   const wanted = words.slice(1, -1).join(' ').toLowerCase();
   if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
     return `"${to}" is not a rung. They are ${CHANNEL_STATES.join(", ")}.`;
   }
 
-  // Matched against the id AND the spoken name, since the map he reads in
-  // /notes prints the names and the ids are what the table holds.
+  // The id or the spoken name, since /notes prints the names.
   const hit = CHANNELS.find(([id, name]) =>
     id.toLowerCase() === wanted || name.toLowerCase() === wanted);
   if (!hit) {
@@ -2080,6 +2006,11 @@ export function parseChannel(text: string): { channel: string; state: string } |
   return { channel: hit[0], state: to };
 }
 
+/* In prompt.ts's order, so the list is stable and a rung never seems to move.
+   A channel with no row shows at the bottom rung rather than vanishing — this
+   block exists to make absence visible. Each rung carries the day it last
+   moved: the ladder only climbs, so without the date a year of use piles
+   everything at `owns` and a rung from March reads like last night's. */
 export function channelsList(rows: Channel[]): string {
   const byId = new Map(rows.map(r => [r.channel, r]));
   return CHANNELS.map(([id, name]) => {
@@ -2090,24 +2021,16 @@ export function channelsList(rows: Channel[]): string {
   }).join("\n");
 }
 
-/* THE READ, SEPARATE FROM EITHER RENDERING, because there are two of them now
-   and they are addressed to different people — `channelsBlock` below speaks to
-   her about him, `notesList` speaks to him about himself, and neither is the
-   place for a query. */
+/* The read, apart from both renderings — one speaks to her, one to him. */
 async function readChannels(): Promise<Channel[]> {
   return readRows<Channel>('Channels',
-    // Bounded by the list that defines it rather than by a literal: the table
-    // cannot hold a sixth row — the primary key sits on a five-value check —
-    // so this is the one read here whose limit can never bite. It is written
-    // anyway, because every read of her tables carrying one is the invariant,
-    // and the read that was allowed to be the exception was the one that got
-    // missed.
+    // A limit that can never bite — the key sits on a five-value check — kept
+    // because every read here carries one.
     `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence,moved_on` +
     `&limit=${CHANNELS.length}`);
 }
 
-/* Optional the same way notesBlock is: a database blip costs her the map, not
-   the briefing. */
+/* Optional, as notesBlock is. */
 export async function channelsBlock(): Promise<string> {
   try {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
@@ -2118,35 +2041,23 @@ export async function channelsBlock(): Promise<string> {
   }
 }
 
-// Seven days, handed over unasked, so "you have not traded since Tuesday" costs
-// no tool round. Same read as get_trades through the same read-only view — she
-// gains no reach here, only the saved trip.
+// Seven days handed over unasked, saving a tool round; the same read, no new
+// reach.
 export async function tradesBlock(): Promise<string> {
   return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
 /* ─── What his trades broke since the last briefing ────────────────────────
-   THE BRIEFING JUDGED "YESTERDAY", AND A WEEK HAS A DAY NO YESTERDAY REACHES.
-   On a Monday yesterday is Sunday, so a rule Friday's trades broke was never
-   raised unless he asked — R-11, R-12 and R-14 all fail on the day the trade
-   is taken, and Friday is a day. Since the last briefing that actually went
-   out is the window that covers every closed trade once, whichever day the
-   last one was and whether a morning in between failed.
+   Since the last briefing that went out, rather than "yesterday": on a Monday
+   yesterday is Sunday, and Friday's breaches went unraised. Computed, not read
+   off the rows by eye — and this is §8's moment for the marker that says he
+   followed a rule the row says he broke. A sentence only when something broke.
 
-   AND WHICH RULES BROKE IS COMPUTED, NOT READ OFF THE ROWS. The prompt tells
-   her doing that by eye over a list of trades is where she will be wrong, and
-   the briefing was the one place still asking her to. §8 also calls a rule his
-   own marker says he followed, and the row says he did not, the most valuable
-   signal the system produces, with no moment where it fires by default; this
-   is that moment, and it is only ever a sentence when something broke.
-
-   CLOSED TRADES ONLY, because a verdict on an open one is a hard prohibition,
-   and a block that names one invites it. A trade counts if its day began on or
-   after the last briefing's, or it closed after that briefing — the second
-   half is the Friday hold that closed on Monday, which is R-15's whole case
-   and was open on both briefings either side of the weekend. Narrowing the
-   population can lose a day-level failure on a partial day; it cannot invent
-   one, which is the direction a gap here has to fail in. */
+   Closed trades only: a verdict on an open one is prohibited. A trade counts if
+   its day began since that briefing or it closed since — the Friday hold
+   closed on Monday, R-15's case. Narrowing can lose a day-level failure on a
+   partial day, never invent one.
+   ───────────────────────────────────────────────────────────────────────── */
 const BREACH_DAYS = 7;
 
 export function sinceBriefing(t: TradeRow, at: string): boolean {
@@ -2179,15 +2090,8 @@ export async function breachesBlock(): Promise<string> {
 }
 
 /* ─── The running story, the open threads, and the day's calendar ──────────
-   Three reads and three renderings, and they are together because they are one
-   idea: a briefing that starts from nothing writes a briefing that could have
-   been written on any morning, which the prompt calls a failure and had no
-   means to avoid.
-
-   Optional, all three, exactly as notesBlock and channelsBlock are: a database
-   blip costs her the context, never the briefing. Logged, because a bot that
-   has quietly stopped carrying its own story reads exactly like one that never
-   had one.
+   One idea: a briefing that starts from nothing could have been written on any
+   morning. Optional and logged, as the other blocks are.
    ───────────────────────────────────────────────────────────────────────── */
 type Thesis = { thesis: string; moved_on: string | null };
 
@@ -2197,11 +2101,8 @@ async function readThesis(): Promise<Thesis | null> {
   return row ?? null;
 }
 
-/* THE DATE IS THE HALF THAT MAKES IT USABLE, for the reason `moved_on` is on a
-   channel: a thesis written three weeks ago and never moved is not the same
-   claim as one written last night, and without the date the two read
-   identically. Formatted off a midday anchor in UTC, because `moved_on` is a
-   stored New York civil day and re-zoning it moves it back a day. */
+/* Dated, so a thesis never moved in three weeks does not read like last
+   night's — formatted as civilDay is. */
 export function thesisLine(row: Thesis | null): string {
   if (!row) return "";
   const since = row.moved_on ? ` (last moved ${civilDay(row.moved_on)})` : "";
@@ -2218,21 +2119,11 @@ export async function thesisBlock(): Promise<string> {
 }
 
 /* ─── Whether the journal is still being written ────────────────────────────
-   The poller and the email function are the two writers with no voice. Their
-   failures reach a console nobody reads, and the symptom of either dying is
-   trades that never arrive — which looks exactly like a week he did not trade.
-   `sync_health` is the heartbeat they leave; this is the one place it is read.
-
-   SHE SAYS IT ONLY WHEN IT IS TRUE, and staleness is the test rather than the
-   error. A writer that fails every run and one that stopped being invoked at
-   all produce the same silence, and only `last_ok` sees both. Six hours is
-   chosen against the poll's two-minute schedule and the fact that this reaches
-   him at 08:00: shorter and a quiet Sunday reads as a fault, longer and a
-   Monday outage reaches him on Tuesday.
-
-   It is a fact about his instruments, not a reading of the market, so it goes
-   in plainly and she is told to lead with it — a briefing about gold written on
-   top of a journal that stopped updating is worse than no briefing.
+   The poller and the email function have no voice, and either dying looks like
+   a week he did not trade. sync_health is their heartbeat and this its one
+   reader. Six hours against the two-minute poll: shorter and a quiet Sunday
+   reads as a fault, longer and a Monday outage reaches him Tuesday. A fact
+   about his instruments, so she leads with it.
    ─────────────────────────────────────────────────────────────────────────── */
 const STALE_HOURS = 6;
 
@@ -2241,15 +2132,10 @@ const WRITERS: Record<string, string> = {
   email:  "the fill emails",
 };
 
-/* THE TWO WRITERS CANNOT BE JUDGED THE SAME WAY, and judging them the same way
-   is a monitor that cries wolf until it is ignored. The poller runs every two
-   minutes on a schedule, so its silence IS evidence — nothing ran. The email
-   function runs only when a fill arrives, so its silence is a quiet week, and a
-   staleness rule over it fires on almost every ordinary day.
-
-   So silence is read for the scheduled writer only. What is read for both is
-   the outcome of the LAST run: an error stamped after the most recent success
-   means the thing is failing now, whichever way it is triggered. */
+/* The two writers cannot be judged alike. The poller is scheduled, so its
+   silence is evidence; the email function runs only on a fill, so its silence
+   is a quiet week. Silence is read for the scheduled writer only; the outcome
+   of the LAST run is read for both. */
 const SCHEDULED = new Set(["poller"]);
 
 type Health = {
@@ -2263,8 +2149,8 @@ export function healthLine(rows: Health[], now = Date.now()): string {
 
   const bad = rows.filter(r => {
     const ok = when(r.last_ok), failed = when(r.last_error_at);
-    // Its most recent outcome was a failure. `!(ok > failed)` rather than
-    // `ok < failed` so a writer that has never succeeded still counts.
+    // Last outcome a failure; `!(ok > failed)` also counts a writer that has
+    // never succeeded.
     if (Number.isFinite(failed) && !(ok > failed)) return true;
     return SCHEDULED.has(r.id) &&
       (!Number.isFinite(ok) || now - ok > STALE_HOURS * 3600_000);
@@ -2274,8 +2160,7 @@ export function healthLine(rows: Health[], now = Date.now()): string {
   return "\nHis journal is not being written:\n" + bad.map(r => {
     const name = WRITERS[r.id] ?? r.id;
     const failing = r.last_error_at && !(when(r.last_ok) > when(r.last_error_at));
-    // Two different states and they read differently to him: a writer erroring
-    // is one he can see the reason for, a writer nobody is calling is not.
+    // A writer erroring has a reason he can see; one nobody calls has not.
     return failing
       ? `· ${name} failed at ${stamp(r.last_error_at!)}: ${r.last_error ?? "no detail recorded"}`
       : `· ${name} ${r.last_ok ? `last completed a run at ${stamp(r.last_ok)}`
@@ -2290,9 +2175,7 @@ export async function healthBlock(): Promise<string> {
       `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error,last_error_at` +
       `&order=id.desc&limit=5`,
       { headers: sbHeaders() });
-    // A database without 008 answers 404 here, and that is a supported state:
-    // the feature is inert until the file is applied rather than being a read
-    // that kills the briefing.
+    // Without 008 this is a 404, and the feature is simply inert.
     if (!res.ok) return "";
     return healthLine(await res.json());
   } catch (err) {
