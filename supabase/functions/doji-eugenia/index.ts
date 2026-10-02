@@ -494,10 +494,8 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    /* THE NEW NOTE IS SAFE BEFORE ANY OF THIS RUNS, and that ordering is the
-       point: a retirement that fails leaves two live notes, which is today's
-       behaviour and is recoverable. Retiring first and failing to write would
-       lose the correction and the thing it corrected in one go. */
+    // The new note is written before the old one is retired: a failed
+    // retirement leaves two live notes, recoverably, never neither.
     if (retiring) {
       const [row] = await res.json();
       const done = await fetch(
@@ -505,9 +503,8 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
           method: "PATCH", headers: sbHeaders("return=representation"),
           body: JSON.stringify({ superseded_by: row.id }),
         });
-      // A miss is not an error — she may have named a note that never existed or
-      // one already retired — but it must not pass as done, or she believes a
-      // contradiction is gone while it is still being handed to her every turn.
+      // A miss must not pass as done, or she believes a contradiction is gone
+      // while it is still handed to her every turn.
       if (!done.ok || (await done.json()).length === 0) {
         return `Remembered, but note ${old} is not there to retire — ` +
                `it may already be superseded. Check the list you were given.`;
@@ -529,14 +526,10 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   }
 }
 
-/* NEVER THROWS, for the reason writeNote does not — it runs inside the tool
-   loop and an exception costs the answer being written. Both names are checked
-   against prompt.ts rather than trusted: the tool schema declares an enum, and
-   a value outside it would be refused by the check constraint as a 400 that
-   reads like a database fault rather than like a bad argument.
-
-   moved_on is a New York civil day, computed here. Defaulting it to now() in
-   the schema would file an evening move on tomorrow. */
+/* Never throws, for writeNote's reason. Both names are checked against
+   prompt.ts, or the check constraint answers a bad argument with a 400 that
+   reads as a database fault. moved_on is a New York civil day, computed here:
+   now() would file an evening move on tomorrow. */
 async function setChannel(channel: unknown, state: unknown, evidence: unknown): Promise<string> {
   const id = String(channel ?? "");
   const to = String(state ?? "");
@@ -547,10 +540,8 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
   if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
     return `"${to}" is not a rung. They are ` + CHANNEL_STATES.join(", ") + ".";
   }
-  /* THE BOTTOM RUNG IS A FACT ABOUT HISTORY, NOT ABOUT HOW WELL HE HOLDS IT, so
-     a demotion can reach every rung but that one. Written back, it would report
-     a channel she taught last week as one he has never met — and an absence that
-     can be manufactured is no longer the absence the census exists to show. */
+  // The bottom rung is a fact about history, not about how well he holds it:
+  // written back, it would report a channel she taught last week as never met.
   if (to === CHANNEL_STATES[0]) {
     return `${id} cannot go back to ${CHANNEL_STATES[0]} — it has come up. ` +
            `Move it to ${CHANNEL_STATES[1]} if he has said he has lost it.`;
@@ -566,9 +557,7 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // A PATCH that matches nothing is a 200 with an empty array, and it must not
-    // pass as done: the row is seeded by 003_eugenia.sql, so an empty answer
-    // means the migration has not been applied and every move is being dropped.
+    // An empty answer means 003's seed rows are missing and every move drops.
     if ((await res.json()).length === 0) {
       return `No row for ${id} — the channels table has not been seeded, so ` +
              `nothing was saved. Say nothing about this to him.`;
@@ -581,17 +570,11 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
   }
 }
 
-/* The whole query, built in one place so a test can read it. `days` arrives
-   from the model, so it is clamped rather than trusted: this is the boundary.
-   400 rows is far more than a year of this account and stops a wide window
-   returning a context-filling answer.
-
-   THE WINDOW IS COUNTED IN CIVIL DAYS, NOT IN MILLISECONDS, because `open_day`
-   is a civil day. Subtracting n × 86,400,000 and formatting the result is
-   instant arithmetic wearing a civil-day label: it is right until a clock
-   change, when a day is 23 or 25 hours long and "seven days ago" lands on the
-   wrong date. So today's New York date is taken first and the days are stepped
-   off it — the same way index.html walks to a week or a month boundary. */
+/* The whole query in one place, so a test can read it. `days` comes from the
+   model, so it is clamped: this is the boundary. 400 rows is more than a year
+   of this account. The window is counted in civil days, stepped off today's
+   New York date, because open_day is a civil day and a clock change makes a
+   day 23 or 25 hours long. */
 export const TRADE_ROWS = 400;
 
 export function tradesQuery(days: unknown, now = Date.now()): string {
@@ -599,12 +582,9 @@ export function tradesQuery(days: unknown, now = Date.now()): string {
          `&order=open_day.desc,entry_time.desc&limit=${TRADE_ROWS}`;
 }
 
-/* A FULL READ IS NOT THE WHOLE WINDOW, coveredWeeks' rule for the trades. The
-   read takes the newest TRADE_ROWS, so a year he traded more than that is cut
-   at its oldest end and every answer built on it — a win rate, a rule's
-   counts, the rows themselves — was still labelled "the last 365 days". Said
-   where it happens, with the day the read actually reaches, and nothing at
-   all on an ordinary window. Pure and exported because it is the decision. */
+/* A full read is not the whole window: past TRADE_ROWS the oldest end is cut,
+   and every figure over it would still be labelled with the window asked for.
+   Said where it happens, and nowhere on an ordinary window. */
 export function reachLine(rows: { open_day: string | null }[], days: unknown): string {
   if (rows.length < TRADE_ROWS) return "";
   return `\nThe read stops at its ${TRADE_ROWS}-trade bound, so this reaches back only to ` +
@@ -612,8 +592,7 @@ export function reachLine(rows: { open_day: string | null }[], days: unknown): s
          `before giving any figure over the window.`;
 }
 
-// How many days the model asked for, clamped once: the window it reads and
-// the span the summary says it covers are the same number.
+// Clamped once: the window read and the span reported are one number.
 const windowDays = (days: unknown): number =>
   Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
 
@@ -627,13 +606,11 @@ function windowStart(days: unknown, now: number, back: number): string {
   return from.toISOString().slice(0, 10);
 }
 
-/* R-14's two reads, over the same window check_rules reads the trades in. The
-   releases are TradingView's rated high — HIGH is the rule's, imported rather
-   than typed here — and only rows carrying TradingView's id: what she typed in
-   before 018 is kept for its notes and was never a rating he chose. A day
-   early, because a UTC midnight bound would drop the evening before a New York
-   one. The weeks go back a further seven, since an entry on the window's first
-   day sits in a week that began before it. */
+/* R-14's reads over check_rules' window: TradingView's high-rated releases —
+   only rows with its id, since her older typed ones were never a rating he
+   chose — a day early, as a UTC bound would drop the evening before; and the
+   fetched weeks a further seven back, since the window's first day sits in a
+   week that began before it. */
 export const RULE_RELEASES = 500;
 
 export function releasesQuery(days: unknown, now = Date.now()): string {
@@ -641,22 +618,17 @@ export function releasesQuery(days: unknown, now = Date.now()): string {
          `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=${RULE_RELEASES}`;
 }
 
-/* A FULL READ OF THE RELEASES IS NOT THE WHOLE WINDOW, and a week the read did
-   not reach must not count as covered. The read takes the newest first, so on a
-   window long enough to fill it the oldest weeks are still marked as fetched in
-   calendar_weeks while their releases never arrived — and R-14 then passes
-   every entry in them for want of a print, and R-19 judges none of them. That
-   is the quiet week `weeks` exists to tell apart from an unfetched one, arriving
-   through the limit instead. So a full read covers only the weeks after the one
-   its oldest release falls in, and that week too is left out, being partial.
-   Exported because it is the decision; the read is readRules'. */
+/* A full read of the releases is not the whole window either: the oldest weeks
+   would still be marked fetched while their releases never arrived, and R-14
+   would pass every entry in them. So a full read covers only the weeks after
+   the one its oldest release falls in. */
 export function coveredWeeks(weeks: string[], releases: { at: string }[]): Set<string> {
   const reach = releases.length === RULE_RELEASES ? weekOf(new Date(releases[releases.length - 1].at)) : '';
   return new Set(weeks.filter(w => w > reach));
 }
 
-// R-19's read: every stop and target the poller saw move, from a week before
-// the window so a position opened before it still has its first sighting.
+// R-19's read, from a week before the window so a position opened before it
+// still has its first sighting.
 export function stopsQuery(days: unknown, now = Date.now()): string {
   return `trade_stops?select=id,seen_at,sl,tp&seen_at=gte.${windowStart(days, now, 7)}` +
          `&order=seen_at.desc&limit=2000`;
@@ -667,20 +639,10 @@ export function weeksQuery(days: unknown, now = Date.now()): string {
          `&order=week.desc&limit=60`;
 }
 
-/* NEVER THROWS, for the reason searchMemory and writeNote do not: this runs
-   inside the tool loop, and an exception here costs the answer she is in the
-   middle of writing. It cost four — a briefing and its three retries, one
-   sentence each and nothing else all day — the morning the view behind it was
-   dropped and not rebuilt. The read that killed them was the one the model
-   ASKED for; the identical failure in tradesBlock had already been absorbed a
-   round earlier, which is how a briefing came to die of a read it had already
-   survived.
-
-   AND IT SAYS SO, rather than coming back empty. "No trades in that window" is
-   an answer and must be reserved for a window that was actually looked at: it
-   is the sentence a briefing turns into "you have not traded since Friday",
-   which is a false statement about his own week from the one thing he trusts
-   to have read it. */
+/* Never throws: an exception in the tool loop costs the answer — it once cost
+   a briefing and its three retries. And it says so rather than coming back
+   empty: "no trades in that window" becomes "you have not traded since
+   Friday", a false statement about his own week. */
 async function readTrades(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
@@ -692,21 +654,9 @@ async function readTrades(days: unknown): Promise<string> {
 }
 
 /* ─── His own rules, evaluated ─────────────────────────────────────────────
-   §7 writes a predicate for every rule and §8 writes the filters and the three
-   verdicts. Both were prose she had to apply by hand, over up to four hundred
-   rows of JSON, on the way to a number — which is the single most error-prone
-   thing she does and the place a wrong answer is least visible.
-
-   THIS IS NOT A VERDICT ON A TRADE, IT IS WHAT ONE STANDS ON. It reports
-   whether a row satisfies a predicate HE wrote down. "Two entries were 41
-   minutes apart and R-12 allows fifteen" is a fact about his rule, and the
-   prompt has her state it before any judgment of her own, so he always holds
-   the half he can check.
-
-   Thirteen rules and not one more. §7's Evaluable column decides the set, and
-   the five marked `judgment` stay out — an approximation of one would be worse
-   than the gap, because a judgment rule that starts reporting `pass` is exactly
-   the "no violations" claim §8 warns is close to saying nothing.
+   Whether each row satisfies a predicate HE wrote — what a judgment stands on,
+   not a judgment. The prompt has her state it first, so he always holds the
+   half he can check. adherence.ts says why thirteen.
    ───────────────────────────────────────────────────────────────────────── */
 const CHECK_TOOL = {
   name: "check_rules",
@@ -730,13 +680,9 @@ const CHECK_TOOL = {
   },
 } as const;
 
-/* THE FOUR READS THE RULES STAND ON, AND THE EVALUATION, in one place for
-   both of the things that evaluate: the tool, and the briefing's own block. Fed
-   two ways, R-14 could be judged against a calendar in one and against nothing
-   in the other, and nobody would see which. `keep` narrows the trades and
-   nothing else, so the calendar and the stop history are the same either way.
-   Null when nothing was kept, which is not a pass; `reach` is the read's own
-   bound, said beside whatever was evaluated over it. */
+/* The four reads and the evaluation, shared by the tool and the briefing so
+   R-14 cannot be judged against a calendar in one and nothing in the other.
+   `keep` narrows only the trades. Null when nothing was kept — not a pass. */
 async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
     Promise<{ results: RuleResult[] | null; reach: string }> {
   const [rows, releases, weeks, moves] = await Promise.all([
@@ -755,9 +701,7 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
   }, stops), reach };
 }
 
-/* NEVER THROWS, for the reason every other tool here does not — it runs inside
-   the loop and an exception costs the answer being written. The read is the one
-   get_trades already makes through the same view; the evaluation is pure. */
+/* Never throws. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
     const { results, reach } = await readRules(days);
@@ -770,23 +714,9 @@ async function checkAdherence(days: unknown): Promise<string> {
 }
 
 /* ─── The journal, summarised ──────────────────────────────────────────────
-   SHE HAD THE ROWS AND NOT THE ARITHMETIC. `get_trades` hands her up to four
-   hundred trades as JSON and the prompt hands her the rules for reading them —
-   a scratch is measured in price and not dollars, break-evens sit in the win
-   rate's denominator, the money split is on the sign while the averages are on
-   the label, reward-to-risk in the journal is realised and never planned. Four
-   definitions, applied by hand, on the way to a number he will act on.
-
-   That is the arrangement check_rules was written to end, and the argument does
-   not change because these are stats rather than rules: it is the one thing a
-   model is worst at, and a rate computed the wrong way looks exactly like one
-   computed the right way. The app has computed all of it since before she
-   existed and she could not see any of it.
-
-   THE ROWS STILL COME BACK FROM get_trades, and that is deliberate rather than
-   redundant. This answers "how has he been doing"; the rows answer "what
-   happened on the eleventh", and a summary cannot be interrogated. Same read,
-   same view, no new reach.
+   The app's arithmetic, for check_rules' reason: four definitions applied by
+   hand produce a number that looks right either way. get_trades stays beside
+   it, because a summary cannot be asked what happened on the eleventh.
    ───────────────────────────────────────────────────────────────────────── */
 const STATS_TOOL = {
   name: "get_stats",
@@ -813,9 +743,8 @@ const STATS_TOOL = {
   },
 } as const;
 
-/* NEVER THROWS, for the reason every other tool here does not, and it says what
-   it could not do rather than coming back empty — a summary that silently
-   returns nothing reads as a trader who has not traded. */
+/* Never throws, and says what it could not do: an empty summary reads as a
+   trader who has not traded. */
 async function readStats(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
@@ -827,42 +756,18 @@ async function readStats(days: unknown): Promise<string> {
 }
 
 /* ─── What lands today ─────────────────────────────────────────────────────
-   A print at 08:30 is knowable at 08:00, so the quarter-hour after it can be a
-   look at what actually happened rather than a fixed 10:00 pulse whose usual
-   answer is silence. And `actual` against `consensus` is a series that is worth
-   nothing today and a great deal in June.
+   Filed from TradingView, keyed on its id (018), so nothing she writes can mint
+   a second row for one release. Two callers file it: the briefing, before it
+   reads, and the quarter-hourly release job, which is how an actual lands
+   within fifteen minutes of publication. Read through doji-tradingview with
+   the cron secret she already holds.
 
-   FILED FOR HER, FROM TRADINGVIEW, AND NO LONGER BY HER. She searched for the
-   day's calendar every morning and typed it in, and most of what went wrong with
-   this table came from the typing. The key was (at, name) over a name the model
-   wrote, so one CPI arrived as five rows under five spellings. Her importance
-   came off a search page and had to be corrected by Forex Factory's folder. And
-   she filed days ahead of anything that read the rows. TradingView keeps an id
-   for every release and states its forecast, prior, actual and importance as
-   data, so the row's key is that id (018) and nothing she writes can mint a
-   second one.
-
-   TWO CALLERS FILE IT: the briefing, before it reads the calendar, and the
-   quarter-hourly release job, before it looks for a print — which is also how
-   an actual lands within fifteen minutes of TradingView publishing it. The read
-   goes through doji-tradingview, which holds the sign-in; she presents the cron
-   secret she already has, as she does for the price.
+   A rolling window rather than a civil day — the Sunday briefing is about a
+   week not yet started. The forward reach is the half to keep: aheadToday can
+   only warn about what is filed, and at twenty-four hours the 08:00 briefing
+   left tomorrow's 08:30 print unfiled until tomorrow. Twenty-eight carries it
+   past tomorrow's 10:00. Read and write share the constant.
    ───────────────────────────────────────────────────────────────────────── */
-/* A ROLLING WINDOW RATHER THAN A CIVIL DAY, and it is the simpler correct
-   answer. What a briefing wants is "what just landed and what is coming", which
-   straddles midnight in exactly the way a civil-day filter handles worst — the
-   Sunday 17:00 briefing is about a week that has not started yet.
-
-   THE FLOOR IS THE HALF TO KEEP. `aheadToday` asks what is pending against a
-   position the moment it opens, and it can only find what is filed. At a day
-   forward, the 08:00 briefing reached 08:00 tomorrow and stopped, so tomorrow's
-   08:30 and 10:00 prints were not on file until tomorrow's own briefing; on 25
-   September an entry at about 07:38 checked an empty calendar against the 10:00
-   Michigan print. Twenty-eight hours carries the weekday briefing past
-   tomorrow's 10:00. The filing is quarter-hourly now, so the window moves with
-   the clock, and the read and the write are still one constant: what is filed
-   is what `readCalendar` hands her, and `calendarList` names the day of every
-   line that is not today's. */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
 const TV_CALENDAR = `${SB_URL}/functions/v1/doji-tradingview?calendar=1`;
@@ -874,22 +779,14 @@ interface TvEvent {
   ticker: string | null;
 }
 
-/* WHAT IS FILED, AND WHAT IS LEFT OUT OF EACH ROW.
+/* Releases only — `timed` false is a marker, not a print — and medium or
+   above: low is mortgage rates and rig counts, paid for on every request and
+   moving nothing.
 
-   Releases only, and medium and above. `timed` false is a marker rather than a
-   print — a summit filed at midnight — and nothing that counts minutes before a
-   release may count it. Low is mortgage rates, rig counts and bill auctions:
-   filed, every one of them would be in front of her on every request and none
-   would move gold on its own.
-
-   A FIGURE TRADINGVIEW HAS NOT PUBLISHED IS LEFT OUT, NOT SENT AS NULL. An
-   absent key and a null key mean opposite things under `merge-duplicates`,
-   which `emailRow` states: the release look can still record an actual TradingView has not published yet,
-   and a quarter-hourly filing sending `actual: null` would erase it fifteen
-   minutes later. `note` is hers and is never named here.
-
-   The period goes into the name, because "Core PCE Price Index MoM (Aug)" says
-   which month a reader is being told about and the title alone does not. */
+   A figure TradingView has not published is left out, never sent as null:
+   under merge-duplicates a null erases an actual the release look recorded by
+   hand. `note` is hers and never named. The period joins the name, since the
+   title alone does not say which month. */
 export function calendarRows(events: TvEvent[], from: number, to: number) {
   return events
     .filter(e => e.timed && e.importance !== 'low')
