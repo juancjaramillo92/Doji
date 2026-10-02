@@ -1,39 +1,22 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // DOJI — email fill  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// One caller: the Apps Script in doji_gmail_sync.gs. It reads cTrader's TP/SL
-// alerts out of Gmail, parses the fill, and posts the result here. This writes
-// it.
+// One caller: doji_gmail_sync.gs parses cTrader's TP/SL alerts out of Gmail
+// and posts the fill here, and this writes it. The write lives here so the
+// secret held in Google's infrastructure opens five columns of one table
+// rather than the account: Apps Script cannot use an sb_secret_ key, and the
+// alternative was the trader's password in Script Properties.
 //
-// THE WRITE IS HERE BECAUSE OF WHERE THE ALTERNATIVE PUT A PASSWORD. Supabase's
-// sb_secret_ keys refuse any client whose user agent looks like a browser, and
-// Apps Script's does with no way to change it. The obvious alternative is for
-// the script to sign in as the trader, which puts the account password in
-// Script Properties — but that constraint is about who may write, not about
-// where the write happens. Doing it here leaves the parser holding one secret
-// whose entire authority is the five columns below, instead of the account.
-//
-// It also means every write to `trades` that is not the app's now happens in a
-// runtime deployed from main, and the "only these columns" guarantee is a
-// tested function rather than a loop in a file nobody can run.
-//
-// EMAIL-OWNED COLUMNS ONLY, and the projection happens here rather than in the
-// caller. PostgREST's merge-duplicates sets exactly the keys present in the
-// payload, so entry_time, entry_price, exit_price, commission, open_day,
-// computed_pnl, setup, the three discipline answers and `deleted` are never
-// named and therefore cannot be touched. `balance` is named, and the poller
-// yields it: it writes that column only `where balance is null`, because the
-// figure here is the one the broker itself printed on the fill.
+// merge-duplicates sets exactly the keys present, so naming five columns is
+// the whole guarantee. `balance` is named and the poller yields it, writing
+// only `where balance is null`: this is the figure the broker printed.
 //
 // SECURITY CONTRACT
-//   1. Every request must present DOJI_EMAIL_SECRET on the x-doji-key header.
-//      Its own secret, not the cron secret the other three share — this is the
-//      only one that lives outside the trader's own infrastructure, so it opens
-//      the narrowest door there is: five columns of one table.
-//   2. The body is read, and it is the only function here that reads one. It is
-//      therefore whitelisted, shape-checked and type-checked by emailRow before
-//      a single value reaches a request — see the note there.
-//   3. user_id is supplied from secrets, never from the body.
+//   1. Every request presents DOJI_EMAIL_SECRET on x-doji-key — its own
+//      secret, since it is the only one living outside his infrastructure.
+//   2. The body is read — the only function here that reads one — so emailRow
+//      whitelists and type-checks it before any value reaches a request.
+//   3. user_id comes from secrets, never from the body.
 //
 // Deploy:  supabase functions deploy doji-email-sync --no-verify-jwt
 // Secrets: DOJI_EMAIL_SECRET, DOJI_USER_ID, SB_SECRET_KEY
@@ -43,37 +26,26 @@ import { env, secretMatches, json, sbHeaders, heartbeat, SB_URL, SB_KEY }
 
 const EMAIL_SECRET = env("DOJI_EMAIL_SECRET");
 
-// `trades.user_id` is NOT NULL and defaults to auth.uid(), which is null under
-// the service role. The email is often the FIRST writer to reach a position the
-// poller never folded, so this row may be an INSERT rather than an UPDATE and
-// the owner has to be supplied — the same reason doji-mcp-sync needs it.
+// The email is often the first writer to reach a position, so this may be an
+// INSERT, and auth.uid() is null under the secret key: the owner is supplied.
 const USER_ID = env("DOJI_USER_ID");
 
 /* ─── The boundary ─────────────────────────────────────────────────────────
-   Everything below arrived over the wire, so nothing above it is trusted.
+   Everything below arrived over the wire. The five columns:
 
-   The five columns and their shapes, stated once:
-
-     id          `PID` + digits, exactly as foldPosition mints it. Unprefixed,
-                 the same position would land on a second row.
-     direction   BUY or SELL, and it is the POSITION side. Written by the poller
-                 too, so a wrong value here is repaired within two minutes for
-                 anything the poller can see and is permanent for anything it
-                 cannot.
-     fill_time   the closing instant. The app's filing-day fallback for a row
-                 with no open_day, so a value that does not parse would move a
-                 trade's calendar day rather than fail.
-     net_pnl     the broker's settled figure, including swap. The one number
-                 nothing else in this system can supply.
+     id          `PID` + digits, as foldPosition mints it, or the position
+                 lands on a second row.
+     direction   BUY or SELL, the position side. The poller repairs a wrong
+                 one within two minutes, for positions it can see.
+     fill_time   the closing instant, and the app's filing-day fallback, so an
+                 unparseable value would move the trade's day.
+     net_pnl     the broker's settled figure, swap included; nothing else here
+                 can supply it.
      balance     the account after the fill.
 
-   A MISSING VALUE IS DROPPED, NOT SENT AS NULL. merge-duplicates writes exactly
-   the keys present, so `direction: null` would erase a correct direction rather
-   than leave it alone. That is why this builds a payload rather than filtering
-   one — an absent key and a null key mean opposite things here.
-
-   Refusals carry a reason, because the only thing that ever reads them is a log
-   in the Apps Script editor and "400" on its own sends you nowhere.
+   A missing value is dropped, never sent as null: under merge-duplicates
+   `direction: null` erases a correct direction. So this builds a payload
+   rather than filtering one. Refusals carry a reason for the Apps Script log.
    ───────────────────────────────────────────────────────────────────────── */
 export type Fill = { row: Record<string, unknown> } | { error: string };
 
@@ -96,9 +68,8 @@ export function emailRow(input: unknown, userId: string): Fill {
     fill_time: b.fill_time,
   };
 
-  // Optional, and each refused rather than coerced: a P&L arriving as the
-  // string "57.10" would be stored by PostgREST and read back as a number,
-  // which is the kind of thing that works until the day it does not.
+  // Refused rather than coerced: "57.10" would be stored and read back as a
+  // number, until the day it is not.
   for (const k of ["net_pnl", "balance"] as const) {
     if (b[k] === undefined || b[k] === null) continue;
     if (!finite(b[k])) return { error: `${k} is not a finite number` };
@@ -108,13 +79,8 @@ export function emailRow(input: unknown, userId: string): Fill {
   return { row };
 }
 
-/* Returns the response rather than throwing, because the STATUS is the answer
-   the caller needs. Postgres refuses a row for reasons that will never change —
-   a user_id that is not a real user, a direction the check constraint rejects —
-   and PostgREST reports those as 4xx. Collapsing them into a 500 tells the Apps
-   Script to try again, which it then does every minute until the thread ages
-   out of the 90-day window and the fill's net_pnl is gone. That is the exact
-   failure the three-outcome design exists to prevent, rebuilt one layer down. */
+/* Returns the response rather than throwing: the status is what the caller
+   needs. */
 const upsert = (row: Record<string, unknown>) =>
   fetch(`${SB_URL}/rest/v1/trades?on_conflict=id`, {
     method: "POST",
@@ -122,41 +88,26 @@ const upsert = (row: Record<string, unknown>) =>
     body: JSON.stringify([row]),
   });
 
-/* WHAT POSTGRES SAID, TRANSLATED INTO WHAT THE APPS SCRIPT DOES ABOUT IT.
-   400 out means this row will never be accepted, so the thread is labelled and
-   leaves the queue; 500 out means try again, so it stays unlabelled.
+/* What Postgres said, as what the Apps Script does about it: 400 out labels the
+   thread and it leaves the queue, 500 out leaves it to be retried.
 
-   PERMANENT IS A STATEMENT ABOUT THE ROW, NOT ABOUT THE CALLER, and getting
-   that backwards loses data. The first version of this treated every 4xx as
-   permanent — so a rotated SB_SECRET_KEY answers 401, the Apps Script labels
-   the thread failed, it drops out of the Gmail query, and every queued fill's
-   net_pnl is gone. The key being wrong says nothing about the fill.
+   Permanent is a statement about the ROW. Only 400, 409 and 422 mean Postgres
+   examined this row and will never accept it; a 401 from a rotated key, a 429
+   or a 5xx says nothing about the fill, and labelling it would discard the only
+   settled P&L this system gets. Retrying something permanent costs a thread
+   left visibly in the queue, which is the cheap side.
 
-   So the list is the other way round: only a status meaning Postgres examined
-   THIS ROW and will never accept it. 400 malformed, 409 a constraint, 422
-   unprocessable. Everything else — 401, 403, 404, 408, 429, every 5xx, no
-   response at all — is the caller, the connection or the deployment, and a
-   person fixing one of those wants the fill still waiting.
-
-   The two failure modes are not symmetrical. Retrying something permanent
-   costs a thread sitting in the queue, which is visible and harmless.
-   Discarding something transient costs the only settled P&L this system gets.
-
-   Exported because it is the joint between the two halves and both were
-   written against literals: parse.test.mjs proves the script labels a 400
-   permanently and retries everything else, and nothing proved this end emits a
-   400 for the same cases. */
+   Exported because it is the joint between the halves: parse.test.mjs holds
+   the script's side, and this is the function's. */
 const PERMANENT = [400, 409, 422];
 
 export const answerFor = (status: number): 400 | 500 =>
   PERMANENT.includes(status) ? 400 : 500;
 
 // ─── Entry point ───────────────────────────────────────────────────────────
-// Guarded so importing this module runs nothing — the file loads under plain
-// Node, where Deno.serve does not exist.
+// Guarded so importing this module runs nothing.
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
-  // AUTHORISATION FIRST, BEFORE THE BODY IS EVEN READ. An unset secret refuses
-  // rather than admits, for the same reason it does in the other three.
+  // Authorisation before the body is read; an unset secret refuses.
   if (!EMAIL_SECRET || !USER_ID || !SB_KEY) {
     console.error("doji-email-sync: a required secret is not set — refusing all requests");
     return json({ ok: false, error: "not configured" }, 503);
@@ -165,25 +116,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: "unauthorized" }, 401);
   }
 
-  // THE THREE ANSWERS ARE THE CALLER'S THREE OUTCOMES, and they are different
-  // on purpose. 400 says the fill will never be accepted, so the Apps Script
-  // labels the thread and it leaves the queue. 5xx says try again, so the
-  // thread stays unlabelled and the next run retries it. Collapsing the two is
-  // how a momentary Supabase outage used to discard a fill's P&L forever.
-  /* A 400 FROM HERE IS A FILL DISCARDED FOR EVER, AND NEITHER ONE LEFT A TRACE.
-     The two refusals below are the only paths that end a thread's life without
-     writing anything: the Apps Script labels it, it drops out of the Gmail
-     query, and the settled P&L is gone. `heartbeat` was called on the write
-     paths and on neither of these, so the one failure mode that loses data
-     reached nobody — `sync_health` went on showing whatever the last fill said,
-     possibly weeks old.
-
-     NOT A FALSE ALARM ON AN ORDINARY DAY, which is the test every monitor here
-     has to pass. Only the Apps Script holds this secret, and it sends a payload
-     it built from a parse it had already accepted — so a body this boundary
-     refuses is the two halves DISAGREEING about the same email. That is never
-     ordinary, and it is exactly the state `healthLine` exists to put in front
-     of him. */
+  /* Three answers, three outcomes for the caller: 400 never accepted, 5xx try
+     again, 200 written. Every 400 discards a fill for ever, so each marks the
+     heartbeat — and it is no ordinary-day alarm: only the Apps Script holds
+     this secret, so a refused body is its parse and this boundary disagreeing
+     about one email. */
   let body: unknown;
   try {
     body = await req.json();
@@ -192,15 +129,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: "body is not JSON" }, 400);
   }
 
-  /* A BODY CARRYING NO `id` IS A PROBE AND NEVER WAS A FILL. `testSecret()` in
-     doji_gmail_sync.gs posts `{}` on purpose — a body this function cannot
-     accept, so a 400 proves the secret was taken and a 401 proves it was not,
-     and nothing is written either way. Marking that as a failure would report
-     a healthy sync as broken every time a person ran the diagnostic, which is
-     the ordinary-day false alarm every monitor here has to survive.
-
-     `parseAlert_` cannot produce a fill without one, so an `id` is what
-     separates a parsed fill being discarded from a caller knocking. */
+  /* A body with no `id` is a probe, never a fill: testSecret() posts `{}` on
+     purpose, and parseAlert_ cannot produce a fill without one. Marking it
+     would report a healthy sync as broken whenever the diagnostic ran. */
   const fill = emailRow(body, USER_ID);
   if ("error" in fill) {
     console.error("doji-email-sync: refused —", fill.error);
@@ -220,8 +151,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   }
 
   if (res.ok) {
-    // A fill that landed. The Apps Script retries anything unlabelled, so this
-    // is the one place a run that WORKED leaves a trace.
+    // The one trace a run that worked leaves.
     await heartbeat("email");
     return json({ ok: true, id: fill.row.id });
   }
