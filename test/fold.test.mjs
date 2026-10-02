@@ -5900,3 +5900,23 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
     assert.doesNotMatch(monday, /R-12/, 'Monday judges Friday\'s entries a second time');
   } finally { globalThis.fetch = realFetch; }
 });
+
+/* ─── A calendar read that reached its bound says so ─────────────────────────
+   The read keeps the right end — earliest first, so a heavy day loses
+   tomorrow's rows, which the next briefing reads. What it must not do is read
+   as the whole list: cut silently, the last line handed to her looks like the
+   last thing due, and "nothing else today" is a sentence she can then write. */
+
+test('a full calendar read says it stopped, and a short one says nothing', async () => {
+  const realFetch = globalThis.fetch;
+  const at = (i) => new Date(Date.now() + (i + 1) * 60_000).toISOString();
+  const rows = (n) => Array.from({ length: n }, (_, i) =>
+    ({ id: i, at: at(i), name: `release ${i}`, importance: 'medium',
+       consensus: null, prior: null, actual: null, note: null }));
+  const block = async (n) => {
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rows(n) });
+    try { return await calendarBlock(); } finally { globalThis.fetch = realFetch; }
+  };
+  assert.match(await block(40), /The list stops at 40 entries/);
+  assert.doesNotMatch(await block(39), /stops at/);
+});

@@ -2051,6 +2051,13 @@ actual, read as still **due** hours after the print. `calendarList` marks a row
 with no figure **PAST** once its time has gone, which is also every speech, all
 day, and every print whose number has not reached the calendar yet.
 
+**The read is bounded at forty rows, and a full read says it stopped.** It reads
+earliest first, so a day too heavy for the bound loses the furthest-ahead rows —
+tomorrow's, which the next briefing reads and the trade event reads for itself —
+and that end is the right one to lose. What the bound may not do is pass as the
+whole list, so a read that reached it ends with a line telling her later
+releases were not read.
+
 **A figure TradingView has not published is left out of the row, never sent as
 null.** `merge-duplicates` writes exactly the keys a payload names, so a filing
 carrying `actual: null` would erase an actual the release look recorded by hand

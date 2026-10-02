@@ -3248,12 +3248,18 @@ type Release = {
 };
 
 
+/* A BOUND, AND IT KEEPS THE RIGHT END: read earliest first, a day too heavy
+   for it loses the furthest-ahead rows — tomorrow's, which the next briefing
+   reads and `aheadToday` reads for itself. What a bound must not do is read as
+   the whole list, so a full read says it stopped. */
+const CAL_ROWS = 40;
+
 async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();
   const to   = new Date(now + CAL_AHEAD * 3600_000).toISOString();
   return readRows<Release>('Calendar',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
-    `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=40`);
+    `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
 // Times in ET because that is the clock the prompt asks her to speak in, and
@@ -3312,7 +3318,11 @@ export function calendarList(rows: Release[], now = Date.now(),
 
 export async function calendarBlock(): Promise<string> {
   try {
-    return calendarList(await readCalendar());
+    const rows = await readCalendar();
+    return calendarList(rows) + (rows.length === CAL_ROWS
+      ? `\n· The list stops at ${CAL_ROWS} entries, so later releases were not read. ` +
+        `Do not say nothing else is due after the last one.`
+      : "");
   } catch (err) {
     console.error("doji-eugenia: calendar unavailable —", err instanceof Error ? err.message : err);
     return "";
