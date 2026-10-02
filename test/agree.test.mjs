@@ -7190,3 +7190,17 @@ test('the short-message gate does not hold a reply to two or three sentences', (
   assert.doesNotMatch(trim, /This is two or three sentences/,
     'TRIM tells every message it reads that it is two or three sentences, replies included');
 });
+
+/* ─── The trade look is told what happened, not a state that may be false ────
+   It fires on an open and on a close, and it told her on both that he was in a
+   position while reading it. On a close that took his day past R-11 he may hold
+   nothing at all, and she is told so beside the situation she is describing. */
+
+test('the trade look does not tell her he is in a position on a close', () => {
+  const body = EUGENIA_PROMPT.match(/export const TRADE_EVENT = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
+  assert.ok(body, 'prompt.ts no longer exports TRADE_EVENT');
+  assert.doesNotMatch(body, /He is in a position while reading this/,
+    'TRADE_EVENT tells her he is in a position, and it is also sent after a close');
+  assert.match(body, /just opened a position or just closed one/,
+    'TRADE_EVENT no longer says which two things it is sent about');
+});
