@@ -534,7 +534,13 @@ export interface OpenPlan { id: string; planned_sl?: number; planned_tp?: number
    by a missing number", and nothing divides: no rule in `adherence.ts` reads
    either column, and `positionsBlock` names only what it has. The ratio is
    arithmetic HE runs, which §6 step 4 says outright. So the guard belonged at
-   the render, where it already was, and never at the write. */
+   the render, where it already was, and never at the write.
+
+   AND A POSITION CARRYING NEITHER STAYS IN THE LIST. It has no plan to write —
+   writePlan skips an absent side — but the stop history reads the same list,
+   and a stop and target both pulled are the largest move R-19 can see. Dropped
+   here, nothing was written for it, and the last row on file, the stop he had
+   just taken off, read as still resting. */
 export function openPlans(positions: any[]): OpenPlan[] {
   return (positions ?? []).flatMap((p: any) => {
     const id = Number(p?.positionId);
@@ -544,9 +550,7 @@ export function openPlans(positions: any[]): OpenPlan[] {
       const n = Number(p?.[k]);
       return Number.isFinite(n) && n > 0 ? n : undefined;
     };
-    const planned_sl = side('stopLoss'), planned_tp = side('takeProfit');
-    if (planned_sl === undefined && planned_tp === undefined) return [];
-    return [{ id: `PID${id}`, planned_sl, planned_tp }];
+    return [{ id: `PID${id}`, planned_sl: side('stopLoss'), planned_tp: side('takeProfit') }];
   });
 }
 
@@ -593,7 +597,7 @@ async function writePlan(plan: OpenPlan): Promise<number> {
    A ROW PER CHANGE, NEVER PER POLL, and this is the decision: a position whose
    latest row already says what the broker says gets nothing. A side the broker
    stopped carrying is a change too, written as null, so a pulled target is not
-   read as the old one still resting. Pure, so it can be driven; the latest row
+   read as the old one still resting — and so are both sides at once. Pure, so it can be driven; the latest row
    per position is whatever the caller read, newest first. */
 export interface StopRow { id: string; sl: number | null; tp: number | null }
 

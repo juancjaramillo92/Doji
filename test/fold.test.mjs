@@ -3677,6 +3677,12 @@ test('R-19 judges the stop in force when a print lands on a position from an ear
      the trade was losing and a breach if it was winning. */
   assert.equal(r([first, moved(3990)]).verdict, 'unknown');
 
+  /* BOTH PULLED BEFORE THE PRINT, which the poller now writes as a row of two
+     nulls. Without it the break-even stop he had just taken off read as the
+     stop in force, and the position passed with nothing protecting it. */
+  assert.equal(r([first, moved(4000, '2026-10-14T11:00:00Z'), moved(null, '2026-10-14T12:00:00Z', null)]).verdict,
+    'fail', 'a stop and target pulled before the print passed on the break-even stop they replaced');
+
   // A move the poller wrote a couple of minutes after the print is not late;
   // one well after it is.
   assert.equal(r([first, moved(4000, '2026-10-14T12:33:00Z')]).verdict, 'pass');
@@ -4654,8 +4660,13 @@ test('each side of the plan is recorded on its own, and a bad id is dropped', ()
     [{ id: 'PID1', planned_sl: undefined, planned_tp: 4432.1 }],
     'a zero is "not set" rather than a price, and must not survive as one');
 
-  // Neither side, a bad id, and nothing at all are still nothing.
-  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]), []);
+  /* NEITHER SIDE IS STILL A POSITION. It has no plan to write, and the stop
+     history reads this same list: dropped here, a stop and target pulled
+     together wrote nothing, and the last row — the stop he had just taken off —
+     read as still resting. A bad id and nothing at all are still nothing. */
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]),
+    [{ id: 'PID1', planned_sl: undefined, planned_tp: undefined }],
+    'a position carrying no stop and no target dropped out of the stop history');
   assert.deepEqual(openPlans([{ stopLoss: 4403.24, takeProfit: 4432.1 }]), []);
   assert.deepEqual(openPlans([]), []);
   assert.deepEqual(openPlans(undefined), []);
@@ -4677,6 +4688,18 @@ test('a stop or target is written when it moves, and never on a poll where it di
   // A pulled target is a change, written as null rather than left as the old one.
   assert.deepEqual(stopChanges([plan(4000, undefined)], [{ id: 'PID1', sl: 4000, tp: 4030 }]),
     [{ id: 'PID1', sl: 4000, tp: null }]);
+});
+
+test('a stop and target pulled together are recorded, through the list the poll builds', () => {
+  /* DRIVEN FROM THE BROKER'S SHAPE rather than from a plan built by hand: the
+     defect was upstream of stopChanges, in the list it is handed, and a test
+     that supplies the plan cannot see a position that never reaches it. */
+  const held = [{ id: 'PID1', sl: 4000, tp: 4030 }];
+  const pulled = openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]);
+  assert.deepEqual(stopChanges(pulled, held), [{ id: 'PID1', sl: null, tp: null }],
+    'a stop and target taken off together left the old ones on file as still resting');
+  // And once on file, the next poll of the same naked position writes nothing.
+  assert.deepEqual(stopChanges(pulled, [{ id: 'PID1', sl: null, tp: null }, ...held]), []);
 });
 
 test('every open position with a plan is filed, not just the first', () => {

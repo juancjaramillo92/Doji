@@ -318,7 +318,8 @@ first sighting and a closed position reports only its final stop, so where the
 stop sat when a print landed — which is all of R-19 — was seen every two minutes
 and kept nowhere. `stopChanges` writes a row only when a position's stop or target
 differs from the last row written for it, a side the broker stopped carrying as
-null, so seven hundred polls of a stop that never moved are one row. A move is
+null — both sides too, so a stop and target pulled together are not read as the
+last ones still resting — so seven hundred polls of a stop that never moved are one row. A move is
 recorded up to two minutes after it is made, the plan's own *as first seen*. The
 table is outside `eugenia_trades` because it is a history rather than a column;
 `check_rules` reads it beside the trades.
