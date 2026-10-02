@@ -2513,6 +2513,47 @@ test('an empty window still says it is empty, because that is an answer', async 
   assert.match(answered, /No trades in that window/);
 });
 
+/* ─── A paused turn, and a cut-off one ───────────────────────────────────────
+   Two stop reasons that both carry text, and neither text is the answer. A
+   pause is the server's search loop running out of iterations mid-turn; a
+   max_tokens stop is the answer truncated. Driven through ask() for the reason
+   the tests above are: the loop is what has to tell them apart from an ending.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const pausedContent = [
+  { type: 'text', text: 'Let me look at the overnight session.' },
+  { type: 'server_tool_use', id: 'srv_1', name: 'web_search', input: { query: 'gold' } },
+];
+const paused = (model) => served(model, { stop_reason: 'pause_turn', content: pausedContent });
+
+test('a paused turn is resumed, not sent as the answer', async () => {
+  const { sent, lines } = await bodiesOf([paused('claude-opus-5'), answers('claude-opus-5')]);
+  assert.equal(sent.length, 2, 'the paused turn ended the loop, so its preamble was the answer');
+  // Resumed by sending it back as it stands, with nothing after it.
+  assert.deepEqual(sent[1].messages.at(-1), { role: 'assistant', content: pausedContent });
+  assert.match(lines[0], /2 round\(s\)/);
+});
+
+test('a turn cut off at max_tokens fails rather than sending half an answer', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const rows = [];
+  globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
+    ? (rows.push(JSON.parse(init.body)[0]), { ok: true, status: 201 })
+    : served('claude-opus-5', { stop_reason: 'max_tokens',
+        content: [{ type: 'text', text: 'Gold opened the week at' }] });
+  console.error = () => {};
+  try {
+    await assert.rejects(ask([{ role: 'user', content: 'anything' }], 'medium', 'test'),
+      /max_tokens/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].ok, false);
+  assert.match(rows[0].detail, /max_tokens/, 'the failure row does not say why the turn died');
+});
+
 /* ─── What the cache costs, and what stops it being bought twice ─────────────
    TWO THINGS SHIP TOGETHER HERE BECAUSE THEY ARE THE SAME OMISSION. Only the
    system block carried a breakpoint, so a tool round re-sent the whole

@@ -3933,6 +3933,16 @@ call and routes by refusal category, so there is no model list here to go stale.
 A decline before any output is not billed. The `stop_reason === "refusal"` check
 stays and still fires: it is now the case where the whole chain declined.
 
+**Two other stop reasons carry text that is not the answer, and the loop reads
+both.** `pause_turn` is the server's own search loop stopping at ten iterations
+mid-turn — reachable by any caller allowed twelve searches and six fetches — and
+read as an ending it sent whatever preamble came before the pause, or died on
+`no text`. It is resumed by sending the paused response back as it stands, and
+counts as a round, so `MAX_ROUNDS` still bounds it. `max_tokens` is an answer
+cut off, or a tool call dropped half-written; it throws, so the briefing's retry,
+a gate's draft or the apology runs, and the failure row says `cut off at
+max_tokens`.
+
 **And a fallback now says so.** It is invisible by construction — the call
 succeeds, the briefing arrives on time, and the only difference is that another
 model wrote it. `ask()` compares the `model` on each response against the one

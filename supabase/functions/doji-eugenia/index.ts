@@ -2088,6 +2088,29 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
     }
 
+    /* A TURN THE SERVER PAUSED HAS NOT ENDED. web_search and web_fetch run in a
+       sampling loop on Anthropic's side, and that loop stops at ten iterations
+       with `pause_turn` — which a caller allowed twelve searches and six
+       fetches can reach in one request. Read as an ending, the paused response
+       was whatever text came before the pause: a preamble sent to him as the
+       briefing, or `no text` and a dead turn. It resumes by being sent back as
+       it stands with nothing after it — the trailing server call is what tells
+       the API to carry on — and it costs a round like any other, which is what
+       bounds it. */
+    if (body.stop_reason === "pause_turn") {
+      convo.push({ role: "assistant", content: body.content });
+      continue;
+    }
+
+    /* AND AN ANSWER CUT OFF IS NOT AN ANSWER. At `max_tokens` the text stops
+       mid-sentence, or a tool call is dropped half-written and the text before
+       it reads as the whole reply. Thrown rather than sent, so each caller's
+       own failure handling runs — the briefing's retry, a gate's draft, the
+       apology — and the row names the reason. */
+    if (body.stop_reason === "max_tokens") {
+      throw new Error("Claude was cut off at max_tokens");
+    }
+
     if (body.stop_reason === "tool_use") {
       convo.push({ role: "assistant", content: body.content });
 
