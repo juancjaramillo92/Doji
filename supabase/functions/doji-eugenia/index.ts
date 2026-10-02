@@ -3058,51 +3058,23 @@ async function postPulse(): Promise<Response> {
 }
 
 /* ─── The look after a number lands ────────────────────────────────────────
-   THE FIRST THING IN THIS SYSTEM THAT IS NOT A CLOCK.
-
-   Everything else here fires at an hour someone chose in advance: 08:00, 10:00,
-   22:00. A print at 08:30 landed into a briefing that had already gone and
-   waited for a 10:00 pulse whose default answer is silence — so the one moment
-   of the day when something genuinely happened was the moment she was least
-   likely to speak.
-
-   This fires off the calendar SHE FILED. The briefing records what is due; the
-   quarter-hourly job asks whether anything high-impact has landed and not yet
-   been looked at; and `looked_at` makes the answer once-only. It is data
-   deciding when she speaks, which is the whole difference between a scheduled
-   feed and something that notices.
-
-   STILL SILENT BY DEFAULT, and that is not timidity — a number landing exactly
-   where everyone expected it is not news, and the pulse's own reasoning applies
-   unchanged. `isSilent` is shared with it rather than reimplemented.
+   The first thing here that is not a clock: an 08:30 print used to land after
+   the briefing and wait for a pulse whose default is silence. This fires off
+   the filed calendar — the quarter-hourly job asks whether anything high has
+   landed unlooked, and `looked_at` makes it once-only. Still silent by
+   default: a number landing where everyone expected is not news.
    ───────────────────────────────────────────────────────────────────────── */
-// Older than this and the moment has gone: a print six hours stale is history,
-// and history belongs in tomorrow's briefing rather than in a message now. It
-// also bounds what a redeploy after a long outage can send — without it, a day
-// of unlooked releases would all arrive at once.
+// Older than this, a print is history for tomorrow's briefing — and a redeploy
+// after an outage cannot send a day of looks at once.
 const RELEASE_STALE_H = 6;
 
-// A bound rather than a working limit, like every other read of a growing table
-// here. Six hours of high-impact prints is a handful; forty is far more than a
-// heavy morning files even when it files the same release five times.
+// A bound, not a working limit.
 const RELEASE_ROWS = 40;
 
-/* ONE LOOK PER RELEASE TIME, WHICH IS NOT WHAT ONE ROW PER LOOK GAVE.
-
-   One time holds several rows: the 08:30 slot is most of a report, and while
-   she typed the calendar `PPI`, `US PPI` and `US PPI (August)` were three rows
-   and one print. Every one of them marked `high` fired its own look, its own
-   model call and its own message — five for a single CPI on 11 September, at
-   12:35, 12:50, 13:05, 13:20 and 13:35.
-
-   So the question this asks is about the TIME rather than the row: the earliest
-   release time nothing has looked at yet, and then every high row standing at
-   it. Where several numbers land together one message covers them, which is
-   how a person reads "the 8:30 data" anyway, and a row arriving later at a time
-   already marked cannot open a second look.
-
-   Exported and pure because the decision is the whole of it, and a query that
-   returns the right rows proves nothing about which of them get looked at. */
+/* One look per release TIME, not per row: the 08:30 slot is most of a report,
+   and her typed rows once fired five looks for one CPI. The earliest time
+   nothing has looked at, and every high row at it, in one message. Exported and
+   pure, since which rows get looked at is the decision. */
 export function dueRelease(rows: Release[]): Release[] {
   const byTime = new Map<string, Release[]>();
   for (const r of rows) (byTime.get(r.at) ?? byTime.set(r.at, []).get(r.at)!).push(r);
@@ -3114,10 +3086,8 @@ export function dueRelease(rows: Release[]): Release[] {
 
 async function pendingRelease(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - RELEASE_STALE_H * 3600_000).toISOString();
-  /* `looked_at` is READ rather than filtered on, because the question is
-     whether anything at this time has been looked at — a filter would hide the
-     mark that makes the rest of the group skippable and hand back the
-     duplicates one at a time, which is the behaviour this replaced. */
+  // looked_at is read, not filtered on: a filter would hide the mark that makes
+  // the rest of the group skippable.
   const rows = await readRows<Release>('Release',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
     `&importance=eq.high` +
@@ -3126,22 +3096,10 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
   return dueRelease(rows);
 }
 
-/* MARKED BEFORE THE LOOK, NOT AFTER, and it is the briefing marker's argument
-   exactly. Marked after, a look that generates and fails to write leaves the
-   release pending — so the next quarter-hour runs it again, and the one after
-   that, each one a model call with web search behind it. Marked first, a
-   failure costs one look. Losing a look is cheaper than looping on one. */
-// EVERY ROW AT THAT TIME, not the one the message happens to name: the others
-// are the same print under another spelling, and one left unmarked is the next
-// hour's duplicate look.
-/* THE LOOK WAITS FOR THE NUMBER, AND NOT FOR EVER. TradingView publishes an
-   actual a minute or two after the print, and a look that runs first spends a
-   web search finding what the next filing would have handed it. So a due group
-   with a figure still missing is left for the next quarter-hour — unmarked,
-   since the mark is what makes a look happen once — until half an hour has
-   passed, and then it looks anyway with `record_actual` as its fallback. A
-   speech has no figure to wait for: no consensus and no prior means nothing
-   is coming, and it is looked at on time. */
+/* The look waits for the number, up to half an hour: TradingView publishes an
+   actual a minute or two late, and a look run first spends a search finding
+   what the next filing would hand it. Left unmarked meanwhile. A speech — no
+   consensus, no prior — has nothing coming and is looked at on time. */
 const ACTUAL_WAIT_MIN = 30;
 
 export function awaitingActual(due: Release[], now: number): boolean {
@@ -3150,18 +3108,11 @@ export function awaitingActual(due: Release[], now: number): boolean {
 }
 
 /* ─── How it usually goes ──────────────────────────────────────────────────
-   The last twelve prints of the same series, each with what was expected, so a
-   release that has just landed is read against its own record: core PCE below
-   consensus for six months running is less of a surprise than its size alone
-   says, and one above it for the first time in a year is more of one. The
-   series is TradingView's `ticker` (020), which ties this month's release to
-   every month before it where the id names one release only.
-
-   LISTED, NOT SCORED. The figures are text — "0.2%", "197K" — and a surprise
-   worked out here would be a parse of text into a sign, with every unit a
-   chance to get it backwards; the record is put in front of her as it stands,
-   and reading it is the judgement she is there for. Oldest first, read
-   newest-first and reversed, as every bounded read here is. */
+   The last twelve prints of the same series (020's ticker), each with its
+   consensus, so a surprise is read against its own record. Listed, not scored:
+   the figures are text, and a surprise computed here would be a parse with
+   every unit a chance to get the sign backwards.
+   ───────────────────────────────────────────────────────────────────────── */
 const RECORD = 12;
 
 export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'consensus' | 'actual'>[]): string {
@@ -3171,18 +3122,11 @@ export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'co
       (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file")).join("\n");
 }
 
-/* WHAT THE LAST PRINT BECAME, read off two rows already filed. A release
-   revises the one before it and TradingView carries the revised figure as this
-   row's `prior`, while last month's row keeps the figure first reported — so
-   the revision is the two disagreeing, and on 2 October it was half the story:
-   payrolls missed by sixty thousand AND August came down from 162K to 133K.
-   She would otherwise have to remember last month's number and compare.
-
-   ONLY AGAINST THE PRINT IMMEDIATELY BEFORE. The newest row on file is last
-   month's only if none is missing, and comparing against an older one would
-   report as a revision what is simply two months apart. A gap half as long
-   again as the one before it is a missing print, whatever the series' rhythm —
-   weekly, monthly or quarterly — and says nothing. */
+/* What the last print became. TradingView carries the revised figure as this
+   row's `prior` while last month's row keeps the first report, so a revision is
+   the two disagreeing — half the story on 2 October, payrolls' August cut from
+   162K to 133K. Only against the print immediately before: a gap half as long
+   again as the one before it is a missing print, and says nothing. */
 export function revisionLine(r: Pick<Release, 'at' | 'prior'>,
                              record: Pick<Release, 'at' | 'name' | 'actual'>[]): string {
   const [last, before] = record;
@@ -3197,8 +3141,7 @@ export function recordQuery(ticker: string, before: string): string {
          `&at=lt.${before}&actual=not.is.null&order=at.desc&limit=${RECORD}`;
 }
 
-/* One read per series in the group, and a read that fails costs its block and
-   nothing else: the look still has the print in front of it. */
+/* One read per series; a failed read costs its block only. */
 async function recordBlock(due: Release[]): Promise<string> {
   const series = [...new Map(due.filter(r => r.ticker).map(r => [r.ticker!, r])).values()];
   const parts = await Promise.all(series.map(async r => {
@@ -3213,6 +3156,9 @@ async function recordBlock(due: Release[]): Promise<string> {
   return parts.join("");
 }
 
+/* Marked before the look, for the briefing marker's reason: a look that fails
+   after generating would otherwise repeat every quarter hour, billed. Every row
+   at that time, or one left unmarked is the next look. */
 async function markLooked(ids: number[]): Promise<void> {
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=in.(${ids.join(',')})`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
@@ -3229,26 +3175,17 @@ async function postRelease(): Promise<Response> {
 
   await markLooked(due.map(r => r.id));
 
-  // THE MAP, because the prompt now asks it to build a term he has never had
-  // built and cannot know which those are without it. Asking her to teach from
-  // a ladder she is not handed is the shape the nightly pass was already fixed
-  // for: an instruction that outruns its inputs.
+  // The channel map, since it is asked to build terms by rung.
   const [notes, channels, story, loops, desk, record] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(), recordBlock(due),
   ]);
-  /* ONE TIME, AND EVERY ROW STANDING AT IT. Where the same print was filed
-     under several names the lines repeat with different figures against them,
-     and saying so is better than picking one: she is being told what the
-     calendar holds, not being handed a fact. */
   const landed = due.map(r =>
     `· ${r.name}` +
     (r.actual ? ` — printed ${r.actual}` : " — not yet published") +
     (r.consensus ? `, ${r.consensus} expected` : "") +
     (r.prior ? `, after ${r.prior}` : "")).join("\n");
-  /* THE UTC STAMP, BECAUSE THE TOOL TAKES IT AND THE HEADING IS IN ET. She was
-     being asked to reconstruct it from a New York clock, which is a conversion
-     standing where an input belongs. Normalised through Date so both sides of
-     the filter spell the same instant the same way. */
+  // The UTC instant beside the ET heading: record_actual takes it, and a
+  // conversion she would do in her head is an input.
   const asked = RELEASE +
     `\n\nWhat landed at ${nyTime(due[0].at)} ET — ${new Date(due[0].at).toISOString()} in UTC, ` +
     `which is what record_actual takes:\n${landed}` +
@@ -3262,37 +3199,23 @@ async function postRelease(): Promise<Response> {
 
   const sent = await trim(said, desk, story);
   await sayAloud(sent);
-  // Stored, unlike a quiet one: this is a thing he read, and a follow-up
-  // question about it needs the exchange it follows.
+  // Stored, unlike a quiet look: a follow-up needs it.
   await remember([{ role: 'user', content: `[${named} landed]` },
                   { role: 'assistant', content: sent }]);
   return json({ ok: true, release: named, said: "sent" });
 }
 
 /* ─── The trade she hears about in two minutes ─────────────────────────────
-   The poller writes a position within two minutes of it opening, and until now
-   nothing told her: a trade taken at 10:47 reached her the next morning as one
-   row inside a week of JSON, by which time there is nothing useful left to say.
+   Still no verdict; she may say only his own rules, at the moment they apply:
 
-   SHE STILL GIVES NO VERDICT, and the two things she may say are both his own
-   rules read back at the moment they apply:
+     opened — a high-impact print is pending and he is now in a position: R-14
+              and R-19. Citing them is hers; deciding what he does is not.
+     closed — that fill took the day past −4%: R-11 says the day ends there.
 
-     opened — a high-impact print is pending and he is now in a position. R-14
-              is about standing aside before one and R-19 about a position
-              inherited into one. Naming the rule is citation; deciding what he
-              should do about it is not hers and the prompt forbids it.
-     closed — that fill took the day past −4% of account. R-11 says the day ends
-              there. It is arithmetic against a threshold he set, and it is the
-              one thing that is both time-critical and not a judgment.
-
-   SILENCE COSTS NOTHING AND IS THE COMMON CASE. Both branches decide from data
-   BEFORE any model call — no pending print, or no breach, and the function
-   returns without spending anything at all. A trade event that always ran a
-   model call would be a bill attached to every fill for a message that usually
-   should not be sent.
+   Both branches decide from data before any model call, so an ordinary fill
+   costs nothing.
    ───────────────────────────────────────────────────────────────────────── */
-// How far ahead a print still counts as pending against a position just opened.
-// Beyond this it is tomorrow's problem and the briefing will carry it.
+// Beyond this a print is tomorrow's, and the briefing carries it.
 const PENDING_AHEAD_H = 8;
 
 async function aheadToday(now = Date.now()): Promise<Release[]> {
@@ -3303,33 +3226,20 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
     `&order=at.asc&limit=5`);
 }
 
-/* Exported so the sequence — read the row, guard, decide — is driven rather
-   than read; every guard here returns before a model call, and a guard that
-   stopped returning reads exactly like one that was never needed. */
+/* Exported so read, guard, decide is driven: every guard returns before a
+   model call, and one that stopped returning looks like one never needed. */
 export async function postTradeEvent(id: string, event: string): Promise<Response> {
   const [row] = await readRows<TradeRow>('Trade',
     `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
-  // Soft-deleted, or not through the view. Nothing to say and nothing wrong.
+  // Soft-deleted: nothing to say.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
-  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY, and neither had anything
-     checking that the trade is. `aheadToday` reads the releases still to come
-     THIS day, and R-11 says the day ends here — a sentence whose whole content
-     is that he should stop trading now.
-
-     The trigger fires on a transition rather than on a clock, so the row it
-     carries is only today's by habit. Anything that stamps an old close fires
-     it for an old day: a `?force=1` repair, a broker email landing late, the
-     backfill that gave the poller the eight closes it had never recorded. That
-     backfill is how this surfaced — two messages arrived saying "today's
-     realised P&L is −61.78" and "the day sits at −318.88", about the 11th and
-     the 19th of August, in the present tense, three weeks late.
-
-     Filed under `open_day`, which is the day the position OPENED — so an
-     overnight hold closing this morning belongs to yesterday and is skipped
-     too. That is right rather than a gap: R-11 forbids an entry LATER than the
-     loss that breached, and a day that is over can have no later entry. There
-     is nothing to warn about and nothing he could do about it. */
+  /* Both things this path may say are about today, and the trigger fires on a
+     transition, not a clock — anything stamping an old close fires it for an
+     old day, and once reported August's losses in the present tense. A
+     property of the event, so it guards both branches. An overnight hold
+     closing this morning is yesterday's and skipped too: R-11 forbids a LATER
+     entry, and a finished day has none. */
   if (row.open_day !== nyDate(new Date())) {
     return json({ ok: true, trade: id, skipped: "not today" });
   }
@@ -3337,14 +3247,8 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
   let situation: string;
 
   if (event === 'opened') {
-    /* OPENED AND ALREADY CLOSED, which the trigger cannot tell apart. It fires
-       on an insert with no fill_time, and a position opened and closed inside
-       one two-minute poll is inserted with its exit price set and its close
-       instant written a moment later — so this event arrives about a position
-       that no longer exists, and the message it would send opens "he has just
-       opened" with his own R-14 cited against a trade he is out of. The close
-       event that follows is the one that is true. `isOpen` is the same two
-       witnesses the desk reads. */
+    // Opened and closed inside one poll arrives as an open event about a
+    // position he is out of; the close event that follows is the true one.
     if (!isOpen(row)) return json({ ok: true, trade: id, skipped: "already closed" });
     const ahead = await aheadToday();
     if (!ahead.length) return json({ ok: true, trade: id, said: "nothing pending" });
@@ -3355,8 +3259,7 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
       ahead.map(r => `· ${nyTime(r.at)} ET ${r.name}` +
                      (r.consensus ? `, ${r.consensus} expected` : "")).join("\n");
   } else {
-    // The day as it now stands, computed rather than asked for — and read from
-    // the same view get_trades uses, so this gains her no reach.
+    // The day as it stands, computed, through the same view.
     const day = row.open_day;
     if (!day) return json({ ok: true, skipped: "no filing day" });
     const standing = dayStanding(await readRows<TradeRow>('Day',
@@ -3370,19 +3273,10 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
       `R-11 sets. Read R-11 in the strategy before you say anything about it.`;
   }
 
-  /* THE TWO READS GO HERE AND NOT AT THE TOP, which is the whole of why this
-     path costs nothing on an ordinary fill. Both branches above return before
-     any of this on the common case — no print pending, no breach — and moving
-     the reads up would spend them on every open and close the poller sees, two
-     minutes apart, for a message that is not going to be sent.
-
-     HISTORY IS THE HALF THAT MATTERS MOST HERE, and it is the one this path
-     never had. The R-14/R-19 message fires on a print pending against an open
-     position — which is exactly what the morning briefing may have already
-     named. Without the window she cannot know she said it two hours ago, so
-     the sharpest thing she sends arrives as a repetition. And notes beside it
-     for the reason they are on every other path: an instruction he gave her is
-     obeyed everywhere except the two messages that reach him mid-trade. */
+  /* The reads come after the early returns, so an ordinary fill costs nothing.
+     History matters most here: the print this warns about is the one the
+     briefing likely named, and without the window she repeats herself. Notes,
+     or his instructions are obeyed everywhere but mid-trade. */
   const [history, notes] = await Promise.all([recent(), notesBlock()]);
 
   const said = await ask(
@@ -3398,84 +3292,36 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
 }
 
 /* ─── The move nobody filed ────────────────────────────────────────────────
-   THE OTHER TWO SENSES ARE EVENTS AND PRICE IS NOT. A release lands and a
-   position opens; both are rows appearing, and both are noticed by asking
-   whether a row is there. Gold is always there. "It moved" is not a fact about
-   the instrument at all — it is a fact about the instrument AND a previous
-   reading — which is why this sense needs a mark and the others need none.
-
-   WHAT MAKES A MOVE WORTH WAKING HER FOR IS THE DAY'S OWN MEASURE, not a number
-   in dollars. Gold at 4,400 and gold at 2,000 are the same market and a fixed
-   $10 threshold means two different things to them; a table of thresholds goes
-   stale the year nobody revises it, and that failure looks exactly like a quiet
-   market. So the test is relative twice over: against the range the session has
-   actually printed, and against the price itself.
-
-   AND A MOVE A PRINT EXPLAINS IS NOT THIS SENSE'S TO REPORT. The release spine
-   is already looking at anything high-impact that landed, so a jump at 08:30 on
-   payrolls would otherwise reach him twice in the same ten minutes, once from
-   each sense, saying the same thing. The calendar she filed is what tells them
-   apart.
-
-   SILENT BY DEFAULT AFTER ALL OF THAT, because the gates decide that something
-   happened and only she can decide whether it is worth a sentence. `isSilent`
-   is shared with the pulse and the release look rather than reimplemented.
+   Releases and positions are rows appearing; gold is always there, so "it
+   moved" is a fact about a price AND a previous reading — hence the mark. The
+   test is relative twice, to the session's range and to the price, because a
+   fixed dollar threshold means different things at 4,400 and at 2,000 and
+   goes stale silently. A move a fresh print explains is the release look's, or
+   payrolls reaches him twice. Silent by default after all of that.
    ───────────────────────────────────────────────────────────────────────── */
-/* THE FIVE NUMBERS THIS SENSE RESTS ON, and every one of them is a decision
-   rather than a fact — which is why they are named here instead of appearing
-   inside the predicate, the same reason CLOSEOUT_MIN and STRETCH are named in
-   adherence.ts. */
-// A third of everything the session has done so far, inside a quarter of an
-// hour. The share binds on an established session, where the range is wide
-// enough for an ordinary swing to clear any fixed floor.
+// Decisions rather than facts, so named here, as CLOSEOUT_MIN and STRETCH are.
+// A third of the session's range inside a quarter of an hour.
 export const MOVE_SHARE = 0.35;
-/* AND THE FLOOR BINDS FOR SEVEN HOURS OF EVERY WEEKDAY, WHICH IS NOT WHAT THIS
-   PAIR WAS BUILT BELIEVING. The share was the real test and the floor was for
-   the ragged hour after the Sunday open — one edge case, once a week. But the
-   range this share is taken against is the BROKER'S session range, and that
-   session restarts at the 17:00 New York roll every single weekday. So from
-   17:00 until the range has been rebuilt the share is measured against a few
-   hours of thin evening trade, it stops binding, and the floor is the whole
-   test — for a third of the week rather than for an hour of it.
-
-   A tenth of a percent was a floor written to be generous, because something
-   above it was expected to be doing the work. It is $4.49 on gold at 4,485,
-   which gold covers in a quarter of an hour on an ordinary afternoon, and it is
-   what let a $7 drift at 20:57 reach him as a sharp move. A quarter of a
-   percent — $11.21 at the same price — is a figure that is an event in the thin
-   hours as well as the busy ones, which is what the floor now has to be, since
-   the thin hours are exactly when it is alone.
-
-   It costs nothing on an established session: a range of $50 asks $17.50 of the
-   share, which is already above the floor. The floor binds only where the range
-   is under about $32, which is to say on a session too young or too quiet for
-   its own range to be a measure of anything. That is the case this is for. */
+/* A quarter of a percent of the price, the least the bar may be. The range is
+   the broker's session's, which restarts at the 17:00 roll, so for hours every
+   evening it is small because the session is young — and a tenth of a percent
+   let a $7 drift at 20:57 through. Applied to the bar, below. */
 export const MOVE_FLOOR = 0.0025;
-// Two missed runs and the gap is no longer a quarter of an hour. A move measured
-// across an outage is a move across an hour, which is a different claim — so the
-// mark is advanced and the reading starts again.
+// Past two missed runs the gap is not a quarter-hour, so the reading restarts.
 export const MARK_STALE_MIN = 40;
-// One message about one move. A market that trends all afternoon is one story,
-// and telling it every fifteen minutes is the failure a threshold alone cannot
-// prevent.
+// One message per move: a trending afternoon is one story.
 export const MOVE_QUIET_H = 2;
-// How recently a high-impact print counts as the explanation. Six hours later a
-// move is its own event again; the release spine's own staleness window is wider
-// because it is asking a different question — whether the print has been looked
-// at, not whether it is what just moved the price.
+// How recently a print counts as the explanation — a different question from
+// the release look's own staleness window.
 const MOVE_EXPLAINED_H = 1;
 
 export interface Mark { bid: number; at: string; looked_at: string | null }
 
-/* PURE, AND THE WHOLE DECISION IS HERE. Every gate can be driven from both
-   sides by a test, which for a sense that is silent by design is the only way
-   to know it can fire at all — a predicate that always answers "not worth it"
-   and a market that is genuinely quiet produce the same empty log for weeks. */
+/* Pure, so every gate is driven both ways: for a sense silent by design, that
+   is the only way to know it can fire. */
 export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
   { worth: true; move: number } | { worth: false; why: string } {
-  // The seeded row, and the only shape that is not a price. It exists so the
-  // first run has something to PATCH rather than a branch that runs once in the
-  // life of the database.
+  // The seeded zero row, the one shape that is not a price.
   if (!(mark.bid > 0)) return { worth: false, why: "no mark yet" };
 
   const age = (now - Date.parse(mark.at)) / 60_000;
@@ -3489,30 +3335,11 @@ export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
   const move = Math.round((spot.bid - mark.bid) * 100) / 100;
   const size = Math.abs(move);
 
-  /* THE BAR IS THE SESSION'S RANGE, AND THE FLOOR NOW SAYS WHEN THAT BAR IS TOO
-     LOW TO MEAN ANYTHING. The two gates used to stand side by side, so a range
-     near zero made the share stop binding and left the floor as the whole test.
-
-     That is not a rare state, and the comment here used to describe it as one.
-     The broker's session restarts at the 17:00 New York roll, so for hours
-     every evening the range is small because the session is YOUNG rather than
-     because the market is quiet — and a thin-liquidity wobble cleared a bar
-     built for a full day's trading.
-
-     It cost three open loops in a week: $13 just after the Sunday roll, $17
-     just after the next one, both filed as unexplained and neither ever closed,
-     because there was nothing to explain. The one real find in that run, $33 at
-     11:12 on a Wednesday, cleared both gates on its own. A sense that
-     manufactures a loop it can never close is worse than a quiet one — the loop
-     then rides into every briefing after it.
-
-     So the floor is applied to the BAR rather than beside it: a session that has
-     not built a range worth judging against is one she cannot judge, and silence
-     is the honest answer rather than a lower standard. A move under MOVE_FLOOR
-     of the price is still never reported, since the bar is never below it —
-     what changed is the composition, not either number. A quote carrying no
-     high or low makes the range zero and lands here too, which is the same
-     statement: nothing to judge against. */
+  /* The floor bounds the bar rather than standing beside it. A session too
+     young to have a range is one she cannot judge, and silence beats a lower
+     standard: beside it, the floor alone let post-roll wobbles of $13 and $17
+     through as loops nothing could ever close. A quote with no range lands
+     here too. */
   const bar = (spot.high - spot.low) * MOVE_SHARE;
   if (bar < spot.bid * MOVE_FLOOR) {
     return { worth: false, why: "no session range to judge against yet" };
