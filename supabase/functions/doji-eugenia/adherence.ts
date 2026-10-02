@@ -1,42 +1,25 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // THE STRATEGY, EXECUTED — the thirteen rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
-// §7 of strategy.ts writes a predicate for all nineteen rules and §8 writes the
-// population filters and the three verdicts. Both were prose: she was handed up
-// to four hundred rows of JSON and expected to apply seven filters and a
-// three-state verdict in her head, on the way to producing a number.
+// §7 writes a predicate per rule and §8 the population filters and three
+// verdicts. Applied by hand over four hundred rows, a rate over the wrong
+// population looks exactly like one over the right — §8's own opening. So it is
+// code, and pure: rows in, verdicts out, no clock but the one passed in, which
+// is what lets every rule be driven both ways from a test.
 //
-// That is the one thing a model is worst at and SQL-shaped arithmetic is best
-// at, and it is where a wrong answer is least visible — a rate computed over
-// the wrong population looks exactly like a rate computed over the right one,
-// which is §8's own opening sentence.
+// Thirteen, because §7's Evaluable column decides it: `journal` rules only. A
+// judgment rule reporting `pass` is the "no violations" claim §8 warns about.
 //
-// SO IT IS CODE, AND IT IS PURE. Rows in, verdicts out, no clock but the one
-// passed in and no database anywhere. That is what lets every rule below be
-// driven from a test with a hand-built row and broken on purpose — which is the
-// only way anything here earns the word "checked".
-//
-// THIRTEEN RULES, AND THE SET IS NOT A CHOICE. §7's Evaluable column decides
-// it: `journal` means a row can answer it today. R-05 through R-08 and R-17 are
-// `judgment` — nothing stored can see them,
-// and inventing an approximation here would be worse than the gap, because a
-// judgment rule that starts reporting `pass` is exactly the "no violations"
-// claim §8 warns is close to saying nothing.
-//
-// IT GIVES NO VERDICT ON A TRADE, and could not: it reports whether a row
-// satisfies a predicate HE wrote. "Two entries eleven days ago were 41 minutes
-// apart, and R-12 allows fifteen" is a fact about his own rule. The prohibition
-// is on her judging the trading, and this judges the rule.
+// It judges whether a row satisfies a predicate HE wrote — a fact about his own
+// rule, never a verdict on the trading.
 // ═══════════════════════════════════════════════════════════════════════════
 import { nyDate } from "../_shared/edge.ts";
-/* The journal's own break-even band, not a second reading of it. `journal.ts`
-   imports `TradeRow` from here with `import type`, which is erased — so this is
-   a one-way dependency at runtime and not a cycle. */
+// The journal's own band, not a second one. journal.ts imports TradeRow with
+// `import type`, erased at runtime, so this is not a cycle.
 import { BE, sessionAt } from "./journal.ts";
 
-/* The row as eugenia_trades serves it. Written out rather than inferred,
-   because this module is the one place that reasons about every column at once
-   and a missing name here is a rule that silently never fires. */
+/* The row eugenia_trades serves, written out: a column missing here is a rule
+   that silently never fires. agree.test.mjs holds it against the view. */
 export interface TradeRow {
   id: string;
   direction: string | null;
@@ -57,8 +40,7 @@ export interface TradeRow {
   best_price: number | null;
 }
 
-/* §8's three verdicts, and the third is not a formality — it mirrors the
-   journal's own three-state boolean, where null is unanswered and is not "no". */
+/* §8's three verdicts; `unknown` mirrors the journal's null, which is not "no". */
 export type Verdict = 'pass' | 'fail' | 'unknown';
 
 export interface RuleResult {
@@ -67,22 +49,17 @@ export interface RuleResult {
   passed: number;
   failed: number;
   unresolved: number;
-  // The rows that failed and the rows nothing could decide, named so a finding
-  // can be checked rather than believed. Capped, because a tool result is
-  // context and a bad month should not fill it.
+  // Failed and undecided rows, named so a finding can be checked. Capped,
+  // because a tool result is context.
   ids: string[];
   why: string;
 }
 
 const NAMED = 6;
 
-/* THE WORST OUTCOME PRESENT WINS, and `pass` is the strict reading.
-   fail > unknown > pass, and an empty population is `unknown` rather than
-   `pass` — which is §8 stated as code: a rule whose population came back empty
-   is unknown, and one narrowed by a missing column is unknown outside the
-   narrowed set rather than pass across the whole of it. The counts travel
-   beside the verdict precisely so that "unknown with nine passes and one
-   Friday close-out" is legible as what it is. */
+/* The worst outcome present wins: fail > unknown > pass, and an empty
+   population is unknown — §8 as code. The counts travel with the verdict so
+   "unknown, nine passes and one Friday close-out" reads as what it is. */
 export function settle(passed: number, failed: number, unresolved: number): Verdict {
   if (failed > 0) return 'fail';
   if (unresolved > 0 || passed === 0) return 'unknown';
@@ -100,16 +77,10 @@ const result = (rule: string, why: string, pass: string[], fail: string[], unkno
 });
 
 /* ─── The clock these rules are written in ─────────────────────────────────
-   Every boundary in the strategy is a New York wall-clock one — the Friday
-   17:00 close, a civil `open_day`, a market holiday — and none of them is a
-   fixed number of milliseconds from anything. nyDate is shared and gives the
-   civil day; minutes and the weekday are needed here and nowhere else, so this
-   is the one place they are computed.
-
-   `en-GB` with an explicit h23 cycle, matching _shared/nyClock: hour12:false
-   leaves the cycle to the locale and can resolve to h24, which renders midnight
-   as "24:05" and would put a midnight fill on the wrong side of every
-   comparison below. */
+   Every boundary in the strategy is New York wall-clock — the Friday close, a
+   civil open_day, a holiday. Minutes and weekday are needed only here. h23, or
+   a midnight fill lands on the wrong side of every comparison.
+   ───────────────────────────────────────────────────────────────────────── */
 const NY = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', weekday: 'short', hourCycle: 'h23',
@@ -129,15 +100,9 @@ export function nyWall(at: Date): Wall {
   };
 }
 
-/* THE INSTANT A NEW YORK WALL TIME ACTUALLY IS, which is the half that cannot
-   be done with a formatter. Date.UTC of a wall time is that time in UTC, not in
-   New York; the gap between the two is the offset, and the offset is what
-   changes twice a year — so it is measured rather than assumed.
-
-   Guess, ask New York what the guess reads as, and subtract the difference.
-   Correct in both halves of the year and at every clock change except an
-   ambiguous wall time, and 17:00 is never one — the spring gap is 02:00-03:00
-   and the autumn repeat is 01:00-02:00. */
+/* The instant a New York wall time is. The offset changes twice a year, so it
+   is measured: guess, read the guess in New York, subtract the difference.
+   Exact except on an ambiguous wall time, which 17:00 never is. */
 export function nyInstant(y: number, m: number, d: number, hour: number): number {
   const guess = Date.UTC(y, m - 1, d, hour);
   const w = nyWall(new Date(guess));
@@ -145,21 +110,13 @@ export function nyInstant(y: number, m: number, d: number, hour: number): number
 }
 
 /* ─── R-16's calendar ──────────────────────────────────────────────────────
-   A US market or bank holiday is a known date, which is exactly why §5 calls
-   R-16 decidable the day before and checkable afterwards. Computed rather than
-   listed: a hard-coded table of dates is a rule that silently stops being true
-   the year nobody remembers to extend it, and that failure looks like perfect
-   compliance.
-
-   OBSERVANCE IS PART OF THE RULE. A fixed-date holiday landing on a Saturday is
-   observed on the Friday before and on a Sunday the Monday after, so the market
-   is shut on a day the naive date test calls open.
-
-   BANK HOLIDAYS TOO, because the rule says so and the check used to stop at the
-   market's list. Two days are the banks' alone: Columbus Day and Veterans Day,
-   when the exchanges trade and the money behind them is thin. The Fed moves a
-   Sunday one to the Monday and does not move a Saturday one at all, which is
-   `bankObserved`; a Saturday holds no session either way. */
+   Computed rather than listed: a table of dates stops being true the year
+   nobody extends it, and that failure looks like perfect compliance.
+   Observance is part of the rule — a Saturday holiday is observed the Friday
+   before, a Sunday one the Monday after. Bank holidays count too, per the
+   rule: Columbus and Veterans Day are the banks' alone, and the Fed moves a
+   Sunday one to Monday and a Saturday one nowhere (bankObserved).
+   ───────────────────────────────────────────────────────────────────────── */
 const nthWeekday = (y: number, m: number, wd: number, n: number): number => {
   const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   return 1 + ((wd - first + 7) % 7) + (n - 1) * 7;
@@ -170,9 +127,7 @@ const lastWeekday = (y: number, m: number, wd: number): number => {
   return last.getUTCDate() - ((last.getUTCDay() - wd + 7) % 7);
 };
 
-/* Easter by the anonymous Gregorian algorithm, and Good Friday is two days
-   before it. The only moving holiday on the list, and the only reason this
-   function is longer than a lookup would be. */
+/* Easter by the anonymous Gregorian algorithm; Good Friday is two days before. */
 export function easter(y: number): { m: number; d: number } {
   const a = y % 19, b = Math.floor(y / 100), c = y % 100;
   const dd = Math.floor(b / 4), e = b % 4;
@@ -190,8 +145,7 @@ export function easter(y: number): { m: number; d: number } {
 const iso = (y: number, m: number, d: number) =>
   `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-// Saturday → the Friday before, Sunday → the Monday after. Applied to the fixed
-// dates only; a holiday defined as "the third Monday" can never need it.
+// The Fed's observance: Sunday → Monday, Saturday stays.
 const bankObserved = (y: number, m: number, d: number): string =>
   iso(y, m, d + (new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 0 ? 1 : 0));
 
@@ -202,13 +156,9 @@ function observed(y: number, m: number, d: number): string {
   return iso(moved.getUTCFullYear(), moved.getUTCMonth() + 1, moved.getUTCDate());
 }
 
-/* THE CHRISTMAS STRETCH IS AN OPERATIONAL READING, AND IT IS NAMED SO IT CAN BE
-   ARGUED WITH. §5 says "the Christmas-to-New-Year stretch" and gives no dates,
-   so a number had to be chosen to make the rule checkable at all: the 24th
-   through the 31st, which is Christmas Eve to New Year's Eve. Exported rather
-   than inlined because it is the one figure in this file that is a decision
-   rather than a fact, and a decision buried in a comparison is one nobody can
-   find to change. */
+/* §5's "Christmas-to-New-Year stretch" given dates: the 24th to the 31st. A
+   decision rather than a fact, so it is named where it can be found and
+   argued with. */
 export const STRETCH = { from: 24, to: 31 };
 
 export function lowVolumeDays(y: number): Set<string> {
@@ -235,30 +185,25 @@ export function lowVolumeDays(y: number): Set<string> {
 }
 
 /* ─── §8's population filters ──────────────────────────────────────────────
-   Applied by every rule below rather than remembered case by case, which is
-   §8's own instruction. `deleted` is already filtered by the view, so it is not
-   here — a filter this file cannot apply is not one it should pretend to. */
+   Applied by every rule rather than remembered case by case. `deleted` is
+   already filtered by the view.
+   ───────────────────────────────────────────────────────────────────────── */
 export const isBroker = (t: TradeRow) => t.id.startsWith('PID');
 const priced = (t: TradeRow) => t.entry_price != null && t.exit_price != null;
 const closed = (t: TradeRow) => t.pnl != null;
 
 const gap = (t: TradeRow) => Math.abs((t.exit_price as number) - (t.entry_price as number));
 
-// Money compared against a threshold in dollars, so the tolerance is a cent.
-// Without it a stop that filled at exactly $20.00 can read as $20.000000001 and
-// be reported as a breach of a rule it satisfies exactly.
+// A cent of tolerance, so a stop filled at exactly $20.00 cannot read as
+// $20.000000001.
 const CENT = 0.005;
 
 /* ─── R-01 ─────────────────────────────────────────────────────────────────
-   Take profit $30, or $25 where the level looks hard to reach. §7: no win with
-   |exit − entry| < 25, except a Friday close-out, which is unknown.
-
-   THE EXCEPTION IS NARROW BECAUSE §6 MADE IT NARROW. R-15 forces a close at the
-   Friday 17:00 New York close, and a forced exit at +$12 is a win under $25
-   that R-01 would flag every single week. §6 draws the line in words — "a win
-   under $25 filling at the Friday close is unknown; one filling at 2 p.m.
-   Friday is still a flag" — and a window had to be chosen to make that
-   checkable. Thirty minutes, named, for the reason STRETCH is. */
+   Take profit $30, or $25 where the level looks hard. §7: no win with
+   |exit − entry| < 25, a Friday close-out being unknown. R-15 forces that
+   close, and §6 draws the line: filling at the close is unknown, at 2 p.m.
+   Friday still a flag. Thirty minutes, named for STRETCH's reason.
+   ───────────────────────────────────────────────────────────────────────── */
 export const CLOSEOUT_MIN = 30;
 
 export function nearFridayClose(fill: Date): boolean {
@@ -276,24 +221,14 @@ function r01(rows: TradeRow[]): RuleResult {
     if (!priced(t)) { unknown.push(t.id); continue; }
     if (gap(t) >= 25 - CENT) { pass.push(t.id); continue; }
 
-    /* A SCRATCH IS NOT A WIN THAT FAILED TO TAKE PROFIT, and §7's predicate
-       read literally says it is. The document contradicts itself here: its
-       Exit section names four legitimate ways a trade ends and one of them is
-       "at break-even once R-04 has moved the stop there" — while the predicate
-       flags any win closing under $25. A break-even stop-out filling a few
-       cents favourable clears the commission, so `pnl > 0`, and every one of
-       them came back a breach of a rule he had just followed.
-
-       The journal already decides what a scratch is: `resultOf` calls it `be`
-       inside ±$3 of the ENTRY PRICE, and that band is what leaves this
-       population rather than a second number invented here. The reading is
-       named for CLOSEOUT_MIN's reason — where §7 and §6 part, the code has to
-       choose, and a choice buried in a comparison is one nobody can find. */
+    /* A scratch is not a missed target. §6 names a break-even stop-out as a
+       legitimate exit, while §7's predicate flags any win under $25 — and a
+       break-even stop a few cents favourable clears the commission. The
+       journal's own ±$3 band decides what a scratch is; named for
+       CLOSEOUT_MIN's reason, since this is where two sections part. */
     if (gap(t) <= BE) continue;
 
-    // Under $25 and beyond a scratch. A Friday close-out is the one exit the
-    // data cannot tell from a discretionary one, so it is unknown rather than
-    // either answer.
+    // A Friday close-out is the one exit the data cannot tell from a choice.
     if (t.fill_time && nearFridayClose(new Date(t.fill_time))) unknown.push(t.id);
     else fail.push(t.id);
   }
@@ -303,10 +238,9 @@ function r01(rows: TradeRow[]): RuleResult {
 
 /* ─── R-02 ─────────────────────────────────────────────────────────────────
    Stop never beyond $20 from entry. §7: no loss with |exit − entry| > 20 — the
-   CAP only. The other half of R-02, whether the stop was RESPECTED, is not
-   checked here: `planned_sl` records the stop as the poller first saw it, so it
-   is no longer unrecoverable — but almost no row carries one yet, which is why
-   §7's Evaluable column did not move. This checks the cap and says so. */
+   cap only. Whether the stop was respected needs planned_sl, which almost no
+   row carries yet, so §7 keeps it out.
+   ───────────────────────────────────────────────────────────────────────── */
 function r02(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
@@ -319,23 +253,16 @@ function r02(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-03 ─────────────────────────────────────────────────────────────────
-   No entry after a full-stop loss on the same day, except one sweep re-entry.
-   §7: within an open_day, at most one entry_time later than the fill_time of a
-   loss with |exit − entry| ≥ 20.
+   No entry after a full-stop loss the same day, bar one sweep re-entry. §7:
+   within an open_day, at most one entry later than the fill of a loss with
+   |exit − entry| ≥ 20. A full stop is the stop at its $20 ceiling, by his
+   definition, so a smaller loss leaves the population.
 
-   A FULL STOP IS $20 FROM ENTRY BECAUSE HE SAID SO, and that is the whole of
-   why this is checkable. §12 used to count a stop set tighter and taken in
-   full, which no row can tell from a hand-cut exit; his definition is the stop
-   at its ceiling, so a smaller loss is not one and leaves the population
-   rather than making the day unknown.
-
-   UNKNOWN ONLY WHERE THE ANSWER COULD DIFFER. A loss with no prices might be a
-   full stop, and a full stop with no fill_time cannot be placed before the
-   entries it would count — but a day with fewer than three entries cannot
-   breach this whatever those rows turn out to be, so it is not reported as
-   something the data failed to decide. A breach found elsewhere in the day
-   stands regardless: a known third entry after a known full stop is a fail
-   whatever else is unmeasured. */
+   Unknown only where the answer could differ: an unpriced loss might be a full
+   stop, and one with no fill_time cannot be placed — but a day with fewer
+   than three entries cannot breach whatever they are. A known breach stands
+   regardless.
+   ───────────────────────────────────────────────────────────────────────── */
 export const FULL_STOP = 20;
 
 function r03(rows: TradeRow[]): RuleResult {
@@ -348,7 +275,7 @@ function r03(rows: TradeRow[]): RuleResult {
     const unmeasured = losses.filter(t => !priced(t));
     if (!full.length && !unmeasured.length) continue;
 
-    // Entries after the loss closed; null where there is no instant to count from.
+    // Entries after the loss closed; null with no instant to count from.
     const after = (t: TradeRow) =>
       t.fill_time ? entries.filter(at => at > +new Date(t.fill_time as string)).length : null;
 
@@ -363,20 +290,14 @@ function r03(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-04 ─────────────────────────────────────────────────────────────────
-   Stop to break-even once price reaches +$20. §7: no loss beyond the scratch
-   band on a trade whose best_price was $20 or more in his favour.
+   Stop to break-even at +$20. §7: no loss beyond the scratch band on a trade
+   whose best_price ran $20 or more his way. Losses only: a win says nothing
+   about the stop, and an exit inside the band is R-04 having fired. A loss
+   that never ran $20 passes, the rule never having engaged.
 
-   THE POPULATION IS LOSSES, and that is the rule's own shape rather than a
-   limit of the data. A win says nothing about where the stop sat, and an exit
-   inside the ±$3 band is R-04 having fired — so only a loss beyond the band
-   can breach it, and it does exactly when the trade had already been $20 his
-   way: the stop that should have been at entry was not. A loss that never got
-   there passes, because the rule never engaged.
-
-   best_price reads whole minutes inside the trade only, so the excursion here
-   can fall short of what happened and never exceed it — a breach can be
-   missed, never invented. Null is a trade too short to measure or not yet
-   reached by the poller, and is unknown. */
+   best_price can fall short of what happened, never exceed it, so a breach can
+   be missed but not invented. Null is unknown.
+   ───────────────────────────────────────────────────────────────────────── */
 export const TO_BREAK_EVEN = 20;
 
 function r04(rows: TradeRow[]): RuleResult {
@@ -396,50 +317,23 @@ function r04(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-10 ─────────────────────────────────────────────────────────────────
-   One position at a time. §7: no two rows whose entry_time→fill_time spans
-   overlap.
+   One position at a time. §7: no two entry→fill spans overlap.
 
-   AN OPEN POSITION EXTENDS TO NOW, not to null. A trade still running while a
-   second one opened is the clearest possible breach of this rule, and treating
-   a null fill_time as "no span" would drop exactly that case.
+   Three states. Closed with a fill_time: the span ends there. Closed with an
+   exit_price and no fill_time: the end is unknown, so the row is unresolved —
+   running it to now once failed every later trade. Neither: still open, and it
+   runs to now, the clearest breach there is.
 
-   BUT A NULL fill_time IS NOT ALWAYS AN OPEN POSITION, and reading it as one
-   manufactured breaches out of nothing. The poller stamps that column only on
-   the closes its fold window reaches; what it records on every close is
-   `exit_price`. So a position closed with no alert email behind it, outside
-   that window, ran to `now` here for ever — and every trade taken after it overlapped it, so
-   one missing email turned a clean month into a cascade of R-10 failures, each
-   naming a real row and each wrong.
-
-   Three states rather than two. Closed with a time: the span ends there. Closed
-   with no time — `exit_price` set, `fill_time` null — the END IS UNKNOWN, and
-   an unknown end cannot be compared with anything, so the row is unresolved
-   rather than assumed to run to now. Only a row neither witness has closed is
-   still open, and only that one extends to now.
-
-   TWO SWEEPS, BECAUSE COMPARING EACH SPAN WITH THE ONE BEFORE IT IS NOT THE
-   SAME QUESTION. Sorted by entry, the previous span is not the only earlier one
-   still running: a multi-session hold — which the summary says is a shape he
-   trades — covers everything opened inside it, and a second trade taken after a
-   first one has closed sits beside a `to` that has already been left behind. So
-   `spans[i].from < spans[i-1].to` answered for one neighbour and the third
-   trade of a nested set came back PASSED, named nowhere.
-
-   The verdict survived that, which is why it went unseen: a span nested inside
-   an earlier one always has a neighbour that overlaps too, so something was
-   always flagged and the rule always said `fail`. What was wrong is what she
-   REPORTS — the counts, and the ids she hands him to check. A breach counted as
-   a pass and left out of the list is this file's own opening argument about a
-   rate over the wrong population, arriving inside one rule.
-
-   Forward for a span that starts before an earlier one ends, backward for one
-   that ends after a later one starts. Between them they name every span
-   overlapping any other, in one pass each rather than a scan per row. */
+   Two sweeps, because comparing each span with the one before it misses a
+   nested set: a multi-session hold covers everything opened inside it, and the
+   third such trade came back a pass. The verdict never showed it — something
+   always overlapped — but the counts and ids he checks did. Forward for a span
+   starting before an earlier one ends, backward for one ending after a later
+   one starts: every overlapping span, one pass each.
+   ───────────────────────────────────────────────────────────────────────── */
 function r10(rows: TradeRow[], now: number): RuleResult {
   const dated = rows.filter(t => isBroker(t) && t.entry_time);
 
-  // Closed by the poller and never stamped by the email: there is no instant to
-  // end the span at, so it is named as undecidable rather than run to now.
   const unknown = dated
     .filter(t => !t.fill_time && t.exit_price !== null)
     .map(t => t.id);
@@ -456,17 +350,14 @@ function r10(rows: TradeRow[], now: number): RuleResult {
   const pass: string[] = [], fail: string[] = [];
   const bad = new Set<string>();
 
-  // The furthest any earlier span runs to. Strict, so a position closing in the
-  // same instant the next one opens is a clean handover rather than a breach.
+  // Strict: closing in the instant the next opens is a handover.
   let ends = -Infinity;
   for (const s of spans) {
     if (s.from < ends) bad.add(s.id);
     ends = Math.max(ends, s.to);
   }
 
-  // And the earliest any later span starts, which is the same test read from
-  // the other side — it catches the long hold that the ones nested inside it
-  // were already caught against.
+  // The same test from the other side: catches the long hold.
   let starts = Infinity;
   for (let i = spans.length - 1; i >= 0; i--) {
     if (spans[i].to > starts) bad.add(spans[i].id);
@@ -478,14 +369,11 @@ function r10(rows: TradeRow[], now: number): RuleResult {
 }
 
 /* ─── R-11 ─────────────────────────────────────────────────────────────────
-   The day ends at −4% of account, however it was reached. §7: within an
-   open_day, no entry_time later than the fill_time of the loss that took
-   cumulative P&L past −4% of size_oz × 500.
-
-   THE ACCOUNT IS DERIVED AND NEVER `balance`, which §8 withholds precisely so
-   this denominator cannot be reached for by mistake: balance moves on transfers
-   with no trade behind them. A day whose rows carry no size at all is unknown
-   rather than passed — there is no account to take 4% of. */
+   The day ends at −4% of account. §7: within an open_day, no entry later than
+   the fill of the loss that took cumulative P&L past −4% of size_oz × 500.
+   Never `balance`, which §8 withholds because it moves on transfers. No size,
+   no account: unknown.
+   ───────────────────────────────────────────────────────────────────────── */
 export const DAY_LOSS = 0.04;
 
 function r11(rows: TradeRow[]): RuleResult {
@@ -495,26 +383,15 @@ function r11(rows: TradeRow[]): RuleResult {
     const done = all.filter(t => t.pnl != null);
     if (!done.length) continue;
 
-    /* ONE SIZE OR NONE. `find` took whichever non-null size came first in
-       whatever order the rows arrived in, and a day carrying two of them is
-       exactly the day R-13 exists to flag — so the denominator of the limit
-       was decided by row order on the days least able to afford it. A bigger
-       size is a bigger account and a more forgiving floor, so the two answers
-       are not close. Two sizes means no account, which means no limit. */
+    // One size or none. A day carrying two is exactly R-13's day, and 4 oz and
+    // 20 oz imply floors far apart: two sizes is no account.
     const sizes = new Set(done.map(t => t.size_oz).filter(s => s != null));
     if (sizes.size !== 1) { unknown.push(day); continue; }
     const size = [...sizes][0] as number;
 
-    /* A CLOSED ROW WITH NO `fill_time` CANNOT BE PLACED IN THE SEQUENCE, and
-       this rule is a running total walked in time order. Dropping it silently
-       is what R-15 was repaired for and R-11 kept doing: a lost LOSS never
-       reaches the floor and the day comes back `pass`, a lost WIN breaches a
-       day that never did. Both directions are corrupted by the same absence,
-       so the day is undecidable rather than either answer.
-
-       `dayStanding` below sums every closed row and needs no order, so it
-       stays whole — which is how this was found: the two disagreed about the
-       same day, one telling him the day was over while this reported pass. */
+    /* A closed row with no fill_time cannot be placed in a running total: a lost
+       loss passes the day, a lost win breaches it. So the day is unknown.
+       dayStanding sums and needs no order, so it stays whole. */
     const settled = done.filter(t => t.fill_time)
       .sort((a, b) => +new Date(a.fill_time as string) - +new Date(b.fill_time as string));
     if (settled.length < done.length) { unknown.push(day); continue; }
@@ -535,21 +412,15 @@ function r11(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-12 ─────────────────────────────────────────────────────────────────
-   At most one entry a day; two only when the second is a sweep re-entry. §7:
-   no open_day with three or more entries; a second entry more than 15 min after
-   the prior fill_time is a fail, within 15 min is unknown.
+   One entry a day; two only for a sweep re-entry. §7: three or more is a fail;
+   a second more than 15 minutes after the prior fill is a fail, within 15 is
+   unknown — no row says an entry was a sweep re-entry, so a prompt one is
+   undecidable by construction.
 
-   THE FIFTEEN MINUTES IS WHAT MAKES HALF OF THIS CHECKABLE. Nothing on a row
-   says an entry was a sweep re-entry — §8 lists it among what is not stored —
-   so a prompt second entry is unknown by construction and a late one is a fail
-   whatever it was. Three is a fail either way, since the rule permits two.
-
-   AND A SECOND ENTRY TAKEN WHILE THE FIRST WAS STILL OPEN IS A FAIL, NOT A
-   PROMPT ONE. A re-entry follows the first trade closing; one taken before it
-   closed is a second position, which he does not trade — his words, v1.21. It
-   read as `unknown` because a negative gap is "within fifteen minutes", which
-   is arithmetic answering a question the rule never asked. A first trade still
-   open now is the same case. One closed with no instant stays `unknown`. */
+   A second entry while the first was still open is a second position, which he
+   does not trade (v1.21): a fail, not a prompt re-entry, though the gap reads
+   negative. A first closed with no instant stays unknown.
+   ───────────────────────────────────────────────────────────────────────── */
 export const SWEEP_MIN = 15;
 
 function r12(rows: TradeRow[]): RuleResult {
@@ -572,12 +443,10 @@ function r12(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-13 ─────────────────────────────────────────────────────────────────
-   The sizing rung moves only between months. §7: one distinct size_oz per
-   calendar month, over rows carrying one.
-
-   THE MONTH IS THE CIVIL ONE `open_day` IS FILED UNDER, so it is sliced off the
-   stored date rather than derived from a timestamp — a trade opened at 20:00 on
-   the 31st is filed on the 31st and belongs to that month whatever UTC says. */
+   The sizing rung moves only between months. §7: one size_oz per calendar
+   month. The month is sliced off open_day, the civil day a trade is filed on,
+   whatever UTC says.
+   ───────────────────────────────────────────────────────────────────────── */
 function r13(rows: TradeRow[]): RuleResult {
   const months = new Map<string, Set<number>>();
   for (const t of rows) {
@@ -592,31 +461,22 @@ function r13(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-14 ─────────────────────────────────────────────────────────────────
-   No entries in the hours before a high-impact release. §7: no entry in the
-   30 minutes before a US release TradingView rates high; an entry with one
-   later that day but further off is unknown.
+   No entries before a high-impact release. §7: none in the 30 minutes before a
+   US release TradingView rates high; one with a release later that day but
+   further off is unknown. Thirty minutes is the floor no reading excuses, and
+   the rest is his judgement — unknown, never pass. HIGH is his decision
+   (v1.20), imported by the query that reads the calendar.
 
-   BOTH NUMBERS ARE HIS, and the second is a floor rather than the rule. §6
-   calls the stand-aside open-ended — a 10 a.m. print can cost the New York
-   morning from the open — so thirty minutes is the part no reading of it can
-   excuse, and a release further ahead the same day leaves the entry to his
-   judgement: unknown, never pass. HIGH is what counts as high impact, stated
-   here because it is the rule's decision — his, as of v1.20 — and the query
-   that reads the calendar imports it rather than typing it again.
-
-   A WEEK NOBODY FETCHED IS NOT A QUIET WEEK. A week with no releases stored
-   and a week never asked for read the same, and every entry in the second
-   would pass. `weeks` is the evidence of a whole-week fetch, written only
-   after that week's releases were; an entry outside one is unknown.
-   After the print is not checked: he stands aside through it by judgement,
-   and set no number for it. */
+   A week nobody fetched is not a quiet week: `weeks` is evidence of a
+   whole-week fetch, and an entry outside one is unknown. After the print is
+   not checked; he set no number for it.
+   ───────────────────────────────────────────────────────────────────────── */
 export const NEWS_MIN = 30;
 export const HIGH = 'high';
 
 export interface Calendar { releases: string[]; weeks: Set<string> }
 
-// The Sunday, New York, that the week holding `at` began on — the key
-// calendar_weeks is written under.
+// The Sunday, New York, the week began on — calendar_weeks' key.
 export function weekOf(at: Date): string {
   const w = nyWall(at);
   const d = new Date(Date.UTC(w.y, w.m - 1, w.d - w.wd));
@@ -640,15 +500,11 @@ function r14(rows: TradeRow[], cal: Calendar): RuleResult {
 }
 
 /* ─── R-15 ─────────────────────────────────────────────────────────────────
-   Nothing is held over the weekend. §7: no entry_time before and fill_time
-   after a Friday 17:00 New York close.
-
-   WALKED DAY BY DAY RATHER THAN ARITHMETIC ON THE SPAN, because "the Friday
-   17:00 close inside this span" is a wall-clock instant whose UTC value moves
-   with the offset — and a span crossing the March or November change would be
-   an hour wrong exactly where it matters. The walk is bounded: a span longer
-   than a month is not this account and is answered `unknown` rather than
-   looped over. */
+   Nothing held over the weekend. §7: no entry before and fill after a Friday
+   17:00 New York close. Walked day by day, because that close is a wall-clock
+   instant whose UTC value moves with the offset. A span over a month is not
+   this account, and is unknown.
+   ───────────────────────────────────────────────────────────────────────── */
 const SPAN_DAYS = 31;
 
 export function crossesFridayClose(from: Date, to: Date): boolean | null {
@@ -672,13 +528,8 @@ function r15(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
     if (!isBroker(t) || !t.entry_time) continue;
-    /* CLOSED, WITH NO INSTANT SAYING WHEN. The poller stamps `fill_time` only on
-       the closes its fold window reaches, so an older close with no alert
-       behind it has an `exit_price` and no time — and this rule is entirely about whether
-       a span crossed a particular Friday instant. It used to `continue` past
-       those, which drops them from the population silently: the one shape §8
-       says a rate must never be computed over. A position still genuinely open
-       is a different case and is still skipped, since it has not closed at all. */
+    // Closed with no instant: unknown, never silently dropped. Still open: not
+    // closed at all, so skipped.
     if (!t.fill_time) {
       if (t.exit_price !== null) unknown.push(t.id);
       continue;
@@ -691,9 +542,9 @@ function r15(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-16 ─────────────────────────────────────────────────────────────────
-   No trading on known low-volume days. §7: no entry_time on a US market or
-   bank holiday, or in the Christmas stretch. The day is the New York civil
-   one, because that is the day the market or the banks were shut on. */
+   No trading on known low-volume days. §7: no entry on a US market or bank
+   holiday or in the Christmas stretch, by the New York civil day.
+   ───────────────────────────────────────────────────────────────────────── */
 function r16(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [];
   const cache = new Map<number, Set<string>>();
@@ -709,25 +560,17 @@ function r16(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-18 ─────────────────────────────────────────────────────────────────
-   Stop and target are resting orders; a position is never closed by hand.
-   §7: no closed trade without a broker alert, except at the Friday close.
+   Stop and target rest at the broker; never closed by hand. §7: no closed trade
+   without a broker alert, the Friday close excepted. cTrader emails on a stop
+   or target fill and sends nothing for a hand close, and net_pnl comes from
+   that alert alone — so a closed row without one was closed by him. The prices
+   cannot say this.
 
-   THE ALERT IS THE EVIDENCE, AND ITS ABSENCE IS THE BREACH. cTrader emails
-   when a stop or target fills and sends nothing for a hand close — his own
-   account, confirmed against eight closes nothing was ever sent for. net_pnl
-   is written from that alert alone, so a closed row without one is a position
-   he closed himself. The prices cannot say this: a hand close at the stop and
-   the stop filling look identical.
-
-   R-15's close-out is the one permitted hand close, read through R-01's window
-   so the two rules agree on what "at the Friday close" is. A close under the
-   grace is unknown rather than a breach — the alert is normally seconds behind
-   the fill, and the Apps Script retries anything the function refused — and a
-   close with no instant cannot be aged or placed against Friday.
-
-   ONE WAY TO BE WRONG, AND IT IS NAMED. An alert the email path lost reads as
-   a hand close. The failure carries the id, so it can be looked up in Gmail
-   rather than believed. */
+   The Friday close-out reads through R-01's window, so the rules agree on what
+   it is. Inside the grace a close is unknown, the alert normally seconds
+   behind; one with no instant cannot be placed. The one way to be wrong — an
+   alert the email path lost — carries the id, to be looked up in Gmail.
+   ───────────────────────────────────────────────────────────────────────── */
 export const ALERT_GRACE_MIN = 60;
 
 function r18(rows: TradeRow[], now: number): RuleResult {
@@ -745,29 +588,20 @@ function r18(rows: TradeRow[], now: number): RuleResult {
 }
 
 /* ─── R-19 ─────────────────────────────────────────────────────────────────
-   A print landing on a position inherited from an earlier session: in profit,
-   stop to break-even; losing, tighten; the target never moves; never wider.
-   §7: judged at the first high-rated US release inside the position's span whose
-   session is not the one it was opened in, against the stop and target in
-   force then.
+   A print on a position from an earlier session: in profit, stop to
+   break-even; losing, tighten; target never moves; never wider. §7: judged at
+   the first high-rated US release inside the span whose session differs from
+   the entry's, against the stop and target then in force. Narrow because §6
+   made it so: a print in the entry's own session is R-14's.
 
-   THE POPULATION IS NARROW BECAUSE §6 MADE IT NARROW. "Read generally it turns
-   there is news later into a reason to touch any position" — so a trade opened
-   in the session its print lands in is R-14's business and never this one's,
-   and a trade no print lands on is not in it at all.
+   A stop tightened short of break-even is the rule when losing and a breach
+   when winning, and no row says which it was: unknown. At or past break-even
+   passes either way; untouched, wider, or a moved target fails either way.
 
-   ONE CASE THE DATA CANNOT PART. A stop tightened but short of break-even is
-   the rule on a losing trade and a breach on a winning one, and whether it was
-   winning at the print is a price nothing here holds — so it is unknown rather
-   than guessed. Break-even or better passes either way, since a losing trade
-   cannot hold a stop past its entry; an untouched stop fails either way, since
-   both branches move it. So does a wider one, and a target that moved.
-
-   STOP_GRACE_MIN because the poller writes a move up to two minutes after it
-   is made: a stop pulled in a minute before the print must not read as late. A
-   move a few minutes after the print passes for the same reason, and that is
-   the direction this errs in. A trade whose stop history starts after its
-   print — anything before 014 — is unknown. */
+   STOP_GRACE_MIN covers the poller writing a move up to two minutes late — so
+   a move just after the print also passes, the side this errs on. A stop
+   history starting after the print is unknown.
+   ───────────────────────────────────────────────────────────────────────── */
 export const STOP_GRACE_MIN = 5;
 
 export interface Stop { seen_at: string; sl: number | null; tp: number | null }
@@ -781,7 +615,7 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
     if (!isBroker(t) || !t.entry_time) continue;
     const entry = new Date(t.entry_time), e = +entry;
     if (!cal.weeks.has(weekOf(entry))) { unknown.push(t.id); continue; }
-    // Closed with no instant: the span has no end, so what it spanned is unknown.
+    // Closed with no instant: no end to the span.
     if (!t.fill_time && t.exit_price !== null) { unknown.push(t.id); continue; }
     const end = t.fill_time ? +new Date(t.fill_time) : Infinity;
 
@@ -810,9 +644,7 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
                 pass, fail, unknown);
 }
 
-/* One pass over the rows to bucket them by filing day, so the two day-scoped
-   rules do not each scan the list per day. The same reason index.html builds
-   Data.byDay once rather than filtering inside a loop. */
+/* One pass to bucket by filing day, as Data.byDay does in the app. */
 function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
   const days = new Map<string, TradeRow[]>();
   for (const t of rows) {
@@ -823,10 +655,8 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
   return days;
 }
 
-/* THE WHOLE SET, IN §7's ORDER. Order matters only for reading, and reading is
-   the point: the list she is handed should be the list the rules table states,
-   so a rule that stopped being evaluated is a gap in a sequence rather than an
-   absence nobody can see. */
+/* The whole set in §7's order, so a rule that stopped being evaluated is a gap
+   in a sequence she can see. */
 export function checkRules(rows: TradeRow[], now = Date.now(),
                            cal: Calendar = { releases: [], weeks: new Set() },
                            stops: Map<string, Stop[]> = new Map()): RuleResult[] {
@@ -836,27 +666,19 @@ export function checkRules(rows: TradeRow[], now = Date.now(),
 }
 
 /* ─── Where a day stands right now ────────────────────────────────────────
-   R-11 asks whether he TRADED AFTER the day was already past −4%, which is a
-   question about the past and answers `pass` at the very moment the limit is
-   reached — correctly, since nothing has been taken after it yet.
-
-   This is the other question, and it is the one a close is worth waking her
-   for: is the day past its limit AS OF NOW. A rule he wrote says the day ends
-   here, and saying so at the moment it becomes true is citing his own rule
-   rather than judging his trade. Separate function because it is a separate
-   question, and folding it into r11 would make that rule answer two things.
-
-   Returns null when the day cannot be judged — no rows, or no size to derive an
-   account from — because a limit with no denominator is not a limit. */
+   R-11 asks whether he traded AFTER the limit — a question about the past that
+   answers pass at the moment the limit is reached. This asks whether the day
+   is past its limit NOW, which is when a close is worth waking her for. Null
+   when no account can be derived.
+   ───────────────────────────────────────────────────────────────────────── */
 export interface Standing { day: string; pnl: number; account: number; breached: boolean }
 
 export function dayStanding(rows: TradeRow[], day: string): Standing | null {
   const all = rows.filter(t => isBroker(t) && t.open_day === day);
   if (!all.length) return null;
 
-  // Two sizes is no account, for r11's reason. Whole rather than ordered: this
-  // is a sum and not a sequence, so a close with no `fill_time` still counts
-  // here where r11 cannot place it.
+  // Two sizes is no account. A sum, not a sequence, so an unstamped close
+  // still counts.
   const sizes = new Set(all.map(t => t.size_oz).filter(s => s != null));
   if (sizes.size !== 1) return null;
   const size = [...sizes][0] as number;
@@ -866,11 +688,8 @@ export function dayStanding(rows: TradeRow[], day: string): Standing | null {
   return { day, pnl, account, breached: pnl <= -DAY_LOSS * account };
 }
 
-/* Rendered here rather than by the caller, for the reason searchList and
-   channelsList are: it is a decision about what she is told, and a decision a
-   test can read. Counts always, ids only where there is something to name —
-   a list of six passing trade ids is noise, and the same list on a failure is
-   the entire finding. */
+/* Rendered here, so what she is told is a decision a test can read. Ids only
+   where something failed or is undecided — on a pass they are noise. */
 export function adherenceList(results: RuleResult[]): string {
   return results.map(r => {
     const counts = `${r.passed} pass, ${r.failed} fail, ${r.unresolved} unknown`;
