@@ -2219,17 +2219,23 @@ const Data = {
       this.offline = false;
       try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.all)); } catch (e) {}
       setSyncStatus('ok');
+      this.index();
     } catch (e) {
-      // The last thing the database confirmed, so it is safe to draw. Writes
-      // are refused while offline, which is why nothing needs reconciling on
-      // return.
       console.warn('Doji: load failed, using snapshot', e);
-      try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
-      catch (err) { this.all = []; }
-      this.rows = this.all.filter(t => !t.deleted);
-      this.offline = true;
-      setSyncStatus('offline');
+      this.cached();
     }
+  },
+
+  // The last thing the database confirmed, so it is safe to draw. Writes are
+  // refused while offline, which is why nothing needs reconciling on return.
+  // Two callers: a read the database did not answer, and a boot that could not
+  // reach it to ask who was signed in.
+  cached() {
+    try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
+    catch (err) { this.all = []; }
+    this.rows = this.all.filter(t => !t.deleted);
+    this.offline = true;
+    setSyncStatus('offline');
     this.index();
   },
 
@@ -4035,6 +4041,20 @@ function bootState(text, failed) {
   el.classList.remove('done');
 }
 
+/* UNREACHABLE IS NOT SIGNED OUT. supabase-js answers a server it could not
+   reach with the same `error` it uses for a refusal, and an access token lasts
+   an hour — so most opens without a network failed the session check before the
+   journal was asked for, and showed the login screen, where nothing can be done
+   offline, in place of the cached copy the README promises. Drawn read-only
+   instead, and booted properly the moment the network is back. */
+const unreachable = e => e?.name === 'AuthRetryableFetchError';
+
+function openOffline() {
+  Data.cached();
+  render();
+  window.addEventListener('online', () => location.reload(), { once: true });
+}
+
 (async function boot() {
   // Both libraries are plain blocking scripts with no fallback. An unreachable
   // CDN leaves window.supabase undefined and Data.init() throws before anything
@@ -4064,9 +4084,9 @@ function bootState(text, failed) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   window.addEventListener('focus', tick);
 
-  let data;
+  let data, error;
   try {
-    ({ data } = await Data.init());
+    ({ data, error } = await Data.init());
   } catch (e) {
     console.error('Doji: init failed', e);
     bootState('Could not reach the server. Check your connection and reload.', true);
@@ -4075,7 +4095,11 @@ function bootState(text, failed) {
 
   // The login overlay is its own full-screen surface, so the banner stands down
   // rather than sitting behind it.
-  if (!data?.session) { bootState(null); Login.show(); return; }
+  if (!data?.session) {
+    bootState(null);
+    if (unreachable(error)) openOffline(); else Login.show();
+    return;
+  }
 
   try {
     await Data.start();
@@ -4088,7 +4112,7 @@ function bootState(text, failed) {
   } catch (e) {
     console.error('Doji: start failed', e);
     bootState(null);
-    Login.show();
+    if (unreachable(e)) openOffline(); else Login.show();
   }
 })();
 

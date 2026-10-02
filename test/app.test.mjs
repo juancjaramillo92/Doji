@@ -9,7 +9,8 @@
    WHAT IS NOT COVERED, said plainly. These tests assert on values and on
    emitted markup; they cannot see pixels, so a renderer that produces correct
    HTML with broken CSS passes here. Supabase is a recording stand-in, so load
-   and save are exercised but realtime and the auth paths are not. The xlsx
+   and save are exercised, and so is each answer a boot can get about the
+   session, but realtime and the auth server itself are not. The xlsx
    export is exercised against a recording SheetJS stub, so the rows it builds
    are asserted and the bytes SheetJS writes from them are not. And the Apps
    Script has no coverage at all, here or anywhere.
@@ -1055,6 +1056,72 @@ test('signing out takes the journal off the device', async () => {
   assert.equal(win.localStorage.getItem(key), null,
     'the snapshot survived sign-out — the next person sees the login screen ' +
     'and the previous session\'s trades one keypress apart');
+});
+
+/* ─── Opening it with no network ─────────────────────────────────────────────
+   The README promises the journal opens and draws from the snapshot without a
+   connection. It did not: supabase-js answers a server it cannot reach with
+   the same `error` it uses for a refusal, the session check failed first, and
+   the login screen came up — where nothing can be done offline — in front of a
+   journal the device already held. Driven through the real boot, because the
+   load() test above passed the whole time this was broken.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const settle = () => new Promise(r => setTimeout(r, 20));
+const UNREACHABLE = { name: 'AuthRetryableFetchError', message: 'Failed to fetch', status: 0 };
+
+test('an open that cannot reach the server draws the snapshot, read-only', async () => {
+  const dev = await boot({
+    snapshot: [journalled({ id: 'PID7', open_day: '2026-07-30', pnl: 40 })],
+    auth: { getSession: async () => ({ data: { session: null }, error: UNREACHABLE }) },
+  });
+  try {
+    await settle();
+    assert.ok(!dev.$('login-overlay').classList.contains('open'),
+      'the login screen came up offline, in front of the journal the device holds');
+    assert.equal(dev.app.Data.offline, true, 'drawn from the snapshot without going read-only');
+    assert.deepEqual([...dev.app.Data.rows].map(t => t.id), ['PID7']);
+    assert.ok(dev.$('trade-table').querySelector('tr[data-trade="PID7"]'),
+      'the snapshot was read and never drawn');
+    assert.equal(dev.$('sync-dot').className, 'sync-dot offline');
+  } finally { dev.close(); }
+});
+
+test('a session that is genuinely gone still asks him to sign in', async () => {
+  const dev = await boot({
+    snapshot: [journalled({ id: 'PID7' })],
+    auth: { getSession: async () => ({ data: { session: null }, error: null }) },
+  });
+  try {
+    await settle();
+    assert.ok(dev.$('login-overlay').classList.contains('open'),
+      'a signed-out device drew the previous session from its snapshot');
+    assert.equal(dev.$('trade-table').querySelector('tr[data-trade]'), null);
+  } finally { dev.close(); }
+});
+
+test('a refused user check is a sign-in, an unreachable one is the snapshot', async () => {
+  const session = async () => ({ data: { session: { access_token: 't' } }, error: null });
+  const refused = await boot({
+    snapshot: [journalled({ id: 'PID7' })],
+    auth: { getSession: session,
+            getUser: async () => ({ data: { user: null }, error: { name: 'AuthApiError', status: 401 } }) },
+  });
+  try {
+    await settle();
+    assert.ok(refused.$('login-overlay').classList.contains('open'), 'a refused session was drawn anyway');
+  } finally { refused.close(); }
+
+  const away = await boot({
+    snapshot: [journalled({ id: 'PID7' })],
+    auth: { getSession: session,
+            getUser: async () => ({ data: { user: null }, error: UNREACHABLE }) },
+  });
+  try {
+    await settle();
+    assert.ok(!away.$('login-overlay').classList.contains('open'),
+      'an unreachable user check sent him to a login he cannot complete offline');
+  } finally { away.close(); }
 });
 
 /* ─── Sorting ────────────────────────────────────────────────────────────── */
