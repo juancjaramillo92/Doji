@@ -814,9 +814,8 @@ async function readTvCalendar(from: string, to: string): Promise<TvEvent[]> {
   return answer.events;
 }
 
-/* IN GROUPS THAT CARRY THE SAME KEYS, which is what makes leaving a figure out
-   reach the database at all: PostgREST refuses a bulk insert whose objects do
-   not all name the same columns. */
+/* Grouped by the keys each row carries: PostgREST refuses a bulk insert whose
+   objects name different columns, and leaving a figure out depends on it. */
 async function upsertCalendar(rows: Record<string, string>[]): Promise<number> {
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
@@ -833,20 +832,17 @@ async function upsertCalendar(rows: Record<string, string>[]): Promise<number> {
   return rows.length;
 }
 
-// Exported so a test can drive the write: which rows go up together is the
-// half that decides whether a missing figure reaches the database at all.
+// Exported so a test can drive the grouping.
 export async function fileCalendar(now: number): Promise<number> {
   const from = now - CAL_BACK * 3600_000, to = now + CAL_AHEAD * 3600_000;
   return upsertCalendar(calendarRows(await readTvCalendar(utcDay(from), utcDay(to)), from, to));
 }
 
-/* A WHOLE WEEK, AND THEN THE MARK THAT SAYS SO — the coverage R-14 and R-19
-   read (019). `week` is a Sunday in New York, `weekOf`'s key. TradingView is
-   asked in UTC days, so the read runs to the next Sunday and keeps only what
-   `weekOf` files under this week: the Saturday-evening hours a New York week
-   ends on are the next UTC day. The mark goes down only after the rows did,
-   so a failure in between leaves the week unknown rather than covered and
-   empty — the direction every gap in this system has to fail in. */
+/* A whole week, then the mark that says so (019). `week` is a New York Sunday;
+   TradingView is asked in UTC days, so the read runs to the next Sunday and
+   keeps what weekOf files under this week. The mark goes down only after the
+   rows, so a failure between leaves the week unknown rather than covered and
+   empty. */
 export async function fileWeek(week: string, now = Date.now()): Promise<number> {
   const next = utcDay(Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000);
   const rows = calendarRows(await readTvCalendar(week, next), 0, Infinity)
@@ -860,13 +856,9 @@ export async function fileWeek(week: string, now = Date.now()): Promise<number> 
   return filed;
 }
 
-/* NEVER TAKES ITS CALLER DOWN, AND BOTH OUTCOMES ARE A ROW. A briefing with no
-   fresh calendar still has yesterday's filing and her search; a filing that
-   failed and left only a console line is the embedding sweep's lesson again —
-   a calendar that silently stopped moving looks exactly like a quiet week. */
-/* The week's own meter, kept apart from the quarter-hourly one so a row says
-   which of the two writers it is about — the nightly week and the history door
-   are the only things that mark a week covered. */
+/* Never takes its caller down, and both outcomes are a row: a calendar that
+   silently stopped moving looks like a quiet week. Its own caller label, apart
+   from the quarter-hourly filing, because only this marks a week covered. */
 async function filedWeek(week: string): Promise<boolean> {
   try {
     await recordRun({ caller: 'calendar week', ok: true, detail: `${week}: ${await fileWeek(week)} filed` });
@@ -879,13 +871,10 @@ async function filedWeek(week: string): Promise<boolean> {
   }
 }
 
-/* THE WEEKS FROM A DATE TO NOW, AT MOST TWO YEARS OF THEM. Anchored at noon UTC
-   on the Sunday, which is a Sunday in New York in both halves of the year, so
-   stepping a week never crosses a clock change into the wrong day. The bound
-   keeps one run inside the worker's wall clock — a second a week, and a
-   `HISTORY_PAUSE_MS` each time TradingView refuses; a longer history is a
-   second run from where the first stopped. Pure, so the walk is driven rather
-   than trusted. */
+/* The weeks from a date to now, at most two years — one run's worth inside the
+   wall clock; a longer history is a second run. Anchored at noon UTC on the
+   Sunday, so a week's step never crosses a clock change into the wrong day.
+   Pure, so the walk is driven. */
 const HISTORY_WEEKS = 104;
 
 export function historyWeeks(start: string, now: number): string[] | null {
@@ -898,19 +887,12 @@ export function historyWeeks(start: string, now: number): string[] | null {
   return weeks;
 }
 
-/* One week at a time, for `?bars=raw`'s reason: each week's failure is its own
-   row in `eugenia_runs`, which is where this door's answer is read — it runs
-   behind the 200 like every other, so the response says nothing.
-
-   A REFUSED WEEK IS ASKED AGAIN ONCE, AFTER A PAUSE, AND A SECOND REFUSAL ENDS
-   THE WALK. TradingView refuses past about thirty calendar reads a minute and
-   says to retry in half of one: the first year walked filed thirty-one weeks
-   and then wrote twenty-three refusals in a second and a half, every one of
-   them a week the run had been asked for and could have filed by waiting. The
-   pause is a constant rather than the figure in the refusal, which is prose in
-   someone else's error. Twice refused, the rest would meet the same answer, so
-   the walk stops and its last row names the week to start the next run from.
-   Exported with the pause as a parameter so the sequence is driven. */
+/* One week at a time, each failure its own eugenia_runs row — where this door
+   is read, since it answers before it works. TradingView refuses past about
+   thirty calendar reads a minute, so a refused week is asked again once after
+   a pause, and a second refusal ends the walk with its last row naming where
+   to resume. Exported with the pause as a parameter so the sequence is
+   driven. */
 const HISTORY_PAUSE_MS = 35_000;
 
 export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
@@ -934,29 +916,14 @@ async function filed(now = Date.now()): Promise<void> {
   }
 }
 
-/* THE FALLBACK FOR A PRINT TRADINGVIEW HAS NOT PUBLISHED, and it goes to the
-   row that was looked at or nowhere. An upsert keyed on a name the model writes
-   once filed a print under `retail sales` beside the row it had been handed as
-   `US retail sales (August, advance)` — an INSERT, the actual on a row with no
-   consensus and the consensus on a row with no actual, and nothing failed.
+/* The fallback for a print TradingView has not published. It cannot insert —
+   an upsert on a model-written name once filed a print beside the row it was
+   handed — so it is a PATCH over the two columns a look owns, never consensus
+   or prior. A name matching nothing answers with the names on file, since an
+   empty PATCH is a 200 that reads like a write.
 
-   So this one CANNOT INSERT. A PATCH and nothing else, over the two columns a
-   look owns — which makes it structural rather than remembered: a look cannot
-   mint a row under any spelling, and it cannot write `consensus` or `prior`,
-   which are TradingView's.
-
-   AND A NAME THAT MATCHES NOTHING ANSWERS WITH THE NAMES ON FILE, because a
-   PATCH filtered to nothing is a 200 with an empty body — silence that reads
-   exactly like a write, the shape `planned` was repaired for in the poller. She
-   is handed the names in the message and quoting one is the whole job; when she
-   paraphrases anyway the next round has what it needs instead of a second row. */
-/* A SPEECH HAS NO FIGURE, SO THE FIGURE CANNOT BE THE PRICE OF THE LINE. The
-   look after a release is told it may add one line on what it meant whichever
-   way it decides, and a speech rated high is looked at the moment it lands —
-   so the one record a Chair's press conference could leave was refused here
-   for want of a number nothing will ever print. Either half may come alone;
-   an absent key is left as it was, which is `emailRow`'s rule, so a line
-   written after the figure never erases it. */
+   Either half may come alone: a speech has no figure, and its one line must
+   not be refused for want of a number. An absent key is left as it was. */
 async function recordActual(at: unknown, name: unknown, actual: unknown, note: unknown): Promise<string> {
   const when = new Date(String(at ?? ""));
   const called = String(name ?? "").trim();
@@ -971,13 +938,9 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
   if (printed) patch.actual = printed;
   if (line) patch.note = line;
 
-  /* THE NAME GOES OUT AS ITSELF, ENCODED AND NOTHING ELSE. An `eq` value is
-     read whole — PostgREST splits on a comma only inside `in.(…)`, and strips
-     double quotes only there — so wrapping this one in quotes made them part of
-     the name compared. Every call missed from the day that went in: six on one
-     core PCE, each answered with `core PCE` as what was on file. Encoded because
-     `&`, `#` and `%` do mean something in a URL, and a release is named by
-     whoever writes the calendar. */
+  // The name goes out encoded and nothing else. PostgREST reads an `eq` value
+  // whole — quotes are stripped only inside `in.(…)` — so quoting it once made
+  // every call miss.
   const at_ = when.toISOString();
 
   try {
@@ -988,8 +951,7 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if ((await res.json()).length) return `Recorded against ${called}.`;
 
-    // Bounded like every other read here: the 08:30 slot holds most of a
-    // report, and a list longer than that is not worth reading back to her.
+    // Bounded: the 08:30 slot holds most of a report.
     const standing = await readRows<Release>('Release',
       `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
     return standing.length
@@ -1024,24 +986,11 @@ const ACTUAL_TOOL = {
 } as const;
 
 /* ─── The price, read off the instrument ───────────────────────────────────
-   She has quoted gold out of whatever a news page said, at whatever staleness
-   that page had, since she existed. The broker this system already polls serves
-   a live bid and ask, and now she can read it.
-
-   THROUGH THE POLLER, NOT THROUGH THE BROKER, and that is the whole design.
-   `doji-mcp-sync` holds CTRADER_MCP_TOKEN, and the same endpoint that serves a
-   price also serves `create_order`, `close_position` and `amend_position`.
-   Giving Eugenia that token would put a market order one prompt injection away
-   from the bot whose entire product is that she gives no signals — so she gets
-   a JSON price from a function that will only ever answer with one, and the
-   token stays where it was.
-
-   The cron secret is what she presents, which she already holds because her own
-   scheduled half checks it. Against the poller it opens exactly what the README
-   says it opens: a read-only poll that was going to run anyway.
+   Through the poller, never the broker: the endpoint that serves a price also
+   serves create_order, so the token stays in doji-mcp-sync and she presents
+   the cron secret, which there opens only a read-only poll.
    ───────────────────────────────────────────────────────────────────────── */
-// SB_URL is already the project's own origin, so the poller is one path away
-// and needs no second copy of the project ref — which agree.test.mjs counts.
+// One path from SB_URL, so no second copy of the project ref.
 const MARKET_URL = `${SB_URL}/functions/v1/doji-mcp-sync?market=1`;
 
 const MARKET_TOOL = {
@@ -1059,15 +1008,10 @@ const MARKET_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
-/* THE MARKET AROUND GOLD, IN A CONVERSATION. The briefing and the move look
-   are handed the dollar, the yields, the real yield and the wires; a reply was
-   not, so asked why gold fell she had a web search and nothing else, against
-   her own rule never to quote those from one. The same two reads the move look
-   makes, through the function that holds the TradingView sign-in, with the
-   headlines wider because a question is about the morning. The briefing's
-   rate odds too, and the speculators' weekly count, which only the Sunday
-   briefing is otherwise handed, because "is gold crowded" is a question asked
-   on a Wednesday. */
+/* The market around gold, in a conversation: the reads the move look makes,
+   headlines wider, plus the rate odds and the speculators' count — "is gold
+   crowded" gets asked on a Wednesday. Without it her only source was a web
+   search, against her own rule. */
 const AROUND_TOOL = {
   name: "get_around",
   description:
@@ -1084,19 +1028,14 @@ const AROUND_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
-/* The fields of that answer this file actually reads. The poller folds pipettes
-   out of the quote and settles the scale before it is served, so everything
-   here is a display price — see the poller, where that asymmetry is named. */
+/* Display prices: the poller settles the scale before serving. */
 export interface Quote {
   bid: number; ask: number; high: number; low: number;
   prev_close: number | null; change: number | null; at: string;
 }
 
-/* THE NUMBERS, AND NULL WHERE THERE ARE NONE. Two callers want two different
-   things from one read: the tool below wants a sentence it can hand the model,
-   and the price sense wants the figures — so the fetch is here once and each
-   caller says what an unreadable price means to it. A price that cannot be read
-   is not a price of zero, and neither caller may be given one. */
+/* The figures, or null: an unreadable price is not zero. One fetch, and each
+   caller says what a missing price means to it. */
 async function marketQuote(): Promise<Quote | null> {
   try {
     const res = await fetch(MARKET_URL, { headers: { "x-doji-key": CRON_SECRET } });
@@ -1110,26 +1049,12 @@ async function marketQuote(): Promise<Quote | null> {
   }
 }
 
-/* THE ROLL IS THE WINDOW EVERY ONE OF THOSE NUMBERS IS MEASURED OVER, AND THE
-   QUOTE USED NOT TO SAY SO. `high`, `low`, `prev_close` and `change` all belong
-   to the broker's session, which for gold restarts at the 17:00 New York roll —
-   so `change` is the overnight move for the sixteen hours before that roll and
-   only the evening's move for the seven after it. Served as a bare `change` in
-   a JSON blob it reads as neither, which is to say it reads as "on the day",
-   and that is what she said at 20:57 on a session under four hours old: up $12
-   where the calendar day was up more than $40. Both numbers were real. One
-   label was wrong, and it was the one nothing in this file had ever written
-   down.
-
-   A LABEL RATHER THAN A SECOND CALL, because there is no second call to make.
-   Nothing this system can read spans the calendar day — `get_trendbars` serves
-   the broker's daily bars, which roll on the same boundary — so the honest fix
-   is to name the window and say plainly that the day is not in it, rather than
-   to compute a figure out of numbers that cannot carry one.
-
-   Pure and exported for the reason foldSpot is: a window named wrongly is
-   invisible in the output and arrives as a confident wrong number, and this is
-   the one thing here a test can drive from both sides of the roll. */
+/* The window every figure is measured over. High, low, previous close and the
+   move all belong to the broker's session, which restarts at the 17:00 New
+   York roll — so the same `change` is the overnight move before that hour and
+   the evening's after it. Unlabelled it read as "on the day". Nothing here
+   spans the calendar day, so the window is named rather than computed. Pure,
+   so both sides of the roll are driven. */
 export const ROLL_HOUR = 17;
 
 export function quoteWindow(now: Date): string {
@@ -1144,21 +1069,11 @@ export function quoteWindow(now: Date): string {
       "previous close is the overnight move.";
 }
 
-/* ONE RENDERING OF A QUOTE, AND THE WINDOW IS PART OF IT RATHER THAN BESIDE IT.
-   Three callers want this — the tool, the briefing's own block and the price
-   sense — and a quote said three ways is three chances to say `change` without
-   saying what it is a change FROM, which is the mistake this whole section is
-   here about. Prose rather than the JSON the tool used to return, for the same
-   reason: a bare field name in a blob is read as whatever it sounds like, and
-   `change` sounds like the day. */
+/* One rendering of a quote, with the window inside it, for all three callers —
+   prose, because a bare `change` reads as whatever it sounds like. */
 export function quoteLine(q: Quote, now: Date): string {
-  /* THE BROKER MAY NOT REPORT A PREVIOUS CLOSE, and this is where that used to
-     become a sentence. `prev_close` was typed `number` and arrived null, so the
-     template printed the word "null", `null >= 0` chose "up", and
-     `Math.abs(null)` gave 0 — "against a previous close of null — up 0 since
-     it". Neither half true, in the line the briefing opens on. The bid and the
-     range are still worth having, so the move is what goes rather than the
-     quote, and she is told not to reconstruct it. */
+  // No previous close, no move — and she is told not to reconstruct one. The
+  // bid and the range are still worth having.
   const since = q.prev_close === null || q.change === null
     ? `. The broker reported no previous close on this read, so there is no ` +
       `move to state and you may not infer one.`
@@ -1169,51 +1084,31 @@ export function quoteLine(q: Quote, now: Date): string {
     `has traded ${q.low} to ${q.high}${since} ` + quoteWindow(now);
 }
 
-// Said rather than served empty, on both paths that can meet it: a briefing
-// that opens on a silently missing price either invents a number or drops the
-// line the whole first paragraph is built on.
+// Said rather than left out: a briefing missing its price invents one or
+// drops the line its first paragraph is built on.
 const NO_PRICE =
   "The live price could not be read just now. Say you do not have a current " +
   "level rather than quoting one from a search.";
 
-/* NEVER THROWS, for the reason every other tool here does not. */
+/* Never throws. */
 async function readMarket(): Promise<string> {
   const quote = await marketQuote();
   return quote ? quoteLine(quote, new Date()) : NO_PRICE;
 }
 
-/* THE ONE NUMBER EVERY BRIEFING OPENS ON WAS THE ONLY INPUT IT WAS NOT HANDED.
-
-   Notes, the channel map, his week of trades, the thesis, the open threads, the
-   calendar and his desk are all read before the call and put in front of her.
-   The price — which the prompt calls the opening line, and the one figure he
-   checks against his own screen — was a TOOL she had to remember to reach for.
-   That is an instruction standing where an input belongs, and it fails the way
-   this file's instructions always fail: she quotes a level off a search page,
-   it is four digits and looks like gold, and nothing anywhere reports that it
-   is however stale that page was.
-
-   The tool stays, because a reply asking where gold is needs it and most
-   replies do not — which is the same trade get_trades makes. This is the one
-   path where the answer is known in advance to be wanted.
-
-   NEVER THROWS, and it has no catch: marketQuote already swallows its own
-   failure and answers null, so the sentence below is the whole handling. */
+/* The briefing is handed the price rather than told to fetch it: an
+   instruction where an input belongs fails the way instructions do, with a
+   level off a search page that still looks like gold. The tool stays for
+   replies. marketQuote already swallows its failure. */
 export async function marketBlock(): Promise<string> {
   const quote = await marketQuote();
   return "\n\n" + (quote ? quoteLine(quote, new Date()) : NO_PRICE);
 }
 
 /* ─── The running story ────────────────────────────────────────────────────
-   Her memory had two timescales and needed three. Turns roll over in a morning;
-   notes are durable facts about HIM. Nothing held what is going on in the
-   MARKET across weeks, so every briefing rebuilt the story out of a web search
-   and continuity survived only as long as yesterday stayed inside twelve turns.
-
-   THE NIGHTLY PASS WRITES IT AND NOTHING ELSE DOES. A thesis is a reading
-   across days, which is the same argument that keeps set_channel out of
-   CHAT_TOOLS: rewriting it mid-conversation would let one exchange redirect the
-   week's story, and the pass is the only caller that sees a whole day.
+   What the market has been trading, across weeks: turns roll over in a
+   morning and notes are about him. The nightly pass alone writes it, for
+   set_channel's reason — one exchange must not redirect the week's story.
    ───────────────────────────────────────────────────────────────────────── */
 export const THESIS_MAX = 600;
 
