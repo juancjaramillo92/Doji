@@ -1,30 +1,24 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EUGENIA — market briefing and conversation  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// The second bot. Gladys collects the journal; Eugenia does macro. Same two-
-// caller shape as doji-gladys, told apart by which secret arrives:
+// The second bot: Gladys collects the journal, Eugenia does macro. Two
+// callers, told apart by the secret they present:
 //
-//   x-doji-key                        the scheduled jobs in
-//                                     supabase/004_cron.sql, the trades
+//   x-doji-key                        the scheduled jobs in 004, the trades
 //                                     trigger in 005, and her own speaking
 //                                     worker — postScheduled reads which.
-//   x-telegram-bot-api-secret-token   Telegram — the trader replied, answer him.
+//   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
 //
-// SHE OWNS NO COLUMN OF `trades` AND HAS NO WRITE PATH TO IT. She reads the
-// journal through the eugenia_trades view, which is granted SELECT and nothing
-// else, and writes only her own conversation and her own notes — which is why
-// she is not a fifth writer and has nothing to arbitrate with anybody.
+// She owns no column of `trades` and has no write path to it: she reads the
+// journal through eugenia_trades, granted SELECT alone, and writes only her
+// own tables.
 //
-// THE SCHEDULE IS DECIDED HERE, NOT IN CRON. Weekdays at 08:00 and Sunday at
-// 17:00 New York — and pg_cron schedules in UTC, so a fixed expression would be
-// an hour wrong for half the year. The job runs hourly and briefDue() answers
-// whether this is the hour, exactly as marketOpen() does for the poller. Asking
-// America/New_York for its own clock is correct all year and is one function.
+// The schedule is decided here rather than in cron, which runs in UTC: the job
+// runs hourly and dueNow answers against New York's own clock.
 //
-// HOLDING HER CRON SECRET IS NOT NOTHING. Against the poller it starts a poll
-// that was going to run anyway; here `?force=1` spends money, a briefing at a
-// time, with no bound in the code. The bound is a spend cap on the Anthropic
-// key, which is the only place one can actually be enforced.
+// Her cron secret is not harmless: here `?force=1` spends money, a briefing at
+// a time. The bound is the spend cap on the Anthropic key, the one place one
+// can be enforced.
 //
 // Deploy:   supabase functions deploy doji-eugenia --no-verify-jwt
 // Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET and
@@ -35,46 +29,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
-// The thirteen rules a row can answer, evaluated rather than reasoned about. Pure
-// and imported rather than inlined for the reason balanceTarget and foldHours
-// are exported in the app: it is the part that has to be testable.
+// Pure and imported, so the parts that decide are testable.
 import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, weekOf,
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
-// The app's own arithmetic over the journal — a win rate, the money split, the
-// realised reward-to-risk, the session and setup breakdowns. Pure and imported
-// for the reason adherence.ts is: it is the part that has to be testable, and
-// it is a copy of index.html that agree.test.mjs holds against it.
 import { journalStats, statsList } from "./journal.ts";
-// Everything shared lives in _shared/edge.ts — one definition each, for the
-// reason that file gives.
 import {
   env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
 const WEBHOOK_SECRET = env("EUGENIA_WEBHOOK_SECRET");
-// The same chat as Gladys — one trader, one thread each. Numeric, for the same
-// reason as doji-gladys: it is both a send target and an identity.
+// The same chat as Gladys; numeric, being both a send target and an identity.
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
 const ANTHROPIC_KEY  = env("ANTHROPIC_API_KEY");
 
 /* ─── When the briefing is due ─────────────────────────────────────────────
-   Monday to Friday at 08:00, Sunday at 17:00 — New York, which is the clock
-   every other time in this system is kept in. Sunday 17:00 is also the gold
-   open, so the week's first briefing lands exactly as the market does.
-
-   Returns which briefing is due, or null. The two answers differ in what she
-   is asked and in their calendar — Sunday's is the week it opens — and that is
-   the whole reason this is not a boolean.
+   Weekdays at 08:00 and Sunday at 17:00 New York — the gold open, so the
+   week's first briefing lands with the market. Which briefing rather than a
+   boolean: the two are asked different things and read different calendars.
    ───────────────────────────────────────────────────────────────────────── */
 export type Brief = 'weekday' | 'sunday';
 
-// nyClock is shared with the poller's market hours, so the two cannot disagree
-// about what hour it is in New York — the sort of difference nobody finds until
-// March. Both schedules below read it, which is why it is read once here.
 export function briefDue(now: Date): Brief | null {
   const { wd, hour } = nyClock(now);
   if (wd >= 1 && wd <= 5 && hour === 8) return 'weekday';
@@ -82,39 +60,19 @@ export function briefDue(now: Date): Brief | null {
   return null;
 }
 
-/* THE SECOND LOOK, and its default answer is silence.
-
-   Weekdays at 10:00 New York: an hour and a half after the briefing, which puts
-   it past the 08:30 data window and into the session. One extra call a day
-   rather than a check every hour — an hourly watch is twenty-three model calls
-   with web search behind them, and the cost of that is not worth a feature
-   whose right answer is usually "nothing happened".
-
-   It is therefore NOT event-driven, and calling it that would be a lie: it is a
-   second scheduled look that usually says nothing. Adding a second hour is one
-   line if the morning one proves useful. */
+/* The second look, whose default answer is silence: weekdays at 10:00, past
+   the 08:30 data and into the session. One call a day rather than an hourly
+   watch, whose right answer would usually be "nothing happened". */
 export function pulseDue(now: Date): boolean {
   const { wd, hour } = nyClock(now);
   return wd >= 1 && wd <= 5 && hour === 10;
 }
 
-/* Weekday 09:00, 10:00 and 11:00 New York — the hours where a briefing is still
-   a briefing rather than a bulletin about a morning that has gone. Nothing
-   fires unless the 08:00 one failed, which briefedToday() decides.
-
-   AND SUNDAY HAD NO SECOND CHANCE AT ALL, WHICH IS THE WRONG WAY ROUND. It is
-   the only briefing of the week that cannot be retried and the one whose
-   absence takes longest to notice — a missing weekday morning is missing again
-   tomorrow, a missing Sunday open is missing for seven days. The same three
-   hours after its own briefing, which keeps it an evening about a week that is
-   opening rather than a note about one already under way, and leaves the 22:00
-   pass two hours clear. The week-walk over dueNow is what holds that spacing.
-
-   IT RETURNS WHICH BRIEFING RATHER THAN WHETHER ONE IS DUE, because a retry has
-   to send the same shape the failed one would have. dueNow named 'weekday'
-   itself, which was true only for as long as this window was weekdays-only —
-   a literal that answers correctly by accident of another function's range is
-   the shape that breaks the first time that range moves. */
+/* The retries, which fire only if the briefing did not land: weekdays 09:00 to
+   11:00, while it is still a briefing, and Sunday 18:00 to 20:00 — the one
+   whose absence would otherwise last a week. Returns which briefing, because a
+   retry sends the shape the failed one would have; dueNow once named
+   'weekday' itself, right only while this window was weekdays-only. */
 export function retryDue(now: Date): Brief | null {
   const { wd, hour } = nyClock(now);
   if (wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11) return 'weekday';
@@ -122,92 +80,48 @@ export function retryDue(now: Date): Brief | null {
   return null;
 }
 
-/* WHICH BRIEFING THIS DAY TAKES, which is a different question from which one
-   this HOUR owes and was being answered with a constant. `?force=1` read
-   `briefDue(now) ?? 'weekday'`, so the door that exists for the hour a briefing
-   did NOT arrive could not produce a Sunday one outside the single hour it was
-   already due — forcing it on a Sunday evening sent a weekday briefing into a
-   market that had just opened for the week. */
+/* Which briefing this DAY takes — what ?force=1 needs, so a forced Sunday
+   evening briefing is a Sunday one. */
 export const briefKind = (now: Date): Brief =>
   nyClock(now).wd === 0 ? 'sunday' : 'weekday';
 
-/* SLEEP, ROUGHLY. Twenty-two hundred New York, every day including the weekend —
-   a Saturday conversation is worth keeping as much as a Tuesday one.
-
-   Clear of every other hour by construction: the briefing is 08:00 and Sunday
-   17:00, the retries are 09:00 to 11:00, the pulse is 10:00. The week-walk test
-   is what actually holds that, since an hour added to any of them could collide
-   here and nothing else would notice.
-
-   Late enough that the trading day and any evening conversation are done, which
-   is what makes a fixed 24-hour window the right read: nothing needs a watermark
-   because the window and the period between runs are the same length. A missed
-   night loses the DISTILLATION of that day, never the day — the turns stay in
-   the table and stay searchable, which is exactly why consolidation is allowed
-   to be lossy. */
+/* The nightly pass: 22:00 New York, every day. Clear of every other hour,
+   which the week-walk test holds. The window and the gap between runs are the
+   same twenty-four hours, so no watermark is needed; a missed night loses the
+   distillation, never the day, since the turns stay searchable. */
 export function consolidateDue(now: Date): boolean {
   return nyClock(now).hour === 22;
 }
 
-/* AND IT GETS THE RETRY THE BRIEFING HAS HAD ALL ALONG. Twenty-three hundred,
-   still inside the same New York civil day — which is what makes "did tonight's
-   pass run" a question with an answer, since the check below is against today.
-
-   The pass was the only schedule in this file with no meter and no second
-   chance. A briefing that dies is retried three times and apologised for; a
-   pass that died was silent, and its symptom is that her memory quietly stops
-   growing — which looks exactly like a bot with nothing worth remembering.
-   That is the same invisible-absence shape `unseen` and `moved_on` exist to
-   defeat, arriving for a third time in a different place. */
+/* Its retry at 23:00, still the same civil day, so "did tonight's pass run" has
+   an answer. A pass that dies silently looks like a memory with nothing worth
+   keeping. */
 export function consolidateRetryDue(now: Date): boolean {
   return nyClock(now).hour === 23;
 }
 
-/* WHAT THIS HOUR OWES — one answer, because one call cannot owe two.
-
-   The three schedules above overlap, so the decision between them is a fourth
-   one and belongs here rather than spread through the caller: each predicate
-   answering correctly on its own says nothing about which of them wins.
-
-   At 10:00 the retry window and the pulse both apply, and the retry takes it:
-   on a day the briefing failed, the briefing is the thing worth having and a
-   second look at a morning he was never told about is not. `briefed` is the
-   fact the caller reads from the database, and only the retry hours turn on
-   it. */
+/* What this hour owes — one answer, because the schedules overlap and each
+   being right alone settles nothing. At 10:00 a needed retry beats the pulse:
+   a second look at a morning he was never told about is worth nothing. */
 export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
     Brief | 'pulse' | 'consolidate' | null {
   const brief = briefDue(now);
   if (brief) return brief;
   const retry = retryDue(now);
   if (retry && !briefed) return retry;
-  // ONE CLAUSE FOR BOTH NIGHTLY HOURS, and the gate is what makes 23:00 a retry
-  // rather than a second pass: a night that already distilled itself does
-  // nothing at 23:00, and a night that failed at 22:00 gets one more go while
-  // the day it is reading is still the day it is filed under.
+  // The gate makes 23:00 a retry rather than a second pass.
   if ((consolidateDue(now) || consolidateRetryDue(now)) && !consolidated) return 'consolidate';
   return pulseDue(now) ? 'pulse' : null;
 }
 
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
-   THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
-   characters and a briefing always arrived whole; it now caps only the market
-   half and lets the teaching take what a chain needs, so a morning that builds a
-   term properly can genuinely reach here. Splitting badly is worse than not
-   splitting — a break mid-sentence reads as a bug — which is why the preference
-   below is what it is.
+   A briefing that builds a term properly can reach it. A break mid-sentence
+   reads as a bug, so the split prefers a blank line, then any newline, then a
+   hard cut.
 
-   So the split prefers a blank line, then any newline, then — only if a single
-   paragraph is itself over the limit — a hard cut. The prompt puts a blank line
-   between paragraphs and nowhere else, which is why the first choice is nearly
-   always the one taken.
-
-   TWO LOOKUPS RATHER THAN A max() OVER THE PAIR, and the difference is that the
-   max() cannot express the preference above. Every blank line contains a
-   newline at a higher index, so lastIndexOf('\n') is always at or past
-   lastIndexOf('\n\n') and the paragraph term can never win — the split silently
-   took the last newline of any kind, which lands mid-list inside the one shape
-   FORMAT permits a newline in.
+   Two lookups rather than a max() over the pair: lastIndexOf('\n') is always
+   at or past lastIndexOf('\n\n'), so a max can never prefer the paragraph.
    ───────────────────────────────────────────────────────────────────────── */
 export const TG_LIMIT = 4096;
 
@@ -217,7 +131,7 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
 
   while (rest.length > limit) {
     const window = rest.slice(0, limit);
-    // lastIndexOf on the window, so the break is always inside the budget.
+    // On the window, so the break is always inside the budget.
     const para = window.lastIndexOf('\n\n');
     const line = window.lastIndexOf('\n');
     const cut = para > limit / 2 ? para : line > limit / 2 ? line : limit;
@@ -229,16 +143,11 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
 }
 
 /* ─── The journal, read-only ───────────────────────────────────────────────
-   She can look at trades when the conversation is about trades, and cannot
-   touch them. Three things make that true and none of them is her restraint:
-   the view fixes the columns and hides deleted rows, the grant on it is SELECT
-   only, and this function is the single database read of the journal she has —
-   there is no write path to `trades` anywhere in the file.
-
-   A TOOL rather than trades pasted into every request. Most messages are about
-   the Fed, not about last Tuesday, and a journal stapled to every turn would be
-   paid for on every turn and would break the prompt cache each time a fill
-   landed. She pulls it when she needs it.
+   Read-only by structure, not restraint: the view fixes the columns and hides
+   deleted rows, its grant is SELECT, and this is her one read of the journal.
+   A tool rather than trades in every request — most messages are about the
+   Fed, and a journal on every turn is paid for every turn and breaks the cache
+   on every fill.
    ───────────────────────────────────────────────────────────────────────── */
 const TRADES_TOOL = {
   name: "get_trades",
@@ -261,31 +170,14 @@ const TRADES_TOOL = {
 } as const;
 
 /* ─── What she remembers ───────────────────────────────────────────────────
-   Twelve turns of conversation roll over in a morning, so without this she can
-   never know in September that he has been working on holding his stop since
-   August.
+   Three kinds. A `fact` she noticed about him. An `instruction` he gave her —
+   "stop mentioning the ten-year" — his only channel for correcting her. A
+   `commitment` he made — "this week I stop after two losses" — read the other
+   way: held against his trades, not obeyed.
 
-   THREE KINDS, AND THEY ARE NOT INTERCHANGEABLE. A `fact` is something about
-   him she noticed. An `instruction` is something he TOLD her — "stop mentioning
-   the ten-year", "too long" — and it is the only channel he has for correcting
-   her: no settings page, no feedback button, and the conversation window
-   forgets by morning. A `commitment` is something he told her HE would do —
-   "this week I stop after two losses" — and it is read the opposite way to an
-   instruction: she does not obey it, she holds his trades against it.
-
-   They are one table because they are the same shape and the same lifecycle,
-   and they are read SEPARATELY because they are not the same size. Notes arrive
-   at a few a week; instructions at a few ever. One newest-20 window over both
-   would evict "stop mentioning the ten-year" after a month of ordinary
-   observations — silently, and after she had told him it stuck, which is the
-   one failure this feature cannot have.
-
-   APPEND-ONLY, and read newest-first. Superseding any of them means writing a
-   newer one, which is also how a person's memory works and is what lets him change
-   his mind about an instruction with nothing to delete.
-
-   Still not a writer to `trades`. eugenia_turns and eugenia_notes are hers;
-   the journal remains one read through a view with no write path in the file.
+   One table, read as separate windows: one newest-20 window would evict a
+   standing instruction after a month of observations, after she had told him
+   it stuck. Append-only; a correction is a newer note superseding the old.
    ───────────────────────────────────────────────────────────────────────── */
 export const NOTE_KINDS = ['fact', 'instruction', 'commitment'] as const;
 export const NOTE_MAX = 200;
@@ -327,24 +219,14 @@ const NOTES_TOOL = {
 } as const;
 
 /* ─── Where he stands on each channel ──────────────────────────────────────
-   The five channels are the map her teaching is anchored to, and this is the
-   only part of her memory that never scrolls: five rows rather than a window,
-   so a channel he has NEVER used is legible as a row saying so. Notes cannot
-   carry that — an absence is not something anybody writes down.
+   The five channels her teaching is anchored to: five rows rather than a
+   window, so a channel he has never used is a row saying so — an absence
+   nobody would write down as a note.
 
-   CONSOLIDATION ONLY, and deliberately not in CHAT_TOOLS beside `remember`.
-   A note is a moment and is fairly written in one; a rung is a judgment across
-   days, and moving one from a single exchange is the same error as reading a
-   pattern into one fill. The nightly pass is the only caller that sees a whole
-   day, which is exactly the argument that put note-writing there as well.
-
-   A DEMOTION IS NOT THAT JUDGMENT — IT IS SOMETHING HE SAID — and it still
-   lands here rather than mid-conversation. The pass reads the whole day, so
-   *"explain that again"* is in front of it either way, and the rung is fixed
-   before the next morning's briefing, which is the only place it is read. What
-   putting the tool in CHAT_TOOLS would buy is a few hours; what it would cost
-   is its schema on every single request and a promotion she could make from one
-   exchange.
+   The nightly pass's alone, not in CHAT_TOOLS: a rung is a judgment across
+   days, and moving one from a single exchange is reading a pattern into one
+   fill. A demotion is something he SAID, but it lands at the pass too — the
+   pass reads the whole day, and the rung is read only by the next briefing.
    ───────────────────────────────────────────────────────────────────────── */
 const CHANNEL_TOOL = {
   name: "set_channel",
@@ -373,14 +255,9 @@ const CHANNEL_TOOL = {
 } as const;
 
 /* ─── What he has decided ──────────────────────────────────────────────────
-   The summary and the rules table ride on the cached system prompt and are in
-   front of her on every turn. This is the rest: the reasoning under a rule, how
-   a column is meant to be read, what a term means exactly.
-
-   SHE CANNOT WRITE IT, and that is the point rather than an omission. A document
-   that defines whether he followed his rules cannot also be edited by the thing
-   checking them — adherence to a moving target is not measurable, and her own
-   analysis would start feeding the standard she measures against.
+   The summary and rules table ride on the cached system prompt; this is the
+   rest. She cannot write it: a document that decides whether he followed his
+   rules cannot be edited by the thing checking them.
    ───────────────────────────────────────────────────────────────────────── */
 const STRATEGY_TOOL = {
   name: "get_strategy",
@@ -401,22 +278,13 @@ const STRATEGY_TOOL = {
   },
 } as const;
 
-/* Synchronous and cannot fail: it is a module constant, not a database read.
-   An unknown section is answered rather than refused — the number arrives from
-   the model, so a mistyped or an invented one is what this has to survive, and
-   "there is no such section" is a better answer than silence, which she would
-   fill in herself.
+/* A module constant, so it cannot fail. An unknown section is answered rather
+   than refused — the number comes from the model, and a blank is something she
+   would fill in herself.
 
-   A SUBSECTION IS SERVED BY THE SECTION THAT HOLDS IT, and without that the two
-   citations she is handed on every single turn were the two this could not
-   answer. R-05 cites §4.1 and R-06 cites §4.2; both are written, in full,
-   inside §4 — and an exact lookup told her they did not exist, which is not a
-   blank she fills in herself but something worse: a wrong fact about the
-   document, delivered by the one tool that exists to stop her inventing one.
-
-   Exported because it is the decision. The test that was meant to catch this
-   read the file for the word `has no section` and passed, and the one that
-   reads citations captured `4` out of `§4.1`. */
+   A subsection is served by the section holding it: R-05 and R-06 cite §4.1
+   and §4.2, which are prose inside §4, and an exact lookup once told her they
+   did not exist. Exported because it is the decision. */
 export function readStrategy(section: unknown): string {
   const key = String(section ?? "").trim().replace(/^§/, '');
   const found = SECTIONS[key] ?? SECTIONS[key.split('.')[0]];
@@ -427,14 +295,9 @@ export function readStrategy(section: unknown): string {
 }
 
 /* ─── Reaching what the windows do not ─────────────────────────────────────
-   Twelve turns and twenty notes are what she is HANDED. Everything older is
-   still in the tables and simply never selected, so the archive is complete and
-   unreachable at the same time. This is the reach.
-
-   Deliberately not a wider window. Every token handed over is paid on every
-   request and competes with the briefing for attention; a search is paid only
-   when a question needs one, which is the same trade get_trades makes for the
-   journal.
+   Twelve turns and twenty notes are what she is handed; everything older is in
+   the tables and never selected. A search is paid for only when a question
+   needs one, where a wider window is paid on every request.
    ───────────────────────────────────────────────────────────────────────── */
 const SEARCH_TOOL = {
   name: "search_memory",
@@ -459,36 +322,18 @@ const SEARCH_TOOL = {
   },
 } as const;
 
-// Twelve hits and 300 characters each is roughly one briefing's worth of text —
-// enough to answer from, and bounded, because a turn can be a whole briefing and
-// an unbounded search result would push the conversation out of its own context.
+// About one briefing's worth of text: enough to answer from, and bounded.
 const SEARCH_HITS = 12;
 const SEARCH_CHARS = 300;
 
 export type Hit = { source: string; id: number; at: string; retired: boolean; body: string };
 
-/* WHO SAID IT IS PART OF THE HIT, and it went missing on the way out of the
-   database. eugenia_turns carries `role`; eugenia_search did not select it, and
-   every turn came back rendered `you said` — so half of every result set was
-   HIS words handed back to her as her own. She would quote an instruction he
-   gave as her own analysis, or deny having said something he said, fluently and
-   with nothing anywhere reporting it.
-
-   The role rides in `source` rather than in a column of its own because
-   `create or replace function` may not change a return type, and dropping the
-   function to widen it takes its grants with it. Three values, one column, no
-   migration hazard: `note`, `you`, `him`.
-
-   The words themselves are a map rather than a chain of ternaries, because they
-   are one half of a vocabulary the database holds the other half of: a name
-   woven into a conditional is not something a reader can enumerate, and this
-   pair has to be comparable against the SQL's own literals or it is once again
-   a copy nothing can check. An unrecognised source renders as itself rather
-   than folding into hers — a value renamed on one side would otherwise land in
-   the default branch and quietly restore the misattribution.
-
-   Pure, so a test can drive all three renderings; the read stays with the
-   caller — the same split notesList and channelsList are written on. */
+/* Who said it is part of the hit: without the role, half of every result was
+   HIS words handed back as hers. It rides in `source` — `note`, `you`, `him` —
+   because changing the function's return type would mean dropping it and its
+   grants. A map rather than ternaries, so agree.test.mjs can hold it against
+   the SQL's literals; an unknown source renders as itself rather than falling
+   into hers. Pure; the read stays with the caller. */
 export const SAID: Record<string, string> = { you: 'you said', him: 'he said' };
 
 export function searchList(hits: Hit[]): string {
@@ -503,73 +348,39 @@ export function searchList(hits: Hit[]): string {
 }
 
 /* ─── Meaning, rather than words ───────────────────────────────────────────
-   THE SEARCH BELOW WAS FULL TEXT AND TRIGRAM, WHICH FIND A REPHRASING AND NOT
-   A DIFFERENT IDEA. *"What did we conclude about the December cut"* against a
-   turn that said *"the market has mostly given up on easing this year"* shares
-   no substrings at all — so she answers that they never discussed it, which is
-   worse than answering that she cannot find it.
+   Full text and trigram find a rephrasing, not a different idea: "the December
+   cut" against "the market has given up on easing" shares no substring, and
+   she would answer that they never discussed it. This adds no memory and no
+   window — everything a vector finds was already in the table.
 
-   THIS ADDS NO MEMORY AND NO WINDOW. Twelve turns and twenty notes are what she
-   is handed and that does not move: every token in a window is paid on every
-   request, and search is what reaches past it. Everything a vector finds was
-   already in the table.
+   Unset is a first-class state: with no EMBED_KEY every caller gets null, rows
+   land without a vector, and the search runs as it did before.
 
-   UNSET IS A FIRST-CLASS STATE. With no EMBED_KEY every caller here gets null,
-   writes its row without a vector, and the search runs exactly as it did before
-   — the SQL's fusion over one arm reproduces the old ordering. That is what
-   lets this ship before the key exists rather than after.
-
-   AND A VENDOR THAT REFUSES IS NOT THE SAME THING, which is the distinction the
-   first version of this file lost. It swallowed every failure into a console
-   line, so `?embed=1` — a door you run by hand and read the answer of — replied
-   `ok: true, filled: 0` and said nothing about why: no credit on the account, a
-   key with the wrong permission and a mistyped secret all looked identical, and
-   the one place the reason was written is the Edge log this repository already
-   says nobody reads.
-
-   So embed() THROWS, and the two write paths are the ones that swallow it —
-   `.catch(() => null)` at each, because a vendor failure must never cost the
-   note or the turn. The door does not, and that asymmetry is the whole design
-   rather than an oversight: `agree.test.mjs` asserts both write sites carry the
-   catch, since a helper reached from a caught call site and a bare one is
-   exactly the shape this file has been bitten by before.
+   A vendor that refuses is different, so embed() THROWS: ?embed=1 must be able
+   to say whether it was credit, permission or a mistyped secret. The write
+   paths and the search swallow it with `.catch(() => null)`, because a vendor
+   failure must never cost a note, a turn or the lexical arm. agree.test.mjs
+   counts both sides.
    ───────────────────────────────────────────────────────────────────────── */
 const EMBED_URL = env("EMBED_URL") || "https://api.openai.com/v1/embeddings";
 const EMBED_KEY = env("EMBED_KEY");
 
-/* PINNED HERE RATHER THAN READ FROM THE ENVIRONMENT, and that is the whole
-   difference between this and STT_MODEL. A transcription model chosen in the
-   dashboard changes one answer; an EMBEDDING model chosen there changes what is
-   comparable to what. Vectors from two models are not comparable and nothing
-   says so — the column type catches a change of WIDTH and cannot catch a change
-   at the same width, so ranking would degrade into noise with no error
-   anywhere. Changing it is therefore a code change, reviewable in a diff, and
-   it means re-embedding both tables. */
+/* Pinned, unlike STT_MODEL: vectors from two models are not comparable, and
+   the column catches a change of width but not one at the same width. A change
+   is a reviewed diff and a re-embedding of both tables. */
 const EMBED_MODEL = "text-embedding-3-small";
 export const EMBED_DIMS = 1536;
 
-/* Fifty at a time. The vendor call is one request whatever the count, so the
-   batch is sized by the writes that follow it — those are one PATCH per row,
-   since an upsert cannot be used here: PostgREST would send a row carrying only
-   `id` and `embedding`, and `content not null` is checked when the tuple is
-   built, before any conflict is detected. */
+/* Fifty at a time, sized by the writes that follow: one PATCH per row, since an
+   upsert carrying only id and embedding fails `content not null` before any
+   conflict is detected. */
 const EMBED_BATCH = 50;
 
-/* ORDERED BY THE INDEX THE VENDOR STATES, never by arrival. Each object carries
-   the position of the input it answers, and taking the array as it comes would
-   file a vector against the wrong row — a memory that returns the wrong text
-   for the right question, with nothing anywhere able to reveal it.
-
-   ALL OR NOTHING for the same reason: a short answer, or one of the wrong
-   width, gives no way to tell WHICH row lost its vector, so none is written and
-   the sweep tries the batch again.
-
-   Pure and exported because it is the decision, and because the alternative is
-   a test that stubs a vendor to prove a sort it supplied the answer to. Returns
-   pgvector's own text form rather than numbers: the same string goes into the
-   column and into the search, and `[0.1,0.2,…]` crosses a JSON body into a
-   `vector` intact where a JSON array would depend on a cast from json that
-   pgvector does not promise. */
+/* Ordered by the index the vendor states, never by arrival: a vector filed
+   against the wrong row is a memory returning the wrong text, undetectably. All
+   or nothing, since a short or wrong-width answer cannot say which row lost
+   its vector. Returns pgvector's text form, which crosses a JSON body intact
+   into both the column and the search. */
 export function foldVectors(data: any, want: number): string[] | null {
   const rows = Array.isArray(data) ? [...data] : [];
   rows.sort((a: any, b: any) => (a?.index ?? 0) - (b?.index ?? 0));
@@ -588,10 +399,8 @@ async function embed(texts: string[]): Promise<string[] | null> {
     headers: { Authorization: `Bearer ${EMBED_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: EMBED_MODEL, dimensions: EMBED_DIMS, input: texts }),
   });
-  // THE BODY AND NOT ONLY THE STATUS. Every refusal this will actually meet is
-  // a 4xx whose body names it — no credit on the account, a key without the
-  // permission, a model the key may not reach — and they are three different
-  // repairs. A bare "HTTP 429" sends someone to check the wrong one.
+  // The body names the refusal — credit, permission, model — and each is a
+  // different repair.
   if (!res.ok) {
     throw new Error(`embedding refused (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
   }
@@ -601,21 +410,15 @@ async function embed(texts: string[]): Promise<string[] | null> {
   return vecs;
 }
 
-/* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
-   loop, and an exception here costs the answer she is in the middle of writing.
-   A search that fails comes back as a sentence she can carry on from. */
+/* Never throws: it runs inside the tool loop, and a failed search comes back
+   as a sentence she can carry on from. */
 async function searchMemory(query: unknown): Promise<string> {
   const q = String(query ?? "").trim();
   if (!q) return "Nothing to search for.";
 
   try {
-    /* CAUGHT HERE RATHER THAN LEFT TO THE try AROUND IT, and the difference is
-       the whole degradation. The enclosing catch answers "your memory could not
-       be searched" — true of a database that refused, and false of an embedding
-       vendor that did: the lexical arm is untouched and would have answered
-       perfectly well. Unset key, refused call, or a query that embeds to
-       nothing are one null here, and the search runs on words as it always
-       did. */
+    // Caught here: a vendor failure leaves the lexical arm, which still answers.
+    // The catch below is for a database that refused.
     const [qv] = await embed([q]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/rpc/eugenia_search`, {
       method: "POST", headers: sbHeaders(),
@@ -624,8 +427,7 @@ async function searchMemory(query: unknown): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const hits: Hit[] = await res.json();
 
-    // An empty result is an ANSWER, and saying so plainly is what stops her
-    // reporting that she never discussed something when the search simply broke.
+    // An empty result is an answer, distinct from a broken search.
     if (!hits.length) return `Nothing in your memory matches "${q}".`;
 
     return searchList(hits);
@@ -635,37 +437,22 @@ async function searchMemory(query: unknown): Promise<string> {
   }
 }
 
-// Twenty of each is a season of observations at the few-a-week the prompt asks
-// for, and more standing instructions than he is ever likely to give — they are
-// one sentence each, so the whole memory costs less than one paragraph.
+// Twenty of each: a season of observations, and more instructions than he will
+// give — the whole memory costs less than a paragraph.
 const NOTES = 20;
 
-/* LIVE NOTES ONLY, and the filter is the whole feature. Drop `superseded_by=is.null`
-   and every retired line comes back — she is handed the correction and the thing
-   it corrected, with nothing to say which won. The failure is silent, which is
-   why agree.test.mjs reads this query for the filter.
-
-   The id comes back too, because a note she cannot name is a note she cannot
-   retire. It costs a few characters per line and it is what makes `supersedes`
-   callable at all. */
-/* EVERY READ OF HER TABLES IS THE SAME THREE STEPS — ask, refuse to go on with
-   a bad status, parse — and the only thing that ever varied was the noun in the
-   error. Fourteen copies of that is fourteen chances for one to omit the status
-   check, and the one that omits it does not fail loudly: PostgREST answers a
-   missing table with a 404 carrying a JSON body, so `await res.json()` succeeds
-   and the caller is handed an object where it expected rows. An unapplied
-   migration then reads as a block with nothing to say.
-
-   `fillEmbeddings` is deliberately NOT folded in. It needs `content-range` off
-   the response to know how much backlog is left, and a helper returning only
-   the rows would have to hand the response back to give it that — which is the
-   wrapper this exists to avoid. */
+/* Every read of her tables: ask, refuse a bad status, parse. In one place
+   because PostgREST answers a missing table with a 404 whose JSON body parses
+   fine, and a copy that skips the status check hands back an object for rows.
+   fillEmbeddings stays out: it needs the response's content-range. */
 async function readRows<T>(what: string, url: string): Promise<T[]> {
   const res = await fetch(url, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`${what} read failed (HTTP ${res.status})`);
   return await res.json();
 }
 
+// Live notes only: drop `superseded_by=is.null` and she is handed each
+// correction beside what it corrected. The id comes back so she can retire one.
 async function readNotes(kind: string): Promise<Note[]> {
   return readRows<Note>('Notes',
     `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
@@ -674,51 +461,32 @@ async function readNotes(kind: string): Promise<Note[]> {
 
 type Note = { id: number; note: string };
 
-// `[12] he trades the London open` — the number is how a note is NAMED when one
-// is retired, so it is part of the line rather than decoration. Both renderings
-// carry it: hers, so she can pass `supersedes`, and his, so he can say which.
+// The number is how a note is named when one is retired — in both renderings.
 const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
 
-/* Truncated rather than refused, and it NEVER THROWS.
+/* Truncated rather than refused, and never throws: the reply she is writing
+   matters more than the note, and a throw would cost the whole of it. That is
+   also how she survives running without 003: no memory, every answer lands.
 
-   Both for the same reason: this tool exists for a side effect, and the answer
-   she is in the middle of writing matters more than the note. A sentence one
-   character over its budget is still worth keeping, and a throw here would
-   propagate out of the tool loop and cost the whole reply — so a failed write
-   comes back as a sentence she can read and carry on from. It is also what
-   makes her survive being deployed before 003_eugenia.sql has been run:
-   no table, no memory, but every answer still lands.
-
-   BOTH ANSWERS SAY WHICH KIND FAILED, because the two are not equally
-   forgivable. A lost observation costs a little continuity and she should not
-   mention it. A lost INSTRUCTION is worse than saying nothing: she is about to
-   acknowledge it, and an acknowledgement for something that was never stored
-   means he stops repeating himself about a thing she will keep doing. Same for
-   a truncation — an instruction cut mid-sentence becomes a standing rule
-   nobody wrote. */
+   Failures say which kind failed. A lost fact she need not mention; a lost
+   INSTRUCTION she is about to acknowledge, and an acknowledgement of something
+   never stored means he stops repeating a thing she will keep doing. */
 async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Promise<string> {
   const text = String(note ?? "").trim();
   if (!text) return "Nothing to remember.";
 
-  // The kind decides how a failure is reported, so an unrecognised one takes
-  // the quieter branch rather than promising him something.
+  // An unrecognised kind takes the quieter branch.
   const k = (NOTE_KINDS as readonly string[]).includes(String(kind)) ? String(kind) : 'fact';
   const kept = text.slice(0, NOTE_MAX);
 
-  // Decided BEFORE the write, because it decides what the write asks for. Only a
-  // retirement needs the new row back, and asking for it every time left a body
-  // nobody read on the common path — an unconsumed response holds its connection
-  // open, and most notes supersede nothing.
+  // Only a retirement needs the new row back; an unread body holds its
+  // connection open.
   const old = Math.trunc(Number(supersedes));
   const retiring = Number.isFinite(old) && old > 0;
 
   try {
-    /* INSIDE THE try AND BEFORE THE INSERT. Before, so the note lands with its
-       vector in one statement rather than needing a second write that could
-       fail on its own — a null here costs nothing but a place in the sweep.
-       Inside, and caught: this function's whole contract is that it never
-       throws, and embed() does — deliberately, so the maintenance door can say
-       why. A lost vector must never read to him as a lost note. */
+    // Embedded before the insert, so the note lands with its vector in one
+    // write; caught, because a lost vector must never read as a lost note.
     const [vec] = await embed([kept]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
       method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
