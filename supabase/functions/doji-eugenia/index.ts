@@ -850,9 +850,25 @@ function windowStart(days: unknown, now: number, back: number): string {
    early, because a UTC midnight bound would drop the evening before a New York
    one. The weeks go back a further seven, since an entry on the window's first
    day sits in a week that began before it. */
+export const RULE_RELEASES = 500;
+
 export function releasesQuery(days: unknown, now = Date.now()): string {
   return `eugenia_calendar?select=at&importance=eq.${HIGH}&tv_id=not.is.null` +
-         `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=500`;
+         `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=${RULE_RELEASES}`;
+}
+
+/* A FULL READ OF THE RELEASES IS NOT THE WHOLE WINDOW, and a week the read did
+   not reach must not count as covered. The read takes the newest first, so on a
+   window long enough to fill it the oldest weeks are still marked as fetched in
+   calendar_weeks while their releases never arrived — and R-14 then passes
+   every entry in them for want of a print, and R-19 judges none of them. That
+   is the quiet week `weeks` exists to tell apart from an unfetched one, arriving
+   through the limit instead. So a full read covers only the weeks after the one
+   its oldest release falls in, and that week too is left out, being partial.
+   Exported because it is the decision; the read is readRules'. */
+export function coveredWeeks(weeks: string[], releases: { at: string }[]): Set<string> {
+  const reach = releases.length === RULE_RELEASES ? weekOf(new Date(releases[releases.length - 1].at)) : '';
+  return new Set(weeks.filter(w => w > reach));
 }
 
 // R-19's read: every stop and target the poller saw move, from a week before
@@ -948,7 +964,7 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
   const stops = new Map<string, Stop[]>();
   for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
   return checkRules(kept, Date.now(), {
-    releases: releases.map(r => r.at), weeks: new Set(weeks.map(w => w.week)),
+    releases: releases.map(r => r.at), weeks: coveredWeeks(weeks.map(w => w.week), releases),
   }, stops);
 }
 

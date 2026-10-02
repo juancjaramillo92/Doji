@@ -2454,6 +2454,13 @@ an entry outside one is `unknown`. Two things mark a week, and both go through
   asked again once after a pause; refused twice, the walk stops, and its last
   row names the week to start the next run from.
 
+**And a week the read did not reach is not covered either.** `check_rules` reads
+the releases newest first, bounded at five hundred rows over a window of up to a
+year. Filled, it leaves the oldest weeks marked fetched with their releases
+never read, which is the quiet week again arriving through the limit: every entry
+in them would pass R-14 for want of a print. So a full read covers only the
+weeks after the one its oldest release falls in.
+
 The quarter-hourly filing sees a rolling day and a half and marks nothing.
 TradingView's data goes back to 2003, so the weeks already traded can be judged.
 Forex Factory's export only ever held the current one.
