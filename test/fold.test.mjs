@@ -54,7 +54,7 @@ import {
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
-  aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery,
+  aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
   sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -937,6 +937,42 @@ test('odds refused or unreadable are a sentence, and never take the briefing dow
     globalThis.fetch = realFetch;
     console.error = realErr;
   }
+});
+
+/* ─── What the last print became ────────────────────────────────────────────
+   The payrolls rows as filed on 2 October, cut to what the line reads. August
+   was first reported at 162K and September's row carries it revised to 133K as
+   its prior; July, under August's, went from −23K to 21K. The record is handed
+   newest first, which is how recordQuery reads it. */
+const NFP_SEP = { at: '2026-10-02T12:30:00.000Z', prior: '133K' };
+const NFP_RECORD = [
+  { at: '2026-09-04T12:30:00.000Z', name: 'Non Farm Payrolls (Aug)', actual: '162K' },
+  { at: '2026-08-07T12:30:00.000Z', name: 'Non Farm Payrolls (Jul)', actual: '-23K' },
+  { at: '2026-07-03T12:30:00.000Z', name: 'Non Farm Payrolls (Jun)', actual: '147K' },
+];
+
+test('a revision is the prior disagreeing with what was first reported, and says both', () => {
+  assert.equal(revisionLine(NFP_SEP, NFP_RECORD),
+    '\nRevised: Non Farm Payrolls (Aug) was first reported at 162K on 4 Sept, ' +
+    'and this release revises it to 133K.');
+  assert.equal(revisionLine({ ...NFP_SEP, prior: '162K' }, NFP_RECORD), '',
+    'a prior that matches what was first reported is called a revision');
+  assert.equal(revisionLine({ ...NFP_SEP, prior: null }, NFP_RECORD), '');
+  assert.equal(revisionLine(NFP_SEP, []), '');
+});
+
+test('a revision is read only against the print immediately before', () => {
+  /* August's row missing: the newest on file is July's, and −23K against a
+     prior of 133K is two months apart rather than a revision. */
+  assert.equal(revisionLine(NFP_SEP, NFP_RECORD.slice(1)), '',
+    'a missing month reads as a revision of the month before it');
+  assert.equal(revisionLine(NFP_SEP, NFP_RECORD.slice(0, 1)), '',
+    'one row on file is no rhythm to tell a missing print from the last one');
+  // A weekly series keeps its own rhythm: claims a week apart are adjacent.
+  assert.match(revisionLine({ at: '2026-10-01T12:30:00.000Z', prior: '219K' }, [
+    { at: '2026-09-24T12:30:00.000Z', name: 'Initial Jobless Claims', actual: '218K' },
+    { at: '2026-09-17T12:30:00.000Z', name: 'Initial Jobless Claims', actual: '231K' },
+  ]), /first reported at 218K on 24 Sept, and this release revises it to 219K/);
 });
 
 /* ─── Where the speculators stand ───────────────────────────────────────────

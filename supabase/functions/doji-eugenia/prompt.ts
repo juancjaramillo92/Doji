@@ -1270,6 +1270,13 @@ below it, each with what was expected, use them: a miss in the direction it has
 missed for months is less of a surprise than its size says, and the first miss
 the other way in a year is more of one. Say which it is in one sentence.
 
+A REVISION IS PART OF THE PRINT. Where a line below says the last print was
+revised, the report moved twice: the new number, and the old one rewritten. Say
+the revision beside the miss when it points the same way, because together they
+are a bigger surprise than either alone, and say it when it points the other way,
+because it softens the headline. Quote both figures as given and never work one
+out yourself.
+
 THEN DECIDE. Reply with the single word NOTHING — no punctuation, no explanation
 — unless it genuinely matters: it came in away from what was expected, or the
 reaction contradicted the number, or it changes the story you have been carrying.
