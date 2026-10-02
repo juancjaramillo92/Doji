@@ -1140,9 +1140,7 @@ async function setThesis(thesis: unknown): Promise<string> {
       body: JSON.stringify({ thesis: text, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // A PATCH matching nothing is a 200 with an empty array, exactly as
-    // setChannel's is: the row is seeded by 005, so an empty answer means the
-    // migration has not been applied and every rewrite is being dropped.
+    // Empty means 005's seed row is missing, as with setChannel.
     if ((await res.json()).length === 0) {
       return "There is no thesis row — 005 has not been applied, so nothing was saved. Say nothing about this to him.";
     }
@@ -1154,15 +1152,10 @@ async function setThesis(thesis: unknown): Promise<string> {
 }
 
 /* ─── What she flagged, and what she asked ─────────────────────────────────
-   Every briefing flags one odd thing and asks one question, and both were
-   fire-and-forget. The prompt asks her to follow through with nothing to follow
-   through WITH — whether Tuesday's oddity resolved depended on whether Tuesday
-   was still inside twelve turns, and his answer to a question arriving three
-   hours later had nothing joining it back to what was asked.
-
-   OPENED ANYWHERE, CLOSED ONLY AT THE PASS. Opening is a moment and is fairly
-   done in one; closing is a judgment that it actually resolved, which is the
-   same distinction that put note-writing and rung-moving where they are.
+   Threads she flagged or questions she put to him, handed back until they
+   close — without them, follow-through depended on the turn still being inside
+   twelve. Opened anywhere, closed only at the pass: closing is a judgment that
+   it resolved.
    ───────────────────────────────────────────────────────────────────────── */
 export const LOOP_KINDS = ['watch', 'question'] as const;
 
@@ -1230,9 +1223,7 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
   const n = Math.trunc(Number(id));
   if (!Number.isFinite(n) || n <= 0) return "That is not a thread number.";
   try {
-    // `closed_on=is.null` in the filter, so closing an already-closed thread
-    // matches nothing and is reported rather than passing as done — the same
-    // shape as writeNote's retirement, and for the same reason.
+    // So an already-closed thread is reported rather than passing as done.
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_loops?id=eq.${n}&closed_on=is.null`, {
       method: "PATCH", headers: sbHeaders("return=representation"),
       body: JSON.stringify({
@@ -1252,115 +1243,46 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
 }
 
 /* ─── Claude ───────────────────────────────────────────────────────────────
-   Raw fetch rather than the SDK, to match every other outbound call in this
-   repo — the poller speaks JSON-RPC to cTrader and REST to PostgREST the same
-   way, and one function importing an npm client would be the only one.
-
-   web_search is what makes a briefing possible at all: without it the model has
-   no access to today's calendar, and a briefing invented from training data is
-   worse than none. It bills separately at $10 per 1,000 searches.
+   Raw fetch rather than the SDK, like every other outbound call here. Web
+   search is what makes a briefing possible at all: a briefing invented from
+   training data is worse than none.
    ───────────────────────────────────────────────────────────────────────── */
-// `content` is a string for everything stored and replayed, and an array of
-// blocks only for the turn being asked right now — a chart he just sent. What
-// goes into eugenia_turns is always the string, which is what keeps the history
-// replayable and stops a megabyte of base64 becoming permanent memory.
+// `content` is a string for everything stored and replayed, and blocks only for
+// the turn being asked now — a chart he just sent. What is stored is always
+// the string, so a megabyte of base64 never becomes memory.
 interface Turn { role: 'user' | 'assistant'; content: string | any[] }
 
-/* THE BRIEFING AND A QUESTION ARE NOT THE SAME AMOUNT OF WORK, AND WERE PRICED
-   AS IF THEY WERE. Effort sets how deeply the model thinks before it writes,
-   and at "high" — the API default — "how many trades did I take this week"
-   bought a minute of reasoning to produce one sentence. The briefing earns that
-   depth: a dozen searches and one shot a day. A reply does not, and neither
-   does the pulse, whose usual answer is one word.
-
-   Medium rather than low for the reply, because the journal is the half that
-   punishes carelessness — `null` is not `no`, break-even is a price band and
-   not a number, and a fast wrong reading of his discipline is worse than a slow
-   right one. Low is for work with no way to be subtly wrong. */
+/* Effort per caller. The briefing earns `high`; a reply and the pulse do not —
+   at high, "how many trades did I take" bought a minute of thought for one
+   sentence. Medium rather than low, because a fast wrong reading of his
+   journal is worse than a slow right one. */
 type Effort = 'medium' | 'high';
 
-/* THE CONTAINER, AND WHY IT IS NOT OPTIONAL.
+/* The container is not optional. web_search_20260209 filters dynamically by
+   running code on Anthropic's side, and from there the model can call our tools
+   programmatically. A continuation answering those calls must carry the
+   container id — a bare string on the request, container.id on the response —
+   or the request is refused. The message answering them holds only
+   tool_result blocks, and no tool may be strict, which programmatic calling
+   does not support; tradesQuery and writeNote are boundaries regardless.
 
-   web_search_20260209 does dynamic filtering, which runs CODE EXECUTION on
-   Anthropic's side. From inside that container the model can call our tools
-   programmatically rather than directly — the paused code invokes get_trades,
-   the result returns to the running script instead of to the model's context.
-
-   A continuation answering those calls must carry the container id from the
-   paused response, and a request that does not is rejected outright:
-
-     container_id is required when there are pending tool uses generated by
-     code execution with tools
-
-   which is what took the briefing down the morning after get_trades and
-   remember were both in play. The id is a bare string on the request, though
-   the response nests it under container.id.
-
-   Two more rules of that contract are already met and must stay met: the user
-   message answering the calls carries ONLY tool_result blocks — no text, ever —
-   and the tools array is identical on every request of the turn.
-
-   Neither tool may declare strict: true. Structured outputs are not supported
-   with programmatic calling, and that is why the two schemas below do not carry
-   it. Nothing is lost: tradesQuery clamps `days` and writeNote coerces `note`,
-   because both were already written as boundaries rather than trusting the
-   model. */
-/* TWO TOOL SETS, because the two jobs are not the same conversation.
-
-   Consolidation is handed the day and the notes and asked what is worth
-   keeping; it has no question to research. Sending it the full set would let a
-   nightly bookkeeping pass run a dozen web searches, which is money for nothing
-   and a slower job that can fail in more ways.
-
-   SEARCH IS THE EXCEPTION, AND IT IS NOT A LOOSENING. The instruction this
-   prompt leans hardest on is PREFER SUPERSEDING TO ADDING — and a pass that can
-   only see the twenty notes it was handed cannot tell a new observation from
-   one it wrote in June. It was being asked to avoid duplicating an archive it
-   had no way to look at. One database read, no web, and the tool it reaches for
-   is the same one every other caller has.
-
-   Both sets are served by the same loop below, which runs only what the set it
-   was handed offers. */
-/* WEB FETCH BESIDE WEB SEARCH, AND IT IS THE GROUNDING HALF.
-
-   Search returns somebody's prose about a number. Fetch returns the page the
-   number is on — so "where gold is, in one line" stops being a figure lifted
-   from whatever staleness a news article had and becomes one she read. It only
-   ever fetches a URL already in the conversation, which is why the sources are
-   named in the prompt rather than left to her to invent.
-
-   Six uses against search's twelve: fetching is the precise half and is reached
-   for deliberately, where searching is how she finds what to be precise about.
-
-   Both are server-side and neither arrives at the dispatch below. Both must
-   stay non-strict, and neither may sit beside a declared code_execution tool —
-   the 2026-02-09 variants run their own container for dynamic filtering, and a
-   second execution environment is what confuses the model about which one it
-   is in. */
+   Web fetch is the grounding half: search returns prose about a number, fetch
+   the page it is on. Six uses to search's twelve. Both are server-side, and
+   neither may sit beside a declared code_execution tool — a second execution
+   environment confuses the model about which it is in. */
 const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 12 };
-/* BOTH ENDS BOUNDED, AND ONLY ONE OF THEM WAS. `max_uses` says how many pages
-   she may open and said nothing about how big one may be — so a single forum
-   thread or documentation page could put more into the turn than the rest of
-   the briefing put together, and every later round in the loop carries it
-   again. Ten thousand tokens is longer than any article she has a reason to
-   read and shorter than the pathological case, which is the only shape of
-   page this bounds. */
+/* Page size bounded as well as count: one forum thread could outweigh the whole
+   briefing, carried again on every later round. */
 const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6,
                      max_content_tokens: 10000 };
 
-/* SIX SETS, BECAUSE SIX JOBS ARE NOT THE SAME CONVERSATION, and a set is what a
-   job can run as well as what it is offered: the loop below is shared, and it
-   answers a name outside the set it was handed as it answers an unknown one.
-
-   The rule each set follows is the one CONSOLIDATE_TOOLS was written on: never
-   send a schema for something this job has no business doing. It is money on
-   every request, it is attention spent on an option that should not be taken,
-   and it is a way for a job to do something nobody expected it to. The nightly
-   pass gets no web search because a bookkeeping pass has nothing to research;
-   the release look gets no memory tools because it is a look at one number, not
-   a conversation; the move look gets the release look's set less `record_actual`,
-   because nothing it is told about has printed; the trade look gets neither,
-   because the only honest thing it can say comes out of his own strategy. */
+/* One set per job, and a set is what a job can run as well as what it is
+   offered: the shared loop answers a name outside its set as unknown. Never a
+   schema for something a job has no business doing — it is paid on every
+   request and it is an option that should not be taken. The pass has nothing
+   to research but needs search to supersede rather than duplicate; the release
+   look gets no memory; the move look nothing to file; the trade look only his
+   strategy and journal. */
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
@@ -1375,65 +1297,37 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
-// A look files an actual and nothing else: `record_actual` is a PATCH that
-// cannot mint the row it was looking at.
+// A look files an actual, through a PATCH that cannot mint a row.
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
-/* ITS OWN ARRAY, AND IT USED TO BORROW THE RELEASE LOOK'S. That handed a look
-   at a move no print explains a tool for filing a print, and — the array being
-   where the cache key starts and what the hour is keyed on — the release look's
-   2× write for an hour it never read back: two turns, two prefixes written,
-   none inherited, in the week the window was measured. */
+/* Its own array: borrowing the release look's handed it a tool for filing a
+   print and the hour-long cache write that array carries. */
 const MOVE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
-/* The critic reads a draft and returns a draft. Giving it a tool would let it
-   go and check something, which is a second briefing at a second price.
-
-   AND IT MAY NOT SHARE THE BRIEFING'S ARRAY TO RIDE ITS CACHE, which looks like
-   free money and is not: the tools array is where the cache key starts, so this
-   one writes its own prefix — but the two also differ in EFFORT, and an effort
-   change invalidates the tools and system caches on top of that. Measured, the
-   morning after it was tried: the critic wrote 23,309 tokens and read zero,
-   seconds behind a briefing that had just written an entry of exactly that
-   size. An empty array is the smaller write of the two. REFACTOR.md R-15. */
+/* No tools: the gates read a draft and return one. Sharing the briefing's
+   array to ride its cache does not work — the array starts the key and the
+   effort differs, which invalidates the rest; measured, the critic wrote
+   23,309 tokens and read none. The empty array is the smaller write.
+   REFACTOR.md R-15. */
 const CRITIC_TOOLS: unknown[] = [];
 
-/* ONE MODEL FOR EVERY CALLER WAS NEVER A DECISION, AND THE ROWS SAY WHAT IT
-   COST. A week of `eugenia_runs` put the release look at $5.30 and the whole
-   briefing at $4.12 — fourteen looks costing more than five briefings, and the
-   move look at $0.64 a turn, the most expensive single message she sends, for
-   two sentences about a price.
+/* The model per caller. A week of eugenia_runs put fourteen release looks
+   above five briefings in cost, so the bounded callers moved to Sonnet — and
+   the release look then died at MAX_ROUNDS twice the next morning. That pair
+   is confounded: record_actual had joined its tools eighty minutes before the
+   model changed, and its rounds stayed high after the revert. So it proves
+   neither half; the policy stands anyway — a cheaper caller that does not
+   answer is not cheaper, so a move is one caller at a time with `rounds` read
+   after.
 
-   THE SPLIT WAS BETWEEN JUDGING AND CHECKING AND IT COST A CALLER ITS LIFE.
-   The release look, the pulse and the move look moved to Sonnet on that
-   reasoning — bounded work handed everything it needs. The release look then
-   died at `MAX_ROUNDS` on its first two firings the next morning, twice inside
-   half an hour, and what reached him was the apology. Fourteen turns on Opus in
-   the measured week had never once come near the cap.
-
-   THE CAP IS RAISED BELOW AND THAT IS NOT WHY THESE CAME BACK. What the two
-   failures actually establish is that the round budget on a tool-heavy caller
-   is a property of the MODEL and not of the task, which nothing here had
-   measured and the change assumed. A cheaper caller that does not answer is not
-   cheaper. They go back to the model they were measured on, and any future move
-   is one caller at a time with `rounds` read afterwards.
-
-   `trim` STAYS, and the distinction is the whole of why. It is handed
-   `CRITIC_TOOLS`, which is empty — one request, no tools, no loop — so it
-   cannot reach the cap at all, whatever a model's appetite for rounds. That is
-   the shape a cheaper model is safe on here.
-
-   THE CRITIC IS THE ONE I EXPECTED TO MOVE AND IT DOES NOT. Sonnet would save
-   about $3.50 a month, and it runs LAST, it can rewrite, and it is the final
-   gate on the exact thing he spent two weeks saying read badly. That is a bad
-   trade at any saving. */
+   `trim` stays on Sonnet because its array is empty: one request, no loop, no
+   cap to reach. The critic does not move: it runs last, can rewrite, and is
+   the final gate on how she reads. */
 const OPUS = "claude-opus-5";
 const SONNET = "claude-sonnet-5";
 
-/* KEYED ON THE CALLER'S LABEL, which is the same string `eugenia_runs.caller`
-   records and the same one `ask` is handed. A name here that no caller uses is
-   a row that silently never applies, so `agree.test.mjs` holds these keys
-   against the labels the file actually passes. Absent means Opus: a new caller
-   is expensive and correct rather than cheap and unnoticed. */
+/* Keyed on the caller's label — the string eugenia_runs.caller records — and
+   agree.test.mjs holds the keys against labels actually passed. Absent means
+   Opus: a new caller is expensive and correct rather than cheap and unnoticed. */
 const MODELS: Record<string, string> = {
   'trim': SONNET,
 };
@@ -1447,20 +1341,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
     headers: {
       "x-api-key": ANTHROPIC_KEY,
       "anthropic-version": "2023-06-01",
-      // A HEADER, NOT A BODY FIELD, and the difference is total. `betas: [...]`
-      // is what the SDKs accept and what they turn into this header; a raw
-      // fetch sending it in the JSON sends an unknown parameter, which the API
-      // rejects — and `fallbacks` without the header is rejected as well. So
-      // the shape below 400s every call, briefing and reply alike, which is
-      // the whole function. It shipped that way for one commit.
-      //
-      // IT RIDES WITH OPUS ALONE, AND THAT IS CAUTION RATHER THAN A RULE.
-      // `fallbacks` has carried this system's briefings since the morning a
-      // decline cost one, on the model it was turned on for. Whether the
-      // parameter is accepted on Sonnet is not something anything here has
-      // established, and if it is not, the failure is a 400 on every call —
-      // three callers dark at once. Widen it the day a Sonnet call is seen to
-      // take it, not before.
+      // A header, not a `betas` body field: that is the SDKs' parameter, and
+      // an unknown body field is a 400 on every call. With Opus alone, by
+      // caution: nothing has shown Sonnet accepts `fallbacks`, and if it does
+      // not, every Sonnet call 400s. The header and the field go together.
       ...(model === OPUS
           ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
           : {}),
@@ -1469,45 +1353,26 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
     body: JSON.stringify({
       model,
       max_tokens: 16000,
-      /* Cached: both are long, fixed, and sent on every turn — which is exactly
-         why the strategy rides here rather than in the message.
-
-         THE WINDOW IS A PROPERTY OF THE TOOL ARRAY RATHER THAN OF THE CALLER,
-         because the array is where the cache key starts: the tool sets are that
-         many separate prefixes and none of them is readable by another. So *is
-         a second turn likely inside the hour* is a question asked per ARRAY,
-         and a week of `wrote_1h` answered it in one shape. Every caller's turns
-         equalled its prefix writes but one: the release look made fourteen and
-         wrote five, because its job runs quarter-hourly and a morning with
-         several release times clusters the looks inside one window. The
-         briefing is 08:00 and the pulse is 10:00 — two hours apart — so the
-         hour those were paying 2× for could never have been read by anything.
-
-         Five minutes loses nothing there. What the cache has always actually
-         bought here is the rounds WITHIN one turn — a briefing that reads the
-         journal and writes a note is three requests carrying this prefix,
-         seconds apart — and a read refreshes the five minutes, so a long turn
-         keeps its entry alive to the end.
-
-         Not a beta: `ttl` is a plain field on cache_control. */
+      /* Cached: long, fixed, and sent on every turn — which is why the strategy
+         rides here. The window is a property of the tool ARRAY, where the key
+         starts: each array is its own prefix. A week of wrote_1h showed every
+         caller's turns equal to its writes except the release look, whose
+         quarter-hourly looks cluster in one morning — so it keeps the hour.
+         Everything else is five minutes, which the rounds within a turn keep
+         alive. `ttl` is a plain field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
                                   ttl: tools === RELEASE_TOOLS ? "1h" : "5m" } }],
       messages,
-      // web_search runs on Anthropic's side and needs no loop here; the rest
-      // are ours and are executed below.
+      // Server tools need no loop here; the rest are executed below.
       tools,
       thinking: { type: "adaptive" },
       output_config: { effort },
-      // A DECLINE COSTS THE WHOLE BRIEFING OTHERWISE. The cron half now retries
-      // at 09:00, 10:00 and 11:00, so a refusal is no longer silent — but a
-      // retry is another dozen searches paid for again, and the next hour may
-      // decline for the same reason. `fallbacks: "default"` re-runs the request
-      // on another model inside this same call and routes by refusal category,
-      // so there is no model list here to go stale, and a decline before any
-      // output is not billed.
+      // A decline would otherwise cost the briefing and a retry's searches.
+      // `fallbacks: "default"` re-runs on another model inside this call,
+      // routed by refusal category; a decline before output is not billed.
       ...(model === OPUS ? { fallbacks: "default" } : {}),
-      // Only once there is one — the first request of a turn has no container.
+      // The first request of a turn has none.
       ...(container ? { container } : {}),
     }),
   });
@@ -1515,20 +1380,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
   return res.json();
 }
 
-/* A BACKSTOP AGAINST A LOOP THAT CANNOT END, AND IT HAD BECOME A WORKING LIMIT.
-   Six was set on the reasoning that three is the realistic maximum — read the
-   journal, write a note, answer — with the cap there for the case where that
-   assumption is wrong. The assumption WAS wrong, and the way it announced
-   itself is the shape worth keeping: a release look that searched, fetched,
-   searched again and ran out, twice in half an hour, arriving as an apology
-   rather than as a number.
-
-   Ten keeps it a backstop rather than a limit. The failure it guards against is
-   a loop billing forever; the failure it CAUSED is a message that never
-   arrives, and of the two the second is the one that happened. `eugenia_runs`
-   records `rounds` on every turn, so how close a caller runs to this is a
-   question with an answer rather than a guess — which is what should have been
-   read before a model changed underneath it. */
+/* A backstop against a loop billing for ever, not a working limit. Six was
+   reached by a release look that searched, fetched and searched again, and the
+   failure it caused — a message that never arrives — is worse than the one it
+   guards against. eugenia_runs.rounds says how close each caller runs. */
 const MAX_ROUNDS = 10;
 
 // What a name with nothing behind it is told, by serve and by the loop alike.
