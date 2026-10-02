@@ -3345,10 +3345,17 @@ const Watch = {
   // no boundary arithmetic to get wrong. Hers reaches four hours further ahead.
   BACK_H: 12, AHEAD_H: 24,
 
+  // A time from another day names the day, her own calendar's rule. Twelve
+  // hours back and a day forward hold this morning's 08:30 and tomorrow's, which
+  // otherwise read identically, and last night's 20:00 reads as tonight's.
   when(iso) {
-    return new Intl.DateTimeFormat('en-GB', {
+    const at = new Date(iso);
+    const time = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-    }).format(new Date(iso));
+    }).format(at);
+    if (Dates.nyDay(iso) === Dates.today()) return time;
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short' })
+      .format(at) + ' ' + time;
   },
 
   async draw() {

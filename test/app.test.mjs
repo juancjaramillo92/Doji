@@ -1206,6 +1206,27 @@ test('the card shows what lands today, the story, and what is still open', async
   assert.match(el.innerHTML, /08:30/);
 });
 
+test('a release on another day names the day, and today\'s does not', async () => {
+  /* At twelve hours back and a day forward the card holds this morning's 08:30
+     and tomorrow's, and they read identically without the day. Her own
+     calendar list was fixed for exactly this; the card was not. */
+  const at = (dayOffset) => {
+    const d = new Date(Date.now() + dayOffset * 86_400_000);
+    return d.toISOString();
+  };
+  const el = await watching({
+    calendar: [{ at: at(0), name: 'today print', importance: 'high', consensus: null, actual: null, note: null },
+               { at: at(1), name: 'tomorrow print', importance: 'high', consensus: null, actual: null, note: null }],
+  });
+  const lines = [...el.querySelectorAll('.watch-line')].map(l => l.textContent);
+  const day = new win.Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short' })
+    .format(new Date(at(1)));
+  assert.match(lines.find(l => l.includes('tomorrow print')), new RegExp(`^${day} \\d\\d:\\d\\d`),
+    "tomorrow's release reads as today's");
+  assert.match(lines.find(l => l.includes('today print')), /^\d\d:\d\d/,
+    "today's release carries a day it does not need");
+});
+
 test('a landed release is not drawn as one still to come', async () => {
   const el = await watching({
     calendar: [{ at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
