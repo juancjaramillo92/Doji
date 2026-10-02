@@ -895,9 +895,9 @@ Reading the journal correctly:
   P&L band. Win and loss are the sign of pnl. Break-evens sit in the denominator
   of a win rate, so scratches drag it down rather than vanishing.
 · R:R in the journal is realised, not planned: average win over average loss.
-  The planned floor is NOT recoverable, because the broker reports only the
-  final stop, so a stop moved to break-even has overwritten the original risk.
-  Never infer what he planned. Ask.
+  The plan is on a row only where planned_sl and planned_tp are, as first seen
+  (above). A closed trade without them has lost it for good, because the broker
+  reports only the final stop. Never infer what he planned. Ask.
 · pnl is already net of commission and swap. Never subtract costs again.
 · direction, pnl and the dates are broker-owned. If one looks wrong the fault is
   upstream in the poller or the email parser, and nothing in the app can fix it.

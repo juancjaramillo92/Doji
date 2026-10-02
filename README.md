@@ -76,6 +76,7 @@ supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
 supabase/018_calendar_tradingview.sql   her calendar keyed by TradingView's id
 supabase/019_calendar_weeks.sql         the weeks R-14 can judge; Forex Factory dropped
 supabase/020_calendar_ticker.sql        which series a release belongs to
+supabase/021_calendar_name_key.sql      the calendar's old key by name, dropped
 supabase/verify.sql                     read-only: does the database match these?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -318,7 +319,8 @@ first sighting and a closed position reports only its final stop, so where the
 stop sat when a print landed — which is all of R-19 — was seen every two minutes
 and kept nowhere. `stopChanges` writes a row only when a position's stop or target
 differs from the last row written for it, a side the broker stopped carrying as
-null, so seven hundred polls of a stop that never moved are one row. A move is
+null — both sides too, so a stop and target pulled together are not read as the
+last ones still resting — so seven hundred polls of a stop that never moved are one row. A move is
 recorded up to two minutes after it is made, the plan's own *as first seen*. The
 table is outside `eugenia_trades` because it is a history rather than a column;
 `check_rules` reads it beside the trades.
@@ -506,14 +508,14 @@ rests on, tested rather than repeated.
 on `trades` scopes rows to their owner and says nothing about columns, so a
 client signed in as the trader could write any column of its own rows —
 `net_pnl`, `direction`, `fill_time`, every figure the app does not own and
-cannot repair. 009 revokes insert, update and delete on the table and grants
+cannot repair. 011 revokes insert, update and delete on the table and grants
 back update on exactly five columns: `Data.OWNED`'s four, plus `deleted`.
 
 This paragraph used to argue the other way, and the argument is worth keeping
 because two thirds of it were dissolved rather than overruled. It said the grant
 list would be a fifth copy of the boundary *in the one place nothing here can
 test*, and that getting it wrong would *silently break soft delete rather than
-failing loudly*. Both are now false: `agree.test.mjs` reads the grant out of 009
+failing loudly*. Both are now false: `agree.test.mjs` reads the grant out of 011
 and both of `verify.sql`'s lists, holds all three against `Data.OWNED`, and goes
 red on a list that is too narrow, too wide, or drifting in either file. The
 missing-`deleted` case — the exact silent breakage that was predicted — is one
@@ -577,19 +579,36 @@ rather than one click away from an export. The procedure:
 ```sql
 -- 1. paste the file's `trades` array as the argument
 -- 2. run it; every column is written except the generated pnl
-insert into trades
-select * from jsonb_populate_recordset(null::trades, '<<<PASTE ARRAY HERE>>>')
+insert into trades (id, user_id, direction, entry_time, fill_time, entry_price,
+  exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl,
+  setup, followed_rules, followed_sl, followed_tp, deleted, created_at,
+  updated_at, tg_message_id, planned_sl, planned_tp, best_price)
+select id, user_id, direction, entry_time, fill_time, entry_price,
+  exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl,
+  setup, followed_rules, followed_sl, followed_tp, deleted, created_at,
+  updated_at, tg_message_id, planned_sl, planned_tp, best_price
+from jsonb_populate_recordset(null::trades, '<<<PASTE ARRAY HERE>>>')
 on conflict (id) do update set
   direction = excluded.direction, entry_time = excluded.entry_time,
   fill_time = excluded.fill_time, entry_price = excluded.entry_price,
-  exit_price = excluded.exit_price, commission = excluded.commission,
-  balance = excluded.balance, open_day = excluded.open_day,
-  net_pnl = excluded.net_pnl, computed_pnl = excluded.computed_pnl,
-  setup = excluded.setup,
+  exit_price = excluded.exit_price, size_oz = excluded.size_oz,
+  commission = excluded.commission, balance = excluded.balance,
+  open_day = excluded.open_day, net_pnl = excluded.net_pnl,
+  computed_pnl = excluded.computed_pnl, setup = excluded.setup,
   followed_rules = excluded.followed_rules, followed_sl = excluded.followed_sl,
   followed_tp = excluded.followed_tp, deleted = excluded.deleted,
-  tg_message_id = excluded.tg_message_id;
+  tg_message_id = excluded.tg_message_id, planned_sl = excluded.planned_sl,
+  planned_tp = excluded.planned_tp, best_price = excluded.best_price;
 ```
+
+**The columns are named, and `select *` is the mistake it replaced.** Postgres
+refuses any value for a generated column, a null included, so `insert into
+trades select * from jsonb_populate_recordset(...)` stopped at `pnl` before a
+single row landed. The restore point failed on the day it was needed. The update
+list had also stopped at the columns of its year, so `size_oz`, the plan and
+`best_price` came back as whatever the damaged row held. `agree.test.mjs` reads
+all three lists against the schema, so a column added later fails the suite
+until it is restored too.
 
 The deleted rows matter: restoring without them lets the poller rebuild every
 trade you ever removed.
@@ -2363,6 +2382,14 @@ this morning is filed under yesterday and is skipped with them, which is correct
 R-11 forbids an entry *later* than the breaching loss, and a day that is over can
 have no later entry.
 
+**And "opened" is checked against the row, because the trigger cannot tell.** It
+fires on an insert with no `fill_time`, and a position opened and closed inside
+one two-minute poll is inserted already carrying its exit price, with the close
+instant stamped a moment later. That event arrived about a trade that was over,
+and with a print pending she would have cited R-14 at a position he was out of.
+The opened branch returns unless `isOpen` reads the row as open; the closed
+event that follows is the true one.
+
 **And a move a print explains is not this sense's to report.** The spine is
 already looking at anything high-impact that landed, so a jump at 08:30 on
 payrolls would otherwise reach him twice in ten minutes saying the same thing.
@@ -2467,6 +2494,13 @@ year. Filled, it leaves the oldest weeks marked fetched with their releases
 never read, which is the quiet week again arriving through the limit: every entry
 in them would pass R-14 for want of a print. So a full read covers only the
 weeks after the one its oldest release falls in.
+
+**The trades read has the same bound and says so.** Every tool over the journal
+reads the newest four hundred trades in its window. A year he traded more than
+that is cut at its oldest end, and `get_trades`, `get_stats` and `check_rules`
+all went on calling the answer the last 365 days. `reachLine` adds one sentence
+when a read comes back full: the day it actually reaches, and that she must say
+so before quoting a figure over the window. On an ordinary window it adds nothing.
 
 The quarter-hourly filing sees a rolling day and a half and marks nothing.
 TradingView's data goes back to 2003, so the weeks already traded can be judged.
@@ -3914,6 +3948,15 @@ walks. So walk it from a year back, `?history=` with a date twelve months ago,
 and the release look has a year of each series behind it from the next print
 on.
 
+### Applying 021, which drops the calendar's key by name
+
+`021_calendar_name_key.sql` drops `eugenia_calendar_unique`, the `(at, name)`
+key 005 carried from the days she typed the calendar in. **Safe to re-run.**
+Since 018 one release is one row by TradingView's id, and nothing writes by name.
+The old key could only refuse. A filing goes up as one bulk insert, so one row
+colliding with a name she typed long ago would be refused with every row beside
+it. That would recur every quarter hour, and the calendar would stop moving.
+
 ### Programmatic tool calls need their container
 
 `web_search_20260209` does dynamic filtering, and **that runs code execution on
@@ -4496,7 +4539,7 @@ something else, and every later change would be reasoned about from a file that
 was not the truth. That failure is silent, which is what makes it expensive.
 
 **Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `020_calendar_ticker.sql` are not
+SQL editor, never by a robot: `001_trades.sql` through `021_calendar_name_key.sql` are not
 under `supabase/migrations/`, so nothing applies them automatically, and a
 schema change that lands because a file was committed is exactly the accident
 the Operating section argues against for restores. The Apps Script is deployed
@@ -4816,8 +4859,9 @@ been wrong once, reporting a correct database as broken.
     and connect TradingView — see **TradingView** — then
     `supabase/018_calendar_tradingview.sql`, `supabase/019_calendar_weeks.sql` and
     `supabase/020_calendar_ticker.sql`, and walk the history door once from a
-    year back — see **Applying 019** and **Applying 020**.
-16. Run `supabase/verify.sql` and read it against 001–020. Nothing is set up
+    year back — see **Applying 019** and **Applying 020**. Then
+    `supabase/021_calendar_name_key.sql`, safe to re-run.
+16. Run `supabase/verify.sql` and read it against 001–021. Nothing is set up
     until that agrees.
 
 ---

@@ -56,7 +56,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
-  sinceBriefing, breachesList, breachesBlock, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
+  sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -3677,6 +3677,12 @@ test('R-19 judges the stop in force when a print lands on a position from an ear
      the trade was losing and a breach if it was winning. */
   assert.equal(r([first, moved(3990)]).verdict, 'unknown');
 
+  /* BOTH PULLED BEFORE THE PRINT, which the poller now writes as a row of two
+     nulls. Without it the break-even stop he had just taken off read as the
+     stop in force, and the position passed with nothing protecting it. */
+  assert.equal(r([first, moved(4000, '2026-10-14T11:00:00Z'), moved(null, '2026-10-14T12:00:00Z', null)]).verdict,
+    'fail', 'a stop and target pulled before the print passed on the break-even stop they replaced');
+
   // A move the poller wrote a couple of minutes after the print is not late;
   // one well after it is.
   assert.equal(r([first, moved(4000, '2026-10-14T12:33:00Z')]).verdict, 'pass');
@@ -4654,8 +4660,13 @@ test('each side of the plan is recorded on its own, and a bad id is dropped', ()
     [{ id: 'PID1', planned_sl: undefined, planned_tp: 4432.1 }],
     'a zero is "not set" rather than a price, and must not survive as one');
 
-  // Neither side, a bad id, and nothing at all are still nothing.
-  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]), []);
+  /* NEITHER SIDE IS STILL A POSITION. It has no plan to write, and the stop
+     history reads this same list: dropped here, a stop and target pulled
+     together wrote nothing, and the last row — the stop he had just taken off —
+     read as still resting. A bad id and nothing at all are still nothing. */
+  assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]),
+    [{ id: 'PID1', planned_sl: undefined, planned_tp: undefined }],
+    'a position carrying no stop and no target dropped out of the stop history');
   assert.deepEqual(openPlans([{ stopLoss: 4403.24, takeProfit: 4432.1 }]), []);
   assert.deepEqual(openPlans([]), []);
   assert.deepEqual(openPlans(undefined), []);
@@ -4677,6 +4688,18 @@ test('a stop or target is written when it moves, and never on a poll where it di
   // A pulled target is a change, written as null rather than left as the old one.
   assert.deepEqual(stopChanges([plan(4000, undefined)], [{ id: 'PID1', sl: 4000, tp: 4030 }]),
     [{ id: 'PID1', sl: 4000, tp: null }]);
+});
+
+test('a stop and target pulled together are recorded, through the list the poll builds', () => {
+  /* DRIVEN FROM THE BROKER'S SHAPE rather than from a plan built by hand: the
+     defect was upstream of stopChanges, in the list it is handed, and a test
+     that supplies the plan cannot see a position that never reaches it. */
+  const held = [{ id: 'PID1', sl: 4000, tp: 4030 }];
+  const pulled = openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]);
+  assert.deepEqual(stopChanges(pulled, held), [{ id: 'PID1', sl: null, tp: null }],
+    'a stop and target taken off together left the old ones on file as still resting');
+  // And once on file, the next poll of the same naked position writes nothing.
+  assert.deepEqual(stopChanges(pulled, [{ id: 'PID1', sl: null, tp: null }, ...held]), []);
 });
 
 test('every open position with a plan is filed, not just the first', () => {
@@ -5979,4 +6002,72 @@ test('a full calendar read says it stopped, and a short one says nothing', async
   };
   assert.match(await block(40), /The list stops at 40 entries/);
   assert.doesNotMatch(await block(39), /stops at/);
+});
+
+/* ─── A position opened and closed inside one poll ───────────────────────────
+   The open trigger fires on an insert with no fill_time, and a scalp under two
+   minutes is inserted already carrying its exit price — so the "opened" event
+   arrives about a trade that is over. Driven through the real handler, with a
+   print pending, because that is the only case in which it would have spoken.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('an opened event for a trade already closed says nothing and reads no calendar', async () => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  const row = (o) => ({ id: 'PID9', direction: 'BUY', entry_time: new Date().toISOString(),
+    fill_time: null, entry_price: 4000, exit_price: null, pnl: null, open_day: today,
+    setup: null, followed_rules: null, followed_sl: null, followed_tp: null, size_oz: 4,
+    net_pnl: null, planned_sl: null, planned_tp: null, best_price: null, ...o });
+  const pending = [{ id: 1, at: new Date(Date.now() + 3600_000).toISOString(), name: 'US CPI',
+    importance: 'high', consensus: '0.3%', prior: null, actual: null, note: null }];
+
+  const run = (trade) => {
+    const asked = [];
+    return withFetch(async (url) => {
+      asked.push(String(url));
+      if (String(url).includes('eugenia_trades')) return new Response(JSON.stringify([trade]), { status: 200 });
+      if (String(url).includes('eugenia_calendar')) return new Response(JSON.stringify(pending), { status: 200 });
+      // The model, answering with the silence the prompt allows.
+      if (String(url).includes('anthropic')) return new Response(JSON.stringify(
+        { content: [{ type: 'text', text: 'NOTHING' }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
+      return new Response('[]', { status: 200 });
+    }, async () => ({ said: await (await postTradeEvent('PID9', 'opened')).json(), asked }));
+  };
+
+  const closed = await run(row({ exit_price: 4001, pnl: 3.86 }));
+  assert.equal(closed.said.skipped, 'already closed',
+    'an opened event about a trade already out told him he had just opened it');
+  assert.ok(!closed.asked.some(u => u.includes('eugenia_calendar') || u.includes('anthropic')),
+    'a closed trade still read the calendar or called the model on its opened event');
+
+  // The other side: a position genuinely open, with a print pending, gets past
+  // the guard to the calendar — the guard must not swallow the case it sits in.
+  const open = await run(row());
+  assert.ok(open.asked.some(u => u.includes('eugenia_calendar')),
+    'an open position with a print pending never reached the calendar');
+});
+
+/* ─── A trades read that reached its bound ───────────────────────────────────
+   The read takes the newest TRADE_ROWS. A year he traded more than that is cut
+   at its oldest end, and every tool built on it went on calling its answer
+   "the last 365 days". Driven through serve() for all three tools, because the
+   line is appended by each caller and a pure test of the line proves nothing
+   about any of them saying it.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a trades read that hit its bound says how far back it reaches, in every tool built on it', async () => {
+  const rows = (n) => Array.from({ length: n }, (_, i) => ({
+    id: `PID${i}`, direction: 'BUY', entry_time: '2026-06-01T14:00:00Z', fill_time: '2026-06-01T14:30:00Z',
+    entry_price: 4000, exit_price: 4010, pnl: 40, net_pnl: 40, setup: null, followed_rules: null,
+    followed_sl: null, followed_tp: null, size_oz: 4, planned_sl: null, planned_tp: null, best_price: null,
+    // Newest first, as the query orders them, so the last row is the oldest day read.
+    open_day: i === n - 1 ? '2026-02-10' : '2026-06-01',
+  }));
+  const ask = (n, tool) => withFetch(async (url) =>
+    new Response(JSON.stringify(String(url).includes('eugenia_trades') ? rows(n) : []), { status: 200 }),
+    () => serve(tool, { days: 365 }));
+
+  for (const tool of ['get_trades', 'get_stats', 'check_rules']) {
+    assert.match(await ask(TRADE_ROWS, tool), /reaches back only to 2026-02-10, not the whole 365 days/,
+      `${tool} answered a read cut at its bound as though it covered the whole window`);
+    assert.doesNotMatch(await ask(TRADE_ROWS - 1, tool), /stops at its/,
+      `${tool} called a read short of its bound truncated, which is every ordinary window`);
+  }
 });

@@ -45,7 +45,11 @@ export function appScript() {
   return HTML.slice(HTML.lastIndexOf('<script>') + 8, HTML.lastIndexOf('</script>'));
 }
 
-export async function boot({ now } = {}) {
+/* `auth` replaces the two session answers, so a boot can be driven down the
+   path a real device takes — signed in, signed out, or unable to reach the
+   server to ask. `snapshot` is what the device already holds from its last
+   confirmed read, written before the script runs as a real device's would be. */
+export async function boot({ now, auth = {}, snapshot } = {}) {
   const dom = new JSDOM(HTML, {
     url: 'https://doji.test/',
     runScripts: 'outside-only',
@@ -153,12 +157,13 @@ export async function boot({ now } = {}) {
   win.supabase = {
     createClient: () => ({
       auth: {
-        getSession: async () => ({ data: { session: null } }),
+        getSession: auth.getSession ?? (async () => ({ data: { session: null } })),
         // Sign-out is a real path with a real consequence — it is what clears
         // the offline snapshot off the device — so it is answered rather than
         // stubbed away.
         signOut: async () => ({ error: null }),
-        getUser: async () => ({ data: { user: { id: 'u' } }, error: null }),
+        getUser: auth.getUser ?? (async () => ({ data: { user: { id: 'u' } }, error: null })),
+        signInWithPassword: auth.signInWithPassword ?? (async () => ({ error: null })),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
       },
       channel: () => ({ on() { return this; }, subscribe() { return this; } }),
@@ -203,6 +208,8 @@ export async function boot({ now } = {}) {
     },
     write: () => new Uint8Array([0])
   };
+
+  if (snapshot) win.localStorage.setItem('doji_snapshot_v1', JSON.stringify(snapshot));
 
   win.eval(appScript() + `\nwindow.__app = { ${EXPOSED.join(', ')} };`);
 

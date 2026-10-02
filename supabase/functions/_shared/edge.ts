@@ -236,7 +236,7 @@ export function nyClock(now: Date): { wd: number; hour: number } {
 
 /* ─── Market hours ─────────────────────────────────────────────────────────
    Gold trades Sunday 17:00 to Friday 17:00, New York. The poller skips the
-   ~49-hour weekend close — roughly 1,400 pointless calls a week for data that
+   48-hour weekend close — roughly 1,400 pointless calls a week for data that
    cannot have changed — and Eugenia's price sense skips it for the same reason
    and by the same rule, which is why this is here rather than in either of
    them.

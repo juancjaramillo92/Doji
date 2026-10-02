@@ -15,7 +15,7 @@
 // the column is what stops that resurrecting it two minutes later.
 //
 // SECURITY CONTRACT
-//   1. ALLOWED_TOOLS is a hardcoded whitelist holding two read tools.
+//   1. ALLOWED_TOOLS is a hardcoded whitelist of read tools.
 //      mcpPost() throws on anything else, and it is the only place a tool name
 //      becomes a request.
 //   2. Every request must present DOJI_CRON_SECRET on the x-doji-key header.
@@ -23,9 +23,9 @@
 //      longer checks anything — authorisation happens here, in code, before any
 //      work begins. See the note at the entry point.
 //   3. No value from the HTTP request reaches an MCP call. The body is never
-//      read. The only request input consulted is three query flags — force,
-//      raw and hours — the first two boolean and the third clamped. No code
-//      path constructs an order.
+//      read. The only request input consulted is the query flags the entry
+//      point reads — each a fixed choice except `hours`, which is
+//      clamped. No code path constructs an order.
 //   4. Tokens live only in Deno.env — never logged, never returned, never
 //      written to the database.
 //
@@ -534,7 +534,13 @@ export interface OpenPlan { id: string; planned_sl?: number; planned_tp?: number
    by a missing number", and nothing divides: no rule in `adherence.ts` reads
    either column, and `positionsBlock` names only what it has. The ratio is
    arithmetic HE runs, which §6 step 4 says outright. So the guard belonged at
-   the render, where it already was, and never at the write. */
+   the render, where it already was, and never at the write.
+
+   AND A POSITION CARRYING NEITHER STAYS IN THE LIST. It has no plan to write —
+   writePlan skips an absent side — but the stop history reads the same list,
+   and a stop and target both pulled are the largest move R-19 can see. Dropped
+   here, nothing was written for it, and the last row on file, the stop he had
+   just taken off, read as still resting. */
 export function openPlans(positions: any[]): OpenPlan[] {
   return (positions ?? []).flatMap((p: any) => {
     const id = Number(p?.positionId);
@@ -544,9 +550,7 @@ export function openPlans(positions: any[]): OpenPlan[] {
       const n = Number(p?.[k]);
       return Number.isFinite(n) && n > 0 ? n : undefined;
     };
-    const planned_sl = side('stopLoss'), planned_tp = side('takeProfit');
-    if (planned_sl === undefined && planned_tp === undefined) return [];
-    return [{ id: `PID${id}`, planned_sl, planned_tp }];
+    return [{ id: `PID${id}`, planned_sl: side('stopLoss'), planned_tp: side('takeProfit') }];
   });
 }
 
@@ -593,7 +597,7 @@ async function writePlan(plan: OpenPlan): Promise<number> {
    A ROW PER CHANGE, NEVER PER POLL, and this is the decision: a position whose
    latest row already says what the broker says gets nothing. A side the broker
    stopped carrying is a change too, written as null, so a pulled target is not
-   read as the old one still resting. Pure, so it can be driven; the latest row
+   read as the old one still resting — and so are both sides at once. Pure, so it can be driven; the latest row
    per position is whatever the caller read, newest first. */
 export interface StopRow { id: string; sl: number | null; tp: number | null }
 
@@ -850,7 +854,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     /* ?tools=1 — WHAT THE BROKER ACTUALLY OFFERS, which is a question this
        repository has had to answer by reading its own allow-list and hoping.
 
-       ALLOWED_TOOLS names the two this function calls. It has never said
+       ALLOWED_TOOLS names the tools this function calls. It has never said
        anything about what EXISTS: the poller needs deals and a balance, so
        those are what it asked for, and whether cTrader also serves a quote, a
        symbol list or an open-position feed was never established either way.

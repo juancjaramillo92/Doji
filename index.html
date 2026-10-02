@@ -1661,9 +1661,9 @@ tr.broker-pending td:first-child {
         <div class="io-section-label">Full Backup (JSON)</div>
         <div class="io-section-desc">
           Exports <b>everything</b> — every trade, every journal field — as a single
-          <b>.json</b> file. A copy to keep, not a restore point: Supabase holds the
-          data. Replacing it from a file is done in the SQL editor, knowingly,
-          rather than one click from an export.
+          <b>.json</b> file, the soft-deleted trades included, so it is a real
+          restore point. Restoring is done in the SQL editor, knowingly, with the
+          statement in the README, rather than one click from an export.
         </div>
         <div class="io-section-actions">
           <button id="io-export-json-btn" class="btn r4">↓ Export Backup</button>
@@ -2219,17 +2219,23 @@ const Data = {
       this.offline = false;
       try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.all)); } catch (e) {}
       setSyncStatus('ok');
+      this.index();
     } catch (e) {
-      // The last thing the database confirmed, so it is safe to draw. Writes
-      // are refused while offline, which is why nothing needs reconciling on
-      // return.
       console.warn('Doji: load failed, using snapshot', e);
-      try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
-      catch (err) { this.all = []; }
-      this.rows = this.all.filter(t => !t.deleted);
-      this.offline = true;
-      setSyncStatus('offline');
+      this.cached();
     }
+  },
+
+  // The last thing the database confirmed, so it is safe to draw. Writes are
+  // refused while offline, which is why nothing needs reconciling on return.
+  // Two callers: a read the database did not answer, and a boot that could not
+  // reach it to ask who was signed in.
+  cached() {
+    try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
+    catch (err) { this.all = []; }
+    this.rows = this.all.filter(t => !t.deleted);
+    this.offline = true;
+    setSyncStatus('offline');
     this.index();
   },
 
@@ -2919,8 +2925,8 @@ function disciplineBars(list) {
 
 /* ─── R:R bar ────────────────────────────────────────────────────────────────
    Realised, not planned: average win over average loss from closed P&L. The
-   planned ratio is not recoverable — the broker reports only the FINAL stop, so
-   a stop moved to break-even has overwritten the original risk.
+   plan is on a row only as the poller first saw it, and only on the trades
+   since it began recording one, so a planned ratio is not computed here.
 
    The same head and track as disciplineBar, so the row above the wheel and the
    three below it are one component carrying different figures. Per period, not
@@ -3333,16 +3339,23 @@ function renderRollForward(rows) {
    nothing on this card is the reason anyone opened the app.
    ─────────────────────────────────────────────────────────────────────────── */
 const Watch = {
-  // The same rolling window her own briefing reads, and for the same reason: a
-  // civil-day filter is at its worst exactly where this matters, since Sunday's
-  // 17:00 open is about a week that has not started. Twelve hours back and a day
-  // forward needs no boundary arithmetic to get wrong.
+  // A rolling window, for the reason her briefing reads one: a civil-day filter
+  // is at its worst exactly where this matters, since Sunday's 17:00 open is
+  // about a week that has not started. Twelve hours back and a day forward needs
+  // no boundary arithmetic to get wrong. Hers reaches four hours further ahead.
   BACK_H: 12, AHEAD_H: 24,
 
+  // A time from another day names the day, her own calendar's rule. Twelve
+  // hours back and a day forward hold this morning's 08:30 and tomorrow's, which
+  // otherwise read identically, and last night's 20:00 reads as tonight's.
   when(iso) {
-    return new Intl.DateTimeFormat('en-GB', {
+    const at = new Date(iso);
+    const time = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-    }).format(new Date(iso));
+    }).format(at);
+    if (Dates.nyDay(iso) === Dates.today()) return time;
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short' })
+      .format(at) + ' ' + time;
   },
 
   async draw() {
@@ -3773,10 +3786,9 @@ const IO = {
     notify(`Journal ready — ${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`);
   },
 
-  // A snapshot for keeping, not a restore point. Supabase takes its own
-  // backups; this exists so the trader owns a readable copy independent of an
-  // account. No restore button by design — replacing the database from a file
-  // is a job for the SQL editor, not a click away from an export.
+  // A restore point he owns, independent of the account. No restore button by
+  // design: replacing the database from a file is a job for the SQL editor and
+  // the README's statement, not a click away from an export.
   backup() {
     const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
     IO.showLink(url, 'doji-backup-' + Dates.today() + '.json', 'io-section-json');
@@ -3824,6 +3836,8 @@ const Login = {
       await Data.start();
       render();
       bootState(null);
+      // Boot's own order: the card after the journal, never in front of it.
+      Watch.draw();
     } catch (e) {
       console.error('Doji login:', e);
       err.textContent = 'Could not reach the server. Try again.';
@@ -4035,6 +4049,20 @@ function bootState(text, failed) {
   el.classList.remove('done');
 }
 
+/* UNREACHABLE IS NOT SIGNED OUT. supabase-js answers a server it could not
+   reach with the same `error` it uses for a refusal, and an access token lasts
+   an hour — so most opens without a network failed the session check before the
+   journal was asked for, and showed the login screen, where nothing can be done
+   offline, in place of the cached copy the README promises. Drawn read-only
+   instead, and booted properly the moment the network is back. */
+const unreachable = e => e?.name === 'AuthRetryableFetchError';
+
+function openOffline() {
+  Data.cached();
+  render();
+  window.addEventListener('online', () => location.reload(), { once: true });
+}
+
 (async function boot() {
   // Both libraries are plain blocking scripts with no fallback. An unreachable
   // CDN leaves window.supabase undefined and Data.init() throws before anything
@@ -4064,9 +4092,9 @@ function bootState(text, failed) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   window.addEventListener('focus', tick);
 
-  let data;
+  let data, error;
   try {
-    ({ data } = await Data.init());
+    ({ data, error } = await Data.init());
   } catch (e) {
     console.error('Doji: init failed', e);
     bootState('Could not reach the server. Check your connection and reload.', true);
@@ -4075,7 +4103,11 @@ function bootState(text, failed) {
 
   // The login overlay is its own full-screen surface, so the banner stands down
   // rather than sitting behind it.
-  if (!data?.session) { bootState(null); Login.show(); return; }
+  if (!data?.session) {
+    bootState(null);
+    if (unreachable(error)) openOffline(); else Login.show();
+    return;
+  }
 
   try {
     await Data.start();
@@ -4088,7 +4120,7 @@ function bootState(text, failed) {
   } catch (e) {
     console.error('Doji: start failed', e);
     bootState(null);
-    Login.show();
+    if (unreachable(e)) openOffline(); else Login.show();
   }
 })();
 

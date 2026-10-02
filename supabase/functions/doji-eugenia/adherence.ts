@@ -404,10 +404,10 @@ function r04(rows: TradeRow[]): RuleResult {
    a null fill_time as "no span" would drop exactly that case.
 
    BUT A NULL fill_time IS NOT ALWAYS AN OPEN POSITION, and reading it as one
-   manufactured breaches out of nothing. That column has a single writer and it
-   is the EMAIL path; the poller records a close as `exit_price` and never
-   touches fill_time at all. So a position closed with no alert email behind it
-   ran to `now` here for ever — and every trade taken after it overlapped it, so
+   manufactured breaches out of nothing. The poller stamps that column only on
+   the closes its fold window reaches; what it records on every close is
+   `exit_price`. So a position closed with no alert email behind it, outside
+   that window, ran to `now` here for ever — and every trade taken after it overlapped it, so
    one missing email turned a clean month into a cascade of R-10 failures, each
    naming a real row and each wrong.
 
@@ -672,9 +672,9 @@ function r15(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
     if (!isBroker(t) || !t.entry_time) continue;
-    /* CLOSED, WITH NO INSTANT SAYING WHEN. `fill_time` is the email path's
-       column and the poller never writes it, so a close with no alert behind it
-       has an `exit_price` and no time — and this rule is entirely about whether
+    /* CLOSED, WITH NO INSTANT SAYING WHEN. The poller stamps `fill_time` only on
+       the closes its fold window reaches, so an older close with no alert
+       behind it has an `exit_price` and no time — and this rule is entirely about whether
        a span crossed a particular Friday instant. It used to `continue` past
        those, which drops them from the population silently: the one shape §8
        says a rate must never be computed over. A position still genuinely open

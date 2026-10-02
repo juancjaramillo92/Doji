@@ -167,12 +167,6 @@ select cron.schedule(
   $$
 );
 
--- ─── Housekeeping ──────────────────────────────────────────────────────────
--- cron.job_run_details grows by 750 rows a day from the poller alone and
--- nothing prunes it on its own. Seven days is longer than any question anyone
--- asks of it — and it is not where a failure is diagnosed anyway, because it
--- records that the SQL ran, not what the function answered. net._http_response
--- is the one that carries the answer, and Supabase prunes that itself.
 -- ─── The watcher over everything above ─────────────────────────────────────
 -- EVERY JOB IN THIS FILE CAN BE REFUSED A WORKER AND NOTHING WOULD SAY SO. A
 -- 546 comes back before the function exists, so it writes no row, sends no
@@ -219,6 +213,13 @@ select cron.schedule(
   $$ select public.pace_watch() $$
 );
 
+-- ─── Housekeeping ──────────────────────────────────────────────────────────
+-- cron.job_run_details grows by 750 rows a day from the poller alone and
+-- nothing prunes it on its own. Seven days is longer than any question anyone
+-- asks of it — and it is not where a failure is diagnosed anyway, because it
+-- records that the SQL ran, not what the function answered. net._http_response
+-- is the one that carries the answer, and Supabase prunes that itself.
+--
 -- Two archives, one job. `dispatch` gains a row per poll — seven hundred and
 -- twenty a day from the poller alone — so settled rows past a month go the same
 -- way cron's own history does. Failures are settled too, so a month is what is

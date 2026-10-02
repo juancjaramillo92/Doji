@@ -4,9 +4,10 @@
 // The second bot. Gladys collects the journal; Eugenia does macro. Same two-
 // caller shape as doji-gladys, told apart by which secret arrives:
 //
-//   x-doji-key                        the hourly pg_cron job in
-//                                     supabase/003_eugenia.sql — post the
-//                                     briefing if this is one of its hours.
+//   x-doji-key                        the scheduled jobs in
+//                                     supabase/004_cron.sql, the trades
+//                                     trigger in 005, and her own speaking
+//                                     worker — postScheduled reads which.
 //   x-telegram-bot-api-secret-token   Telegram — the trader replied, answer him.
 //
 // SHE OWNS NO COLUMN OF `trades` AND HAS NO WRITE PATH TO IT. She reads the
@@ -823,9 +824,24 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
    change, when a day is 23 or 25 hours long and "seven days ago" lands on the
    wrong date. So today's New York date is taken first and the days are stepped
    off it — the same way index.html walks to a week or a month boundary. */
+export const TRADE_ROWS = 400;
+
 export function tradesQuery(days: unknown, now = Date.now()): string {
   return `eugenia_trades?open_day=gte.${windowStart(days, now, 0)}` +
-         `&order=open_day.desc,entry_time.desc&limit=400`;
+         `&order=open_day.desc,entry_time.desc&limit=${TRADE_ROWS}`;
+}
+
+/* A FULL READ IS NOT THE WHOLE WINDOW, coveredWeeks' rule for the trades. The
+   read takes the newest TRADE_ROWS, so a year he traded more than that is cut
+   at its oldest end and every answer built on it — a win rate, a rule's
+   counts, the rows themselves — was still labelled "the last 365 days". Said
+   where it happens, with the day the read actually reaches, and nothing at
+   all on an ordinary window. Pure and exported because it is the decision. */
+export function reachLine(rows: { open_day: string | null }[], days: unknown): string {
+  if (rows.length < TRADE_ROWS) return "";
+  return `\nThe read stops at its ${TRADE_ROWS}-trade bound, so this reaches back only to ` +
+         `${rows[rows.length - 1].open_day}, not the whole ${windowDays(days)} days. Say so ` +
+         `before giving any figure over the window.`;
 }
 
 // How many days the model asked for, clamped once: the window it reads and
@@ -900,7 +916,7 @@ export function weeksQuery(days: unknown, now = Date.now()): string {
 async function readTrades(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
-    return rows.length ? JSON.stringify(rows) : "No trades in that window.";
+    return rows.length ? JSON.stringify(rows) + reachLine(rows, days) : "No trades in that window.";
   } catch (err) {
     console.error("doji-eugenia: trades read failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now. Say you cannot see it rather than saying he has not traded.";
@@ -951,8 +967,10 @@ const CHECK_TOOL = {
    two ways, R-14 could be judged against a calendar in one and against nothing
    in the other, and nobody would see which. `keep` narrows the trades and
    nothing else, so the calendar and the stop history are the same either way.
-   Null when nothing was kept, which is not a pass. */
-async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true): Promise<RuleResult[] | null> {
+   Null when nothing was kept, which is not a pass; `reach` is the read's own
+   bound, said beside whatever was evaluated over it. */
+async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
+    Promise<{ results: RuleResult[] | null; reach: string }> {
   const [rows, releases, weeks, moves] = await Promise.all([
     readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
     readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
@@ -960,12 +978,13 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
     readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
   ]);
   const kept = rows.filter(keep);
-  if (!kept.length) return null;
+  const reach = reachLine(rows, days);
+  if (!kept.length) return { results: null, reach };
   const stops = new Map<string, Stop[]>();
   for (const m of moves) (stops.get(m.id) ?? stops.set(m.id, []).get(m.id)!).push(m);
-  return checkRules(kept, Date.now(), {
+  return { results: checkRules(kept, Date.now(), {
     releases: releases.map(r => r.at), weeks: coveredWeeks(weeks.map(w => w.week), releases),
-  }, stops);
+  }, stops), reach };
 }
 
 /* NEVER THROWS, for the reason every other tool here does not — it runs inside
@@ -973,9 +992,9 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
    get_trades already makes through the same view; the evaluation is pure. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
-    const results = await readRules(days);
+    const { results, reach } = await readRules(days);
     if (!results) return "No trades in that window, so there is nothing to check.";
-    return adherenceList(results);
+    return adherenceList(results) + reach;
   } catch (err) {
     console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
@@ -1032,7 +1051,7 @@ const STATS_TOOL = {
 async function readStats(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
-    return statsList(journalStats(rows), windowDays(days));
+    return statsList(journalStats(rows), windowDays(days)) + reachLine(rows, days);
   } catch (err) {
     console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
     return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
@@ -1592,11 +1611,12 @@ const LOOP_TOOL = {
   description:
     "Keep one open thread. kind='watch' for something odd you flagged that has not " +
     "resolved — a reaction that went the wrong way, a number that does not fit. " +
-    "kind='question' for a question you put to him and have not had an answer to. " +
-    "Both come back to you every briefing until they close, which is what lets you " +
-    "say how something landed rather than never mentioning it again. Open at most " +
-    "one of each in a briefing, and only for something you would actually want " +
-    "back — this is not a diary.",
+    "kind='question' for a question you put to him in a conversation and have not " +
+    "had an answer to. Both come back to you every briefing until they close, which " +
+    "is what lets you say how something landed rather than never mentioning it " +
+    "again. A briefing asks him nothing, so it opens at most one watch and never a " +
+    "question. Open one only for something you would actually want back — this is " +
+    "not a diary.",
   input_schema: {
     type: "object",
     properties: {
@@ -2481,24 +2501,15 @@ async function postEmbed(): Promise<Response> {
   return json({ ok: true, notes, turns });
 }
 
-/* ─── And she answers in the channel he used ───────────────────────────────
-   NO SETTING, NO TOGGLE, NO STORED PREFERENCE. He speaks because his hands are
-   busy — driving, at a screen, mid-session — and the whole point is over the
-   moment he has to look at a phone to read the answer. So the rule is the
-   message he sent: a voice note is answered aloud, a typed line is answered in
-   text, and nothing anywhere has to remember which he prefers.
+/* ─── And everything she writes is spoken ──────────────────────────────────
+   He speaks because his hands are busy — driving, at a screen, mid-session —
+   and the point is over the moment he has to look at a phone to read. So every
+   message she composes goes as a voice note, on every path: the briefing he
+   asked to have read to him, the looks, the trade event and a reply.
 
-   IT FALLS OUT THAT NOTHING SCHEDULED EVER SPEAKS. The briefing, the pulse, the
-   release look, the move look and the trade event are not replies to anything —
-   they reach this file by another path entirely — so they stay text without a
-   rule saying so. That is the right answer for the briefing in particular: a
-   fourteen-hundred-character read is something you skim, and audio is the one
-   format you cannot.
-
-   THE TEXT GOES FIRST AND IS NEVER CONTINGENT ON THE VOICE. It is what
-   remember() stores, what a later search finds, and what he re-reads at a desk;
-   a voice note is none of those. So it is already delivered before this is
-   attempted, which is what makes a failure here cost nothing but the audio.
+   THE TRANSCRIPT IS WHAT IS KEPT, whatever happened on the wire. remember()
+   stores the text, a later search finds the text, and the text is what goes
+   instead when the audio does not land — see sayAloud.
    ───────────────────────────────────────────────────────────────────────── */
 const TTS_URL   = env("TTS_URL") || "https://api.openai.com/v1/audio/speech";
 const TTS_KEY   = env("TTS_KEY");
@@ -2781,7 +2792,7 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
    right while her narration of it is a guess.
 
    A display format with one caller, so it stays here rather than in _shared,
-   the same way Gladys's nyTime does. The trust clause is load-bearing: the
+   the same way Gladys's nyDayTime does. The trust clause is load-bearing: the
    turns above genuinely are from this morning, and without it the freshest
    thing in her context still argues for the wrong answer. */
 // hourCycle rather than hour12: false, which leaves the cycle to the locale and
@@ -3092,7 +3103,8 @@ export async function breachesBlock(): Promise<string> {
     const [last] = await readRows<{ created_at: string }>('Briefing marker',
       `${SB_URL}/rest/v1/${briefedQuery()}`);
     const at = last?.created_at ?? new Date(Date.now() - 86_400_000).toISOString();
-    return breachesList(await readRules(BREACH_DAYS, t => sinceBriefing(t, at)));
+    const { results, reach } = await readRules(BREACH_DAYS, t => sinceBriefing(t, at));
+    return breachesList(results) + reach;
   } catch (err) {
     console.error("doji-eugenia: breaches unavailable —", err instanceof Error ? err.message : err);
     return "\n\nWhich rules his recent trades broke could not be checked just now. Say nothing about a broken rule rather than working it out from the rows.";
@@ -3723,14 +3735,15 @@ export function positionsList(
    price she cannot read costs one line, where the outer catch would cost her the
    position itself. Read only when something is open, which on most days is not
    at all. */
-/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` has exactly one
-   writer and it is the EMAIL path — the poller never sets it, on any row. What
-   the poller records when a position closes is `exit_price`, off the broker's
-   own deals, every two minutes.
+/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` is written by the
+   email and by the poller's writeFill — and the poller stamps only the closes
+   its fold window reaches, so a close older than that with no alert behind it
+   carries an `exit_price` and a null `fill_time` for good. What the poller
+   records on every close is `exit_price`, off the broker's own deals.
 
-   So a position that closed without an alert email landing — a manual close,
-   R-15's Friday close-out, a parse that failed, an email that never came — kept
-   `fill_time` null for ever, and this block told him he was in a trade for ever.
+   Read off `fill_time` alone, a position that closed without an alert email
+   landing — a manual close, R-15's Friday close-out, a parse that failed —
+   kept reading as open, and this block told him he was in a trade for ever.
    It did it while citing R-19 and R-15 at him about a position that had not
    existed since Wednesday, which is the worst thing this block can do: it is the
    one place she speaks with his own rules behind her.
@@ -3774,9 +3787,10 @@ export async function positionsBlock(): Promise<string> {
 // it takes — the timeout in the cron job only has to outlast the work. That is
 // the whole difference between this caller and Telegram's.
 //
-// One hourly job, three answers: a briefing hour, a pulse hour, or neither.
-// ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the nightly
-// pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
+// The hourly job asks dueNow which of its schedules this hour owes, if any; the
+// two quarter-hourly senses and the person's repair doors each name theirs with
+// a flag. ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the
+// nightly pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
 // same two jobs: a manual re-run after a failure, and a way to exercise the path
 // without waiting for the hour. ?consolidate=1 is also the only way to SEE what
 // the nightly pass does, since it sends nothing and stores no turn.
@@ -3949,15 +3963,6 @@ async function briefedToday(): Promise<boolean> {
 }
 
 
-/* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
-   eugenia_turns and never read back, so every morning started from nothing and
-   she could not know what she had said the day before, whether it landed, or
-   that she had already explained a term twice this week. Continuity is most of
-   what separates a person from a feed.
-
-   The stored user turn is a marker, not the sent text: the notes and the week's
-   trades are rebuilt fresh every morning, and storing them would resend a stale
-   copy as history for the next six briefings. */
 /* ─── The feedback keyboard ────────────────────────────────────────────────
    An instruction note is the only correction channel he has, and it is a good
    one — but it fires only when something annoys him enough to type. On every
@@ -4116,6 +4121,15 @@ async function gate(draft: string, asked: string, label: string, most?: number):
   }
 }
 
+/* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
+   eugenia_turns and never read back, so every morning started from nothing and
+   she could not know what she had said the day before, whether it landed, or
+   that she had already explained a term twice this week. Continuity is most of
+   what separates a person from a feed.
+
+   The stored user turn is a marker, not the sent text: the notes and the week's
+   trades are rebuilt fresh every morning, and storing them would resend a stale
+   copy as history for the next six briefings. */
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
   /* Filed before the reads, so the calendar she is handed is this morning's —
@@ -4743,7 +4757,10 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
     `&order=at.asc&limit=5`);
 }
 
-async function postTradeEvent(id: string, event: string): Promise<Response> {
+/* Exported so the sequence — read the row, guard, decide — is driven rather
+   than read; every guard here returns before a model call, and a guard that
+   stopped returning reads exactly like one that was never needed. */
+export async function postTradeEvent(id: string, event: string): Promise<Response> {
   const [row] = await readRows<TradeRow>('Trade',
     `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
   // Soft-deleted, or not through the view. Nothing to say and nothing wrong.
@@ -4774,6 +4791,15 @@ async function postTradeEvent(id: string, event: string): Promise<Response> {
   let situation: string;
 
   if (event === 'opened') {
+    /* OPENED AND ALREADY CLOSED, which the trigger cannot tell apart. It fires
+       on an insert with no fill_time, and a position opened and closed inside
+       one two-minute poll is inserted with its exit price set and its close
+       instant written a moment later — so this event arrives about a position
+       that no longer exists, and the message it would send opens "he has just
+       opened" with his own R-14 cited against a trade he is out of. The close
+       event that follows is the one that is true. `isOpen` is the same two
+       witnesses the desk reads. */
+    if (!isOpen(row)) return json({ ok: true, trade: id, skipped: "already closed" });
     const ahead = await aheadToday();
     if (!ahead.length) return json({ ok: true, trade: id, said: "nothing pending" });
     situation =
@@ -5401,7 +5427,7 @@ async function handleMessage(update: any): Promise<void> {
          shorter for a limit that no longer exists, which is the one thing this
          was changed to stop. */
       const aloud =
-        `\n\nYour answer is sent as text and read back to him aloud, so write it ` +
+        `\n\nYour answer reaches him as a voice note, so write it ` +
         `to be heard: plain sentences, no headings, and nothing that only works ` +
         `on a page. Its length is whatever the answer needs.`;
       const context = text + about + aloud + notes + channels + story + loops + calendar + desk;
