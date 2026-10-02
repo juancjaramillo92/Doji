@@ -126,6 +126,22 @@ const NUMBERED = readdirSync(new URL('../supabase', import.meta.url))
   .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8'))
   .join('\n');
 
+/* Every column `trades` has, read out of 001's table and every later file's
+   `add column`, with whether Postgres generates it. Two readers need the list
+   and one of them needs the flag, so it is read once. Every numbered file, not
+   the one that happened to add the last column: 012 appended best_price and a
+   reader anchored on 006 did not see it arrive. */
+const tradesColumns = () => {
+  const schema = SCHEMA.slice(SCHEMA.indexOf('create table public.trades'));
+  const declared = schema.slice(0, schema.indexOf('\n);'))
+    .split('\n').map(l => l.match(/^ {2}([a-z_]+)\s+[a-z].*?(generated always)?/))
+    .filter(m => m && m[1] !== 'constraint')
+    .map(m => ({ name: m[1], generated: /generated always/.test(m.input) }));
+  const added = [...NUMBERED.matchAll(/alter table public\.trades add column if not exists (\w+)/g)]
+    .map(m => ({ name: m[1], generated: false }));
+  return [...new Map([...declared, ...added].map(c => [c.name, c])).values()];
+};
+
 const servedView = () => {
   const all = viewColumns(NUMBERED, 'the numbered SQL files');
   return all[all.length - 1];
@@ -1772,15 +1788,7 @@ test('the documents name only symbols the repository has', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the Data model names every column the trades table has, and no other', () => {
-  const schema = SCHEMA.slice(SCHEMA.indexOf('create table public.trades'));
-  const declared = schema.slice(0, schema.indexOf('\n);'))
-    .split('\n').map(l => (l.match(/^ {2}([a-z_]+)\s+[a-z]/) ?? [])[1])
-    .filter(c => c && c !== 'constraint');
-  // Every numbered file, not the one that happened to add the last column: 012
-  // appended best_price and a reader anchored on 006 did not see it arrive.
-  const added = [...NUMBERED.matchAll(/alter table public\.trades add column if not exists (\w+)/g)]
-    .map(m => m[1]);
-  const columns = [...new Set([...declared, ...added])];
+  const columns = tradesColumns().map(c => c.name);
   assert.ok(columns.length >= 20,
     `only ${columns.length} columns read out of the schema — the reader has gone blind`);
 
@@ -1806,6 +1814,44 @@ test('the Data model names every column the trades table has, and no other', () 
     'the Data model tabulates a column the schema does not have');
 });
 
+
+/* ─── The restore names every column, and never the generated one ───────────
+   The procedure read `insert into trades select * from
+   jsonb_populate_recordset(null::trades, ...)`. Postgres refuses any value for
+   a generated column, a null included, so it stopped at `pnl` before a row
+   landed — and nothing ever ran it, because a restore is only run on the day
+   one is needed. Its update list had also stopped at the columns of its year,
+   so a restored row kept whatever the damaged one held for `size_oz`, the plan
+   and `best_price`. Run against Postgres 16 to find it and to confirm the fix.
+
+   Read against the schema rather than a list typed here, so the column added
+   next year is one the restore misses until this goes red. */
+test('the restore procedure writes every column the table lets it write', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const sql = readme.match(/```sql\n-- 1\. paste the file's `trades` array[\s\S]*?```/)?.[0];
+  assert.ok(sql, 'the README no longer carries the restore procedure');
+
+  const list = (text) => text.split(',').map(c => c.trim()).filter(Boolean);
+  const target = list(sql.match(/insert into trades \(([^)]*)\)/)?.[1] ?? '');
+  const source = list(sql.match(/\nselect ([\s\S]*?)\nfrom jsonb_populate_recordset/)?.[1] ?? '');
+  const updated = [...sql.matchAll(/(\w+) = excluded\.(\w+)/g)]
+    .map(m => { assert.equal(m[1], m[2], `${m[1]} is restored from ${m[2]}`); return m[1]; });
+
+  const columns = tradesColumns();
+  assert.ok(columns.length >= 20, 'the schema reader has gone blind');
+  const writable = columns.filter(c => !c.generated).map(c => c.name).sort();
+  assert.deepEqual(columns.filter(c => c.generated).map(c => c.name), ['pnl'],
+    'the generated columns are not the ones this test was written against');
+
+  assert.deepEqual([...target].sort(), writable,
+    'the restore does not insert exactly the writable columns — a generated one ' +
+    'refuses the whole statement, and a missing one is lost on a fresh restore');
+  assert.deepEqual(source, target, 'the select does not line up with the insert list');
+  // Identity, ownership and creation stand on a row that already exists.
+  const kept = ['id', 'user_id', 'created_at', 'updated_at'];
+  assert.deepEqual([...updated].sort(), writable.filter(c => !kept.includes(c)),
+    'a row that exists is restored without some of its columns');
+});
 /* ─── The Layout block is a copy of the tree, and nothing compared it ───────
    README.md opens with a listing of every file and what it is for. It is the
    first thing a cold session reads and the only place the repository is

@@ -577,19 +577,36 @@ rather than one click away from an export. The procedure:
 ```sql
 -- 1. paste the file's `trades` array as the argument
 -- 2. run it; every column is written except the generated pnl
-insert into trades
-select * from jsonb_populate_recordset(null::trades, '<<<PASTE ARRAY HERE>>>')
+insert into trades (id, user_id, direction, entry_time, fill_time, entry_price,
+  exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl,
+  setup, followed_rules, followed_sl, followed_tp, deleted, created_at,
+  updated_at, tg_message_id, planned_sl, planned_tp, best_price)
+select id, user_id, direction, entry_time, fill_time, entry_price,
+  exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl,
+  setup, followed_rules, followed_sl, followed_tp, deleted, created_at,
+  updated_at, tg_message_id, planned_sl, planned_tp, best_price
+from jsonb_populate_recordset(null::trades, '<<<PASTE ARRAY HERE>>>')
 on conflict (id) do update set
   direction = excluded.direction, entry_time = excluded.entry_time,
   fill_time = excluded.fill_time, entry_price = excluded.entry_price,
-  exit_price = excluded.exit_price, commission = excluded.commission,
-  balance = excluded.balance, open_day = excluded.open_day,
-  net_pnl = excluded.net_pnl, computed_pnl = excluded.computed_pnl,
-  setup = excluded.setup,
+  exit_price = excluded.exit_price, size_oz = excluded.size_oz,
+  commission = excluded.commission, balance = excluded.balance,
+  open_day = excluded.open_day, net_pnl = excluded.net_pnl,
+  computed_pnl = excluded.computed_pnl, setup = excluded.setup,
   followed_rules = excluded.followed_rules, followed_sl = excluded.followed_sl,
   followed_tp = excluded.followed_tp, deleted = excluded.deleted,
-  tg_message_id = excluded.tg_message_id;
+  tg_message_id = excluded.tg_message_id, planned_sl = excluded.planned_sl,
+  planned_tp = excluded.planned_tp, best_price = excluded.best_price;
 ```
+
+**The columns are named, and `select *` is the mistake it replaced.** Postgres
+refuses any value for a generated column, a null included, so `insert into
+trades select * from jsonb_populate_recordset(...)` stopped at `pnl` before a
+single row landed. The restore point failed on the day it was needed. The update
+list had also stopped at the columns of its year, so `size_oz`, the plan and
+`best_price` came back as whatever the damaged row held. `agree.test.mjs` reads
+all three lists against the schema, so a column added later fails the suite
+until it is restored too.
 
 The deleted rows matter: restoring without them lets the poller rebuild every
 trade you ever removed.
