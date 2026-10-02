@@ -1638,12 +1638,8 @@ export function spokenBriefing(rows: (Turn & { created_at: string })[]): string 
     ? String(text.content) : null;
 }
 
-/* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
-   in the only sense that matters: he has the message before this runs. Both
-   turns go in one vendor call and one INSERT — and the pair still has to be one
-   INSERT for the reason openOnUser exists, since a concurrent write taking a
-   sequence value between them is what leaves the window opening on an assistant
-   turn. */
+/* Every caller reaches this after sending, so the embedding costs him nothing.
+   The pair is one INSERT, for openOnUser's reason. */
 async function remember(turns: Turn[]) {
   const vecs = await embed(turns.map(t => String(t.content))).catch(() => null);
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_turns`, {
@@ -1655,17 +1651,11 @@ async function remember(turns: Turn[]) {
 
 export interface Sweep { filled: number; left: number }
 
-/* WHAT A NIGHT OF SWEEPING CAME TO, IN THE ONE FORM THAT SEPARATES THREE
-   REPAIRS. A vendor that refuses throws, so it reaches the row as a message and
-   names itself. What is left is a pair of counts, and the pair that matters is
-   nothing filled with a backlog still waiting: `embed()` returns null on an
-   unset key ALONE — every other way of failing throws — so that combination is
-   an exact statement about the key rather than a guess about the vendor.
-
-   The quiet night has to read as quiet. An archive fully embedded answers
-   `0 filled, 0 left`, and a line that called that a missing key would fire
-   every night for the life of the deployment, which is how a monitor stops
-   being read. */
+/* A night's sweep, in the form that parts three repairs. A refusing vendor
+   throws and names itself. embed() returns null on an unset key alone, so
+   nothing filled against a backlog is an exact statement about the key. A
+   drained archive reads `0 filled, 0 left` and accuses nobody, or the line
+   fires every night and stops being read. */
 export function sweepLine(notes: Sweep, turns: Sweep): string {
   const counts = (s: Sweep) => `${s.filled} filled, ${s.left} left`;
   const line = `notes ${counts(notes)} · turns ${counts(turns)}`;
@@ -1675,29 +1665,11 @@ export function sweepLine(notes: Sweep, turns: Sweep): string {
 }
 
 /* ─── What the vendor missed ───────────────────────────────────────────────
-   A null embedding is every row written before 007 ran, plus any row whose
-   vendor call failed. Both are invisible from the outside: the row is there,
-   the search still answers, and it simply never returns that row from its
-   semantic arm.
-
-   ONE PATCH PER ROW, WHICH IS DELIBERATE RATHER THAN LAZY. An upsert would be
-   one request, and PostgREST would send rows carrying only `id` and
-   `embedding`: `content not null` is checked when the tuple is built, before
-   any conflict is detected, so the whole batch would be refused. The expensive
-   half is the vendor call and that is one request for the batch either way.
-
-   RESUMABLE, AND IT SAYS HOW MUCH IS LEFT. `count=exact` is what turns this
-   from a call you repeat hopefully into one you repeat until it answers zero.
-
-   NEWEST FIRST, AND THAT IS THE SAME MISTAKE THE NIGHTLY WINDOW ALREADY MADE.
-   This drained `id.asc`, which finishes the same backlog either way — so it
-   looked like a choice with no consequence, exactly as `order=id.asc&limit=200`
-   did on the day's turns. The consequence is WHEN. The nightly sweep fills
-   fifty rows a night, so a vendor outage that left a fortnight of turns without
-   vectors becomes searchable oldest-first: last month's archive comes back
-   before last week's conversation, and the rows he is likeliest to ask her
-   about are the last to arrive. Ordering by id.desc drains the same rows in the
-   order they are worth having.
+   Rows with no embedding — everything before 007, and any whose vendor call
+   failed — are never found by meaning, silently. One PATCH per row, for
+   EMBED_BATCH's reason. count=exact makes it resumable: repeat until it
+   answers zero. Newest first: an outage's fortnight should come back before
+   last month's archive, being what he is likeliest to ask about.
    ───────────────────────────────────────────────────────────────────────── */
 async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   const res = await fetch(
@@ -1710,10 +1682,8 @@ async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   if (!rows.length) return { filled: 0, left: 0 };
 
   const vecs = await embed(rows.map(r => String(r[column])));
-  // NOT CAUGHT HERE, and that is the point of the door: a vendor that refused
-  // reaches postScheduled, which puts its reason in the response and in the one
-  // message he actually reads. Only an unset key reaches this line, and it is
-  // the one case with nothing to report — the same rows wait for the key.
+  // Not caught: a refusing vendor's reason reaches the door's answer. Only an
+  // unset key arrives here, and then the rows wait for it.
   if (!vecs) return { filled: 0, left };
 
   let filled = 0;
@@ -1729,86 +1699,36 @@ async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
 }
 
 async function postEmbed(): Promise<Response> {
-  // One after the other rather than together: each is fifty single-row PATCHes,
-  // and there is nothing to be gained by having a hundred of them in flight.
+  // Sequential: nothing gained by a hundred PATCHes in flight.
   const notes = await fillEmbeddings('eugenia_notes', 'note');
   const turns = await fillEmbeddings('eugenia_turns', 'content');
   return json({ ok: true, notes, turns });
 }
 
 /* ─── And everything she writes is spoken ──────────────────────────────────
-   He speaks because his hands are busy — driving, at a screen, mid-session —
-   and the point is over the moment he has to look at a phone to read. So every
-   message she composes goes as a voice note, on every path: the briefing he
-   asked to have read to him, the looks, the trade event and a reply.
-
-   THE TRANSCRIPT IS WHAT IS KEPT, whatever happened on the wire. remember()
-   stores the text, a later search finds the text, and the text is what goes
-   instead when the audio does not land — see sayAloud.
+   He listens because his hands are busy, so every message she composes goes as
+   a voice note, on every path. The transcript is what is kept, and the text is
+   what goes when the audio does not land — see sayAloud.
    ───────────────────────────────────────────────────────────────────────── */
 const TTS_URL   = env("TTS_URL") || "https://api.openai.com/v1/audio/speech";
 const TTS_KEY   = env("TTS_KEY");
-// Both from the environment, unlike EMBED_MODEL. Nothing is stored, so a change
-// here alters one message rather than what is comparable to what — and which
-// voice she has is his to change without a deploy.
-//
-// THE TWO ARE COUPLED AND THE VENDOR DECIDES HOW. The older `tts-1` serves a
-// smaller set of voices and takes no delivery instruction, so overriding the
-// model alone can leave a voice it does not have — a 400 on every reply, which
-// costs the audio and not the answer, and is the reason both defaults name the
-// current model's recommended pairing rather than the safest-looking one.
+// From the environment, unlike EMBED_MODEL: nothing is stored, so a change
+// alters one message, and the voice is his to change. The two are coupled —
+// `tts-1` serves fewer voices and takes no instruction — so the defaults are
+// the current model's own pairing.
 const TTS_MODEL = env("TTS_MODEL") || "gpt-4o-mini-tts";
 const TTS_VOICE = env("TTS_VOICE") || "marin";
 
-/* HOW IT IS READ, WHICH IS A PRODUCT DECISION AND NOT A SETTING. The prompt
-   spends most of its length keeping her off signals and verdicts, and a
-   breathless delivery of a deliberately unexcited paragraph contradicts the
-   whole of it — the register has to survive the trip through audio. Pinned
-   here for that reason where the voice is his to change: which voice reads it
-   is taste, how it is read is the product.
+/* How it is read is the product, so it is pinned where the voice is not: a
+   breathless read of a deliberately calm paragraph contradicts the prompt.
 
-   IT ASKED FOR THE REGISTER AND NOT FOR THE DELIVERY, WHICH IS WHY IT READ AS A
-   MACHINE. Two sentences, and both of them said what NOT to do — not breathless,
-   not selling. A model given only prohibitions gives back the null reading:
-   every sentence the same length of time, every pitch contour the same, no beat
-   at a paragraph break, which is exactly what a person means by robotic. What
-   was missing is the positive half. This is the one dial the vendor offers, and
-   the model and the voice are already the newest it serves, so there is nowhere
-   else for this to come from.
-
-   THE LAST LINE IS PRONUNCIATION AND IT EARNS ITS PLACE ON REAL TEXT. Her
-   calendar lines are `08:30 ET <name>`, the trade event reads R-11 and R-14/R-19
-   back at him, and a level is a comma'd figure. Read as glyphs those are three
-   stumbles in the middle of a fluent paragraph. Said here rather than rewritten
-   on the way out, because what `remember` stores must stay the text he can read
-   — a rewriter would either touch the transcript or be a second copy of it.
-
-   AND THE FIRST REPAIR ASKED FOR A PER-SENTENCE SHAPE OVER TEXT THAT IS SIXTEEN
-   NEAR-IDENTICAL SENTENCES. It said `sentences finish downward`, which is right
-   about one sentence and is the metronome itself when applied to the register
-   `WRITING` produces: measured over the approved example, sixteen sentences,
-   mean 9.2 words, fourteen of them between 5 and 13. Sixteen identical falls in
-   a row, each one resetting to the same place to start the next. The rule was
-   aimed at news-reader uplift and it bought that at the price of the thing it
-   was written to fix.
-
-   SO THE ARC MOVED UP A LEVEL, TO THE PARAGRAPH. That is the one rhythm
-   variable still free: the WORDS cannot carry it, because sentence length is
-   fixed by rules that exist for the eye and are staying — he read a draft under
-   them and they are why the page works. What is left is where the pitch sits
-   across four sentences and how long she rests between them, and neither was
-   being asked for. Only the last sentence of a paragraph fully lands now; the
-   ones before it stay open, which is what a person does when something is still
-   coming.
-
-   SPANISH IS SAID AS A NATIVE SAYS IT, AND CAREFUL IS THE GRINGO TELL. `Not
-   read as English letters` ruled out the worst reading and asked for nothing
-   better: a correct, deliberate Spanish word in an American mouth is still an
-   American saying a Spanish word, and slowing down to get it right is the tell
-   itself — the same slowing that dragged `jefesito` out. A native speaker is
-   quickest in their own language. So the switch is asked for as code-switching,
-   both directions, because the other failure is a Spanish accent leaking onto
-   the English around it. */
+   It says what TO do, because prohibitions alone produced the null reading —
+   every sentence the same length and contour, which is what robotic means. The
+   arc sits at the paragraph rather than the sentence: WRITING's short, even
+   sentences would make a per-sentence fall a metronome. Pronunciation is
+   spelled out for the codes she reads back (08:30 ET, R-11, a comma'd level)
+   rather than rewriting the text, which must stay what is stored. Spanish is
+   asked for as native code-switching: careful Spanish is the gringo tell. */
 const TTS_STYLE = `Voice: a colleague reading something over to one person who is
 busy. Low and warm, certain of what she is saying, with nothing to sell.
 
@@ -1837,80 +1757,37 @@ heh-feh-SEE-toh. Say it at speed and without care, the way anyone says their
 own language; slowing down to get it right is exactly what sounds foreign. Then
 straight back to her ordinary English, with no accent carried across.`;
 
-/* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
-   cap — seven hundred characters, then four thousand — and a cap decides that
-   past some length a message is not worth hearing. Nothing she writes should be
-   shortened to fit a voice note, and nothing she writes should go unspoken for
-   being long: those are the same decision made twice, and it is his, and it is
-   no.
-
-   What remains is not a judgement at all. The speech vendor accepts a bounded
-   input in one request, so a long message becomes SEVERAL voice notes, exactly
-   as it already becomes several text messages. `chunk` is the one that does it,
-   with its paragraph preference, so each part is a whole thought rather than a
-   sentence cut in half. */
+/* A chunk size, not a cap: a cap decides some messages are not worth hearing,
+   and he decided none are. The vendor takes a bounded input, so a long message
+   is several voice notes, split by `chunk` into whole thoughts. */
 const TTS_LIMIT = 4000;
 
-/* HIS EAR SET THIS, NOT A DEFAULT. At 1.0 he was playing every voice note at
-   1.5x in Telegram and calling 1.5 a shade fast — so the number is his, read
-   off what he was already doing, and it belongs at generation rather than in a
-   player setting he has to remember on each message.
-
-   IT MAY BE IGNORED, AND THAT IS THE THING TO KNOW BEFORE READING A RESULT
-   HERE. `speed` is documented for this endpoint across 0.25–4.0, and
-   gpt-4o-mini-tts has been reported to quietly disregard it where tts-1 honours
-   it — no error, no header, audio at 1.0 and a constant in this file claiming
-   otherwise. Nothing in the test suite can see the difference, because the
-   suite never calls the vendor. So if the tempo is unchanged, this is the first
-   thing to suspect and the fallback is to ask for pace in TTS_STYLE instead. */
+/* His number: at 1.0 he was playing every note at 1.5× and calling that a
+   shade fast. It may be silently ignored — gpt-4o-mini-tts has been reported
+   to disregard `speed` — and nothing here can see it; if the tempo is
+   unchanged, ask for pace in TTS_STYLE instead. */
 const TTS_SPEED = 1.3;
 
-/* THE VOICE GETS A BUDGET, AND THE TEXT IS WHAT IS LEFT WHEN IT RUNS OUT. Every
-   request in speak() waited for as long as the vendor took, and on 2 October it
-   took longer than the worker had: the briefing was stored at 08:02:23, the
-   speech request never answered, and at 08:06:40 — four hundred seconds after
-   boot — the platform shut the worker down. A worker that is killed runs no
-   catch, so there was no fallback to text, no row, no apology, and no retry,
-   because the marker had already gone down. The one failure the fallback exists
-   for arrived in the only shape it could not see.
+/* The voice gets a budget, and the text is what is left when it runs out. A
+   speech request that never answered once outlived the worker, which was
+   killed with no catch, no row and no retry. One budget per message, not per
+   request, which would multiply by the parts; 150s is the slowest speaking
+   that ever landed.
 
-   ONE BUDGET FOR THE WHOLE MESSAGE, NOT ONE PER REQUEST, because a long message
-   is several parts and a per-request limit multiplies by them. A hundred and
-   fifty seconds is the slowest speaking that ever landed — a Sunday at 155s,
-   storing included — and it is what a path that writes and speaks in one
-   worker can afford with the text still to send.
-
-   THE BRIEFING DOES NOT SPEAK IN THE WORKER THAT WROTE IT, which is the larger
-   half of the repair. Writing and speaking shared one four-hundred-second clock,
-   so a slow morning in either was taken out of the other. postBriefing stores
-   the briefing and hands it to a second worker (`?speak=`), whose clock is its
-   own: SPEAK_WORKER_MS of it goes to the voice, leaving the read before and the
-   text after. */
+   The briefing speaks in a second worker (`?speak=`) with its own clock, so a
+   slow morning in writing or speaking is not taken out of the other. */
 const SPEAK_MS = 150_000;
 const SPEAK_WORKER_MS = 330_000;
 
-/* AND A PART THAT DOES NOT LAND GETS ONE MORE ATTEMPT, each bounded on its own
-   as well as by the budget. A vendor that stalls has stalled on one request, and
-   the next is a fresh connection — so on the speaking worker's budget a stall
-   costs one attempt rather than the voice. On SPEAK_MS a stalled first attempt
-   has spent the budget, so only a quick refusal is tried twice there. */
+/* A part that does not land gets one more attempt, each bounded: a stall is
+   one request, and the next is a fresh connection. On SPEAK_MS only a quick
+   refusal gets its second try. */
 const ATTEMPT_MS = 150_000;
 
-/* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
-   format Telegram would not render — every one of them leaves him with the
-   answer he already has and no audio, which is a degraded reply rather than a
-   missing one. That is the opposite call from VOICE_TROUBLE, and the difference
-   is that a voice note she cannot hear costs the whole exchange while a reply
-   she cannot speak costs the convenience.
-
-   Its own fetch rather than the shared telegram() helper, for tgDownload's
-   reason: sendVoice is multipart and that helper posts JSON.
-
-   AND OGG/OPUS SPECIFICALLY, which is the one thing here that would fail
-   quietly rather than loudly. The default is mp3 and it would work — the
-   request succeeds, Telegram accepts the file, and it arrives as an ATTACHMENT
-   rather than a voice note, with no waveform and no speed control. Nothing
-   errors; the feature just stops being the thing it was for. */
+/* Never throws and never messages him: any failure answers false and the text
+   goes instead. Its own fetch, sendVoice being multipart. Ogg/opus, because the
+   default mp3 works and arrives as a file attachment rather than a voice note,
+   with nothing erroring. */
 async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Promise<boolean> {
   if (!TTS_KEY) return false;
 
@@ -1919,12 +1796,9 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        /* WITHOUT MARKS SHE WAS TOLD NOT TO WRITE. The prompt says plain text,
-           because Telegram is sent no parse mode and renders an asterisk as an
-           asterisk — but this text is model-written, and a model trained on
-           markdown reaches for a bold label in exactly the slot that is a list.
-           `**Today:**` read aloud is a gamble on what the vendor does with an
-           asterisk, so the boundary strips what the instruction only asks for. */
+        // Markdown stripped at the boundary: no parse mode is sent, yet a model
+        // writes a bold label in a list anyway, and an asterisk read aloud is
+        // a gamble.
         model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
@@ -1935,13 +1809,10 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
 
     const form = new FormData();
     form.append("chat_id", CHAT_ID);
-    // Type and filename both, the same reasoning transcribe() gives for the
-    // other direction: it is not knowable which one Telegram reads.
+    // Type and filename both: which one Telegram reads is not knowable.
     form.append("voice", new Blob([new Uint8Array(await spoken.arrayBuffer())],
                                   { type: "audio/ogg" }), "reply.ogg");
-    // The briefing's keyboard rides on the voice note now, because there is no
-    // text message under it to carry one. JSON in a multipart field, which is
-    // what Telegram takes for reply_markup on sendVoice.
+    // The briefing's keyboard rides on the voice note, as JSON in the field.
     if (keyboard) form.append("reply_markup", JSON.stringify(keyboard));
     const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
       method: "POST", body: form, signal,
@@ -1955,38 +1826,20 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
   }
 }
 
-/* THE VOICE NOTE IS THE MESSAGE, AND THE TEXT IS WHAT HAPPENS WHEN IT IS NOT.
-   It sent both for one day and both arrived, which is two notifications and two
-   bubbles for one thing she said — he asked for the voice note alone.
+/* The voice note is the message and the text its fallback — both went for a
+   day, two notifications for one thing said. Audio-only would turn a refusing
+   vendor or an unset key into a missing message, so the text is sent, in full,
+   whenever any part did not land. What is stored is unaffected.
 
-   THE OBJECTION TO THAT WAS REAL AND THIS IS THE ANSWER TO IT rather than a
-   climb-down. A speech vendor that refuses, an unset key, a format Telegram will
-   not render: audio-only turns every one of those into a MISSING message, which
-   is the failure shape this whole system is built against. So the text is not
-   dropped, it is the fallback — attempted only when the audio did not land, and
-   then in full rather than in part, because a half-heard message with no text
-   under it is worse than either.
-
-   WHAT IS STORED IS UNAFFECTED, and that is the half worth being clear about:
-   `remember` writes the transcript whatever happened on the wire, so her memory,
-   `search_memory` and the nightly pass read exactly what they always did.
-
-   IT IS NOT `say` ITSELF, because three things go through `say` that must stay
-   silent: the `/notes` audit, which is a rendered table and unlistenable; the
-   apologies, which are failure notices; and the short operational lines. A
-   message she wrote is a different thing from a line the function printed. */
-// Exported for the one guarantee here that a source read cannot settle: that
-// there is no path on which he gets nothing. With no TTS key every `speak`
-// answers false, which is exactly the shape of a vendor that refused. The
-// budget is a parameter for the same reason — so a vendor that never answers
-// can be driven in a test without waiting out SPEAK_MS.
+   Not `say` itself, which keeps three things silent: the /notes audit, the
+   apologies, and short operational lines. Exported so the fallback is driven —
+   with no TTS key every speak answers false, a refusing vendor's shape — with
+   the budget a parameter so a stall needs no waiting out. */
 export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK_MS): Promise<boolean> {
   const parts = chunk(words, TTS_LIMIT);
   const signal = AbortSignal.timeout(budget);
   let heard = parts.length > 0;
-  // Sequentially, because Telegram does not promise ordering across two sends —
-  // chunk()'s own reason for the same shape in say(). The keyboard rides on the
-  // last part and only the last, which is say()'s rule as well.
+  // Sequentially, keyboard on the last part, as in say().
   for (const [i, part] of parts.entries()) {
     const marked = i === parts.length - 1 ? keyboard : undefined;
     let landed = false;
@@ -1995,44 +1848,23 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
     }
     if (!landed) heard = false;
   }
-  // ANY part missing, not all of them. A message he heard three quarters of is
-  // one he cannot act on, and the text is cheap.
+  // Any part missing: three quarters of a message cannot be acted on.
   if (!heard) await say(words, keyboard);
   return heard;
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
-   Folded into the opening user message rather than sent as a mid-conversation
-   system message. That channel exists for exactly this and would keep the
-   cached prefix intact — but its request shape could not be exercised from the
-   machine this was written on, and a 400 there kills every reply she gives.
-   Nothing here is untrusted anyway: the trades are his own journal, and the
-   notes are her sentences or his, in his own thread — so the injection safety a
-   system turn buys is not what this needs.
-
-   remember() stores the RAW message, never the augmented one, so a preamble is
-   never resent forever as history.
+   Folded into the opening user message rather than a mid-conversation system
+   message, whose request shape could not be exercised here — and a 400 there
+   kills every reply. Nothing in it is untrusted. remember() stores the raw
+   message, so a preamble is never resent as history.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* ─── What time it is ─────────────────────────────────────────────────────
-   SHE HAS NO CLOCK OTHERWISE, and the absence does not read as one. Her whole
-   context is a system prompt about morning briefings and a history whose most
-   recent long turn IS this morning's briefing — so asked a question at 23:42
-   she opened with "morning", which is not a model error but the only inference
-   available from what she was given.
-
-   It also silently undermines everything she says about dates. The prompt asks
-   her to be specific with dates and to say he has not traded since one, and
-   get_trades computes its window from Date.now() on this side — so the DATA is
-   right while her narration of it is a guess.
-
-   A display format with one caller, so it stays here rather than in _shared,
-   the same way Gladys's nyDayTime does. The trust clause is load-bearing: the
-   turns above genuinely are from this morning, and without it the freshest
-   thing in her context still argues for the wrong answer. */
-// hourCycle rather than hour12: false, which leaves the cycle to the locale and
-// can resolve to h24 — midnight rendering "24:05". _shared's nyClock states it
-// for the same reason.
+   She has no clock otherwise: asked something at 23:42 with this morning's
+   briefing the freshest thing in context, she said "morning". The trust clause
+   is load-bearing for that reason. h23, or midnight reads "24:05".
+   ───────────────────────────────────────────────────────────────────────── */
 const nyStamp = (now: Date) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', weekday: 'long', day: 'numeric', month: 'long',
   year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
