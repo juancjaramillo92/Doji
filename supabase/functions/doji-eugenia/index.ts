@@ -1390,27 +1390,11 @@ const MAX_ROUNDS = 10;
 const unserved = (name: string) =>
   `There is no tool called "${name}" here. Answer without it and do not mention this.`;
 
-/* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
-   ifs because a reader should be able to enumerate what she can do by looking
-   at one list. It said "ten of them" while there were thirteen, which is why
-   the number is gone rather than corrected: prefer a name to a count, as the
-   triggers row in verify.sql already says.
-
-   NOTHING HERE THROWS, which is the rule every handler below already follows
-   individually and which this restates as a property of the whole surface: it
-   runs inside the loop, and an exception costs the answer she is in the middle
-   of writing rather than the tool she was in the middle of calling.
-
-   AN UNKNOWN NAME IS ANSWERED, NOT DROPPED. Every tool_use block must come back
-   with a tool_result or the next request is a 400 — so a name no set serves
-   gets a sentence saying so, which is also the only way that mistake would ever
-   become visible rather than presenting as a turn that died. */
-/* Exported for the same reason `ask` below is: the rule this file repeats more
-   than any other — nothing served to the tool loop may throw — was asserted by
-   reading each handler's source and never by running one. A handler that gained
-   an uncaught path would read exactly like one that had not, and the briefing
-   it killed would be the first anyone heard of it. Driven against a database
-   that refuses, every tool has to come back with a sentence. */
+/* The one place a tool name becomes work — a switch, so what she can do is one
+   enumerable list. Nothing here throws: an exception in the loop costs the
+   answer, not the tool. An unknown name is answered, never dropped, because a
+   tool_use without its tool_result is a 400 on the next request. Exported so a
+   test can drive every tool against a refusing database. */
 export async function serve(name: string, input: any): Promise<string> {
   switch (name) {
     case TRADES_TOOL.name:   return await readTrades(input.days);
@@ -1434,77 +1418,37 @@ export async function serve(name: string, input: any): Promise<string> {
   }
 }
 
-/* `label` NAMES THE CALLER, and it no longer does only that: `eugenia_runs`
-   files the row under it and `modelFor` picks the model from it, so one string
-   decides what ran and what it is filed as. The callers are not distinguishable
-   from effort alone — the briefing and the nightly pass both run high — and a
-   cost line that cannot say which of them spent the money is a cost line nobody
-   can act on. It said "the four jobs" while there were twice that; a count in a
-   comment goes stale on the release that adds a caller, and nothing compares
-   it.
-
-   Exported so a test can drive the loop itself against a stubbed `fetch`.
-   Asserting on a comparison in isolation would prove the arithmetic and not
-   that the line is ever printed, which is the half that has been wrong here
-   before. */
+/* `label` names the caller: eugenia_runs files the row under it and modelFor
+   picks the model from it, so one string decides what ran and what it is filed
+   as. Effort alone cannot tell the callers apart. Exported so a test can drive
+   the loop against a stubbed fetch. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
                           tools: unknown[] = CHAT_TOOLS): Promise<string> {
-  // DERIVED FROM THE LABEL RATHER THAN PASSED, so a caller cannot be given one
-  // model and recorded under another — `label` is already what eugenia_runs
-  // stores, and one string deciding both is what keeps the meter answerable.
+  // Derived, so a caller cannot run one model and be recorded under another.
   const model = modelFor(label);
   const offered = new Set(tools.map((t: any) => t.name));
   const convo: any[] = withClock(messages);
-  // Carried forward once seen, and never cleared: the container outlives the
-  // round that opened it, and a later request that drops it fails the same way
-  // the missing one did.
+  // Carried forward and never cleared: it outlives the round that opened it.
   let container: string | undefined;
-  // Summed across the rounds rather than logged per round, because the unit
-  // worth knowing is what one briefing cost, not what one leg of it did.
+  // Summed across rounds: the unit worth knowing is the turn.
   let inTok = 0, outTok = 0, cached = 0, searches = 0, fetches = 0;
-  /* WHAT THE CACHE COSTS, WHICH NOTHING HERE COULD SEE. A cache READ is a tenth
-     of the input price and was counted from the first day; a cache WRITE is
-     1.25× at five minutes and 2× at an hour, and was counted nowhere — so the
-     one figure that decides whether the `ttl` above earns its doubled price
-     was the one figure the meter beside it did not collect. Two columns rather
-     than one because the two TTLs bill differently and a sum of them cannot be
-     turned back into money.
-
-     The five-minute figure is taken as the REMAINDER rather than read: only two
-     TTLs exist, so it is exact — and if the vendor ever stops breaking the
-     total down, an hour reads zero and everything lands here, which looks
-     wrong. Read directly, both would read zero, which looks like a cache
-     costing nothing. */
+  /* Cache writes, the expensive side of the cache — 1.25× at five minutes, 2×
+     at an hour — kept apart because their sum is not money. The five-minute
+     figure is the remainder, so a vendor that stops itemising shows up as
+     wrong rather than as a cache costing nothing. */
   let wrote1h = 0, wrote5m = 0;
-  /* EMPTY UNLESS `fallbacks` ACTUALLY FIRED, which is the whole reason to keep
-     it. A decline re-runs the request on another model inside the same call and
-     that is what rescues the briefing — but it also means the briefing he read
-     was written by a model nothing in this system named, and it reads exactly
-     like one that was not — so it is counted here, where the tokens and the
-     searches already are, for the reason they are.
-
-     Kept once set: a turn where one leg fell back is worth knowing about
-     whatever the remaining rounds came back on. */
+  // Set when `fallbacks` fired: the message was then written by a model
+  // nothing here named, and reads exactly like one that was not. Kept once set.
   let fellBack = "";
-  // Both exist for the row written on the way out, and `rounds` is separate
-  // from the loop variable because the catch below is outside its scope — a
-  // turn that died in round three should say three.
+  // For the row; `rounds` outlives the loop so a turn that died says where.
   const started = Date.now();
   let rounds = 0;
-  /* WHAT THE ROUNDS WERE SPENT ON, because a count of them could not say. The
-     release look went from two or three rounds to seven, eight and nine on the
-     morning `record_actual` became its tool, and one of those mornings
-     took six rounds with no search at all — rounds spent on her own tools, and
-     nothing recorded which. A name `record_actual` could not match costs a
-     round and says so; so does each `get_market`, and a model that calls one
-     tool per round rather than batching them. Those are different repairs and
-     the row could not tell them apart. Server-side searches and fetches are
-     already counted beside it; this is the client half. */
+  // What the rounds were spent on — the client-tool half of the tally, beside
+  // the server tools. A count of rounds could not say.
   const called: Record<string, number> = {};
   const toolLine = () =>
     Object.entries(called).map(([name, n]) => `${name}×${n}`).join(', ') || null;
-  // The tool_result block currently carrying the loop's breakpoint, so the next
-  // round can take the mark off it before marking its own.
+  // The tool_result carrying the loop's cache breakpoint.
   let marked: any;
 
   try {
@@ -1517,23 +1461,9 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     inTok    += used.input_tokens ?? 0;
     outTok   += used.output_tokens ?? 0;
     cached   += used.cache_read_input_tokens ?? 0;
-    /* THE OTHER SERVER TOOL, AND IT WAS BILLING INTO A COLUMN THAT DID NOT
-       EXIST. `web_search` was counted from the day this meter was written;
-       `web_fetch` sits in the same two arrays with `max_uses: 6`, bills on its
-       own tariff, and was tallied nowhere — so "fourteen looks cost more than
-       five briefings" was read off the half of the server bill that happened to
-       have a column. It also made `searches: 0` unreadable: a release look that
-       burned six rounds without one search looks idle and may have been
-       fetching the whole time.
-
-       SUMMED RATHER THAN NAMED, because `web_fetch_requests` is this file's
-       expectation of a key it has never seen come back, and a key spelled wrong
-       reads 0 for ever — which is `planned`'s failure exactly. Whatever
-       `*_requests` the response carries beyond the search is what gets counted,
-       so a renamed field, or a third server tool, arrives in the meter instead
-       of vanishing from it. Kept apart from `searches` for the reason
-       `wrote_1h` and `wrote_5m` are: the tariffs differ and their sum is not
-       money. */
+    /* Fetches are summed from whatever `*_requests` keys come back beyond the
+       search, rather than from a key name this file guesses — a wrong guess
+       reads 0 for ever. Apart from searches, being a different tariff. */
     const server = used.server_tool_use ?? {};
     searches += server.web_search_requests ?? 0;
     fetches  += Object.entries(server)
@@ -1543,37 +1473,23 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     wrote1h  += hour;
     wrote5m  += madeCache - hour;
-    // AGAINST WHAT THIS CALLER ASKED FOR, not against one name for the file.
-    // Compared with a single constant, every Sonnet caller would report a
-    // fallback on every call and the column would stop meaning anything.
+    // Against what this caller asked for, or every Sonnet call reads as a
+    // fallback.
     if (body.model && body.model !== model) fellBack = body.model;
-    // Still checked, and it still happens: `fallbacks` rescues a model that
-    // declines, and this is the case where the whole chain did. No usable
-    // content, so it is caught before the blocks are read rather than surfacing
-    // as an empty message.
+    // The whole fallback chain declined: no usable content.
     if (body.stop_reason === "refusal") {
       throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
     }
 
-    /* A TURN THE SERVER PAUSED HAS NOT ENDED. web_search and web_fetch run in a
-       sampling loop on Anthropic's side, and that loop stops at ten iterations
-       with `pause_turn` — which a caller allowed twelve searches and six
-       fetches can reach in one request. Read as an ending, the paused response
-       was whatever text came before the pause: a preamble sent to him as the
-       briefing, or `no text` and a dead turn. It resumes by being sent back as
-       it stands with nothing after it — the trailing server call is what tells
-       the API to carry on — and it costs a round like any other, which is what
-       bounds it. */
+    /* A paused turn has not ended: the server's search loop stops at ten
+       iterations with pause_turn. Sent back as it stands, it resumes; read as
+       an ending, a preamble went out as the briefing. It costs a round. */
     if (body.stop_reason === "pause_turn") {
       convo.push({ role: "assistant", content: body.content });
       continue;
     }
 
-    /* AND AN ANSWER CUT OFF IS NOT AN ANSWER. At `max_tokens` the text stops
-       mid-sentence, or a tool call is dropped half-written and the text before
-       it reads as the whole reply. Thrown rather than sent, so each caller's
-       own failure handling runs — the briefing's retry, a gate's draft, the
-       apology — and the row names the reason. */
+    // Cut off is not an answer: thrown, so each caller's own failure path runs.
     if (body.stop_reason === "max_tokens") {
       throw new Error("Claude was cut off at max_tokens");
     }
@@ -1581,59 +1497,23 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     if (body.stop_reason === "tool_use") {
       convo.push({ role: "assistant", content: body.content });
 
-      /* ALL RESULTS IN ONE USER MESSAGE, AND ALL OF THEM RUN AT ONCE.
-
-         The single message was always right — splitting them teaches the model
-         to stop asking for tools in parallel. But the work behind it was a for
-         loop with an await inside, so a round that asked for the journal, the
-         rules and a memory search served them one after another and paid the
-         sum of three round trips to answer a batch the model had deliberately
-         parallelised. Collected and awaited together, a round costs its slowest
-         tool rather than all of them.
-
-         Ordering is preserved by mapping rather than pushing: tool_result
-         blocks are matched by tool_use_id, but a stable order keeps the
-         transcript readable and the tests deterministic. */
+      // All results in one message, served at once: a round costs its slowest
+      // tool rather than the sum. Mapped, so the order is stable.
       const calls = (body.content ?? []).filter((b: any) => b.type === "tool_use");
       for (const c of calls) called[c.name] = (called[c.name] ?? 0) + 1;
-      /* ONLY WHAT THIS CALLER WAS OFFERED, which is what makes a tool set a
-         guarantee rather than a hint. `serve` can run every tool in the file,
-         and the rules that matter most here are about WHO may run one — only
-         the nightly pass moves a rung, rewrites the thesis or closes a thread,
-         and only a look files a print. Those held for as long as the model
-         named nothing it had not been given; a name arriving from outside the
-         set is the model's text, at a boundary, and is answered as unknown. */
+      // Only what this caller was offered, so a tool set is a guarantee: only
+      // the pass moves a rung or closes a thread, only a look files a print.
       const results = await Promise.all(calls.map(async (b: any) => ({
         type: "tool_result", tool_use_id: b.id,
         content: offered.has(b.name) ? await serve(b.name, b.input ?? {}) : unserved(b.name),
       })));
 
-      // EVERY CALL GETS A RESULT, INCLUDING ONE THIS FUNCTION DOES NOT SERVE —
-      // serve() answers an unknown name with a sentence rather than nothing.
-      // A user message missing the tool_result for a tool_use block is a 400,
-      // so dropping the odd one out would turn a name we mistyped into a dead
-      // turn. web_search and web_fetch run on Anthropic's side and never arrive
-      // here at all.
       if (!results.length) throw new Error("tool_use with no tool call in it");
 
-      /* AND THE ROUND THAT FOLLOWS READS ALL OF THIS BACK INSTEAD OF BUYING IT
-         AGAIN. Only the system block carried a breakpoint, so everything after
-         it — twelve turns of history, the day's blocks, and every tool result
-         and web page collected so far — was re-sent at full price on every
-         round of the loop. A briefing that reads the journal and writes a note
-         paid for its own search results three times.
-
-         THE MARKER MOVES RATHER THAN ACCUMULATES, and that is not tidiness: a
-         request may carry four breakpoints, the system block holds one, and
-         this loop runs six rounds. Left behind on each round the fifth request
-         is a 400. Stripping the old one costs nothing — a block already written
-         to the cache stays readable whether or not it still carries the mark.
-
-         FIVE MINUTES, DELIBERATELY, WHERE THE PREFIX ASKS FOR AN HOUR. Rounds
-         are seconds apart and nothing reads this after the turn ends, so the
-         hour's doubled write price would buy a lifetime no one uses. The longer
-         TTL has to come first in the request, and it does: system renders ahead
-         of messages. */
+      /* A breakpoint on the newest result, so the next round reads everything
+         so far from the cache instead of buying it again. It moves rather than
+         accumulates — a request may carry four. Five minutes: rounds are
+         seconds apart and nothing reads it after the turn. */
       if (marked) delete marked.cache_control;
       marked = results[results.length - 1];
       marked.cache_control = { type: "ephemeral" };
@@ -1645,20 +1525,8 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const text = (body.content ?? [])
       .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
     if (!text) throw new Error("Claude returned no text");
-    /* WHAT ANY OF THIS COSTS, IN THE TWO PLACES IT CAN BE READ.
-
-       The console line is unchanged and still the fastest way to see one turn
-       while looking at it. The row is the same figures somewhere they survive:
-       this repository's own account of pg_net says plainly that nobody reads
-       Edge logs, which is exactly why a failed briefing messages Telegram — and
-       every cost and quality meter in this file was still writing there and
-       nowhere else. "Is the briefing drifting long again", "what did last month
-       cost", "how often does fallbacks actually fire" were questions whose
-       answers were being collected and then discarded within hours.
-
-       Searches are counted apart from the tokens because they bill apart.
-       Only on the way out; the catch below records the turns that never got
-       here, which are the ones a cost line could never see at all. */
+    // The console line to watch one turn; the row, because nobody reads Edge
+    // logs. The catch records the turns that never got here.
     console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es), ${fetches} fetch(es)` +
@@ -1673,11 +1541,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
   } catch (err) {
-    /* A FAILED TURN IS A ROW TOO, and it is the row that was never there.
-       A briefing that dies costs the same searches and the same tokens as one
-       that lands, and until now the only trace was a Telegram apology — a
-       message, not data, so "how often does this actually fail" had no answer.
-       Recorded and rethrown: the caller's own handling is unchanged. */
+    // A failed turn is a row too — the one that never existed. Rethrown.
     await recordRun({
       caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
@@ -1690,17 +1554,9 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   }
 }
 
-/* NEVER THROWS AND NEVER BLOCKS THE ANSWER, which is what separates a meter
-   from a dependency. Recording is the least important thing happening in any
-   turn: a briefing that was written, paid for and delivered must not be lost
-   because an instrumentation insert failed, and it must not be lost because the
-   005 migration has not been applied yet either.
-
-   WHAT EARNS A ROW IS AN ABSENCE NOBODY WOULD NOTICE, which is why ask() is no
-   longer its only writer: a delivered briefing, a nightly sweep and the channel
-   census all produce a number whose only other home is a console. Nothing reads
-   any of it back into her context — this is for him and for whoever is
-   debugging, which is why it carries no note and no opinion, only figures. */
+/* Never throws and never blocks the answer: a delivered briefing must not be
+   lost to an instrumentation insert. A row is for an absence nobody would
+   otherwise notice. Nothing reads it back into her context. */
 async function recordRun(row: Record<string, unknown>): Promise<void> {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_runs`, {
@@ -1714,15 +1570,10 @@ async function recordRun(row: Record<string, unknown>): Promise<void> {
 
 /* ─── Telegram and history ─────────────────────────────────────────────── */
 
-// Her token, bound once. Every call below is unchanged by the binding.
 const tg = (method: string, body: unknown) => telegram(BOT_TOKEN, method, body);
 
-// One message per chunk, in order. Sequential rather than parallel: Telegram
-// does not promise ordering, and a briefing whose section 5 arrives before
-// section 2 is unreadable.
-// A KEYBOARD RIDES ON THE LAST PART AND ONLY THE LAST, which is what makes it a
-// keyboard under the briefing rather than one under each of its pieces. Optional,
-// so every existing caller is unchanged by its existence.
+// One message per chunk, sequentially — Telegram does not promise order. A
+// keyboard rides on the last part only.
 async function say(text: string, keyboard?: unknown) {
   const parts = chunk(text);
   for (const [i, part] of parts.entries()) {
@@ -1735,31 +1586,13 @@ async function say(text: string, keyboard?: unknown) {
   }
 }
 
-/* Twelve turns, oldest first.
+/* Twelve turns, oldest first: the briefing a follow-up follows and the
+   exchange since, keeping a one-line question cheap.
 
-   A briefing is long, so a wider window would resend several of them on every
-   question for no gain — what a follow-up needs is the briefing it follows and
-   the exchange since, not last Tuesday's calendar. Twelve covers a morning's
-   conversation and keeps the cost of a one-line question near the cost of a
-   one-line question.
-
-   IT MUST START ON A USER TURN, which is the Messages API's one hard rule about
-   the shape of a conversation. Consecutive same-role turns it merges; a leading
-   assistant turn it refuses, and the refusal is total — every reply 400s until
-   the offending row rolls out of the window.
-
-   Pairs are written in a single INSERT, so the obvious argument is that an even
-   window can only ever open on a user turn. That argument is wrong, and it held
-   this together for one release. Two rows in one statement draw two sequence
-   values, and a concurrent INSERT can take one in between: two messages sent
-   seconds apart — ordinary, since the webhook answers 200 immediately and both
-   handlers then run at once — can interleave as u₁ u₂ a₁ a₂. The window then
-   opens mid-pair.
-
-   So the shape is repaired rather than assumed, which also means HISTORY no
-   longer has to be even and nothing depends on a sentence being remembered.
-   Exported because it is the decision, and a decision asserted in a comment is
-   what this replaced.
+   It must open on a user turn or the API refuses every reply. Pairs are written
+   in one INSERT, but a concurrent one can take a sequence value between them,
+   so the shape is repaired rather than assumed. Exported because it is the
+   decision.
    ───────────────────────────────────────────────────────────────────────── */
 const HISTORY = 12;
 
@@ -1774,15 +1607,11 @@ async function recent(): Promise<Turn[]> {
   return openOnUser(dateTurns(rows.reverse()));
 }
 
-/* WHICH OF HER MESSAGES A SWIPE-REPLY ANSWERS. Telegram hands back the message
-   he replied to, but a voice note carries no text, and her history dates a turn
-   by the day alone — so "too dense" under the 10:00 pulse and under the release
-   look an hour later read identically, and the second may already be outside
-   the twelve turns. Every caller but the briefing stores after it sends, so the
-   turn is the EARLIEST assistant row at or after the send; the newest would be
-   whatever she said since, which is the one message it is certainly not. Five
-   minutes covers a message's several voice notes and bounds one that was never
-   stored. Exported because it is the decision, the same reason dayQuery is. */
+/* Which of her messages a swipe-reply answers. A voice note carries no text
+   and history dates turns by day, so it is found by time: the earliest
+   assistant row at or after the send — every caller but the briefing stores
+   after sending. Five minutes covers several voice notes. Exported because it
+   is the decision. */
 const atSecond = (s: number) => new Date(s * 1000).toISOString();
 
 export function repliedQuery(sent: number): string {
@@ -1791,19 +1620,10 @@ export function repliedQuery(sent: number): string {
          `&order=created_at.asc&limit=1`;
 }
 
-/* AND THE BRIEFING IS THE ONE MESSAGE STORED BEFORE IT IS SENT, which is the
-   rule above failing for the message likeliest to be answered this way. Its
-   marker goes down first, for postBriefing's reason, and the speaking worker
-   sends it seconds to minutes later — so a swipe-reply to the briefing looked
-   forward from the voice note and found nothing, every time.
-
-   Asked only when that look finds nothing, and back across the speaking
-   worker's whole budget. The newest two rows there are taken only if they ARE
-   a briefing and its marker, paired by the instant they share as postSpeak
-   pairs them: anything else in that window is a message he is not replying
-   to, and no quote is the direction to fail in rather than a wrong one. Asked
-   first instead, it would name the briefing under a reply to the answer she
-   gave a minute after it. */
+/* The briefing is stored before it is sent, so the look above misses it. Asked
+   only when that finds nothing, back across the speaking worker's budget, and
+   taken only if the newest two rows are a briefing and its marker sharing an
+   instant: no quote is the direction to fail in. */
 export function spokenQuery(sent: number): string {
   return `eugenia_turns?select=role,content,created_at` +
          `&created_at=gte.${atSecond(sent - SPEAK_WORKER_MS / 1000 - 60)}` +
