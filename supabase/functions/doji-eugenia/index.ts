@@ -4500,6 +4500,27 @@ export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'co
       (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file")).join("\n");
 }
 
+/* WHAT THE LAST PRINT BECAME, read off two rows already filed. A release
+   revises the one before it and TradingView carries the revised figure as this
+   row's `prior`, while last month's row keeps the figure first reported — so
+   the revision is the two disagreeing, and on 2 October it was half the story:
+   payrolls missed by sixty thousand AND August came down from 162K to 133K.
+   She would otherwise have to remember last month's number and compare.
+
+   ONLY AGAINST THE PRINT IMMEDIATELY BEFORE. The newest row on file is last
+   month's only if none is missing, and comparing against an older one would
+   report as a revision what is simply two months apart. A gap half as long
+   again as the one before it is a missing print, whatever the series' rhythm —
+   weekly, monthly or quarterly — and says nothing. */
+export function revisionLine(r: Pick<Release, 'at' | 'prior'>,
+                             record: Pick<Release, 'at' | 'name' | 'actual'>[]): string {
+  const [last, before] = record;
+  if (!r.prior || !last?.actual || !before || r.prior === last.actual) return "";
+  if (Date.parse(r.at) - Date.parse(last.at) > 1.5 * (Date.parse(last.at) - Date.parse(before.at))) return "";
+  return `\nRevised: ${last.name} was first reported at ${last.actual} on ` +
+         `${civilDay(last.at.slice(0, 10))}, and this release revises it to ${r.prior}.`;
+}
+
 export function recordQuery(ticker: string, before: string): string {
   return `eugenia_calendar?select=at,name,consensus,actual&ticker=eq.${encodeURIComponent(ticker)}` +
          `&at=lt.${before}&actual=not.is.null&order=at.desc&limit=${RECORD}`;
@@ -4512,7 +4533,7 @@ async function recordBlock(due: Release[]): Promise<string> {
   const parts = await Promise.all(series.map(async r => {
     try {
       const rows = await readRows<Release>('Record', `${SB_URL}/rest/v1/${recordQuery(r.ticker!, r.at)}`);
-      return recordList(r.name, rows.reverse());
+      return recordList(r.name, [...rows].reverse()) + revisionLine(r, rows);
     } catch (err) {
       console.error("doji-eugenia: track record unavailable —", err instanceof Error ? err.message : err);
       return "";

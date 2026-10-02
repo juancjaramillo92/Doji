@@ -6483,6 +6483,23 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
     'she may quote a later meeting as its own odds, which FedWatch does not show');
 });
 
+/* THE REVISION RIDES ON THE RECORD READ, AND THE ORDER OF THAT READ IS THE
+   WHOLE OF IT. revisionLine is pure and driven in fold.test.mjs against rows
+   newest first; recordList wants them oldest first. `rows.reverse()` reverses in
+   place, so handing it the same array before revisionLine reads it gives the
+   revision the OLDEST print on file and every month a false one. */
+test('the release look is handed the revision, off the record read newest first', () => {
+  const at = EUGENIA_TS.indexOf('async function recordBlock(');
+  assert.ok(at > -1, 'doji-eugenia no longer has recordBlock()');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  assert.match(body, /recordList\(r\.name, \[\.\.\.rows\]\.reverse\(\)\) \+ revisionLine\(r, rows\)/,
+    'the record is reversed in place before the revision reads it, or the revision is not handed over');
+  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
+  assert.match(release, /A REVISION IS PART OF THE PRINT/, 'RELEASE no longer tells her what a revision line is');
+  assert.match(release, /never work one\s+out yourself/,
+    'RELEASE no longer keeps her from computing a revision the line did not give');
+});
+
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
   /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
      neither can see whether anything calls them. A briefing that reads before

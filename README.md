@@ -2073,6 +2073,21 @@ sign is a chance to get every unit backwards. Reading the record is her job.
 `RELEASE` asks her to say whether a miss runs the way the series has been
 missing, or is the first the other way in a long time.
 
+**And it is handed what the last print became.** A release revises the one
+before it. TradingView carries the revised figure as the new row's `prior`,
+while last month's row keeps the figure first reported, so the revision is the
+two disagreeing. On 2 October payrolls missed by sixty thousand and August came
+down from 162K to 133K in the same report, which is half the story.
+`revisionLine` reads it off the same record read, with no new query: *"Revised:
+Non Farm Payrolls (Aug) was first reported at 162K on 4 Sept, and this release
+revises it to 133K."* It compares only against the print immediately before.
+The newest row on file is last month's only if none is missing, so a gap half as
+long again as the one before it, whatever the series' rhythm, says nothing
+rather than report two months apart as a revision. `RELEASE` tells her to say a
+revision beside the miss and never to work one out herself. The briefing does
+not carry it: a revision is published with the new report, so at 08:00 there is
+none to show yet, and the look right after the print is where it lands.
+
 **The question is about the time rather than the row.** The 08:30 slot is most
 of a report, and while she typed the calendar each spelling of one print fired
 its own look, its own model call and its own message — five for a single CPI on
