@@ -2540,9 +2540,24 @@ const TTS_SPEED = 1.3;
    ONE BUDGET FOR THE WHOLE MESSAGE, NOT ONE PER REQUEST, because a long message
    is several parts and a per-request limit multiplies by them. A hundred and
    fifty seconds is the slowest speaking that ever landed — a Sunday at 155s,
-   storing included — and it leaves a briefing that took two and a half minutes
-   to write well inside the four hundred with the text still to send. */
+   storing included — and it is what a path that writes and speaks in one
+   worker can afford with the text still to send.
+
+   THE BRIEFING DOES NOT SPEAK IN THE WORKER THAT WROTE IT, which is the larger
+   half of the repair. Writing and speaking shared one four-hundred-second clock,
+   so a slow morning in either was taken out of the other. postBriefing stores
+   the briefing and hands it to a second worker (`?speak=`), whose clock is its
+   own: SPEAK_WORKER_MS of it goes to the voice, leaving the read before and the
+   text after. */
 const SPEAK_MS = 150_000;
+const SPEAK_WORKER_MS = 330_000;
+
+/* AND A PART THAT DOES NOT LAND GETS ONE MORE ATTEMPT, each bounded on its own
+   as well as by the budget. A vendor that stalls has stalled on one request, and
+   the next is a fresh connection — so on the speaking worker's budget a stall
+   costs one attempt rather than the voice. On SPEAK_MS a stalled first attempt
+   has spent the budget, so only a quick refusal is tried twice there. */
+const ATTEMPT_MS = 150_000;
 
 /* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
    format Telegram would not render — every one of them leaves him with the
@@ -2636,7 +2651,12 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
   // chunk()'s own reason for the same shape in say(). The keyboard rides on the
   // last part and only the last, which is say()'s rule as well.
   for (const [i, part] of parts.entries()) {
-    if (!await speak(part, i === parts.length - 1 ? keyboard : undefined, signal)) heard = false;
+    const marked = i === parts.length - 1 ? keyboard : undefined;
+    let landed = false;
+    for (let attempt = 0; attempt < 2 && !landed && !signal.aborted; attempt++) {
+      landed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(ATTEMPT_MS)]));
+    }
+    if (!landed) heard = false;
   }
   // ANY part missing, not all of them. A message he heard three quarters of is
   // one he cannot act on, and the text is cheap.
@@ -3681,6 +3701,7 @@ export const APOLOGY: Record<string, string> = {
   trade:        "Something broke while I was looking at your position, jefe.",
   move:         "I lost sight of the price for a moment, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
+  speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
 };
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
@@ -3713,6 +3734,11 @@ async function postScheduled(url: URL): Promise<Response> {
        traded are walked once, by hand, from the date given. */
     const history = url.searchParams.get("history");
     if (history) { job = 'history'; return await postHistory(history); }
+
+    // The briefing's second half, opened by postBriefing and by a person
+    // re-sending a briefing that was stored and never reached him.
+    const speak = url.searchParams.get("speak");
+    if (speak) { job = 'speak'; return await postSpeak(speak); }
 
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
@@ -4031,6 +4057,26 @@ async function postBriefing(due: Brief): Promise<Response> {
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   const stored = Date.now();
+
+  /* HANDED TO A SECOND WORKER TO SPEAK, so the voice has a clock of its own —
+     see SPEAK_WORKER_MS. The door answers before it works, so a 2xx here says
+     the worker started and nothing about the voice; postSpeak writes the
+     delivered row once he has it. A worker that would not start — a refused
+     boot, a 546 — is what this checks for, and then the briefing is spoken
+     here, as it was before there were two: losing the second worker must
+     never be losing the briefing. */
+  const handed = await fetch(`${SB_URL}/functions/v1/doji-eugenia?speak=${due}`, {
+    method: "POST", headers: { "x-doji-key": CRON_SECRET },
+  }).then(async res => { await res.body?.cancel(); return res.ok ? null : `HTTP ${res.status}`; },
+          (err: unknown) => err instanceof Error ? err.message : String(err));
+  if (handed === null) {
+    await recordRun({
+      caller: `${due} briefing written`, chars: brief.length, ms: Date.now() - opened, ok: true,
+      detail: `stored in ${Math.round((stored - checked) / 1000)}s, handed to the speaking worker`,
+    });
+    return json({ ok: true, brief: due, chars: brief.length });
+  }
+
   const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
 
   /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
@@ -4050,10 +4096,49 @@ async function postBriefing(due: Brief): Promise<Response> {
   await recordRun({
     caller: `${due} briefing delivered`, chars: brief.length,
     ms: spoken - opened, ok: true,
-    detail: `stored in ${Math.round((stored - checked) / 1000)}s, `
-          + `${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - stored) / 1000)}s`,
+    detail: `stored in ${Math.round((stored - checked) / 1000)}s, the speaking worker did not start `
+          + `(${handed}), ${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - stored) / 1000)}s`,
   });
   return json({ ok: true, brief: due, chars: brief.length });
+}
+
+/* THE SECOND WORKER: TODAY'S STORED BRIEFING, SPOKEN ON A CLOCK OF ITS OWN.
+   Found the way the retry finds it — by the marker — and paired with its text
+   by the instant the two were written. They go in as one INSERT and share
+   `created_at` to the microsecond, where a turn written by anything else in
+   between would carry its own; adjacent ids would not be proof of that.
+
+   Today's only, because the door is also a repair a person can open: a
+   briefing that was stored and never reached him is sent again with
+   `?speak=weekday`, and yesterday's would arrive as this morning's.
+
+   THE DELIVERED ROW IS WRITTEN HERE NOW, after the send, because it is the
+   statement that he has it: 010 reads its absence as a briefing that never
+   arrived. `ms` is this worker's own time, and `written` is the other's.
+   Exported so the sequence — find, pair, speak, record — is driven rather than
+   read: the pairing is the half a wrong filter would get silently wrong. */
+export async function postSpeak(due: string): Promise<Response> {
+  if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
+  const opened = Date.now();
+  const [marker] = await readRows<{ created_at: string }>('Briefing marker',
+    `${SB_URL}/rest/v1/eugenia_turns?select=created_at&role=eq.user` +
+    `&content=eq.${encodeURIComponent(briefingMarker(due))}&order=id.desc&limit=1`);
+  const today = nyDate(new Date());
+  if (!marker || nyDate(new Date(marker.created_at)) !== today) {
+    throw new Error(`no ${due} briefing is stored for ${today}`);
+  }
+  const [turn] = await readRows<{ content: string }>('Briefing',
+    `${SB_URL}/rest/v1/eugenia_turns?select=content&role=eq.assistant` +
+    `&created_at=eq.${encodeURIComponent(marker.created_at)}&order=id.desc&limit=1`);
+  if (!turn) throw new Error(`the ${due} briefing's marker is stored and its text is not`);
+
+  const heard = await sayAloud(turn.content, feedbackKeyboard(today), SPEAK_WORKER_MS);
+  const spoken = Date.now();
+  await recordRun({
+    caller: `${due} briefing delivered`, chars: turn.content.length, ms: spoken - opened, ok: true,
+    detail: `${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - opened) / 1000)}s`,
+  });
+  return json({ ok: true, spoke: due, heard });
 }
 
 /* How silence is said, since a tool call cannot express "do not send this".

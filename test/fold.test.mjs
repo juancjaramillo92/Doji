@@ -50,7 +50,7 @@ import {
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud,
+  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
@@ -4968,6 +4968,101 @@ test('a speech vendor that never answers still leaves him the message, in time',
   assert.equal(texts.length, 1,
     'no text went out when the voice never answered — the briefing of 2 October, again');
   assert.equal(texts[0].body.text, 'Gold is holding 4,410 into the close.');
+});
+
+test('a speech vendor that refuses once is asked again before the text goes', async () => {
+  /* THE SECOND ATTEMPT, which is what turns a vendor's bad minute into a voice
+     note rather than text. Driven with a refusal that answers at once, so the
+     test needs no clock: the attempt is the same whichever way the first one
+     failed, and the stall that cost 2 October is the budget test's to hold. */
+  const realFetch = globalThis.fetch, realErr = console.error, realDeno = globalThis.Deno;
+  globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
+  const fresh = await import('../supabase/functions/doji-eugenia/index.ts?retry');
+  delete globalThis.Deno;
+  if (realDeno) globalThis.Deno = realDeno;
+
+  let asked = 0;
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes('/audio/speech')) {
+      asked++;
+      return asked === 1
+        ? { ok: false, status: 503, arrayBuffer: async () => new ArrayBuffer(0) }
+        : { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) };
+    }
+    sent.push(u);
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  console.error = () => {};
+  let heard;
+  try {
+    heard = await fresh.sayAloud('Gold is holding 4,410 into the close.');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+  assert.equal(asked, 2, 'a part that failed once was not asked for again');
+  assert.equal(heard, true, 'the second attempt landed and the voice is reported as not heard');
+  assert.equal(sent.filter(u => u.includes('sendVoice')).length, 1);
+  assert.equal(sent.filter(u => u.includes('sendMessage')).length, 0,
+    'the text went as well as the voice that landed — two bubbles for one message');
+});
+
+/* THE BRIEFING'S SECOND WORKER, driven through the real sequence: the marker,
+   its text paired by the instant both were written, the send, and the delivered
+   row after it. The stub answers each read only when its filter matches what a
+   correct read asks for — a stub that answered any read would pass a pairing
+   that reads the wrong row. */
+test('the speaking worker sends today\'s stored briefing and only then says it was delivered', async () => {
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const stamp = new Date(Date.now() - 60_000).toISOString().replace('Z', '+00:00');
+  const steps = [];
+  globalThis.fetch = async (url, init) => {
+    const u = decodeURIComponent(String(url));
+    if (u.includes('/eugenia_turns?select=created_at')) {
+      steps.push('marker');
+      assert.match(u, /role=eq\.user&content=eq\.\[weekday briefing\]&order=id\.desc&limit=1/);
+      return Response.json([{ created_at: stamp }]);
+    }
+    if (u.includes('/eugenia_turns?select=content')) {
+      steps.push('text');
+      return Response.json(u.includes(`created_at=eq.${stamp}`) && u.includes('role=eq.assistant')
+        ? [{ content: 'Buenos días. Payrolls lands at 08:30.' }] : []);
+    }
+    if (u.includes('sendMessage')) {
+      steps.push(`sent:${JSON.parse(init.body).text}`);
+      return Response.json({ ok: true });
+    }
+    if (u.includes('/eugenia_runs')) {
+      steps.push(`row:${JSON.parse(init.body)[0].caller}`);
+      return new Response(null, { status: 201 });
+    }
+    throw new Error(`unexpected request ${u}`);
+  };
+  console.error = () => {};
+  try {
+    const res = await postSpeak('weekday');
+    assert.equal((await res.json()).heard, false, 'with no voice key the text went, and it reads as heard');
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+  assert.deepEqual(steps, ['marker', 'text', 'sent:Buenos días. Payrolls lands at 08:30.',
+                           'row:weekday briefing delivered'],
+    'the speaking worker did not find, pair, send and then record, in that order');
+});
+
+test('the speaking worker refuses a briefing that is not today\'s, and a door that names no briefing', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json([{ created_at: '2026-09-30T12:02:23.4243+00:00' }]);
+  try {
+    await assert.rejects(postSpeak('weekday'), /no weekday briefing is stored for/,
+      "yesterday's briefing would arrive as this morning's");
+    await assert.rejects(postSpeak('pulse'), /no such briefing to speak: pulse/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('nothing she writes is left unspoken for being long', () => {

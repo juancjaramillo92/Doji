@@ -142,7 +142,7 @@ sequence end to end over one that asserts on a function in isolation.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 670 tests, six suites
+npm test      # 673 tests, six suites
 ```
 
 Node 22.22.2+ — jsdom's floor, above the 22.6 `--experimental-strip-types`
@@ -1555,7 +1555,8 @@ compounds.
 
   SIX PATHS send him something she wrote, so that ordering lives in `sayAloud`
   rather than in six copies — five of which nothing would be guarding.
-  `agree.test.mjs` reads it AND counts the six call sites, and `fold.test.mjs`
+  `agree.test.mjs` reads it AND counts the seven call sites — the briefing has
+  two, its speaking worker and its own fallback — and `fold.test.mjs`
   DRIVES the fallback, which is the one property a source read cannot settle:
   with no TTS key every `speak` answers false, which is exactly the shape of a
   vendor that refused, so the real sequence is replayed and the text must still

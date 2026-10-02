@@ -49,8 +49,9 @@
 -- briefing that is already dying.
 --
 -- `ms` IS A LOWER BOUND ON THE WALL CLOCK AND NEVER AN OVERSTATEMENT. A row
--- measures one model call, or — on the delivered row — everything `postBriefing`
--- did; the worker's clock started earlier, at the request, and stops later. So
+-- measures one model call, or — on the written and delivered rows — everything
+-- one of the briefing's two workers did; the worker's clock started earlier, at
+-- the request, and stops later. So
 -- a row alone crossing the share means the invocation behind it certainly did,
 -- and reading the largest row rather than trying to reassemble an invocation
 -- costs only lateness, never a false alarm. There is no invocation id to
