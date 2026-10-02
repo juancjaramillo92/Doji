@@ -1124,6 +1124,22 @@ test('a refused user check is a sign-in, an unreachable one is the snapshot', as
   } finally { away.close(); }
 });
 
+test('signing in from the login screen draws her card, as a signed-in boot does', async () => {
+  const dev = await boot();
+  try {
+    await settle();
+    dev.db.tables.eugenia_thesis = [{ thesis: 'The market is trading the December cut.', moved_on: null }];
+    dev.db.tables.eugenia_calendar = [];
+    dev.db.tables.eugenia_loops = [];
+    dev.$('login-email').value = 'him@doji.test';
+    dev.$('login-pass').value = 'secret';
+    await dev.app.Login.submit();
+    await settle();
+    assert.equal(dev.$('watch-card').style.display, 'flex',
+      'the card is drawn only by a boot that found a session, never after a sign-in');
+  } finally { dev.close(); }
+});
+
 /* ─── Sorting ────────────────────────────────────────────────────────────── */
 
 test('the sort runs on the true execution instant, oldest first', () => {

@@ -3830,6 +3830,8 @@ const Login = {
       await Data.start();
       render();
       bootState(null);
+      // Boot's own order: the card after the journal, never in front of it.
+      Watch.draw();
     } catch (e) {
       console.error('Doji login:', e);
       err.textContent = 'Could not reach the server. Try again.';
