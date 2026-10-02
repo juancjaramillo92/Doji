@@ -4912,6 +4912,64 @@ test('a speech vendor that cannot answer still leaves him the message', async ()
     'the fallback sent something other than the message itself');
 });
 
+test('a speech vendor that never answers still leaves him the message, in time', async () => {
+  /* THE SHAPE THAT COST A BRIEFING. The test above is a vendor that REFUSES,
+     which speak() has always caught. On 2 October the vendor did not refuse —
+     it never answered, and the worker was shut down at its four hundred seconds
+     with the voice request still open: no catch ran, so nothing fell back.
+
+     So this one needs a key, which means a fresh instance of the module read
+     with one — TTS_KEY is fixed when the file loads, and the instance the rest
+     of this suite imported has none. The vendor stub hangs until the request is
+     aborted, exactly as a vendor that never answers does, and the budget is
+     passed short so the test does not wait out SPEAK_MS. */
+  const realFetch = globalThis.fetch, realErr = console.error, realDeno = globalThis.Deno;
+  globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
+  const fresh = await import('../supabase/functions/doji-eugenia/index.ts?voice');
+  delete globalThis.Deno;
+  if (realDeno) globalThis.Deno = realDeno;
+
+  const asked = [], sent = [];
+  globalThis.fetch = (url, init) => {
+    const u = String(url);
+    if (u.includes('/audio/speech')) {
+      asked.push(u);
+      // Never settles unless aborted — a request sent without the budget waits
+      // here for good, which is what the test's own timeout then reports.
+      return new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal.reason)));
+    }
+    sent.push({ url: u, body: init?.body ? JSON.parse(init.body) : null });
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
+  };
+  console.error = () => {};
+  /* RACED AGAINST A DEADLINE OF ITS OWN, for two reasons. The regression this
+     guards is a wait with no end, which must fail rather than hang the suite.
+     And the timer behind AbortSignal.timeout is unref'd: a real open request
+     keeps the event loop alive and this stub does not, so the deadline's timer
+     is what stands in for the open socket while the budget runs out. */
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(
+      'sayAloud waited past its budget for a vendor that never answers')), 3_000);
+  });
+  let heard;
+  try {
+    heard = await Promise.race([
+      fresh.sayAloud('Gold is holding 4,410 into the close.', undefined, 50), deadline]);
+  } finally {
+    clearTimeout(timer);
+    globalThis.fetch = realFetch;
+    console.error = realErr;
+  }
+
+  assert.equal(asked.length, 1, 'the voice was never attempted, so this proves nothing about a hang');
+  assert.equal(heard, false, 'a voice that never landed is reported as heard');
+  const texts = sent.filter(r => r.url.includes('sendMessage'));
+  assert.equal(texts.length, 1,
+    'no text went out when the voice never answered — the briefing of 2 October, again');
+  assert.equal(texts[0].body.text, 'Gold is holding 4,410 into the close.');
+});
+
 test('nothing she writes is left unspoken for being long', () => {
   /* THERE WAS A CAP AND NOW THERE IS NOT. Seven hundred characters, then four
      thousand — and a cap decides that past some length a message is not worth

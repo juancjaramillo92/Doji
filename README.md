@@ -2557,6 +2557,20 @@ a source read cannot settle. With no TTS key every `speak()` answers false, whic
 is exactly the shape of a vendor that refused, so the real sequence replays and
 the text must still go out.
 
+**A vendor that never answers is the other shape, and it cost a briefing.** On
+2 October the briefing was stored at 08:02:23. The speech request then never
+answered, and at 08:06:40, four hundred seconds after boot, the platform shut
+the worker down. A worker that is killed runs no catch. So there was no text, no
+row, no apology and no retry, because the marker had already gone down. Every
+request in `speak()` now carries one budget, `SPEAK_MS`: a hundred and fifty
+seconds for the whole message, not per part, since a per-request limit
+multiplies by the parts. That is the slowest speaking that ever landed (a
+Sunday at 155s, storing included), and it leaves a briefing written in two and a
+half minutes well inside the four hundred with the text still to send. A part
+that has not landed when it runs out has failed like any other, and the text
+goes. `fold.test.mjs` drives that too, against a vendor stub that never settles,
+on a fresh instance of the module read with a key.
+
 That ordering lives in **`sayAloud`** rather than in six copies of two lines —
 five of which nothing would be guarding, and the failure of getting it backwards
 is that the audio arrives and the text does not. A test reads the order inside it
@@ -3484,7 +3498,8 @@ were billed. `postBriefing` adds the briefing's length in characters, and
 the `<brief> briefing delivered` row carries it, which is where a manual run
 reads it now: `?force=1` answers before it works, like everything else a cron
 secret reaches, so its body says `accepted` rather than `chars`. Its `detail`
-splits what came after the critic — `stored in 1s, spoken in 19s` — because
+splits what came after the critic — `stored in 1s, spoken in 19s`, or `sent as
+text` where the voice did not land — because
 both model calls have rows of their own and that stretch had none: the Sunday
 that took 315s spent 155 of them there, where Monday spent 20, and nothing
 could say whether the embedding or the voice was the slow half.

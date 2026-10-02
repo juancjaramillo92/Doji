@@ -4863,8 +4863,9 @@ test('the delivered row splits what came after the critic, around the right call
       `postBriefing has ${order[i - 1]} after ${order[i]} — the split would time ` +
       `the wrong call and still read as a number`);
   }
-  assert.match(body, /detail: `stored in \$\{[^}]+\}s, `\s*\+ `spoken in \$\{[^}]+\}s`/,
-    'the delivered row no longer carries the stored/spoken split');
+  assert.match(body, /detail: `stored in \$\{[^}]+\}s, `\s*\+ `\$\{heard \? "spoken" : "sent as text"\} in \$\{[^}]+\}s`/,
+    'the delivered row no longer carries the stored/spoken split, or no longer says ' +
+    'whether he got the voice or the text');
 });
 
 test('010 says a slow run once, and the week stays visible to diagnose', () => {
@@ -5617,6 +5618,9 @@ test('the text is sent only when the audio did not land', () => {
   assert.match(body, /if \(!heard\) await say\(words, keyboard\)/,
     'the text is no longer the fallback — either it goes unconditionally, or a ' +
     'speech vendor that refuses is now a message he never receives');
+  assert.match(body, /const signal = AbortSignal\.timeout\(budget\)/,
+    'sayAloud no longer bounds the voice — a vendor that never answers holds the ' +
+    'worker until the platform shuts it down, and the text never goes');
   assert.match(body, /i === parts\.length - 1 \? keyboard/,
     "the briefing's keyboard is on every part or on none — there is no text " +
     'message under the voice note to carry it any more');
@@ -5715,6 +5719,13 @@ test('the audio is asked for in the one format Telegram renders as a voice note'
     'to go on');
   assert.match(body, /"reply\.ogg"/,
     'the upload no longer carries an .ogg filename');
+  /* BOTH REQUESTS CARRY THE BUDGET. fold.test.mjs drives a hanging vendor at
+     the speech request; an upload to Telegram that hangs is the same worker
+     shut down at four hundred seconds with nothing falling back, and no test
+     there can reach it without a second stub of the same thing. */
+  assert.equal((body.match(/\bsignal\b/g) || []).length, 3,
+    'speak() takes the budget and does not hand it to both of its requests — a ' +
+    'request without it waits for as long as the vendor takes');
 });
 
 test('the length she is told to write to is the length that is spoken', () => {
