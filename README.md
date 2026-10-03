@@ -1839,399 +1839,181 @@ and the grants are held by tests; the rest shows up in use.
 
 ### Where he stands on each channel
 
-**The same bug this schema already fixed once.** `kind` exists because one
-newest-20 window over notes and instructions together would evict *"stop
-mentioning the ten-year"* after a month of ordinary observations. What he
-**understands** has that property too and did not have that fix: a note saying
-he worked out the dollar link unaided is not an observation about Tuesday, it is
-a durable fact about him, and it was sitting in the bucket that ages out. Twenty
-notes later it is gone and she re-explains a mechanism the prompt forbids her to
-re-explain.
+`eugenia_channels` is five rows, one per channel, and it never scrolls — a
+**census over a fixed set**, which makes it the only place an **absence** is
+legible. A channel he has never once used is a row saying `unseen`; in
+`eugenia_notes` it would be nothing written down, which nobody can notice. And
+what he understands is durable, where a note ages out of a twenty-note window.
 
-`eugenia_channels` is five rows, one per channel, and it never scrolls. Not a
-window — a **census over a fixed set**, which is what makes it the only place in
-the system where an **absence** is legible. A channel he has never once used is
-a row saying `unseen`; in `eugenia_notes` it is nothing written down, and
-nothing is not a thing anyone can notice. That absence is the whole point: it is
-the one question her memory could never answer, and the only one that says where
-the teaching should go.
+The ladder is `unseen → explained → used → owns`, and order matters:
+`channelsList` renders a missing row at the **first** rung, so a reversed list
+would show every unseeded channel as owned.
 
-The ladder is `unseen → explained → used → owns`. Order matters, and not only as
-documentation: `channelsList` renders a row it was not given at the **first**
-rung, so reversing the list would render every unseeded channel as owned.
+**Every rung carries `moved_on`, the day it last moved.** Nothing brings a rung
+down on her reading of a bad evening, so over a year the channels he uses pile up
+at the top and the census loses the absence it exists to show. A rung that has
+not moved in months counts toward the tiebreaker the way a low one does. It is
+formatted as the civil day it was stored as: `new Date('2026-03-12')` is
+midnight UTC, the 11th in New York.
 
-**Every rung carries the day it last moved, and that is what stops the map going
-blind.** The ladder does not come down on her reading of a bad evening — failing
-to reach for a mechanism once is not the same as having lost it — so over a year
-the channels he has used pile up at the top, and a census with nothing left at
-`unseen` has no absence left to show, which is the entire thing it is for.
-`moved_on` was written by `set_channel` from the first day and read by nobody: a
-rung set in March looked exactly like one set last night. The prompt now counts a
-rung that has not moved in months toward the tiebreaker the same way a low one
-counts — a channel that has gone quiet, not one he has lost.
+**On subject it is a tiebreaker; on register it drives outright.** It decides
+which of two mechanisms *both* live today she unpacks — lean toward the thinner
+one — and never what the day is about, or the briefing becomes a curriculum. It
+does decide how a term is said, and that table is **`PITCH`**: build the term
+from §3 at `unseen`, restate the mechanism in a clause at `explained`, say it
+plainly at `used`, bare at `owns`. `PITCH` is defined once in `prompt.ts` and
+interpolated into the cached prefix **and** into §0, the way `SUMMARY` is, and
+`agree` asserts it is in `SYSTEM`. Held only in §0 — `get_strategy`-only — with a
+pair of ends quoted in the prompts, it never reached her: `unseen` is a
+**one-way door**, so a build rule gated on it stops applying the first time a
+channel is mentioned, and a binary rule over four rungs reads as *the other
+case*.
 
-It is formatted as the civil day it was stored as. Read back through a New York
-formatter it would move: `new Date('2026-03-12')` is midnight UTC, which is the
-11th in New York, so every rung would read a day early in the one column that
-says how stale it is.
+**Only the nightly pass may move a rung**, because a rung is a judgment across
+days. `set_channel` is in `CONSOLIDATE_TOOLS` and not beside `remember` in
+`CHAT_TOOLS`, and the loop enforces it: `ask()` answers a tool name outside the
+set it was handed as it answers an unknown one, and runs nothing. Most nights
+nothing moves, and that is the honest outcome.
 
-**It is a tiebreaker for what the briefing is about, never a driver**, and the
-prompt says so in those words. It decides which of two mechanisms that are *both*
-live today she unpacks — lean toward the thinner one. It never decides what the
-day is about. A briefing that worked through the channels in turn because one was
-`unseen` would be a curriculum, and the opening paragraph would stop being what
-actually matters that morning, which is the only thing it is for.
+**It comes back down when he says so.** *"I have lost this"*, *"explain that
+again"* — promoting too early is her natural error and he is the only one who can
+see it, so the demotion is his to declare. It still lands at the pass, which
+reads the whole day and runs before the next briefing, the only place the rung is
+read. **Nothing goes back to `unseen`**, and `setChannel` refuses it before the
+write: that rung says a channel never came up, and writing it back would report
+one she taught last week as never met. A channel he has lost goes to `explained`.
 
-**It does drive how a thing is said**, and that is the second job §0 of the
-strategy gave it: build the term from §3 at `unseen`, restate the mechanism in a
-clause at `explained`, say it plainly at `used`, say it bare at `owns`. Subject
-and register are two different questions, and the rung answers only the second.
-On subject it is a tiebreaker; on register it drives outright.
+**And `/channel` is the rung he moves himself.** `/channel <channel> <rung>` takes
+the id or the spoken name, with the rung as the last word, since three of the
+five names are several words. The ladder otherwise climbs only on him using a
+term back, so a reader who rarely answers would sit at `explained` — restate the
+mechanism every time — for ever. It goes through `setChannel`, so the one-way
+door and the unseeded-table check hold; and it is him saying where he is, not
+her reading of him, so `set_channel` stays out of `CHAT_TOOLS`.
 
-**That table is `PITCH`, and for a long time she was never handed it.** It was
-written in §0 — and §0 below its summary is `get_strategy`-only, with no prompt
-on any path telling her to fetch it. So the rule that decides how every
-explanation is pitched sat in a section nothing ever opened, and what she
-actually held was a pair of ends quoted in two prompts: *build it at `unseen`,
-do not at `owns`*.
+The five ids live in `prompt.ts`, read by the tool's enum and interpolated into
+her prose; the check constraint and the seed are the real second copies. §2 heads
+each channel with the **spoken** name, so `agree.test.mjs` resolves §2's headings
+against the names rather than the ids.
 
-`unseen` is a **one-way door**. `setChannel` refuses to write it back, correctly,
-because it means a channel has never once come up — history, not understanding.
-So the only build instruction she had stopped being reachable the first time each
-subject was mentioned, and the two rungs every channel actually sits at had no
-instruction at all. A binary rule over four states reads as *the other case*, and
-she used every term bare. Every message she sent was her following the rule she
-had; no prompt tweak could reach it, because the rule that would have produced
-the teaching was in a file she never read from.
+### What he can see of it
 
-`PITCH` now lives in `prompt.ts` beside the ladder, is interpolated into the
-cached prefix **and** into §0 — the way `SUMMARY` already is, so the two are the
-same characters — and `agree` asserts it is in `SYSTEM` rather than merely
-well-formed. The old test proved a row per rung and proved nothing about whether
-the rows reached her, which is this repository's oldest shape of mistake.
+**`/notes` is his audit**, answered from the database rather than by the model —
+`notesList()` renders the rows with the id each is named by, so nothing can be
+paraphrased, dropped or invented. Without it her memory is the one part of this
+system he can write to and cannot read, and a wrong note fails by absence: a fact
+saying he understands something he does not makes her **stop explaining it**.
+The channel map is part of the same listing, rendered *by* `notesList()` rather
+than appended from the block written for her, so the one message addressed to him
+never switches into the third person about him. A failed channel read costs the
+whole reply rather than being swallowed: an audit that silently omits half of
+what it audits is the defect it exists to prevent.
 
-**Only the nightly pass may move a rung.** `set_channel` is in
-`CONSOLIDATE_TOOLS` and deliberately not in `CHAT_TOOLS` beside `remember`: a
-note is a moment and is fairly written in one, but a rung is a judgment across
-days, and moving one on a single exchange is the same error as reading a pattern
-into one fill. Most nights nothing moves, and the prompt says that is the
-honest outcome rather than a wasted run.
+**A note can be retired.** Every note reaches her with its number, and `remember`
+takes an optional `supersedes`, so a correction names what it replaces. **The
+filter is the whole feature and fails silently**: without `superseded_by is null`
+on the read she is handed the correction *and* the thing it corrected, every
+turn. The column, the filter and the tool parameter are held together by a test.
+The row itself stays — findable by search and marked no longer true — and there
+is no delete path.
 
-**And the loop holds that, not the model's restraint.** A tool set is what a
-caller can run as well as what it is shown: `ask()` answers a name outside the
-set it was handed exactly as it answers an unknown one, and runs nothing. Until
-then every tool in the file was runnable from every path, and *only the nightly
-pass moves a rung* held only for as long as the model never named a tool it had
-not been given.
+**She can search everything she ever said.** The windows are the newest slice of
+two append-only tables, and `search_memory` reaches the rest on demand rather
+than widening the windows, where every token is paid on every request — the trade
+`get_trades` makes for the journal. See **Search that survives a rephrasing**.
 
-**It comes back down when he says so, and only then.** *"I have lost this"*,
-*"explain that again"* — the rung drops that night and she does not defend the
-earlier read. Promoting too early is her natural error and he is the only one who
-can see it, so this direction is his to declare where the other is hers to infer.
-It still lands at the pass rather than mid-conversation: the pass reads the whole
-day, so what he said is in front of it either way, and the rung is right before
-the next morning's briefing, which is the only place it is read. Putting the tool
-in `CHAT_TOOLS` would buy a few hours and cost its schema on every request and a
-promotion she could make from one exchange.
+### His strategy, which she holds and cannot write
 
-**Nothing goes back to `unseen`, and `setChannel` refuses it before the write.**
-That rung says a channel has never once come up — a fact about history, not about
-how well he holds it. A demotion able to write it would report a channel she
-taught last week as one he has never met, which is the census saying the opposite
-of the truth in the one column it exists for. A channel he has lost goes to
-`explained`.
+`strategy.ts` is the document he wrote — what he trades, the rules, how each is
+checked. Its own retrieval contract decides what she carries: the summary, a
+one-line index of every section, and the rules table ride on the **cached**
+system prompt; `get_strategy` fetches the reasoning behind any of it. The index is
+there because nothing cites §8 — which population, which filters, which figure
+is honest — and a tool she can call is not a tool she knows when to call.
 
-The five ids live in `prompt.ts` and are read from there by the tool's enum and
-interpolated into her prose, so the check constraint and the seed are the genuine
-second copies — `agree.test.mjs` holds them together, because an id the tool
-offers and the constraint refuses is a `set_channel` that 400s and is reported to
-nobody.
-
-**The strategy is a copy in the other vocabulary.** Each `CHANNELS` entry is an id
-and a spoken name, and §2 heads each channel with the *name*, because
-`central_bank_buying` is not something a person says across a desk. So the name
-can drift with every id in the repository still agreeing — she would read the
-mechanism under one name and move the rung under another — which is why the test
-resolves §2's headings against the names rather than the ids. §0's pitch table is
-the same shape for the four rungs.
-
-**`/notes` is how he reads what she is keeping**, and it is answered from the
-database rather than by the model — `notesList()` renders the rows themselves,
-with the id each is named by, so the listing is an audit rather than her account
-of one. Asked to recite her own notes she could paraphrase a line, drop one, or
-produce a plausible sentence that is not in the table, and none of that would be
-visible.
-
-Without it her memory is the one part of this system he can write to and cannot
-read. A fact is recorded silently by design and an instruction is acknowledged
-in four words that scroll away, so the evidence that anything stuck lasts about
-a morning — and a wrong note fails in the worst available way. A fact saying he
-understands something he does not makes her **stop explaining it**, and the
-symptom is an absence, which is the hardest thing there is to notice.
-
-The channel map is part of the same listing, because it is the half of her
-memory he has never been able to see at all — and the half that says what she is
-missing rather than what she has. It is rendered *by* `notesList()` rather than
-appended after it: the block the briefing uses is written for her and opens
-*Where he stands on each channel*, so the one message in the system addressed to
-him used to switch into the third person about him halfway down. Rendering the
-whole audit in one place fixes that and makes it one pure function.
-
-**And `/channel` is the half of that map he can move himself.**
-`/channel <channel> <rung>` — either the id or the spoken name the listing
-prints, and the rung as the last word, because three of the five names are
-several words long. It reuses `setChannel`, so the one-way door on `unseen` and
-the check for an unseeded table hold exactly as they do for the nightly pass.
-
-It exists because **the ladder could only ever climb on evidence he does not
-produce.** A rung moves at the nightly pass and it moves on him using a term
-back, so a reader who takes the briefing and rarely answers it sits at
-`explained` for ever — and `explained` is the rung that says restate the
-mechanism in a clause every time the word is used. Weeks of that read as her
-being unable to stop over-explaining; what it actually was is a census with no
-way up. That stays true of *her* reading of him — one exchange is not evidence,
-and `set_channel` is still out of `CHAT_TOOLS`. This is not her reading of him:
-it is him saying where he is, which is the standing a demotion already had and
-the only testimony on the subject that was never in doubt.
-
-It also means a failed channel read now costs the whole `/notes` reply rather
-than being swallowed, which is the opposite of the rule the briefing's blocks
-follow and is right here: this is an audit, answered from the database precisely
-so nothing can quietly drop a row, and one that silently omits half of what it
-audits is the defect it exists to prevent.
-
-Append-only, and now with a way to retire a line rather than only bury it. Every
-note reaches her with a number in brackets, and `remember` takes an optional
-`supersedes` — so a new note that contradicts an old one names it, and the old
-one stops being read.
-
-**That filter is the whole feature and it fails silently.** Without
-`superseded_by is null` on the read she is handed the correction *and* the thing
-it corrected, every turn, with nothing marking which is current — no error, and
-a note count that looks perfectly healthy. `agree.test.mjs` reads the query for
-it, and checks the column, the filter and the tool parameter all exist together,
-since any one of the three missing leaves the other two doing nothing.
-
-The row itself never goes. It keeps what she used to believe and names what
-changed it, which is exactly what a search over this table will need later:
-findable, and marked as no longer true. There is still no delete path, so the
-only things she can do to that table are add a sentence and retire one.
-
-**She can search everything she has ever said.** The twelve turns and twenty
-notes she is handed are the newest slice of two append-only tables; everything
-older was still there and simply never selected. `search_memory` reaches it —
-one RPC, `eugenia_search`, ranking notes and turns together by words and by
-meaning so a question like *"what did we conclude about the December cut"* is
-answerable from March even when nobody used those words.
-
-**Searched, not loaded, and that is the design rather than a limitation.**
-Widening the windows would put the archive in her context, where every token is
-paid on every request and competes with the briefing for attention. The windows
-stay small and what is outside them is addressable on demand — the same trade
-`get_trades` makes for the journal.
-
-`websearch_to_tsquery` rather than `to_tsquery`, because the query is written by
-a model: the strict parser throws on an unbalanced quote, and a throw inside the
-tool loop costs the whole answer. **A retired note is returned and marked, never
-hidden** — that is the promise `superseded_by` makes, and *what did I used to
-think* is worth being able to answer.
-
-**And a hit says who said it.** `eugenia_turns` carries `role`; the search did
-not select it, so every turn came back rendered as *you said* and half of every
-result set was **his** messages handed back to her as her own words — she would
-quote an instruction he gave as her own analysis, or deny saying something he
-said, fluently, with nothing anywhere reporting it. The role rides in `source`
-rather than in a column of its own, because `create or replace function` may not
-change a return type and dropping the function to widen it takes its grants with
-it. Three words, one column: `note`, `you`, `him`. They are a vocabulary shared
-with `searchList`, so `agree.test.mjs` holds the two lists against each other.
-
-**She holds his strategy and can never write it.** `strategy.ts` is the document
-he wrote — what he trades, the rules, how each one is checked. Its own retrieval
-contract decides what she carries: the summary, a one-line index of every
-section, and the rules table ride on the **cached** system prompt, so they are in
-front of her on every turn; `get_strategy` fetches the reasoning behind any of
-it. Loading the whole document instead would be close to a hundred thousand
-characters against every message, competing with the briefing for attention.
-
-**The index is there because nothing cites §8.** Every other section is reachable
-from a rule's `§` column, and §8 — which population, which filters, which figure
-is the honest one — is the section that decides whether a number means anything
-at all. No rule points at it. A tool she can call is not a tool she knows when to
-call.
-
-**A subsection is served by the section that holds it**, and without that the two
-citations she carries on every single turn were the two `get_strategy` could not
-answer. R-05 cites §4.1 and R-06 cites §4.2; both are written, in full, inside
-§4, and an exact lookup told her they did not exist — not a blank she fills in
-herself but a wrong fact about her own document, delivered by the one tool that
-exists to stop her inventing one. `agree.test.mjs` now resolves every citation in
-the rules table through the same lookup, and checks a dotted one names a heading
-that is actually in what came back: the fallback would otherwise answer a
-mistyped §4.7 with §4 and read exactly like a citation that worked. Its reader
-captured `4` out of `§4.1` and reported both as fine.
+**A subsection is served by the section that holds it.** R-05 cites §4.1 and R-06
+§4.2, both prose inside §4. `agree.test.mjs` resolves every citation through the
+same lookup and checks a dotted one names a heading actually present in what came
+back, since the fallback would answer a mistyped §4.7 with §4. A number the
+document does not hold is named as missing rather than returned blank, because it
+arrives from the model and a blank is something she would fill in herself.
 
 **The asymmetry is the point.** A document that decides whether he followed his
-rules cannot be edited by the thing checking them — adherence to a moving target
-is not measurable, and her own analysis would start feeding the standard she
-measures against. She has no write path to it at all, in the same way she has
-none to `trades`.
+rules cannot be edited by the thing checking them. She has no write path to it.
 
-**The Evaluable column is what the table is for.** `journal` means a rule can be
-checked against a row today, `field` that a column would have to exist first,
-`judgment` that nothing stored can see it. A judgment rule is not a weaker rule —
-it is one whose compliance is invisible, so it never counts as kept merely
-because nothing contradicted it.
+**The Evaluable column is what the rules table is for.** `journal` means a row can
+answer it today, `field` that a column would have to exist first, `judgment` that
+nothing stored can see it — not a weaker rule, but one never counted as kept
+merely because nothing contradicted it. The numbering skips 1 and 11, which reads
+as deliberate where holes would read as a draft. **§2 and §3 are not his** —
+researched reference, labelled so where they start. Everything else is, and a
+rule he has not stated is a `[decide]` rather than a pattern read as a rule.
 
-The numbering skips 1 and 11, and that is a decision rather than an unfinished
-document: a numbering that skips reads as deliberate where six holes read as a
-draft. Every section anything cites is written. `get_strategy` still names a
-number it does not hold rather than returning nothing: the number arrives from
-the model, so a mistyped or an invented one is what it has to survive, and a
-blank is something she would fill in herself, which is the one outcome worse than
-reporting it missing.
+**§3 is the foundation**: built from the ground up — what inflation is, what the
+Fed sets, how a hike transmits, what a bond yield, TIPS and breakevens are, why
+gold sits at the end of it — plus every metric a briefing uses, written to teach.
+**§0 turns the channel map into an instruction**, which is `PITCH`.
 
-**Two of the sections are not his.** §2 and §3 are researched reference material
-rather than decisions he made, and both say so where they start. Everything else
-in the file is his, and a rule he has not stated is a `[decide]` rather than a
-pattern read as a rule — which is the difference between a document that records
-what he decided and one that tells him what he apparently does.
+**§6 holds R-08's four steps**: top-down bias; levels (liquidity pools, support
+and resistance, the $25 grid); a candle or chart pattern with signal then
+confirmation; reward-to-risk of at least 1:1.5. The order is the rule — a failed
+step ends the sequence. Steps 1 to 3 are invisible to anything stored; step 4 can
+be read only off a row carrying the stop and target as first seen. The default
+$30 target over a stop of $20 or tighter is always 1:1.5, so the step binds only
+on a $25 target set at entry. A realised 1:1.25 is the rule working on a target
+shortened mid-trade and a breach on a $25 one set at entry, and only a row
+carrying the plan can tell which.
 
-**§3 is the foundation, and it exists because he said the briefings land as terms
-he nods past.** Nineteen thousand characters built from the ground up — what
-inflation is, what the Fed actually sets, how a rate hike transmits, what a bond
-yield is, what TIPS and breakevens measure, and why gold sits at the end of all
-of it — plus every metric a briefing uses. It is written to teach rather than to
-be looked up, and it is what she reaches for when a term needs building rather
-than naming.
+**The stop is a ceiling, not a value**, which makes R-02 one-sided: $20 is the
+most it may ever be, it usually sits tighter off the chart, and it moves only
+outward to break-even or inward under R-19. A loss further than $20 can only be a
+widened stop; a $10 stop closed $18 out passes. A clean R-02 means no stop went
+past $20, never that stops were respected.
 
-**§0 decides how much building a term needs, and it reads that off the channel
-map.** Each of the five channels carries `unseen → explained → used → owns`, and
-§0 turns the rung into an instruction: build it from §3 at `unseen`, restate the
-mechanism in a clause at `explained`, say it plainly at `used`, say it bare at
-`owns`. Reaching for the build-up at `owns` is condescending, and skipping it at
-`unseen` is the term he nods past — so the same table that exists to show an
-absence now also sets the register.
+**R-10 and R-11** — one position at a time; the day ends at −4% of the account —
+come out of broker columns alone: overlapping entry-to-fill spans, and cumulative
+P&L against `size_oz × 500`. R-11 is not R-03: a full stop at a small rung ends
+the day under R-03 having spent well under 4%, and three smaller losses can spend
+the 4% without R-03 seeing anything. His definition of a full stop, settled at
+v1.14, is what made R-03 `journal`. **R-12** caps him at one entry a day, two only
+for a sweep re-entry; **R-13** pins a rung change to a month boundary; **R-14**
+stands him aside before a high-impact release; **R-15** closes anything live
+before the Friday close; **R-16** keeps him off low-volume days; **R-17** stops him
+when the trading itself deteriorates — behaviour rather than a number, so
+`judgment`. **R-18** — stop and target are resting broker orders and a position is
+never closed by hand — makes R-01 and R-02 exact. **R-19** is the one exception to
+*never tightened*: a high-impact print landing on a position inherited from an
+earlier session takes it to break-even if in profit, a closer invalidation if
+not, and the target never moves. R-09 was retired at v1.18.
 
-§6 holds R-08's four steps — top-down bias; levels, meaning liquidity pools,
-support and resistance and the $25 grid; a candle or chart pattern with signal
-then confirmation; and reward-to-risk of at least 1:1.5. The order is the rule: a
-failed step ends the sequence rather than being traded off against a later one,
-and nothing stored can see any of the four. **Psychological levels were a fifth
-step until v1.9** and are now inside the levels step: they gated nothing of their
-own — attention rather than a test — and a step that can never be the step you
-stopped at breaks the one claim R-08 makes.
+**§4: the two setups differ by method, not location.** Break & Retest is a
+continuation trade through a level that has broken and flipped; Support &
+Resistance a mean-reversion trade off a level that is holding. So a win rate split
+by `setup` compares continuation against mean-reversion. A level is marked by the
+$25 grid or by a reaction point, strongest where they agree, so a previous high
+mid-range is tradeable for Break & Retest.
 
-**Step 4 is arithmetic he runs, and it binds in exactly one place.** The default
-$30 target over a stop of $20 or tighter is always at least 1:1.5, so on the
-default path the step refuses nothing. What it refuses is a $25 target set at
-entry, which needs a stop of $16.67 or tighter — and no row records which target
-was set.
+It is a TS module for the reason `prompt.ts` is: a function deploys as its own
+directory, and an import guarantees the file travels with it. It is markdown in a
+template literal, so **every backtick is escaped**.
 
-So a realised 1:1.25 is **legitimate as an outcome and illegitimate as a plan**:
-the rule working where a $30 target was shortened on a trade already open, and a
-breach where $25 was set at entry over a $20 stop. Nothing on the row separates
-them, so it is `unknown` rather than either. That is v1.9's correction to a
-contradiction the document carried for six versions and then papered over for
-two — one floor that disagreed with itself, restated as two numbers at two
-moments, when the honest statement is that the row cannot tell which happened.
+### His journal, which she reads and cannot write
 
-**The stop is a ceiling, not a value**, and that is what makes R-02 one-sided.
-$20 is the most it may ever be; where it actually goes is read off the chart at
-entry, so it is usually tighter, and the only way it moves is outward to
-break-even, or inward under R-19. A loss closing further than $20 from entry can
-therefore only be a stop that was widened, which is what the predicate catches —
-and a $10 stop that closed $18 out was widened by eight dollars and passes
-silently. A clean R-02 run means no stop went past $20. It never means stops were
-respected.
+`get_trades` reads the journal through `eugenia_trades`, and three things make it
+read-only: the view fixes the column list (no `user_id`, `balance`, `commission`
+or `computed_pnl`) and hides deleted rows; its grant is `select` alone; and her
+function has one database read of the journal and no write path to it. The grant
+makes the *view* read-only, not the key — she holds the service key for her own
+tables — so the structural guarantee is the one that matters.
 
-**R-10 and R-11 arrived at v1.9 with IDs they should have had all along.** One
-position at a time, and the day ends at −4% of account: both were prose in §5
-from v1.5, neither was ever in the table, so neither was ever checked. Both come
-out of broker columns alone — two rows whose entry-to-fill spans overlap, and
-cumulative P&L against `size_oz × 500` — which is why they arrive as `journal`
-rather than as another thing waiting on a schema change. R-11 also separates two
-rules §5 had been stating as one: a full stop ends the day under R-03 and −4%
-ends it under R-11, and the two can disagree in both directions — a full stop is
-$20 from entry, which at a small rung ends the day having spent well under 4%,
-and three smaller losses can spend the whole 4% without R-03 seeing anything.
-**That definition is his, settled at v1.14**, and it is what made R-03 `journal`:
-§12 had also counted a tighter stop taken in full, which no row can tell from a
-hand-cut exit.
+The view is `security_invoker`, which a view is **not** by default: without it,
+RLS would depend on whoever ran `003_eugenia.sql` rather than on who is asking, and
+a grant widened by mistake would leak every user's trades.
 
-**The table reached nineteen rules, and the eight after R-11 came out of audits
-rather than out of new behaviour.** It is eighteen since v1.18 retired R-09, a line
-from a book he read while learning rather than one he traded by. R-12 caps him at one entry a day, two only
-when the second is a sweep re-entry. R-13 pins a rung change to a month boundary.
-R-14 stands him aside in the hours before a high-impact release — the first rule
-connecting the briefing to the trading. R-15 closes anything live before the
-Friday close, because a weekend gap can open past the stop. R-16 keeps him off
-known low-volume days. R-17 stops him when the trading itself has deteriorated,
-and its trigger is behaviour rather than a drawdown number, which is why it is
-`judgment` and not a threshold.
-
-**R-18 is the one that changes what the older rules mean.** The stop and the
-target are resting broker orders and a position is never closed by hand, so a
-loss further from entry than $20 is an edited order rather than a decision at the
-screen — which turns R-01 and R-02 from suggestive into exact. R-19 is the single
-exception to *never tightened*: a high-impact print landing on a position
-inherited from an earlier session goes to break-even if it is in profit and to a
-closer invalidation if it is not, and the target never moves. It also costs a
-reading the journal had for free: a scratch on this account was reliably R-04
-having fired, and a scratch under $20 can now be R-19 instead — unless the trade
-was opened in the same session, in which case it is neither and is a question.
-
-§4 is the one section that answers a question the rules could not. **The two
-setups differ by method, not by location**: Break & Retest is a continuation
-trade taken through a level that has already broken and flipped, and Support &
-Resistance is a mean-reversion trade taken off a level that is holding. Interior
-levels are where levels break, the extremes are where they turn price back — so
-R-05 and R-06 read as rules about location and are rules about method. It also
-settles what a per-setup statistic is: a win rate split by `setup` compares
-continuation against mean-reversion, not one part of the chart against another.
-
-**An interior level is not only a quarter**, and reducing it to one was the error
-v1.12 corrected. A level is marked by the $25 grid — 00 and 50 psychological, 25
-and 75 the quarters between — or by a reaction point, a previous high or low where
-something actually happened, and it is strongest where the two agree. So a
-previous high mid-range is tradeable for Break & Retest, which the earlier reading
-excluded. A `[decide]` in the text is a value he has not settled, and she is told
-to say so rather than supply one.
-
-A TS module rather than a markdown file for the reason `prompt.ts` is one: a
-function deploys as its own directory, and an import is the one way to be certain
-a file travels with it. It is markdown inside a template literal, so **every
-backtick is escaped** — writing a new one plainly ends the string, which fails
-loudly at build rather than subtly at runtime.
-
-**She reads the journal and can never write it.** `get_trades` is a tool she
-calls when the conversation is about his trading, and three separate things make
-it read-only: the `eugenia_trades` view fixes the column list (no `user_id`, no
-`balance`, no `commission`, no `computed_pnl`) and hides deleted rows; the grant on that view is
-`select` and nothing else; and her function has exactly one database read of the
-journal and no write path to it anywhere. Said plainly, because it is the honest
-limit: the grant makes the *view* read-only, not the key — she holds the service
-key to write her own tables, so the structural guarantee is what matters and the
-grant is the second lock.
-
-The view is `security_invoker`, which a view is **not** by default. Without it
-the view reads `trades` with the rights of whoever ran `003_eugenia.sql`, so
-what row level security does depends on an attribute of that role rather than on
-who is asking — and the grant is then the only thing between the publishable key
-and every user's trades. With it the reader's own rights apply. Nothing changes
-for Eugenia, who holds the service key and bypasses RLS either way; what changes
-is that a grant widened by mistake leaks nothing.
-
-She is still not a fifth writer to `trades`. The only things she writes are
-`eugenia_turns` and `eugenia_notes`.
-
-**Context goes in the user turn, not in a system message.** Mid-conversation
-system messages are the channel built for exactly this and would keep the cached
-prefix intact — but that request shape could not be exercised from the machine
-this was written on, and a 400 there kills every reply she gives. Nothing here
-is untrusted anyway: the trades are his own journal, and the notes are her
-sentences or his, in his own thread — so the injection safety a system turn buys
-is not what this needs.
+**Context goes in the user turn, not a mid-conversation system message.** That
+shape would keep the cached prefix intact, but it could not be exercised from
+where this was built, and a 400 there kills every reply. Nothing in the context is
+untrusted: his journal, and notes that are her sentences or his.
 
 ### When it breaks, she says so
 
