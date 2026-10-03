@@ -36,7 +36,7 @@ import {
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
 import {
-  env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -432,7 +432,7 @@ async function searchMemory(query: unknown): Promise<string> {
 
     return searchList(hits);
   } catch (err) {
-    console.error("doji-eugenia: search failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: search failed —", why(err));
     return "Your memory could not be searched just now. Say you cannot check rather than answering as though you had.";
   }
 }
@@ -519,7 +519,7 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     }
     return "Remembered.";
   } catch (err) {
-    console.error("doji-eugenia: note not written —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: note not written —", why(err));
     return k !== 'fact'
       ? "That did NOT save. Tell him it did not stick and that he will have to say it again."
       : "That did not save. Carry on and do not mention it.";
@@ -565,7 +565,7 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
     return `${id} is now ${to}.`;
   } catch (err) {
     console.error("doji-eugenia: channel not moved —",
-      err instanceof Error ? err.message : err);
+      why(err));
     return "That did not save. Carry on and do not mention it.";
   }
 }
@@ -648,7 +648,7 @@ async function readTrades(days: unknown): Promise<string> {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
     return rows.length ? JSON.stringify(rows) + reachLine(rows, days) : "No trades in that window.";
   } catch (err) {
-    console.error("doji-eugenia: trades read failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: trades read failed —", why(err));
     return "His journal could not be read just now. Say you cannot see it rather than saying he has not traded.";
   }
 }
@@ -708,7 +708,7 @@ async function checkAdherence(days: unknown): Promise<string> {
     if (!results) return "No trades in that window, so there is nothing to check.";
     return adherenceList(results) + reach;
   } catch (err) {
-    console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: rule check failed —", why(err));
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
   }
 }
@@ -750,7 +750,7 @@ async function readStats(days: unknown): Promise<string> {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
     return statsList(journalStats(rows), windowDays(days)) + reachLine(rows, days);
   } catch (err) {
-    console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: stats read failed —", why(err));
     return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
   }
 }
@@ -864,9 +864,9 @@ async function filedWeek(week: string): Promise<boolean> {
     await recordRun({ caller: 'calendar week', ok: true, detail: `${week}: ${await fileWeek(week)} filed` });
     return true;
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error(`doji-eugenia: week ${week} not filed —`, why);
-    await recordRun({ caller: 'calendar week', ok: false, detail: `${week}: ${why}`.slice(0, 500) });
+    const reason = why(err);
+    console.error(`doji-eugenia: week ${week} not filed —`, reason);
+    await recordRun({ caller: 'calendar week', ok: false, detail: `${week}: ${reason}`.slice(0, 500) });
     return false;
   }
 }
@@ -910,9 +910,9 @@ async function filed(now = Date.now()): Promise<void> {
   try {
     await recordRun({ caller: 'calendar', ok: true, detail: `${await fileCalendar(now)} filed` });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: calendar not filed —", why);
-    await recordRun({ caller: 'calendar', ok: false, detail: why.slice(0, 500) });
+    const reason = why(err);
+    console.error("doji-eugenia: calendar not filed —", reason);
+    await recordRun({ caller: 'calendar', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
@@ -959,7 +959,7 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
         `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
       : "Nothing is on file at that time, so there is no entry to fill in. Leave it.";
   } catch (err) {
-    console.error("doji-eugenia: actual not written —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: actual not written —", why(err));
     return "That did not save. Carry on and do not mention it.";
   }
 }
@@ -1044,7 +1044,7 @@ async function marketQuote(): Promise<Quote | null> {
     if (!quote?.ok || typeof quote.bid !== 'number') throw new Error("no readable quote");
     return quote as Quote;
   } catch (err) {
-    console.error("doji-eugenia: market read failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: market read failed —", why(err));
     return null;
   }
 }
@@ -1146,7 +1146,7 @@ async function setThesis(thesis: unknown): Promise<string> {
     }
     return "Thesis updated.";
   } catch (err) {
-    console.error("doji-eugenia: thesis not written —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: thesis not written —", why(err));
     return "That did not save. Carry on and do not mention it.";
   }
 }
@@ -1214,7 +1214,7 @@ async function openLoop(kind: unknown, body: unknown): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return "Kept open.";
   } catch (err) {
-    console.error("doji-eugenia: loop not opened —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: loop not opened —", why(err));
     return "That did not save. Carry on and do not mention it.";
   }
 }
@@ -1237,7 +1237,7 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
     }
     return "Closed.";
   } catch (err) {
-    console.error("doji-eugenia: loop not closed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: loop not closed —", why(err));
     return "That did not save. Carry on and do not mention it.";
   }
 }
@@ -1547,7 +1547,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
       out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
       ms: Date.now() - started, ok: false,
-      detail: [err instanceof Error ? err.message : String(err), toolLine()]
+      detail: [why(err), toolLine()]
         .filter(Boolean).join(' · tools: ').slice(0, 500),
     });
     throw err;
@@ -1564,7 +1564,7 @@ async function recordRun(row: Record<string, unknown>): Promise<void> {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {
-    console.error("doji-eugenia: run not recorded —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: run not recorded —", why(err));
   }
 }
 
@@ -1821,7 +1821,7 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
     if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
     return true;
   } catch (err) {
-    console.error("doji-eugenia: could not speak —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: could not speak —", why(err));
     return false;
   }
 }
@@ -1927,7 +1927,7 @@ export async function notesBlock(): Promise<string> {
              ? `\n\nWhat you have noticed about him, newest first:${list(noticed)}`
              : "");
   } catch (err) {
-    console.error("doji-eugenia: notes unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: notes unavailable —", why(err));
     return "";
   }
 }
@@ -2036,7 +2036,7 @@ export async function channelsBlock(): Promise<string> {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
   } catch (err) {
     console.error("doji-eugenia: channels unavailable —",
-      err instanceof Error ? err.message : err);
+      why(err));
     return "";
   }
 }
@@ -2084,7 +2084,7 @@ export async function breachesBlock(): Promise<string> {
     const { results, reach } = await readRules(BREACH_DAYS, t => sinceBriefing(t, at));
     return breachesList(results) + reach;
   } catch (err) {
-    console.error("doji-eugenia: breaches unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: breaches unavailable —", why(err));
     return "\n\nWhich rules his recent trades broke could not be checked just now. Say nothing about a broken rule rather than working it out from the rows.";
   }
 }
@@ -2113,7 +2113,7 @@ export async function thesisBlock(): Promise<string> {
   try {
     return thesisLine(await readThesis());
   } catch (err) {
-    console.error("doji-eugenia: thesis unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: thesis unavailable —", why(err));
     return "";
   }
 }
@@ -2179,7 +2179,7 @@ export async function healthBlock(): Promise<string> {
     if (!res.ok) return "";
     return healthLine(await res.json());
   } catch (err) {
-    console.error("doji-eugenia: health unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: health unavailable —", why(err));
     return "";
   }
 }
@@ -2211,7 +2211,7 @@ export async function loopsBlock(): Promise<string> {
   try {
     return loopsList(await readLoops());
   } catch (err) {
-    console.error("doji-eugenia: loops unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: loops unavailable —", why(err));
     return "";
   }
 }
@@ -2279,7 +2279,7 @@ export async function calendarBlock(): Promise<string> {
         `Do not say nothing else is due after the last one.`
       : "");
   } catch (err) {
-    console.error("doji-eugenia: calendar unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: calendar unavailable —", why(err));
     return "";
   }
 }
@@ -2302,7 +2302,7 @@ export async function weekBlock(now = Date.now()): Promise<string> {
     const rows = await readRows<Release>('Week', `${SB_URL}/rest/v1/${weekQuery(now)}`);
     return calendarList(rows, now, "The week ahead, every release TradingView rates high");
   } catch (err) {
-    console.error("doji-eugenia: week unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: week unavailable —", why(err));
     return "";
   }
 }
@@ -2353,7 +2353,7 @@ export async function aroundBlock(): Promise<string> {
     if (!res.ok || !answer.ok || !answer.market?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
     return aroundList(answer);
   } catch (err) {
-    console.error("doji-eugenia: market around gold unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: market around gold unavailable —", why(err));
     return NO_AROUND;
   }
 }
@@ -2391,7 +2391,7 @@ export async function ratesBlock(): Promise<string> {
     if (!res.ok || !answer.ok || !answer.meetings?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
     return ratesList(answer);
   } catch (err) {
-    console.error("doji-eugenia: rate odds unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: rate odds unavailable —", why(err));
     return "\n\nWhat the futures price for the Fed could not be read just now. Do not quote rate " +
       "odds from a search; say you do not have them.";
   }
@@ -2448,7 +2448,7 @@ export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
     if (!res.ok || !answer.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
     return headlinesList(answer, Date.now(), minutes);
   } catch (err) {
-    console.error("doji-eugenia: headlines unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: headlines unavailable —", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
   }
 }
@@ -2505,7 +2505,7 @@ export async function positioningBlock(): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return positioningList(await res.json());
   } catch (err) {
-    console.error("doji-eugenia: positioning unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: positioning unavailable —", why(err));
     return "\n\nWhere the speculators stand could not be read just now; do not quote it from a search.";
   }
 }
@@ -2598,7 +2598,7 @@ export async function positionsBlock(): Promise<string> {
       dayStanding(rows, day),
       open.length ? await readMark().catch(() => null) : null);
   } catch (err) {
-    console.error("doji-eugenia: positions unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: positions unavailable —", why(err));
     return "";
   }
 }
@@ -2672,19 +2672,19 @@ async function postScheduled(url: URL): Promise<Response> {
    trade event, which has no retry behind it. pg_net discards the response and
    nobody reads the console, so the message is how he finds out. */
 async function jobFailed(job: string, err: unknown): Promise<Response> {
-  const why = err instanceof Error ? err.message : String(err);
-  console.error("doji-eugenia:", why);
+  const reason = why(err);
+  console.error("doji-eugenia:", reason);
   /* The row first, because the message can fail and its catch swallows that:
      a job that dies before its first model call otherwise leaves no row, and
      the table reads as a system with nothing to do. `<job> job`, so it is never
      confused with an ask() label. */
-  await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
+  await recordRun({ caller: `${job} job`, ok: false, detail: reason.slice(0, 500) });
 
   await tg("sendMessage", {
     chat_id: CHAT_ID,
-    text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,
+    text: `${apologyFor(job)}\n\n${reason.slice(0, 600)}`,
   }).catch(() => {});
-  return json({ ok: false, error: why, job }, 500);
+  return json({ ok: false, error: reason, job }, 500);
 }
 
 /* What postBriefing stores in place of the text: one definition, or a retry
@@ -2712,7 +2712,7 @@ async function briefedToday(): Promise<boolean> {
     return !!latest && nyDate(new Date(latest.created_at)) === nyDate(new Date());
   } catch (err) {
     console.error("doji-eugenia: could not check for today's briefing —",
-      err instanceof Error ? err.message : err);
+      why(err));
     return true;
   }
 }
@@ -2793,10 +2793,10 @@ async function gate(draft: string, asked: string, label: string, most?: number):
     return sent;
   } catch (err) {
     // A gate that fails must never cost the message it was checking.
-    const why = err instanceof Error ? err.message : String(err);
-    console.error(`doji-eugenia: ${label} failed —`, why);
+    const reason = why(err);
+    console.error(`doji-eugenia: ${label} failed —`, reason);
     await recordRun({ caller, ok: false, chars: draft.length,
-                      detail: `failed, the draft went — ${why}`.slice(0, 500) });
+                      detail: `failed, the draft went — ${reason}`.slice(0, 500) });
     return draft;
   }
 }
@@ -2847,7 +2847,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   const handed = await fetch(`${SB_URL}/functions/v1/doji-eugenia?speak=${due}`, {
     method: "POST", headers: { "x-doji-key": CRON_SECRET },
   }).then(async res => { await res.body?.cancel(); return res.ok ? null : `HTTP ${res.status}`; },
-          (err: unknown) => err instanceof Error ? err.message : String(err));
+          (err: unknown) => why(err));
   if (handed === null) {
     await recordRun({
       caller: `${due} briefing written`, chars: brief.length, ms: Date.now() - opened, ok: true,
@@ -2942,7 +2942,7 @@ async function consolidatedToday(): Promise<boolean> {
     return !!latest && nyDate(new Date(latest.at)) === nyDate(new Date());
   } catch (err) {
     console.error("doji-eugenia: could not check for tonight's pass —",
-      err instanceof Error ? err.message : err);
+      why(err));
     return true;
   }
 }
@@ -2960,7 +2960,7 @@ export async function feedbackBlock(): Promise<string> {
     return `\n\nWhat he made of the recent briefings:\n${said.join("\n")}\n` +
            `Read this as one signal beside the day, never as a score to raise.`;
   } catch (err) {
-    console.error("doji-eugenia: feedback unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: feedback unavailable —", why(err));
     return "";
   }
 }
@@ -3006,9 +3006,9 @@ async function postConsolidation(): Promise<Response> {
     console.log("doji-eugenia: embeddings swept —", swept);
     await recordRun({ caller: 'embeddings', ok: true, detail: swept });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: embedding sweep failed —", why);
-    await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
+    const reason = why(err);
+    console.error("doji-eugenia: embedding sweep failed —", reason);
+    await recordRun({ caller: 'embeddings', ok: false, detail: reason.slice(0, 500) });
   }
 
   // The whole week, which R-14 and R-19 judge against — the quarter-hourly
@@ -3031,9 +3031,9 @@ async function recordChannels() {
     console.log(`doji-eugenia: channels — ${rungs}`);
     await recordRun({ caller: 'channels', ok: true, detail: rungs });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: channels unavailable —", why);
-    await recordRun({ caller: 'channels', ok: false, detail: why.slice(0, 500) });
+    const reason = why(err);
+    console.error("doji-eugenia: channels unavailable —", reason);
+    await recordRun({ caller: 'channels', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
@@ -3149,7 +3149,7 @@ async function recordBlock(due: Release[]): Promise<string> {
       const rows = await readRows<Release>('Record', `${SB_URL}/rest/v1/${recordQuery(r.ticker!, r.at)}`);
       return recordList(r.name, [...rows].reverse()) + revisionLine(r, rows);
     } catch (err) {
-      console.error("doji-eugenia: track record unavailable —", err instanceof Error ? err.message : err);
+      console.error("doji-eugenia: track record unavailable —", why(err));
       return "";
     }
   }));
@@ -3514,7 +3514,7 @@ async function transcribe(bytes: Uint8Array, name: string, mime: string): Promis
     const said = String((await res.json())?.text ?? "").trim();
     return said ? { said } : { trouble: 'empty' };
   } catch (err) {
-    console.error("doji-eugenia: transcription failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: transcription failed —", why(err));
     return { trouble: 'failed' };
   }
 }
@@ -3550,7 +3550,7 @@ async function handleFeedback(query: any): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     await ack(tap.verdict === 'good' ? "Noted, gracias." : "Noted — I will look at that tonight.");
   } catch (err) {
-    console.error("doji-eugenia: feedback not written —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: feedback not written —", why(err));
     await ack("That did not save, jefe.");
   }
 }
@@ -3633,7 +3633,7 @@ async function handleMessage(update: any): Promise<void> {
         await say(notesList(told, noticed, channels, loops, story, promised));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —",
-          err instanceof Error ? err.message : err);
+          why(err));
         await say("I cannot read my notes just now, jefe.");
       }
       return;
@@ -3710,7 +3710,7 @@ async function handleMessage(update: any): Promise<void> {
     // The text, never the blocks or the audio: a megabyte resent as history.
     await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
   } catch (err) {
-    console.error("doji-eugenia:", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia:", why(err));
     await tg("sendMessage",
       { chat_id: CHAT_ID, text: "Something broke on my side, jefe. Try again in a moment." })
       .catch(() => {});
@@ -3720,7 +3720,7 @@ async function handleMessage(update: any): Promise<void> {
 // Keeps work alive past the response. The catch matters: nothing awaits it.
 function background(work: Promise<unknown>) {
   const guarded = work.catch(err =>
-    console.error("doji-eugenia:", err instanceof Error ? err.message : err));
+    console.error("doji-eugenia:", why(err)));
 
   const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
   // Logged, because without it the worker can be reclaimed at the 200 and the
@@ -3780,7 +3780,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
     // pg_net discards this; only the console sees it.
-    console.error("doji-eugenia:", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });

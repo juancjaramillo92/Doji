@@ -26,7 +26,7 @@
 // Deploy:  supabase functions deploy doji-tradingview --no-verify-jwt
 // Secrets: DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, nyDate, SB_URL, SB_KEY } from "../_shared/edge.ts";
+import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, nyDate, SB_URL, SB_KEY, why } from "../_shared/edge.ts";
 
 const TV_URL = "https://mcp.tradingview.com/mcp";
 
@@ -342,6 +342,10 @@ export function unwrap(envelope: any, tool: string): any {
   return answer;
 }
 
+// What a tool answered, unwrapped — the read every folder starts from.
+const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>) =>
+  unwrap(parseSse(await tvPost(session, tool, args)), tool);
+
 /* ─── The calendar ─────────────────────────────────────────────────────────
    The releases as data, each with an id TradingView keeps — the key her
    calendar is filed on — and its figures with unit and scale. US only: every
@@ -433,13 +437,12 @@ async function readMarket() {
   const session = await tvSession();
   const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
   for (const m of MARKET) {
-    const tool = "mcp-tv-get-ohlcv";
     try {
-      const bars = foldBars(unwrap(parseSse(await tvPost(session, tool,
-        { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 })), tool));
+      const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv",
+        { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 }));
       market.push({ ...m, daily: !!m.daily, ...bars });
     } catch (err) {
-      missing.push({ symbol: m.symbol, name: m.name, error: err instanceof Error ? err.message : String(err) });
+      missing.push({ symbol: m.symbol, name: m.name, error: why(err) });
     }
   }
   return { ok: true, market, missing };
@@ -467,14 +470,13 @@ export function foldHeadlines(answers: { symbol: string; answer: any }[]) {
 
 async function readHeadlines() {
   const session = await tvSession();
-  const tool = "mcp-tv-get-news";
   const answers: { symbol: string; answer: any }[] = [], missing: Record<string, string>[] = [];
   for (const f of FEEDS) {
     try {
       answers.push({ symbol: f.symbol,
-        answer: unwrap(parseSse(await tvPost(session, tool, { symbol: f.symbol, limit: f.limit })), tool) });
+        answer: await tvCall(session, "mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }) });
     } catch (err) {
-      missing.push({ symbol: f.symbol, error: err instanceof Error ? err.message : String(err) });
+      missing.push({ symbol: f.symbol, error: why(err) });
     }
   }
   return { ok: true, headlines: foldHeadlines(answers), missing };
@@ -603,25 +605,24 @@ async function readRates() {
   const prices: Record<string, number> = {};
   const contracts: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
   for (const ym of contractMonths(today)) {
-    const tool = "mcp-tv-get-ohlcv", symbol = zq(ym);
+    const symbol = zq(ym);
     try {
-      const bars = foldBars(unwrap(parseSse(await tvPost(session, tool, { symbol, interval: "1D", count: 2 })), tool));
+      const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 2 }));
       prices[ym] = bars.last;
       contracts.push({ symbol, price: bars.last, at: bars.at });
     } catch (err) {
-      missing.push({ symbol, error: err instanceof Error ? err.message : String(err) });
+      missing.push({ symbol, error: why(err) });
     }
   }
   let calendar: string[] | null = null;
   try {
-    const tool = "mcp-tv-get-economic-calendar";
-    const events = foldCalendar(unwrap(parseSse(await tvPost(session, tool,
+    const events = foldCalendar(await tvCall(session, "mcp-tv-get-economic-calendar",
       { countries: "US", date_from: today,
-        date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) })), tool));
+        date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) }));
     calendar = events.filter((e: { title: string }) => /interest rate decision/i.test(e.title))
       .map((e: { at: string }) => nyDate(new Date(e.at)));
   } catch (err) {
-    console.error("doji-tradingview: calendar unread for the meeting check —", err instanceof Error ? err.message : err);
+    console.error("doji-tradingview: calendar unread for the meeting check —", why(err));
   }
   const moved = unlisted(calendar ?? []);
   if (moved.length) {
@@ -652,7 +653,9 @@ const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISO
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
 const AROUND = MARKET.map(m => m.symbol);
 
-const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
+type Call = [AllowedTool, Record<string, unknown>];
+
+const PROBES: Record<string, () => Call[]> = {
   calendar: () => [
     ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(0), date_to: day(2) }],
     ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(-7), date_to: day(0), min_importance: 1 }],
@@ -661,15 +664,14 @@ const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
     ["mcp-tv-get-symbol-data-batch", { symbols: AROUND }],
     // The real yield is daily; a 15m bar of it answers nothing.
     ...AROUND.filter(s => s !== "FRED:DFII10")
-      .map(symbol => ["mcp-tv-get-ohlcv", { symbol, interval: "15m", count: 2 }] as [AllowedTool, Record<string, unknown>]),
+      .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "15m", count: 2 }]),
     ["mcp-tv-get-ohlcv", { symbol: "FRED:DFII10", interval: "1D", count: 3 }],
   ],
   gold: () => [
     ["mcp-tv-get-symbol-data-batch", { symbols: GOLD }],
     ["mcp-tv-get-ohlcv", { symbol: GOLD[0], interval: "1m", count: 3 }],
   ],
-  news: () => FEEDS.map(f => ["mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }] as
-    [AllowedTool, Record<string, unknown>]),
+  news: () => FEEDS.map((f): Call => ["mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }]),
   econ: () => [
     ["mcp-tv-get-economic-symbols", { country: "US", category: "prce" }],
     ["mcp-tv-get-economic-symbols", { country: "US", category: "mny" }],
@@ -682,8 +684,7 @@ const PROBES: Record<string, () => [AllowedTool, Record<string, unknown>][]> = {
   fedfunds: () => [
     ["mcp-tv-search-symbols", { query: "30 day fed funds" }],
     ...["CBOT:ZQ1!", "CBOT:ZQ2!", "CBOT:ZQ3!", "CBOT:ZQV2026", "CBOT:ZQX2026", "CBOT:ZQZ2026"]
-      .map(symbol => ["mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 3 }] as
-        [AllowedTool, Record<string, unknown>]),
+      .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 3 }]),
   ],
 };
 
@@ -696,13 +697,13 @@ async function probe(name: string): Promise<string> {
   if (name === "gold") {
     const broker = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?market=1`,
       { headers: { "x-doji-key": CRON_SECRET } })
-      .then(r => r.text(), (err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+      .then(r => r.text(), (err: unknown) => `FAILED: ${why(err)}`);
     parts.push(`--- broker, via doji-mcp-sync?market=1, at ${new Date().toISOString()} ---\n${broker}`);
   }
   for (const [tool, args] of PROBES[name]()) {
     const began = Date.now();
     const body = await tvPost(session, tool, args)
-      .catch((err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+      .catch((err: unknown) => `FAILED: ${why(err)}`);
     parts.push(`--- ${tool} ${JSON.stringify(args)}, ${Date.now() - began} ms ---\n${body}`);
   }
   return parts.join("\n");
@@ -748,9 +749,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         return json({ ok: false, error: `from and to are YYYY-MM-DD, at most ${CALENDAR_DAYS} days ` +
                       `apart, and not before ${CALENDAR_FIRST}` }, 400);
       }
-      const session = await tvSession();
-      const answer = unwrap(parseSse(await tvPost(session, "mcp-tv-get-economic-calendar",
-        { countries: "US", ...window })), "mcp-tv-get-economic-calendar");
+      const answer = await tvCall(await tvSession(), "mcp-tv-get-economic-calendar",
+        { countries: "US", ...window });
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
@@ -769,7 +769,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
     return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1, ?rates=1 or ?probe=" }, 400);
   } catch (err) {
-    console.error("doji-tradingview:", err instanceof Error ? err.message : err);
+    console.error("doji-tradingview:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });

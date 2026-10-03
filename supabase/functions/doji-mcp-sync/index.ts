@@ -24,7 +24,7 @@
 
 import {
   env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
-  SB_URL, SB_KEY,
+  SB_URL, SB_KEY, why
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -619,7 +619,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         const body = await mcpPost(session, "get_trendbars", {
           symbolId: SYMBOL_IDS[0], period: "M_1",
           fromTimestamp: String(w.from), toTimestamp: String(w.from + 15 * 60_000),
-        }).catch((err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+        }).catch((err: unknown) => `FAILED: ${why(err)}`);
         parts.push(`--- get_trendbars M_1, ${w.days} days back, from ` +
           `${new Date(w.from).toISOString()}, ${Date.now() - began} ms ---\n${body}`);
       }
@@ -690,7 +690,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }
     } catch (err) {
       console.error("doji-mcp-sync: close instant not recorded —",
-        err instanceof Error ? err.message : err);
+        why(err));
     }
 
     // get_balance is the only source of a balance — get_deals carries none —
@@ -721,7 +721,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       stops = await recordStops(plans);
     } catch (err) {
       console.error("doji-mcp-sync: plan not recorded —",
-        err instanceof Error ? err.message : err);
+        why(err));
     }
 
     // Last, being the one step that reads the table; never fatal either.
@@ -730,7 +730,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       excursions = await fillExcursions(session);
     } catch (err) {
       console.error("doji-mcp-sync: excursion not recorded —",
-        err instanceof Error ? err.message : err);
+        why(err));
     }
 
     // Marked after every step, so it means the deals landed.
@@ -743,7 +743,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       has_more: data.hasMore ?? null,
     });
   } catch (err) {
-    console.error("doji-mcp-sync:", err instanceof Error ? err.message : err);
+    console.error("doji-mcp-sync:", why(err));
     // The only record of a poll that failed at 03:00.
     await heartbeat("poller", err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

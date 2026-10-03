@@ -28,6 +28,9 @@ export function secretMatches(presented: string | null, expected: string): boole
   return diff === 0;
 }
 
+// A caught value as a message: an Error's own, anything else stringified.
+export const why = (err: unknown): string => err instanceof Error ? err.message : String(err);
+
 export const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -60,8 +63,7 @@ export async function heartbeat(who: "poller" | "email", failure?: unknown) {
         last_error_at: new Date().toISOString(),
         // Both ends of 008's `between 1 and 500`: an empty message — `new
         // Error()` — is refused too, and takes last_error_at with it.
-        last_error: String(failure instanceof Error ? failure.message : failure)
-          .slice(0, 500) || "no detail",
+        last_error: why(failure).slice(0, 500) || "no detail",
       };
   try {
     await fetch(`${SB_URL}/rest/v1/sync_health?id=eq.${who}`, {
