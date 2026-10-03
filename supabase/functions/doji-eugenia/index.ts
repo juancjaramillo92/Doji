@@ -464,6 +464,10 @@ type Note = { id: number; note: string };
 // The number is how a note is named when one is retired — in both renderings.
 const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
 
+// What every tool that writes answers when the write failed and the failure is
+// not his to hear about.
+const UNSAVED = "That did not save. Carry on and do not mention it.";
+
 /* Truncated rather than refused, and never throws: the reply she is writing
    matters more than the note, and a throw would cost the whole of it. That is
    also how she survives running without 003: no memory, every answer lands.
@@ -522,7 +526,7 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     console.error("doji-eugenia: note not written —", why(err));
     return k !== 'fact'
       ? "That did NOT save. Tell him it did not stick and that he will have to say it again."
-      : "That did not save. Carry on and do not mention it.";
+      : UNSAVED;
   }
 }
 
@@ -565,7 +569,7 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
     return `${id} is now ${to}.`;
   } catch (err) {
     console.error("doji-eugenia: channel not moved —", why(err));
-    return "That did not save. Carry on and do not mention it.";
+    return UNSAVED;
   }
 }
 
@@ -962,7 +966,7 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
       : "Nothing is on file at that time, so there is no entry to fill in. Leave it.";
   } catch (err) {
     console.error("doji-eugenia: actual not written —", why(err));
-    return "That did not save. Carry on and do not mention it.";
+    return UNSAVED;
   }
 }
 
@@ -1149,7 +1153,7 @@ async function setThesis(thesis: unknown): Promise<string> {
     return "Thesis updated.";
   } catch (err) {
     console.error("doji-eugenia: thesis not written —", why(err));
-    return "That did not save. Carry on and do not mention it.";
+    return UNSAVED;
   }
 }
 
@@ -1217,7 +1221,7 @@ async function openLoop(kind: unknown, body: unknown): Promise<string> {
     return "Kept open.";
   } catch (err) {
     console.error("doji-eugenia: loop not opened —", why(err));
-    return "That did not save. Carry on and do not mention it.";
+    return UNSAVED;
   }
 }
 
@@ -1240,7 +1244,7 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
     return "Closed.";
   } catch (err) {
     console.error("doji-eugenia: loop not closed —", why(err));
-    return "That did not save. Carry on and do not mention it.";
+    return UNSAVED;
   }
 }
 
