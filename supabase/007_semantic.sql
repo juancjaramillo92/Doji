@@ -1,28 +1,16 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- DOJI — Eugenia: finding what she meant, not what she typed
+-- DOJI — Eugenia: search by meaning
 -- ───────────────────────────────────────────────────────────────────────────
--- THIS IS NOT A SIXTH MEMORY. Her memories are LIFETIMES — turns roll over in a
--- morning, notes persist, channels outlive both, the thesis is only ever
--- current, loops close, the calendar compounds. This is the REACH into two of
--- them, and the windows stay exactly as small as they are: twelve turns and
--- twenty notes, because every token in a window is paid on every request.
--- `search_memory` is what reaches past the window, and this makes that reach
--- work on meaning.
+-- Not a memory but the reach into two of them. The windows stay small — every
+-- token in one is paid on every request — and search_memory reaches past them.
+-- This makes that reach work on meaning: "what did we conclude about the
+-- December cut" against "the market has mostly given up on easing" shares no
+-- substring, and without it she answers that they never discussed it.
 --
--- WHAT IT FIXES, CONCRETELY. *"What did we conclude about the December cut"*
--- against a turn that said *"the market has mostly given up on easing this
--- year"*. No shared substrings, so full text finds nothing and trigram finds
--- nothing — and the answer she gives is that you never discussed it, which is
--- worse than saying she cannot find it.
---
--- THE LEXICAL ARM STAYS, AND THAT IS THE LOAD-BEARING DECISION HERE. Two
--- reasons and both matter. A vector is worse than trigram at exact terms — a
--- date, a ticker, `R-08`, a note id — where the thing being asked for IS the
--- string. And a row whose embedding is null simply does not appear in a
--- nearest-neighbour query: no error, no log, half an archive quietly
--- unsearchable. The lexical arm is full coverage over both tables and cannot
--- have that failure, so it is the floor under the semantic one rather than a
--- fallback beside it.
+-- The lexical arm stays, as the floor rather than a fallback. A vector is worse
+-- than trigram where the thing asked for IS the string — a date, a ticker,
+-- R-08 — and a row with no embedding never appears in a nearest-neighbour
+-- query at all, silently.
 --
 -- Run once, in the SQL editor. Safe to re-run.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -30,50 +18,34 @@
 create extension if not exists vector;
 
 -- ─── One column per searchable table ───────────────────────────────────────
--- 1536 IS A COPY. It is stated here and again as EMBED_DIMS in doji-eugenia,
--- because the request has to ask the vendor for this width and the column has
--- to accept it — a disagreement is a 400 on every write, so `agree.test.mjs`
--- reads both. It is text-embedding-3-small's native width; the model is pinned
--- in the function file rather than read from the environment, for the reason
--- stated there.
+-- 1536 is a copy of EMBED_DIMS in doji-eugenia: the request asks the vendor for
+-- this width and the column must accept it. agree.test.mjs reads both.
 --
--- NULL IS A REAL AND EXPECTED STATE. Every row written before this ran has one,
--- and so does any row whose embedding call failed — the write path stores the
--- turn either way, because losing what she said to save a vector would be the
--- wrong trade by a wide margin. `?embed=1` fills them in and `verify.sql`
+-- Null is expected: on every older row, and on any whose embedding call failed,
+-- since the write stores the turn either way. ?embed=1 fills them; verify.sql
 -- counts what is left.
 alter table public.eugenia_notes add column if not exists embedding vector(1536);
 alter table public.eugenia_turns add column if not exists embedding vector(1536);
 
--- HNSW rather than IVFFlat: it needs no training pass over existing rows, which
--- matters on a table that starts empty of vectors and fills in over days.
--- Cosine, matching the `<=>` the query below uses — an index built for one
--- operator does not serve another, and the query would fall back to a full scan
--- with nothing saying so.
+-- HNSW needs no training pass over rows that fill in over days. Cosine, to
+-- match the query's `<=>`: an index for another operator falls back to a full
+-- scan silently.
 create index if not exists eugenia_notes_embedding
   on public.eugenia_notes using hnsw (embedding vector_cosine_ops);
 create index if not exists eugenia_turns_embedding
   on public.eugenia_turns using hnsw (embedding vector_cosine_ops);
 
 -- ─── The search itself ─────────────────────────────────────────────────────
--- DROPPED AND RECREATED, WHICH THIS REPOSITORY OTHERWISE AVOIDS. 005 replaces
--- this function in place precisely so its grants survive. That is not available
--- here: the query vector is a new argument, `create or replace function` cannot
--- change an argument list, and creating `(text, int, text)` beside `(text, int)`
--- makes an OVERLOAD rather than a replacement. Two things then go wrong at once
--- — a two-argument call matches both and Postgres refuses it as ambiguous, and
--- the new function carries `execute` to PUBLIC by default, which `anon`
--- inherits: a public entry point to her memory with only RLS behind it.
---
--- So the drop is deliberate and the revoke and grant below are part of the
--- statement, not a follow-up. Re-running this file re-applies all three.
+-- Dropped and recreated, which nothing else here does. The query vector is a new
+-- argument, `create or replace` cannot change an argument list, and creating
+-- beside the old signature makes an overload: a two-argument call becomes
+-- ambiguous, and the new function carries EXECUTE to PUBLIC. So the revoke and
+-- grant below are part of this statement, and re-running reapplies all three.
 drop function if exists public.eugenia_search(text, int);
 drop function if exists public.eugenia_search(text, int, text);
 
--- `qv` IS TEXT AND CAST INSIDE, not declared as a vector. PostgREST sends the
--- body as JSON, and pgvector's input is a text representation — `[0.1,0.2,…]`
--- — so text is the shape that crosses that boundary intact rather than the one
--- that depends on a cast from json existing.
+-- `qv` is text and cast inside: PostgREST sends JSON, and pgvector's input is
+-- its text form, so text crosses that boundary without relying on a json cast.
 create function public.eugenia_search(q text, lim int default 12, qv text default null)
 returns table (source text, id bigint, at timestamptz, retired boolean, body text)
 language sql
@@ -84,11 +56,9 @@ as $$
            case when qv is null or qv = '' then null else qv::vector(1536) end as vec
   ),
 
-  /* THE LEXICAL ARM — unchanged from what it was, deliberately. Its internal
-     order is still `lexical desc` before the score, so a true full-text match
-     still beats a trigram-only one; with no query vector the fusion below runs
-     over this arm alone and reproduces exactly today's ordering. That is what
-     makes this whole file a no-op until an embedding key exists. */
+  /* The lexical arm. A full-text match outranks a trigram-only one, and with
+     no query vector the fusion runs over this arm alone and keeps its order —
+     so this file changes nothing until an embedding key exists. */
   lex as (
     select 'note' as src, n.id, n.created_at as at,
            n.superseded_by is not null as retired, n.note as body,
@@ -109,18 +79,13 @@ as $$
         or q <% t.content
   ),
 
-  /* THE SEMANTIC ARM — one nearest-neighbour scan per table, which is what the
-     HNSW index serves. `order by … limit` rather than a distance threshold: a
-     threshold is a number nobody can choose honestly across every phrasing, and
-     it is the shape that returns nothing on the day it matters. Ranking is what
-     the fusion below wants anyway, so the distances are never compared against
-     anything but each other.
+  /* The semantic arm: one nearest-neighbour scan per table, which the HNSW
+     index serves. A limit rather than a distance threshold, which nobody can
+     choose honestly across phrasings; the fusion wants ranks anyway.
 
-     BOTH NULL CHECKS ARE LOAD-BEARING AND NEITHER IS PADDING. A row with no
-     embedding must not be ordered by a distance it does not have. And with no
-     query vector every distance is null, `order by null` returns whatever the
-     scan reaches first, and the LIMIT would then feed arbitrary rows into the
-     fusion — a search that got quietly worse the moment the key was unset. */
+     Both null checks are needed. A row with no embedding has no distance to
+     order by, and with no query vector every distance is null, so the limit
+     would feed arbitrary rows into the fusion. */
   sem_notes as (
     select 'note' as src, n.id, n.created_at as at,
            n.superseded_by is not null as retired, n.note as body,
@@ -140,21 +105,13 @@ as $$
      limit greatest(1, least(coalesce(lim, 25), 25))
   ),
 
-  /* RECIPROCAL RANK FUSION, not a weighted sum of the two scores. ts_rank and
-     cosine distance are on unrelated scales — one is a small positive number
-     whose size depends on document length, the other is bounded — so any
-     weighting of them is a constant somebody guessed, and it would need
-     re-guessing the day either arm changed. RRF compares only POSITIONS, so it
-     needs no calibration and cannot be thrown off by a scale.
+  /* Reciprocal rank fusion. ts_rank and cosine distance are on unrelated
+     scales, so any weighted sum is a guessed constant; ranks need none. 60 is
+     the published constant, untuned: it flattens the top few positions, so a
+     row both arms found outweighs one that is first in either.
 
-     60 is the constant from the paper this comes from and is not tuned here; it
-     flattens the difference between the first few positions, so a row found by
-     BOTH arms outweighs one that is merely first in either.
-
-     EACH ARM IS RANKED WHERE IT IS BUILT. A CTE's own `order by` is not carried
-     out of it — selecting from sem_notes without ordering by the distance again
-     would number the rows in whatever order the scan produced, which is the
-     ranking silently replaced by an arbitrary one. */
+     Each arm is ranked here, again: a CTE's `order by` is not carried out of
+     it, and numbering without it would rank in scan order. */
   ranked as (
     select src, id, at, retired, body,
            row_number() over (order by exact desc, score desc, at desc) as pos
@@ -176,22 +133,11 @@ as $$
 $$;
 
 -- ─── And who may call it ───────────────────────────────────────────────────
--- THREE LINES, AND THE FIRST TWO ARE NOT THE SAME LINE TWICE. `public` here is
--- the PUBLIC pseudo-role, which every function carries EXECUTE for by default.
--- `anon` and `authenticated` are granted it SEPARATELY and explicitly, by the
--- default privileges Supabase sets on the `public` SCHEMA — two different
--- things spelled the same way, which is why revoking from one leaves the other
--- untouched and reports nothing.
---
--- This was the state of `eugenia_search` from the day 003 created it, because
--- 003 revokes from PUBLIC and stops there and nothing ever asked the database
--- the question. It was not a leak: the function is not `security definer`, so
--- an anon caller executes it as anon and meets RLS on two tables that have no
--- policy for it. It was the stated guarantee being false, and one mistaken
--- policy away from being the other thing. `verify.sql` asks it now, of every
--- callable function in the schema rather than of this one.
---
--- Not a follow-up to the create above: the drop took the old grants with it.
+-- The first two revokes are not one line twice. `public` is the PUBLIC
+-- pseudo-role; anon and authenticated hold EXECUTE separately, from the
+-- default privileges Supabase sets on the public schema, so revoking from
+-- PUBLIC alone leaves them able to call it. verify.sql asks this of every
+-- callable function.
 revoke all on function public.eugenia_search(text, int, text) from public;
 revoke all on function public.eugenia_search(text, int, text) from anon, authenticated;
 grant execute on function public.eugenia_search(text, int, text) to service_role;

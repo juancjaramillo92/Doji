@@ -1,45 +1,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // THE JOURNAL SUMMARISED — the app's own arithmetic, where she can reach it
 // ───────────────────────────────────────────────────────────────────────────
-// `index.html` computes a win rate, a money split, a realised reward-to-risk
-// and a session breakdown, and she could see none of it. What she had was up to
-// four hundred rows of JSON and a prompt telling her the rules to apply to them
-// by hand — which is the same arrangement `adherence.ts` was written to end,
-// for the same reason: that is the one thing a model is worst at, and a rate
-// computed the wrong way looks exactly like one computed the right way.
+// The win rate, money split, realised reward-to-risk and breakdowns index.html
+// computes, so get_stats answers without her applying the rules by hand over
+// four hundred rows — the thing a model is worst at, and a rate computed wrong
+// looks exactly like one computed right.
 //
-// The prompt already carries every definition below. That is the tell. A rule
-// stated to a model and applied by it on every question is a rule that will be
-// applied differently on some of them.
+// Pure, and a copy of the app's definitions that agree.test.mjs holds to it.
+// The three places the app is deliberately subtle:
 //
-// PURE, AND A COPY THAT A TEST HOLDS. These are the app's definitions, in a
-// second runtime, with no build step between them — so `agree.test.mjs` reads
-// both and fails when they part. That is the price of four runtimes; the copy
-// nothing compares is the defect, not the copy.
-//
-// THE THREE PLACES THE APP IS DELIBERATELY SUBTLE, all of which she got wrong
-// by hand and all of which are load-bearing here:
-//
-//   · A scratch is measured in PRICE, not dollars — ±$3 of the ENTRY PRICE at
-//     any lot size. Read against P&L the band would mean something different
-//     every time size changed. Rows with no prices fall back to P&L, which is
-//     the only measure they have.
-//   · `money` splits on the SIGN of each P&L and `averages` splits on the
-//     RESULT LABEL, and that difference is the point: it keeps gross − loss
-//     exactly equal to net, while a scratch bucketed with the winners would
-//     halve an average win.
-//   · A break-even is in the win rate's DENOMINATOR. Scratches drag it down
-//     rather than vanishing, and a rate that quietly drops them is higher than
-//     the truth on exactly the trader who scratches a lot.
+//   · A scratch is measured in PRICE — ±$3 of the entry at any size — or the
+//     band would shift with every lot size. Rows without prices fall back to
+//     P&L, the only measure they have.
+//   · `money` splits on the SIGN, keeping gross − loss equal to net; `averages`
+//     splits on the RESULT LABEL, or a scratch would halve an average win.
+//   · A break-even is in the win rate's denominator; dropping scratches
+//     flatters exactly the trader who scratches a lot.
 // ═══════════════════════════════════════════════════════════════════════════
 import type { TradeRow } from "./adherence.ts";
 
 /* ±$3 of the entry PRICE, one fill. `CONFIG.BE` in the app. */
 export const BE = 3;
 
-/* Each centre against its OWN local clock, so London's boundary moves with
-   London's daylight saving rather than New York's — which is why this is four
-   time zones rather than four offsets. `Dates.MARKETS` in the app. */
+/* Each centre on its own local clock, so London's boundary moves with London's
+   daylight saving — four time zones, not four offsets. `Dates.MARKETS` in the
+   app. */
 export const MARKETS = {
   sydney: { tz: 'Australia/Sydney',  open: 7,  close: 16 },
   tokyo:  { tz: 'Asia/Tokyo',        open: 9,  close: 18 },
@@ -47,20 +32,14 @@ export const MARKETS = {
   ny:     { tz: 'America/New_York',  open: 8,  close: 17 },
 } as const;
 
-// The overlaps are the more specific case and are tested first; the dead
-// stretch between the New York close and the Sydney open folds into Asian, the
-// session it precedes. `CONFIG.SESSIONS` in the app, in the same order.
+// Overlaps first, as the more specific case; the gap between the New York close
+// and the Sydney open folds into Asian. `CONFIG.SESSIONS`, in the same order.
 export const SESSIONS =
   ['Asian', 'Asia+London', 'London', 'London+NY', 'New York'] as const;
 
-// hourCycle rather than hour12, for the reason every other clock in this repo
-// states it: hour12:false leaves the cycle to the locale and can resolve to
-// h24, and an hour of 24 fails every `h >= open` it meets.
-/* HELD, not rebuilt. Constructing an Intl.DateTimeFormat is the expensive part
-   of using one; formatting with it is cheap and it carries no state between
-   calls. `sessionAt` asks for up to four hours per trade, so a formatter per
-   call is thousands of constructions per `get_stats` — the same defect the app
-   carried, fixed the same way. */
+// h23, or an hour of 24 fails every `h >= open`. Held per zone rather than
+// built per call: construction is the expensive part, and sessionAt asks up to
+// four hours per trade.
 const HOUR_FMT: Record<string, Intl.DateTimeFormat> = {};
 
 const hourIn = (tz: string, at: Date): number => +(HOUR_FMT[tz] ??=
@@ -84,8 +63,7 @@ export function sessionAt(at: Date): string {
   return 'Asian';
 }
 
-// Off the entry, falling back to the fill — an email-only row the poller never
-// reached has no entry_time and its fill is the only instant it carries.
+// Off the entry, else the fill: an email-only row has no entry_time.
 export const sessionOf = (t: TradeRow): string | null =>
   t.entry_time ? sessionAt(new Date(t.entry_time))
   : t.fill_time ? sessionAt(new Date(t.fill_time))
@@ -93,17 +71,13 @@ export const sessionOf = (t: TradeRow): string | null =>
 
 export type Result = 'win' | 'loss' | 'be';
 
-/* A trade with no P&L is UNDECIDED and belongs to neither side. It is not a
-   loss, and counting it as one is the shape of error that makes a bad month
-   look worse than it was. */
+/* No P&L is undecided, never a loss. */
 export function resultOf(t: TradeRow): Result | null {
   if (t.pnl == null) return null;
   const scratch = t.entry_price != null && t.exit_price != null
     ? Math.abs(t.exit_price - t.entry_price) <= BE
     : Math.abs(t.pnl) <= BE;
-  // Exactly nothing made is a break-even whatever the price did — the one case
-  // the price band cannot reach, and the value that needs no scaling. The app
-  // says the same, in the same shape.
+  // Exactly zero is a break-even whatever the price did, as in the app.
   return scratch || t.pnl === 0 ? 'be' : t.pnl > 0 ? 'win' : 'loss';
 }
 
@@ -111,8 +85,8 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 
 export interface Counts { win: number; loss: number; be: number; decided: number; wr: number | null }
 
-// Over DECIDED trades, with break-evens in the denominator. `wr` is null rather
-// than zero on an empty population: nothing decided is not a win rate of none.
+// Over decided trades, break-evens included. Null on an empty population:
+// nothing decided is not a win rate of none.
 export function counts(rows: TradeRow[]): Counts {
   const out = { win: 0, loss: 0, be: 0, decided: 0, wr: null as number | null };
   for (const t of rows) {
@@ -126,7 +100,7 @@ export function counts(rows: TradeRow[]): Counts {
 
 export interface Money { n: number; gross: number; loss: number; net: number }
 
-// On the SIGN, which is what makes gross − loss come out exactly equal to net.
+// On the sign, so gross − loss is exactly net.
 export function money(rows: TradeRow[]): Money {
   let gross = 0, loss = 0, n = 0;
   for (const t of rows) {
@@ -139,7 +113,7 @@ export function money(rows: TradeRow[]): Money {
 
 export interface Averages { avgWin: number | null; avgLoss: number | null }
 
-// On the RESULT LABEL, which is the one place this must differ from money().
+// On the result label — the one place this must differ from money().
 export function averages(rows: TradeRow[]): Averages {
   let winSum = 0, winN = 0, lossSum = 0, lossN = 0;
   for (const t of rows) {
@@ -153,26 +127,20 @@ export function averages(rows: TradeRow[]): Averages {
   };
 }
 
-/* REALISED, NEVER PLANNED, and the distinction is the whole of what she may say
-   about it: average win over average loss, out of trades that closed. The
-   planned ratio is R-08 step 4 and is a number HE runs — the plan is on a row
-   only as first seen, and only on the trades since 006, so it is not computed
-   here. Null where there is no
-   loss to divide by, because a ratio against nothing is not infinity, it is
-   unanswerable. */
+/* Realised, never planned: average win over average loss. The planned ratio is
+   R-08 step 4, readable only off rows carrying the plan as first seen, and not
+   computed here. Null with no loss to divide by. */
 export const realisedRR = (a: Averages): number | null =>
   a.avgWin !== null && a.avgLoss ? round2(a.avgWin / a.avgLoss) : null;
 
-// Setup and all three discipline answers. P&L is deliberately not required —
-// a position can be journalled before it closes.
+// Setup and all three answers; P&L is not required, since a position can be
+// journalled while open.
 export const isJournalled = (t: TradeRow): boolean =>
   !!t.setup && t.followed_rules != null && t.followed_sl != null && t.followed_tp != null;
 
 export interface Slice { key: string; n: number; counts: Counts; money: Money }
 
-// Bucketed in ONE pass over the rows, so a slice is O(trades) rather than a
-// scan per key — the same reason the app indexes once rather than filtering
-// inside a loop.
+// One pass over the rows, not a scan per key.
 function sliceBy(rows: TradeRow[], key: (t: TradeRow) => string | null): Slice[] {
   const buckets = new Map<string, TradeRow[]>();
   for (const t of rows) {
@@ -185,18 +153,11 @@ function sliceBy(rows: TradeRow[], key: (t: TradeRow) => string | null): Slice[]
     ({ key: k, n: list.length, counts: counts(list), money: money(list) }));
 }
 
-/* HOW MANY OF THOSE DOLLARS ARE SETTLED, which a single net figure cannot say.
-   §8 withholds `computed_pnl` by name and serves `net_pnl` beside `pnl` for
-   exactly this: `pnl` is `coalesce(net_pnl, computed_pnl)`, so a row where
-   `net_pnl` is null is the FOLDED figure and carries no swap. Reading the rows
-   she can see that; a total cannot, and this tool exists to be preferred over
-   reading the rows — so aggregating without it takes away the one signal §8
-   built in.
-
-   Small in practice and not nothing: swap accrues only across the 17:00 roll,
-   so an intraday close is exact and a multi-session hold closed by hand is
-   short by a night's carry. Counted rather than corrected, because the figure
-   itself is unreachable from here — the email is its only source. */
+/* How many dollars are settled, which a net figure cannot say. `pnl` is
+   coalesce(net_pnl, computed_pnl), and a row without net_pnl is the folded
+   figure, with no swap. The rows show that; a total does not, and this tool is
+   preferred over the rows — so it counts them. Only a hold across the 17:00
+   roll is short, by a night's carry. */
 export interface Stats {
   n: number;
   journalled: number;
@@ -204,12 +165,11 @@ export interface Stats {
   money: Money;
   averages: Averages;
   rr: number | null;
-  // Of the rows carrying a P&L, how many are the broker's settled figure and
-  // how many fell back to the fold.
+  // Of the rows with a P&L: the broker's settled figure, or the fold.
   settled: number;
   fellBack: number;
-  // And of the rows the session breakdown is taken over, how many got their
-  // session from the CLOSING fill because the poller never reached them.
+  // Rows whose session comes from the closing fill, the poller never having
+  // reached them.
   seam: number;
   bySession: Slice[];
   bySetup: Slice[];
@@ -228,13 +188,8 @@ export function journalStats(rows: TradeRow[]): Stats {
     settled: priced.filter(t => t.net_pnl != null).length,
     fellBack: priced.filter(t => t.net_pnl == null).length,
     seam: rows.filter(t => t.entry_time == null && t.fill_time != null).length,
-    // Ordered by the app's own list rather than by whatever the rows produced,
-    // so a session with no trades is absent and the rest read in the order he
-    // sees them on screen.
-    // ONE call, ordered afterwards. `sliceBy` buckets in a single pass for the
-    // reason its own comment gives, and calling it inside the map defeated
-    // exactly that — five passes over every row, four fifths of each thrown
-    // away, with the helper doing the right thing throughout.
+    // One slice pass, ordered by the app's list, so the sessions read as he
+    // sees them and an empty one is absent.
     bySession: (bySession => SESSIONS
       .map(s => bySession.find(x => x.key === s))
       .filter((x): x is Slice => !!x))(sliceBy(rows, sessionOf)),
@@ -245,10 +200,9 @@ export function journalStats(rows: TradeRow[]): Stats {
 const pct = (v: number | null) => v === null ? '—' : `${v}%`;
 const usd = (v: number | null) => v === null ? '—' : `$${v.toFixed(2)}`;
 
-/* Rendered here rather than by the caller, for the reason adherenceList and
-   searchList are: what she is told is a decision, and a decision a test can
-   read. Every figure carries the population it was taken over, because a rate
-   without its denominator is the thing §8 warns about arriving as a number. */
+/* Rendered here, so what she is told is a decision a test can read. Every
+   figure carries its population: a rate without its denominator is what §8
+   warns about. */
 export function statsList(s: Stats, days: number): string {
   if (!s.n) return `No trades in the last ${days} days.`;
   const c = s.counts;
@@ -263,8 +217,7 @@ export function statsList(s: Stats, days: number): string {
       `over ${c.decided} decided. Break-evens are IN that denominator.`,
     `· gross ${usd(s.money.gross)}, losses ${usd(s.money.loss)}, net ${usd(s.money.net)}, ` +
       `over ${s.money.n} rows carrying a P&L`,
-    // Only where there is one. A line saying nothing fell back is noise on
-    // every ordinary window, and the tool description carries the meaning.
+    // Only where there is one; the tool description carries the meaning.
     s.fellBack
       ? `· ${s.settled} of those are the broker's settled figure and ${s.fellBack} ` +
         `fell back to the folded one, which carries no swap — so the net above is ` +
@@ -273,11 +226,8 @@ export function statsList(s: Stats, days: number): string {
       : '',
     `· average win ${usd(s.averages.avgWin)}, average loss ${usd(s.averages.avgLoss)}, ` +
       `realised reward-to-risk ${s.rr === null ? '—' : `1:${s.rr}`} — realised, not planned`,
-    // THE SESSION SEAM, on the same terms as the P&L fallback above and for the
-    // same reason: the breakdown below is the one read that spans it. A row the
-    // poller never reached has no entry_time, so its session comes from when it
-    // CLOSED rather than from when it opened — which can be a different session
-    // entirely on anything held across one. Only where there is one.
+    // The session seam, on the same terms: a row without entry_time takes its
+    // session from the close, which can differ on anything held across one.
     s.seam && s.bySession.length
       ? `· ${s.seam} of these have no entry_time, so their session below is taken ` +
         `from the closing fill rather than the entry. Say so before reading a ` +

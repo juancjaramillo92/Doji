@@ -1,24 +1,16 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — 016: the TradingView sign-in
 -- ───────────────────────────────────────────────────────────────────────────
--- One row, written by doji-tradingview and read by nothing else. It holds what
--- an OAuth sign-in leaves behind — the client the server registered, where to
--- refresh, the tokens — and, between ?connect=1 and the browser coming back,
--- the state and PKCE verifier that prove the callback belongs to that connect.
+-- One row, written and read by doji-tradingview alone: the OAuth client, the
+-- tokens, and between ?connect=1 and the callback the state and PKCE verifier.
+-- A table rather than an Edge secret because the refresh token may rotate on
+-- every use and a function cannot rewrite its own secrets.
 --
--- A TABLE RATHER THAN AN EDGE SECRET because TradingView may rotate the refresh
--- token on every use and a function cannot rewrite its own secrets: kept there,
--- the sign-in would survive exactly one refresh.
+-- No policy, for 008's reason. Never in the memory backup: a live refresh token
+-- in a workflow artefact is the account.
 --
--- No user_id and no policy, for sync_health's reason: only the function, holding
--- the secret key, ever touches it, and RLS with nothing behind it denies the
--- publishable key outright. It is NOT in the memory backup and must not be — a
--- live refresh token in a workflow artefact is the account, not a memory.
---
--- Safe to re-run: `if not exists`, and revokes that are no-ops when nothing is
--- held.
+-- Safe to re-run.
 -- ═══════════════════════════════════════════════════════════════════════════
-
 create table if not exists public.tradingview_auth (
   id                text primary key default 'current' check (id = 'current'),
   client_id         text,
@@ -33,7 +25,6 @@ create table if not exists public.tradingview_auth (
 
 alter table public.tradingview_auth enable row level security;
 
--- Both public roles by name, for 007's reason: they hold table privileges from
--- the schema's default grants, and RLS is the second wall rather than the only
--- one for a row that holds a credential.
+-- Both public roles by name, for 007's reason: a row holding a credential
+-- gets two walls, not RLS alone.
 revoke all on public.tradingview_auth from anon, authenticated;

@@ -1,34 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — the email parser
    ───────────────────────────────────────────────────────────────────────────
-   net_pnl is the only settled P&L in the system. computed_pnl is arithmetic
-   over the deals and swap appears in none of them, so a position carried
-   through the 17:00 New York rollover is only ever correct from the email —
-   and if this parser mis-reads a label the fill returns null, the thread is
-   labelled failed, it leaves the queue, and the trade keeps the computed figure
-   forever with nothing anywhere reporting it. That is the case these cover.
+   net_pnl is the only settled P&L in the system: swap appears in no deal, so a
+   position carried through the 17:00 New York rollover is only ever correct
+   from the email. A mis-read label returns null, the thread is labelled
+   failed, and the trade keeps the computed figure forever with nothing
+   reporting it.
 
-   THE ANCHOR IS A REAL MESSAGE. `fixtures/ctrader-stop-loss-filled.html` is the
-   body of an actual Pepperstone alert, decoded from quoted-printable exactly as
-   GmailApp hands it over, for a fill that is in the database — PID577885869,
-   SELL, -108.40, balance 385.73. Every field the parser claims is checked
-   against what the broker actually sent, not against a shape anyone guessed at.
+   THE ANCHOR IS A REAL MESSAGE. `fixtures/ctrader-stop-loss-filled.html` is an
+   actual Pepperstone alert, decoded from quoted-printable as GmailApp hands it
+   over, for a fill that is in the database — PID577885869, SELL, -108.40,
+   balance 385.73. Money arrives as `USD -108.40` and the time as
+   `19/08/2026 20:22:55 (UTC)`, and only a real body can say so.
 
-   That mattered. The fixture this replaced was written to the alert's shape and
-   got two things wrong that no assertion could have caught: money arrives as
-   `USD -108.40`, with a currency prefix, and the fill time as
-   `19/08/2026 20:22:55 (UTC)`, with the zone in brackets. Both parse correctly —
-   but nothing was testing that they did.
-
-   WHAT IS STILL SYNTHETIC, and it is unavoidable: the variants. A buy, a
-   thousands separator, a missing P&L, an unreadable time — none of those exist
-   as saved messages, so `alert()` builds them in the real message's shape. The
-   last test in the first section holds that builder against the real body, so a
-   variant cannot quietly stop resembling what cTrader sends.
-
-   The rest of the script is out of reach: GmailApp needs a mailbox. What is
-   reachable is the labelling, and the labelling is where a transient failure
-   used to be recorded as permanent.
+   The variants — a buy, a thousands separator, a missing P&L, an unreadable
+   time — exist as no saved message, so `alert()` builds them in the real
+   message's shape, and one test holds that builder against the real body.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,10 +28,9 @@ const SUBJECT = '[cTrader live account] Stop loss filled for XAUUSD';
 
 const ALERT = readFileSync(new URL('./fixtures/ctrader-stop-loss-filled.html', import.meta.url), 'utf8');
 
-/* A variant, in the real message's shape. Label and value sit in SEPARATE <p>
-   elements, which is what the tag-stripping in parseAlert_ exists for — a
-   fixture that ran them together on one line would not exercise it. The USD
-   prefix and the bracketed zone are cTrader's, not decoration. */
+/* Label and value sit in SEPARATE <p> elements, which is what the
+   tag-stripping in parseAlert_ exists for. The USD prefix and the bracketed
+   zone are cTrader's. */
 const field = (label, value) =>
   `<p style="font-size: 13px;">\n                ${label}            </p>\n` +
   `            <p style="font-size: 16px; font-weight: 600;">\n                ${value}\n            </p>\n` +
@@ -66,10 +52,9 @@ const alert = (f = {}) => `
   </td></tr></table>
 </body></html>`;
 
-// Spread on the way out: the fill is built inside the vm context, so it carries
-// that realm's Object.prototype and a strict deep-equal compares prototypes as
-// well as contents. null is preserved — it is the parser's refusal, and turning
-// it into an empty object would make every refusal test assert on the default.
+// Spread on the way out: the fill carries the vm realm's Object.prototype, and
+// a strict deep-equal compares prototypes. null is kept — it is the parser's
+// refusal.
 const parse = (body = ALERT, subject = SUBJECT) => {
   const fill = boot().parseAlert_(subject, body);
   return fill && { ...fill };
@@ -78,9 +63,8 @@ const parse = (body = ALERT, subject = SUBJECT) => {
 /* ─── The fill ───────────────────────────────────────────────────────────── */
 
 test('the real alert parses to the five columns the email owns, and no others', () => {
-  // These five values are the row in the database: PID577885869. If this
-  // assertion and that row ever disagree, one of them is wrong about a fill
-  // that actually happened.
+  // These five values are the row in the database: PID577885869. If they ever
+  // disagree, one of them is wrong about a fill that actually happened.
   assert.deepEqual(parse(), {
     id: 'PID577885869',
     direction: 'SELL',
@@ -91,18 +75,16 @@ test('the real alert parses to the five columns the email owns, and no others', 
 });
 
 test('the money figures survive their currency prefix', () => {
-  // `USD -108.40`, not `-108.40`. The old fixture omitted the prefix, so
-  // nothing proved the parser could see past it.
+  // `USD -108.40`, not `-108.40`.
   const { net_pnl, balance } = parse();
   assert.equal(net_pnl, -108.40);
   assert.equal(balance, 385.73);
 });
 
 test('the built variants still look like the real message', () => {
-  // The one guard on the synthetic half: parse the real body and a variant
-  // built to match it, and require the same five keys with the same types. A
-  // builder that drifts from what cTrader sends makes every variant below a
-  // test of nothing.
+  // The guard on the synthetic half: the real body and a variant built to match
+  // it must yield the same five keys with the same types, or every variant below
+  // tests nothing.
   const real = parse();
   const built = parse(alert());
   assert.deepEqual(Object.keys(built).sort(), Object.keys(real).sort());
@@ -113,27 +95,20 @@ test('the built variants still look like the real message', () => {
 });
 
 test('the fill time carries an explicit Z, because the email states UTC', () => {
-  // WITHOUT THE Z the runtime reads the string in its own timezone, and an
-  // evening fill lands on the wrong New York day — which is the bug this
-  // suffix was added for. Asserted as an instant, not as a string, so the
-  // check is about what it MEANS rather than how it is spelled.
+  // WITHOUT THE Z the runtime reads the string in its own timezone and an evening
+  // fill lands on the wrong New York day. Asserted as an instant, so the check is
+  // about what it MEANS.
   const { fill_time } = parse();
   assert.equal(fill_time.endsWith('Z'), true);
   assert.equal(Date.parse(fill_time), Date.UTC(2026, 7, 19, 20, 22, 55));
 });
 
 test('the slashed date is day first, on the dates where that is a real choice', () => {
-  /* WHAT THE REAL MESSAGE CANNOT SETTLE. Its fill time is 19/08/2026, and 19 is
-     not a month — so a parser that simply swapped the two would produce
-     2026-19-08, which is not a date, and the tests above already catch it.
-
-     What they cannot catch is a reading that is only wrong when both numbers
-     are plausible months. There the wrong one gives a REAL date in the wrong
-     month: filed silently, with the P&L and the balance all correct, and
-     nothing anywhere reporting it. Every fill from the 1st to the 12th.
-
-     05/08/2026 is the 5th of August in cTrader's format. Under month-first it
-     would be the 8th of May. */
+  /* WHAT THE REAL MESSAGE CANNOT SETTLE. Its day is 19, which is not a month, so
+     a parser that swapped the two would produce no date at all. The silent case
+     is both numbers being plausible months: a REAL date in the wrong month, every
+     fill from the 1st to the 12th. 05/08/2026 is the 5th of August in cTrader's
+     format; month-first it would be the 8th of May. */
   assert.equal(parse(alert({ fillTime: '05/08/2026 10:00:00 (UTC)' })).fill_time,
     '2026-08-05T10:00:00Z');
 });
@@ -144,8 +119,8 @@ test('an ISO fill time is accepted as well as the slashed one', () => {
 });
 
 test('direction is the position side, in either spelling', () => {
-  // The real message sends it upper case; the others are cheap insurance
-  // against cTrader changing its mind about capitalisation.
+  // The real message sends it upper case; the others guard against cTrader
+  // changing its capitalisation.
   assert.equal(parse(alert({ direction: 'SELL' })).direction, 'SELL');
   assert.equal(parse(alert({ direction: 'Sell' })).direction, 'SELL');
   assert.equal(parse(alert({ direction: 'BUY'  })).direction, 'BUY');
@@ -153,15 +128,13 @@ test('direction is the position side, in either spelling', () => {
 });
 
 test('a thousands separator does not truncate the balance', () => {
-  // This account has not crossed 1,000 yet, so the real message carries no
-  // comma and cannot cover it. Read without stripping, `USD 1,234,567.89`
-  // gives 1 — a plausible number, wrong by six orders of magnitude, silent.
+  // The real message carries no comma. Read without stripping, `USD 1,234,567.89`
+  // gives 1 — plausible, wrong by six orders of magnitude, silent.
   assert.equal(parse(alert({ balance: 'USD 1,234,567.89' })).balance, 1234567.89);
 });
 
 test('a win keeps its sign too', () => {
-  // The real message is a loss, so the positive case is the one that needs
-  // building.
+  // The real message is a loss, so the positive case is built.
   assert.equal(parse(alert({ net: 'USD 57.10' })).net_pnl, 57.10);
 });
 
@@ -187,22 +160,18 @@ test('a fill with an unreadable time is refused rather than filed under today', 
 });
 
 test('a fill with no readable P&L is refused, not written without one', () => {
-  /* THE FIGURE NOTHING ELSE CAN SUPPLY. computed_pnl is arithmetic over the
-     deals and swap appears in none of them, so a row written from this email
-     without a net_pnl keeps the computed figure forever and looks complete
-     while doing it. Refusing labels the thread and logs the subject; writing
-     what parsed loses the number with nothing reporting it.
-
-     The real body with its Net P&L value blanked — which is also what a renamed
-     label would look like to the parser. */
+  /* THE FIGURE NOTHING ELSE CAN SUPPLY. A row written without a net_pnl keeps
+     the computed figure forever and looks complete while doing it, so the parse
+     is refused and the thread labelled. The real body with its Net P&L blanked —
+     which is also what a renamed label looks like to the parser. */
   const body = ALERT.replace('USD -108.40', '');
   assert.equal(parse(body), null);
 });
 
 test('a missing balance is absent rather than zero, and does not refuse the fill', () => {
-  // Unlike the P&L, this column has a second writer: the poller's get_balance
-  // fills it `where balance is null`. So it is dropped and repaired on the next
-  // poll. Zero would be a real figure and would read as a wiped-out account.
+  // Unlike the P&L, this column has a second writer: the poller fills it `where
+  // balance is null`, so it is dropped and repaired on the next poll. Zero would
+  // read as a wiped-out account.
   const fill = parse(ALERT.replace('USD 385.73', ''));
   assert.equal(fill.balance, null);
   assert.equal(fill.net_pnl, -108.40);
@@ -210,9 +179,8 @@ test('a missing balance is absent rather than zero, and does not refuse the fill
 
 /* ─── The three outcomes ─────────────────────────────────────────────────────
    The labelling is the part that can lose data. A PERMANENT failure earns the
-   fail label and the thread leaves the queue; a TRANSIENT one must leave the
-   thread UNLABELLED so the next run retries it. Treating them the same is how a
-   momentary Supabase outage used to discard a fill's net_pnl forever.
+   fail label and the thread leaves the queue; a TRANSIENT one leaves the thread
+   UNLABELLED so the next run retries it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const run = (responses) => {
@@ -229,8 +197,8 @@ test('a written fill is labelled synced', () => {
 });
 
 test('a refused fill is permanent, so the thread leaves the queue', () => {
-  // 400 is the function saying this will never be accepted. Retrying it every
-  // minute for ninety days is the only alternative.
+  // 400 is the function saying this will never be accepted; the alternative is
+  // retrying it every minute for ninety days.
   const { labels } = run([{ code: 400, text: '{"error":"direction is not BUY or SELL"}' }]);
   assert.deepEqual(labels, ['doji-parse-failed']);
 });
@@ -278,8 +246,7 @@ test('one bad message in a thread does not discard the good one', () => {
 
 test('the first run creates the two labels rather than failing on their absence', () => {
   // A fresh Google account has neither, and getOrCreateLabel_ is what stands
-  // between that and a script that throws on its first minute. Nothing could
-  // reach that branch while the harness answered every lookup with a label.
+  // between that and a script that throws in its first minute.
   const t = thread([message(SUBJECT, ALERT)]);
   const gs = boot({ threads: [t], responses: [{ code: 200 }], existingLabels: [] });
   gs.syncPepperstone();
@@ -302,13 +269,10 @@ test('the request carries the secret on the header the function checks', () => {
 });
 
 test('no account credential is anywhere in the script', () => {
-  /* THE PASSWORD IS THE FINDING THIS KEEPS CLOSED, and the first version of
-     this test could not have caught it coming back: it asked the stub for
-     DOJI_PASSWORD, and the stub returns null for every key it does not know
-     regardless of what the script reads. It asserted the harness, not the file.
-
-     So this reads the source. A sign-in path reappearing here would put the
-     whole account back into Google's infrastructure to save one network hop. */
+  /* THE PASSWORD STAYS OUT, and this reads the SOURCE: the stub returns null for
+     every key it does not know, so asking it would assert the harness. A sign-in
+     path here would put the whole account back into Google's infrastructure to
+     save one network hop. */
   // Word-bounded, because DOJI_EMAIL is a prefix of DOJI_EMAIL_SECRET and a
   // plain substring test fails on the one credential the script is allowed.
   for (const gone of ['DOJI_PASSWORD', 'DOJI_EMAIL', 'signInWithPassword',

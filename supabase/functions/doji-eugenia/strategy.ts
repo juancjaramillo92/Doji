@@ -1,51 +1,27 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // THE STRATEGY — his rules, as they stand
 // ───────────────────────────────────────────────────────────────────────────
-// The fourth thing she remembers, and the only one she cannot write. Turns are
-// a window, notes are what she noticed, the archive is searchable — and this is
-// what he has DECIDED, which none of those can be.
+// What he has DECIDED, and the one memory she cannot write. A module rather
+// than a markdown file, because an import is what guarantees it travels with
+// the function. Markdown inside a template literal, so every backtick in it is
+// escaped.
 //
-// A TS module rather than a markdown file, for the reason prompt.ts is one: a
-// function is deployed as its own directory and an import is the one way to be
-// certain a file travels with it. It is markdown inside a template literal, so
-// EVERY BACKTICK IS ESCAPED — a new one written plainly ends the string, and the
-// failure is a build error rather than anything subtle.
+// Two exports, per the document's own retrieval contract: ALWAYS — the summary
+// and the rules table — rides on the cached system prefix, and SECTIONS is what
+// get_strategy serves. All of it on every message would be near a hundred
+// thousand characters.
 //
-// TWO EXPORTS, BECAUSE THE DOCUMENT ASKS FOR TWO. Its own retrieval contract
-// says the summary and the rules table are always in context and everything else
-// is fetched when a conversation needs it. ALWAYS rides on the cached system
-// prefix, so it is paid once rather than per turn; SECTIONS is what get_strategy
-// serves. Loading all of it instead would be close to a hundred thousand
-// characters against every message, competing with the briefing for attention.
-//
-// THE SUMMARY IS WRITTEN ONCE, IN SUMMARY, AND INTERPOLATED INTO BOTH. It used
-// to be typed out twice — in ALWAYS and again in SECTIONS["0"] — which is two
-// hand-maintained copies of the one paragraph she carries on every single turn.
-//
-// §2 AND §3 ARE NOT HIS DECISIONS. Everything else here is what he trades and how
-// he judges it. §3 is the foundation — what inflation is, what the Fed does, how
-// a bond yield works — written to TEACH, bottom-up, assuming nothing. §2 is the
-// five channels, written to be LOOKED UP on a briefing day. Both are researched
-// reference material and both say so where they start. They must use the SPOKEN
-// channel names from prompt.ts, never the database ids.
-//
-// SECTIONS 1 AND 11 DO NOT EXIST AND ARE NOT CITED. A numbering that skips reads
-// as a decision; six holes read as an unfinished document.
+// §2 and §3 are researched reference rather than his decisions, labelled where
+// they start, and use the SPOKEN channel names from prompt.ts. Sections 1 and
+// 11 do not exist and nothing cites them.
 // ═══════════════════════════════════════════════════════════════════════════
-
-/* THE ONE THING THIS FILE TAKES FROM HERS. The pitch table is an instruction to
-   HER about how to talk, so it lives in prompt.ts beside the ladder it acts on
-   and beside the cached prefix that has to carry it — and §0 interpolates the
-   same constant rather than restating it, the way ALWAYS and §0 already share
-   SUMMARY. It was written out twice here and there before, and only this copy
-   was ever reachable: §0 below its summary is get_strategy-only. */
+/* The pitch table is an instruction to HER, so it lives in prompt.ts and §0
+   interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.21";
+export const VERSION = "v1.22";
 
-/* The whole strategy said once. Interpolated into ALWAYS and into §0, so the
-   paragraph she holds on every turn and the paragraph get_strategy serves are
-   the same characters and cannot disagree. */
+/* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
 opened for. Two setups, told apart by method: **Break & Retest trades the
 continuation** through an interior level that has broken and flipped, **Support &
@@ -129,7 +105,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.20
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.21
 
 ### Summary
 
@@ -191,7 +167,7 @@ promoting too early — he follows an explanation in the moment, she marks it
 earlier read. Promotions are hers to infer; demotions are his to declare. The
 nightly pass is what moves it, because that is where the tool is and it reads the
 whole day — so the rung is right before the next briefing, which is the only
-place it is read.
+place it is read. He can also set any rung himself, at once, with \`/channel\`.
 
 ### Tolerance
 
@@ -469,8 +445,7 @@ why an inflation print driven by energy is read differently from one driven by
 services, and it is the whole reason "core" exists.
 
 **Deflation is the mirror, and central banks fear it more.** Falling prices sound
-good until you
-notice that if a thing will be cheaper next month, you wait — and everybody
+good until you notice that if a thing will be cheaper next month, you wait — and everybody
 waiting is a recession. Debts also get harder to repay, since you owe the same
 number of dollars but each one is worth more. This is why central banks target a
 small positive number rather than zero.
@@ -621,7 +596,7 @@ which owning either bond leaves you equally well off. Above it, the TIPS holder
 wins; below it, the nominal holder does.
 
 **So the breakeven is what the market expects inflation to average**, priced by
-people with money at risk rather than by a survey. It is the anchor the Fed is
+people with money at risk rather than by a survey. It is the anchor the Fed
 watches for whether expectations are holding.
 
 **One trap in reading the level.** TIPS are indexed to CPI, but the 2% target is
@@ -900,7 +875,7 @@ guards against with the sizing rung.
 **The Asian session straddles the calendar date.** It opens the previous evening,
 so the Asian session he trades on a Tuesday morning opened Monday. A Tuesday
 release has nothing to do with it. R-12 counts entries per \`open_day\` — the
-broker's day, rolling at 17:00 New York — so a 1 a.m. Asian trade and a 10 a.m.
+New York calendar date the position opened — so a 1 a.m. Asian trade and a 10 a.m.
 New York trade on the same date are **two entries on one day**, which he has
 confirmed is how he counts it too.
 
@@ -1204,8 +1179,10 @@ Step 4 is arithmetic over what steps 2 and 3 produced:
 $20 or tighter is always at least 1:1.5, so step 4 refuses nothing and needs no
 checking. It binds in exactly one place, below.
 
-**Nothing stored can see any of the four steps**, including step 4 — the plan is not
-on the row (§8). Arithmetic he runs, not arithmetic anything verifies.
+**Nothing stored can see steps 1 to 3.** Step 4 can be read only off a row
+carrying the stop and target as first seen (§8), which is the trades since that
+began; on every other row it is arithmetic he runs, not arithmetic anything
+verifies.
 
 ### The $25 target is two different things
 
@@ -1214,15 +1191,15 @@ Both permitted, not the same decision. **$30 is the target; $25 is the exception
 **As an entry choice.** The level looks hard to reach before he is in, so $25 is set
 from the start. **This is the one place step 4 binds:** $25 over a $20 stop is
 1:1.25 and fails the sequence, so a $25 entry target requires a stop of $16.67 or
-tighter. The only pairing that can enter in breach of his own rule, and no row will
-ever show it.
+tighter. The only pairing that can enter in breach of his own rule, and only a row
+carrying the plan as first seen can show it (§8).
 
 **As a management decision.** A $30 target is on and structure shows it is genuinely
 hard to reach — multiple recent highs in the way, or the level turning. Pulling it
 to $25 is permitted; step 4 already passed at entry.
 
 **So a realised 1:1.25 is legitimate as an outcome and illegitimate as a plan**, and
-no row can tell which produced it.
+only a row carrying the plan as first seen can tell which produced it.
 
 ### Entry
 
@@ -1358,8 +1335,9 @@ Wednesday's triple swap is the expensive one. Only the weekend is off the table.
 colour the answer. The three discipline answers ask whether the stop and target were
 *respected*, not whether they were moved. \`null\` is unanswered and is not "no".
 
-The plan itself is not recorded. \`planned_stop\` and \`planned_target\` were tried and
-retired at v1.8 — he journals a trade, not a plan — and §8 lists what that costs.`,
+He does not journal the plan. \`planned_stop\` and \`planned_target\` were tried and
+retired at v1.8 — he journals a trade, not a plan. The broker's stop and target, as
+the poller first saw them on the open position, are on the row instead (§8).`,
 
   "7": `## 7 · The rules, enumerated
 
@@ -1439,8 +1417,10 @@ TIGHTENS.** The predicate compares against 20 flat. Since the stop is a ceiling 
 is usually tighter (§5), a trade whose stop sat at $10 and closed $18 from entry had
 its stop widened by eight dollars, and this passes it silently.
 
-The version that would catch it compares against the trade's own planned stop, and
-that column was retired at v1.8 by decision. **Known, deliberate, one-sided.** Never
+The version that would catch it compares against the trade's own stop. That is on a
+row only as first seen, on the trades since the poller began recording it (§8), and
+even there an exit past it is a widened stop or ordinary slippage on a gap, which
+the row cannot tell apart. **Known, deliberate, one-sided.** Never
 read a clean R-02 run as stops respected — read it as no stop having gone past $20.
 
 Expect occasional false positives from the spread: a broker stop fills against bid
@@ -1656,8 +1636,8 @@ within thirty minutes of an entry is answerable now, off TradingView's calendar 
 the rest of the window is open-ended by his own description, and no row says
 whether he waited long enough before it.
 
-**Which rule broke.** \`followed_rules\` is one boolean covering R-03, R-05 through
-R-14, and R-16 and R-17. It records that something broke, not what — and on his own
+**Which rule broke.** \`followed_rules\` is one boolean covering every rule but R-01,
+R-02, R-04 and R-19. It records that something broke, not what — and on his own
 account (§9) it is mostly answering *did I wait?*
 
 **Whether an entry was an override.** A setup correctly identified as bad and taken
@@ -1998,8 +1978,8 @@ is not decided.
 required — an open position can be journalled before it closes.
 
 **Filing day.** \`open_day\` where the poller supplied one, otherwise the New York
-civil day of the closing fill. The day a trade is counted under, rolling at 17:00 New
-York — which is why an Asian-session trade taken at 1 a.m. files under that date
+civil day of the closing fill. The day a trade is counted under, rolling at midnight
+New York — which is why an Asian-session trade taken at 1 a.m. files under that date
 even though its session opened the evening before.
 
 **Session.** One of five buckets — Asian, Asia+London, London, London+NY, New York —
@@ -2077,7 +2057,8 @@ place — a $25 target set at entry, which needs a stop of $16.67 or tighter.
 
 **A realised 1:1.25 is legitimate as an outcome and illegitimate as a plan.** The rule
 working when a $30 target was shortened on a trade already open; a breach when $25 was
-set at entry over a $20 stop. Nothing on the row separates them, so it is \`unknown\`.
+set at entry over a $20 stop. On a row without the plan nothing separates them, so it
+is \`unknown\`; on one carrying \`planned_tp\` the target as first seen does (§8).
 
 In the app, realised R:R is a different number entirely: average win ÷ average loss
 over closed P&L. It cannot be read as the plan.`,
@@ -2094,7 +2075,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
-| v1.0 | [decide] | Initial document. R-01 through R-09. | — |
+| v1.22 | [decide] | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
 | v1.21 | [decide] | **R-16 reads bank holidays as well as market ones**, as its rule always said. The check had stopped at the exchanges' list, so Columbus Day and Veterans Day — the two days the banks close and the market trades — passed an entry the rule forbids. Veterans Day follows the Fed's observance: a Sunday moves to the Monday, a Saturday is not moved. **R-12 fails a second entry taken while the first was still open**, which had read as \`unknown\` because a negative gap counted as "within fifteen minutes". A sweep re-entry follows the first trade closing; one taken before it is a second position, and he trades one entry at a time. | His decisions, when the two gaps between the rules and their checks were put to him |
 | v1.20 | [decide] | **High impact is a US release TradingView rates high**, for R-14 and R-19 alike — one calendar for the briefing, the warnings and the rules, where two had been read. TradingView's ratings differ from Forex Factory's folders in places (it rates average hourly earnings and jobless claims medium, and a summit high), so a past verdict can move; a calendar marker with no release time is not a release and counts for neither rule. Its data goes back to 2003, so the weeks already traded are fetched once and R-14 stops reading them as unfetched. | His decision, to stop reading the same calendar from two services |
 | v1.19 | [decide] | **R-19 made checkable.** \`trade_stops\` records every stop and target the poller sees a position carry, one row per change, where the row keeps the first and the broker only the last; with Forex Factory's calendar saying a print was pending, R-19 moves to \`journal\`. Judged at the first USD red folder landing on a position opened in an earlier session: break-even or better passes, an untouched or wider stop fails, a moved target fails, a stop tightened short of break-even is \`unknown\` — right if the trade was losing, wrong if winning, and no row holds which. | His go-ahead, after asking which rules still had holes |
@@ -2115,6 +2096,7 @@ it stays as written, because correcting the record would falsify it.
 | v1.4 | [decide] | \`planned_stop\` and \`planned_target\` recorded at journalling time. R-03 moves from \`field\` to \`journal\`. §8 and §12 restated: intent is on the row. | Schema change |
 | v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach. R-01 gains its lower bound. The R:R floor restated as 1:1.25. | His decision |
 | v1.2 | [decide] | Tolerance settled at none. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror. | His decision |
-| v1.1 | [decide] | \`TOL\` named and R-01/R-02 given executable predicates. R-03 relabelled \`field\`. §8 records \`size_oz\` and the \`pnl\` fallback. | Review of v1.0 against the live schema |`,
+| v1.1 | [decide] | \`TOL\` named and R-01/R-02 given executable predicates. R-03 relabelled \`field\`. §8 records \`size_oz\` and the \`pnl\` fallback. | Review of v1.0 against the live schema |
+| v1.0 | [decide] | Initial document. R-01 through R-09. | — |`,
 
 };

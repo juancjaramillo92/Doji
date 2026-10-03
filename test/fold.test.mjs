@@ -1,32 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — Edge Function tests
    ───────────────────────────────────────────────────────────────────────────
-   Covers the pure exports of all four Edge Functions — doji-mcp-sync,
-   doji-email-sync, doji-gladys and doji-eugenia — and the primitives in
-   _shared they are built from. Each guards every Deno touch behind env() and
-   Deno?.serve, so importing them under plain Node runs nothing — that guard
-   exists for this file and nothing else, which is why it is exercised by the
-   mere fact that these imports work.
+   The pure exports of all five Edge Functions and the _shared primitives they
+   are built from. Each guards every Deno touch behind env() and Deno?.serve,
+   so importing them under plain Node runs nothing.
 
-   Run:  npm test
-
-   WHAT IS NOT COVERED, said plainly: mcpInit, mcpCall, upsert and writeBalance
-   all reach the network on their first line and are not exported. The transport
-   is verified in production by the fact that rows arrive; the arithmetic is
-   verified here. The same goes for both bots — sendMessage, editMessageText,
-   the PATCH and the Claude call are all network on their first line, so what is
-   tested is what they decide, not what they send. Which effort level each of
-   Eugenia's two callers asks for is therefore not covered here either; the
-   `Effort` union is what a compiler catches instead.
+   NOT COVERED: anything whose first line is the network — the MCP transport,
+   the upserts, the Telegram sends, the Claude call. What is tested is what
+   they decide, not what they send; the transport is proved by rows arriving.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// secretMatches comes from _shared, not from a function module, because there
-// is now one of it. That this import resolves is also what proves every
-// function's `../_shared/edge.ts` resolves — the same file, the same path
-// shape — which is the check standing between a bad extraction and a deploy.
+// secretMatches comes from _shared, and this import resolving proves every
+// function's `../_shared/edge.ts` resolves.
 import { secretMatches, nyClock, nyDate, marketOpen, parseSse } from '../supabase/functions/_shared/edge.ts';
 
 import {
@@ -87,18 +75,12 @@ const deal = (o) => ({
    THE ANCHOR — a real get_deals response, and a real email about one of its
    trades
    ───────────────────────────────────────────────────────────────────────────
-   `fixtures/ctrader-get-deals.txt` is the body cTrader actually returned for a
-   week of this account, captured through the poller's own ?raw=1 — SSE framing,
-   JSON-RPC envelope, double-encoded payload and all. Everything else in this
-   section runs on deals invented below, which is the belief the email fixture
-   exists to stop trusting; this is the other half of that.
-
-   AND THE TWO FIXTURES OVERLAP. Position 577885869 is in both: the poller saw
-   its deals, and `ctrader-stop-loss-filled.html` is the email Pepperstone sent
-   about the same fill. Two independent records of one trade, from two
-   different systems, neither built by anyone here — so the fold can be checked
-   against something other than its own arithmetic. That is as close to an
-   end-to-end test as a repository with no live broker can get.
+   `fixtures/ctrader-get-deals.txt` is what cTrader returned for a week of this
+   account, captured through ?raw=1 — SSE framing, JSON-RPC envelope,
+   double-encoded payload and all. Position 577885869 is in it AND in
+   `ctrader-stop-loss-filled.html`, the email Pepperstone sent about the same
+   fill: two independent records of one trade, neither built here, so the fold
+   is checked against something other than its own arithmetic.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const RAW_DEALS = readFileSync(
@@ -106,9 +88,8 @@ const RAW_DEALS = readFileSync(
 
 const REAL_DEALS = JSON.parse(parseSse(RAW_DEALS).result.content[0].text).deals;
 
-/* The poller's own source, read once: the Deal interface is the only statement
-   in this repository of what a deal IS, and both the real capture and the
-   builder below are checked against it. */
+/* The Deal interface is the only statement here of what a deal IS; the capture
+   and the builder below are both checked against it. */
 const POLLER_SRC = readFileSync(
   new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
@@ -124,20 +105,17 @@ const declaredDealFields = () => {
 };
 
 test('the real response is read through its framing, its envelope and its double encoding', () => {
-  /* Three layers, and the synthetic parseSse tests further down build only the
-     first. `data:` lines carrying a JSON-RPC envelope whose one content block
-     is a STRING that is itself a JSON document — parseSse handles the outside
-     and mcpCall parses the inside twice, which is a shape nobody would
-     invent. */
+  /* Three layers: `data:` lines carrying a JSON-RPC envelope whose one content
+     block is a STRING that is itself JSON. parseSse handles the outside and
+     mcpCall parses the inside twice — a shape nobody would invent. */
   assert.match(RAW_DEALS, /^event: message\ndata: \{/);
   assert.equal(REAL_DEALS.length, 41);
   assert.equal(JSON.parse(parseSse(RAW_DEALS).result.content[0].text).hasMore, false);
 });
 
 test('every field the poller declares is on every deal cTrader actually sent', () => {
-  // The interface is a SUBSET on purpose — the real deals also carry orderId,
-  // which nothing here reads. What matters is the other direction: a field the
-  // fold depends on that the broker does not send.
+  // The interface is a SUBSET on purpose (deals also carry orderId). What matters
+  // is a field the fold depends on that the broker does not send.
   for (const d of REAL_DEALS) {
     for (const field of declaredDealFields()) {
       assert.ok(field in d, `deal ${d.dealId} has no ${field}`);
@@ -147,17 +125,14 @@ test('every field the poller declares is on every deal cTrader actually sent', (
 
 test('commission really does arrive negative, which is why the column stores a magnitude', () => {
   // The schema's check constraint refuses a negative commission, so foldPosition
-  // takes the absolute value. That was a claim about cTrader until now.
+  // takes the absolute value — held here against what cTrader actually sends.
   assert.ok(REAL_DEALS.every(d => d.commission < 0),
     'cTrader has started reporting commission positive — foldPosition would now flip a sign');
 });
 
 test('a real trade folds to the numbers the broker emailed about the same trade', () => {
-  /* THE ONE TEST HELD AGAINST SOMETHING NOBODY IN THIS REPOSITORY WROTE — and
-     the JOIN ITSELF comes out of the email too. The position id is the email's
-     own, not a number typed here, so replacing either capture moves the whole
-     comparison rather than leaving it pointed at a trade that is no longer in
-     both. */
+  /* THE ONE TEST HELD AGAINST SOMETHING NOBODY HERE WROTE. The position id is the
+     email's own, so replacing either capture moves the comparison with it. */
   const email = readFileSync(
     new URL('./fixtures/ctrader-stop-loss-filled.html', import.meta.url), 'utf8')
     .replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
@@ -184,30 +159,23 @@ test('a real trade folds to the numbers the broker emailed about the same trade'
   // The closing price, which the email calls the fill price.
   assert.equal(folded.exit_price, Number(said(/Fill price\s+([\d.]+)/, 'fill price')));
 
-  /* THE SIZE, AND IT IS THE REASON THE COLUMN IS IN OUNCES. cTrader sends the
-     poller a volume of 400 and it divides by 100; the email prints `Oz 4.00`
-     for the same position. Two systems, two units on the wire, one number — so
-     storing anything but ounces would mean converting away from what both of
-     them actually said. */
+  /* THE SIZE, AND THE REASON THE COLUMN IS IN OUNCES. cTrader sends a volume of
+     400, the poller divides by 100, and the email prints `Oz 4.00`: two units on
+     the wire, one number. */
   assert.equal(folded.size_oz, Number(said(/Volume\s+Oz\s+([\d.]+)/, 'volume')));
 
-  /* And the settled figure. gross is (entry − exit) × oz for a short:
-     (4485.77 − 4512.80) × 4 = −108.12, which is the email's Gross P&L; less the
-     commission it is −108.40, which is the email's Net P&L. They agree to the
-     cent only because swap was zero on this trade — it opened and closed inside
-     one New York session — and a position held through 17:00 would not. */
+  /* gross for a short is (entry − exit) × oz: (4485.77 − 4512.80) × 4 = −108.12,
+     the email's Gross P&L; less commission, −108.40, its Net P&L. They agree to
+     the cent only because this trade held no swap. */
   assert.equal(folded.computed_pnl,
     Number(said(/Net P&L\s+USD\s+(-?[\d.]+)/, 'net P&L')));
   // Read off the deals, not typed: the magnitude of what both of them charged.
   assert.equal(folded.commission,
     Math.abs(mine.reduce((sum, d) => sum + d.commission, 0)) / 100);
 
-  /* THE FILL TIME, AGAINST A TIMESTAMP. The email writes it in local words and
-     the deals in milliseconds, so this is the one place the parser's reading of
-     that string is checked against a machine-readable instant for the same
-     event. It confirms the instant, NOT the day-first rule — 19 cannot be a
-     month, so this trade would parse the same either way. That rule is pinned
-     by an ambiguous date in test/parse.test.mjs and only there. */
+  /* THE FILL TIME, AGAINST A TIMESTAMP: the email's words against the deals'
+     milliseconds for one event. It confirms the instant, NOT the day-first rule —
+     19 cannot be a month. That is pinned in test/parse.test.mjs. */
   const fill = email.match(/Fill time\s+(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
   assert.ok(fill, 'the saved email no longer states its fill time');
   const [, dd, mo, yyyy, hh, mm, ss] = fill;
@@ -223,16 +191,10 @@ test('a real trade folds to the numbers the broker emailed about the same trade'
 });
 
 test('a real position held overnight is filed under the day it OPENED', () => {
-  /* THE FILING ANCHOR, ON TRADES THAT ACTUALLY CROSSED A NEW YORK MIDNIGHT.
-     The cross-check above cannot see this rule: its trade opened and closed in
-     one session, so entry and close give the same day and reading the wrong
-     deal is invisible. The capture holds two positions that did span the
-     boundary, and they are the only place in the suite where a real fill
-     settles it.
-
-     Found rather than named: a position id typed here would go stale the day
-     the fixture is replaced, and the point is that the CAPTURE contains such a
-     trade, not that one particular trade does. */
+  /* THE FILING ANCHOR, ON TRADES THAT CROSSED A NEW YORK MIDNIGHT. The trade above
+     opened and closed in one session, so reading the wrong deal is invisible
+     there. Found rather than named, so replacing the capture cannot leave this
+     pointed at a trade it no longer holds. */
   const byPosition = new Map();
   for (const d of REAL_DEALS) {
     if (!byPosition.has(d.positionId)) byPosition.set(d.positionId, []);
@@ -253,13 +215,10 @@ test('a real position held overnight is filed under the day it OPENED', () => {
   }
 });
 
-/* THE BUILDER AGAINST THE SAME INTERFACE.
-
-   Every fold test below runs on deals this file invents. The capture above is
-   what holds the interface to cTrader; this holds the builder to the interface,
-   so a field added or renamed in the source cannot leave the synthetic deals
-   behind. A field DROPPED is still not caught — fewer declared fields is fewer
-   things to check. */
+/* THE BUILDER AGAINST THE SAME INTERFACE. The capture holds the interface to
+   cTrader; this holds the invented deals below to the interface, so a field
+   added or renamed in the source cannot leave them behind. A field DROPPED is
+   not caught. */
 
 test('a built deal carries every field the poller declares it reads', () => {
   const built = deal({ side: 'SELL', price: 3400 });
@@ -319,9 +278,8 @@ test('a closed long inverts the P&L sign convention', () => {
 });
 
 test('direction comes from the first deal, not the last', () => {
-  // The deals arrive out of order on purpose: the sort inside foldPosition is
-  // what makes ordered[0] the entry, and passing them pre-sorted would test
-  // nothing.
+  // Out of order on purpose: the sort inside foldPosition is what makes
+  // ordered[0] the entry.
   const row = foldPosition([
     deal({ side: 'BUY',  price: 3371.38, min: 29, dealId: 2 }),
     deal({ side: 'SELL', price: 3400.00, min: 0 })
@@ -330,12 +288,8 @@ test('direction comes from the first deal, not the last', () => {
 });
 
 test('a sliced deal set inverts direction and leaves exit_price null', () => {
-  // NOT a bug being asserted as correct — this is the documented signature of a
-  // row folded without its entry deal, which is what the fold window exists to
-  // prevent. A repair query looks for exactly this: a position whose closing
-  // deal was inside the window while its entry had aged out. If this test ever
-  // stops failing to find the entry, the window has changed and the repair
-  // signature below is no longer the right thing to search for.
+  // The signature of a row folded without its entry deal, which the fold window
+  // exists to prevent and a repair query searches for.
   const closeOnly = foldPosition([
     deal({ side: 'BUY', price: 3371.38, min: 29, dealId: 2 })
   ], USER);
@@ -363,10 +317,9 @@ test('a partial close leaves the position open and its P&L unresolved', () => {
   assert.equal(row.exit_price, null);
   assert.equal(row.computed_pnl, null);
 
-  /* AND THE SIZE IS WHAT WAS OPENED, NOT WHAT HAS CLOSED SO FAR. The two are
-     equal on every fully closed position, so the anchor above cannot tell them
-     apart — a fold reporting closeOz passes every other test in this file and
-     would report 1.00 oz for a 2.00 oz position that is half out. */
+  /* THE SIZE IS WHAT WAS OPENED, NOT WHAT HAS CLOSED SO FAR. Equal on every
+     fully closed position, so only a half-closed one can show a fold reporting
+     1.00 oz for a 2.00 oz position. */
   assert.equal(row.size_oz, 2);
 });
 
@@ -411,12 +364,9 @@ test('the fold window is always wider than the write window', () => {
 /* ─── Balance ────────────────────────────────────────────────────────────── */
 
 // get_balance answers "what is the account worth now"; the column asks "what
-// was it worth after this fill". Those agree only while nothing has happened in
-// between, which is the whole of what balanceTarget enforces.
-//
-// The poll runs an hour past T0, so a close at minute 55 is five minutes old
-// and one at minute 45 is fifteen — the same minutes-past-T0 vocabulary the
-// deals above use.
+// was it worth after this fill". They agree only while nothing has happened in
+// between, which is what balanceTarget enforces. The poll runs an hour past
+// T0, so a close at minute 55 is five minutes old.
 const POLL  = T0 + 60 * 60_000;
 const close = (min) => ({ id: 'PID' + min, at: T0 + min * 60_000 });
 
@@ -435,16 +385,14 @@ test('two closes in one run: only the later one ended at that balance', () => {
 });
 
 test('a backfill writes no balance at all', () => {
-  // ?force=1&hours=200 folds positions that closed days ago. Every one fails
-  // the age test, so no historical balance — email-written or otherwise — is
-  // overwritten. This bound is what makes a repair safe to run.
+  // ?force=1&hours=200 folds positions closed days ago. Each fails the age test,
+  // so no historical balance is overwritten — what makes a repair safe to run.
   assert.equal(balanceTarget([close(-72 * 60), close(-24 * 60)], POLL), null);
 });
 
 test('a fully closed position ends on a deal opposite its direction', () => {
-  // The handler takes the LATEST deal's timestamp as the close time rather than
-  // re-splitting on side. That holds only because outstanding open volume keeps
-  // isClosed false, so the claim is asserted here rather than assumed there.
+  // The handler takes the LATEST deal as the close time, which holds only because
+  // outstanding open volume keeps isClosed false — asserted here.
   const deals = [
     deal({ side: 'SELL', price: 3400.00, min: 0 }),
     deal({ side: 'BUY',  price: 3371.38, min: 29, dealId: 2 })
@@ -473,10 +421,8 @@ test('a missing secret on either side is a closed door, not an open one', () => 
 });
 
 test('a NUL-padded secret does not match its unpadded self', () => {
-  // The one case the byte loop cannot catch on its own: every extra byte is
-  // zero, so `a[i] ?? 0` reads identical to it. The explicit length comparison
-  // is the only thing standing between these two, which is why it is there and
-  // why removing it as redundant would be wrong.
+  // Every extra byte is zero, so `a[i] ?? 0` reads identical to it. The explicit
+  // length comparison is the only thing separating these two.
   assert.equal(secretMatches('hunter2', 'hunter2\u0000'), false);
   assert.equal(secretMatches('hunter2\u0000', 'hunter2'), false);
 });
@@ -546,12 +492,10 @@ test('a token is fresh until a minute before it expires, and not after', () => {
 });
 
 /* A STUB THAT IS BOTH POSTGREST AND THE TOKEN ENDPOINT, and that FILTERS the
-   way PostgREST does. A stub answering every PATCH with the row is how the
-   release look's quoted filter matched nothing for a fortnight under a green
-   test, so the lease's `or=(refreshing_until.is.null,refreshing_until.lt.…)` is
-   evaluated against the row here and a PATCH it excludes answers an empty
-   array. `onRead` lets a test change the row behind a read, which is how
-   another caller's renewal is simulated without a second runtime. */
+   way PostgREST does: a stub answering every PATCH with the row hides a filter
+   that matches nothing. The lease's `or=(…)` is evaluated against the row and
+   a PATCH it excludes answers an empty array. `onRead` changes the row behind
+   a read, simulating another caller's renewal. */
 function authServer(row, issue, onRead = () => {}) {
   const presented = [];
   const fetch = async (url, init = {}) => {
@@ -590,10 +534,10 @@ async function withFetch(stub, run) {
   try { return await run(); } finally { globalThis.fetch = real; }
 }
 
-/* THE SEQUENCE, BECAUSE THE FAILURE IS IN THE SECOND STEP. A server that
-   rotates kills each refresh token the moment it answers, so what has to be
-   proved is that the NEXT refresh presents the one it was just given — and a
-   server that does not rotate sends none, which must not be stored as null. */
+/* THE SEQUENCE, BECAUSE THE FAILURE IS IN THE SECOND STEP. A rotating server
+   kills each refresh token as it answers, so the NEXT refresh must present the
+   one just given — and a server that does not rotate sends none, which must
+   not be stored as null. */
 test('two refreshes against a rotating server each present the token the last one stored', async () => {
   const server = authServer({ ...STALE }, [{ access_token: 'A2', refresh_token: 'R2', expires_in: 0 },
                                           { access_token: 'A3', expires_in: 3600 }]);
@@ -610,9 +554,8 @@ test('two refreshes against a rotating server each present the token the last on
   assert.equal(server.row().refreshing_until, null, 'the lease was not released with the token');
 });
 
-/* TWO CALLERS, ONE STALE TOKEN, ONE RENEWAL. The briefing and the release look
-   can both find the token stale in the same second; a server that rotates may
-   revoke the sign-in on seeing a refresh token twice. */
+/* TWO CALLERS, ONE STALE TOKEN, ONE RENEWAL. A rotating server may revoke the
+   sign-in on seeing a refresh token twice. */
 test('two callers finding the token stale at once renew it once and share it', async () => {
   const server = authServer({ ...STALE }, [{ access_token: 'A2', refresh_token: 'R2', expires_in: 3600 }]);
   const got = await withFetch(server.fetch, () => Promise.all([accessToken(), accessToken()]));
@@ -621,9 +564,8 @@ test('two callers finding the token stale at once renew it once and share it', a
   assert.equal(server.row().refreshing_until, null);
 });
 
-/* AND THE ROW IS READ AGAIN ONCE THE LEASE IS HELD. Here another caller renews
-   between this one's first read and its lease: the token it first read is now
-   spent, and presenting it is the double presentation again. */
+/* THE ROW IS READ AGAIN ONCE THE LEASE IS HELD: another caller renewed in
+   between, so the token first read is spent. */
 test('a caller that wins the lease after someone else renewed presents nothing', async () => {
   let server;
   server = authServer({ ...STALE }, [], () => server.set({
@@ -723,9 +665,8 @@ test('every line of the market says what its number is measured from, and comput
   assert.match(out, /· Ten-year real yield \(TIPS\) 2\.91% on 29 Sept?, from 2\.83% on 25 Sept? — a daily series, a day or more behind/);
   // A symbol TradingView would not serve is named rather than left out.
   assert.match(out, /Not read just now: VIX\./);
-  /* NO DIRECTION WORD, because none is computed: a change with its sign worked
-     out here is a figure with its window stripped, which is how an evening's
-     move was once called the day's. */
+  /* NO DIRECTION WORD, because none is computed: a sign worked out here is a
+     figure with its window stripped. */
   assert.doesNotMatch(out, /\b(up|down|rose|fell)\b/);
   assert.match(out, /hourly bars rather than live ticks/);
 });
@@ -748,9 +689,8 @@ test('a market that will not read is a sentence telling her not to reach for a s
 });
 
 /* ─── What the wires said ────────────────────────────────────────────────────
-   Four headlines from the 1 October probe, fields as served — and the Reuters
-   gold story put on the dollar's feed as well, since a story on both feeds is
-   the overlap the fold exists to remove. */
+   Four headlines from the 1 October probe, fields as served, with the Reuters
+   gold story on the dollar's feed too — the overlap the fold removes. */
 const H = (id, published, title, name) => ({ id, published, title, provider: { name }, paywall: true });
 const GOLD_NEWS = { data: { headlines: [
   H('tag:reuters.com,2026:newsml_L1N45N0PD:0', 1790869666,
@@ -793,11 +733,10 @@ test('the move look is handed the last hour of headlines and says so, and says w
     /One of the two feeds could not be read\./);
 });
 
-/* A conversation reads six hours, and six hours is a span a feed read to a
-   fixed number of headlines may not hold. Folded, the fixture's dollar feed
-   stops at 12:52 New York while its gold feed reaches 09:27, so before 12:52
-   only one feed was read — and a block that did not say so would hand her a
-   quiet dollar where there was an unread one. */
+/* Six hours is a span a feed read to a fixed number of headlines may not hold.
+   The fixture's dollar feed stops at 12:52 New York while gold's reaches 09:27,
+   and a block that did not say so would hand her a quiet dollar where there
+   was an unread one. */
 test('the conversation reads six hours of headlines, names another day, and says where a feed stops', () => {
   const headlines = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
   const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T18:00:00Z'), 6 * 60);
@@ -878,9 +817,8 @@ test('the odds are the two outcomes either side of the move priced', () => {
 });
 
 /* THE TABLE IS TRUE UNTIL THE YEAR NOBODY EXTENDS IT, so this fails half a year
-   before it runs out rather than on the morning it does — on the real clock,
-   because the clock is the thing it is about. Every decision is the second day
-   of a Tuesday–Wednesday meeting, which is what catches the first day typed. */
+   before it runs out, on the real clock. Every decision is the second day of a
+   Tuesday–Wednesday meeting, which catches the first day typed. */
 test('the table of Fed meetings reaches half a year ahead, and every date is a decision day', () => {
   const left = (Date.parse(FOMC.at(-1)) - Date.now()) / 86_400_000;
   assert.ok(left > 182, `the table of FOMC meetings ends ${FOMC.at(-1)}; add the Fed's next published year`);
@@ -894,12 +832,10 @@ test('a decision the calendar lists and the table does not refuses the odds; a g
   assert.deepEqual(unlisted(['2026-10-21']), ['2026-10-21']);
 });
 
-/* What ?rates=1 answered live on 1 October at the 18:00 bar, cut to what
-   Eugenia reads. FedWatch shows a later meeting as the chance of each range BY
-   THEN — December at 20.6/61.3/18.1 that morning — and the fold's odds for it
-   are December's own, given October: a different number for the same pricing.
-   So a later meeting is said in basis points priced, which both agree on, and a
-   chance for it beside his screen would read as a mistake. */
+/* What ?rates=1 answered on 1 October at the 18:00 bar. FedWatch shows a later
+   meeting as the chance of each range BY THEN; the fold's odds are that
+   meeting's own, given the one before — a different number for the same
+   pricing. So a later meeting is said in basis points, which both agree on. */
 const RATES = {
   meetings: [
     { date: '2026-10-28', move_bp: 6.6, total_bp: 6.6, odds: [{ bp: 0, chance: 73 }, { bp: 25, chance: 27 }] },
@@ -1050,9 +986,8 @@ test('the calendar window is whole days, at most a month, inside the data', () =
 
 /* ─── Market hours ───────────────────────────────────────────────────────── */
 
-// August 2026 is EDT (UTC-4); January 2026 is EST (UTC-5). Both are tested
-// because the whole reason this lives in code rather than in a cron expression
-// is that a UTC schedule is an hour wrong for half the year.
+// August 2026 is EDT, January EST: a UTC schedule is an hour wrong for half
+// the year, which is why this is code rather than a cron expression.
 test('the market is shut all Saturday', () => {
   assert.equal(marketOpen(new Date(Date.UTC(2026, 7, 8, 16, 0))), false);   // Sat 12:00 NY
   assert.equal(marketOpen(new Date(Date.UTC(2026, 7, 8, 4, 0))), false);    // Sat 00:00 NY
@@ -1081,9 +1016,8 @@ test('midweek is open around the clock', () => {
 });
 
 /* ─── Telegram: callback_data ────────────────────────────────────────────────
-   The grammar is the whole state store — there is no session table and no
-   stored message id — so a payload that parses wrong writes the wrong column to
-   the wrong trade, silently.
+   The grammar is the whole state store, so a payload that parses wrong writes
+   the wrong column to the wrong trade, silently.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('a tap names one journal column and its value', () => {
@@ -1107,9 +1041,7 @@ test('[Edit] and [Done] carry no column, so they write nothing', () => {
 });
 
 test('only the four journal columns are reachable from a button', () => {
-  // The one guarantee that matters: no payload can name a broker column. If
-  // this ever passes for something outside Data.OWNED, the fourth writer has
-  // stopped being confined to the journal half.
+  // The guarantee that matters: no payload can name a broker column.
   for (const field of ['direction', 'pnl', 'net_pnl', 'deleted', 'user_id', 'balance']) {
     assert.equal(parseCallback(`PID1|${field}|1`), null, field);
   }
@@ -1146,10 +1078,9 @@ function T0_ISO() { return new Date(Date.UTC(2026, 6, 30, 14, 0, 0)).toISOString
 const settled = { ...open, setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: false };
 
 test('every button fits inside Telegram\'s 64-byte callback_data cap', () => {
-  // Measured in BYTES, not characters, and over every button both forms draw —
-  // a setup value travels inside the payload, so the vocabulary sets the
-  // budget. Worst case today is 39. Asserting the cap rather than the current
-  // longest name, so a longer legal setup fails this only if it truly overruns.
+  // Measured in BYTES, over every button both forms draw — a setup travels inside
+  // the payload, so the vocabulary sets the budget. The cap is asserted, not the
+  // current longest name.
   const rows = [
     ...renderMessage(open, false).reply_markup.inline_keyboard,
     ...renderMessage(settled, false).reply_markup.inline_keyboard
@@ -1163,14 +1094,9 @@ test('every button fits inside Telegram\'s 64-byte callback_data cap', () => {
 });
 
 test('no setup name contains the delimiter its callback_data is split on', () => {
-  /* callback_data is `id|field|value`, and parseCallback refuses anything that
-     is not exactly two or three parts. A setup named "Break | Retest" would
-     therefore arrive as four and every tap on it would be dropped — silently,
-     because an unrecognised payload is acknowledged and ignored by design.
-
-     The vocabulary is the one string in this system a person edits, and nothing
-     else checks this. It is the same class as the 64-byte cap above: a legal
-     name that the grammar cannot carry. */
+  /* parseCallback refuses anything but two or three `|` parts, so a setup named
+     "Break | Retest" would arrive as four and every tap on it be dropped
+     silently. The vocabulary is the one string here a person edits. */
   for (const setup of SETUPS) {
     assert.equal(setup.includes('|'), false,
       `"${setup}" contains the callback_data delimiter and can never be tapped`);
@@ -1178,20 +1104,12 @@ test('no setup name contains the delimiter its callback_data is split on', () =>
 });
 
 test('the message heads with the New York hour and the New York day', () => {
-  /* Two instants either side of the boundary, because they fail differently.
-
-     04:05 UTC is 00:05 the same day in New York: only the HOUR moves, and it
-     moves to the one an h24 cycle would render as 24.
-
-     02:00 UTC is 22:00 the PREVIOUS day in New York: the DAY moves, which is
-     the failure that files a trade under tomorrow. The first fixture alone does
-     not cover this — its date reads 22 August in both zones, which an earlier
-     version of this comment claimed otherwise.
-
-     Driven through renderMessage rather than the private formatter, because the
-     message is what the trader reads. WHAT IT DOES NOT PROVE is the h24 half:
-     nyTime states hourCycle h23, and V8 resolves en-GB to h23 either way, so
-     reverting that option leaves this green. Reverting the timezone fails it. */
+  /* Either side of the boundary, because they fail differently. 04:05 UTC is
+     00:05 the same day in New York: only the HOUR moves, to the one an h24 cycle
+     renders as 24. 02:00 UTC is 22:00 the PREVIOUS day: the DAY moves, filing a
+     trade under tomorrow. Driven through renderMessage, which is what he reads.
+     NOT PROVED: the h24 half — V8 resolves en-GB to h23 either way, so reverting
+     hourCycle stays green. Reverting the timezone fails it. */
   assert.match(renderMessage({ ...open, entry_time: '2026-08-22T04:05:00Z' }, false).text,
     /22 Aug, 00:05 ET/);
   assert.match(renderMessage({ ...open, entry_time: '2026-08-22T02:00:00Z' }, false).text,
@@ -1217,9 +1135,8 @@ test('the fourth answer settles the message to one [Edit] row', () => {
 });
 
 test('a reopened form offers [Done], an unfinished one does not', () => {
-  // Without it there is no way back to the summary: every answer is already in,
-  // so no tap can be the fourth. A [Done] on an unfinished journal would be a
-  // button for abandoning it, so it appears only once all four are answered.
+  // Without it there is no way back to the summary. On an unfinished journal it
+  // would be a button for abandoning it, so it appears only once all four are in.
   const reopened = renderMessage(settled, true).reply_markup.inline_keyboard;
   assert.equal(reopened.length, 5);
   assert.deepEqual(reopened[4], [{ text: 'Done', callback_data: 'PID562780708|done' }]);
@@ -1239,9 +1156,7 @@ test('[Done] collapses a reopened form, [Edit] opens it again', () => {
 /* ─── Telegram: the message ──────────────────────────────────────────────── */
 
 test('an unanswered discipline column draws as unanswered, never as no', () => {
-  // The null-is-not-no rule, in the one place it is shown to a person. A
-  // message that drew a blank as ✗ would teach the trader the opposite of what
-  // the column means.
+  // Null is not no, in the one place it is shown to a person.
   const text = renderMessage({ ...open, followed_sl: false }, false).text;
   assert.match(text, /Rules: —/);
   assert.match(text, /Stop Loss: ✗/);
@@ -1268,16 +1183,13 @@ test('the open form greets, then states the fill', () => {
 });
 
 /* ─── Telegram: when the form settles ────────────────────────────────────────
-   The decision that was wrong. An earlier version read the keyboard's row count
-   off the incoming message, which is true on every tap — an open form always
-   has four rows — so the message never settled and the summary, the [Edit]
-   button and the readRow path were all unreachable. These replay the taps.
+   An open form always has four keyboard rows, so reading the row count off the
+   incoming message can never settle it. These replay the taps.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('the fourth answer settles the form, and the three before it do not', () => {
-  // The whole sequence, exactly as the webhook drives it: read before, write,
-  // then redraw with staysOpen. This is the regression test for a message that
-  // could never settle at all.
+  // The whole sequence as the webhook drives it: read before, write, then
+  // redraw with staysOpen.
   const complete = r => r.setup !== null && r.followed_rules !== null &&
                         r.followed_sl !== null && r.followed_tp !== null;
   let row = { ...open };
@@ -1297,25 +1209,17 @@ test('the fourth answer settles the form, and the three before it do not', () =>
 });
 
 /* ─── Telegram: an answer written somewhere else ─────────────────────────────
-   The app writes the same four columns, and for as long as nothing told Gladys
-   so, journalling a trade in the app left her message reading `Setup: —` for
-   the life of the trade. supabase/002_gladys.sql now fires on the update and
+   The app writes the same four columns; 002_gladys.sql fires on the update and
    sends the row with the answers AS THEY STOOD, and doji-gladys decides the
-   redraw from that before-state with answered() — the same expression
-   staysOpen() applies to a tap.
-
-   THEY HAVE TO STAY THE SAME EXPRESSION, because a tap fires both: the webhook
-   redraws, and the write it just made fires the trigger, which redraws again.
-   Two answers that differed would leave the message wherever the SECOND one
-   landed — and the second one is the trigger, so a form reopened with [Edit]
-   would shut under the correction being made in it.
+   redraw from that before-state with answered() — the expression staysOpen()
+   applies to a tap. THEY MUST STAY ONE EXPRESSION: a tap fires both redraws,
+   the trigger's lands second, and a difference would shut a form reopened with
+   [Edit] under the correction being made in it.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('a trade missing any one answer is not answered', () => {
-  /* All four, and the setup counts. answered() is the whole gate on settling —
-     a message that settled without a setup would read
-     `Logged · SELL 3400.00 · null`, and the app path would settle a trade the
-     app itself still shows as pending. */
+  /* All four, setup included: a message settling without one would read
+     `Logged · SELL 3400.00 · null`. */
   for (const missing of ['setup', 'followed_rules', 'followed_sl', 'followed_tp']) {
     assert.equal(answered({ ...settled, [missing]: null }), false, missing);
   }
@@ -1338,9 +1242,7 @@ test('the trigger and a tap decide the redraw identically, on every before-state
 });
 
 test('journalling from the app settles the message, exactly as a fourth tap does', () => {
-  /* The app writes all four columns in ONE update, so the trigger sees a
-     before-state with every answer null against a row with every answer in —
-     a sequence no tap can produce, and the one the complaint was about. */
+  /* The app writes all four in ONE update — a before-state no tap can produce. */
   const before = { setup: null, followed_rules: null, followed_sl: null, followed_tp: null };
   const drawn = renderMessage(settled, answered(before));
 
@@ -1350,10 +1252,8 @@ test('journalling from the app settles the message, exactly as a fourth tap does
 });
 
 test('correcting a settled trade from the app reopens the form, as a tap does', () => {
-  // Complete before the write, so this is a correction rather than a last
-  // answer — and a correction leaves the form open whoever made it. Deciding
-  // that from the ROW rather than from the writer is what lets the trigger a
-  // tap fires agree with the tap's own redraw.
+  // A correction leaves the form open whoever made it; deciding from the ROW
+  // rather than the writer is what makes the trigger agree with the tap.
   const corrected = { ...settled, followed_tp: true };
   const viaApp = renderMessage(corrected, answered(settled)).reply_markup.inline_keyboard;
   const viaTap = renderMessage(corrected, staysOpen(parseCallback('PID562780708|tp|1'), settled))
@@ -1364,17 +1264,10 @@ test('correcting a settled trade from the app reopens the form, as a tap does', 
 });
 
 test('the taps are taken off the buttons the form actually drew', () => {
-  /* THE SAME SEQUENCE AS ABOVE, WITH NOTHING TYPED INTO IT. The test before
-     this one writes its own callback_data, so it proves the loop settles on
-     four answers and says nothing about whether the keyboard emits payloads
-     that reach it. Those are different questions, and only this one covers the
-     join: a ✓ button drawn with any value but `1` parses to null, the tap is
-     acknowledged and dropped by design, and the bot goes silent while every
-     test that supplies its own payload stays green.
-
-     So each round renders the form, finds the button that writes the field,
-     and taps THAT — the payload, the parse and the redraw all off the real
-     thing. */
+  /* THE SAME SEQUENCE, WITH NOTHING TYPED INTO IT. The test above supplies its own
+     callback_data; this one proves the keyboard emits payloads that reach the
+     loop. A ✓ drawn with any value but `1` parses to null and the tap is dropped
+     by design, so each round renders the form, finds the button and taps THAT. */
   let row = { ...open };
 
   for (const field of ['setup', 'rules', 'sl', 'tp']) {
@@ -1401,13 +1294,9 @@ test('the taps are taken off the buttons the form actually drew', () => {
 });
 
 test('every button either form draws is a tap the parser accepts', () => {
-  /* The sequence above walks one path through the keyboard — the ✓ half of each
-     pair, and the first setup. Everything it does not press is untested by it,
-     and a ✗ drawn as `|no` instead of `|0` is refused by parseCallback exactly
-     as silently as a ✓ would be: acknowledged, dropped, no change on screen.
-
-     So this presses nothing and checks everything. Both forms, every row, every
-     button, including the [Edit] and [Done] that write no column at all. */
+  /* The walk above presses one path. A ✗ drawn as `|no` is dropped as silently,
+     so this presses nothing and checks every button on both forms, [Edit] and
+     [Done] included. */
   const forms = [
     ['the open form', renderMessage(open, false)],
     ['the settled summary', renderMessage(settled, false)],
@@ -1443,11 +1332,8 @@ test('[Edit] reopens whatever it is pressed on', () => {
 });
 
 /* ─── Eugenia: when the briefing is due ──────────────────────────────────────
-   Weekdays 08:00 and Sunday 17:00 New York. The cron job fires hourly and this
-   is the whole decision, so an off-by-one here is a briefing that never arrives
-   or one that arrives every hour. August 2026 is EDT (UTC-4), January is EST
-   (UTC-5) — both are tested, because a fixed UTC schedule is exactly what this
-   exists to avoid.
+   Weekdays 08:00 and Sunday 17:00 New York, from an hourly job — an off-by-one
+   is a briefing that never arrives or arrives every hour. EDT and EST both.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('the weekday briefing is 08:00 New York, in both halves of the year', () => {
@@ -1475,9 +1361,7 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
 });
 
 /* ─── Eugenia: the pulse ─────────────────────────────────────────────────────
-   The second scheduled look. It has to sit on a weekday hour that is NOT a
-   briefing hour, and it has to be able to stay quiet — a pulse that could never
-   go silent would message him every weekday whether or not anything happened.
+   A weekday hour that is NOT a briefing hour, and able to stay quiet.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the pulse is 10:00 New York on weekdays, in both halves of the year', () => {
@@ -1505,31 +1389,17 @@ test('a briefing hour and a pulse hour never collide', () => {
   }
 });
 
-/* ─── Eugenia: which of the three schedules this hour owes ──────────────────
-   Each predicate is right on its own and that is not the question — the three
-   overlap, and what an hour owes is the composition of them.
-
-   So this walks 168 CONSECUTIVE HOURS and states the whole timetable, rather
-   than sampling four separate UTC days: a run that restarts at 00:00 UTC each
-   day never reaches Sunday 20:00–23:59 in New York, which is 00:00–03:59 UTC on
-   the Monday, and a spurious briefing hour hiding there would ship green.
-
-   Sun 16 Aug 2026 00:00 UTC is Sat 15 Aug 20:00 in New York, so the range
-   covers every New York hour of Sunday 16th through Friday 21st, and both
-   weekend edges.
+/* ─── Eugenia: which schedule this hour owes ─────────────────────────────────
+   The predicates overlap, so what an hour owes is their composition. This walks
+   168 CONSECUTIVE HOURS: a walk restarting at 00:00 UTC never reaches Sunday
+   20:00–23:59 New York, which is Monday 00:00–03:59 UTC. Sun 16 Aug 2026 00:00
+   UTC is Sat 15 Aug 20:00 New York, so both weekend edges are covered.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* DRIVEN AS THE LOOP ACTUALLY RUNS, not called with a hand-picked flag.
-
-   dueNow now takes a second fact — whether tonight's pass has already run — and
-   asserting on it with a fixed `true` or `false` would be the exact shape of
-   test this repository has been bitten by: one that supplies the answer and so
-   cannot discover that the answer is never produced. The pass at 22:00 records
-   itself, which is what makes 23:00 a retry rather than a second pass, and only
-   a walk that carries that state forward can show it.
-
-   `passFails` is the night the recording never happens. Everything else is the
-   ordinary sequence. */
+/* DRIVEN AS THE LOOP RUNS, not called with a hand-picked flag. The pass at
+   22:00 records itself, which is what makes 23:00 a retry rather than a second
+   pass, and only a walk carrying that state forward can show it. `passFails`
+   is the night the recording never happens. */
 const timetable = (briefed, passFails = false) => {
   const owed = [];
   const done = new Set();
@@ -1544,10 +1414,8 @@ const timetable = (briefed, passFails = false) => {
 };
 
 test('an ordinary week owes one briefing and one pulse a day, and nothing else', () => {
-  // August, so New York is EDT: 08:00 ET is 12:00 UTC, 10:00 ET is 14:00, and
-  // the Sunday open at 17:00 ET is 21:00.
-  // And 22:00 ET is 02:00 UTC the NEXT day, so each night's consolidation sorts
-  // ahead of the morning it precedes rather than after the day it is about.
+  // August, so EDT: 08:00 ET is 12:00 UTC, 10:00 is 14:00, Sunday's 17:00 is
+  // 21:00, and 22:00 ET is 02:00 UTC the NEXT day.
   assert.deepEqual(timetable(true), [
     '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
     '2026-08-17T02:00 consolidate', '2026-08-17T12:00 weekday', '2026-08-17T14:00 pulse',
@@ -1560,21 +1428,15 @@ test('an ordinary week owes one briefing and one pulse a day, and nothing else',
 });
 
 test('a week of failed briefings owes the retry hours, and the pulse gives way', () => {
-  // 09:00, 10:00 and 11:00 ET are 13:00, 14:00 and 15:00 UTC. 14:00 is the one
-  // hour the pulse also wants, and the retry takes it: a second look at a
-  // morning he was never told about is not what is missing.
-  // Consolidation is untouched by any of it: it is not a briefing, so a briefing
-  // that failed neither delays nor replaces it.
+  // 09:00–11:00 ET are 13:00–15:00 UTC. 14:00 is the pulse's hour too, and the
+  // retry takes it. Consolidation is not a briefing, so a failed one neither
+  // delays nor replaces it.
   const day = (d) => [`2026-08-${d}T02:00 consolidate`,
                       `2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
                       `2026-08-${d}T14:00 weekday`, `2026-08-${d}T15:00 weekday`];
-  /* AND SUNDAY RETRIES AS ITSELF. 22:00, 23:00 and 00:00 UTC are 18:00, 19:00
-     and 20:00 in New York — the same three hours after its own briefing that a
-     weekday gets, and it must come back 'sunday' rather than 'weekday' or the
-     retry sends Buenos dias at the week's open. The last of them is 00:00 UTC
-     on the Monday, which is still Sunday evening in New York; it is the hour a
-     walk restarting each UTC day never reaches, and the reason this one runs
-     168 consecutive hours. Two clear of the 02:00 pass. */
+  /* AND SUNDAY RETRIES AS ITSELF, at 18:00–20:00 New York (22:00–00:00 UTC), or
+     the retry says Buenos dias at the week's open. 00:00 UTC Monday is the hour a
+     walk restarting each UTC day never reaches. */
   assert.deepEqual(timetable(false), [
     '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
     '2026-08-16T22:00 sunday', '2026-08-16T23:00 sunday', '2026-08-17T00:00 sunday',
@@ -1594,9 +1456,7 @@ test('the timetable holds its New York hours in winter too', () => {
     owed.push(`${at.toISOString().slice(11, 16)} ${due}`);
     if (due === 'consolidate') done.add(nyDate(at));
   }
-  // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's
-  // consolidation, which is what a fixed UTC day of a New York timetable looks
-  // like from the inside.
+  // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's pass.
   assert.deepEqual(owed, ['03:00 consolidate', '13:00 weekday', '15:00 pulse']);
 });
 
@@ -1615,8 +1475,8 @@ test('a sentence that merely opens with the word is news, and is sent', () => {
 });
 
 /* ─── Eugenia: the retry ─────────────────────────────────────────────────────
-   A briefing that failed at 08:00 used to wait a full day. These are the hours
-   it may try again, and the marker that stops it trying once one has landed.
+   The hours a failed briefing may try again, and the marker that stops it once
+   one has landed.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the retry window is the three weekday hours after the briefing', () => {
@@ -1635,12 +1495,9 @@ test('the retry window holds its New York hours in winter too', () => {
   assert.equal(retryDue(new Date(Date.UTC(2026, 0, 14, 13))), null);
 });
 
-/* ─── Sunday's own three hours, which it did not have ────────────────────────
-   The Sunday open is the one briefing of the week that could not be retried,
-   and the one whose absence takes seven days to come round again — so it was
-   both the least recoverable and the least noticeable. It went missing on the
-   first Sunday the branch existed for and there was no second chance in the
-   timetable at all.
+/* ─── Sunday's own three hours ───────────────────────────────────────────────
+   The Sunday open is the briefing whose absence takes seven days to come round
+   again — the least recoverable and the least noticeable.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('Sunday retries in the three hours after its open, as itself', () => {
@@ -1663,10 +1520,8 @@ test('Saturday never retries, and the weekday window does not reach Sunday', () 
 });
 
 /* ─── Which briefing a forced call sends ─────────────────────────────────────
-   `?force=1` exists for the hour a briefing did NOT arrive, and it read
-   `briefDue(now) ?? 'weekday'` — so outside the single hour a Sunday briefing
-   is due, the door for recovering one could not produce one. The fallback is a
-   question about the DAY, and it was being answered with a constant.
+   `?force=1` exists for the hour a briefing did NOT arrive, so which kind it
+   sends is a question about the DAY, never a constant.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a forced briefing takes the shape of the day, not a constant', () => {
@@ -1682,9 +1537,8 @@ test('a forced briefing takes the shape of the day, not a constant', () => {
 
 test('the retry asks the database for exactly what a briefing stores', () => {
   /* Both markers, or the briefing that stores the missing one is never seen and
-     the 09:00 retry sends a second. The equality is the database's now: the
-     filter names the two strings and nothing else can satisfy it, so a question
-     merely mentioning the word cannot suppress a real briefing. */
+     the 09:00 retry sends a second. The filter names the two strings, so a
+     question merely mentioning the word cannot suppress a real briefing. */
   const q = briefedQuery();
   assert.equal(q.split('?')[0], 'eugenia_turns');
   for (const due of ['weekday', 'sunday']) {
@@ -1696,11 +1550,9 @@ test('the retry asks the database for exactly what a briefing stores', () => {
 });
 
 test('the retry reads one row, not a window that a busy morning can overflow', () => {
-  /* This is the defect it replaced. Scanning the last thirty user turns for the
-     marker is correct on a quiet morning and wrong on a talkative one: thirty
-     messages between 08:00 and 09:00 push it out, briefedToday answers "no",
-     and the retry pays for a whole second briefing and sends it. A filter on
-     the marker cannot be crowded out, however much was said around it. */
+  /* Thirty messages between 08:00 and 09:00 would push the marker out of any
+     scan of recent turns, and the retry would send a second briefing. A filter
+     on the marker cannot be crowded out. */
   const q = briefedQuery();
   assert.match(q, /limit=1(&|$)/);
   assert.match(q, /order=id\.desc/);
@@ -1710,11 +1562,9 @@ test('the retry reads one row, not a window that a busy morning can overflow', (
 });
 
 /* ─── Eugenia: what he can see of her memory ─────────────────────────────────
-   notesBlock renders the notes for HER, framed as instructions to obey.
-   notesList renders the same rows for HIM, and is the only window he has into
-   what she is keeping — everything in there was written by her, a fact
-   silently, so an unreadable memory is one he can only audit by noticing an
-   absence.
+   notesBlock renders the notes for HER, as instructions to obey. notesList
+   renders the same rows for HIM — the only window he has into what she keeps,
+   all of it written by her, silently.
    ───────────────────────────────────────────────────────────────────────── */
 
 // The map rides in the same message, so every case below supplies one.
@@ -1748,14 +1598,10 @@ test('an empty memory says so, and an empty half prints no heading', () => {
 });
 
 test('the whole audit is addressed to him, never about him', () => {
-  /* THE DEFECT THIS EXISTS TO CATCH. The map used to be appended by
-     channelsBlock(), which is written for HER context and opens "Where he
-     stands on each channel" — so the one message in the system addressed to
-     him switched into the third person about him halfway down. The map is not
-     optional here: it is the half of her memory he could never see at all.
-
-     Read as a whole rather than by heading, because the failure was a heading
-     from the other rendering leaking in, and any of them would do it. */
+  /* The map is rendered here, not appended from channelsBlock(), which is written
+     for HER and opens "Where he stands on each channel" — the one message
+     addressed to him must not switch into the third person about him. Read as a
+     whole, since any heading from the other rendering would do it. */
   const out = notesList([{ id: 2, note: 'stop mentioning the ten-year' }],
                         [{ id: 1, note: 'he trades the London open' }], MAP);
   for (const [, name] of CHANNELS) {
@@ -1767,18 +1613,15 @@ test('the whole audit is addressed to him, never about him', () => {
 });
 
 /* ─── Eugenia: where he stands on each channel ───────────────────────────────
-   The five channels are the only part of her memory that does not scroll, and
-   the only place an ABSENCE is legible. Everything below is about that second
-   property: a channel he has never touched has to SHOW, because in her notes it
-   is nothing written down, and nothing is not a thing anyone can notice.
+   The only part of her memory that does not scroll, and the only place an
+   ABSENCE is legible: a channel he has never touched has to SHOW, because in
+   her notes it is nothing written down.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('a channel with no row shows at the bottom rung, never vanishes', () => {
-  /* THE DEFECT THIS EXISTS TO CATCH. The map renders what the database gives
-     it, so a channel that was never seeded — or was dropped in a repair — would
-     simply not appear, and the one thing the map is for is that a channel he
-     has never used is VISIBLE. Silently showing four channels reads exactly
-     like a trader who has covered the fifth. */
+  /* A channel never seeded, or dropped in a repair, would simply not appear —
+     and four channels shown reads exactly like a trader who has covered the
+     fifth. */
   const out = channelsList([{ channel: 'dollar', state: 'owns', evidence: null, moved_on: null }]);
   for (const [, name] of CHANNELS) {
     assert.ok(out.includes(name), `${name} is missing from the map entirely`);
@@ -1798,16 +1641,9 @@ test('the map is rendered in the order the prompt teaches them', () => {
 });
 
 test('she is shown the name she says, never the id she stores', () => {
-  /* "central_bank_buying" is not something a person says across a desk, and a
-     prompt that hands her one is a prompt that will eventually see it repeated
-     back to him.
-
-     The underscore is the test rather than the id itself, and that is not
-     laziness: three of the five ids ARE their own display words — `jobs` is
-     `jobs`, and `inflation` is a substring of two of the names — so asking
-     whether an id appears is a question that cannot be answered. What can be
-     answered is whether anything MACHINE-SHAPED got through, and snake_case is
-     the whole of what that means here. */
+  /* "central_bank_buying" is not something a person says across a desk. The
+     underscore is the test rather than the id, because three ids ARE their own
+     display words; snake_case is the whole of what machine-shaped means here. */
   const out = channelsList(CHANNELS.map(([channel]) => ({ channel, state: 'owns', evidence: null, moved_on: null })));
   assert.ok(!out.includes('_'), `a raw channel id reached her: ${out}`);
 });
@@ -1822,10 +1658,8 @@ test('the evidence rides with the rung when there is any', () => {
 });
 
 /* THE DATE IS WHAT KEEPS THE MAP FROM GOING BLIND. Nothing brings a rung down
-   but him saying he has lost one, so a year of ordinary use piles every channel
-   he has touched at `owns` and the census stops being able to say which one is
-   thin — which is the only thing it is for. `moved_on` was written from the
-   first day and rendered by nobody. */
+   but him, so a year of use piles every channel at `owns` and the census can
+   no longer say which is thin. */
 
 test('a rung says when it last moved', () => {
   const out = channelsList([
@@ -1835,12 +1669,9 @@ test('a rung says when it last moved', () => {
 });
 
 test('the stored civil day is the day shown, not the day before it', () => {
-  /* moved_on is written by setChannel as a NEW YORK civil day. Read back
-     through a New York formatter it moves: new Date('2026-03-12') is midnight
-     UTC, which is 19:00 on the 11th in New York, so every rung in the map would
-     read a day early — quietly, and in the one column that says how stale a
-     rung is. Both halves of the year, since this is the shape of mistake that
-     only shows up in one of them. */
+  /* moved_on is a NEW YORK civil day. new Date('2026-03-12') is midnight UTC,
+     19:00 on the 11th in New York, so read through a New York formatter every
+     rung would show a day early. Both halves of the year. */
   assert.match(channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: '2026-03-12' }]),
     /jobs — used since 12 Mar/);
   assert.match(channelsList([{ channel: 'jobs', state: 'used', evidence: null, moved_on: '2026-01-01' }]),
@@ -1849,26 +1680,22 @@ test('the stored civil day is the day shown, not the day before it', () => {
 
 test('a rung that has never moved says nothing rather than a blank date', () => {
   // Every channel is seeded before anything is known, so a null moved_on is the
-  // ordinary case rather than an error, and "since " with nothing after it
-  // would be the map reporting a fault that is not one.
+  // ordinary case and must not render as "since " and nothing.
   const out = channelsList([{ channel: 'jobs', state: 'unseen', evidence: null, moved_on: null }]);
   assert.match(out, /jobs — unseen/);
   assert.ok(!out.includes('since'), out);
 });
 
 test('the bottom rung is the first one, because the map falls back to it', () => {
-  // channelsList renders a missing row at CHANNEL_STATES[0]. Reorder the ladder
-  // and every unseeded channel would render as owned — the exact inversion that
-  // would make a thin channel look covered.
+  // A missing row renders at CHANNEL_STATES[0]. Reorder the ladder and every
+  // unseeded channel reads as owned.
   assert.equal(CHANNEL_STATES[0], 'unseen');
 });
 
 /* ─── Eugenia: who said the thing the search found ───────────────────────────
-   eugenia_turns carries `role` and eugenia_search did not select it, so every
-   turn came back rendered as her own words — half of every result set was HIS
-   messages handed back to her as things she had said. She would quote an
-   instruction he gave as her own analysis, or deny saying something he said,
-   fluently, with nothing reporting it. The role now rides in `source`.
+   Without `role`, every turn came back as her own words — she would quote his
+   instruction as her analysis, or deny saying what he said. It rides in
+   `source`.
    ───────────────────────────────────────────────────────────────────────── */
 
 const AT = '2026-08-19T14:00:00Z';   // Wed 19 Aug 2026, 10:00 New York
@@ -1905,9 +1732,9 @@ test('every hit is dated, and a long one is cut rather than sent whole', () => {
 });
 
 /* ─── Eugenia: the strategy she can read ─────────────────────────────────────
-   A section she is cited to and cannot fetch is worse than a blank: readStrategy
-   answers "there is no section 4.1", which is a wrong fact about the document,
-   delivered by the one tool that exists to stop her inventing one.
+   A section she is cited to and cannot fetch is worse than a blank: "there is
+   no section 4.1" is a wrong fact about the document, from the tool that exists
+   to stop her inventing one.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('a subsection is served by the section that holds it', () => {
@@ -1932,16 +1759,14 @@ test('a section that genuinely is not written says so rather than nothing', () =
     assert.match(readStrategy(key), /has no section/, `${key} came back silently`);
   }
 
-  // A subsection of a section that IS written resolves to it — §4 is the thing
-  // that would hold a §4.9, and handing it over lets her read that it is not
-  // there. The fallback only reaches one level up, never to a guess.
+  // A subsection of a written section resolves to it, so she can read that §4.9
+  // is not there. One level up, never a guess.
   assert.match(readStrategy('4.9'), /## 4 · The setups/);
 });
 
 /* ─── Eugenia: the day the nightly pass reads ────────────────────────────────
-   The limit has to take the NEWEST turns of the window. Taking the oldest is a
-   pass that distils the morning and drops the evening — where a late
-   instruction lives — and the two look identical from outside.
+   The limit takes the NEWEST turns. The oldest would distil the morning and
+   drop the evening, where a late instruction lives.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('the day window keeps the newest turns, never the oldest', () => {
@@ -1959,9 +1784,7 @@ test('the window starts exactly the stated number of hours back', () => {
 });
 
 /* ─── Eugenia: which message a swipe-reply answers ───────────────────────────
-   Answered off a stand-in table rather than by reading the query's spelling,
-   because the spelling of a wrong answer is equally plausible: the newest row
-   in the window is what she said SINCE, and a query ordered that way reads
+   Answered off a stand-in table, because a query ordered the wrong way reads
    exactly as well as the right one.
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -1995,10 +1818,8 @@ test('a reply is matched to the message it answers, not to what she said since',
 });
 
 test('a reply to the briefing finds it, though it was stored before it was sent', () => {
-  /* THE ONE MESSAGE STORED FIRST. The marker and the text go down together
-     before the speaking worker sends anything, so the voice note he swipes is
-     dated after the row it carries — and looking forward from it found nothing
-     on every briefing. */
+  /* THE ONE MESSAGE STORED FIRST. The marker and text go down before the speaking
+     worker sends, so the voice note he swipes is dated after its row. */
   const sent = Date.UTC(2026, 9, 2, 12, 3, 0) / 1000;
   const iso = (s) => new Date((sent + s) * 1000).toISOString();
   const briefing = [
@@ -2027,15 +1848,10 @@ test('a reply to the briefing finds it, though it was stored before it was sent'
 
 
 /* ─── The heartbeat the two silent writers leave ─────────────────────────────
-   The poller and the email function report failure to nobody: console.error and
-   a response pg_net discards. So the symptom of either dying is trades that
-   never arrive, and that is indistinguishable from a week he did not trade.
-
-   STALENESS IS THE TEST, NOT THE ERROR, and that is the whole design. A writer
-   failing every run and a writer that stopped being invoked at all — an
-   unscheduled cron job, a renamed function, a deploy that dropped one — produce
-   the same silence, and an alarm on failure cannot fire for the second. Only
-   last_ok going cold sees both.
+   The poller and the email function report failure to nobody, so either dying
+   looks like a week he did not trade. STALENESS IS THE TEST, NOT THE ERROR: a
+   writer failing every run and one no longer invoked produce the same silence,
+   and only last_ok going cold sees the second.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const HEALTH_NOW = Date.UTC(2026, 7, 19, 12, 0);
@@ -2052,18 +1868,14 @@ test('a writer that has run recently is not mentioned at all', () => {
 });
 
 /* ─── THE TWO FALSE ALARMS, WHICH ARE THE WHOLE RISK HERE ────────────────────
-   A monitor that is wrong on ordinary days gets ignored, and an ignored monitor
-   is worse than none — it is the green tick that stops anyone looking. Both of
-   these fired on the first design and both are ordinary days.
+   A monitor wrong on ordinary days gets ignored, and an ignored monitor is
+   worse than none. Both of these are ordinary days.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a quiet weekend is not the poller dying', () => {
-  /* Gold closes Friday 17:00 New York and opens Sunday 17:00. The poller is
-     still invoked every two minutes across that and answers "market closed" —
-     which IS a completed run: cron fired, the function is deployed, its secrets
-     loaded, it decided correctly. It marks itself on that path for exactly this
-     reason. Without the mark, forty-eight hours pass against a six-hour window
-     and she reports the sync dead every Sunday evening. */
+  /* Gold shuts Friday 17:00 New York to Sunday 17:00, and the poller answering
+     "market closed" across it IS a completed run. Unmarked, forty-eight hours
+     pass against a six-hour window and the sync reads dead every Sunday. */
   const line = healthLine(
     [{ id: 'poller', last_ok: ago(0.05), last_error: null, last_error_at: null }],
     HEALTH_NOW);
@@ -2071,10 +1883,8 @@ test('a quiet weekend is not the poller dying', () => {
 });
 
 test('a week with no fills is not the email path dying', () => {
-  /* The email function runs only when a fill arrives, so silence is a quiet
-     week and nothing else. Judging it by staleness fires on almost every
-     ordinary day — which is the same defect as the weekend one and far more
-     frequent. Silence is evidence only for the writer that runs on a clock. */
+  /* The email function runs only when a fill arrives, so its silence is a quiet
+     week. Silence is evidence only for the writer that runs on a clock. */
   const line = healthLine(
     [{ id: 'email', last_ok: ago(200), last_error: null, last_error_at: null }],
     HEALTH_NOW);
@@ -2109,9 +1919,8 @@ test('a writer that has never run says so rather than showing a blank', () => {
 });
 
 test('the last outcome decides, for the writer no clock can judge', () => {
-  /* The email path is reported on its OUTCOME rather than its silence, so a
-     failure has to surface however long ago the last fill was — and a success
-     after it has to clear. */
+  /* Reported on OUTCOME, so a failure surfaces however old the last fill, and a
+     success after it clears. */
   const failing = healthLine(
     [{ id: 'email', last_ok: ago(30), last_error: 'HTTP 401 — bad key', last_error_at: ago(2) }],
     HEALTH_NOW);
@@ -2136,16 +1945,10 @@ test('a writer that has failed and never succeeded is reported', () => {
 });
 
 /* ─── The copy of her memory, and the loop that is the whole of it ───────────
-   The app's weekly backup carries `trades` — the one table cTrader could
-   rebuild. Her notes, turns, channel map, thesis, loops and calendar have no
-   other source, and the app cannot read them by design. This script is the only
-   copy, which makes its paging the load-bearing part: PostgREST caps a response
-   at its own max-rows whatever is asked for, so ONE read of eugenia_turns
-   returns a page and looks exactly like a complete archive.
-
-   That failure is invisible in every way that matters — the job is green, the
-   file is well-formed, the counts look plausible — and it is discovered on the
-   day someone restores from it.
+   Her notes, turns, channels, thesis, loops and calendar have no other source.
+   PostgREST caps a response at its own max-rows whatever is asked, so ONE read
+   of eugenia_turns returns a page that looks exactly like a complete archive —
+   green job, well-formed file, plausible counts, found on restore.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a table larger than one page is read to the end', async () => {
@@ -2203,9 +2006,7 @@ test('the backup names every table that has no other source', async () => {
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
 
 test('a briefing longer than one message is split, and never mid-sentence', () => {
-  // Deliberately over the length the prompt asks for — most briefings now fit
-  // in one message, and this exercises the ones that do not. Written in
-  // paragraphs, as she writes, so the split should always find a break.
+  // Over the length the prompt asks for, in paragraphs as she writes.
   const section = (n) => `SECTION ${n}\n` + `Real yields drive gold. `.repeat(60);
   const brief = [...Array(7)].map((_, i) => section(i + 1)).join('\n\n');
   assert.ok(brief.length > TG_LIMIT, 'the fixture must actually exceed the limit');
@@ -2227,14 +2028,10 @@ test('a message that fits is sent whole, as one', () => {
 });
 
 test('the seam lands on a paragraph break, not on the last newline in budget', () => {
-  /* THE DEFECT THIS EXISTS TO CATCH, and it was live for as long as chunk was.
-     The split read Math.max(lastIndexOf('\n\n'), lastIndexOf('\n')) — and every
-     blank line contains a newline at a higher index, so the paragraph term
-     could never win and the break always went to the last newline of any kind.
-
-     FORMAT permits exactly one thing to carry an internal newline: a plain-dash
-     list of times. So the fixture is a paragraph, then such a list, and the
-     break belongs before the list rather than inside it. */
+  /* Two lookups, not Math.max(lastIndexOf('\n\n'), lastIndexOf('\n')): every
+     blank line contains a newline at a higher index, so the max can never pick
+     the paragraph. The one thing allowed an internal newline is a plain-dash
+     list, so the break belongs before the list rather than inside it. */
   const para = 'Gold is at 3,412, up nine overnight. '.repeat(3).trim();
   const times = '- 08:30 ET claims\n- 10:00 ET Powell\n- 14:00 ET minutes';
   const text  = `${para}\n\n${times}\n\n${para}`;
@@ -2263,9 +2060,8 @@ test('a single paragraph over the limit is cut rather than dropped', () => {
 });
 
 /* ─── Eugenia: the journal, read-only ────────────────────────────────────────
-   `days` arrives from the model, so tradesQuery is the boundary and clamping is
-   its job. The view it names is the read-only one; that this function reads a
-   view rather than the table is the guarantee she cannot write a trade.
+   `days` arrives from the model, so tradesQuery clamps it. Reading the view
+   rather than the table is the guarantee she cannot write a trade.
    ───────────────────────────────────────────────────────────────────────── */
 
 const NOW = Date.UTC(2026, 7, 19, 12, 0);   // 19 Aug 2026
@@ -2289,15 +2085,10 @@ test('a window from the model is clamped, never trusted', () => {
 });
 
 test('the window is n civil days back from today in New York', () => {
-  /* open_day is a civil day, so the bound has to be one. Two instants where an
-     instant-arithmetic bound gets it wrong:
-
-     02:00 UTC is 22:00 the previous evening in New York, so a UTC-derived date
-     is already tomorrow and the window starts a day late — every evening.
-
-     The evening after the clocks go back, a day is 25 hours long, so
-     subtracting seven fixed days lands six civil days ago and the oldest day of
-     "this past week" is gone. Spring-forward stretches it to eight. */
+  /* open_day is a civil day, so the bound has to be one. 02:00 UTC is 22:00 the
+     previous evening in New York, where a UTC date is already tomorrow; and the
+     evening after the clocks go back a day is 25 hours, so seven fixed days
+     lands six civil days ago. */
   const evening   = new Date('2026-08-22T02:00:00Z').getTime();   // Fri 21 Aug, 22:00 ET
   const fallBack  = new Date('2026-11-03T04:30:00Z').getTime();   // Mon 2 Nov, 23:30 ET
   const springFwd = new Date('2026-03-09T03:30:00Z').getTime();   // Sun 8 Mar, 23:30 ET
@@ -2312,14 +2103,9 @@ test('the journal read is bounded, so a wide window cannot fill the context', ()
 });
 
 /* ─── The New York clock ─────────────────────────────────────────────────────
-   One definition, read by the poller's market hours and by both of Eugenia's
-   schedules. It was two near-identical copies whose only difference was what
-   they returned when Intl failed to emit a part — Monday noon on one side, -1
-   on the other, and neither reachable.
-
-   These assert the clock DIRECTLY rather than through its three callers,
-   because those callers already have their own tests and a bug here would move
-   all of them together in a way that reads as correct.
+   One definition, read by the poller's market hours and Eugenia's schedules.
+   Asserted DIRECTLY, because a bug here would move all its callers together
+   in a way that reads as correct.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the clock reads New York, not UTC, in both halves of the year', () => {
@@ -2354,15 +2140,10 @@ test('the market check and the briefing check read the same hour', () => {
 });
 
 /* ─── Eugenia's history window ───────────────────────────────────────────────
-   The Messages API merges consecutive same-role turns and refuses a leading
-   assistant one, and the refusal is total: every reply 400s until the offending
-   row rolls out of the window.
-
-   The window used to rely on turns being written in pairs, which they are —
-   but two rows in one INSERT draw two sequence values and a concurrent INSERT
-   can take one in between, so the pairs can interleave and the window can open
-   mid-pair. That was an invariant held up by a comment; this is the same
-   invariant held up by a function.
+   The Messages API refuses a leading assistant turn, and the refusal is total
+   until the row rolls out. Two rows in one INSERT draw two sequence values and
+   a concurrent INSERT can take one between them, so the window can open
+   mid-pair. openOnUser holds the invariant.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const u = (content) => ({ role: 'user', content });
@@ -2380,9 +2161,8 @@ test('a window opening on an assistant turn is trimmed until it does not', () =>
 });
 
 test('interleaved pairs are repaired rather than sent', () => {
-  // Two messages seconds apart: both handlers read the same history and both
-  // write a pair, and the sequence values interleave as u1 u2 a1 a2. Reading
-  // any even number of those can open on an assistant turn.
+  // Two messages seconds apart interleave as u1 u2 a1 a2; any even window can
+  // open on an assistant turn.
   const scrambled = [a('a1'), a('a2'), u('u3'), a('a3')];
   const repaired = openOnUser(scrambled);
   assert.equal(repaired[0].role, 'user');
@@ -2398,13 +2178,9 @@ test('a window with no user turn at all becomes empty, not invalid', () => {
 
 /* ─── Eugenia: which model actually answered ─────────────────────────────────
    `fallbacks: "default"` re-runs a declined request on another model inside the
-   same call, and that is what stops a refusal costing the whole briefing. It
-   also means the briefing he read can have been written by a model nothing in
-   this system named — and on the page it reads exactly like one that was not.
-
-   DRIVEN THROUGH ask() RATHER THAN ASSERTED ON THE COMPARISON. The comparison
-   is one `!==` and was never the part at risk; the part at risk is the line
-   never being printed, which asserting on a hand-fed flag cannot discover.
+   call, so the briefing he read can have been written by a model nothing here
+   named. Driven through ask(): the risk is the line never being printed, which
+   a hand-fed flag cannot discover.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // Only what ask() actually reads out of a response.
@@ -2445,14 +2221,9 @@ test('the ordinary turn says nothing about the model, because nothing happened',
 });
 
 test('a caller on a cheaper model does not read as having fallen back', async () => {
-  /* THE HALF THE SPLIT COULD HAVE BROKEN SILENTLY. The fallback column is
-     `what answered` against `what was asked for`, and that was one constant for
-     the whole file. Left that way, every Sonnet caller would report a fallback
-     on every single call — three of the eight, every turn — and `fell_back`
-     would stop meaning anything on the day the models parted.
-
-     Driven through `ask` with a Sonnet caller's label, because the comparison
-     is inside the loop and a constant put back there passes every pure test. */
+  /* The fallback column compares what answered against what THIS caller asked
+     for. A file-wide constant would report a fallback on every Sonnet call. Driven
+     through `ask`, because the comparison is inside the loop. */
   const realFetch = globalThis.fetch, realLog = console.log;
   const lines = [];
   globalThis.fetch = async () => answers('claude-sonnet-5');
@@ -2476,9 +2247,8 @@ test('a turn served by another model names it in the cost line', async () => {
 });
 
 test('a fallback on one round survives a later round that did not fall back', async () => {
-  // Round one declines and is rescued; round two runs on the model that was
-  // asked for. Clearing on the second would report the turn as ordinary, which
-  // is the shape of every silent failure in this system.
+  // Round one declines and is rescued; round two runs on what was asked for.
+  // Clearing on the second would report the turn as ordinary.
   const [line] = await costLines([asksForStrategy('some-other-model'),
                                   answers('claude-opus-5')]);
   assert.match(line, /2 round\(s\)/);
@@ -2486,16 +2256,9 @@ test('a fallback on one round survives a later round that did not fall back', as
 });
 
 /* ─── A failed tool read must not take the answer with it ────────────────────
-   THE 404 THAT COST A DAY. `eugenia_trades` was dropped and not rebuilt, and
-   the briefing did not come out thinner — it died, four times, at 08:00 and at
-   each retry, each one a single sentence saying something broke. tradesBlock
-   had already absorbed the identical failure a round earlier, so what was left
-   to kill the turn was the read the MODEL asked for.
-
-   Driven through ask() rather than asserted on readTrades, for the reason the
-   fallback tests above are: that readTrades returns a sentence is not the
-   claim. The claim is that the loop carries on and hands that sentence to the
-   next round, and only the sequence can show it.
+   A read the MODEL asked for that 404s must come back as a sentence the loop
+   hands to the next round, not kill the briefing. Driven through ask(),
+   because the claim is about the loop carrying on.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const asksForTrades = (model) =>
@@ -2533,10 +2296,8 @@ test('a journal read that 404s is answered to her, and the turn finishes', async
 });
 
 test('a journal read that 404s never comes back as an empty window', async () => {
-  // The one answer it must not give. "No trades in that window" from a window
-  // nothing looked at is what a briefing reads as "you have not traded since
-  // Friday" — a false statement about his own week, in her voice, with nothing
-  // anywhere reporting that the read never happened.
+  // "No trades in that window" from a window nothing looked at reads as "you have
+  // not traded since Friday" — false, in her voice, with nothing reporting it.
   const { answered } = await turnWithJournal(404, twoRounds);
   assert.doesNotMatch(answered, /No trades in that window/);
 });
@@ -2580,10 +2341,9 @@ test('a tool the caller was not offered is answered as unknown and never runs', 
 });
 
 /* ─── A paused turn, and a cut-off one ───────────────────────────────────────
-   Two stop reasons that both carry text, and neither text is the answer. A
-   pause is the server's search loop running out of iterations mid-turn; a
-   max_tokens stop is the answer truncated. Driven through ask() for the reason
-   the tests above are: the loop is what has to tell them apart from an ending.
+   Two stop reasons that carry text that is not the answer: the server's search
+   loop out of iterations, and a max_tokens truncation. The loop has to tell
+   them from an ending.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const pausedContent = [
@@ -2621,16 +2381,11 @@ test('a turn cut off at max_tokens fails rather than sending half an answer', as
 });
 
 /* ─── What the cache costs, and what stops it being bought twice ─────────────
-   TWO THINGS SHIP TOGETHER HERE BECAUSE THEY ARE THE SAME OMISSION. Only the
-   system block carried a breakpoint, so a tool round re-sent the whole
-   conversation at full price; and a cache WRITE — 1.25× at five minutes, 2× at
-   an hour — was counted nowhere, so the meter that exists to say what a turn
-   cost could not see either fact.
-
-   DRIVEN THROUGH ask(), for the reason every other test in this section is:
-   what was at risk was never the arithmetic. A breakpoint that is computed and
-   never attached to a request, and a usage field read into a variable nothing
-   prints, both pass any assertion made on the value alone.
+   A breakpoint on the system block alone re-sends the conversation at full
+   price each tool round; and a cache WRITE — 1.25× at five minutes, 2× at an
+   hour — is the expensive side the meter must count. Driven through ask(): a
+   breakpoint never attached, or a usage field nothing prints, passes any
+   assertion on the value alone.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // The same two-round shape as above, with the request bodies kept.
@@ -2680,11 +2435,10 @@ test('the round after a tool call reads the last one back instead of buying it',
 });
 
 test('the mark moves rather than accumulating, which is what keeps it under four', async () => {
-  /* A REQUEST MAY CARRY FOUR BREAKPOINTS, THE SYSTEM BLOCK HOLDS ONE, AND THIS
-     LOOP RUNS SIX ROUNDS. Left behind on each round the fifth request is a 400
-     — and a briefing that 400s on its fifth round is a briefing that dies on
-     exactly the mornings it had the most to read. Two tool rounds is enough to
-     tell a mark that moved from one that stayed. */
+  /* A REQUEST MAY CARRY FOUR BREAKPOINTS AND THE SYSTEM BLOCK HOLDS ONE. Left
+     behind on each round, the fifth request is a 400 — on exactly the mornings
+     with most to read. Two tool rounds tell a mark that moved from one that
+     stayed. */
   const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
                                    asksForStrategy('claude-opus-5'),
                                    answers('claude-opus-5')]);
@@ -2694,10 +2448,8 @@ test('the mark moves rather than accumulating, which is what keeps it under four
 });
 
 test('a cache write is counted, and the two prices are counted apart', async () => {
-  /* THE FIGURE THAT DECIDES THE ttl AND WAS THE ONE THE METER DID NOT COLLECT.
-     A read is a tenth of the input price and was always counted; a write is
-     1.25× or 2× depending on the lifetime asked for, so a single total cannot
-     be turned back into money. */
+  /* A read is a tenth of the input price; a write is 1.25× or 2× by lifetime, so
+     a single total cannot be turned back into money. */
   const { lines } = await bodiesOf([served('claude-opus-5', {
     stop_reason: 'end_turn',
     content: [{ type: 'text', text: 'an answer' }],
@@ -2712,11 +2464,9 @@ test('a cache write is counted, and the two prices are counted apart', async () 
 });
 
 test('a vendor that stops splitting the total reads as wrong, never as free', async () => {
-  /* THE FIVE-MINUTE FIGURE IS THE REMAINDER RATHER THAN A READ, and this is the
-     whole reason. Read directly, a response with no `cache_creation` breakdown
-     would report both TTLs at zero — a cache costing nothing, which is what a
-     working one is supposed to look like. As a remainder it lands somewhere
-     visible instead. */
+  /* THE FIVE-MINUTE FIGURE IS THE REMAINDER, not a read: with no
+     `cache_creation` breakdown both TTLs would read zero — a cache costing
+     nothing, which is what a working one looks like. */
   const { lines } = await bodiesOf([served('claude-opus-5', {
     stop_reason: 'end_turn',
     content: [{ type: 'text', text: 'an answer' }],
@@ -2726,10 +2476,8 @@ test('a vendor that stops splitting the total reads as wrong, never as free', as
 });
 
 /* ─── The rung he can move himself ───────────────────────────────────────────
-   The ladder climbs on him using a term back, judged at the nightly pass — so a
-   reader who takes the briefing and rarely answers it never leaves `explained`,
-   the rung that says restate the mechanism every time. This is him saying where
-   he is, which is the standing a demotion already had.
+   A reader who rarely answers never leaves `explained` by the pass alone. This
+   is him saying where he is, the standing a demotion already had.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a channel and a rung come back as the ids the table holds', () => {
@@ -2744,10 +2492,8 @@ test('the spoken name works, because that is the one he is shown', () => {
 });
 
 test('the rung is the last word, not the second', () => {
-  /* THE SHAPE THAT BREAKS ON THE REAL NAMES. Three of the five are several
-     words long, so reading the rung out of position two makes most of the map
-     unnameable — and it fails as "no such channel", which reads like the
-     command working on a name he got wrong. */
+  /* Three of the five names are several words, so reading the rung from position
+     two fails as "no such channel" — like a name he got wrong. */
   const multi = CHANNELS.filter(([, n]) => n.includes(' '));
   assert.ok(multi.length >= 3, 'the names are no longer multi-word — this test is asserting nothing');
   for (const [id, name] of multi) {
@@ -2783,13 +2529,9 @@ test('every other message is not this command', () => {
 });
 
 /* ─── One look per release time, because one print is not one row ────────────
-   While she typed the calendar, `PPI`, `US PPI` and `US PPI (August)` were
-   three rows and one print, and each one marked high fired its own look, its
-   own model call and its own message. A time holds several rows still — the
-   08:30 slot is most of a report — so one look covers the time.
-
-   The fixture is the real morning, names and timestamps as the table holds
-   them: five high rows for one CPI at 12:30 on 11 September.
+   A time holds several rows — the 08:30 slot is most of a report — so one look
+   covers the time. The fixture is the real morning: five high rows for one CPI
+   at 12:30 on 11 September.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const CPI_MORNING = [
@@ -2809,9 +2551,8 @@ test('one print under five names is one look, not five', () => {
 });
 
 test('a release time with any mark on it is finished, whatever else stands there', () => {
-  /* THE HALF THAT BREAKS THE LOOP. A row minted at 08:35 by the look itself is
-     unlooked and shares the release time — under the old question it was the
-     next quarter-hour's second message about the same number. */
+  /* A row minted at 08:35 by the look itself is unlooked and shares the release
+     time; asked per row, it would be a second message about the same number. */
   const minted = [...CPI_MORNING.slice(0, 2).map(r => ({ ...r, looked_at: '2026-09-11T12:35:00+00' })),
                   ...CPI_MORNING.slice(2)];
   const due = dueRelease(minted);
@@ -2832,28 +2573,17 @@ test('nothing standing unlooked is no look at all', () => {
 });
 
 /* ─── The actual goes to the row that was looked at ──────────────────────────
-   An upsert keyed on a name the model writes was once handed
-   `US retail sales (August, advance)`, marked that row at 12:35:00 and filed
-   the print under `retail sales` at 12:36:15. An INSERT, silently: the actual
-   landed on a row with no consensus and the consensus stayed on a row with no
-   actual, which is the one comparison the table holds. The prompt had said *the
-   same time and name* since the tool was written, which is the evidence that an
-   instruction cannot carry this.
-
-   So the tool on that path cannot insert at all. These drive it rather than
-   asserting on its source, because "it is a PATCH" is exactly the claim a
+   An upsert keyed on a model-written name files the actual on a new row with no
+   consensus — silently, and the one comparison the table holds is lost. So the
+   tool cannot insert at all. Driven, because "it is a PATCH" is the claim a
    reading cannot settle.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* Every request record_actual made, with the answer it gave, against `onFile` —
-   the calendar as it stands. THE STUB FILTERS THE WAY PostgREST DOES, and that
-   is the point of it. It used to answer every PATCH with a matched row whatever
-   the URL said, and the test beside it asserted the name went out wrapped in
-   double quotes: so the suite held the tool to a filter that could never match,
-   and went green while every print for a fortnight was recorded nowhere. A top-
-   level `eq` value is taken whole — PostgREST's `pSingleVal` is `many anyChar`
-   — and quotes are stripped only inside an `in.(…)` list. So each filter here
-   is split off the raw query, decoded, and compared literally. */
+/* Every request record_actual made, with the answer it got, against `onFile`.
+   THE STUB FILTERS THE WAY PostgREST DOES: a top-level `eq` value is taken
+   whole (`pSingleVal` is `many anyChar`) and quotes are stripped only inside
+   `in.(…)`. A stub that answered every PATCH with a match would hold the tool
+   to a filter that can never match, green. */
 async function actualWrites(input, onFile) {
   const realFetch = globalThis.fetch, realErr = console.error;
   const sent = [];
@@ -2888,11 +2618,8 @@ test('the actual is patched onto the row and never posted as a new one', async (
 });
 
 test('only the two columns a look owns are written', async () => {
-  /* THE SAME RELEASE CARRIED TWO CONTRADICTORY PRIORS — `+0.5% m/m (Jul)` on the
-     row the briefing filed and `-0.5% m/m (Jul, revised)` on the one the look
-     minted — because the look could write those columns at all. It cannot now,
-     and the schema is only half of that: a model sending them anyway must not
-     reach the database with them. */
+  /* The look cannot write consensus or prior, and the schema is half of that: a
+     model sending them anyway must not reach the database with them. */
   const { sent } = await actualWrites(
     { ...RETAIL, consensus: '+0.3% m/m', prior: '-0.5% m/m (Jul, revised)', importance: 'low' },
     [RETAIL]);
@@ -2901,10 +2628,8 @@ test('only the two columns a look owns are written', async () => {
 });
 
 test('a speech is recorded by its line alone, and a line never erases a figure', async () => {
-  /* A speech prints nothing, so a tool that demanded the figure refused the one
-     record a Chair's press conference could leave. Either half may come alone,
-     and an absent key is left as it was: a line written after the figure must
-     not send `actual` at all. */
+  /* A speech prints nothing, so either half may come alone, and an absent key is
+     left as it was: a line written after the figure must not send `actual`. */
   const POWELL = { at: '2026-10-29T18:30:00Z', name: 'Fed Chair Powell Speaks' };
   const speech = await actualWrites({ ...POWELL, note: 'Said a December hike is not the base case.' }, [POWELL]);
   assert.match(speech.said, /Recorded against/, 'a speech with no figure is still refused');
@@ -2917,13 +2642,9 @@ test('a speech is recorded by its line alone, and a line never erases a figure',
 });
 
 test('the name she was handed matches the row it names, whatever it is spelled with', async () => {
-  /* THE NAME GOES OUT AS ITSELF. It was wrapped in double quotes on the belief
-     that a comma splits an `eq` value, which is true only inside `in.(…)`, and
-     the quotes were then compared as part of the name. On 30 September she
-     filed `core PCE` six times, was told six times that nothing by that name was
-     on file, and was read `core PCE` back as what was — and said so to him.
-     Every punctuation a release name carries, including the ones that DO mean
-     something in a URL. */
+  /* THE NAME GOES OUT AS ITSELF — wrapped in quotes, the quotes are compared as
+     part of it. Every punctuation a release name carries, including the ones
+     that mean something in a URL. */
   for (const name of ['core PCE', 'US retail sales (August, advance)', 'S&P Global PMI',
                       'Fed "dot plot"', '#1 jobs report: 100%']) {
     const row = { ...RETAIL, name };
@@ -2936,9 +2657,8 @@ test('the name she was handed matches the row it names, whatever it is spelled w
 });
 
 test('a name that matches nothing answers with the names on file', async () => {
-  /* A PATCH FILTERED TO NOTHING IS A 200 WITH AN EMPTY BODY, which reads exactly
-     like a write that landed. Answered with what is actually there, the next
-     round has what it needs instead of leaving a second row behind. */
+  /* A PATCH FILTERED TO NOTHING IS A 200 WITH AN EMPTY BODY. Answered with what
+     is actually on file, the next round has what it needs. */
   const { said, sent } = await actualWrites({ ...RETAIL, name: 'retail sales' },
     [RETAIL, { ...RETAIL, name: 'jobless claims' }]);
   assert.equal(sent.length, 2, 'nothing was read back, so she is told nothing and files again');
@@ -2962,9 +2682,8 @@ test('a release without a readable time, or with nothing to record, writes nothi
 });
 
 /* ─── The calendar TradingView files ─────────────────────────────────────────
-   Driven off the same fixture doji-tradingview's fold is tested against, folded
-   by that fold — so the two halves of the read are held together rather than
-   each against a hand-written copy of the other.
+   Driven off the fixture doji-tradingview's fold is tested against, folded by
+   that fold, so the two halves of the read are held together.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const FOLDED = foldCalendar(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar'));
@@ -3036,10 +2755,9 @@ test('the quarter-hourly filing keeps to twelve hours back and twenty-eight ahea
   }
 });
 
-/* A WEEK IS MARKED COVERED BY A WHOLE-WEEK FETCH, AND ONLY AFTER ITS ROWS. A
-   mark standing in front of rows that never landed is a covered week with no
-   releases in it, which R-14 passes every entry in — the failure the coverage
-   exists to stop, arriving through the thing that writes it. */
+/* A WEEK IS MARKED COVERED ONLY AFTER ITS ROWS. A mark in front of rows that
+   never landed is a covered week with no releases, which R-14 passes every
+   entry in. */
 async function weekWrites(week, failRows = false) {
   const sent = [];
   const realFetch = globalThis.fetch;
@@ -3094,10 +2812,8 @@ test('the history walks Sundays in New York from the date given, through a clock
 });
 
 /* THE WALK IS REPLAYED, NOT ASSUMED. TradingView refuses a burst of calendar
-   reads and the first year walked turned twenty-three weeks into refusals in a
-   second and a half. A refused week is asked again after the pause; twice
-   refused, the walk ends there rather than spending the rest of the run on the
-   same answer. */
+   reads; a refused week is asked again after the pause, and twice refused the
+   walk ends rather than spending the run on the same answer. */
 test('the history asks a refused week again once, and a second refusal ends the walk', async () => {
   const reads = [], runs = [];
   const refusals = new Map([['2026-09-13', 1], ['2026-09-20', 2]]);
@@ -3153,10 +2869,9 @@ test('the release look waits for a missing figure, but not past half an hour, an
 });
 
 /* ─── The email boundary ─────────────────────────────────────────────────────
-   doji-email-sync is the only function here that reads a request body, so it is
-   the only one with a shape to check. What it must guarantee is what the Apps
-   Script's EMAIL_OWNED loop used to: five columns reach the table and nothing
-   else can, whatever arrives.
+   doji-email-sync is the only function that reads a request body, so it is the
+   one with a shape to check: five columns reach the table and nothing else
+   can, whatever arrives.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const fill = (o = {}) => ({
@@ -3231,30 +2946,23 @@ test('a body that is not an object at all is refused without throwing', () => {
 
 /* ─── The email path: what the caller is told ────────────────────────────────
    The other half of the three-outcome contract. test/parse.test.mjs proves the
-   Apps Script labels a 400 permanently and retries everything else; these prove
-   this end emits a 400 for the same cases and only those. Two halves each
-   tested against a literal is how the first version of this shipped treating
-   every 4xx as permanent.
+   Apps Script labels a 400 permanently and retries everything else; these
+   prove this end emits a 400 for exactly those cases.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('only a status about the row itself is permanent', () => {
-  // Postgres looked at this row and will never take it: malformed, a constraint
-  // it violates, a value it cannot process. Retrying is the only alternative,
-  // every minute for ninety days.
+  // Postgres looked at this row and will never take it. The alternative is
+  // retrying every minute for ninety days.
   for (const status of [400, 409, 422]) {
     assert.equal(answerFor(status), 400, `${status} should be permanent`);
   }
 });
 
 test('a status about the caller is transient, so the fill keeps its place', () => {
-  /* THE ONE THAT LOST DATA. A rotated SB_SECRET_KEY answers 401 — which says
-     nothing whatever about the fill. Treated as permanent, the thread is
-     labelled failed, drops out of the Gmail query, and every queued net_pnl is
-     gone by the time anyone notices the key.
-
-     404 is a renamed function, 403 a revoked grant, 429 a rate limit, and every
-     5xx is Supabase. A person fixing any of those wants the fill still waiting
-     for them. */
+  /* A rotated SB_SECRET_KEY answers 401, which says nothing about the fill:
+     treated as permanent, every queued net_pnl would be gone by the time anyone
+     noticed the key. 404 is a renamed function, 403 a revoked grant, 429 a rate
+     limit, 5xx is Supabase — each a repair that wants the fill still waiting. */
   for (const status of [401, 403, 404, 408, 429, 500, 502, 503, 504]) {
     assert.equal(answerFor(status), 500, `${status} should be retryable`);
   }
@@ -3267,10 +2975,8 @@ test('zero is a real P&L and must survive', () => {
 });
 
 /* ─── The clock she is given ─────────────────────────────────────────────────
-   She has no other one. Asked a question at 23:42 she answered "morning",
-   because her whole context is a system prompt about morning briefings and a
-   history whose most recent long turn IS that morning's briefing — the only
-   inference available from what she was handed.
+   She has no other. Without it a question at 23:42 reads as morning, because
+   her most recent long turn IS that morning's briefing.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the stamp is the New York wall clock, not UTC', () => {
@@ -3287,18 +2993,12 @@ test('the stamp follows New York through the daylight-saving change', () => {
 });
 
 /* ─── Whether the semantic half of her memory is still being filled ─────────
-   A row whose `embedding` is null does not appear in a nearest-neighbour query
-   at all — no error, no log — so a vendor that has stopped answering costs her
-   half of `search_memory` while the lexical arm carries on returning results.
-   The nightly sweep is the only thing that would know, and until now it said so
-   to a console.
-
-   THREE OUTCOMES AND THE LINE HAS TO PART THEM, because they are three
-   different repairs. A vendor that refuses throws and arrives as its own
-   message, so what is left here is the pair of counts — and `embed()` returns
-   null on an unset key ALONE, every other failure throwing, which is what makes
-   "nothing filled with a backlog waiting" an exact statement rather than a
-   guess.
+   A row with a null `embedding` is absent from a nearest-neighbour query, so a
+   vendor that stopped answering costs half of `search_memory` while the
+   lexical arm carries on. THREE OUTCOMES, THREE REPAIRS: a refusing vendor
+   throws and arrives as its own message, and `embed()` returns null on an
+   unset key ALONE — which makes "nothing filled with a backlog waiting" an
+   exact statement rather than a guess.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a night that filled rows says so and accuses nobody', () => {
@@ -3320,10 +3020,9 @@ test('nothing filled against a backlog names the key', () => {
 });
 
 test('a fully swept archive is not a missing key', () => {
-  /* THE FALSE ALARM, and it is the ordinary night rather than the edge case.
-     Once the backlog is drained every sweep answers `0 filled, 0 left` for the
-     rest of the deployment. A line that read that as a missing key would fire
-     every night forever, which is how a meter stops being read at all. */
+  /* THE FALSE ALARM IS THE ORDINARY NIGHT: a drained archive answers `0 filled,
+     0 left` for the rest of the deployment, and a line that accused the key
+     there would fire every night and stop being read. */
   assert.equal(sweepLine({ filled: 0, left: 0 }, { filled: 0, left: 0 }),
     'notes 0 filled, 0 left · turns 0 filled, 0 left');
 
@@ -3343,16 +3042,10 @@ test('midnight reads as 00, never as 24', () => {
   assert.match(nowBlock(new Date('2026-08-22T04:05:00Z')), /at 00:05/);
 });
 
-/* withClock is where the stamp is actually attached, and it exists because the
-   three callers appending it themselves was three chances to forget — removing
-   it from the pulse alone left every test green.
-
-   Moving it to one place makes it harder to forget and no easier to SEE: ask()
-   reaches the network on its first line, so no assertion here can watch it
-   build a request. Deleting the call from ask() left all 162 green, which is
-   the same hole one level up. So this reads the file. It is weaker than driving
-   the sequence and it is the strongest thing available, which is worth saying
-   rather than leaving someone to assume the wiring is covered. */
+/* withClock is where the stamp is attached, once, rather than by three callers
+   each able to forget. ask() reaches the network on its first line, so no
+   assertion can watch it build a request — this reads the file. Weaker than
+   driving the sequence, and the strongest thing available. */
 const EUGENIA = readFileSync(
   new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -3385,9 +3078,8 @@ test('a window that does not end on a user turn is left alone', () => {
   assert.deepEqual(withClock([], new Date()), []);
 });
 
-/* dateTurns answers "yesterday you said", which across a weekend is otherwise a
-   guess — the prompt asks for continuity and forbids inferring the date from
-   the conversation, which leaves the turns themselves as the only source. */
+/* dateTurns answers "yesterday you said": the prompt forbids inferring the date
+   from the conversation, which leaves the turns as the only source. */
 
 const stored = (role, content, created_at) => ({ role, content, created_at });
 
@@ -3420,18 +3112,11 @@ test('created_at never leaks into the turn the API is sent', () => {
 /* ═══════════════════════════════════════════════════════════════════════════
    THE STRATEGY, EXECUTED — adherence.ts
    ───────────────────────────────────────────────────────────────────────────
-   §7 writes a predicate for every rule and §8 writes the population filters and
-   the three verdicts. Until now both were prose she applied by hand over four
-   hundred rows of JSON, which is the one thing a model is worst at and where a
-   wrong answer is least visible.
-
-   EVERY RULE IS DRIVEN IN BOTH DIRECTIONS, and that is the whole point of this
-   block rather than a stylistic preference. A predicate that can only be seen
-   to return `pass` has not been shown to work — it has been shown to be
-   reachable, which is what three "clean" results in this repository's history
-   turned out to mean. So each rule below is given a row that satisfies it and a
-   row that breaks it, and the third verdict is driven wherever the data can
-   produce one.
+   §7 writes a predicate for every rule and §8 the population filters and the
+   three verdicts. EVERY RULE IS DRIVEN IN BOTH DIRECTIONS: a predicate only
+   ever seen returning `pass` has been shown reachable, not shown to work. Each
+   gets a row that satisfies it and one that breaks it, and `unknown` wherever
+   the data can produce it.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // A row with everything null but the id and a size, so each test names only the
@@ -3464,11 +3149,10 @@ test('R-01 flags a win that closed under $25, and spares the Friday close-out', 
     verdictOf([win({ exit_price: 4012, fill_time: '2026-01-06T18:00:00Z' })], 'R-01').verdict,
     'fail', 'a $12 win on a Tuesday is a discretionary exit and R-01 flags it');
 
-  /* THE ONE EXCEPTION §6 CARVES, and it is narrow on purpose: R-15 forces a
-     close at the Friday 17:00 New York close, so a forced exit at +$12 would be
-     flagged every single week. 21:50Z is 16:50 in New York in January — inside
-     the window — and the same trade at 19:00Z is 14:00 there and still a flag,
-     which is exactly the pair §6 draws the line between. */
+  /* THE ONE EXCEPTION §6 CARVES: R-15 forces a close at the Friday 17:00 close,
+     so a forced exit at +$12 would otherwise be flagged every week. 21:50Z is
+     16:50 New York in January, inside the window; 19:00Z is 14:00 and still a
+     flag — the pair §6 draws the line between. */
   assert.equal(
     verdictOf([win({ exit_price: 4012, fill_time: '2026-01-09T21:50:00Z' })], 'R-01').verdict,
     'unknown');
@@ -3509,9 +3193,8 @@ test('R-03 allows one entry after a $20 stop, and a tighter loss is not one', ()
   // Past the cap is R-02's breach and still a full stop.
   assert.equal(r([stop({ exit_price: 3975 }), win('PIDa', '10:40'), win('PIDb', '12:00')]).verdict, 'fail');
 
-  /* HIS DEFINITION, AND THE HALF A LOOSER ONE WOULD GET WRONG. A $12 stop taken
-     in full is a loss and not a full stop, so two entries after it leave the
-     population entirely — counted nowhere, rather than failed or unknown. */
+  /* HIS DEFINITION. A $12 stop taken in full is a loss and not a full stop, so
+     the entries after it leave the population — counted nowhere. */
   const tight = r([stop({ exit_price: 3988, pnl: -48 }), win('PIDa', '10:40'), win('PIDb', '12:00')]);
   assert.deepEqual([tight.passed, tight.failed, tight.unresolved], [0, 0, 0]);
   assert.equal(r([stop({ exit_price: 3980.01 }), win('PIDa', '10:40'), win('PIDb', '12:00')]).failed, 0,
@@ -3592,9 +3275,8 @@ test('R-14 fails an entry in the thirty minutes before a release rated high, and
   assert.equal(rr([at('2026-10-14T12:31:00Z')]).verdict, 'pass');
   assert.equal(rr([at('2026-10-13T13:00:00Z')]).verdict, 'pass');
 
-  /* A WEEK NOBODY FETCHED LOOKS EXACTLY LIKE A QUIET ONE, which is the whole
-     reason calendar_weeks exists: the same CPI entry, with the week unfetched, is
-     unknown rather than the pass an empty calendar would hand it. */
+  /* A WEEK NOBODY FETCHED LOOKS EXACTLY LIKE A QUIET ONE, which is what
+     calendar_weeks exists for: unfetched, the entry is unknown, not pass. */
   assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set() }).verdict, 'unknown');
   assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set(['2026-10-11']) }).verdict, 'pass');
   // And with no calendar handed at all, which is every caller but check_rules.
@@ -3617,10 +3299,9 @@ test("R-14's reads cover the trades' window, TradingView's high-rated releases o
 });
 
 test("a full release read covers only the weeks it reached, so R-14 cannot pass an entry for want of a print", async () => {
-  /* The read takes the newest releases first. On a year long enough to fill it,
-     the oldest weeks are still marked fetched in calendar_weeks while their
-     releases never arrived — and an entry in one of them passed R-14 for want of
-     a print. Driven through check_rules, because the guard is in the read. */
+  /* The read takes the newest releases. On a year long enough to fill it, the
+     oldest weeks are marked fetched while their releases never arrived. Driven
+     through check_rules, because the guard is in the read. */
   const day = (n) => new Date(Date.now() - n * 864e5);
   const entry = day(300);
   const trade = { id: 'PID1', direction: 'BUY', entry_time: entry.toISOString(),
@@ -3677,9 +3358,8 @@ test('R-19 judges the stop in force when a print lands on a position from an ear
      the trade was losing and a breach if it was winning. */
   assert.equal(r([first, moved(3990)]).verdict, 'unknown');
 
-  /* BOTH PULLED BEFORE THE PRINT, which the poller now writes as a row of two
-     nulls. Without it the break-even stop he had just taken off read as the
-     stop in force, and the position passed with nothing protecting it. */
+  /* BOTH PULLED BEFORE THE PRINT, written by the poller as a row of two nulls.
+     Without it the break-even stop just taken off reads as the stop in force. */
   assert.equal(r([first, moved(4000, '2026-10-14T11:00:00Z'), moved(null, '2026-10-14T12:00:00Z', null)]).verdict,
     'fail', 'a stop and target pulled before the print passed on the break-even stop they replaced');
 
@@ -3702,9 +3382,8 @@ test('R-19 judges the stop in force when a print lands on a position from an ear
   // No history, a history that starts after the print, or a week never fetched.
   assert.equal(r([]).verdict, 'unknown');
   assert.equal(r([moved(3980, '2026-10-14T13:00:00Z')]).verdict, 'unknown');
-  /* A HISTORY THAT BEGINS JUST AFTER THE PRINT, inside the grace, is the one
-     that could be misread: its first row is the stop in force, so it looks
-     untouched — but nothing says where the stop was before it. */
+  /* A HISTORY BEGINNING JUST AFTER THE PRINT, inside the grace, looks untouched —
+     but nothing says where the stop was before it. */
   assert.equal(r([moved(3980, '2026-10-14T12:32:00Z')]).verdict, 'unknown',
     'a stop history begun after the print was read as a stop left untouched');
   assert.equal(r([first, moved(4000)], buy(), { releases: [cpi], weeks: new Set() }).verdict, 'unknown');
@@ -3730,9 +3409,8 @@ test('R-10 catches two positions open at once, and an open one still counts', ()
     span('PIDb', '2026-01-06T12:30:00Z', '2026-01-06T13:00:00Z'),
   ], 'R-10').verdict, 'pass');
 
-  /* A STILL-OPEN POSITION EXTENDS TO NOW RATHER THAN TO NOTHING. A trade left
-     running while a second one opened is the clearest breach this rule has, and
-     reading a null fill_time as "no span" is exactly how it would be missed. */
+  /* A STILL-OPEN POSITION EXTENDS TO NOW: a trade left running while a second
+     opened is the clearest breach this rule has. */
   const now = Date.parse('2026-01-06T14:00:00Z');
   assert.equal(verdictOf([
     span('PIDa', '2026-01-06T10:00:00Z', null),
@@ -3740,19 +3418,12 @@ test('R-10 catches two positions open at once, and an open one still counts', ()
   ], 'R-10', now).verdict, 'fail');
 });
 
-/* ─── The breach that was counted as a pass ──────────────────────────────────
-   R-10 COMPARED EACH SPAN WITH THE ONE BEFORE IT, which answers for a neighbour
-   and not for the rule. A long hold covers everything opened inside it, so the
-   second short trade taken within it sits beside a `to` that has already been
-   left behind — and it came back counted as a PASS and named nowhere, while
-   genuinely breaching.
-
-   The verdict is what hid it. A span nested inside an earlier one always has a
-   neighbour that overlaps as well, so something was always flagged and the rule
-   always answered `fail` — which is why no test asserting on a verdict alone
-   could ever have found this. THE COUNTS AND THE IDS ARE THE ASSERTION, and
-   they are what she actually hands him: `check_rules` promises the rows behind
-   the finding, and a breach missing from that list is one he cannot check.
+/* ─── Every trade inside a longer hold is a breach ───────────────────────────
+   A long hold covers everything opened inside it, so comparing each span only
+   with its predecessor misses the second trade taken within one — counted as
+   a PASS and named nowhere. The verdict cannot show it, because a nested span
+   always has an overlapping neighbour too. THE COUNTS AND THE IDS ARE THE
+   ASSERTION: they are what `check_rules` hands him to check.
    ─────────────────────────────────────────────────────────────────────────── */
 test('every position inside a longer hold is a breach, not just the first', () => {
   const span = (id, from, to) => trade({ id, entry_time: from, fill_time: to });
@@ -3772,15 +3443,11 @@ test('every position inside a longer hold is a breach, not just the first', () =
     'a breach he is not handed the id of is one he cannot check');
 });
 
-/* ─── One missing email used to fail every trade after it ────────────────────
-   R-10 ended an unclosed span at `now`, and `fill_time` is written by the email
-   path alone — the poller records a close as `exit_price` and never touches it.
-   So a close with no alert behind it ran to now for ever, and every trade taken
-   after it overlapped that phantom: one missing email, a cascade of R-10
-   failures, each naming a real row and each wrong.
-
-   An end nothing recorded is UNKNOWN, which is this file's whole argument about
-   unknown never being pass — and equally about it never being fail.
+/* ─── A close nothing stamped is unknown, not running ────────────────────────
+   A closed row can carry an `exit_price` and no `fill_time` — a close the poller
+   never stamped and no alert covered. Ended at `now`, it would overlap every
+   trade taken after it: a cascade of R-10 failures, each naming a real row and
+   each wrong. An end nothing recorded is UNKNOWN — never pass, and never fail.
    ─────────────────────────────────────────────────────────────────────────── */
 test('a close the email never stamped is undecidable, not a running position', () => {
   const span = (id, from, to, extra = {}) =>
@@ -3807,13 +3474,10 @@ test('a close the email never stamped is undecidable, not a running position', (
 });
 
 test('R-15 counts a close it cannot time, rather than dropping it', () => {
-  /* The same missing column, in the rule that is entirely about WHEN a span
-     ended. It used to `continue` past a close with no fill_time, which takes
-     the row out of the population altogether — and a rate over the wrong
-     population is §8's opening sentence and this file's whole reason to exist.
-
-     A position still genuinely open is a different case: it has not closed, so
-     there is nothing for this rule to time, and it stays skipped. */
+  /* The same missing column in the rule that is about WHEN a span ended.
+     Stepping past the row takes it out of the population, and a rate over the
+     wrong population is §8's opening sentence. A genuinely open position has
+     nothing to time and stays skipped. */
   const t = (o) => trade({ id: 'PIDx', entry_time: '2026-01-08T10:00:00Z', ...o });
 
   const dropped = verdictOf([t({ exit_price: 4402.7 })], 'R-15');
@@ -3829,10 +3493,9 @@ test('R-15 counts a close it cannot time, rather than dropping it', () => {
 });
 
 test('a clean handover is still clean, however many of them there are', () => {
-  /* THE OTHER DIRECTION, because a fix that flags everything would pass the
-     test above and destroy the rule. Three trades back to back, each opening
-     exactly as the last one closed — strict comparison, so touching endpoints
-     are a handover rather than an overlap. */
+  /* THE OTHER DIRECTION, because a fix that flags everything passes the test
+     above. Back-to-back trades: touching endpoints are a handover, not an
+     overlap. */
   const span = (id, from, to) => trade({ id, entry_time: from, fill_time: to });
   const out = verdictOf([
     span('PID1', '2026-01-06T10:00:00Z', '2026-01-06T11:00:00Z'),
@@ -3859,22 +3522,19 @@ test('R-11 reads the account off the size, and only flags trading after the limi
     leg('PIDx', -90, '2026-01-06T10:00:00Z', '2026-01-06T11:00:00Z'),
   ], 'R-11').verdict, 'pass');
 
-  // A limit with no denominator is not a limit. §8 withholds `balance` precisely
-  // so the wrong one cannot be reached for, which leaves a day with no size
-  // undecidable rather than clean.
+  // A limit with no denominator is not a limit, and §8 withholds `balance` so
+  // the wrong one cannot be reached for.
   assert.equal(verdictOf([
     trade({ id: 'PIDz', pnl: -900, size_oz: null, open_day: '2026-01-06', fill_time: '2026-01-06T11:00:00Z' }),
   ], 'R-11').verdict, 'unknown');
 });
 
 test('R-01 does not call a break-even stop-out a failure to take profit', () => {
-  /* THE STRATEGY CONTRADICTS ITSELF HERE and the code had followed the wrong
-     half. §7's predicate says "no win with abs(exit − entry) < 25"; the Exit
-     section names four legitimate ways a trade ends and one of them is "at
-     break-even once R-04 has moved the stop there". A stop moved to break-even
-     and taken out a few cents favourable clears the commission — so `pnl > 0`,
-     the gap is pennies, and R-01 reported a breach of a rule he had just
-     followed. Common rather than rare: commission is cents at this size. */
+  /* THE STRATEGY CONTRADICTS ITSELF HERE. §7 says "no win with abs(exit − entry)
+     < 25"; §6's Exit names "at break-even once R-04 has moved the stop there" as
+     legitimate. A break-even stop taken a few cents favourable clears the
+     commission, so `pnl > 0` with a gap of pennies — common at this size. The
+     journal's own scratch band decides. */
   const scratch = verdictOf([trade({
     id: 'PIDbe', pnl: 0.12, entry_price: 4400, exit_price: 4400.1,
     fill_time: '2026-01-06T15:00:00Z',
@@ -3903,14 +3563,10 @@ test('R-01 does not call a break-even stop-out a failure to take profit', () => 
 });
 
 test('R-11 will not pass a day it could only partly add up', () => {
-  /* THE R-15 REPAIR, UN-APPLIED TO R-11. `fill_time` is the email path's column
-     and a close with no alert behind it has an `exit_price` and no instant —
-     so it was filtered out of the running total and the day added up without
-     it. A lost LOSS never reaches the floor and the day reports `pass`; a lost
-     WIN breaches a day that never did. Both directions, same absence.
-
-     Found by the two halves of this file disagreeing: `dayStanding` sums every
-     closed row, so it can tell him the day is over while this reports pass. */
+  /* A close with an `exit_price` and no instant cannot be placed in the running
+     total. Stepped over, a lost LOSS never reaches the floor and the day passes;
+     a lost WIN breaches a day that never did. `dayStanding` sums every closed
+     row, so it would say the day is over while this reported pass. */
   const leg = (id, pnl, from, to) =>
     trade({ id, pnl, open_day: '2026-01-06', entry_time: from, fill_time: to,
             exit_price: 4400 });
@@ -3925,7 +3581,7 @@ test('R-11 will not pass a day it could only partly add up', () => {
     'a day missing a closed row from its running total came back decided');
   assert.equal(partial.passed, 0, 'the day was counted as clean');
 
-  // Every close unstamped: the day used to vanish from the population entirely.
+  // Every close unstamped: unknown, not absent from the population.
   const none = verdictOf([leg('PIDx', -90, '2026-01-06T10:00:00Z', null)], 'R-11');
   assert.equal(none.verdict, 'unknown');
   assert.equal(none.unresolved, 1, 'the day is not in the population at all');
@@ -3937,11 +3593,9 @@ test('R-11 will not pass a day it could only partly add up', () => {
 });
 
 test('a day carrying two sizes has no account, in both readers', () => {
-  /* `find(s => s != null)` took whichever size arrived first, and a day with
-     two of them is the day R-13 exists to flag — so the denominator of the
-     limit was decided by row order exactly where it mattered. 4 oz implies
-     2,000 and a −80 floor; 20 oz implies 10,000 and a −400 floor, so the two
-     answers are not close to each other. */
+  /* Two sizes is no account: 4 oz implies 2,000 and a −80 floor, 20 oz 10,000
+     and −400. Taking whichever came first lets row order decide the limit on
+     exactly the day R-13 exists to flag. */
   const rows = [
     trade({ id: 'PIDx', pnl: -90, size_oz: 4,  open_day: '2026-01-06',
             entry_time: '2026-01-06T10:00:00Z', fill_time: '2026-01-06T11:00:00Z' }),
@@ -3955,9 +3609,8 @@ test('a day carrying two sizes has no account, in both readers', () => {
 });
 
 test('dayStanding counts a close the running total cannot place', () => {
-  /* The deliberate difference between the two: this is a SUM and needs no
-     order, so an unstamped close still counts here where r11 must step past
-     it. Collapsing them would take the day-close message down with the rule. */
+  /* The deliberate difference: this is a SUM and needs no order, so an unstamped
+     close counts here where r11 must step past it. */
   const out = dayStanding([
     trade({ id: 'PIDx', pnl: -90, open_day: '2026-01-06', exit_price: 4400 }),
   ], '2026-01-06');
@@ -3977,10 +3630,8 @@ test('R-12 separates a late second entry from a sweep it cannot see', () => {
     entry('PIDb', '2026-01-06T11:30:00Z', '2026-01-06T12:00:00Z'),
   ], 'R-12').verdict, 'fail', `a second entry more than ${SWEEP_MIN} minutes later is a fail`);
 
-  /* WITHIN THE WINDOW IS UNKNOWN, NOT PASS, and the difference is the whole
-     honesty of this rule: nothing on a row says an entry was a sweep re-entry —
-     §8 lists it among what is not stored — so a prompt second entry is
-     undecidable by construction rather than permitted. */
+  /* WITHIN THE WINDOW IS UNKNOWN, NOT PASS: nothing on a row says an entry was a
+     sweep re-entry (§8), so a prompt second entry is undecidable. */
   assert.equal(verdictOf([
     entry('PIDa', '2026-01-06T10:00:00Z', '2026-01-06T10:30:00Z'),
     entry('PIDb', '2026-01-06T10:40:00Z', '2026-01-06T11:00:00Z'),
@@ -4030,10 +3681,9 @@ test('R-15 finds the Friday close inside a span, in both halves of the year', ()
   // And through it by half an hour.
   assert.equal(held('2026-01-09T20:00:00Z', '2026-01-09T22:30:00Z'), 'fail');
 
-  /* JULY, WHERE THE CLOSE IS 21:00Z RATHER THAN 22:00Z. A span ending at 21:30Z
-     is over the close in summer and short of it in winter — which is the exact
-     hour a fixed offset would get wrong, in the direction that reports a rule
-     kept as a rule broken, every summer, for half the year. */
+  /* JULY, WHERE THE CLOSE IS 21:00Z, NOT 22:00Z. A span ending at 21:30Z is over
+     it in summer and short of it in winter — the hour a fixed offset gets wrong,
+     reporting a kept rule as broken every summer. */
   assert.equal(held('2026-07-10T20:00:00Z', '2026-07-10T21:30:00Z'), 'fail');
   assert.equal(held('2026-07-10T20:00:00Z', '2026-07-10T20:30:00Z'), 'pass');
 
@@ -4125,18 +3775,11 @@ test('a day that has hit its limit says so, and one that has not does not', () =
 });
 
 test('pre-sync rows are outside every population', () => {
-  // §8's first filter. A client-id row has no prices and null timestamps, and
-  // sweeping them in is how a hunt for broker-data problems fills with false
-  // positives.
-  /* THE ROWS HAVE TO BE ABLE TO TRIP THE RULES, or this asserts nothing. An
-     earlier version passed one bare row — no entry_time, no open_day, no
-     fill_time — and every rule that needs one of those skipped it on that
-     ground rather than on its id. Removing isBroker from any single rule left
-     the test green, because the fixture could not reach the filter it was
-     written to check.
-
-     So these are real trades in every respect but their ids, and the second
-     half proves it: under broker ids the same rows produce verdicts. */
+  // §8's first filter. A client-id row has no prices and null timestamps.
+  /* THE ROWS HAVE TO BE ABLE TO TRIP THE RULES, or this asserts nothing: a bare
+     row is skipped by every rule for lack of a field, never for its id. These
+     are real trades in every respect but their ids, and the second half proves
+     it — under broker ids the same rows produce verdicts. */
   const rows = (id) => [
     // A win that closed under $25 — R-01. Overlaps the next one — R-10.
     trade({ id: `${id}a`, pnl: 100, entry_price: 4000, exit_price: 4012,
@@ -4158,10 +3801,9 @@ test('pre-sync rows are outside every population', () => {
     'the fixture trips no rule even under a broker id, so the half above ' +
     'proves nothing about the id filter');
 
-  /* AND THE ONE POPULATION checkRules DOES NOT REACH. dayStanding is what tells
-     her a day has passed its R-11 limit, and it takes the same filter for the
-     same reason — a client-id row carrying today's date would put money she
-     never lost today into the figure that stops him trading. */
+  /* AND THE POPULATION checkRules DOES NOT REACH. dayStanding takes the same
+     filter, or a client-id row dated today puts money into the figure that stops
+     him trading. */
   assert.equal(dayStanding(rows('abc'), '2026-01-06'), null,
     'a pre-sync row was counted into the day the loss limit is read over');
   assert.ok(dayStanding(rows('PID'), '2026-01-06'),
@@ -4182,12 +3824,10 @@ test('the render names the failures and says how much was unknown', () => {
 });
 
 test('every rule §7 marks journal is one this file actually evaluates', () => {
-  /* THE COPY THAT WOULD OTHERWISE BE UNCHECKABLE. §7's table is the strategy's
-     own statement of which rules a row can answer, and adherence.ts is a second
-     list of the same fact in a different file. Marking a rule `journal` in the
-     document without implementing it leaves her citing a check nobody runs;
-     implementing one the document calls `judgment` is worse, because it starts
-     reporting `pass` for something §8 says nothing stored can see. */
+  /* §7's table and adherence.ts are two lists of one fact. A rule marked
+     `journal` and not implemented is a check she cites that nobody runs; one
+     implemented that the document calls `judgment` reports `pass` for something
+     §8 says nothing stored can see. */
   const table = [...ALWAYS.matchAll(/^\| (R-\d\d) \|.*?\| (journal|field|judgment) \|/gm)];
   assert.ok(table.length >= 15, `read ${table.length} rules out of the table — the reader has gone blind`);
 
@@ -4206,9 +3846,8 @@ test('every rule §7 marks journal is one this file actually evaluates', () => {
 test('the story carries the day it last moved, and an absent one says nothing', () => {
   const line = thesisLine({ thesis: 'The market is still trading the December cut.', moved_on: '2026-03-12' });
   assert.match(line, /December cut/);
-  /* THE DATE IS FORMATTED OFF A MIDDAY UTC ANCHOR, because moved_on is a stored
-     New York civil day: read back through a New York formatter, midnight UTC on
-     the 12th is the 11th there and every thesis would read a day early. */
+  /* FORMATTED OFF A MIDDAY UTC ANCHOR: moved_on is a New York civil day, and
+     midnight UTC on the 12th is the 11th in New York. */
   assert.match(line, /12 Mar/);
   assert.equal(thesisLine(null), '');
 });
@@ -4239,10 +3878,9 @@ test('a landed release is never described as one still to come', () => {
 });
 
 test('a calendar line from another day names the day, and today stays bare', () => {
-  /* At a day and a morning forward the briefing is handed two 08:30s — today's
-     and tomorrow's — and at twelve hours back last night's 20:00 would read as
-     tonight's. Driven across all three: yesterday evening, this morning, and
-     tomorrow morning, from the 08:00 weekday briefing on a Thursday. */
+  /* A day forward holds two 08:30s and twelve hours back holds last night's
+     20:00, so the day must be named. Driven across yesterday evening, this
+     morning and tomorrow morning, from Thursday's 08:00 briefing. */
   const row = (at, name) => ({ id: 0, at, name, importance: 'high',
     consensus: null, prior: null, actual: null, note: null });
   const out = calendarList([
@@ -4271,12 +3909,10 @@ test('a past speech carries the line written about it', () => {
 
 test('the calendar filed at the weekday briefing reaches the next morning\'s prints', () => {
   /* A trade opened before tomorrow's briefing is checked against what is filed
-     today, by `aheadToday`, and nothing else. So the window has to carry the
-     08:00 briefing past tomorrow's 10:00 — at twenty-four hours it stopped at
-     08:00, and every London-session entry found the day's calendar empty and
-     said nothing about the 08:30 print it was sitting in front of. Derived from
-     the source, so narrowing either the window or moving the briefing later
-     fails here rather than quietly re-opening the gap. */
+     today, by `aheadToday` alone, so the window must carry the 08:00 briefing
+     past tomorrow's 10:00 — or the London session never hears of the 08:30
+     print. Derived from the source, so narrowing the window or moving the
+     briefing later fails here. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const ahead = Number(src.match(/const CAL_BACK = \d+, CAL_AHEAD = (\d+);/)?.[1]);
@@ -4301,10 +3937,9 @@ test('the critic cannot destroy a briefing it was meant to check', () => {
 });
 
 test('a trim that grows past a quarter is overruled, at the lengths it actually ran', () => {
-  /* 30 September: a 541-character reply came back at 852 with TRIM's own notes
-     on top of it, and went out. Every other trim that fortnight stayed within a
-     tenth — 362 to 382 was the largest growth. The critic may add a link or a
-     verdict, so its ceiling stays at twice. */
+  /* A 541-character reply came back at 852 with TRIM's own notes on top of it;
+     every other trim that fortnight stayed within a tenth. The critic may add a
+     link or a verdict, so its ceiling stays at twice. */
   assert.equal(keepDraft('x'.repeat(541), 'y'.repeat(852), TRIM_MOST), true,
     'the revision that carried TRIM\'s notes to him still goes through');
   assert.equal(keepDraft('x'.repeat(362), 'y'.repeat(382), TRIM_MOST), false,
@@ -4323,9 +3958,8 @@ test('a tap under a briefing is read strictly or not at all', () => {
 });
 
 test('the keyboard stays inside the 64 bytes a tap may carry', () => {
-  /* THE SAME CAP GLADYS IS BUILT AROUND, and it is the entire state a tap
-     carries — no session table, no schema change on that path. A longer date
-     format or a third button label is how it would silently overrun. */
+  /* THE SAME 64-BYTE CAP GLADYS IS BUILT AROUND: the payload is the entire state
+     a tap carries. */
   for (const row of feedbackKeyboard('2026-03-12').inline_keyboard) {
     for (const b of row) {
       assert.ok(new TextEncoder().encode(b.callback_data).length < 64,
@@ -4339,10 +3973,8 @@ test('the clock reaches a turn whether it is a sentence or a chart', () => {
   const now = new Date('2026-03-12T18:00:00Z');
   assert.match(stamped('hola', now), /Right now it is/);
 
-  /* A CHART ARRIVES AS BLOCKS, and string concatenation against an array is
-     "[object Object]" attached to nothing — so the one line telling her what day
-     it is would land somewhere she cannot read it, silently, on exactly the
-     turns carrying the most context. */
+  /* A CHART ARRIVES AS BLOCKS, and concatenating against an array is
+     "[object Object]" — the clock lost on the turns carrying most context. */
   const blocks = stamped([{ type: 'image', source: {} }], now);
   assert.ok(Array.isArray(blocks));
   assert.equal(blocks.length, 2);
@@ -4358,11 +3990,8 @@ test('withClock stamps a picture turn as well as a typed one', () => {
 });
 
 test('the apology names the job that actually died', () => {
-  /* IT USED TO SAY "No briefing" FOR ALL OF THEM. A consolidation that died at
-     22:00 reported itself as a missing briefing — sending him to look for the
-     wrong thing at the wrong time of day, and describing the failure whose
-     symptom is that her memory stops growing as the one whose symptom is a
-     message that never arrived. */
+  /* EACH JOB NAMES ITS OWN FAILURE. A consolidation that dies reads as her memory
+     not growing, not as a missing briefing. */
   assert.match(apologyFor('briefing'), /No briefing/);
   assert.match(apologyFor('consolidate'), /nightly/);
   assert.match(apologyFor('pulse'), /second look/);
@@ -4375,11 +4004,8 @@ test('the apology names the job that actually died', () => {
 });
 
 test('the audit he asks for carries everything she keeps', () => {
-  /* `/notes` IS HIS ONE WINDOW INTO ANY OF IT, and it is answered from the
-     database precisely so nothing can paraphrase or drop a row. An audit that
-     shows three of the five things it audits is the defect it exists to
-     prevent — and all of it is addressed to HIM, so nothing in it may switch
-     into the third person about him. */
+  /* `/notes` IS HIS ONE WINDOW INTO ANY OF IT, answered from the database so
+     nothing can paraphrase or drop a row — and all of it addressed to HIM. */
   const out = notesList(
     [{ id: 1, note: 'stop mentioning the ten-year' }],
     [{ id: 2, note: 'he trades the London open' }],
@@ -4407,11 +4033,9 @@ test('the audit still works before any of the newer memory exists', () => {
 });
 
 /* ─── What he committed to, which she holds his trades against ──────────────
-   A commitment is read the opposite way to an instruction — she does not obey
-   it, she checks him against it — so it is its own kind with its own window.
-   Both renderings have to carry it: hers, or nothing is ever held against it;
-   his, or he cannot see what she thinks he promised. Driven through the real
-   read rather than handed a list, because the kind the block ASKS for is the
+   A commitment is read the opposite way to an instruction — checked against,
+   not obeyed — so it is its own kind with its own window, in both renderings.
+   Driven through the real read, because which kind the block ASKS for is the
    half a rendering test cannot reach.
    ─────────────────────────────────────────────────────────────────────────── */
 
@@ -4463,11 +4087,9 @@ test('a night that already distilled itself does nothing at the retry hour', () 
 });
 
 test('a voice note that produced no words says WHICH of the four things went wrong', () => {
-  /* THEY WERE ONE SENTENCE, and that is the failure worth a test. A rejected
-     key, a wrong URL, an unsupported format and genuinely unclear audio all
-     reached him as "I could not make that out — send it again", so the one
-     failure he cannot fix by speaking more clearly was the one he was told to
-     try speaking more clearly for. */
+  /* FOUR FAILURES, FOUR SENTENCES. A rejected key, a wrong URL and an
+     unsupported format are not fixed by speaking more clearly, so they must not
+     be told as unclear audio. */
   const said = Object.values(VOICE_TROUBLE);
   assert.equal(new Set(said).size, said.length, 'two of the four reasons share a sentence');
   assert.equal(said.length, 4);
@@ -4489,13 +4111,11 @@ test('a voice note that produced no words says WHICH of the four things went wro
 /* ═══════════════════════════════════════════════════════════════════════════
    THE PRICE, AND THE TWO SCALES ONE ENDPOINT USES
    ───────────────────────────────────────────────────────────────────────────
-   Every number below is a REAL capture from `?market=raw` and `?positions=1`
-   against the live account, not a shape invented here. That matters more than
-   usual: cTrader serves `get_spot_prices` in pipettes and `get_positions` in
-   display prices, on the same account and the same symbol, and its own tool
-   descriptions say nothing about either. A parser written from the docs would
-   have been a hundred thousand out on one of the two and would still have
-   produced a four-digit number that looked like gold.
+   Every number below is a REAL capture from `?market=raw` and `?positions=1`.
+   cTrader serves `get_spot_prices` in pipettes and `get_positions` in display
+   prices, on one account and one symbol, and documents neither. A parser
+   written from the docs would be a hundred thousand out on one of them and
+   still produce a four-digit number that looks like gold.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // get_spot_prices, symbol 41, exactly as it came back.
@@ -4517,9 +4137,8 @@ test('a spot price is pipettes, and the scale is applied once', () => {
 });
 
 test('the overnight move comes out of the same call as the price', () => {
-  /* sessionClose is the previous session's close — the 17:00 New York roll for
-     gold — so "where it is, with the overnight move" needs no second request
-     and no trendbars. That is the whole of the briefing's opening line. */
+  /* sessionClose is the previous session's close — the 17:00 New York roll — so
+     the overnight move needs no second request. */
   const spot = foldSpot(SPOT);
   assert.equal(spot.bid, 4419.82);
   assert.equal(spot.ask, 4419.93);
@@ -4531,13 +4150,9 @@ test('the overnight move comes out of the same call as the price', () => {
 });
 
 test('a quote with no previous close states no move rather than inventing one', () => {
-  /* THE LINE THE BRIEFING OPENS ON, AND IT HAD NEVER BEEN EXECUTED BY A TEST —
-     only read for a substring. `prev_close` and `change` were typed `number`
-     and forced through with `as number`, so the null `foldSpot` goes out of its
-     way to produce was invisible to every caller. In the template it became
-     text: `${null}` is "null", `null >= 0` is TRUE so the word chosen is "up",
-     and `Math.abs(null)` is 0. Both halves of a confident sentence about the
-     market, wrong, in the one figure he checks against his own screen. */
+  /* THE LINE THE BRIEFING OPENS ON, EXECUTED. A null `prev_close` in a template
+     is "null", `null >= 0` is TRUE so the word is "up", and `Math.abs(null)` is 0:
+     a confident sentence, wrong in the figure he checks against his screen. */
   const blind = { bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
                   prev_close: null, change: null, at: '2026-09-03T12:15:05.346Z' };
   const said = quoteLine(blind, new Date('2026-09-03T12:15:05Z'));
@@ -4570,9 +4185,8 @@ test('foldSpot leaves both halves of the move null when the close is unreadable'
 });
 
 test('a price that will not parse is null rather than NaN', () => {
-  /* NaN formats as "NaN" and would reach him as text in a briefing; a null is
-     something the caller is forced to handle, and the caller throws. An empty
-     answer here is not a price of zero. */
+  /* NaN would print as "NaN"; a null forces the caller to handle it. An empty
+     answer is not a price of zero. */
   assert.equal(foldSpot(undefined), null);
   assert.equal(foldSpot({}), null);
   assert.equal(foldSpot({ bid: 'x', ask: 441993000 }), null);
@@ -4592,14 +4206,10 @@ test('a quote with no previous close still gives a price', () => {
 });
 
 test('a live position carries its plan, and NOT in pipettes', () => {
-  /* THE CAPTURE THAT CONTRADICTS §8. It says the plan — where the stop and the
-     target were set — is not available from the broker, and four questions are
-     marked unanswerable because of it. That is true of a CLOSED position, which
-     is all this system had ever asked about. A live one carries both.
-
-     And it carries them as DISPLAY prices, beside a spot call that does not.
-     This test exists to hold that asymmetry in place: applying fromPipettes
-     here would put the stop at four one-hundredths of a cent. */
+  /* A LIVE POSITION CARRIES ITS PLAN. A closed one does not — the final stop has
+     overwritten it — but an open one carries both sides, as DISPLAY prices
+     beside a spot call that does not. Applying fromPipettes here would put the
+     stop at four one-hundredths of a cent. */
   const position = {
     positionId: 586244103, symbolId: 41, tradeSide: 'BUY', volume: 400,
     entryPrice: 4402.71, stopLoss: 4403.24, takeProfit: 4432.1,
@@ -4619,8 +4229,7 @@ test('a live position carries its plan, and NOT in pipettes', () => {
 });
 
 /* ─── The plan, off the open position ───────────────────────────────────────
-   §8 said this was unrecoverable, and it was — of a CLOSED position. The
-   capture below is the live one that showed otherwise, unchanged.
+   The capture is the live position, unchanged.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('an open position yields its plan, keyed the way the poller files it', () => {
@@ -4641,15 +4250,10 @@ test('an open position yields its plan, keyed the way the poller files it', () =
 });
 
 test('each side of the plan is recorded on its own, and a bad id is dropped', () => {
-  /* REQUIRING THE PAIR WAS WHAT CORRUPTED IT. A stop-only entry recorded
-     NOTHING, so `planned_sl is null` was still true when a target appeared
-     later — by which time R-04 had moved the stop to break-even, and the
-     break-even stop was filed as the plan it exists to be compared against.
-
-     The reason given for the pair was that half a row "would produce a
-     division by a missing number", and nothing divides: no rule in
-     `adherence.ts` reads either column and `positionsBlock` names only what it
-     has. The ratio is arithmetic HE runs. The guard belonged at the render. */
+  /* EACH SIDE IS ITS OWN FIRST SIGHTING. Requiring the pair, a stop-only entry
+     recorded nothing, so `planned_sl is null` was still true when a target
+     appeared — by which time R-04 had moved the stop to break-even, and that was
+     filed as the plan. Nothing divides by either column, so half a row is safe. */
   assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 4403.24 }]),
     [{ id: 'PID1', planned_sl: 4403.24, planned_tp: undefined }],
     'a stop set with no target is thrown away, and the next poll to see a ' +
@@ -4660,10 +4264,9 @@ test('each side of the plan is recorded on its own, and a bad id is dropped', ()
     [{ id: 'PID1', planned_sl: undefined, planned_tp: 4432.1 }],
     'a zero is "not set" rather than a price, and must not survive as one');
 
-  /* NEITHER SIDE IS STILL A POSITION. It has no plan to write, and the stop
-     history reads this same list: dropped here, a stop and target pulled
-     together wrote nothing, and the last row — the stop he had just taken off —
-     read as still resting. A bad id and nothing at all are still nothing. */
+  /* NEITHER SIDE IS STILL A POSITION. The stop history reads this list: dropped
+     here, a stop and target pulled together write nothing, and the stop just
+     taken off reads as still resting. */
   assert.deepEqual(openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]),
     [{ id: 'PID1', planned_sl: undefined, planned_tp: undefined }],
     'a position carrying no stop and no target dropped out of the stop history');
@@ -4691,9 +4294,8 @@ test('a stop or target is written when it moves, and never on a poll where it di
 });
 
 test('a stop and target pulled together are recorded, through the list the poll builds', () => {
-  /* DRIVEN FROM THE BROKER'S SHAPE rather than from a plan built by hand: the
-     defect was upstream of stopChanges, in the list it is handed, and a test
-     that supplies the plan cannot see a position that never reaches it. */
+  /* DRIVEN FROM THE BROKER'S SHAPE: the defect would be upstream of stopChanges,
+     in the list it is handed, and a hand-built plan cannot see it. */
   const held = [{ id: 'PID1', sl: 4000, tp: 4030 }];
   const pulled = openPlans([{ positionId: 1, stopLoss: 0, takeProfit: 0 }]);
   assert.deepEqual(stopChanges(pulled, held), [{ id: 'PID1', sl: null, tp: null }],
@@ -4711,10 +4313,9 @@ test('every open position with a plan is filed, not just the first', () => {
 });
 
 /* ─── How far a trade ran, off the broker's minute bars ─────────────────────
-   The capture is `?bars=raw`'s answer for 17 Sep 2026 14:00–14:15 UTC,
-   unchanged — sixteen bars, the scale and the field names as the broker sent
-   them. The two trades below are placed so the extreme of the window sits in
-   an EDGE minute, which is the bar the figure must never read.
+   `?bars=raw`'s answer for 17 Sep 2026 14:00–14:15 UTC, unchanged. The trades
+   are placed so the window's extreme sits in an EDGE minute, the bar the
+   figure must never read.
    ─────────────────────────────────────────────────────────────────────────── */
 const BARS = JSON.parse(parseSse(readFileSync(
   new URL('./fixtures/ctrader-get-trendbars.txt', import.meta.url), 'utf8'))
@@ -4729,12 +4330,10 @@ test('a real minute bar is in pipettes, and the best price comes out in dollars'
 });
 
 test('the minute he entered in and the minute he left in are never read', () => {
-  /* THE ONE PROPERTY THE COLUMN PROMISES. A bar holds a whole minute of prices
-     and he was in for only part of it, so an edge bar can carry a spike from
-     before the fill or after the close. The window's lowest low is 14:00's,
-     the minute a 14:00:30 entry landed in; its highest high is 14:09's. Each
-     trade below is placed so that bar is an edge, and each must come back
-     short of it rather than past it. */
+  /* A bar holds a whole minute and he was in for part of it, so an edge bar can
+     carry a spike from before the fill or after the close. The lowest low is
+     14:00's, the minute a 14:00:30 entry landed in; the highest high is 14:09's.
+     Each trade must come back short of its edge bar, not past it. */
   assert.equal(bestPrice(BARS, 'SELL', at('14:00:30'), at('14:14:10')), 4364.64,
     "14:00's low of 4364.48 is from before the entry and was read as his");
   assert.equal(bestPrice(BARS, 'BUY', at('14:09:30'), at('14:15:30')), 4379.95,
@@ -4769,9 +4368,8 @@ test('R-04 fails a loss taken after the trade had already run $20 his way', () =
   assert.equal(r([short(3980)]).verdict, 'fail');
   assert.equal(r([short(4020)]).verdict, 'pass');
 
-  /* THE POPULATION IS LOSSES BEYOND THE SCRATCH BAND. A break-even exit is
-     R-04 having fired and a win says nothing about the stop, so neither is
-     counted — even at $25 in his favour. */
+  /* THE POPULATION IS LOSSES BEYOND THE SCRATCH BAND: a break-even exit is R-04
+     having fired and a win says nothing about the stop. */
   const outside = r([
     loss({ id: 'PIDbe', pnl: -8, exit_price: 3998, best_price: 4025 }),
     trade({ id: 'PIDw', pnl: 120, entry_price: 4000, exit_price: 4030, best_price: 4031, open_day: '2026-01-06' }),
@@ -4786,15 +4384,9 @@ test('R-04 fails a loss taken after the trade had already run $20 his way', () =
 /* ═══════════════════════════════════════════════════════════════════════════
    THE PRICE SENSE — DRIVEN FROM BOTH SIDES OF EVERY GATE
    ───────────────────────────────────────────────────────────────────────────
-   A sense that is silent by design is the one where a broken predicate and a
-   quiet market produce the same evidence: nothing, for weeks. `moveWorth`
-   returning "not worth it" to everything would look exactly like gold behaving
-   itself, and no log anywhere would say otherwise. So every gate is driven in
-   BOTH directions here — each one is shown to block, and shown to pass with the
-   one thing it objects to removed.
-
-   The quote below is the real `?market=1` capture folded, so the numbers the
-   gates are tested against are numbers this system has actually served.
+   A sense silent by design is one where a broken predicate and a quiet market
+   look identical for weeks. So every gate is shown to block, and to pass with
+   the one thing it objects to removed — against the real `?market=1` capture.
    ═══════════════════════════════════════════════════════════════════════════ */
 const QUOTE = {                            // the SPOT capture, after foldSpot
   bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
@@ -4813,10 +4405,8 @@ test('a move large by the day own measure is worth waking her for', () => {
 });
 
 test('the mark seeded at zero is not a price, and cannot be a move of 4,400', () => {
-  /* 005 SEEDS THE ROW so the first run has something to PATCH. Read as a price
-     that seed is a move of the entire value of gold, which passes every
-     threshold there is — a message on the first tick after any deploy that
-     rebuilt the table, saying gold had moved four and a half thousand dollars. */
+  /* 005 SEEDS THE ROW so the first run has something to PATCH. Read as a price,
+     the seed is a move of gold's entire value after any rebuild. */
   const out = moveWorth(QUOTE, { ...MARK, bid: 0 }, LOOKED);
   assert.equal(out.worth, false);
   assert.match(out.why, /no mark/);
@@ -4836,9 +4426,8 @@ test('a move measured across an outage is not a quarter-hour move', () => {
 });
 
 test('she says one thing about one move, however long it keeps going', () => {
-  /* THE GATE A THRESHOLD CANNOT REPLACE. A market that trends $15 a quarter
-     hour clears every other gate on every run — this is the only thing between
-     that and eight messages before lunch about one story. */
+  /* A trend of $15 a quarter hour clears every other gate on every run; this is
+     what stands between that and eight messages before lunch on one story. */
   const spoken = { ...MARK, looked_at: new Date(LOOKED - (MOVE_QUIET_H - 0.5) * 3600_000).toISOString() };
   assert.equal(moveWorth(QUOTE, spoken, LOOKED).worth, false);
   assert.match(moveWorth(QUOTE, spoken, LOOKED).why, /already said/);
@@ -4849,18 +4438,15 @@ test('she says one thing about one move, however long it keeps going', () => {
 });
 
 test('the floor is a share of the price, so it cannot go stale as gold moves', () => {
-  /* A FIXED $4 WOULD MEAN TWO DIFFERENT THINGS to gold at 4,400 and gold at
-     2,000, and the year nobody revises it the sense either fires constantly or
-     never — and never looks exactly like a quiet market. */
+  /* A FIXED $4 MEANS DIFFERENT THINGS at 4,400 and at 2,000, and never fires
+     looks exactly like a quiet market. */
   const small = { ...MARK, bid: QUOTE.bid - QUOTE.bid * MOVE_FLOOR * 0.9 };
   assert.equal(moveWorth(QUOTE, small, LOOKED).worth, false);
 
-  /* AND THE GUARANTEE SURVIVED THE GATES BEING RECOMPOSED, which is the half
-     worth asserting rather than the rejection: the floor now bounds the BAR
-     instead of standing beside it, so nothing under this share of the price can
-     ever be reported — the bar is never below it. Asserted over a sweep rather
-     than at one price, because a single quote cannot tell a floor that scales
-     from one that happens to be right at 4,400. */
+  /* THE GUARANTEE THAT SURVIVES THE COMPOSITION: the floor bounds the BAR, so
+     nothing under this share of the price can ever be reported. Swept across
+     prices, because one quote cannot tell a floor that scales from one that
+     happens to be right at 4,400. */
   for (const price of [1800, 2000, 3000, 4400, 6000]) {
     const range = price * 0.01;                        // a full, ordinary session
     const spot = { ...QUOTE, bid: price, high: price, low: price - range };
@@ -4871,12 +4457,10 @@ test('the floor is a share of the price, so it cannot go stale as gold moves', (
 });
 
 test('a move small against the day range is the day, not an event', () => {
-  // Below the share and above the floor: $12.50 on a session that has already
-  // travelled $39 is an ordinary swing, and it is the case the floor alone
-  // would let through on every quiet afternoon. The band between the two gates
-  // is narrow — $11.05 to $13.65 on this quote — so the figure is asserted to
-  // be inside it rather than assumed, which is what makes this a test of the
-  // SHARE rather than a second test of the floor.
+  // Below the share and above the floor: $12.50 on a session that has travelled
+  // $39 is an ordinary swing. The band between the gates is narrow — $11.05 to
+  // $13.65 on this quote — so the figure is asserted inside it, making this a
+  // test of the SHARE rather than a second test of the floor.
   const ordinary = { ...MARK, bid: QUOTE.bid - 12.5 };
   const out = moveWorth(QUOTE, ordinary, LOOKED);
   assert.equal(out.worth, false);
@@ -4887,24 +4471,14 @@ test('a move small against the day range is the day, not an event', () => {
 
 /* ─── The evening roll, which is where the gates were weakest ────────────────
    THE SESSION RESTARTS AT 17:00 NEW YORK, so for hours every evening the range
-   is small because the session is YOUNG rather than because the market is
-   quiet. The two gates used to stand side by side, so a range near zero made
-   the share stop binding and left the floor as the whole test — a bar written
-   for a full day's trading, carried alone through the thinnest hours.
+   is small because the session is YOUNG, not because the market is quiet. Side
+   by side, a near-zero range stops the share binding and leaves the floor — a
+   bar written for a full day — carried alone through the thinnest hours.
 
-   THE PREVIOUS PASS SAW THAT AND CHOSE THE WRONG OF TWO OPTIONS. It reasoned
-   that the share could not be fixed from here, since nothing this system reads
-   spans the calendar day, so the floor had to be set to an amount that is an
-   event in the thin hours. There was a third option it did not consider:
-   refuse to judge. A session with no range yet is one the share cannot be
-   applied to, and silence is a better answer than a lower standard.
-
-   What it cost meanwhile is on his `/notes` — $13 just after the Sunday roll on
-   6 September and $17 just after the next one on the 13th, both filed as
-   unexplained and neither ever closed, because there was nothing to explain.
-   The one real find in that run, $33 at 11:12 on a Wednesday, cleared both
-   gates on its own. A sense that manufactures a loop it cannot close is worse
-   than a quiet one: the loop then rides into every briefing after it.
+   Lowering the standard is the wrong answer; REFUSING TO JUDGE is the right
+   one. A session with no range yet cannot be measured against, and silence
+   beats a lower bar. A sense that manufactures a loop it cannot close is worse
+   than a quiet one: the loop rides into every briefing after it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // The session as she described it at 20:57: 4,485 the top, and a range that
@@ -4917,9 +4491,8 @@ test('the $7 evening drift that reached him does not clear the gates now', () =>
   assert.equal(out.worth, false, 'a $7 drift in thin evening trade is not a sharp move');
   assert.match(out.why, /no session range/);
 
-  // THE SHARE ADMITS IT, which is the finding rather than an aside: $7 of an
-  // $18 range passes a test written for $14 of a $39 one. What rejects it is
-  // that the $18 range is too narrow to be a bar at all.
+  // THE SHARE ADMITS IT: $7 of an $18 range passes a test written for $14 of $39.
+  // What rejects it is that an $18 range is too narrow to be a bar at all.
   assert.ok(7 >= (EVENING.high - EVENING.low) * MOVE_SHARE,
     'the share no longer admits this, so it is not the case this test was built on');
 });
@@ -4936,10 +4509,9 @@ test('the two drops that became loops nobody could close are silent now', () => 
 });
 
 test('and the evening is not simply shut: a move that builds its own range speaks', () => {
-  /* THE COST OF THE CHANGE, STATED RATHER THAN HIDDEN. The bar is higher after
-     the roll than it is at noon — which is the intent, since a young session is
-     one she cannot judge against. A real move is not silenced by it, because a
-     real move IS the range: a $35 fall takes the low with it. */
+  /* THE COST, STATED: the bar is higher after the roll than at noon, by intent. A
+     real move is not silenced, because it IS the range — a $35 fall takes the
+     low with it. */
   const violent = { ...EVENING, low: 4450 };
   const out = moveWorth(violent, { ...MARK, bid: 4485 + 35 }, LOOKED);
   assert.equal(out.worth, true, 'a $35 evening move is silenced, which is too far');
@@ -4947,9 +4519,8 @@ test('and the evening is not simply shut: a move that builds its own range speak
 });
 
 test('the mid-session drop that was a real find still is', () => {
-  // $33 at 11:12 on 9 September, on a session that had travelled a full day.
-  // It cleared both gates before and has to clear both now, or the change has
-  // bought quiet by turning the sense off.
+  // $33 at 11:12 on 9 September, on a full day's session. It must clear both
+  // gates, or quiet was bought by turning the sense off.
   const midday = { ...QUOTE, bid: 4419.82, high: 4452, low: 4413 };
   const out = moveWorth(midday, { ...MARK, bid: 4419.82 + 33 }, LOOKED);
   assert.equal(out.worth, true);
@@ -4957,10 +4528,8 @@ test('the mid-session drop that was a real find still is', () => {
 });
 
 test('a quote carrying no range is not judged at all', () => {
-  /* foldSpot FALLS BACK TO THE BID for a quote with no high or low, which makes
-     the range zero. That used to leave the floor deciding alone; it now lands
-     where every other rangeless session lands — there is nothing to judge
-     against, so she says nothing. */
+  /* foldSpot falls back to the bid for a quote with no high or low, so the range
+     is zero, and she says nothing. */
   const flat = { ...QUOTE, high: QUOTE.bid, low: QUOTE.bid };
   const out = moveWorth(flat, MARK, LOOKED);
   assert.equal(out.worth, false);
@@ -4978,19 +4547,11 @@ test('a fall is a move, and it is reported as one', () => {
 /* ═══════════════════════════════════════════════════════════════════════════
    WHICH SESSION THE QUOTE IS DESCRIBING
    ───────────────────────────────────────────────────────────────────────────
-   `high`, `low`, `prev_close` and `change` are all measured from the broker's
-   session open, and gold's session opens at the 17:00 New York roll. Before
-   that hour the window reaches back through the night and `change` really is
-   the overnight move, which is what the briefing's opening line wants. After
-   it the window is a few hours old and `change` is the evening's move — and
-   served as a bare number in a JSON blob there is nothing to tell the two
-   apart, which is how "up $12 on the day" was said at 20:57 about a day that
-   was up more than $40.
-
-   So the label is driven from both sides of the roll, and from both sides of
-   the daylight-saving change as well: the boundary is 17:00 in New York, not a
-   fixed UTC hour, and a test pinned to one offset would pass all summer and be
-   an hour wrong every winter evening.
+   `high`, `low`, `prev_close` and `change` are measured from the broker's
+   session open, the 17:00 New York roll. Before it `change` is the overnight
+   move; after it, the evening's — and a bare number cannot tell them apart.
+   Driven from both sides of the roll and of the daylight-saving change, since
+   the boundary is 17:00 in New York, not a fixed UTC hour.
    ═══════════════════════════════════════════════════════════════════════════ */
 test('before the roll the quote covers the night, and says so', () => {
   // 08:00 New York on a summer weekday — the briefing's own hour, where the
@@ -5002,8 +4563,7 @@ test('before the roll the quote covers the night, and says so', () => {
 });
 
 test('after the roll the quote is not the day, and says that instead', () => {
-  // 20:57 New York — the minute of the message that prompted this. The window
-  // is under four hours old, and the whole job of the label is to stop the
+  // 20:57 New York: the window is under four hours old, and the label stops the
   // figure inside it being called the move on the day.
   const said = quoteWindow(new Date('2026-09-04T00:57:00Z'));
   assert.match(said, /THIS EVENING/);
@@ -5013,10 +4573,8 @@ test('after the roll the quote is not the day, and says that instead', () => {
 });
 
 test('the roll is 17:00 in New York, in winter as well as in summer', () => {
-  /* THE CASE A FIXED UTC HOUR GETS WRONG FOR HALF THE YEAR, and it is the same
-     argument that keeps every other schedule here on nyClock. 22:00 UTC is
-     18:00 in New York in September and 17:00 in January — one is past the roll
-     and both would be past a boundary written as 22. */
+  /* 22:00 UTC is 18:00 New York in September and 17:00 in January — one past the
+     roll, and both past a boundary written as 22. */
   assert.match(quoteWindow(new Date('2026-09-03T20:59:00Z')), /YESTERDAY/); // 16:59 ET
   assert.match(quoteWindow(new Date('2026-09-03T21:01:00Z')), /THIS EVENING/); // 17:01 ET
   assert.match(quoteWindow(new Date('2026-01-14T21:59:00Z')), /YESTERDAY/); // 16:59 ET
@@ -5024,9 +4582,8 @@ test('the roll is 17:00 in New York, in winter as well as in summer', () => {
 });
 
 test('the roll hour is the one the market hours are already kept on', () => {
-  // marketOpen closes Friday and opens Sunday at this same hour, because it is
-  // one boundary rather than two that happen to agree. A second literal here
-  // would be a copy nothing compares.
+  // marketOpen shuts Friday and opens Sunday at this same hour: one boundary,
+  // not two that happen to agree.
   assert.equal(ROLL_HOUR, 17);
   assert.equal(marketOpen(new Date('2026-09-04T20:59:00Z')), true);  // Fri 16:59 ET
   assert.equal(marketOpen(new Date('2026-09-04T21:01:00Z')), false); // Fri 17:01 ET
@@ -5035,22 +4592,15 @@ test('the roll hour is the one the market hours are already kept on', () => {
 /* ═══════════════════════════════════════════════════════════════════════════
    THE VENDOR'S ANSWER, FOLDED
    ───────────────────────────────────────────────────────────────────────────
-   The embedding call is the one place in this system where a wrong answer is
-   completely undetectable afterwards. A vector filed against the wrong row does
-   not error, does not log, and does not look wrong in the table — it surfaces
-   only as a memory that returns the wrong text for the right question, months
-   later, as her seeming to misremember.
-
-   So the ordering, the count and the width are decided in a pure function and
-   driven from here, rather than proved by stubbing a vendor to return the order
-   the test wanted.
+   A vector filed against the wrong row does not error, log or look wrong — it
+   surfaces months later as her seeming to misremember. So ordering, count and
+   width are decided in a pure function and driven here.
    ═══════════════════════════════════════════════════════════════════════════ */
 const vec = (fill) => Array(EMBED_DIMS).fill(fill);
 
 test('the vectors come back in the order they were asked for', () => {
-  /* THE RESPONSE CARRIES THE POSITION OF THE INPUT IT ANSWERS, and taking the
-     array as it arrives is the bug that cannot be found later: turn A gets
-     turn B's meaning and both rows look perfectly healthy. */
+  /* THE RESPONSE CARRIES THE INDEX OF THE INPUT IT ANSWERS. Taken in arrival
+     order, turn A gets turn B's meaning and both rows look healthy. */
   const out = foldVectors([
     { index: 1, embedding: vec(0.2) },
     { index: 0, embedding: vec(0.1) },
@@ -5060,19 +4610,16 @@ test('the vectors come back in the order they were asked for', () => {
 });
 
 test('a vector is pgvector text, not a JSON array', () => {
-  // The same string goes into the column and into the query, and this is the
-  // form that crosses a JSON body into a `vector` without depending on a cast
-  // from json existing.
+  // The same string goes into the column and the query: the form that crosses a
+  // JSON body into a `vector` without needing a cast from json.
   const [only] = foldVectors([{ index: 0, embedding: vec(0.5) }], 1);
   assert.ok(only.startsWith('[') && only.endsWith(']'));
   assert.equal(only.split(',').length, EMBED_DIMS);
 });
 
 test('a batch that comes back wrong is refused whole', () => {
-  /* ALL OR NOTHING, because a short answer gives no way to tell WHICH row lost
-     its vector. Writing the ones that arrived would silently pair the tail of
-     the batch with the wrong rows — the same undetectable failure as the
-     ordering, arrived at from the other direction. */
+  /* ALL OR NOTHING: a short answer cannot say WHICH row lost its vector, and
+     writing the rest would pair the tail with the wrong rows. */
   assert.equal(foldVectors([{ index: 0, embedding: vec(0.1) }], 2), null,
     'a batch one vector short was accepted');
   assert.equal(foldVectors([{ index: 0, embedding: vec(0.1) },
@@ -5094,28 +4641,18 @@ test('an empty ask is answered empty rather than refused', () => {
 /* ═══════════════════════════════════════════════════════════════════════════
    EVERYTHING SHE WRITES IS ALSO SPOKEN
    ───────────────────────────────────────────────────────────────────────────
-   It used to depend on how he wrote: a voice note was answered aloud and a
-   typed line was not. That rule was sound and it only ever decided a REPLY —
-   everything she STARTS was silent as a side effect of it rather than as a
-   decision, so the briefing he actually wanted read to him was the one message
-   the rule could never reach. He decided it the other way.
-
-   What is left is a bound, and it is the speech vendor's rather than a
-   judgement about listening: everything she writes already fits under it,
-   because the briefing's own ceiling is Telegram's.
+   Every path, whatever channel he used — the briefing he wanted read to him
+   included. There is no length past which a message goes unspoken: a long one
+   is several voice notes, and the text is the fallback when the audio did not
+   land.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 test('a speech vendor that cannot answer still leaves him the message', async () => {
-  /* THE ONE PROPERTY A SOURCE READ CANNOT SETTLE: there is no path on which he
-     gets nothing. Audio-only was the ask, and audio-only turns an unset key, a
-     refusing vendor and a format Telegram will not render into a MISSING
-     message rather than a degraded one — which is the failure shape the whole
-     system is built against.
-
-     Driven rather than read, and for free: with no TTS key `speak` answers
-     false without a request, which is exactly the shape of a vendor that
-     refused. So what this replays is the real sequence — every part fails, and
-     the text must still go. */
+  /* THE ONE PROPERTY A SOURCE READ CANNOT SETTLE: no path leaves him with
+     nothing. An unset key, a refusing vendor and an unrenderable format would
+     otherwise make audio-only a MISSING message. With no TTS key `speak` answers
+     false without a request — the shape of a vendor that refused — so this
+     replays the real sequence: every part fails, and the text must still go. */
   const realFetch = globalThis.fetch, realErr = console.error;
   const sent = [];
   globalThis.fetch = async (url, init) => {
@@ -5139,16 +4676,11 @@ test('a speech vendor that cannot answer still leaves him the message', async ()
 });
 
 test('a speech vendor that never answers still leaves him the message, in time', async () => {
-  /* THE SHAPE THAT COST A BRIEFING. The test above is a vendor that REFUSES,
-     which speak() has always caught. On 2 October the vendor did not refuse —
-     it never answered, and the worker was shut down at its four hundred seconds
-     with the voice request still open: no catch ran, so nothing fell back.
-
-     So this one needs a key, which means a fresh instance of the module read
-     with one — TTS_KEY is fixed when the file loads, and the instance the rest
-     of this suite imported has none. The vendor stub hangs until the request is
-     aborted, exactly as a vendor that never answers does, and the budget is
-     passed short so the test does not wait out SPEAK_MS. */
+  /* A VENDOR THAT NEVER ANSWERS, which no catch sees: the worker is shut down at
+     its wall clock with the request still open, and nothing falls back. This
+     needs a key, so a fresh instance of the module is loaded with one (TTS_KEY
+     is read at load). The stub hangs until aborted, and the budget is passed
+     short so the test does not wait out SPEAK_MS. */
   const realFetch = globalThis.fetch, realErr = console.error, realDeno = globalThis.Deno;
   globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
   const fresh = await import('../supabase/functions/doji-eugenia/index.ts?voice');
@@ -5168,11 +4700,9 @@ test('a speech vendor that never answers still leaves him the message, in time',
     return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
   };
   console.error = () => {};
-  /* RACED AGAINST A DEADLINE OF ITS OWN, for two reasons. The regression this
-     guards is a wait with no end, which must fail rather than hang the suite.
-     And the timer behind AbortSignal.timeout is unref'd: a real open request
-     keeps the event loop alive and this stub does not, so the deadline's timer
-     is what stands in for the open socket while the budget runs out. */
+  /* RACED AGAINST A DEADLINE OF ITS OWN: the regression is a wait with no end,
+     which must fail rather than hang the suite. AbortSignal.timeout's timer is
+     unref'd, so this timer stands in for the open socket a real request holds. */
   let timer;
   const deadline = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(
@@ -5197,10 +4727,9 @@ test('a speech vendor that never answers still leaves him the message, in time',
 });
 
 test('a speech vendor that refuses once is asked again before the text goes', async () => {
-  /* THE SECOND ATTEMPT, which is what turns a vendor's bad minute into a voice
-     note rather than text. Driven with a refusal that answers at once, so the
-     test needs no clock: the attempt is the same whichever way the first one
-     failed, and the stall that cost 2 October is the budget test's to hold. */
+  /* THE SECOND ATTEMPT turns a vendor's bad minute into a voice note rather than
+     text. A refusal that answers at once needs no clock; the stall is the budget
+     test's to hold. */
   const realFetch = globalThis.fetch, realErr = console.error, realDeno = globalThis.Deno;
   globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
   const fresh = await import('../supabase/functions/doji-eugenia/index.ts?retry');
@@ -5235,11 +4764,10 @@ test('a speech vendor that refuses once is asked again before the text goes', as
     'the text went as well as the voice that landed — two bubbles for one message');
 });
 
-/* THE BRIEFING'S SECOND WORKER, driven through the real sequence: the marker,
-   its text paired by the instant both were written, the send, and the delivered
-   row after it. The stub answers each read only when its filter matches what a
-   correct read asks for — a stub that answered any read would pass a pairing
-   that reads the wrong row. */
+/* THE BRIEFING'S SECOND WORKER, through the real sequence: the marker, its text
+   paired by the instant both were written, the send, and the delivered row
+   after it. The stub answers a read only when its filter matches a correct
+   one, or a pairing that reads the wrong row would pass. */
 test('the speaking worker sends today\'s stored briefing and only then says it was delivered', async () => {
   const realFetch = globalThis.fetch, realErr = console.error;
   const stamp = new Date(Date.now() - 60_000).toISOString().replace('Z', '+00:00');
@@ -5292,13 +4820,9 @@ test('the speaking worker refuses a briefing that is not today\'s, and a door th
 });
 
 test('nothing she writes is left unspoken for being long', () => {
-  /* THERE WAS A CAP AND NOW THERE IS NOT. Seven hundred characters, then four
-     thousand — and a cap decides that past some length a message is not worth
-     hearing, which is a judgement he made the other way. A long message becomes
-     SEVERAL voice notes, exactly as it already becomes several text messages.
-
-     Driven through `chunk` at the speech limit, because that is what sayAloud
-     does and the property that matters is that every character comes back. */
+  /* NO CAP: a long message becomes SEVERAL voice notes, as it becomes several
+     text messages. Driven through `chunk` at the speech limit, because every
+     character coming back is the property. */
   const long = Array.from({ length: 40 },
     (_, i) => `Paragraph ${i}. ` + 'word '.repeat(40)).join('\n\n');
   const parts = chunk(long, 4000);
@@ -5314,28 +4838,22 @@ test('nothing she writes is left unspoken for being long', () => {
 });
 
 test('a briefing is one voice note, not several', () => {
-  // The thing he asked for. 250-400 words by its own rule is ~2,800 characters,
-  // well inside one request — splitting it would arrive as two notes with the
-  // teaching block cut across them.
+  // 250–400 words is ~2,800 characters, one request; split, the teaching block
+  // would be cut across two notes.
   assert.equal(chunk('x'.repeat(2800), 4000).length, 1);
 });
 
 test('there is nothing to speak when there is nothing to say', () => {
-  // A zero-length voice note renders in Telegram as a broken attachment rather
-  // than as nothing. No guard says so any more and none is needed: chunk()
-  // returns no parts for an empty string, so the loop that speaks never runs.
+  // A zero-length voice note renders as a broken attachment; chunk() returns no
+  // parts for an empty string, so nothing is spoken.
   assert.deepEqual(chunk('', 4000), []);
 });
 
 /* ─── What he has on, rendered ───────────────────────────────────────────────
-   The block that closed the one thing she could not see. Every field on it is
-   nullable and most of them are null on a row he opened by hand, so the failure
-   this is driven against is not a missing block — it is a block that renders
-   and puts the word `null` where a price goes, which reads as a price.
-
-   THE MARK IS THE OTHER HALF. It is quarter-hourly, so its AGE is the thing
-   that makes it usable, and it belongs beside a position or nowhere: on a flat
-   day it is a number with nothing to be a number of.
+   Every field is nullable and most are null on a hand-opened row, so the
+   failure is a block that renders the word `null` where a price goes. The mark
+   is quarter-hourly, so its AGE makes it usable, and it belongs beside a
+   position or nowhere.
    ─────────────────────────────────────────────────────────────────────────── */
 const DESK_NOW = Date.parse('2026-09-03T14:20:00Z');
 const MARK_NOW = { bid: 4386.1, at: '2026-09-03T14:09:00Z', looked_at: null };
@@ -5345,21 +4863,13 @@ const OPEN = trade({
   planned_sl: 4380, planned_tp: 4412,
 });
 
-/* ─── What counts as open, which was one column and had to be two ────────────
-   THE ROW SHE READ IT OFF HAS ONE WRITER AND IT IS THE EMAIL PATH. The poller
-   never sets `fill_time` — not on any row, not once — and what it does record
-   when a position closes is `exit_price`, folded from the broker's own deals
-   every two minutes.
-
-   So a close with no alert email behind it left `fill_time` null for ever, and
-   she told him he had a buy open days after it had gone, citing R-19 and R-15
-   at him about it. That is the worst failure available to this block: it is the
-   one place she speaks with his own rules behind her.
-
-   `positionsList` could never have caught it. It is pure, it was driven from
-   both sides for its whole life, and it renders exactly what it is handed —
-   the mistake was in deciding what to hand it, which is why the predicate is
-   exported now and driven here instead.
+/* ─── What counts as open: both columns null ─────────────────────────────────
+   `fill_time` is written by the email, and by the poller only for closes its
+   fold window reaches; `exit_price` is the poller's off the broker's deals. A
+   close either missed still has the other, so open is BOTH null — two
+   witnesses, either sufficient. Getting it wrong has her citing R-19 and R-15
+   at him over a position long gone. `positionsList` renders what it is handed,
+   so the predicate is exported and driven here.
    ─────────────────────────────────────────────────────────────────────────── */
 test('a position the poller closed is closed, whether or not the email landed', () => {
   const open = trade({ id: 'PID9', entry_time: '2026-09-02T13:14:00Z' });
@@ -5370,19 +4880,15 @@ test('a position the poller closed is closed, whether or not the email landed', 
     'the poller folded a closing deal for this position — it is not open, and ' +
     'saying it is cites his rules at him about a trade he does not have');
 
-  // And the other witness alone, which is the case the poller can get wrong:
-  // a row folded without its entry deal carries a null exit_price on a trade
-  // that has closed, and the email is what catches that one.
+  // And the other witness alone: a row folded without its entry deal carries a
+  // null exit_price on a closed trade, and the email catches that one.
   assert.equal(isOpen({ ...open, fill_time: '2026-09-02T18:00:00Z' }), false);
   assert.equal(isOpen({ ...open, exit_price: 4402.7, fill_time: '2026-09-02T18:00:00Z' }), false);
 });
 
 test('a pre-sync row is not an open position, however long it sits there', () => {
-  /* Rows whose id does not start with PID pre-date the broker sync: no
-     entry_time, no exit_price, and — since nothing ever emailed about them —
-     no fill_time either. Every one of them read as open, permanently, in the
-     block that tells her what he is exposed to right now. dayStanding has
-     always filtered them; this never did. */
+  /* Rows whose id does not start with PID pre-date the broker sync and carry
+     neither column; they are not open. */
   assert.equal(isOpen(trade({ id: '2025-11-03-a' })), false);
   assert.equal(isOpen(trade({ id: 'PID1' })), true);
 });
@@ -5398,16 +4904,10 @@ test('an open position states its age, its side, its size and its plan', () => {
   assert.match(out, /stop 4380 and target 4412 as first seen/);
 });
 
-/* ─── A hold from another day said only what hour it opened ──────────────────
-   THE BLOCK IS HEADED "what he has on RIGHT NOW", and inside it a position read
-   `open since 09:15 ET` whether it opened this morning or on Monday. There is
-   one way to read a bare clock time under that heading and it is the wrong one.
-
-   Not an edge case: the strategy's own summary calls his positions "intraday to
-   multi-session", and R-15 bounds a hold at the Friday close rather than at
-   midnight. So the shape this got wrong is one he trades, and what it produced
-   is a confident wrong fact about his own open position — in the one block
-   whose whole purpose is that she knows what he is exposed to.
+/* ─── A hold from another day names the day ──────────────────────────────────
+   Under "what he has on RIGHT NOW", `open since 09:15 ET` reads as this
+   morning. His positions run intraday to multi-session and R-15 bounds a hold
+   at the Friday close, so this is a shape he trades.
    ─────────────────────────────────────────────────────────────────────────── */
 test('a position opened on an earlier day says which day', () => {
   // Opened 09:14 New York on the 1st, still open on the 3rd.
@@ -5432,20 +4932,13 @@ test('a position with no plan recorded says nothing about a plan', () => {
   assert.doesNotMatch(out, /stop|target/);
 });
 
-/* HALF A PLAN IS NOT A PLAN, and the columns are independently nullable however
-   the poller writes them — it PATCHes both in one body, but a hand correction in
-   the database sets whichever one it sets. Rendering the pair from either being
-   present puts "target null" in front of her, which reads as a target of
-   nothing rather than as an absent one.
-
-   THIS CASE IS THE TEST. The both-null row above passes whether the guard reads
-   `&&` or `||`, so it was proving nothing about the guard it was written for —
-   only a row carrying exactly one column can tell those two apart. */
+/* HALF A PLAN IS NOT A PLAN. Each side is its own first sighting and a hand
+   correction sets whichever it sets, so the columns are independent; rendering
+   the pair from either puts "target null" in front of her. Only a row carrying
+   exactly one column tells `&&` from `||`. */
 test('a row carrying one half of the plan shows that half and never the absence', () => {
-  /* THE HALF THAT EXISTS IS WORTH SAYING and the half that does not must not be
-     named: a null is equally "he set none" and "the poller never saw this
-     position open", and nothing here can tell those apart. Printing "no stop"
-     would state the first as fact. */
+  /* The half that exists is said; the half that does not is never named: a null
+     is equally "he set none" and "the poller never saw this position open". */
   const stopOnly = positionsList([trade({ ...OPEN, planned_tp: null })], null, null, DESK_NOW);
   assert.doesNotMatch(stopOnly, /null/, `renders a null: ${stopOnly}`);
   assert.match(stopOnly, /stop 4380 as first seen/, 'the stop it has is dropped');
@@ -5475,9 +4968,8 @@ test('the mark is given with its age, counted from the clock passed in', () => {
   assert.match(positionsList([OPEN], null, MARK_NOW, DESK_NOW), /gold was 4386\.1 11 minutes ago/);
 });
 
-/* A PRICE WITH NOTHING TO BE A PRICE OF. On a flat day the mark is the number
-   she would otherwise subtract an entry from, and handing it over anyway is how
-   a spot quote fifteen minutes old ends up in a briefing as the current level. */
+/* A PRICE WITH NOTHING TO BE A PRICE OF. Handed over on a flat day, a quote
+   fifteen minutes old ends up in a briefing as the current level. */
 test('the mark is withheld when nothing is open, however fresh it is', () => {
   const standing = { day: '2026-09-03', pnl: -182.4, account: 2000, breached: false };
   const out = positionsList([], standing, MARK_NOW, DESK_NOW);
@@ -5496,19 +4988,15 @@ test('a day inside the limit and a day past it are not rendered the same', () =>
 /* ═══════════════════════════════════════════════════════════════════════════
    THE JOURNAL SUMMARISED — the app's arithmetic, driven from both sides
    ───────────────────────────────────────────────────────────────────────────
-   Every definition here was previously a sentence in the prompt that she
-   applied by hand over four hundred rows. The three the app is deliberately
-   subtle about are the three she got wrong, and each is driven here against the
-   case that distinguishes it from the plausible alternative — a test that only
-   showed a win rate coming back would pass on every one of the wrong ones.
+   The three definitions the app is subtle about are each driven against the
+   case that separates them from the plausible alternative — a test that only
+   saw a win rate come back would pass every wrong one.
    ═══════════════════════════════════════════════════════════════════════════ */
 const jt = (o) => trade({ id: 'PID1', ...o });
 
 test('a scratch is measured in price, not in dollars', () => {
-  /* ±$3 OF THE ENTRY PRICE AT ANY LOT SIZE. Read against P&L the band means
-     something different every time size changes — $3 of P&L is $3 of gold at
-     0.01 lots and three cents of gold at 1.00. The case that tells them apart
-     is a big position that went nowhere: $2 of price, $200 of P&L. */
+  /* ±$3 OF THE ENTRY PRICE AT ANY SIZE. The case a P&L band gets wrong is a big
+     position that went nowhere: $2 of price, $200 of P&L. */
   assert.equal(resultOf(jt({ entry_price: 4400, exit_price: 4402, pnl: 200 })), 'be',
     'two dollars of price is a scratch however much money was on it');
   assert.equal(resultOf(jt({ entry_price: 4400, exit_price: 4410, pnl: 2 })), 'win',
@@ -5525,9 +5013,8 @@ test('a scratch is measured in price, not in dollars', () => {
 });
 
 test('break-evens are in the win rate denominator, not dropped from it', () => {
-  /* A rate that quietly drops scratches is HIGHER than the truth, and highest
-     on exactly the trader who scratches a lot. One win and one scratch is 50%,
-     not 100%. */
+  /* A rate that drops scratches is HIGHER than the truth, highest on a trader who
+     scratches a lot. One win and one scratch is 50%. */
   const c = counts([
     jt({ id: 'PIDa', entry_price: 4400, exit_price: 4440, pnl: 40 }),
     jt({ id: 'PIDb', entry_price: 4400, exit_price: 4401, pnl: 1 }),
@@ -5548,10 +5035,9 @@ test('break-evens are in the win rate denominator, not dropped from it', () => {
 });
 
 test('money splits on the sign and averages split on the label', () => {
-  /* THE ONE PLACE THE TWO MUST DIFFER, and the case that shows it is a scratch
-     with a positive P&L: money() must count its dollars on the gross side, so
-     gross − loss still equals net exactly, while averages() must keep it out of
-     the average win, which it would otherwise halve. */
+  /* THE ONE PLACE THE TWO MUST DIFFER: a positive scratch's dollars are on
+     money()'s gross side, so gross − loss equals net, while averages() keeps it
+     out of the average win. */
   const rows = [
     jt({ id: 'PIDa', entry_price: 4400, exit_price: 4460, pnl: 60 }),
     jt({ id: 'PIDb', entry_price: 4400, exit_price: 4402, pnl: 2 }),   // scratch, positive
@@ -5577,9 +5063,8 @@ test('the reward-to-risk is unanswerable with no loss to divide by', () => {
 });
 
 test('a session is read against each centre own local clock', () => {
-  /* The overlaps are the more specific case, and the dead stretch between the
-     New York close and the Sydney open folds into Asian. Instants chosen in
-     UTC and asserted through the same four time zones the app uses. */
+  /* The overlaps are the more specific case, and the dead stretch between the New
+     York close and the Sydney open folds into Asian. */
   assert.equal(sessionAt(new Date('2026-09-03T13:00:00Z')), 'London+NY');  // 09:00 ET, 14:00 London
   assert.equal(sessionAt(new Date('2026-09-03T08:00:00Z')), 'Asia+London'); // 09:00 London, 17:00 Tokyo
   assert.equal(sessionAt(new Date('2026-09-03T11:00:00Z')), 'London');
@@ -5595,9 +5080,8 @@ test('journalled means the setup and all three answers, never the P&L', () => {
 });
 
 test('the summary states every figure with the population it was taken over', () => {
-  /* A RATE WITHOUT ITS DENOMINATOR is the number §8 warns about, so the
-     rendering carries the counts beside every share. Driven end to end rather
-     than asserted on the object, because what she READS is the decision. */
+  /* A RATE WITHOUT ITS DENOMINATOR is the number §8 warns about, so the counts
+     ride beside every share. Driven end to end: what she READS is the decision. */
   const out = statsList(journalStats([
     jt({ id: 'PIDa', entry_time: '2026-09-03T13:00:00Z', setup: 'Break & Retest',
          entry_price: 4400, exit_price: 4460, pnl: 60,
@@ -5620,14 +5104,10 @@ test('the summary states every figure with the population it was taken over', ()
   assert.match(statsList(journalStats([]), 7), /No trades in the last 7 days/);
 });
 
-/* ─── The one signal a total cannot carry, and §8 built the journal to keep ───
-   `pnl` is `coalesce(net_pnl, computed_pnl)`. §8 withholds `computed_pnl` by
-   name and serves `net_pnl` beside `pnl` precisely so a fallback row is VISIBLE
-   without the unsettled number being reachable — reading rows she can see it.
-
-   A total cannot, and this tool is the one the prompt now tells her to prefer
-   OVER reading the rows. So a summary that sums `pnl` and says one net figure
-   takes away the only thing §8 put there.
+/* ─── The one signal a total cannot carry ────────────────────────────────────
+   `pnl` is `coalesce(net_pnl, computed_pnl)`, and §8 serves `net_pnl` beside it
+   so a fallback row is VISIBLE. A total cannot show that, and this is the tool
+   she is told to prefer over the rows — so it says what was settled.
    ─────────────────────────────────────────────────────────────────────────── */
 test('a total says how much of it is settled and how much is the fold', () => {
   const settled  = jt({ id: 'PIDa', entry_price: 4400, exit_price: 4460, pnl: 60, net_pnl: 60 });
@@ -5646,14 +5126,9 @@ test('a total says how much of it is settled and how much is the fold', () => {
 });
 
 /* ─── The second fallback under the same summary ─────────────────────────────
-   The session breakdown reads `sessionOf`, which takes the ENTRY instant and
-   drops to the closing fill when a row has no entry_time — an email-only fill
-   the poller never reached. That is the seam the README names, and a hold
-   carried across a session boundary is filed under the wrong one by it.
-
-   Reading the rows she can see which are which; a total cannot, which is
-   exactly the argument that put `fellBack` above. So the count travels with
-   the split, on the same terms: only where there is one.
+   `sessionOf` drops to the closing fill when a row has no entry_time, so a hold
+   across a session boundary is filed under the wrong one. The count travels
+   with the split on `fellBack`'s terms: only where there is one.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the session split says how much of it came from the close', () => {
   const entered = jt({ id: 'PIDa', entry_time: '2026-07-30T14:00:00Z',
@@ -5685,9 +5160,8 @@ test('a window with no seam row says nothing about the seam', () => {
 });
 
 test('a window where nothing fell back says nothing about it', () => {
-  /* Noise on every ordinary window otherwise — swap accrues only across the
-     17:00 roll, so the common case is that every row is settled or intraday
-     and the line would appear saying zero, every time, forever. */
+  /* Swap accrues only across the 17:00 roll, so the common window is all settled
+     or intraday, and a line saying zero every time would be noise. */
   const out = statsList(journalStats([
     jt({ id: 'PIDa', entry_price: 4400, exit_price: 4460, pnl: 60, net_pnl: 60 }),
   ]), 30);
@@ -5696,21 +5170,10 @@ test('a window where nothing fell back says nothing about it', () => {
 });
 
 /* ─── Nothing the tool loop serves may throw, driven rather than read ────────
-   This is the rule this file states more often than any other, and until now it
-   was held by reading each handler's source. Thirty-two catch blocks implement
-   it and not one of them had ever been executed by a test — so a handler that
-   gained an uncaught path would read exactly like one that had not, and the
-   briefing it killed would be the first anyone heard about it. That is the
-   shape `readTrades` already failed in once.
-
-   The database refuses in the four ways it actually refuses: a network that is
-   not there, a 500, a 404 — which is what an unapplied migration looks like —
-   and a 200 carrying something that is not JSON. Every tool the model can name
-   has to come back with a sentence in all four.
-
-   A user message missing the `tool_result` for a `tool_use` block is a 400, so
-   an empty answer is as fatal as a thrown one: the assertion is that something
-   was said, not merely that nothing exploded.
+   The database refuses four ways: no network, a 500, a 404 (an unapplied
+   migration) and a 200 that is not JSON. Every tool must come back with a
+   sentence in all four — and a missing `tool_result` is a 400, so an empty
+   answer is as fatal as a thrown one.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const TOOL_CALLS = [
@@ -5729,14 +5192,10 @@ const TOOL_CALLS = [
   ['close_loop',    { id: 1, resolution: 'answered' }],
 ];
 
-/* AND THE LIST IS HELD AGAINST THE SWITCH, because a list typed by hand is a
-   family that can quietly lose a member. Every tool is driven here against
-   four refusals; one added to `serve` and not added above would be undriven, and this test would go on passing — which is the same
-   fault as a path with no heartbeat and a door with no cron job, arriving in
-   the one place that thought it was exhaustive. The names are resolved through
-   the `*_TOOL` constants rather than read off the `case` labels, because a
-   case names a constant and it is the constant that carries the string the
-   model actually sends. */
+/* AND THE LIST IS HELD AGAINST THE SWITCH: a tool added to `serve` and not
+   above would be undriven, and this would go on passing. Names resolve through
+   the `*_TOOL` constants, because a case label names the constant and the
+   constant carries the string the model sends. */
 test('every tool serve() dispatches is one this suite drives', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
@@ -5771,10 +5230,8 @@ const REFUSALS = {
     { status: 200, headers: { 'content-type': 'application/json' } }),
 };
 
-// One test rather than four generated ones: the suite's own count is read off
-// `test(` declarations, and a test made in a loop is invisible to it — the
-// instruction would then state a number the suite does not run, which is the
-// exact drift that check exists to catch.
+// One test rather than four generated ones: the suite's count is read off
+// `test(` declarations, and a test made in a loop is invisible to it.
 test('every tool answers with a sentence however the database refuses', async () => {
   const realFetch = globalThis.fetch, realErr = console.error;
   console.error = () => {};
@@ -5809,22 +5266,10 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
 });
 
 /* ─── A block that cannot read degrades; it does not take the message with it ─
-   The ten blocks are what she is HANDED — his notes, where he stands, his open
-   position, the day's calendar. Each is built from a database read, and the
-   contract is that a read which fails costs that block and nothing else: the
-   briefing still goes, one paragraph shorter.
-
-   It was enforced by ten separate try/catch blocks and read out of the source by
-   nobody. A block that gained an uncaught path would look exactly like one that
-   had not, and the first anyone would know is a briefing that never arrived —
-   which is the failure `readTrades` had, from a call site whose sibling was
-   caught and hid it.
-
-   `notesBlock` is the one to watch. `notesBlock()` is load-bearing on all seven
-   paths, and an instruction he gave — "stop mentioning the ten-year" — lives
-   only in a note. If it throws, every one of those messages dies; if it
-   degrades, she carries on having forgotten one thing. The second is bad and
-   the first is worse.
+   The blocks are what she is HANDED, each built from a read, and a failed read
+   costs that block and nothing else. `notesBlock` is the one to watch: an
+   instruction he gave lives only in a note, and it is on all seven paths. If
+   it throws, every message dies; if it degrades, one thing is forgotten.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const BLOCKS = {
@@ -5850,11 +5295,9 @@ test('every block degrades to nothing when its read fails, and never throws', as
   } finally { globalThis.fetch = realFetch; console.error = realErr; }
 });
 
-/* AND THE OTHER HALF, which no assertion about throwing can reach: a block that
-   swallowed its failure AND its content would be silent in exactly the same way
-   as one that had nothing to say. So the same blocks are driven against a
-   database that ANSWERS, and each has to come back with something. Without this,
-   a block rewritten to `return ""` at the top would pass every assertion above. */
+/* AND THE OTHER HALF: a block swallowing its content along with its failure is
+   silent the same way as one with nothing to say. Driven against a database
+   that ANSWERS, each must say something — or `return ""` passes everything. */
 test('every block says something when its read succeeds', async () => {
   const rows = {
     eugenia_notes:    [{ id: 1, note: 'he asked for shorter mornings' }],
@@ -5889,19 +5332,16 @@ test('every block says something when its read succeeds', async () => {
 });
 
 /* ─── What broke since the last briefing ─────────────────────────────────────
-   Driven through the real block, against a database that answers, because the
-   window is the decision and a pure test of `sinceBriefing` alone would be
-   handed the marker rather than reading it. Friday is the case it exists for:
-   on a Monday "yesterday" was Sunday, so a Friday breach was never raised. */
+   Driven through the real block, because the window is the decision. Friday is
+   the case it exists for: on a Monday, "yesterday" was Sunday. */
 const closed = (id, open_day, entry_time, fill_time, extra = {}) => trade({
   id, open_day, entry_time, fill_time, entry_price: 3400, exit_price: 3395,
   pnl: -10, net_pnl: -10, ...extra,
 });
 
 /* ─── The week the Sunday briefing opens ─────────────────────────────────────
-   Driven against a database that answers, from Sunday 17:00 New York: the
-   question is whether Friday's payrolls reaches her, and a query asserted on
-   alone would not say whether the rendering names its day. */
+   From Sunday 17:00 New York: whether Friday's payrolls reaches her, with its
+   day named. */
 test('the Sunday briefing is handed the week ahead, high releases only, each with its day', async () => {
   const sunday = Date.parse('2026-09-27T21:00:00Z');
   const q = weekQuery(sunday);
@@ -5985,10 +5425,9 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
 });
 
 /* ─── A calendar read that reached its bound says so ─────────────────────────
-   The read keeps the right end — earliest first, so a heavy day loses
-   tomorrow's rows, which the next briefing reads. What it must not do is read
-   as the whole list: cut silently, the last line handed to her looks like the
-   last thing due, and "nothing else today" is a sentence she can then write. */
+   Earliest first, so a heavy day loses tomorrow's rows. Cut silently, the last
+   line looks like the last thing due, and "nothing else today" becomes a
+   sentence she can write. */
 
 test('a full calendar read says it stopped, and a short one says nothing', async () => {
   const realFetch = globalThis.fetch;
@@ -6005,10 +5444,9 @@ test('a full calendar read says it stopped, and a short one says nothing', async
 });
 
 /* ─── A position opened and closed inside one poll ───────────────────────────
-   The open trigger fires on an insert with no fill_time, and a scalp under two
-   minutes is inserted already carrying its exit price — so the "opened" event
-   arrives about a trade that is over. Driven through the real handler, with a
-   print pending, because that is the only case in which it would have spoken.
+   A scalp under two minutes is inserted already carrying its exit, so the
+   "opened" event arrives about a trade that is over. Driven with a print
+   pending, the only case in which it would have spoken.
    ─────────────────────────────────────────────────────────────────────────── */
 test('an opened event for a trade already closed says nothing and reads no calendar', async () => {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
@@ -6046,11 +5484,8 @@ test('an opened event for a trade already closed says nothing and reads no calen
 });
 
 /* ─── A trades read that reached its bound ───────────────────────────────────
-   The read takes the newest TRADE_ROWS. A year he traded more than that is cut
-   at its oldest end, and every tool built on it went on calling its answer
-   "the last 365 days". Driven through serve() for all three tools, because the
-   line is appended by each caller and a pure test of the line proves nothing
-   about any of them saying it.
+   A year with more than TRADE_ROWS trades is cut at its oldest end. Driven
+   through serve() for all three tools, because each caller appends the line.
    ─────────────────────────────────────────────────────────────────────────── */
 test('a trades read that hit its bound says how far back it reaches, in every tool built on it', async () => {
   const rows = (n) => Array.from({ length: n }, (_, i) => ({

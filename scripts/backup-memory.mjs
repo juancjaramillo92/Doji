@@ -1,47 +1,28 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — a copy of everything about him that exists nowhere else
    ───────────────────────────────────────────────────────────────────────────
-   The weekly backup in the app carries `trades`, which is the one table that
-   could be rebuilt without it: every broker column is in cTrader's history and
-   a wide `?force=1` backfill reconstructs it. Her memory is the other way
-   round. The notes, the turns, the channel map with a `moved_on` date per rung,
-   the thesis, the open loops and the calendar have no source anywhere else, and
-   nothing in the app reaches them — 003 denies the publishable key her notes
-   and turns deliberately, and it should stay denied.
+   `trades` can be rebuilt from cTrader with a wide `?force=1`; her memory has
+   no other source, and the app cannot reach it — 003 denies the publishable
+   key her notes and turns, rightly. So the copy is taken with the secret key,
+   from outside the browser: each table read through PostgREST, paged to the
+   end, written as one JSON document.
 
-   So the copy has to be taken with the secret key, which means from outside the
-   browser. This is that, and it is the whole mechanism: read each table through
-   PostgREST, page until it ends, write one JSON document.
+   It pages because PostgREST caps a response at its own `max-rows`, and one
+   read of `eugenia_turns` looks exactly like a complete archive until the day
+   it is restored. The loop stops on a short page, not on a count it was told.
 
-   IT PAGES RATHER THAN TRUSTING ONE READ. PostgREST caps a response at its own
-   `max-rows` regardless of what is asked for, so a single request against
-   `eugenia_turns` returns a page and looks exactly like a complete archive —
-   the failure being a backup that is quietly short, discovered on the day it is
-   restored. `Content-Range` is what says whether more is coming, and the loop
-   below stops on a short page rather than on a count it was told.
-
-   `eugenia_runs` is deliberately absent: it is the cost meter, it is by far the
-   largest table, and every row in it is a fact about a model call rather than
-   about him. Losing it costs a graph nobody has drawn.
+   `eugenia_runs` is left out: the cost meter, the largest table, and nothing
+   about him.
 
    Run:  SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Each table with the column it is READ BY, which is its primary key. Paging by
-   Range needs a stable order or a row can be served on two pages or on neither,
-   and the key is the only column every row here is guaranteed to have and to
-   have uniquely.
-
-   IT IS NOT ALWAYS `id`. `eugenia_channels` is keyed by `channel`, because the
-   five rungs are the rows and a surrogate key would let a sixth 'macro' exist
-   beside the first. Ordering it by `id` is a 400 from PostgREST — the whole
-   backup, refused — and nothing in this repository could see that until it ran,
-   because a stubbed fetch answers whatever it is asked. `agree.test.mjs` reads
-   each key below against that table's own `create table` now.
-
-   Ordered as they are restored: the tables a later row can reference come
-   first, so a restore run top to bottom never lands a note whose supersedes
-   target is not there yet. */
+/* Each table with its primary key, which orders the paging: Range needs a
+   stable order or a row lands on two pages or none. Not always `id` —
+   eugenia_channels is keyed by `channel`, and ordering it by `id` is a 400
+   that refuses the whole backup; agree.test.mjs reads each key against its
+   `create table`. Listed in restore order, so a note's supersedes target is
+   always there first. */
 export const TABLES = [
   ['eugenia_channels', 'channel'],
   ['eugenia_notes',    'id'],
@@ -50,9 +31,7 @@ export const TABLES = [
   ['eugenia_loops',    'id'],
   ['eugenia_calendar', 'id'],
   ['eugenia_feedback', 'id'],
-  // Every stop and target a position carried. The broker reports only the final
-  // stop once a position closes, so the moves R-19 is judged on are kept here
-  // and nowhere else.
+  // The stop history R-19 is judged on; the broker keeps only the final stop.
   ['trade_stops',      ['id', 'seen_at']],
 ];
 

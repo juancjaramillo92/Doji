@@ -1,31 +1,25 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — sandbox for doji_gmail_sync.gs
    ───────────────────────────────────────────────────────────────────────────
-   The Apps Script was described as untestable, and half of it is: GmailApp
-   needs a live mailbox and nothing here can supply one. The other half never
-   did. parseAlert_ is a pure function of a subject and an HTML body, sendFill_
-   is a function of one HTTP response, and syncPepperstone is a loop over
-   threads — all three are reachable the moment the four Google globals exist.
+   GmailApp needs a live mailbox; the rest does not. parseAlert_ is a pure
+   function of a subject and an HTML body, sendFill_ of one HTTP response, and
+   syncPepperstone a loop over threads — all reachable once the four Google
+   globals exist. The file has no top-level calls, so evaluating it in a vm
+   context runs nothing and leaves every function on that context.
 
-   The file has no top-level calls, only `var` declarations and function
-   declarations, so evaluating it in a vm context runs nothing and leaves every
-   function on that context. That is the whole trick.
-
-   The stubs RECORD rather than merely satisfy. What is being tested about
-   syncPepperstone is which label a thread ends up with, and a stub that
-   accepted addLabel and forgot it could not tell a retry from a permanent
-   failure — which is the distinction that once lost a fill's P&L.
+   The stubs RECORD rather than merely satisfy: what is tested about
+   syncPepperstone is which label a thread ends up with, and a stub that forgot
+   addLabel could not tell a retry from a permanent failure.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-// Exported so a test can assert on what the file SAYS, not only on what the
-// stubs answer. The credential check needs this: a stub that returns null for
-// every unknown property answers "no password here" whatever the script does.
+// Exported so a test can assert on what the file SAYS: a stub that returns null
+// for every unknown property answers "no password here" whatever the script does.
 export const SOURCE = readFileSync(new URL('../doji_gmail_sync.gs', import.meta.url), 'utf8');
 
 // A Gmail thread as the script uses one: messages in, a label out. `labels` is
-// what every assertion about the three outcomes actually reads.
+// what every assertion about the three outcomes reads.
 export function thread(messages) {
   return {
     labels: [],
@@ -41,13 +35,10 @@ export const message = (subject, body, date = new Date('2026-07-30T14:29:00Z')) 
   getDate: () => date,
 });
 
-/* Boots the script. `responses` is what UrlFetchApp hands back, one per call —
-   an object of { code, text }, or an Error to throw, which is how a network
-   failure with no response at all is expressed.
-
-   `existingLabels` is which Gmail labels already exist. It matters because
-   getOrCreateLabel_ and resetDojiLabels both branch on a label being absent,
-   and a stub that always answered with one made neither branch reachable. */
+/* `responses` is what UrlFetchApp hands back, one per call — { code, text }, or
+   an Error to throw, which is a network failure with no response at all.
+   `existingLabels` matters because getOrCreateLabel_ and resetDojiLabels both
+   branch on a label being absent. */
 export function boot({ threads = [], responses = [], secret = 'test-secret',
                        existingLabels = ['doji-synced', 'doji-parse-failed'] } = {}) {
   const log = [];
@@ -63,9 +54,8 @@ export function boot({ threads = [], responses = [], secret = 'test-secret',
     UrlFetchApp: {
       fetch(url, options) {
         posted.push({ url, options, body: JSON.parse(options.payload) });
-        // A call the test did not describe is a call the test cannot be
-        // asserting about. Answering it 200 makes "sent one fill" and "sent
-        // four" look identical from the labels, which is the whole subject.
+        // A call the test did not describe cannot be one it asserts about. Answering
+        // it 200 makes "sent one fill" and "sent four" identical from the labels.
         if (next >= responses.length && responses.length) {
           throw new Error(`gs.mjs: call ${next + 1} was not described — ` +
                           `${responses.length} response(s) supplied`);

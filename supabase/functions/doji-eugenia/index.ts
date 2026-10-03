@@ -1,30 +1,24 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EUGENIA — market briefing and conversation  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// The second bot. Gladys collects the journal; Eugenia does macro. Same two-
-// caller shape as doji-gladys, told apart by which secret arrives:
+// The second bot: Gladys collects the journal, Eugenia does macro. Two
+// callers, told apart by the secret they present:
 //
-//   x-doji-key                        the scheduled jobs in
-//                                     supabase/004_cron.sql, the trades
+//   x-doji-key                        the scheduled jobs in 004, the trades
 //                                     trigger in 005, and her own speaking
 //                                     worker — postScheduled reads which.
-//   x-telegram-bot-api-secret-token   Telegram — the trader replied, answer him.
+//   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
 //
-// SHE OWNS NO COLUMN OF `trades` AND HAS NO WRITE PATH TO IT. She reads the
-// journal through the eugenia_trades view, which is granted SELECT and nothing
-// else, and writes only her own conversation and her own notes — which is why
-// she is not a fifth writer and has nothing to arbitrate with anybody.
+// She owns no column of `trades` and has no write path to it: she reads the
+// journal through eugenia_trades, granted SELECT alone, and writes only her
+// own tables.
 //
-// THE SCHEDULE IS DECIDED HERE, NOT IN CRON. Weekdays at 08:00 and Sunday at
-// 17:00 New York — and pg_cron schedules in UTC, so a fixed expression would be
-// an hour wrong for half the year. The job runs hourly and briefDue() answers
-// whether this is the hour, exactly as marketOpen() does for the poller. Asking
-// America/New_York for its own clock is correct all year and is one function.
+// The schedule is decided here rather than in cron, which runs in UTC: the job
+// runs hourly and dueNow answers against New York's own clock.
 //
-// HOLDING HER CRON SECRET IS NOT NOTHING. Against the poller it starts a poll
-// that was going to run anyway; here `?force=1` spends money, a briefing at a
-// time, with no bound in the code. The bound is a spend cap on the Anthropic
-// key, which is the only place one can actually be enforced.
+// Her cron secret is not harmless: here `?force=1` spends money, a briefing at
+// a time. The bound is the spend cap on the Anthropic key, the one place one
+// can be enforced.
 //
 // Deploy:   supabase functions deploy doji-eugenia --no-verify-jwt
 // Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET and
@@ -35,46 +29,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
-// The thirteen rules a row can answer, evaluated rather than reasoned about. Pure
-// and imported rather than inlined for the reason balanceTarget and foldHours
-// are exported in the app: it is the part that has to be testable.
+// Pure and imported, so the parts that decide are testable.
 import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, weekOf,
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
-// The app's own arithmetic over the journal — a win rate, the money split, the
-// realised reward-to-risk, the session and setup breakdowns. Pure and imported
-// for the reason adherence.ts is: it is the part that has to be testable, and
-// it is a copy of index.html that agree.test.mjs holds against it.
 import { journalStats, statsList } from "./journal.ts";
-// Everything shared lives in _shared/edge.ts — one definition each, for the
-// reason that file gives.
 import {
   env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
 const WEBHOOK_SECRET = env("EUGENIA_WEBHOOK_SECRET");
-// The same chat as Gladys — one trader, one thread each. Numeric, for the same
-// reason as doji-gladys: it is both a send target and an identity.
+// The same chat as Gladys; numeric, being both a send target and an identity.
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
 const ANTHROPIC_KEY  = env("ANTHROPIC_API_KEY");
 
 /* ─── When the briefing is due ─────────────────────────────────────────────
-   Monday to Friday at 08:00, Sunday at 17:00 — New York, which is the clock
-   every other time in this system is kept in. Sunday 17:00 is also the gold
-   open, so the week's first briefing lands exactly as the market does.
-
-   Returns which briefing is due, or null. The two answers differ in what she
-   is asked and in their calendar — Sunday's is the week it opens — and that is
-   the whole reason this is not a boolean.
+   Weekdays at 08:00 and Sunday at 17:00 New York — the gold open, so the
+   week's first briefing lands with the market. Which briefing rather than a
+   boolean: the two are asked different things and read different calendars.
    ───────────────────────────────────────────────────────────────────────── */
 export type Brief = 'weekday' | 'sunday';
 
-// nyClock is shared with the poller's market hours, so the two cannot disagree
-// about what hour it is in New York — the sort of difference nobody finds until
-// March. Both schedules below read it, which is why it is read once here.
 export function briefDue(now: Date): Brief | null {
   const { wd, hour } = nyClock(now);
   if (wd >= 1 && wd <= 5 && hour === 8) return 'weekday';
@@ -82,39 +60,19 @@ export function briefDue(now: Date): Brief | null {
   return null;
 }
 
-/* THE SECOND LOOK, and its default answer is silence.
-
-   Weekdays at 10:00 New York: an hour and a half after the briefing, which puts
-   it past the 08:30 data window and into the session. One extra call a day
-   rather than a check every hour — an hourly watch is twenty-three model calls
-   with web search behind them, and the cost of that is not worth a feature
-   whose right answer is usually "nothing happened".
-
-   It is therefore NOT event-driven, and calling it that would be a lie: it is a
-   second scheduled look that usually says nothing. Adding a second hour is one
-   line if the morning one proves useful. */
+/* The second look, whose default answer is silence: weekdays at 10:00, past
+   the 08:30 data and into the session. One call a day rather than an hourly
+   watch, whose right answer would usually be "nothing happened". */
 export function pulseDue(now: Date): boolean {
   const { wd, hour } = nyClock(now);
   return wd >= 1 && wd <= 5 && hour === 10;
 }
 
-/* Weekday 09:00, 10:00 and 11:00 New York — the hours where a briefing is still
-   a briefing rather than a bulletin about a morning that has gone. Nothing
-   fires unless the 08:00 one failed, which briefedToday() decides.
-
-   AND SUNDAY HAD NO SECOND CHANCE AT ALL, WHICH IS THE WRONG WAY ROUND. It is
-   the only briefing of the week that cannot be retried and the one whose
-   absence takes longest to notice — a missing weekday morning is missing again
-   tomorrow, a missing Sunday open is missing for seven days. The same three
-   hours after its own briefing, which keeps it an evening about a week that is
-   opening rather than a note about one already under way, and leaves the 22:00
-   pass two hours clear. The week-walk over dueNow is what holds that spacing.
-
-   IT RETURNS WHICH BRIEFING RATHER THAN WHETHER ONE IS DUE, because a retry has
-   to send the same shape the failed one would have. dueNow named 'weekday'
-   itself, which was true only for as long as this window was weekdays-only —
-   a literal that answers correctly by accident of another function's range is
-   the shape that breaks the first time that range moves. */
+/* The retries, which fire only if the briefing did not land: weekdays 09:00 to
+   11:00, while it is still a briefing, and Sunday 18:00 to 20:00 — the one
+   whose absence would otherwise last a week. Returns which briefing, because a
+   retry sends the shape the failed one would have; dueNow once named
+   'weekday' itself, right only while this window was weekdays-only. */
 export function retryDue(now: Date): Brief | null {
   const { wd, hour } = nyClock(now);
   if (wd >= 1 && wd <= 5 && hour >= 9 && hour <= 11) return 'weekday';
@@ -122,92 +80,48 @@ export function retryDue(now: Date): Brief | null {
   return null;
 }
 
-/* WHICH BRIEFING THIS DAY TAKES, which is a different question from which one
-   this HOUR owes and was being answered with a constant. `?force=1` read
-   `briefDue(now) ?? 'weekday'`, so the door that exists for the hour a briefing
-   did NOT arrive could not produce a Sunday one outside the single hour it was
-   already due — forcing it on a Sunday evening sent a weekday briefing into a
-   market that had just opened for the week. */
+/* Which briefing this DAY takes — what ?force=1 needs, so a forced Sunday
+   evening briefing is a Sunday one. */
 export const briefKind = (now: Date): Brief =>
   nyClock(now).wd === 0 ? 'sunday' : 'weekday';
 
-/* SLEEP, ROUGHLY. Twenty-two hundred New York, every day including the weekend —
-   a Saturday conversation is worth keeping as much as a Tuesday one.
-
-   Clear of every other hour by construction: the briefing is 08:00 and Sunday
-   17:00, the retries are 09:00 to 11:00, the pulse is 10:00. The week-walk test
-   is what actually holds that, since an hour added to any of them could collide
-   here and nothing else would notice.
-
-   Late enough that the trading day and any evening conversation are done, which
-   is what makes a fixed 24-hour window the right read: nothing needs a watermark
-   because the window and the period between runs are the same length. A missed
-   night loses the DISTILLATION of that day, never the day — the turns stay in
-   the table and stay searchable, which is exactly why consolidation is allowed
-   to be lossy. */
+/* The nightly pass: 22:00 New York, every day. Clear of every other hour,
+   which the week-walk test holds. The window and the gap between runs are the
+   same twenty-four hours, so no watermark is needed; a missed night loses the
+   distillation, never the day, since the turns stay searchable. */
 export function consolidateDue(now: Date): boolean {
   return nyClock(now).hour === 22;
 }
 
-/* AND IT GETS THE RETRY THE BRIEFING HAS HAD ALL ALONG. Twenty-three hundred,
-   still inside the same New York civil day — which is what makes "did tonight's
-   pass run" a question with an answer, since the check below is against today.
-
-   The pass was the only schedule in this file with no meter and no second
-   chance. A briefing that dies is retried three times and apologised for; a
-   pass that died was silent, and its symptom is that her memory quietly stops
-   growing — which looks exactly like a bot with nothing worth remembering.
-   That is the same invisible-absence shape `unseen` and `moved_on` exist to
-   defeat, arriving for a third time in a different place. */
+/* Its retry at 23:00, still the same civil day, so "did tonight's pass run" has
+   an answer. A pass that dies silently looks like a memory with nothing worth
+   keeping. */
 export function consolidateRetryDue(now: Date): boolean {
   return nyClock(now).hour === 23;
 }
 
-/* WHAT THIS HOUR OWES — one answer, because one call cannot owe two.
-
-   The three schedules above overlap, so the decision between them is a fourth
-   one and belongs here rather than spread through the caller: each predicate
-   answering correctly on its own says nothing about which of them wins.
-
-   At 10:00 the retry window and the pulse both apply, and the retry takes it:
-   on a day the briefing failed, the briefing is the thing worth having and a
-   second look at a morning he was never told about is not. `briefed` is the
-   fact the caller reads from the database, and only the retry hours turn on
-   it. */
+/* What this hour owes — one answer, because the schedules overlap and each
+   being right alone settles nothing. At 10:00 a needed retry beats the pulse:
+   a second look at a morning he was never told about is worth nothing. */
 export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
     Brief | 'pulse' | 'consolidate' | null {
   const brief = briefDue(now);
   if (brief) return brief;
   const retry = retryDue(now);
   if (retry && !briefed) return retry;
-  // ONE CLAUSE FOR BOTH NIGHTLY HOURS, and the gate is what makes 23:00 a retry
-  // rather than a second pass: a night that already distilled itself does
-  // nothing at 23:00, and a night that failed at 22:00 gets one more go while
-  // the day it is reading is still the day it is filed under.
+  // The gate makes 23:00 a retry rather than a second pass.
   if ((consolidateDue(now) || consolidateRetryDue(now)) && !consolidated) return 'consolidate';
   return pulseDue(now) ? 'pulse' : null;
 }
 
 
 /* ─── Telegram's 4096-character limit ──────────────────────────────────────
-   THIS IS NO LONGER THE QUIET ONE. The prompt used to aim at fourteen hundred
-   characters and a briefing always arrived whole; it now caps only the market
-   half and lets the teaching take what a chain needs, so a morning that builds a
-   term properly can genuinely reach here. Splitting badly is worse than not
-   splitting — a break mid-sentence reads as a bug — which is why the preference
-   below is what it is.
+   A briefing that builds a term properly can reach it. A break mid-sentence
+   reads as a bug, so the split prefers a blank line, then any newline, then a
+   hard cut.
 
-   So the split prefers a blank line, then any newline, then — only if a single
-   paragraph is itself over the limit — a hard cut. The prompt puts a blank line
-   between paragraphs and nowhere else, which is why the first choice is nearly
-   always the one taken.
-
-   TWO LOOKUPS RATHER THAN A max() OVER THE PAIR, and the difference is that the
-   max() cannot express the preference above. Every blank line contains a
-   newline at a higher index, so lastIndexOf('\n') is always at or past
-   lastIndexOf('\n\n') and the paragraph term can never win — the split silently
-   took the last newline of any kind, which lands mid-list inside the one shape
-   FORMAT permits a newline in.
+   Two lookups rather than a max() over the pair: lastIndexOf('\n') is always
+   at or past lastIndexOf('\n\n'), so a max can never prefer the paragraph.
    ───────────────────────────────────────────────────────────────────────── */
 export const TG_LIMIT = 4096;
 
@@ -217,7 +131,7 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
 
   while (rest.length > limit) {
     const window = rest.slice(0, limit);
-    // lastIndexOf on the window, so the break is always inside the budget.
+    // On the window, so the break is always inside the budget.
     const para = window.lastIndexOf('\n\n');
     const line = window.lastIndexOf('\n');
     const cut = para > limit / 2 ? para : line > limit / 2 ? line : limit;
@@ -229,16 +143,11 @@ export function chunk(text: string, limit = TG_LIMIT): string[] {
 }
 
 /* ─── The journal, read-only ───────────────────────────────────────────────
-   She can look at trades when the conversation is about trades, and cannot
-   touch them. Three things make that true and none of them is her restraint:
-   the view fixes the columns and hides deleted rows, the grant on it is SELECT
-   only, and this function is the single database read of the journal she has —
-   there is no write path to `trades` anywhere in the file.
-
-   A TOOL rather than trades pasted into every request. Most messages are about
-   the Fed, not about last Tuesday, and a journal stapled to every turn would be
-   paid for on every turn and would break the prompt cache each time a fill
-   landed. She pulls it when she needs it.
+   Read-only by structure, not restraint: the view fixes the columns and hides
+   deleted rows, its grant is SELECT, and this is her one read of the journal.
+   A tool rather than trades in every request — most messages are about the
+   Fed, and a journal on every turn is paid for every turn and breaks the cache
+   on every fill.
    ───────────────────────────────────────────────────────────────────────── */
 const TRADES_TOOL = {
   name: "get_trades",
@@ -261,31 +170,14 @@ const TRADES_TOOL = {
 } as const;
 
 /* ─── What she remembers ───────────────────────────────────────────────────
-   Twelve turns of conversation roll over in a morning, so without this she can
-   never know in September that he has been working on holding his stop since
-   August.
+   Three kinds. A `fact` she noticed about him. An `instruction` he gave her —
+   "stop mentioning the ten-year" — his only channel for correcting her. A
+   `commitment` he made — "this week I stop after two losses" — read the other
+   way: held against his trades, not obeyed.
 
-   THREE KINDS, AND THEY ARE NOT INTERCHANGEABLE. A `fact` is something about
-   him she noticed. An `instruction` is something he TOLD her — "stop mentioning
-   the ten-year", "too long" — and it is the only channel he has for correcting
-   her: no settings page, no feedback button, and the conversation window
-   forgets by morning. A `commitment` is something he told her HE would do —
-   "this week I stop after two losses" — and it is read the opposite way to an
-   instruction: she does not obey it, she holds his trades against it.
-
-   They are one table because they are the same shape and the same lifecycle,
-   and they are read SEPARATELY because they are not the same size. Notes arrive
-   at a few a week; instructions at a few ever. One newest-20 window over both
-   would evict "stop mentioning the ten-year" after a month of ordinary
-   observations — silently, and after she had told him it stuck, which is the
-   one failure this feature cannot have.
-
-   APPEND-ONLY, and read newest-first. Superseding any of them means writing a
-   newer one, which is also how a person's memory works and is what lets him change
-   his mind about an instruction with nothing to delete.
-
-   Still not a writer to `trades`. eugenia_turns and eugenia_notes are hers;
-   the journal remains one read through a view with no write path in the file.
+   One table, read as separate windows: one newest-20 window would evict a
+   standing instruction after a month of observations, after she had told him
+   it stuck. Append-only; a correction is a newer note superseding the old.
    ───────────────────────────────────────────────────────────────────────── */
 export const NOTE_KINDS = ['fact', 'instruction', 'commitment'] as const;
 export const NOTE_MAX = 200;
@@ -327,24 +219,14 @@ const NOTES_TOOL = {
 } as const;
 
 /* ─── Where he stands on each channel ──────────────────────────────────────
-   The five channels are the map her teaching is anchored to, and this is the
-   only part of her memory that never scrolls: five rows rather than a window,
-   so a channel he has NEVER used is legible as a row saying so. Notes cannot
-   carry that — an absence is not something anybody writes down.
+   The five channels her teaching is anchored to: five rows rather than a
+   window, so a channel he has never used is a row saying so — an absence
+   nobody would write down as a note.
 
-   CONSOLIDATION ONLY, and deliberately not in CHAT_TOOLS beside `remember`.
-   A note is a moment and is fairly written in one; a rung is a judgment across
-   days, and moving one from a single exchange is the same error as reading a
-   pattern into one fill. The nightly pass is the only caller that sees a whole
-   day, which is exactly the argument that put note-writing there as well.
-
-   A DEMOTION IS NOT THAT JUDGMENT — IT IS SOMETHING HE SAID — and it still
-   lands here rather than mid-conversation. The pass reads the whole day, so
-   *"explain that again"* is in front of it either way, and the rung is fixed
-   before the next morning's briefing, which is the only place it is read. What
-   putting the tool in CHAT_TOOLS would buy is a few hours; what it would cost
-   is its schema on every single request and a promotion she could make from one
-   exchange.
+   The nightly pass's alone, not in CHAT_TOOLS: a rung is a judgment across
+   days, and moving one from a single exchange is reading a pattern into one
+   fill. A demotion is something he SAID, but it lands at the pass too — the
+   pass reads the whole day, and the rung is read only by the next briefing.
    ───────────────────────────────────────────────────────────────────────── */
 const CHANNEL_TOOL = {
   name: "set_channel",
@@ -373,14 +255,9 @@ const CHANNEL_TOOL = {
 } as const;
 
 /* ─── What he has decided ──────────────────────────────────────────────────
-   The summary and the rules table ride on the cached system prompt and are in
-   front of her on every turn. This is the rest: the reasoning under a rule, how
-   a column is meant to be read, what a term means exactly.
-
-   SHE CANNOT WRITE IT, and that is the point rather than an omission. A document
-   that defines whether he followed his rules cannot also be edited by the thing
-   checking them — adherence to a moving target is not measurable, and her own
-   analysis would start feeding the standard she measures against.
+   The summary and rules table ride on the cached system prompt; this is the
+   rest. She cannot write it: a document that decides whether he followed his
+   rules cannot be edited by the thing checking them.
    ───────────────────────────────────────────────────────────────────────── */
 const STRATEGY_TOOL = {
   name: "get_strategy",
@@ -401,22 +278,13 @@ const STRATEGY_TOOL = {
   },
 } as const;
 
-/* Synchronous and cannot fail: it is a module constant, not a database read.
-   An unknown section is answered rather than refused — the number arrives from
-   the model, so a mistyped or an invented one is what this has to survive, and
-   "there is no such section" is a better answer than silence, which she would
-   fill in herself.
+/* A module constant, so it cannot fail. An unknown section is answered rather
+   than refused — the number comes from the model, and a blank is something she
+   would fill in herself.
 
-   A SUBSECTION IS SERVED BY THE SECTION THAT HOLDS IT, and without that the two
-   citations she is handed on every single turn were the two this could not
-   answer. R-05 cites §4.1 and R-06 cites §4.2; both are written, in full,
-   inside §4 — and an exact lookup told her they did not exist, which is not a
-   blank she fills in herself but something worse: a wrong fact about the
-   document, delivered by the one tool that exists to stop her inventing one.
-
-   Exported because it is the decision. The test that was meant to catch this
-   read the file for the word `has no section` and passed, and the one that
-   reads citations captured `4` out of `§4.1`. */
+   A subsection is served by the section holding it: R-05 and R-06 cite §4.1
+   and §4.2, which are prose inside §4, and an exact lookup once told her they
+   did not exist. Exported because it is the decision. */
 export function readStrategy(section: unknown): string {
   const key = String(section ?? "").trim().replace(/^§/, '');
   const found = SECTIONS[key] ?? SECTIONS[key.split('.')[0]];
@@ -427,14 +295,9 @@ export function readStrategy(section: unknown): string {
 }
 
 /* ─── Reaching what the windows do not ─────────────────────────────────────
-   Twelve turns and twenty notes are what she is HANDED. Everything older is
-   still in the tables and simply never selected, so the archive is complete and
-   unreachable at the same time. This is the reach.
-
-   Deliberately not a wider window. Every token handed over is paid on every
-   request and competes with the briefing for attention; a search is paid only
-   when a question needs one, which is the same trade get_trades makes for the
-   journal.
+   Twelve turns and twenty notes are what she is handed; everything older is in
+   the tables and never selected. A search is paid for only when a question
+   needs one, where a wider window is paid on every request.
    ───────────────────────────────────────────────────────────────────────── */
 const SEARCH_TOOL = {
   name: "search_memory",
@@ -459,36 +322,18 @@ const SEARCH_TOOL = {
   },
 } as const;
 
-// Twelve hits and 300 characters each is roughly one briefing's worth of text —
-// enough to answer from, and bounded, because a turn can be a whole briefing and
-// an unbounded search result would push the conversation out of its own context.
+// About one briefing's worth of text: enough to answer from, and bounded.
 const SEARCH_HITS = 12;
 const SEARCH_CHARS = 300;
 
 export type Hit = { source: string; id: number; at: string; retired: boolean; body: string };
 
-/* WHO SAID IT IS PART OF THE HIT, and it went missing on the way out of the
-   database. eugenia_turns carries `role`; eugenia_search did not select it, and
-   every turn came back rendered `you said` — so half of every result set was
-   HIS words handed back to her as her own. She would quote an instruction he
-   gave as her own analysis, or deny having said something he said, fluently and
-   with nothing anywhere reporting it.
-
-   The role rides in `source` rather than in a column of its own because
-   `create or replace function` may not change a return type, and dropping the
-   function to widen it takes its grants with it. Three values, one column, no
-   migration hazard: `note`, `you`, `him`.
-
-   The words themselves are a map rather than a chain of ternaries, because they
-   are one half of a vocabulary the database holds the other half of: a name
-   woven into a conditional is not something a reader can enumerate, and this
-   pair has to be comparable against the SQL's own literals or it is once again
-   a copy nothing can check. An unrecognised source renders as itself rather
-   than folding into hers — a value renamed on one side would otherwise land in
-   the default branch and quietly restore the misattribution.
-
-   Pure, so a test can drive all three renderings; the read stays with the
-   caller — the same split notesList and channelsList are written on. */
+/* Who said it is part of the hit: without the role, half of every result was
+   HIS words handed back as hers. It rides in `source` — `note`, `you`, `him` —
+   because changing the function's return type would mean dropping it and its
+   grants. A map rather than ternaries, so agree.test.mjs can hold it against
+   the SQL's literals; an unknown source renders as itself rather than falling
+   into hers. Pure; the read stays with the caller. */
 export const SAID: Record<string, string> = { you: 'you said', him: 'he said' };
 
 export function searchList(hits: Hit[]): string {
@@ -503,73 +348,39 @@ export function searchList(hits: Hit[]): string {
 }
 
 /* ─── Meaning, rather than words ───────────────────────────────────────────
-   THE SEARCH BELOW WAS FULL TEXT AND TRIGRAM, WHICH FIND A REPHRASING AND NOT
-   A DIFFERENT IDEA. *"What did we conclude about the December cut"* against a
-   turn that said *"the market has mostly given up on easing this year"* shares
-   no substrings at all — so she answers that they never discussed it, which is
-   worse than answering that she cannot find it.
+   Full text and trigram find a rephrasing, not a different idea: "the December
+   cut" against "the market has given up on easing" shares no substring, and
+   she would answer that they never discussed it. This adds no memory and no
+   window — everything a vector finds was already in the table.
 
-   THIS ADDS NO MEMORY AND NO WINDOW. Twelve turns and twenty notes are what she
-   is handed and that does not move: every token in a window is paid on every
-   request, and search is what reaches past it. Everything a vector finds was
-   already in the table.
+   Unset is a first-class state: with no EMBED_KEY every caller gets null, rows
+   land without a vector, and the search runs as it did before.
 
-   UNSET IS A FIRST-CLASS STATE. With no EMBED_KEY every caller here gets null,
-   writes its row without a vector, and the search runs exactly as it did before
-   — the SQL's fusion over one arm reproduces the old ordering. That is what
-   lets this ship before the key exists rather than after.
-
-   AND A VENDOR THAT REFUSES IS NOT THE SAME THING, which is the distinction the
-   first version of this file lost. It swallowed every failure into a console
-   line, so `?embed=1` — a door you run by hand and read the answer of — replied
-   `ok: true, filled: 0` and said nothing about why: no credit on the account, a
-   key with the wrong permission and a mistyped secret all looked identical, and
-   the one place the reason was written is the Edge log this repository already
-   says nobody reads.
-
-   So embed() THROWS, and the two write paths are the ones that swallow it —
-   `.catch(() => null)` at each, because a vendor failure must never cost the
-   note or the turn. The door does not, and that asymmetry is the whole design
-   rather than an oversight: `agree.test.mjs` asserts both write sites carry the
-   catch, since a helper reached from a caught call site and a bare one is
-   exactly the shape this file has been bitten by before.
+   A vendor that refuses is different, so embed() THROWS: ?embed=1 must be able
+   to say whether it was credit, permission or a mistyped secret. The write
+   paths and the search swallow it with `.catch(() => null)`, because a vendor
+   failure must never cost a note, a turn or the lexical arm. agree.test.mjs
+   counts both sides.
    ───────────────────────────────────────────────────────────────────────── */
 const EMBED_URL = env("EMBED_URL") || "https://api.openai.com/v1/embeddings";
 const EMBED_KEY = env("EMBED_KEY");
 
-/* PINNED HERE RATHER THAN READ FROM THE ENVIRONMENT, and that is the whole
-   difference between this and STT_MODEL. A transcription model chosen in the
-   dashboard changes one answer; an EMBEDDING model chosen there changes what is
-   comparable to what. Vectors from two models are not comparable and nothing
-   says so — the column type catches a change of WIDTH and cannot catch a change
-   at the same width, so ranking would degrade into noise with no error
-   anywhere. Changing it is therefore a code change, reviewable in a diff, and
-   it means re-embedding both tables. */
+/* Pinned, unlike STT_MODEL: vectors from two models are not comparable, and
+   the column catches a change of width but not one at the same width. A change
+   is a reviewed diff and a re-embedding of both tables. */
 const EMBED_MODEL = "text-embedding-3-small";
 export const EMBED_DIMS = 1536;
 
-/* Fifty at a time. The vendor call is one request whatever the count, so the
-   batch is sized by the writes that follow it — those are one PATCH per row,
-   since an upsert cannot be used here: PostgREST would send a row carrying only
-   `id` and `embedding`, and `content not null` is checked when the tuple is
-   built, before any conflict is detected. */
+/* Fifty at a time, sized by the writes that follow: one PATCH per row, since an
+   upsert carrying only id and embedding fails `content not null` before any
+   conflict is detected. */
 const EMBED_BATCH = 50;
 
-/* ORDERED BY THE INDEX THE VENDOR STATES, never by arrival. Each object carries
-   the position of the input it answers, and taking the array as it comes would
-   file a vector against the wrong row — a memory that returns the wrong text
-   for the right question, with nothing anywhere able to reveal it.
-
-   ALL OR NOTHING for the same reason: a short answer, or one of the wrong
-   width, gives no way to tell WHICH row lost its vector, so none is written and
-   the sweep tries the batch again.
-
-   Pure and exported because it is the decision, and because the alternative is
-   a test that stubs a vendor to prove a sort it supplied the answer to. Returns
-   pgvector's own text form rather than numbers: the same string goes into the
-   column and into the search, and `[0.1,0.2,…]` crosses a JSON body into a
-   `vector` intact where a JSON array would depend on a cast from json that
-   pgvector does not promise. */
+/* Ordered by the index the vendor states, never by arrival: a vector filed
+   against the wrong row is a memory returning the wrong text, undetectably. All
+   or nothing, since a short or wrong-width answer cannot say which row lost
+   its vector. Returns pgvector's text form, which crosses a JSON body intact
+   into both the column and the search. */
 export function foldVectors(data: any, want: number): string[] | null {
   const rows = Array.isArray(data) ? [...data] : [];
   rows.sort((a: any, b: any) => (a?.index ?? 0) - (b?.index ?? 0));
@@ -588,10 +399,8 @@ async function embed(texts: string[]): Promise<string[] | null> {
     headers: { Authorization: `Bearer ${EMBED_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: EMBED_MODEL, dimensions: EMBED_DIMS, input: texts }),
   });
-  // THE BODY AND NOT ONLY THE STATUS. Every refusal this will actually meet is
-  // a 4xx whose body names it — no credit on the account, a key without the
-  // permission, a model the key may not reach — and they are three different
-  // repairs. A bare "HTTP 429" sends someone to check the wrong one.
+  // The body names the refusal — credit, permission, model — and each is a
+  // different repair.
   if (!res.ok) {
     throw new Error(`embedding refused (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
   }
@@ -601,21 +410,15 @@ async function embed(texts: string[]): Promise<string[] | null> {
   return vecs;
 }
 
-/* NEVER THROWS, for the reason writeNote does not: this runs inside the tool
-   loop, and an exception here costs the answer she is in the middle of writing.
-   A search that fails comes back as a sentence she can carry on from. */
+/* Never throws: it runs inside the tool loop, and a failed search comes back
+   as a sentence she can carry on from. */
 async function searchMemory(query: unknown): Promise<string> {
   const q = String(query ?? "").trim();
   if (!q) return "Nothing to search for.";
 
   try {
-    /* CAUGHT HERE RATHER THAN LEFT TO THE try AROUND IT, and the difference is
-       the whole degradation. The enclosing catch answers "your memory could not
-       be searched" — true of a database that refused, and false of an embedding
-       vendor that did: the lexical arm is untouched and would have answered
-       perfectly well. Unset key, refused call, or a query that embeds to
-       nothing are one null here, and the search runs on words as it always
-       did. */
+    // Caught here: a vendor failure leaves the lexical arm, which still answers.
+    // The catch below is for a database that refused.
     const [qv] = await embed([q]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/rpc/eugenia_search`, {
       method: "POST", headers: sbHeaders(),
@@ -624,8 +427,7 @@ async function searchMemory(query: unknown): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const hits: Hit[] = await res.json();
 
-    // An empty result is an ANSWER, and saying so plainly is what stops her
-    // reporting that she never discussed something when the search simply broke.
+    // An empty result is an answer, distinct from a broken search.
     if (!hits.length) return `Nothing in your memory matches "${q}".`;
 
     return searchList(hits);
@@ -635,37 +437,22 @@ async function searchMemory(query: unknown): Promise<string> {
   }
 }
 
-// Twenty of each is a season of observations at the few-a-week the prompt asks
-// for, and more standing instructions than he is ever likely to give — they are
-// one sentence each, so the whole memory costs less than one paragraph.
+// Twenty of each: a season of observations, and more instructions than he will
+// give — the whole memory costs less than a paragraph.
 const NOTES = 20;
 
-/* LIVE NOTES ONLY, and the filter is the whole feature. Drop `superseded_by=is.null`
-   and every retired line comes back — she is handed the correction and the thing
-   it corrected, with nothing to say which won. The failure is silent, which is
-   why agree.test.mjs reads this query for the filter.
-
-   The id comes back too, because a note she cannot name is a note she cannot
-   retire. It costs a few characters per line and it is what makes `supersedes`
-   callable at all. */
-/* EVERY READ OF HER TABLES IS THE SAME THREE STEPS — ask, refuse to go on with
-   a bad status, parse — and the only thing that ever varied was the noun in the
-   error. Fourteen copies of that is fourteen chances for one to omit the status
-   check, and the one that omits it does not fail loudly: PostgREST answers a
-   missing table with a 404 carrying a JSON body, so `await res.json()` succeeds
-   and the caller is handed an object where it expected rows. An unapplied
-   migration then reads as a block with nothing to say.
-
-   `fillEmbeddings` is deliberately NOT folded in. It needs `content-range` off
-   the response to know how much backlog is left, and a helper returning only
-   the rows would have to hand the response back to give it that — which is the
-   wrapper this exists to avoid. */
+/* Every read of her tables: ask, refuse a bad status, parse. In one place
+   because PostgREST answers a missing table with a 404 whose JSON body parses
+   fine, and a copy that skips the status check hands back an object for rows.
+   fillEmbeddings stays out: it needs the response's content-range. */
 async function readRows<T>(what: string, url: string): Promise<T[]> {
   const res = await fetch(url, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`${what} read failed (HTTP ${res.status})`);
   return await res.json();
 }
 
+// Live notes only: drop `superseded_by=is.null` and she is handed each
+// correction beside what it corrected. The id comes back so she can retire one.
 async function readNotes(kind: string): Promise<Note[]> {
   return readRows<Note>('Notes',
     `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
@@ -674,51 +461,32 @@ async function readNotes(kind: string): Promise<Note[]> {
 
 type Note = { id: number; note: string };
 
-// `[12] he trades the London open` — the number is how a note is NAMED when one
-// is retired, so it is part of the line rather than decoration. Both renderings
-// carry it: hers, so she can pass `supersedes`, and his, so he can say which.
+// The number is how a note is named when one is retired — in both renderings.
 const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
 
-/* Truncated rather than refused, and it NEVER THROWS.
+/* Truncated rather than refused, and never throws: the reply she is writing
+   matters more than the note, and a throw would cost the whole of it. That is
+   also how she survives running without 003: no memory, every answer lands.
 
-   Both for the same reason: this tool exists for a side effect, and the answer
-   she is in the middle of writing matters more than the note. A sentence one
-   character over its budget is still worth keeping, and a throw here would
-   propagate out of the tool loop and cost the whole reply — so a failed write
-   comes back as a sentence she can read and carry on from. It is also what
-   makes her survive being deployed before 003_eugenia.sql has been run:
-   no table, no memory, but every answer still lands.
-
-   BOTH ANSWERS SAY WHICH KIND FAILED, because the two are not equally
-   forgivable. A lost observation costs a little continuity and she should not
-   mention it. A lost INSTRUCTION is worse than saying nothing: she is about to
-   acknowledge it, and an acknowledgement for something that was never stored
-   means he stops repeating himself about a thing she will keep doing. Same for
-   a truncation — an instruction cut mid-sentence becomes a standing rule
-   nobody wrote. */
+   Failures say which kind failed. A lost fact she need not mention; a lost
+   INSTRUCTION she is about to acknowledge, and an acknowledgement of something
+   never stored means he stops repeating a thing she will keep doing. */
 async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Promise<string> {
   const text = String(note ?? "").trim();
   if (!text) return "Nothing to remember.";
 
-  // The kind decides how a failure is reported, so an unrecognised one takes
-  // the quieter branch rather than promising him something.
+  // An unrecognised kind takes the quieter branch.
   const k = (NOTE_KINDS as readonly string[]).includes(String(kind)) ? String(kind) : 'fact';
   const kept = text.slice(0, NOTE_MAX);
 
-  // Decided BEFORE the write, because it decides what the write asks for. Only a
-  // retirement needs the new row back, and asking for it every time left a body
-  // nobody read on the common path — an unconsumed response holds its connection
-  // open, and most notes supersede nothing.
+  // Only a retirement needs the new row back; an unread body holds its
+  // connection open.
   const old = Math.trunc(Number(supersedes));
   const retiring = Number.isFinite(old) && old > 0;
 
   try {
-    /* INSIDE THE try AND BEFORE THE INSERT. Before, so the note lands with its
-       vector in one statement rather than needing a second write that could
-       fail on its own — a null here costs nothing but a place in the sweep.
-       Inside, and caught: this function's whole contract is that it never
-       throws, and embed() does — deliberately, so the maintenance door can say
-       why. A lost vector must never read to him as a lost note. */
+    // Embedded before the insert, so the note lands with its vector in one
+    // write; caught, because a lost vector must never read as a lost note.
     const [vec] = await embed([kept]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
       method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
@@ -726,10 +494,8 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    /* THE NEW NOTE IS SAFE BEFORE ANY OF THIS RUNS, and that ordering is the
-       point: a retirement that fails leaves two live notes, which is today's
-       behaviour and is recoverable. Retiring first and failing to write would
-       lose the correction and the thing it corrected in one go. */
+    // The new note is written before the old one is retired: a failed
+    // retirement leaves two live notes, recoverably, never neither.
     if (retiring) {
       const [row] = await res.json();
       const done = await fetch(
@@ -737,9 +503,8 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
           method: "PATCH", headers: sbHeaders("return=representation"),
           body: JSON.stringify({ superseded_by: row.id }),
         });
-      // A miss is not an error — she may have named a note that never existed or
-      // one already retired — but it must not pass as done, or she believes a
-      // contradiction is gone while it is still being handed to her every turn.
+      // A miss must not pass as done, or she believes a contradiction is gone
+      // while it is still handed to her every turn.
       if (!done.ok || (await done.json()).length === 0) {
         return `Remembered, but note ${old} is not there to retire — ` +
                `it may already be superseded. Check the list you were given.`;
@@ -761,14 +526,10 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   }
 }
 
-/* NEVER THROWS, for the reason writeNote does not — it runs inside the tool
-   loop and an exception costs the answer being written. Both names are checked
-   against prompt.ts rather than trusted: the tool schema declares an enum, and
-   a value outside it would be refused by the check constraint as a 400 that
-   reads like a database fault rather than like a bad argument.
-
-   moved_on is a New York civil day, computed here. Defaulting it to now() in
-   the schema would file an evening move on tomorrow. */
+/* Never throws, for writeNote's reason. Both names are checked against
+   prompt.ts, or the check constraint answers a bad argument with a 400 that
+   reads as a database fault. moved_on is a New York civil day, computed here:
+   now() would file an evening move on tomorrow. */
 async function setChannel(channel: unknown, state: unknown, evidence: unknown): Promise<string> {
   const id = String(channel ?? "");
   const to = String(state ?? "");
@@ -779,10 +540,8 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
   if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
     return `"${to}" is not a rung. They are ` + CHANNEL_STATES.join(", ") + ".";
   }
-  /* THE BOTTOM RUNG IS A FACT ABOUT HISTORY, NOT ABOUT HOW WELL HE HOLDS IT, so
-     a demotion can reach every rung but that one. Written back, it would report
-     a channel she taught last week as one he has never met — and an absence that
-     can be manufactured is no longer the absence the census exists to show. */
+  // The bottom rung is a fact about history, not about how well he holds it:
+  // written back, it would report a channel she taught last week as never met.
   if (to === CHANNEL_STATES[0]) {
     return `${id} cannot go back to ${CHANNEL_STATES[0]} — it has come up. ` +
            `Move it to ${CHANNEL_STATES[1]} if he has said he has lost it.`;
@@ -798,9 +557,7 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // A PATCH that matches nothing is a 200 with an empty array, and it must not
-    // pass as done: the row is seeded by 003_eugenia.sql, so an empty answer
-    // means the migration has not been applied and every move is being dropped.
+    // An empty answer means 003's seed rows are missing and every move drops.
     if ((await res.json()).length === 0) {
       return `No row for ${id} — the channels table has not been seeded, so ` +
              `nothing was saved. Say nothing about this to him.`;
@@ -813,17 +570,11 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
   }
 }
 
-/* The whole query, built in one place so a test can read it. `days` arrives
-   from the model, so it is clamped rather than trusted: this is the boundary.
-   400 rows is far more than a year of this account and stops a wide window
-   returning a context-filling answer.
-
-   THE WINDOW IS COUNTED IN CIVIL DAYS, NOT IN MILLISECONDS, because `open_day`
-   is a civil day. Subtracting n × 86,400,000 and formatting the result is
-   instant arithmetic wearing a civil-day label: it is right until a clock
-   change, when a day is 23 or 25 hours long and "seven days ago" lands on the
-   wrong date. So today's New York date is taken first and the days are stepped
-   off it — the same way index.html walks to a week or a month boundary. */
+/* The whole query in one place, so a test can read it. `days` comes from the
+   model, so it is clamped: this is the boundary. 400 rows is more than a year
+   of this account. The window is counted in civil days, stepped off today's
+   New York date, because open_day is a civil day and a clock change makes a
+   day 23 or 25 hours long. */
 export const TRADE_ROWS = 400;
 
 export function tradesQuery(days: unknown, now = Date.now()): string {
@@ -831,12 +582,9 @@ export function tradesQuery(days: unknown, now = Date.now()): string {
          `&order=open_day.desc,entry_time.desc&limit=${TRADE_ROWS}`;
 }
 
-/* A FULL READ IS NOT THE WHOLE WINDOW, coveredWeeks' rule for the trades. The
-   read takes the newest TRADE_ROWS, so a year he traded more than that is cut
-   at its oldest end and every answer built on it — a win rate, a rule's
-   counts, the rows themselves — was still labelled "the last 365 days". Said
-   where it happens, with the day the read actually reaches, and nothing at
-   all on an ordinary window. Pure and exported because it is the decision. */
+/* A full read is not the whole window: past TRADE_ROWS the oldest end is cut,
+   and every figure over it would still be labelled with the window asked for.
+   Said where it happens, and nowhere on an ordinary window. */
 export function reachLine(rows: { open_day: string | null }[], days: unknown): string {
   if (rows.length < TRADE_ROWS) return "";
   return `\nThe read stops at its ${TRADE_ROWS}-trade bound, so this reaches back only to ` +
@@ -844,8 +592,7 @@ export function reachLine(rows: { open_day: string | null }[], days: unknown): s
          `before giving any figure over the window.`;
 }
 
-// How many days the model asked for, clamped once: the window it reads and
-// the span the summary says it covers are the same number.
+// Clamped once: the window read and the span reported are one number.
 const windowDays = (days: unknown): number =>
   Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
 
@@ -859,13 +606,11 @@ function windowStart(days: unknown, now: number, back: number): string {
   return from.toISOString().slice(0, 10);
 }
 
-/* R-14's two reads, over the same window check_rules reads the trades in. The
-   releases are TradingView's rated high — HIGH is the rule's, imported rather
-   than typed here — and only rows carrying TradingView's id: what she typed in
-   before 018 is kept for its notes and was never a rating he chose. A day
-   early, because a UTC midnight bound would drop the evening before a New York
-   one. The weeks go back a further seven, since an entry on the window's first
-   day sits in a week that began before it. */
+/* R-14's reads over check_rules' window: TradingView's high-rated releases —
+   only rows with its id, since her older typed ones were never a rating he
+   chose — a day early, as a UTC bound would drop the evening before; and the
+   fetched weeks a further seven back, since the window's first day sits in a
+   week that began before it. */
 export const RULE_RELEASES = 500;
 
 export function releasesQuery(days: unknown, now = Date.now()): string {
@@ -873,22 +618,17 @@ export function releasesQuery(days: unknown, now = Date.now()): string {
          `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=${RULE_RELEASES}`;
 }
 
-/* A FULL READ OF THE RELEASES IS NOT THE WHOLE WINDOW, and a week the read did
-   not reach must not count as covered. The read takes the newest first, so on a
-   window long enough to fill it the oldest weeks are still marked as fetched in
-   calendar_weeks while their releases never arrived — and R-14 then passes
-   every entry in them for want of a print, and R-19 judges none of them. That
-   is the quiet week `weeks` exists to tell apart from an unfetched one, arriving
-   through the limit instead. So a full read covers only the weeks after the one
-   its oldest release falls in, and that week too is left out, being partial.
-   Exported because it is the decision; the read is readRules'. */
+/* A full read of the releases is not the whole window either: the oldest weeks
+   would still be marked fetched while their releases never arrived, and R-14
+   would pass every entry in them. So a full read covers only the weeks after
+   the one its oldest release falls in. */
 export function coveredWeeks(weeks: string[], releases: { at: string }[]): Set<string> {
   const reach = releases.length === RULE_RELEASES ? weekOf(new Date(releases[releases.length - 1].at)) : '';
   return new Set(weeks.filter(w => w > reach));
 }
 
-// R-19's read: every stop and target the poller saw move, from a week before
-// the window so a position opened before it still has its first sighting.
+// R-19's read, from a week before the window so a position opened before it
+// still has its first sighting.
 export function stopsQuery(days: unknown, now = Date.now()): string {
   return `trade_stops?select=id,seen_at,sl,tp&seen_at=gte.${windowStart(days, now, 7)}` +
          `&order=seen_at.desc&limit=2000`;
@@ -899,20 +639,10 @@ export function weeksQuery(days: unknown, now = Date.now()): string {
          `&order=week.desc&limit=60`;
 }
 
-/* NEVER THROWS, for the reason searchMemory and writeNote do not: this runs
-   inside the tool loop, and an exception here costs the answer she is in the
-   middle of writing. It cost four — a briefing and its three retries, one
-   sentence each and nothing else all day — the morning the view behind it was
-   dropped and not rebuilt. The read that killed them was the one the model
-   ASKED for; the identical failure in tradesBlock had already been absorbed a
-   round earlier, which is how a briefing came to die of a read it had already
-   survived.
-
-   AND IT SAYS SO, rather than coming back empty. "No trades in that window" is
-   an answer and must be reserved for a window that was actually looked at: it
-   is the sentence a briefing turns into "you have not traded since Friday",
-   which is a false statement about his own week from the one thing he trusts
-   to have read it. */
+/* Never throws: an exception in the tool loop costs the answer — it once cost
+   a briefing and its three retries. And it says so rather than coming back
+   empty: "no trades in that window" becomes "you have not traded since
+   Friday", a false statement about his own week. */
 async function readTrades(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
@@ -924,21 +654,9 @@ async function readTrades(days: unknown): Promise<string> {
 }
 
 /* ─── His own rules, evaluated ─────────────────────────────────────────────
-   §7 writes a predicate for every rule and §8 writes the filters and the three
-   verdicts. Both were prose she had to apply by hand, over up to four hundred
-   rows of JSON, on the way to a number — which is the single most error-prone
-   thing she does and the place a wrong answer is least visible.
-
-   THIS IS NOT A VERDICT ON A TRADE, IT IS WHAT ONE STANDS ON. It reports
-   whether a row satisfies a predicate HE wrote down. "Two entries were 41
-   minutes apart and R-12 allows fifteen" is a fact about his rule, and the
-   prompt has her state it before any judgment of her own, so he always holds
-   the half he can check.
-
-   Thirteen rules and not one more. §7's Evaluable column decides the set, and
-   the five marked `judgment` stay out — an approximation of one would be worse
-   than the gap, because a judgment rule that starts reporting `pass` is exactly
-   the "no violations" claim §8 warns is close to saying nothing.
+   Whether each row satisfies a predicate HE wrote — what a judgment stands on,
+   not a judgment. The prompt has her state it first, so he always holds the
+   half he can check. adherence.ts says why thirteen.
    ───────────────────────────────────────────────────────────────────────── */
 const CHECK_TOOL = {
   name: "check_rules",
@@ -962,13 +680,9 @@ const CHECK_TOOL = {
   },
 } as const;
 
-/* THE FOUR READS THE RULES STAND ON, AND THE EVALUATION, in one place for
-   both of the things that evaluate: the tool, and the briefing's own block. Fed
-   two ways, R-14 could be judged against a calendar in one and against nothing
-   in the other, and nobody would see which. `keep` narrows the trades and
-   nothing else, so the calendar and the stop history are the same either way.
-   Null when nothing was kept, which is not a pass; `reach` is the read's own
-   bound, said beside whatever was evaluated over it. */
+/* The four reads and the evaluation, shared by the tool and the briefing so
+   R-14 cannot be judged against a calendar in one and nothing in the other.
+   `keep` narrows only the trades. Null when nothing was kept — not a pass. */
 async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
     Promise<{ results: RuleResult[] | null; reach: string }> {
   const [rows, releases, weeks, moves] = await Promise.all([
@@ -987,9 +701,7 @@ async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => t
   }, stops), reach };
 }
 
-/* NEVER THROWS, for the reason every other tool here does not — it runs inside
-   the loop and an exception costs the answer being written. The read is the one
-   get_trades already makes through the same view; the evaluation is pure. */
+/* Never throws. */
 async function checkAdherence(days: unknown): Promise<string> {
   try {
     const { results, reach } = await readRules(days);
@@ -1002,23 +714,9 @@ async function checkAdherence(days: unknown): Promise<string> {
 }
 
 /* ─── The journal, summarised ──────────────────────────────────────────────
-   SHE HAD THE ROWS AND NOT THE ARITHMETIC. `get_trades` hands her up to four
-   hundred trades as JSON and the prompt hands her the rules for reading them —
-   a scratch is measured in price and not dollars, break-evens sit in the win
-   rate's denominator, the money split is on the sign while the averages are on
-   the label, reward-to-risk in the journal is realised and never planned. Four
-   definitions, applied by hand, on the way to a number he will act on.
-
-   That is the arrangement check_rules was written to end, and the argument does
-   not change because these are stats rather than rules: it is the one thing a
-   model is worst at, and a rate computed the wrong way looks exactly like one
-   computed the right way. The app has computed all of it since before she
-   existed and she could not see any of it.
-
-   THE ROWS STILL COME BACK FROM get_trades, and that is deliberate rather than
-   redundant. This answers "how has he been doing"; the rows answer "what
-   happened on the eleventh", and a summary cannot be interrogated. Same read,
-   same view, no new reach.
+   The app's arithmetic, for check_rules' reason: four definitions applied by
+   hand produce a number that looks right either way. get_trades stays beside
+   it, because a summary cannot be asked what happened on the eleventh.
    ───────────────────────────────────────────────────────────────────────── */
 const STATS_TOOL = {
   name: "get_stats",
@@ -1045,9 +743,8 @@ const STATS_TOOL = {
   },
 } as const;
 
-/* NEVER THROWS, for the reason every other tool here does not, and it says what
-   it could not do rather than coming back empty — a summary that silently
-   returns nothing reads as a trader who has not traded. */
+/* Never throws, and says what it could not do: an empty summary reads as a
+   trader who has not traded. */
 async function readStats(days: unknown): Promise<string> {
   try {
     const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
@@ -1059,42 +756,18 @@ async function readStats(days: unknown): Promise<string> {
 }
 
 /* ─── What lands today ─────────────────────────────────────────────────────
-   A print at 08:30 is knowable at 08:00, so the quarter-hour after it can be a
-   look at what actually happened rather than a fixed 10:00 pulse whose usual
-   answer is silence. And `actual` against `consensus` is a series that is worth
-   nothing today and a great deal in June.
+   Filed from TradingView, keyed on its id (018), so nothing she writes can mint
+   a second row for one release. Two callers file it: the briefing, before it
+   reads, and the quarter-hourly release job, which is how an actual lands
+   within fifteen minutes of publication. Read through doji-tradingview with
+   the cron secret she already holds.
 
-   FILED FOR HER, FROM TRADINGVIEW, AND NO LONGER BY HER. She searched for the
-   day's calendar every morning and typed it in, and most of what went wrong with
-   this table came from the typing. The key was (at, name) over a name the model
-   wrote, so one CPI arrived as five rows under five spellings. Her importance
-   came off a search page and had to be corrected by Forex Factory's folder. And
-   she filed days ahead of anything that read the rows. TradingView keeps an id
-   for every release and states its forecast, prior, actual and importance as
-   data, so the row's key is that id (018) and nothing she writes can mint a
-   second one.
-
-   TWO CALLERS FILE IT: the briefing, before it reads the calendar, and the
-   quarter-hourly release job, before it looks for a print — which is also how
-   an actual lands within fifteen minutes of TradingView publishing it. The read
-   goes through doji-tradingview, which holds the sign-in; she presents the cron
-   secret she already has, as she does for the price.
+   A rolling window rather than a civil day — the Sunday briefing is about a
+   week not yet started. The forward reach is the half to keep: aheadToday can
+   only warn about what is filed, and at twenty-four hours the 08:00 briefing
+   left tomorrow's 08:30 print unfiled until tomorrow. Twenty-eight carries it
+   past tomorrow's 10:00. Read and write share the constant.
    ───────────────────────────────────────────────────────────────────────── */
-/* A ROLLING WINDOW RATHER THAN A CIVIL DAY, and it is the simpler correct
-   answer. What a briefing wants is "what just landed and what is coming", which
-   straddles midnight in exactly the way a civil-day filter handles worst — the
-   Sunday 17:00 briefing is about a week that has not started yet.
-
-   THE FLOOR IS THE HALF TO KEEP. `aheadToday` asks what is pending against a
-   position the moment it opens, and it can only find what is filed. At a day
-   forward, the 08:00 briefing reached 08:00 tomorrow and stopped, so tomorrow's
-   08:30 and 10:00 prints were not on file until tomorrow's own briefing; on 25
-   September an entry at about 07:38 checked an empty calendar against the 10:00
-   Michigan print. Twenty-eight hours carries the weekday briefing past
-   tomorrow's 10:00. The filing is quarter-hourly now, so the window moves with
-   the clock, and the read and the write are still one constant: what is filed
-   is what `readCalendar` hands her, and `calendarList` names the day of every
-   line that is not today's. */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
 const TV_CALENDAR = `${SB_URL}/functions/v1/doji-tradingview?calendar=1`;
@@ -1106,22 +779,14 @@ interface TvEvent {
   ticker: string | null;
 }
 
-/* WHAT IS FILED, AND WHAT IS LEFT OUT OF EACH ROW.
+/* Releases only — `timed` false is a marker, not a print — and medium or
+   above: low is mortgage rates and rig counts, paid for on every request and
+   moving nothing.
 
-   Releases only, and medium and above. `timed` false is a marker rather than a
-   print — a summit filed at midnight — and nothing that counts minutes before a
-   release may count it. Low is mortgage rates, rig counts and bill auctions:
-   filed, every one of them would be in front of her on every request and none
-   would move gold on its own.
-
-   A FIGURE TRADINGVIEW HAS NOT PUBLISHED IS LEFT OUT, NOT SENT AS NULL. An
-   absent key and a null key mean opposite things under `merge-duplicates`,
-   which `emailRow` states: the release look can still record an actual TradingView has not published yet,
-   and a quarter-hourly filing sending `actual: null` would erase it fifteen
-   minutes later. `note` is hers and is never named here.
-
-   The period goes into the name, because "Core PCE Price Index MoM (Aug)" says
-   which month a reader is being told about and the title alone does not. */
+   A figure TradingView has not published is left out, never sent as null:
+   under merge-duplicates a null erases an actual the release look recorded by
+   hand. `note` is hers and never named. The period joins the name, since the
+   title alone does not say which month. */
 export function calendarRows(events: TvEvent[], from: number, to: number) {
   return events
     .filter(e => e.timed && e.importance !== 'low')
@@ -1149,9 +814,8 @@ async function readTvCalendar(from: string, to: string): Promise<TvEvent[]> {
   return answer.events;
 }
 
-/* IN GROUPS THAT CARRY THE SAME KEYS, which is what makes leaving a figure out
-   reach the database at all: PostgREST refuses a bulk insert whose objects do
-   not all name the same columns. */
+/* Grouped by the keys each row carries: PostgREST refuses a bulk insert whose
+   objects name different columns, and leaving a figure out depends on it. */
 async function upsertCalendar(rows: Record<string, string>[]): Promise<number> {
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
@@ -1168,20 +832,17 @@ async function upsertCalendar(rows: Record<string, string>[]): Promise<number> {
   return rows.length;
 }
 
-// Exported so a test can drive the write: which rows go up together is the
-// half that decides whether a missing figure reaches the database at all.
+// Exported so a test can drive the grouping.
 export async function fileCalendar(now: number): Promise<number> {
   const from = now - CAL_BACK * 3600_000, to = now + CAL_AHEAD * 3600_000;
   return upsertCalendar(calendarRows(await readTvCalendar(utcDay(from), utcDay(to)), from, to));
 }
 
-/* A WHOLE WEEK, AND THEN THE MARK THAT SAYS SO — the coverage R-14 and R-19
-   read (019). `week` is a Sunday in New York, `weekOf`'s key. TradingView is
-   asked in UTC days, so the read runs to the next Sunday and keeps only what
-   `weekOf` files under this week: the Saturday-evening hours a New York week
-   ends on are the next UTC day. The mark goes down only after the rows did,
-   so a failure in between leaves the week unknown rather than covered and
-   empty — the direction every gap in this system has to fail in. */
+/* A whole week, then the mark that says so (019). `week` is a New York Sunday;
+   TradingView is asked in UTC days, so the read runs to the next Sunday and
+   keeps what weekOf files under this week. The mark goes down only after the
+   rows, so a failure between leaves the week unknown rather than covered and
+   empty. */
 export async function fileWeek(week: string, now = Date.now()): Promise<number> {
   const next = utcDay(Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000);
   const rows = calendarRows(await readTvCalendar(week, next), 0, Infinity)
@@ -1195,13 +856,9 @@ export async function fileWeek(week: string, now = Date.now()): Promise<number> 
   return filed;
 }
 
-/* NEVER TAKES ITS CALLER DOWN, AND BOTH OUTCOMES ARE A ROW. A briefing with no
-   fresh calendar still has yesterday's filing and her search; a filing that
-   failed and left only a console line is the embedding sweep's lesson again —
-   a calendar that silently stopped moving looks exactly like a quiet week. */
-/* The week's own meter, kept apart from the quarter-hourly one so a row says
-   which of the two writers it is about — the nightly week and the history door
-   are the only things that mark a week covered. */
+/* Never takes its caller down, and both outcomes are a row: a calendar that
+   silently stopped moving looks like a quiet week. Its own caller label, apart
+   from the quarter-hourly filing, because only this marks a week covered. */
 async function filedWeek(week: string): Promise<boolean> {
   try {
     await recordRun({ caller: 'calendar week', ok: true, detail: `${week}: ${await fileWeek(week)} filed` });
@@ -1214,13 +871,10 @@ async function filedWeek(week: string): Promise<boolean> {
   }
 }
 
-/* THE WEEKS FROM A DATE TO NOW, AT MOST TWO YEARS OF THEM. Anchored at noon UTC
-   on the Sunday, which is a Sunday in New York in both halves of the year, so
-   stepping a week never crosses a clock change into the wrong day. The bound
-   keeps one run inside the worker's wall clock — a second a week, and a
-   `HISTORY_PAUSE_MS` each time TradingView refuses; a longer history is a
-   second run from where the first stopped. Pure, so the walk is driven rather
-   than trusted. */
+/* The weeks from a date to now, at most two years — one run's worth inside the
+   wall clock; a longer history is a second run. Anchored at noon UTC on the
+   Sunday, so a week's step never crosses a clock change into the wrong day.
+   Pure, so the walk is driven. */
 const HISTORY_WEEKS = 104;
 
 export function historyWeeks(start: string, now: number): string[] | null {
@@ -1233,19 +887,12 @@ export function historyWeeks(start: string, now: number): string[] | null {
   return weeks;
 }
 
-/* One week at a time, for `?bars=raw`'s reason: each week's failure is its own
-   row in `eugenia_runs`, which is where this door's answer is read — it runs
-   behind the 200 like every other, so the response says nothing.
-
-   A REFUSED WEEK IS ASKED AGAIN ONCE, AFTER A PAUSE, AND A SECOND REFUSAL ENDS
-   THE WALK. TradingView refuses past about thirty calendar reads a minute and
-   says to retry in half of one: the first year walked filed thirty-one weeks
-   and then wrote twenty-three refusals in a second and a half, every one of
-   them a week the run had been asked for and could have filed by waiting. The
-   pause is a constant rather than the figure in the refusal, which is prose in
-   someone else's error. Twice refused, the rest would meet the same answer, so
-   the walk stops and its last row names the week to start the next run from.
-   Exported with the pause as a parameter so the sequence is driven. */
+/* One week at a time, each failure its own eugenia_runs row — where this door
+   is read, since it answers before it works. TradingView refuses past about
+   thirty calendar reads a minute, so a refused week is asked again once after
+   a pause, and a second refusal ends the walk with its last row naming where
+   to resume. Exported with the pause as a parameter so the sequence is
+   driven. */
 const HISTORY_PAUSE_MS = 35_000;
 
 export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
@@ -1269,29 +916,14 @@ async function filed(now = Date.now()): Promise<void> {
   }
 }
 
-/* THE FALLBACK FOR A PRINT TRADINGVIEW HAS NOT PUBLISHED, and it goes to the
-   row that was looked at or nowhere. An upsert keyed on a name the model writes
-   once filed a print under `retail sales` beside the row it had been handed as
-   `US retail sales (August, advance)` — an INSERT, the actual on a row with no
-   consensus and the consensus on a row with no actual, and nothing failed.
+/* The fallback for a print TradingView has not published. It cannot insert —
+   an upsert on a model-written name once filed a print beside the row it was
+   handed — so it is a PATCH over the two columns a look owns, never consensus
+   or prior. A name matching nothing answers with the names on file, since an
+   empty PATCH is a 200 that reads like a write.
 
-   So this one CANNOT INSERT. A PATCH and nothing else, over the two columns a
-   look owns — which makes it structural rather than remembered: a look cannot
-   mint a row under any spelling, and it cannot write `consensus` or `prior`,
-   which are TradingView's.
-
-   AND A NAME THAT MATCHES NOTHING ANSWERS WITH THE NAMES ON FILE, because a
-   PATCH filtered to nothing is a 200 with an empty body — silence that reads
-   exactly like a write, the shape `planned` was repaired for in the poller. She
-   is handed the names in the message and quoting one is the whole job; when she
-   paraphrases anyway the next round has what it needs instead of a second row. */
-/* A SPEECH HAS NO FIGURE, SO THE FIGURE CANNOT BE THE PRICE OF THE LINE. The
-   look after a release is told it may add one line on what it meant whichever
-   way it decides, and a speech rated high is looked at the moment it lands —
-   so the one record a Chair's press conference could leave was refused here
-   for want of a number nothing will ever print. Either half may come alone;
-   an absent key is left as it was, which is `emailRow`'s rule, so a line
-   written after the figure never erases it. */
+   Either half may come alone: a speech has no figure, and its one line must
+   not be refused for want of a number. An absent key is left as it was. */
 async function recordActual(at: unknown, name: unknown, actual: unknown, note: unknown): Promise<string> {
   const when = new Date(String(at ?? ""));
   const called = String(name ?? "").trim();
@@ -1306,13 +938,9 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
   if (printed) patch.actual = printed;
   if (line) patch.note = line;
 
-  /* THE NAME GOES OUT AS ITSELF, ENCODED AND NOTHING ELSE. An `eq` value is
-     read whole — PostgREST splits on a comma only inside `in.(…)`, and strips
-     double quotes only there — so wrapping this one in quotes made them part of
-     the name compared. Every call missed from the day that went in: six on one
-     core PCE, each answered with `core PCE` as what was on file. Encoded because
-     `&`, `#` and `%` do mean something in a URL, and a release is named by
-     whoever writes the calendar. */
+  // The name goes out encoded and nothing else. PostgREST reads an `eq` value
+  // whole — quotes are stripped only inside `in.(…)` — so quoting it once made
+  // every call miss.
   const at_ = when.toISOString();
 
   try {
@@ -1323,8 +951,7 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if ((await res.json()).length) return `Recorded against ${called}.`;
 
-    // Bounded like every other read here: the 08:30 slot holds most of a
-    // report, and a list longer than that is not worth reading back to her.
+    // Bounded: the 08:30 slot holds most of a report.
     const standing = await readRows<Release>('Release',
       `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
     return standing.length
@@ -1359,24 +986,11 @@ const ACTUAL_TOOL = {
 } as const;
 
 /* ─── The price, read off the instrument ───────────────────────────────────
-   She has quoted gold out of whatever a news page said, at whatever staleness
-   that page had, since she existed. The broker this system already polls serves
-   a live bid and ask, and now she can read it.
-
-   THROUGH THE POLLER, NOT THROUGH THE BROKER, and that is the whole design.
-   `doji-mcp-sync` holds CTRADER_MCP_TOKEN, and the same endpoint that serves a
-   price also serves `create_order`, `close_position` and `amend_position`.
-   Giving Eugenia that token would put a market order one prompt injection away
-   from the bot whose entire product is that she gives no signals — so she gets
-   a JSON price from a function that will only ever answer with one, and the
-   token stays where it was.
-
-   The cron secret is what she presents, which she already holds because her own
-   scheduled half checks it. Against the poller it opens exactly what the README
-   says it opens: a read-only poll that was going to run anyway.
+   Through the poller, never the broker: the endpoint that serves a price also
+   serves create_order, so the token stays in doji-mcp-sync and she presents
+   the cron secret, which there opens only a read-only poll.
    ───────────────────────────────────────────────────────────────────────── */
-// SB_URL is already the project's own origin, so the poller is one path away
-// and needs no second copy of the project ref — which agree.test.mjs counts.
+// One path from SB_URL, so no second copy of the project ref.
 const MARKET_URL = `${SB_URL}/functions/v1/doji-mcp-sync?market=1`;
 
 const MARKET_TOOL = {
@@ -1394,15 +1008,10 @@ const MARKET_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
-/* THE MARKET AROUND GOLD, IN A CONVERSATION. The briefing and the move look
-   are handed the dollar, the yields, the real yield and the wires; a reply was
-   not, so asked why gold fell she had a web search and nothing else, against
-   her own rule never to quote those from one. The same two reads the move look
-   makes, through the function that holds the TradingView sign-in, with the
-   headlines wider because a question is about the morning. The briefing's
-   rate odds too, and the speculators' weekly count, which only the Sunday
-   briefing is otherwise handed, because "is gold crowded" is a question asked
-   on a Wednesday. */
+/* The market around gold, in a conversation: the reads the move look makes,
+   headlines wider, plus the rate odds and the speculators' count — "is gold
+   crowded" gets asked on a Wednesday. Without it her only source was a web
+   search, against her own rule. */
 const AROUND_TOOL = {
   name: "get_around",
   description:
@@ -1419,19 +1028,14 @@ const AROUND_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
-/* The fields of that answer this file actually reads. The poller folds pipettes
-   out of the quote and settles the scale before it is served, so everything
-   here is a display price — see the poller, where that asymmetry is named. */
+/* Display prices: the poller settles the scale before serving. */
 export interface Quote {
   bid: number; ask: number; high: number; low: number;
   prev_close: number | null; change: number | null; at: string;
 }
 
-/* THE NUMBERS, AND NULL WHERE THERE ARE NONE. Two callers want two different
-   things from one read: the tool below wants a sentence it can hand the model,
-   and the price sense wants the figures — so the fetch is here once and each
-   caller says what an unreadable price means to it. A price that cannot be read
-   is not a price of zero, and neither caller may be given one. */
+/* The figures, or null: an unreadable price is not zero. One fetch, and each
+   caller says what a missing price means to it. */
 async function marketQuote(): Promise<Quote | null> {
   try {
     const res = await fetch(MARKET_URL, { headers: { "x-doji-key": CRON_SECRET } });
@@ -1445,26 +1049,12 @@ async function marketQuote(): Promise<Quote | null> {
   }
 }
 
-/* THE ROLL IS THE WINDOW EVERY ONE OF THOSE NUMBERS IS MEASURED OVER, AND THE
-   QUOTE USED NOT TO SAY SO. `high`, `low`, `prev_close` and `change` all belong
-   to the broker's session, which for gold restarts at the 17:00 New York roll —
-   so `change` is the overnight move for the sixteen hours before that roll and
-   only the evening's move for the seven after it. Served as a bare `change` in
-   a JSON blob it reads as neither, which is to say it reads as "on the day",
-   and that is what she said at 20:57 on a session under four hours old: up $12
-   where the calendar day was up more than $40. Both numbers were real. One
-   label was wrong, and it was the one nothing in this file had ever written
-   down.
-
-   A LABEL RATHER THAN A SECOND CALL, because there is no second call to make.
-   Nothing this system can read spans the calendar day — `get_trendbars` serves
-   the broker's daily bars, which roll on the same boundary — so the honest fix
-   is to name the window and say plainly that the day is not in it, rather than
-   to compute a figure out of numbers that cannot carry one.
-
-   Pure and exported for the reason foldSpot is: a window named wrongly is
-   invisible in the output and arrives as a confident wrong number, and this is
-   the one thing here a test can drive from both sides of the roll. */
+/* The window every figure is measured over. High, low, previous close and the
+   move all belong to the broker's session, which restarts at the 17:00 New
+   York roll — so the same `change` is the overnight move before that hour and
+   the evening's after it. Unlabelled it read as "on the day". Nothing here
+   spans the calendar day, so the window is named rather than computed. Pure,
+   so both sides of the roll are driven. */
 export const ROLL_HOUR = 17;
 
 export function quoteWindow(now: Date): string {
@@ -1479,21 +1069,11 @@ export function quoteWindow(now: Date): string {
       "previous close is the overnight move.";
 }
 
-/* ONE RENDERING OF A QUOTE, AND THE WINDOW IS PART OF IT RATHER THAN BESIDE IT.
-   Three callers want this — the tool, the briefing's own block and the price
-   sense — and a quote said three ways is three chances to say `change` without
-   saying what it is a change FROM, which is the mistake this whole section is
-   here about. Prose rather than the JSON the tool used to return, for the same
-   reason: a bare field name in a blob is read as whatever it sounds like, and
-   `change` sounds like the day. */
+/* One rendering of a quote, with the window inside it, for all three callers —
+   prose, because a bare `change` reads as whatever it sounds like. */
 export function quoteLine(q: Quote, now: Date): string {
-  /* THE BROKER MAY NOT REPORT A PREVIOUS CLOSE, and this is where that used to
-     become a sentence. `prev_close` was typed `number` and arrived null, so the
-     template printed the word "null", `null >= 0` chose "up", and
-     `Math.abs(null)` gave 0 — "against a previous close of null — up 0 since
-     it". Neither half true, in the line the briefing opens on. The bid and the
-     range are still worth having, so the move is what goes rather than the
-     quote, and she is told not to reconstruct it. */
+  // No previous close, no move — and she is told not to reconstruct one. The
+  // bid and the range are still worth having.
   const since = q.prev_close === null || q.change === null
     ? `. The broker reported no previous close on this read, so there is no ` +
       `move to state and you may not infer one.`
@@ -1504,51 +1084,31 @@ export function quoteLine(q: Quote, now: Date): string {
     `has traded ${q.low} to ${q.high}${since} ` + quoteWindow(now);
 }
 
-// Said rather than served empty, on both paths that can meet it: a briefing
-// that opens on a silently missing price either invents a number or drops the
-// line the whole first paragraph is built on.
+// Said rather than left out: a briefing missing its price invents one or
+// drops the line its first paragraph is built on.
 const NO_PRICE =
   "The live price could not be read just now. Say you do not have a current " +
   "level rather than quoting one from a search.";
 
-/* NEVER THROWS, for the reason every other tool here does not. */
+/* Never throws. */
 async function readMarket(): Promise<string> {
   const quote = await marketQuote();
   return quote ? quoteLine(quote, new Date()) : NO_PRICE;
 }
 
-/* THE ONE NUMBER EVERY BRIEFING OPENS ON WAS THE ONLY INPUT IT WAS NOT HANDED.
-
-   Notes, the channel map, his week of trades, the thesis, the open threads, the
-   calendar and his desk are all read before the call and put in front of her.
-   The price — which the prompt calls the opening line, and the one figure he
-   checks against his own screen — was a TOOL she had to remember to reach for.
-   That is an instruction standing where an input belongs, and it fails the way
-   this file's instructions always fail: she quotes a level off a search page,
-   it is four digits and looks like gold, and nothing anywhere reports that it
-   is however stale that page was.
-
-   The tool stays, because a reply asking where gold is needs it and most
-   replies do not — which is the same trade get_trades makes. This is the one
-   path where the answer is known in advance to be wanted.
-
-   NEVER THROWS, and it has no catch: marketQuote already swallows its own
-   failure and answers null, so the sentence below is the whole handling. */
+/* The briefing is handed the price rather than told to fetch it: an
+   instruction where an input belongs fails the way instructions do, with a
+   level off a search page that still looks like gold. The tool stays for
+   replies. marketQuote already swallows its failure. */
 export async function marketBlock(): Promise<string> {
   const quote = await marketQuote();
   return "\n\n" + (quote ? quoteLine(quote, new Date()) : NO_PRICE);
 }
 
 /* ─── The running story ────────────────────────────────────────────────────
-   Her memory had two timescales and needed three. Turns roll over in a morning;
-   notes are durable facts about HIM. Nothing held what is going on in the
-   MARKET across weeks, so every briefing rebuilt the story out of a web search
-   and continuity survived only as long as yesterday stayed inside twelve turns.
-
-   THE NIGHTLY PASS WRITES IT AND NOTHING ELSE DOES. A thesis is a reading
-   across days, which is the same argument that keeps set_channel out of
-   CHAT_TOOLS: rewriting it mid-conversation would let one exchange redirect the
-   week's story, and the pass is the only caller that sees a whole day.
+   What the market has been trading, across weeks: turns roll over in a
+   morning and notes are about him. The nightly pass alone writes it, for
+   set_channel's reason — one exchange must not redirect the week's story.
    ───────────────────────────────────────────────────────────────────────── */
 export const THESIS_MAX = 600;
 
@@ -1580,9 +1140,7 @@ async function setThesis(thesis: unknown): Promise<string> {
       body: JSON.stringify({ thesis: text, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // A PATCH matching nothing is a 200 with an empty array, exactly as
-    // setChannel's is: the row is seeded by 005, so an empty answer means the
-    // migration has not been applied and every rewrite is being dropped.
+    // Empty means 005's seed row is missing, as with setChannel.
     if ((await res.json()).length === 0) {
       return "There is no thesis row — 005 has not been applied, so nothing was saved. Say nothing about this to him.";
     }
@@ -1594,15 +1152,10 @@ async function setThesis(thesis: unknown): Promise<string> {
 }
 
 /* ─── What she flagged, and what she asked ─────────────────────────────────
-   Every briefing flags one odd thing and asks one question, and both were
-   fire-and-forget. The prompt asks her to follow through with nothing to follow
-   through WITH — whether Tuesday's oddity resolved depended on whether Tuesday
-   was still inside twelve turns, and his answer to a question arriving three
-   hours later had nothing joining it back to what was asked.
-
-   OPENED ANYWHERE, CLOSED ONLY AT THE PASS. Opening is a moment and is fairly
-   done in one; closing is a judgment that it actually resolved, which is the
-   same distinction that put note-writing and rung-moving where they are.
+   Threads she flagged or questions she put to him, handed back until they
+   close — without them, follow-through depended on the turn still being inside
+   twelve. Opened anywhere, closed only at the pass: closing is a judgment that
+   it resolved.
    ───────────────────────────────────────────────────────────────────────── */
 export const LOOP_KINDS = ['watch', 'question'] as const;
 
@@ -1670,9 +1223,7 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
   const n = Math.trunc(Number(id));
   if (!Number.isFinite(n) || n <= 0) return "That is not a thread number.";
   try {
-    // `closed_on=is.null` in the filter, so closing an already-closed thread
-    // matches nothing and is reported rather than passing as done — the same
-    // shape as writeNote's retirement, and for the same reason.
+    // So an already-closed thread is reported rather than passing as done.
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_loops?id=eq.${n}&closed_on=is.null`, {
       method: "PATCH", headers: sbHeaders("return=representation"),
       body: JSON.stringify({
@@ -1692,115 +1243,46 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
 }
 
 /* ─── Claude ───────────────────────────────────────────────────────────────
-   Raw fetch rather than the SDK, to match every other outbound call in this
-   repo — the poller speaks JSON-RPC to cTrader and REST to PostgREST the same
-   way, and one function importing an npm client would be the only one.
-
-   web_search is what makes a briefing possible at all: without it the model has
-   no access to today's calendar, and a briefing invented from training data is
-   worse than none. It bills separately at $10 per 1,000 searches.
+   Raw fetch rather than the SDK, like every other outbound call here. Web
+   search is what makes a briefing possible at all: a briefing invented from
+   training data is worse than none.
    ───────────────────────────────────────────────────────────────────────── */
-// `content` is a string for everything stored and replayed, and an array of
-// blocks only for the turn being asked right now — a chart he just sent. What
-// goes into eugenia_turns is always the string, which is what keeps the history
-// replayable and stops a megabyte of base64 becoming permanent memory.
+// `content` is a string for everything stored and replayed, and blocks only for
+// the turn being asked now — a chart he just sent. What is stored is always
+// the string, so a megabyte of base64 never becomes memory.
 interface Turn { role: 'user' | 'assistant'; content: string | any[] }
 
-/* THE BRIEFING AND A QUESTION ARE NOT THE SAME AMOUNT OF WORK, AND WERE PRICED
-   AS IF THEY WERE. Effort sets how deeply the model thinks before it writes,
-   and at "high" — the API default — "how many trades did I take this week"
-   bought a minute of reasoning to produce one sentence. The briefing earns that
-   depth: a dozen searches and one shot a day. A reply does not, and neither
-   does the pulse, whose usual answer is one word.
-
-   Medium rather than low for the reply, because the journal is the half that
-   punishes carelessness — `null` is not `no`, break-even is a price band and
-   not a number, and a fast wrong reading of his discipline is worse than a slow
-   right one. Low is for work with no way to be subtly wrong. */
+/* Effort per caller. The briefing earns `high`; a reply and the pulse do not —
+   at high, "how many trades did I take" bought a minute of thought for one
+   sentence. Medium rather than low, because a fast wrong reading of his
+   journal is worse than a slow right one. */
 type Effort = 'medium' | 'high';
 
-/* THE CONTAINER, AND WHY IT IS NOT OPTIONAL.
+/* The container is not optional. web_search_20260209 filters dynamically by
+   running code on Anthropic's side, and from there the model can call our tools
+   programmatically. A continuation answering those calls must carry the
+   container id — a bare string on the request, container.id on the response —
+   or the request is refused. The message answering them holds only
+   tool_result blocks, and no tool may be strict, which programmatic calling
+   does not support; tradesQuery and writeNote are boundaries regardless.
 
-   web_search_20260209 does dynamic filtering, which runs CODE EXECUTION on
-   Anthropic's side. From inside that container the model can call our tools
-   programmatically rather than directly — the paused code invokes get_trades,
-   the result returns to the running script instead of to the model's context.
-
-   A continuation answering those calls must carry the container id from the
-   paused response, and a request that does not is rejected outright:
-
-     container_id is required when there are pending tool uses generated by
-     code execution with tools
-
-   which is what took the briefing down the morning after get_trades and
-   remember were both in play. The id is a bare string on the request, though
-   the response nests it under container.id.
-
-   Two more rules of that contract are already met and must stay met: the user
-   message answering the calls carries ONLY tool_result blocks — no text, ever —
-   and the tools array is identical on every request of the turn.
-
-   Neither tool may declare strict: true. Structured outputs are not supported
-   with programmatic calling, and that is why the two schemas below do not carry
-   it. Nothing is lost: tradesQuery clamps `days` and writeNote coerces `note`,
-   because both were already written as boundaries rather than trusting the
-   model. */
-/* TWO TOOL SETS, because the two jobs are not the same conversation.
-
-   Consolidation is handed the day and the notes and asked what is worth
-   keeping; it has no question to research. Sending it the full set would let a
-   nightly bookkeeping pass run a dozen web searches, which is money for nothing
-   and a slower job that can fail in more ways.
-
-   SEARCH IS THE EXCEPTION, AND IT IS NOT A LOOSENING. The instruction this
-   prompt leans hardest on is PREFER SUPERSEDING TO ADDING — and a pass that can
-   only see the twenty notes it was handed cannot tell a new observation from
-   one it wrote in June. It was being asked to avoid duplicating an archive it
-   had no way to look at. One database read, no web, and the tool it reaches for
-   is the same one every other caller has.
-
-   Both sets are served by the same loop below, which runs only what the set it
-   was handed offers. */
-/* WEB FETCH BESIDE WEB SEARCH, AND IT IS THE GROUNDING HALF.
-
-   Search returns somebody's prose about a number. Fetch returns the page the
-   number is on — so "where gold is, in one line" stops being a figure lifted
-   from whatever staleness a news article had and becomes one she read. It only
-   ever fetches a URL already in the conversation, which is why the sources are
-   named in the prompt rather than left to her to invent.
-
-   Six uses against search's twelve: fetching is the precise half and is reached
-   for deliberately, where searching is how she finds what to be precise about.
-
-   Both are server-side and neither arrives at the dispatch below. Both must
-   stay non-strict, and neither may sit beside a declared code_execution tool —
-   the 2026-02-09 variants run their own container for dynamic filtering, and a
-   second execution environment is what confuses the model about which one it
-   is in. */
+   Web fetch is the grounding half: search returns prose about a number, fetch
+   the page it is on. Six uses to search's twelve. Both are server-side, and
+   neither may sit beside a declared code_execution tool — a second execution
+   environment confuses the model about which it is in. */
 const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 12 };
-/* BOTH ENDS BOUNDED, AND ONLY ONE OF THEM WAS. `max_uses` says how many pages
-   she may open and said nothing about how big one may be — so a single forum
-   thread or documentation page could put more into the turn than the rest of
-   the briefing put together, and every later round in the loop carries it
-   again. Ten thousand tokens is longer than any article she has a reason to
-   read and shorter than the pathological case, which is the only shape of
-   page this bounds. */
+/* Page size bounded as well as count: one forum thread could outweigh the whole
+   briefing, carried again on every later round. */
 const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 6,
                      max_content_tokens: 10000 };
 
-/* SIX SETS, BECAUSE SIX JOBS ARE NOT THE SAME CONVERSATION, and a set is what a
-   job can run as well as what it is offered: the loop below is shared, and it
-   answers a name outside the set it was handed as it answers an unknown one.
-
-   The rule each set follows is the one CONSOLIDATE_TOOLS was written on: never
-   send a schema for something this job has no business doing. It is money on
-   every request, it is attention spent on an option that should not be taken,
-   and it is a way for a job to do something nobody expected it to. The nightly
-   pass gets no web search because a bookkeeping pass has nothing to research;
-   the release look gets no memory tools because it is a look at one number, not
-   a conversation; the move look gets the release look's set less `record_actual`,
-   because nothing it is told about has printed; the trade look gets neither,
-   because the only honest thing it can say comes out of his own strategy. */
+/* One set per job, and a set is what a job can run as well as what it is
+   offered: the shared loop answers a name outside its set as unknown. Never a
+   schema for something a job has no business doing — it is paid on every
+   request and it is an option that should not be taken. The pass has nothing
+   to research but needs search to supersede rather than duplicate; the release
+   look gets no memory; the move look nothing to file; the trade look only his
+   strategy and journal. */
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
@@ -1815,65 +1297,37 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
-// A look files an actual and nothing else: `record_actual` is a PATCH that
-// cannot mint the row it was looking at.
+// A look files an actual, through a PATCH that cannot mint a row.
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
-/* ITS OWN ARRAY, AND IT USED TO BORROW THE RELEASE LOOK'S. That handed a look
-   at a move no print explains a tool for filing a print, and — the array being
-   where the cache key starts and what the hour is keyed on — the release look's
-   2× write for an hour it never read back: two turns, two prefixes written,
-   none inherited, in the week the window was measured. */
+/* Its own array: borrowing the release look's handed it a tool for filing a
+   print and the hour-long cache write that array carries. */
 const MOVE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
-/* The critic reads a draft and returns a draft. Giving it a tool would let it
-   go and check something, which is a second briefing at a second price.
-
-   AND IT MAY NOT SHARE THE BRIEFING'S ARRAY TO RIDE ITS CACHE, which looks like
-   free money and is not: the tools array is where the cache key starts, so this
-   one writes its own prefix — but the two also differ in EFFORT, and an effort
-   change invalidates the tools and system caches on top of that. Measured, the
-   morning after it was tried: the critic wrote 23,309 tokens and read zero,
-   seconds behind a briefing that had just written an entry of exactly that
-   size. An empty array is the smaller write of the two. REFACTOR.md R-15. */
+/* No tools: the gates read a draft and return one. Sharing the briefing's
+   array to ride its cache does not work — the array starts the key and the
+   effort differs, which invalidates the rest; measured, the critic wrote
+   23,309 tokens and read none. The empty array is the smaller write.
+   REFACTOR.md R-15. */
 const CRITIC_TOOLS: unknown[] = [];
 
-/* ONE MODEL FOR EVERY CALLER WAS NEVER A DECISION, AND THE ROWS SAY WHAT IT
-   COST. A week of `eugenia_runs` put the release look at $5.30 and the whole
-   briefing at $4.12 — fourteen looks costing more than five briefings, and the
-   move look at $0.64 a turn, the most expensive single message she sends, for
-   two sentences about a price.
+/* The model per caller. A week of eugenia_runs put fourteen release looks
+   above five briefings in cost, so the bounded callers moved to Sonnet — and
+   the release look then died at MAX_ROUNDS twice the next morning. That pair
+   is confounded: record_actual had joined its tools eighty minutes before the
+   model changed, and its rounds stayed high after the revert. So it proves
+   neither half; the policy stands anyway — a cheaper caller that does not
+   answer is not cheaper, so a move is one caller at a time with `rounds` read
+   after.
 
-   THE SPLIT WAS BETWEEN JUDGING AND CHECKING AND IT COST A CALLER ITS LIFE.
-   The release look, the pulse and the move look moved to Sonnet on that
-   reasoning — bounded work handed everything it needs. The release look then
-   died at `MAX_ROUNDS` on its first two firings the next morning, twice inside
-   half an hour, and what reached him was the apology. Fourteen turns on Opus in
-   the measured week had never once come near the cap.
-
-   THE CAP IS RAISED BELOW AND THAT IS NOT WHY THESE CAME BACK. What the two
-   failures actually establish is that the round budget on a tool-heavy caller
-   is a property of the MODEL and not of the task, which nothing here had
-   measured and the change assumed. A cheaper caller that does not answer is not
-   cheaper. They go back to the model they were measured on, and any future move
-   is one caller at a time with `rounds` read afterwards.
-
-   `trim` STAYS, and the distinction is the whole of why. It is handed
-   `CRITIC_TOOLS`, which is empty — one request, no tools, no loop — so it
-   cannot reach the cap at all, whatever a model's appetite for rounds. That is
-   the shape a cheaper model is safe on here.
-
-   THE CRITIC IS THE ONE I EXPECTED TO MOVE AND IT DOES NOT. Sonnet would save
-   about $3.50 a month, and it runs LAST, it can rewrite, and it is the final
-   gate on the exact thing he spent two weeks saying read badly. That is a bad
-   trade at any saving. */
+   `trim` stays on Sonnet because its array is empty: one request, no loop, no
+   cap to reach. The critic does not move: it runs last, can rewrite, and is
+   the final gate on how she reads. */
 const OPUS = "claude-opus-5";
 const SONNET = "claude-sonnet-5";
 
-/* KEYED ON THE CALLER'S LABEL, which is the same string `eugenia_runs.caller`
-   records and the same one `ask` is handed. A name here that no caller uses is
-   a row that silently never applies, so `agree.test.mjs` holds these keys
-   against the labels the file actually passes. Absent means Opus: a new caller
-   is expensive and correct rather than cheap and unnoticed. */
+/* Keyed on the caller's label — the string eugenia_runs.caller records — and
+   agree.test.mjs holds the keys against labels actually passed. Absent means
+   Opus: a new caller is expensive and correct rather than cheap and unnoticed. */
 const MODELS: Record<string, string> = {
   'trim': SONNET,
 };
@@ -1887,20 +1341,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
     headers: {
       "x-api-key": ANTHROPIC_KEY,
       "anthropic-version": "2023-06-01",
-      // A HEADER, NOT A BODY FIELD, and the difference is total. `betas: [...]`
-      // is what the SDKs accept and what they turn into this header; a raw
-      // fetch sending it in the JSON sends an unknown parameter, which the API
-      // rejects — and `fallbacks` without the header is rejected as well. So
-      // the shape below 400s every call, briefing and reply alike, which is
-      // the whole function. It shipped that way for one commit.
-      //
-      // IT RIDES WITH OPUS ALONE, AND THAT IS CAUTION RATHER THAN A RULE.
-      // `fallbacks` has carried this system's briefings since the morning a
-      // decline cost one, on the model it was turned on for. Whether the
-      // parameter is accepted on Sonnet is not something anything here has
-      // established, and if it is not, the failure is a 400 on every call —
-      // three callers dark at once. Widen it the day a Sonnet call is seen to
-      // take it, not before.
+      // A header, not a `betas` body field: that is the SDKs' parameter, and
+      // an unknown body field is a 400 on every call. With Opus alone, by
+      // caution: nothing has shown Sonnet accepts `fallbacks`, and if it does
+      // not, every Sonnet call 400s. The header and the field go together.
       ...(model === OPUS
           ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
           : {}),
@@ -1909,45 +1353,26 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
     body: JSON.stringify({
       model,
       max_tokens: 16000,
-      /* Cached: both are long, fixed, and sent on every turn — which is exactly
-         why the strategy rides here rather than in the message.
-
-         THE WINDOW IS A PROPERTY OF THE TOOL ARRAY RATHER THAN OF THE CALLER,
-         because the array is where the cache key starts: the tool sets are that
-         many separate prefixes and none of them is readable by another. So *is
-         a second turn likely inside the hour* is a question asked per ARRAY,
-         and a week of `wrote_1h` answered it in one shape. Every caller's turns
-         equalled its prefix writes but one: the release look made fourteen and
-         wrote five, because its job runs quarter-hourly and a morning with
-         several release times clusters the looks inside one window. The
-         briefing is 08:00 and the pulse is 10:00 — two hours apart — so the
-         hour those were paying 2× for could never have been read by anything.
-
-         Five minutes loses nothing there. What the cache has always actually
-         bought here is the rounds WITHIN one turn — a briefing that reads the
-         journal and writes a note is three requests carrying this prefix,
-         seconds apart — and a read refreshes the five minutes, so a long turn
-         keeps its entry alive to the end.
-
-         Not a beta: `ttl` is a plain field on cache_control. */
+      /* Cached: long, fixed, and sent on every turn — which is why the strategy
+         rides here. The window is a property of the tool ARRAY, where the key
+         starts: each array is its own prefix. A week of wrote_1h showed every
+         caller's turns equal to its writes except the release look, whose
+         quarter-hourly looks cluster in one morning — so it keeps the hour.
+         Everything else is five minutes, which the rounds within a turn keep
+         alive. `ttl` is a plain field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
                                   ttl: tools === RELEASE_TOOLS ? "1h" : "5m" } }],
       messages,
-      // web_search runs on Anthropic's side and needs no loop here; the rest
-      // are ours and are executed below.
+      // Server tools need no loop here; the rest are executed below.
       tools,
       thinking: { type: "adaptive" },
       output_config: { effort },
-      // A DECLINE COSTS THE WHOLE BRIEFING OTHERWISE. The cron half now retries
-      // at 09:00, 10:00 and 11:00, so a refusal is no longer silent — but a
-      // retry is another dozen searches paid for again, and the next hour may
-      // decline for the same reason. `fallbacks: "default"` re-runs the request
-      // on another model inside this same call and routes by refusal category,
-      // so there is no model list here to go stale, and a decline before any
-      // output is not billed.
+      // A decline would otherwise cost the briefing and a retry's searches.
+      // `fallbacks: "default"` re-runs on another model inside this call,
+      // routed by refusal category; a decline before output is not billed.
       ...(model === OPUS ? { fallbacks: "default" } : {}),
-      // Only once there is one — the first request of a turn has no container.
+      // The first request of a turn has none.
       ...(container ? { container } : {}),
     }),
   });
@@ -1955,47 +1380,21 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
   return res.json();
 }
 
-/* A BACKSTOP AGAINST A LOOP THAT CANNOT END, AND IT HAD BECOME A WORKING LIMIT.
-   Six was set on the reasoning that three is the realistic maximum — read the
-   journal, write a note, answer — with the cap there for the case where that
-   assumption is wrong. The assumption WAS wrong, and the way it announced
-   itself is the shape worth keeping: a release look that searched, fetched,
-   searched again and ran out, twice in half an hour, arriving as an apology
-   rather than as a number.
-
-   Ten keeps it a backstop rather than a limit. The failure it guards against is
-   a loop billing forever; the failure it CAUSED is a message that never
-   arrives, and of the two the second is the one that happened. `eugenia_runs`
-   records `rounds` on every turn, so how close a caller runs to this is a
-   question with an answer rather than a guess — which is what should have been
-   read before a model changed underneath it. */
+/* A backstop against a loop billing for ever, not a working limit. Six was
+   reached by a release look that searched, fetched and searched again, and the
+   failure it caused — a message that never arrives — is worse than the one it
+   guards against. eugenia_runs.rounds says how close each caller runs. */
 const MAX_ROUNDS = 10;
 
 // What a name with nothing behind it is told, by serve and by the loop alike.
 const unserved = (name: string) =>
   `There is no tool called "${name}" here. Answer without it and do not mention this.`;
 
-/* ONE PLACE A TOOL NAME BECOMES WORK, and it is a switch rather than a chain of
-   ifs because a reader should be able to enumerate what she can do by looking
-   at one list. It said "ten of them" while there were thirteen, which is why
-   the number is gone rather than corrected: prefer a name to a count, as the
-   triggers row in verify.sql already says.
-
-   NOTHING HERE THROWS, which is the rule every handler below already follows
-   individually and which this restates as a property of the whole surface: it
-   runs inside the loop, and an exception costs the answer she is in the middle
-   of writing rather than the tool she was in the middle of calling.
-
-   AN UNKNOWN NAME IS ANSWERED, NOT DROPPED. Every tool_use block must come back
-   with a tool_result or the next request is a 400 — so a name no set serves
-   gets a sentence saying so, which is also the only way that mistake would ever
-   become visible rather than presenting as a turn that died. */
-/* Exported for the same reason `ask` below is: the rule this file repeats more
-   than any other — nothing served to the tool loop may throw — was asserted by
-   reading each handler's source and never by running one. A handler that gained
-   an uncaught path would read exactly like one that had not, and the briefing
-   it killed would be the first anyone heard of it. Driven against a database
-   that refuses, every tool has to come back with a sentence. */
+/* The one place a tool name becomes work — a switch, so what she can do is one
+   enumerable list. Nothing here throws: an exception in the loop costs the
+   answer, not the tool. An unknown name is answered, never dropped, because a
+   tool_use without its tool_result is a 400 on the next request. Exported so a
+   test can drive every tool against a refusing database. */
 export async function serve(name: string, input: any): Promise<string> {
   switch (name) {
     case TRADES_TOOL.name:   return await readTrades(input.days);
@@ -2019,77 +1418,37 @@ export async function serve(name: string, input: any): Promise<string> {
   }
 }
 
-/* `label` NAMES THE CALLER, and it no longer does only that: `eugenia_runs`
-   files the row under it and `modelFor` picks the model from it, so one string
-   decides what ran and what it is filed as. The callers are not distinguishable
-   from effort alone — the briefing and the nightly pass both run high — and a
-   cost line that cannot say which of them spent the money is a cost line nobody
-   can act on. It said "the four jobs" while there were twice that; a count in a
-   comment goes stale on the release that adds a caller, and nothing compares
-   it.
-
-   Exported so a test can drive the loop itself against a stubbed `fetch`.
-   Asserting on a comparison in isolation would prove the arithmetic and not
-   that the line is ever printed, which is the half that has been wrong here
-   before. */
+/* `label` names the caller: eugenia_runs files the row under it and modelFor
+   picks the model from it, so one string decides what ran and what it is filed
+   as. Effort alone cannot tell the callers apart. Exported so a test can drive
+   the loop against a stubbed fetch. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
                           tools: unknown[] = CHAT_TOOLS): Promise<string> {
-  // DERIVED FROM THE LABEL RATHER THAN PASSED, so a caller cannot be given one
-  // model and recorded under another — `label` is already what eugenia_runs
-  // stores, and one string deciding both is what keeps the meter answerable.
+  // Derived, so a caller cannot run one model and be recorded under another.
   const model = modelFor(label);
   const offered = new Set(tools.map((t: any) => t.name));
   const convo: any[] = withClock(messages);
-  // Carried forward once seen, and never cleared: the container outlives the
-  // round that opened it, and a later request that drops it fails the same way
-  // the missing one did.
+  // Carried forward and never cleared: it outlives the round that opened it.
   let container: string | undefined;
-  // Summed across the rounds rather than logged per round, because the unit
-  // worth knowing is what one briefing cost, not what one leg of it did.
+  // Summed across rounds: the unit worth knowing is the turn.
   let inTok = 0, outTok = 0, cached = 0, searches = 0, fetches = 0;
-  /* WHAT THE CACHE COSTS, WHICH NOTHING HERE COULD SEE. A cache READ is a tenth
-     of the input price and was counted from the first day; a cache WRITE is
-     1.25× at five minutes and 2× at an hour, and was counted nowhere — so the
-     one figure that decides whether the `ttl` above earns its doubled price
-     was the one figure the meter beside it did not collect. Two columns rather
-     than one because the two TTLs bill differently and a sum of them cannot be
-     turned back into money.
-
-     The five-minute figure is taken as the REMAINDER rather than read: only two
-     TTLs exist, so it is exact — and if the vendor ever stops breaking the
-     total down, an hour reads zero and everything lands here, which looks
-     wrong. Read directly, both would read zero, which looks like a cache
-     costing nothing. */
+  /* Cache writes, the expensive side of the cache — 1.25× at five minutes, 2×
+     at an hour — kept apart because their sum is not money. The five-minute
+     figure is the remainder, so a vendor that stops itemising shows up as
+     wrong rather than as a cache costing nothing. */
   let wrote1h = 0, wrote5m = 0;
-  /* EMPTY UNLESS `fallbacks` ACTUALLY FIRED, which is the whole reason to keep
-     it. A decline re-runs the request on another model inside the same call and
-     that is what rescues the briefing — but it also means the briefing he read
-     was written by a model nothing in this system named, and it reads exactly
-     like one that was not — so it is counted here, where the tokens and the
-     searches already are, for the reason they are.
-
-     Kept once set: a turn where one leg fell back is worth knowing about
-     whatever the remaining rounds came back on. */
+  // Set when `fallbacks` fired: the message was then written by a model
+  // nothing here named, and reads exactly like one that was not. Kept once set.
   let fellBack = "";
-  // Both exist for the row written on the way out, and `rounds` is separate
-  // from the loop variable because the catch below is outside its scope — a
-  // turn that died in round three should say three.
+  // For the row; `rounds` outlives the loop so a turn that died says where.
   const started = Date.now();
   let rounds = 0;
-  /* WHAT THE ROUNDS WERE SPENT ON, because a count of them could not say. The
-     release look went from two or three rounds to seven, eight and nine on the
-     morning `record_actual` became its tool, and one of those mornings
-     took six rounds with no search at all — rounds spent on her own tools, and
-     nothing recorded which. A name `record_actual` could not match costs a
-     round and says so; so does each `get_market`, and a model that calls one
-     tool per round rather than batching them. Those are different repairs and
-     the row could not tell them apart. Server-side searches and fetches are
-     already counted beside it; this is the client half. */
+  // What the rounds were spent on — the client-tool half of the tally, beside
+  // the server tools. A count of rounds could not say.
   const called: Record<string, number> = {};
   const toolLine = () =>
     Object.entries(called).map(([name, n]) => `${name}×${n}`).join(', ') || null;
-  // The tool_result block currently carrying the loop's breakpoint, so the next
-  // round can take the mark off it before marking its own.
+  // The tool_result carrying the loop's cache breakpoint.
   let marked: any;
 
   try {
@@ -2102,23 +1461,9 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     inTok    += used.input_tokens ?? 0;
     outTok   += used.output_tokens ?? 0;
     cached   += used.cache_read_input_tokens ?? 0;
-    /* THE OTHER SERVER TOOL, AND IT WAS BILLING INTO A COLUMN THAT DID NOT
-       EXIST. `web_search` was counted from the day this meter was written;
-       `web_fetch` sits in the same two arrays with `max_uses: 6`, bills on its
-       own tariff, and was tallied nowhere — so "fourteen looks cost more than
-       five briefings" was read off the half of the server bill that happened to
-       have a column. It also made `searches: 0` unreadable: a release look that
-       burned six rounds without one search looks idle and may have been
-       fetching the whole time.
-
-       SUMMED RATHER THAN NAMED, because `web_fetch_requests` is this file's
-       expectation of a key it has never seen come back, and a key spelled wrong
-       reads 0 for ever — which is `planned`'s failure exactly. Whatever
-       `*_requests` the response carries beyond the search is what gets counted,
-       so a renamed field, or a third server tool, arrives in the meter instead
-       of vanishing from it. Kept apart from `searches` for the reason
-       `wrote_1h` and `wrote_5m` are: the tariffs differ and their sum is not
-       money. */
+    /* Fetches are summed from whatever `*_requests` keys come back beyond the
+       search, rather than from a key name this file guesses — a wrong guess
+       reads 0 for ever. Apart from searches, being a different tariff. */
     const server = used.server_tool_use ?? {};
     searches += server.web_search_requests ?? 0;
     fetches  += Object.entries(server)
@@ -2128,37 +1473,23 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const hour = used.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     wrote1h  += hour;
     wrote5m  += madeCache - hour;
-    // AGAINST WHAT THIS CALLER ASKED FOR, not against one name for the file.
-    // Compared with a single constant, every Sonnet caller would report a
-    // fallback on every call and the column would stop meaning anything.
+    // Against what this caller asked for, or every Sonnet call reads as a
+    // fallback.
     if (body.model && body.model !== model) fellBack = body.model;
-    // Still checked, and it still happens: `fallbacks` rescues a model that
-    // declines, and this is the case where the whole chain did. No usable
-    // content, so it is caught before the blocks are read rather than surfacing
-    // as an empty message.
+    // The whole fallback chain declined: no usable content.
     if (body.stop_reason === "refusal") {
       throw new Error(`Claude declined: ${body.stop_details?.category ?? "unknown"}`);
     }
 
-    /* A TURN THE SERVER PAUSED HAS NOT ENDED. web_search and web_fetch run in a
-       sampling loop on Anthropic's side, and that loop stops at ten iterations
-       with `pause_turn` — which a caller allowed twelve searches and six
-       fetches can reach in one request. Read as an ending, the paused response
-       was whatever text came before the pause: a preamble sent to him as the
-       briefing, or `no text` and a dead turn. It resumes by being sent back as
-       it stands with nothing after it — the trailing server call is what tells
-       the API to carry on — and it costs a round like any other, which is what
-       bounds it. */
+    /* A paused turn has not ended: the server's search loop stops at ten
+       iterations with pause_turn. Sent back as it stands, it resumes; read as
+       an ending, a preamble went out as the briefing. It costs a round. */
     if (body.stop_reason === "pause_turn") {
       convo.push({ role: "assistant", content: body.content });
       continue;
     }
 
-    /* AND AN ANSWER CUT OFF IS NOT AN ANSWER. At `max_tokens` the text stops
-       mid-sentence, or a tool call is dropped half-written and the text before
-       it reads as the whole reply. Thrown rather than sent, so each caller's
-       own failure handling runs — the briefing's retry, a gate's draft, the
-       apology — and the row names the reason. */
+    // Cut off is not an answer: thrown, so each caller's own failure path runs.
     if (body.stop_reason === "max_tokens") {
       throw new Error("Claude was cut off at max_tokens");
     }
@@ -2166,59 +1497,23 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     if (body.stop_reason === "tool_use") {
       convo.push({ role: "assistant", content: body.content });
 
-      /* ALL RESULTS IN ONE USER MESSAGE, AND ALL OF THEM RUN AT ONCE.
-
-         The single message was always right — splitting them teaches the model
-         to stop asking for tools in parallel. But the work behind it was a for
-         loop with an await inside, so a round that asked for the journal, the
-         rules and a memory search served them one after another and paid the
-         sum of three round trips to answer a batch the model had deliberately
-         parallelised. Collected and awaited together, a round costs its slowest
-         tool rather than all of them.
-
-         Ordering is preserved by mapping rather than pushing: tool_result
-         blocks are matched by tool_use_id, but a stable order keeps the
-         transcript readable and the tests deterministic. */
+      // All results in one message, served at once: a round costs its slowest
+      // tool rather than the sum. Mapped, so the order is stable.
       const calls = (body.content ?? []).filter((b: any) => b.type === "tool_use");
       for (const c of calls) called[c.name] = (called[c.name] ?? 0) + 1;
-      /* ONLY WHAT THIS CALLER WAS OFFERED, which is what makes a tool set a
-         guarantee rather than a hint. `serve` can run every tool in the file,
-         and the rules that matter most here are about WHO may run one — only
-         the nightly pass moves a rung, rewrites the thesis or closes a thread,
-         and only a look files a print. Those held for as long as the model
-         named nothing it had not been given; a name arriving from outside the
-         set is the model's text, at a boundary, and is answered as unknown. */
+      // Only what this caller was offered, so a tool set is a guarantee: only
+      // the pass moves a rung or closes a thread, only a look files a print.
       const results = await Promise.all(calls.map(async (b: any) => ({
         type: "tool_result", tool_use_id: b.id,
         content: offered.has(b.name) ? await serve(b.name, b.input ?? {}) : unserved(b.name),
       })));
 
-      // EVERY CALL GETS A RESULT, INCLUDING ONE THIS FUNCTION DOES NOT SERVE —
-      // serve() answers an unknown name with a sentence rather than nothing.
-      // A user message missing the tool_result for a tool_use block is a 400,
-      // so dropping the odd one out would turn a name we mistyped into a dead
-      // turn. web_search and web_fetch run on Anthropic's side and never arrive
-      // here at all.
       if (!results.length) throw new Error("tool_use with no tool call in it");
 
-      /* AND THE ROUND THAT FOLLOWS READS ALL OF THIS BACK INSTEAD OF BUYING IT
-         AGAIN. Only the system block carried a breakpoint, so everything after
-         it — twelve turns of history, the day's blocks, and every tool result
-         and web page collected so far — was re-sent at full price on every
-         round of the loop. A briefing that reads the journal and writes a note
-         paid for its own search results three times.
-
-         THE MARKER MOVES RATHER THAN ACCUMULATES, and that is not tidiness: a
-         request may carry four breakpoints, the system block holds one, and
-         this loop runs six rounds. Left behind on each round the fifth request
-         is a 400. Stripping the old one costs nothing — a block already written
-         to the cache stays readable whether or not it still carries the mark.
-
-         FIVE MINUTES, DELIBERATELY, WHERE THE PREFIX ASKS FOR AN HOUR. Rounds
-         are seconds apart and nothing reads this after the turn ends, so the
-         hour's doubled write price would buy a lifetime no one uses. The longer
-         TTL has to come first in the request, and it does: system renders ahead
-         of messages. */
+      /* A breakpoint on the newest result, so the next round reads everything
+         so far from the cache instead of buying it again. It moves rather than
+         accumulates — a request may carry four. Five minutes: rounds are
+         seconds apart and nothing reads it after the turn. */
       if (marked) delete marked.cache_control;
       marked = results[results.length - 1];
       marked.cache_control = { type: "ephemeral" };
@@ -2230,20 +1525,8 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     const text = (body.content ?? [])
       .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
     if (!text) throw new Error("Claude returned no text");
-    /* WHAT ANY OF THIS COSTS, IN THE TWO PLACES IT CAN BE READ.
-
-       The console line is unchanged and still the fastest way to see one turn
-       while looking at it. The row is the same figures somewhere they survive:
-       this repository's own account of pg_net says plainly that nobody reads
-       Edge logs, which is exactly why a failed briefing messages Telegram — and
-       every cost and quality meter in this file was still writing there and
-       nowhere else. "Is the briefing drifting long again", "what did last month
-       cost", "how often does fallbacks actually fire" were questions whose
-       answers were being collected and then discarded within hours.
-
-       Searches are counted apart from the tokens because they bill apart.
-       Only on the way out; the catch below records the turns that never got
-       here, which are the ones a cost line could never see at all. */
+    // The console line to watch one turn; the row, because nobody reads Edge
+    // logs. The catch records the turns that never got here.
     console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es), ${fetches} fetch(es)` +
@@ -2258,11 +1541,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
   } catch (err) {
-    /* A FAILED TURN IS A ROW TOO, and it is the row that was never there.
-       A briefing that dies costs the same searches and the same tokens as one
-       that lands, and until now the only trace was a Telegram apology — a
-       message, not data, so "how often does this actually fail" had no answer.
-       Recorded and rethrown: the caller's own handling is unchanged. */
+    // A failed turn is a row too — the one that never existed. Rethrown.
     await recordRun({
       caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
       wrote_1h: wrote1h, wrote_5m: wrote5m,
@@ -2275,17 +1554,9 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   }
 }
 
-/* NEVER THROWS AND NEVER BLOCKS THE ANSWER, which is what separates a meter
-   from a dependency. Recording is the least important thing happening in any
-   turn: a briefing that was written, paid for and delivered must not be lost
-   because an instrumentation insert failed, and it must not be lost because the
-   005 migration has not been applied yet either.
-
-   WHAT EARNS A ROW IS AN ABSENCE NOBODY WOULD NOTICE, which is why ask() is no
-   longer its only writer: a delivered briefing, a nightly sweep and the channel
-   census all produce a number whose only other home is a console. Nothing reads
-   any of it back into her context — this is for him and for whoever is
-   debugging, which is why it carries no note and no opinion, only figures. */
+/* Never throws and never blocks the answer: a delivered briefing must not be
+   lost to an instrumentation insert. A row is for an absence nobody would
+   otherwise notice. Nothing reads it back into her context. */
 async function recordRun(row: Record<string, unknown>): Promise<void> {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_runs`, {
@@ -2299,15 +1570,10 @@ async function recordRun(row: Record<string, unknown>): Promise<void> {
 
 /* ─── Telegram and history ─────────────────────────────────────────────── */
 
-// Her token, bound once. Every call below is unchanged by the binding.
 const tg = (method: string, body: unknown) => telegram(BOT_TOKEN, method, body);
 
-// One message per chunk, in order. Sequential rather than parallel: Telegram
-// does not promise ordering, and a briefing whose section 5 arrives before
-// section 2 is unreadable.
-// A KEYBOARD RIDES ON THE LAST PART AND ONLY THE LAST, which is what makes it a
-// keyboard under the briefing rather than one under each of its pieces. Optional,
-// so every existing caller is unchanged by its existence.
+// One message per chunk, sequentially — Telegram does not promise order. A
+// keyboard rides on the last part only.
 async function say(text: string, keyboard?: unknown) {
   const parts = chunk(text);
   for (const [i, part] of parts.entries()) {
@@ -2320,31 +1586,13 @@ async function say(text: string, keyboard?: unknown) {
   }
 }
 
-/* Twelve turns, oldest first.
+/* Twelve turns, oldest first: the briefing a follow-up follows and the
+   exchange since, keeping a one-line question cheap.
 
-   A briefing is long, so a wider window would resend several of them on every
-   question for no gain — what a follow-up needs is the briefing it follows and
-   the exchange since, not last Tuesday's calendar. Twelve covers a morning's
-   conversation and keeps the cost of a one-line question near the cost of a
-   one-line question.
-
-   IT MUST START ON A USER TURN, which is the Messages API's one hard rule about
-   the shape of a conversation. Consecutive same-role turns it merges; a leading
-   assistant turn it refuses, and the refusal is total — every reply 400s until
-   the offending row rolls out of the window.
-
-   Pairs are written in a single INSERT, so the obvious argument is that an even
-   window can only ever open on a user turn. That argument is wrong, and it held
-   this together for one release. Two rows in one statement draw two sequence
-   values, and a concurrent INSERT can take one in between: two messages sent
-   seconds apart — ordinary, since the webhook answers 200 immediately and both
-   handlers then run at once — can interleave as u₁ u₂ a₁ a₂. The window then
-   opens mid-pair.
-
-   So the shape is repaired rather than assumed, which also means HISTORY no
-   longer has to be even and nothing depends on a sentence being remembered.
-   Exported because it is the decision, and a decision asserted in a comment is
-   what this replaced.
+   It must open on a user turn or the API refuses every reply. Pairs are written
+   in one INSERT, but a concurrent one can take a sequence value between them,
+   so the shape is repaired rather than assumed. Exported because it is the
+   decision.
    ───────────────────────────────────────────────────────────────────────── */
 const HISTORY = 12;
 
@@ -2359,15 +1607,11 @@ async function recent(): Promise<Turn[]> {
   return openOnUser(dateTurns(rows.reverse()));
 }
 
-/* WHICH OF HER MESSAGES A SWIPE-REPLY ANSWERS. Telegram hands back the message
-   he replied to, but a voice note carries no text, and her history dates a turn
-   by the day alone — so "too dense" under the 10:00 pulse and under the release
-   look an hour later read identically, and the second may already be outside
-   the twelve turns. Every caller but the briefing stores after it sends, so the
-   turn is the EARLIEST assistant row at or after the send; the newest would be
-   whatever she said since, which is the one message it is certainly not. Five
-   minutes covers a message's several voice notes and bounds one that was never
-   stored. Exported because it is the decision, the same reason dayQuery is. */
+/* Which of her messages a swipe-reply answers. A voice note carries no text
+   and history dates turns by day, so it is found by time: the earliest
+   assistant row at or after the send — every caller but the briefing stores
+   after sending. Five minutes covers several voice notes. Exported because it
+   is the decision. */
 const atSecond = (s: number) => new Date(s * 1000).toISOString();
 
 export function repliedQuery(sent: number): string {
@@ -2376,19 +1620,10 @@ export function repliedQuery(sent: number): string {
          `&order=created_at.asc&limit=1`;
 }
 
-/* AND THE BRIEFING IS THE ONE MESSAGE STORED BEFORE IT IS SENT, which is the
-   rule above failing for the message likeliest to be answered this way. Its
-   marker goes down first, for postBriefing's reason, and the speaking worker
-   sends it seconds to minutes later — so a swipe-reply to the briefing looked
-   forward from the voice note and found nothing, every time.
-
-   Asked only when that look finds nothing, and back across the speaking
-   worker's whole budget. The newest two rows there are taken only if they ARE
-   a briefing and its marker, paired by the instant they share as postSpeak
-   pairs them: anything else in that window is a message he is not replying
-   to, and no quote is the direction to fail in rather than a wrong one. Asked
-   first instead, it would name the briefing under a reply to the answer she
-   gave a minute after it. */
+/* The briefing is stored before it is sent, so the look above misses it. Asked
+   only when that finds nothing, back across the speaking worker's budget, and
+   taken only if the newest two rows are a briefing and its marker sharing an
+   instant: no quote is the direction to fail in. */
 export function spokenQuery(sent: number): string {
   return `eugenia_turns?select=role,content,created_at` +
          `&created_at=gte.${atSecond(sent - SPEAK_WORKER_MS / 1000 - 60)}` +
@@ -2403,12 +1638,8 @@ export function spokenBriefing(rows: (Turn & { created_at: string })[]): string 
     ? String(text.content) : null;
 }
 
-/* EVERY CALLER REACHES THIS AFTER say(), which is what makes the embedding free
-   in the only sense that matters: he has the message before this runs. Both
-   turns go in one vendor call and one INSERT — and the pair still has to be one
-   INSERT for the reason openOnUser exists, since a concurrent write taking a
-   sequence value between them is what leaves the window opening on an assistant
-   turn. */
+/* Every caller reaches this after sending, so the embedding costs him nothing.
+   The pair is one INSERT, for openOnUser's reason. */
 async function remember(turns: Turn[]) {
   const vecs = await embed(turns.map(t => String(t.content))).catch(() => null);
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_turns`, {
@@ -2420,17 +1651,11 @@ async function remember(turns: Turn[]) {
 
 export interface Sweep { filled: number; left: number }
 
-/* WHAT A NIGHT OF SWEEPING CAME TO, IN THE ONE FORM THAT SEPARATES THREE
-   REPAIRS. A vendor that refuses throws, so it reaches the row as a message and
-   names itself. What is left is a pair of counts, and the pair that matters is
-   nothing filled with a backlog still waiting: `embed()` returns null on an
-   unset key ALONE — every other way of failing throws — so that combination is
-   an exact statement about the key rather than a guess about the vendor.
-
-   The quiet night has to read as quiet. An archive fully embedded answers
-   `0 filled, 0 left`, and a line that called that a missing key would fire
-   every night for the life of the deployment, which is how a monitor stops
-   being read. */
+/* A night's sweep, in the form that parts three repairs. A refusing vendor
+   throws and names itself. embed() returns null on an unset key alone, so
+   nothing filled against a backlog is an exact statement about the key. A
+   drained archive reads `0 filled, 0 left` and accuses nobody, or the line
+   fires every night and stops being read. */
 export function sweepLine(notes: Sweep, turns: Sweep): string {
   const counts = (s: Sweep) => `${s.filled} filled, ${s.left} left`;
   const line = `notes ${counts(notes)} · turns ${counts(turns)}`;
@@ -2440,29 +1665,11 @@ export function sweepLine(notes: Sweep, turns: Sweep): string {
 }
 
 /* ─── What the vendor missed ───────────────────────────────────────────────
-   A null embedding is every row written before 007 ran, plus any row whose
-   vendor call failed. Both are invisible from the outside: the row is there,
-   the search still answers, and it simply never returns that row from its
-   semantic arm.
-
-   ONE PATCH PER ROW, WHICH IS DELIBERATE RATHER THAN LAZY. An upsert would be
-   one request, and PostgREST would send rows carrying only `id` and
-   `embedding`: `content not null` is checked when the tuple is built, before
-   any conflict is detected, so the whole batch would be refused. The expensive
-   half is the vendor call and that is one request for the batch either way.
-
-   RESUMABLE, AND IT SAYS HOW MUCH IS LEFT. `count=exact` is what turns this
-   from a call you repeat hopefully into one you repeat until it answers zero.
-
-   NEWEST FIRST, AND THAT IS THE SAME MISTAKE THE NIGHTLY WINDOW ALREADY MADE.
-   This drained `id.asc`, which finishes the same backlog either way — so it
-   looked like a choice with no consequence, exactly as `order=id.asc&limit=200`
-   did on the day's turns. The consequence is WHEN. The nightly sweep fills
-   fifty rows a night, so a vendor outage that left a fortnight of turns without
-   vectors becomes searchable oldest-first: last month's archive comes back
-   before last week's conversation, and the rows he is likeliest to ask her
-   about are the last to arrive. Ordering by id.desc drains the same rows in the
-   order they are worth having.
+   Rows with no embedding — everything before 007, and any whose vendor call
+   failed — are never found by meaning, silently. One PATCH per row, for
+   EMBED_BATCH's reason. count=exact makes it resumable: repeat until it
+   answers zero. Newest first: an outage's fortnight should come back before
+   last month's archive, being what he is likeliest to ask about.
    ───────────────────────────────────────────────────────────────────────── */
 async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   const res = await fetch(
@@ -2475,10 +1682,8 @@ async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   if (!rows.length) return { filled: 0, left: 0 };
 
   const vecs = await embed(rows.map(r => String(r[column])));
-  // NOT CAUGHT HERE, and that is the point of the door: a vendor that refused
-  // reaches postScheduled, which puts its reason in the response and in the one
-  // message he actually reads. Only an unset key reaches this line, and it is
-  // the one case with nothing to report — the same rows wait for the key.
+  // Not caught: a refusing vendor's reason reaches the door's answer. Only an
+  // unset key arrives here, and then the rows wait for it.
   if (!vecs) return { filled: 0, left };
 
   let filled = 0;
@@ -2494,86 +1699,36 @@ async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
 }
 
 async function postEmbed(): Promise<Response> {
-  // One after the other rather than together: each is fifty single-row PATCHes,
-  // and there is nothing to be gained by having a hundred of them in flight.
+  // Sequential: nothing gained by a hundred PATCHes in flight.
   const notes = await fillEmbeddings('eugenia_notes', 'note');
   const turns = await fillEmbeddings('eugenia_turns', 'content');
   return json({ ok: true, notes, turns });
 }
 
 /* ─── And everything she writes is spoken ──────────────────────────────────
-   He speaks because his hands are busy — driving, at a screen, mid-session —
-   and the point is over the moment he has to look at a phone to read. So every
-   message she composes goes as a voice note, on every path: the briefing he
-   asked to have read to him, the looks, the trade event and a reply.
-
-   THE TRANSCRIPT IS WHAT IS KEPT, whatever happened on the wire. remember()
-   stores the text, a later search finds the text, and the text is what goes
-   instead when the audio does not land — see sayAloud.
+   He listens because his hands are busy, so every message she composes goes as
+   a voice note, on every path. The transcript is what is kept, and the text is
+   what goes when the audio does not land — see sayAloud.
    ───────────────────────────────────────────────────────────────────────── */
 const TTS_URL   = env("TTS_URL") || "https://api.openai.com/v1/audio/speech";
 const TTS_KEY   = env("TTS_KEY");
-// Both from the environment, unlike EMBED_MODEL. Nothing is stored, so a change
-// here alters one message rather than what is comparable to what — and which
-// voice she has is his to change without a deploy.
-//
-// THE TWO ARE COUPLED AND THE VENDOR DECIDES HOW. The older `tts-1` serves a
-// smaller set of voices and takes no delivery instruction, so overriding the
-// model alone can leave a voice it does not have — a 400 on every reply, which
-// costs the audio and not the answer, and is the reason both defaults name the
-// current model's recommended pairing rather than the safest-looking one.
+// From the environment, unlike EMBED_MODEL: nothing is stored, so a change
+// alters one message, and the voice is his to change. The two are coupled —
+// `tts-1` serves fewer voices and takes no instruction — so the defaults are
+// the current model's own pairing.
 const TTS_MODEL = env("TTS_MODEL") || "gpt-4o-mini-tts";
 const TTS_VOICE = env("TTS_VOICE") || "marin";
 
-/* HOW IT IS READ, WHICH IS A PRODUCT DECISION AND NOT A SETTING. The prompt
-   spends most of its length keeping her off signals and verdicts, and a
-   breathless delivery of a deliberately unexcited paragraph contradicts the
-   whole of it — the register has to survive the trip through audio. Pinned
-   here for that reason where the voice is his to change: which voice reads it
-   is taste, how it is read is the product.
+/* How it is read is the product, so it is pinned where the voice is not: a
+   breathless read of a deliberately calm paragraph contradicts the prompt.
 
-   IT ASKED FOR THE REGISTER AND NOT FOR THE DELIVERY, WHICH IS WHY IT READ AS A
-   MACHINE. Two sentences, and both of them said what NOT to do — not breathless,
-   not selling. A model given only prohibitions gives back the null reading:
-   every sentence the same length of time, every pitch contour the same, no beat
-   at a paragraph break, which is exactly what a person means by robotic. What
-   was missing is the positive half. This is the one dial the vendor offers, and
-   the model and the voice are already the newest it serves, so there is nowhere
-   else for this to come from.
-
-   THE LAST LINE IS PRONUNCIATION AND IT EARNS ITS PLACE ON REAL TEXT. Her
-   calendar lines are `08:30 ET <name>`, the trade event reads R-11 and R-14/R-19
-   back at him, and a level is a comma'd figure. Read as glyphs those are three
-   stumbles in the middle of a fluent paragraph. Said here rather than rewritten
-   on the way out, because what `remember` stores must stay the text he can read
-   — a rewriter would either touch the transcript or be a second copy of it.
-
-   AND THE FIRST REPAIR ASKED FOR A PER-SENTENCE SHAPE OVER TEXT THAT IS SIXTEEN
-   NEAR-IDENTICAL SENTENCES. It said `sentences finish downward`, which is right
-   about one sentence and is the metronome itself when applied to the register
-   `WRITING` produces: measured over the approved example, sixteen sentences,
-   mean 9.2 words, fourteen of them between 5 and 13. Sixteen identical falls in
-   a row, each one resetting to the same place to start the next. The rule was
-   aimed at news-reader uplift and it bought that at the price of the thing it
-   was written to fix.
-
-   SO THE ARC MOVED UP A LEVEL, TO THE PARAGRAPH. That is the one rhythm
-   variable still free: the WORDS cannot carry it, because sentence length is
-   fixed by rules that exist for the eye and are staying — he read a draft under
-   them and they are why the page works. What is left is where the pitch sits
-   across four sentences and how long she rests between them, and neither was
-   being asked for. Only the last sentence of a paragraph fully lands now; the
-   ones before it stay open, which is what a person does when something is still
-   coming.
-
-   SPANISH IS SAID AS A NATIVE SAYS IT, AND CAREFUL IS THE GRINGO TELL. `Not
-   read as English letters` ruled out the worst reading and asked for nothing
-   better: a correct, deliberate Spanish word in an American mouth is still an
-   American saying a Spanish word, and slowing down to get it right is the tell
-   itself — the same slowing that dragged `jefesito` out. A native speaker is
-   quickest in their own language. So the switch is asked for as code-switching,
-   both directions, because the other failure is a Spanish accent leaking onto
-   the English around it. */
+   It says what TO do, because prohibitions alone produced the null reading —
+   every sentence the same length and contour, which is what robotic means. The
+   arc sits at the paragraph rather than the sentence: WRITING's short, even
+   sentences would make a per-sentence fall a metronome. Pronunciation is
+   spelled out for the codes she reads back (08:30 ET, R-11, a comma'd level)
+   rather than rewriting the text, which must stay what is stored. Spanish is
+   asked for as native code-switching: careful Spanish is the gringo tell. */
 const TTS_STYLE = `Voice: a colleague reading something over to one person who is
 busy. Low and warm, certain of what she is saying, with nothing to sell.
 
@@ -2602,80 +1757,37 @@ heh-feh-SEE-toh. Say it at speed and without care, the way anyone says their
 own language; slowing down to get it right is exactly what sounds foreign. Then
 straight back to her ordinary English, with no accent carried across.`;
 
-/* A CHUNK SIZE, NOT A CAP, AND THE DIFFERENCE IS THE WHOLE POINT. There was a
-   cap — seven hundred characters, then four thousand — and a cap decides that
-   past some length a message is not worth hearing. Nothing she writes should be
-   shortened to fit a voice note, and nothing she writes should go unspoken for
-   being long: those are the same decision made twice, and it is his, and it is
-   no.
-
-   What remains is not a judgement at all. The speech vendor accepts a bounded
-   input in one request, so a long message becomes SEVERAL voice notes, exactly
-   as it already becomes several text messages. `chunk` is the one that does it,
-   with its paragraph preference, so each part is a whole thought rather than a
-   sentence cut in half. */
+/* A chunk size, not a cap: a cap decides some messages are not worth hearing,
+   and he decided none are. The vendor takes a bounded input, so a long message
+   is several voice notes, split by `chunk` into whole thoughts. */
 const TTS_LIMIT = 4000;
 
-/* HIS EAR SET THIS, NOT A DEFAULT. At 1.0 he was playing every voice note at
-   1.5x in Telegram and calling 1.5 a shade fast — so the number is his, read
-   off what he was already doing, and it belongs at generation rather than in a
-   player setting he has to remember on each message.
-
-   IT MAY BE IGNORED, AND THAT IS THE THING TO KNOW BEFORE READING A RESULT
-   HERE. `speed` is documented for this endpoint across 0.25–4.0, and
-   gpt-4o-mini-tts has been reported to quietly disregard it where tts-1 honours
-   it — no error, no header, audio at 1.0 and a constant in this file claiming
-   otherwise. Nothing in the test suite can see the difference, because the
-   suite never calls the vendor. So if the tempo is unchanged, this is the first
-   thing to suspect and the fallback is to ask for pace in TTS_STYLE instead. */
+/* His number: at 1.0 he was playing every note at 1.5× and calling that a
+   shade fast. It may be silently ignored — gpt-4o-mini-tts has been reported
+   to disregard `speed` — and nothing here can see it; if the tempo is
+   unchanged, ask for pace in TTS_STYLE instead. */
 const TTS_SPEED = 1.3;
 
-/* THE VOICE GETS A BUDGET, AND THE TEXT IS WHAT IS LEFT WHEN IT RUNS OUT. Every
-   request in speak() waited for as long as the vendor took, and on 2 October it
-   took longer than the worker had: the briefing was stored at 08:02:23, the
-   speech request never answered, and at 08:06:40 — four hundred seconds after
-   boot — the platform shut the worker down. A worker that is killed runs no
-   catch, so there was no fallback to text, no row, no apology, and no retry,
-   because the marker had already gone down. The one failure the fallback exists
-   for arrived in the only shape it could not see.
+/* The voice gets a budget, and the text is what is left when it runs out. A
+   speech request that never answered once outlived the worker, which was
+   killed with no catch, no row and no retry. One budget per message, not per
+   request, which would multiply by the parts; 150s is the slowest speaking
+   that ever landed.
 
-   ONE BUDGET FOR THE WHOLE MESSAGE, NOT ONE PER REQUEST, because a long message
-   is several parts and a per-request limit multiplies by them. A hundred and
-   fifty seconds is the slowest speaking that ever landed — a Sunday at 155s,
-   storing included — and it is what a path that writes and speaks in one
-   worker can afford with the text still to send.
-
-   THE BRIEFING DOES NOT SPEAK IN THE WORKER THAT WROTE IT, which is the larger
-   half of the repair. Writing and speaking shared one four-hundred-second clock,
-   so a slow morning in either was taken out of the other. postBriefing stores
-   the briefing and hands it to a second worker (`?speak=`), whose clock is its
-   own: SPEAK_WORKER_MS of it goes to the voice, leaving the read before and the
-   text after. */
+   The briefing speaks in a second worker (`?speak=`) with its own clock, so a
+   slow morning in writing or speaking is not taken out of the other. */
 const SPEAK_MS = 150_000;
 const SPEAK_WORKER_MS = 330_000;
 
-/* AND A PART THAT DOES NOT LAND GETS ONE MORE ATTEMPT, each bounded on its own
-   as well as by the budget. A vendor that stalls has stalled on one request, and
-   the next is a fresh connection — so on the speaking worker's budget a stall
-   costs one attempt rather than the voice. On SPEAK_MS a stalled first attempt
-   has spent the budget, so only a quick refusal is tried twice there. */
+/* A part that does not land gets one more attempt, each bounded: a stall is
+   one request, and the next is a fresh connection. On SPEAK_MS only a quick
+   refusal gets its second try. */
 const ATTEMPT_MS = 150_000;
 
-/* NEVER THROWS AND NEVER MESSAGES HIM. Unset key, a vendor that refused, a
-   format Telegram would not render — every one of them leaves him with the
-   answer he already has and no audio, which is a degraded reply rather than a
-   missing one. That is the opposite call from VOICE_TROUBLE, and the difference
-   is that a voice note she cannot hear costs the whole exchange while a reply
-   she cannot speak costs the convenience.
-
-   Its own fetch rather than the shared telegram() helper, for tgDownload's
-   reason: sendVoice is multipart and that helper posts JSON.
-
-   AND OGG/OPUS SPECIFICALLY, which is the one thing here that would fail
-   quietly rather than loudly. The default is mp3 and it would work — the
-   request succeeds, Telegram accepts the file, and it arrives as an ATTACHMENT
-   rather than a voice note, with no waveform and no speed control. Nothing
-   errors; the feature just stops being the thing it was for. */
+/* Never throws and never messages him: any failure answers false and the text
+   goes instead. Its own fetch, sendVoice being multipart. Ogg/opus, because the
+   default mp3 works and arrives as a file attachment rather than a voice note,
+   with nothing erroring. */
 async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Promise<boolean> {
   if (!TTS_KEY) return false;
 
@@ -2684,12 +1796,9 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
       method: "POST",
       headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        /* WITHOUT MARKS SHE WAS TOLD NOT TO WRITE. The prompt says plain text,
-           because Telegram is sent no parse mode and renders an asterisk as an
-           asterisk — but this text is model-written, and a model trained on
-           markdown reaches for a bold label in exactly the slot that is a list.
-           `**Today:**` read aloud is a gamble on what the vendor does with an
-           asterisk, so the boundary strips what the instruction only asks for. */
+        // Markdown stripped at the boundary: no parse mode is sent, yet a model
+        // writes a bold label in a list anyway, and an asterisk read aloud is
+        // a gamble.
         model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
         input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
         instructions: TTS_STYLE, response_format: "opus",
@@ -2700,13 +1809,10 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
 
     const form = new FormData();
     form.append("chat_id", CHAT_ID);
-    // Type and filename both, the same reasoning transcribe() gives for the
-    // other direction: it is not knowable which one Telegram reads.
+    // Type and filename both: which one Telegram reads is not knowable.
     form.append("voice", new Blob([new Uint8Array(await spoken.arrayBuffer())],
                                   { type: "audio/ogg" }), "reply.ogg");
-    // The briefing's keyboard rides on the voice note now, because there is no
-    // text message under it to carry one. JSON in a multipart field, which is
-    // what Telegram takes for reply_markup on sendVoice.
+    // The briefing's keyboard rides on the voice note, as JSON in the field.
     if (keyboard) form.append("reply_markup", JSON.stringify(keyboard));
     const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
       method: "POST", body: form, signal,
@@ -2720,38 +1826,20 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
   }
 }
 
-/* THE VOICE NOTE IS THE MESSAGE, AND THE TEXT IS WHAT HAPPENS WHEN IT IS NOT.
-   It sent both for one day and both arrived, which is two notifications and two
-   bubbles for one thing she said — he asked for the voice note alone.
+/* The voice note is the message and the text its fallback — both went for a
+   day, two notifications for one thing said. Audio-only would turn a refusing
+   vendor or an unset key into a missing message, so the text is sent, in full,
+   whenever any part did not land. What is stored is unaffected.
 
-   THE OBJECTION TO THAT WAS REAL AND THIS IS THE ANSWER TO IT rather than a
-   climb-down. A speech vendor that refuses, an unset key, a format Telegram will
-   not render: audio-only turns every one of those into a MISSING message, which
-   is the failure shape this whole system is built against. So the text is not
-   dropped, it is the fallback — attempted only when the audio did not land, and
-   then in full rather than in part, because a half-heard message with no text
-   under it is worse than either.
-
-   WHAT IS STORED IS UNAFFECTED, and that is the half worth being clear about:
-   `remember` writes the transcript whatever happened on the wire, so her memory,
-   `search_memory` and the nightly pass read exactly what they always did.
-
-   IT IS NOT `say` ITSELF, because three things go through `say` that must stay
-   silent: the `/notes` audit, which is a rendered table and unlistenable; the
-   apologies, which are failure notices; and the short operational lines. A
-   message she wrote is a different thing from a line the function printed. */
-// Exported for the one guarantee here that a source read cannot settle: that
-// there is no path on which he gets nothing. With no TTS key every `speak`
-// answers false, which is exactly the shape of a vendor that refused. The
-// budget is a parameter for the same reason — so a vendor that never answers
-// can be driven in a test without waiting out SPEAK_MS.
+   Not `say` itself, which keeps three things silent: the /notes audit, the
+   apologies, and short operational lines. Exported so the fallback is driven —
+   with no TTS key every speak answers false, a refusing vendor's shape — with
+   the budget a parameter so a stall needs no waiting out. */
 export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK_MS): Promise<boolean> {
   const parts = chunk(words, TTS_LIMIT);
   const signal = AbortSignal.timeout(budget);
   let heard = parts.length > 0;
-  // Sequentially, because Telegram does not promise ordering across two sends —
-  // chunk()'s own reason for the same shape in say(). The keyboard rides on the
-  // last part and only the last, which is say()'s rule as well.
+  // Sequentially, keyboard on the last part, as in say().
   for (const [i, part] of parts.entries()) {
     const marked = i === parts.length - 1 ? keyboard : undefined;
     let landed = false;
@@ -2760,44 +1848,23 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
     }
     if (!landed) heard = false;
   }
-  // ANY part missing, not all of them. A message he heard three quarters of is
-  // one he cannot act on, and the text is cheap.
+  // Any part missing: three quarters of a message cannot be acted on.
   if (!heard) await say(words, keyboard);
   return heard;
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
-   Folded into the opening user message rather than sent as a mid-conversation
-   system message. That channel exists for exactly this and would keep the
-   cached prefix intact — but its request shape could not be exercised from the
-   machine this was written on, and a 400 there kills every reply she gives.
-   Nothing here is untrusted anyway: the trades are his own journal, and the
-   notes are her sentences or his, in his own thread — so the injection safety a
-   system turn buys is not what this needs.
-
-   remember() stores the RAW message, never the augmented one, so a preamble is
-   never resent forever as history.
+   Folded into the opening user message rather than a mid-conversation system
+   message, whose request shape could not be exercised here — and a 400 there
+   kills every reply. Nothing in it is untrusted. remember() stores the raw
+   message, so a preamble is never resent as history.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* ─── What time it is ─────────────────────────────────────────────────────
-   SHE HAS NO CLOCK OTHERWISE, and the absence does not read as one. Her whole
-   context is a system prompt about morning briefings and a history whose most
-   recent long turn IS this morning's briefing — so asked a question at 23:42
-   she opened with "morning", which is not a model error but the only inference
-   available from what she was given.
-
-   It also silently undermines everything she says about dates. The prompt asks
-   her to be specific with dates and to say he has not traded since one, and
-   get_trades computes its window from Date.now() on this side — so the DATA is
-   right while her narration of it is a guess.
-
-   A display format with one caller, so it stays here rather than in _shared,
-   the same way Gladys's nyDayTime does. The trust clause is load-bearing: the
-   turns above genuinely are from this morning, and without it the freshest
-   thing in her context still argues for the wrong answer. */
-// hourCycle rather than hour12: false, which leaves the cycle to the locale and
-// can resolve to h24 — midnight rendering "24:05". _shared's nyClock states it
-// for the same reason.
+   She has no clock otherwise: asked something at 23:42 with this morning's
+   briefing the freshest thing in context, she said "morning". The trust clause
+   is load-bearing for that reason. h23, or midnight reads "24:05".
+   ───────────────────────────────────────────────────────────────────────── */
 const nyStamp = (now: Date) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', weekday: 'long', day: 'numeric', month: 'long',
   year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -2807,23 +1874,11 @@ export const nowBlock = (now = new Date()) =>
   `\n\n[Right now it is ${nyStamp(now)} in New York. Trust this over anything ` +
   `the conversation above implies about the time or the date.]`;
 
-/* THE CLOCK GOES ON IN ONE PLACE, and it has to. Three callers each appending
-   it is three chances to forget: removing it from the pulse alone left every
-   test green, because the tests called nowBlock directly and nothing proved it
-   reached a message. A caller cannot omit what it does not attach.
-
-   The last user turn, because that is the one being asked. History is dated
-   separately — see dateTurns — and the stored turn is still the raw text, since
-   this runs on a copy the caller never sees. */
-/* A TURN IS SOMETIMES BLOCKS RATHER THAN A SENTENCE, and the clock has to reach
-   both. He can send a chart now, which arrives as an image block beside his
-   text — and string concatenation against an array produces "[object Object]"
-   attached to nothing, which would put the one line telling her what day it is
-   somewhere she cannot read it, silently, on exactly the turns that carry the
-   most context.
-
-   Exported and separate because it is the decision. Appended as a trailing text
-   block so it stays the last thing in the message either way. */
+/* The clock goes on in one place, so no caller can forget it — removing it
+   from one path once left every test green. On the last user turn, a copy;
+   the stored turn stays raw. A turn may be blocks (a chart he sent), where
+   string concatenation gives "[object Object]", so it goes on as a trailing
+   text block. Exported because it is the decision. */
 export function stamped(content: string | any[], now: Date): string | any[] {
   return typeof content === 'string'
     ? content + nowBlock(now)
@@ -2837,14 +1892,9 @@ export function withClock(messages: Turn[], now = new Date()): Turn[] {
     i === last ? { ...m, content: stamped(m.content, now) } : m);
 }
 
-/* HISTORY IS DATED TOO, or "yesterday you said" is a guess across a weekend.
-   The prompt asks her for continuity and now forbids inferring the date from
-   the conversation, which together leave her nothing to reason from unless the
-   turns carry their own. created_at is already on the table and already read by
-   briefedToday.
-
-   The user turn of each pair only: it anchors the exchange, and prefixing her
-   own words back to her reads as though she said them. */
+/* History is dated too, or "yesterday you said" is a guess across a weekend.
+   The user turn of each pair only: prefixing her own words reads as though
+   she wrote the date. */
 const shortDay = (d: Date) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', weekday: 'short', day: 'numeric', month: 'short',
 }).format(d);
@@ -2855,13 +1905,10 @@ export function dateTurns(rows: (Turn & { created_at: string })[]): Turn[] {
     : { role, content });
 }
 
-/* Optional by design: a database blip must cost her the memory, not the
-   briefing. Logged, because a bot that has quietly stopped remembering reads
-   exactly like a bot with nothing to remember.
-
-   The two kinds are labelled differently on purpose. What she noticed is
-   context; what he told her is not, and a list that ran them together would
-   invite her to weigh an instruction against her own observation. */
+/* Optional: a database blip costs her the memory, not the briefing. Logged,
+   because a bot that stopped remembering reads like one with nothing to
+   remember. The kinds are labelled apart, so an instruction is never weighed
+   against an observation. */
 export async function notesBlock(): Promise<string> {
   try {
     const [told, promised, noticed] = await Promise.all([
@@ -2887,42 +1934,20 @@ export async function notesBlock(): Promise<string> {
 
 type Channel = { channel: string; state: string; evidence: string | null; moved_on: string | null };
 
-/* THE SAME ROWS, RENDERED FOR HIM RATHER THAN FOR HER, and the only window he
-   has into any of it.
+/* The same rows rendered for him — his only window into a memory he writes to
+   and could not read. A wrong fact that says he understands something makes
+   her stop explaining it, an absence nobody notices. The ids are how he says
+   which note is wrong.
 
-   Her memory is the one part of this system he can write to and could not read.
-   Notes are the only channel he has for correcting her, a fact is recorded
-   SILENTLY by design, and the acknowledgement for an instruction is four words
-   that scroll away — so the evidence that anything stuck lasts about a morning.
-   A wrong note then fails in the worst available way: a fact saying he
-   understands something he does not makes her STOP explaining it, and the
-   symptom is an absence, which is the hardest thing there is to notice.
-
-   Pure, so a test can read the formatting; the read stays with the caller. The
-   ids are the point rather than decoration — they are how she is told which
-   note to retire, and now how he is.
-
-   THE MAP IS PART OF THIS MESSAGE RATHER THAN APPENDED TO IT, and it has to be.
-   The `/notes` reply used to end with channelsBlock() — which is written for HER
-   context and opens `Where he stands on each channel`, so the one message
-   addressed to him switched into the third person about him halfway through.
-   Rendering the whole audit here fixes that and makes it one pure function
-   instead of a him-facing half glued to a her-facing half.
-
-   It also means a failed channels read now costs the whole `/notes` reply
-   rather than being swallowed. That is the right direction here and the
-   opposite of the rule the blocks follow: this is an AUDIT, answered from the
-   database precisely so nothing can quietly drop a row, and an audit that
-   silently omits half of what it audits is the defect it exists to prevent. */
+   The whole audit is rendered here, in his second person, rather than
+   appending blocks written to her. And a failed read costs the whole reply,
+   which is right for an audit: one that silently omits half of itself is the
+   defect it exists to prevent. Pure; the read stays with the caller. */
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
                           promised: Note[] = []): string {
   const list = (ns: Note[]) => ns.map(noteLine).join("\n");
-  /* RENDERED FOR HIM RATHER THAN REUSING loopsList, which is the same reason
-     the channel map is rendered here rather than by appending channelsBlock():
-     that one opens "What you flagged" and is written to HER about her own
-     threads. Sent to him unchanged it would be the audit addressed to him
-     switching into her voice halfway through. */
+  // Not loopsList, which is written to her about her own threads.
     const open = (kind: string, heading: string) => {
       const rs = loops.filter(l => l.kind === kind);
       return rs.length
@@ -2941,47 +1966,18 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
   ].filter(Boolean).join("\n\n");
 }
 
-/* A CIVIL DAY FORMATTED AS ONE, which shortDay cannot do. `moved_on` is already
-   a New York date written by setChannel, so re-zoning it moves it: new Date
-   ('2026-03-12') is midnight UTC, which is the 11th in New York, and every rung
-   would read a day early. Formatted in UTC off a midday anchor, the date that
-   was stored is the date that is shown. */
+/* A stored New York civil day, shown as itself: re-zoned, `2026-03-12` is
+   midnight UTC and reads as the 11th. Formatted in UTC off a midday anchor. */
 const civilDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC', day: 'numeric', month: 'short',
 }).format(new Date(`${iso}T12:00:00Z`));
 
-/* RENDERED IN THE ORDER prompt.ts DECLARES THEM, not in whatever order the
-   database returns — the list she reads should be the list she was taught, and
-   a stable order is also what stops a rung looking like it moved when it did
-   not. A channel with no row is shown at the bottom rung rather than dropped:
-   the point of this block is that an absence is visible, so a missing row must
-   not be the one thing it hides. Pure, so a test can read the shape.
-
-   AND EVERY RUNG CARRIES THE DAY IT LAST MOVED, which is what stops the map
-   going blind. The ladder only ever climbs — deliberately, since failing to
-   reach for a mechanism once is not the same as having lost it — so over a year
-   every channel he has ever used converges on `owns`, and a census with nothing
-   left at `unseen` has no absence left to show. That is the whole thing it is
-   for. `moved_on` was written by setChannel from the first day and read by
-   nobody: a rung set in March looked exactly like one set last night, which is
-   the difference between a channel he owns and a channel that has gone quiet.
-   Rendering it is the entire fix, and it costs one clause. */
 /* ─── The one rung he can move himself ───────────────────────────────────────
-   THE LADDER COULD ONLY EVER CLIMB ON EVIDENCE HE DOES NOT PRODUCE. A rung
-   moves at the nightly pass, and it moves on him using a term back — so a
-   reader who takes the briefing and rarely answers it sits at `explained` for
-   ever, which is the rung that says restate the mechanism every time you use
-   the word. Weeks of it read as her being unable to stop over-explaining; what
-   it actually was is a census with no way up.
-
-   That stays true of HER reading of him — one exchange is not evidence, and
-   `set_channel` stays out of CHAT_TOOLS. This is not her reading of him. It is
-   him saying where he is, which is the same standing a demotion already has and
-   the only testimony on this subject that was never in doubt.
-
-   Exported and pure because the parse is the whole of it: a command that
-   accepts a rung nothing offers, or silently matches the wrong channel, is a
-   map that quietly stops describing him.
+   The ladder climbs on him using a term back, so a reader who rarely answers
+   sat at `explained` for ever — the rung that restates the mechanism every
+   time. Her reading of him still needs the pass; this is him saying where he
+   is, which has the standing a demotion has. Exported and pure, because the
+   parse is the whole of it.
    ─────────────────────────────────────────────────────────────────────────── */
 export function parseChannel(text: string): { channel: string; state: string } | string | null {
   const words = text.trim().split(/\s+/);
@@ -2992,18 +1988,15 @@ export function parseChannel(text: string): { channel: string; state: string } |
            `<${CHANNEL_STATES.slice(1).join('|')}>.`;
   }
 
-  /* THE RUNG IS THE LAST WORD AND THE CHANNEL IS THE REST, because three of the
-     five spoken names are several words and one of them ends in a rung-shaped
-     word. Splitting the other way round made "what central banks are buying"
-     unnameable. */
+  // The rung is the last word and the channel the rest: three spoken names are
+  // several words long.
   const to = words[words.length - 1].toLowerCase();
   const wanted = words.slice(1, -1).join(' ').toLowerCase();
   if (!(CHANNEL_STATES as readonly string[]).includes(to)) {
     return `"${to}" is not a rung. They are ${CHANNEL_STATES.join(", ")}.`;
   }
 
-  // Matched against the id AND the spoken name, since the map he reads in
-  // /notes prints the names and the ids are what the table holds.
+  // The id or the spoken name, since /notes prints the names.
   const hit = CHANNELS.find(([id, name]) =>
     id.toLowerCase() === wanted || name.toLowerCase() === wanted);
   if (!hit) {
@@ -3013,6 +2006,11 @@ export function parseChannel(text: string): { channel: string; state: string } |
   return { channel: hit[0], state: to };
 }
 
+/* In prompt.ts's order, so the list is stable and a rung never seems to move.
+   A channel with no row shows at the bottom rung rather than vanishing — this
+   block exists to make absence visible. Each rung carries the day it last
+   moved: the ladder only climbs, so without the date a year of use piles
+   everything at `owns` and a rung from March reads like last night's. */
 export function channelsList(rows: Channel[]): string {
   const byId = new Map(rows.map(r => [r.channel, r]));
   return CHANNELS.map(([id, name]) => {
@@ -3023,24 +2021,16 @@ export function channelsList(rows: Channel[]): string {
   }).join("\n");
 }
 
-/* THE READ, SEPARATE FROM EITHER RENDERING, because there are two of them now
-   and they are addressed to different people — `channelsBlock` below speaks to
-   her about him, `notesList` speaks to him about himself, and neither is the
-   place for a query. */
+/* The read, apart from both renderings — one speaks to her, one to him. */
 async function readChannels(): Promise<Channel[]> {
   return readRows<Channel>('Channels',
-    // Bounded by the list that defines it rather than by a literal: the table
-    // cannot hold a sixth row — the primary key sits on a five-value check —
-    // so this is the one read here whose limit can never bite. It is written
-    // anyway, because every read of her tables carrying one is the invariant,
-    // and the read that was allowed to be the exception was the one that got
-    // missed.
+    // A limit that can never bite — the key sits on a five-value check — kept
+    // because every read here carries one.
     `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence,moved_on` +
     `&limit=${CHANNELS.length}`);
 }
 
-/* Optional the same way notesBlock is: a database blip costs her the map, not
-   the briefing. */
+/* Optional, as notesBlock is. */
 export async function channelsBlock(): Promise<string> {
   try {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
@@ -3051,35 +2041,23 @@ export async function channelsBlock(): Promise<string> {
   }
 }
 
-// Seven days, handed over unasked, so "you have not traded since Tuesday" costs
-// no tool round. Same read as get_trades through the same read-only view — she
-// gains no reach here, only the saved trip.
+// Seven days handed over unasked, saving a tool round; the same read, no new
+// reach.
 export async function tradesBlock(): Promise<string> {
   return `\n\nHis trades this past week:\n${await readTrades(7)}`;
 }
 
 /* ─── What his trades broke since the last briefing ────────────────────────
-   THE BRIEFING JUDGED "YESTERDAY", AND A WEEK HAS A DAY NO YESTERDAY REACHES.
-   On a Monday yesterday is Sunday, so a rule Friday's trades broke was never
-   raised unless he asked — R-11, R-12 and R-14 all fail on the day the trade
-   is taken, and Friday is a day. Since the last briefing that actually went
-   out is the window that covers every closed trade once, whichever day the
-   last one was and whether a morning in between failed.
+   Since the last briefing that went out, rather than "yesterday": on a Monday
+   yesterday is Sunday, and Friday's breaches went unraised. Computed, not read
+   off the rows by eye — and this is §8's moment for the marker that says he
+   followed a rule the row says he broke. A sentence only when something broke.
 
-   AND WHICH RULES BROKE IS COMPUTED, NOT READ OFF THE ROWS. The prompt tells
-   her doing that by eye over a list of trades is where she will be wrong, and
-   the briefing was the one place still asking her to. §8 also calls a rule his
-   own marker says he followed, and the row says he did not, the most valuable
-   signal the system produces, with no moment where it fires by default; this
-   is that moment, and it is only ever a sentence when something broke.
-
-   CLOSED TRADES ONLY, because a verdict on an open one is a hard prohibition,
-   and a block that names one invites it. A trade counts if its day began on or
-   after the last briefing's, or it closed after that briefing — the second
-   half is the Friday hold that closed on Monday, which is R-15's whole case
-   and was open on both briefings either side of the weekend. Narrowing the
-   population can lose a day-level failure on a partial day; it cannot invent
-   one, which is the direction a gap here has to fail in. */
+   Closed trades only: a verdict on an open one is prohibited. A trade counts if
+   its day began since that briefing or it closed since — the Friday hold
+   closed on Monday, R-15's case. Narrowing can lose a day-level failure on a
+   partial day, never invent one.
+   ───────────────────────────────────────────────────────────────────────── */
 const BREACH_DAYS = 7;
 
 export function sinceBriefing(t: TradeRow, at: string): boolean {
@@ -3112,15 +2090,8 @@ export async function breachesBlock(): Promise<string> {
 }
 
 /* ─── The running story, the open threads, and the day's calendar ──────────
-   Three reads and three renderings, and they are together because they are one
-   idea: a briefing that starts from nothing writes a briefing that could have
-   been written on any morning, which the prompt calls a failure and had no
-   means to avoid.
-
-   Optional, all three, exactly as notesBlock and channelsBlock are: a database
-   blip costs her the context, never the briefing. Logged, because a bot that
-   has quietly stopped carrying its own story reads exactly like one that never
-   had one.
+   One idea: a briefing that starts from nothing could have been written on any
+   morning. Optional and logged, as the other blocks are.
    ───────────────────────────────────────────────────────────────────────── */
 type Thesis = { thesis: string; moved_on: string | null };
 
@@ -3130,11 +2101,8 @@ async function readThesis(): Promise<Thesis | null> {
   return row ?? null;
 }
 
-/* THE DATE IS THE HALF THAT MAKES IT USABLE, for the reason `moved_on` is on a
-   channel: a thesis written three weeks ago and never moved is not the same
-   claim as one written last night, and without the date the two read
-   identically. Formatted off a midday anchor in UTC, because `moved_on` is a
-   stored New York civil day and re-zoning it moves it back a day. */
+/* Dated, so a thesis never moved in three weeks does not read like last
+   night's — formatted as civilDay is. */
 export function thesisLine(row: Thesis | null): string {
   if (!row) return "";
   const since = row.moved_on ? ` (last moved ${civilDay(row.moved_on)})` : "";
@@ -3151,21 +2119,11 @@ export async function thesisBlock(): Promise<string> {
 }
 
 /* ─── Whether the journal is still being written ────────────────────────────
-   The poller and the email function are the two writers with no voice. Their
-   failures reach a console nobody reads, and the symptom of either dying is
-   trades that never arrive — which looks exactly like a week he did not trade.
-   `sync_health` is the heartbeat they leave; this is the one place it is read.
-
-   SHE SAYS IT ONLY WHEN IT IS TRUE, and staleness is the test rather than the
-   error. A writer that fails every run and one that stopped being invoked at
-   all produce the same silence, and only `last_ok` sees both. Six hours is
-   chosen against the poll's two-minute schedule and the fact that this reaches
-   him at 08:00: shorter and a quiet Sunday reads as a fault, longer and a
-   Monday outage reaches him on Tuesday.
-
-   It is a fact about his instruments, not a reading of the market, so it goes
-   in plainly and she is told to lead with it — a briefing about gold written on
-   top of a journal that stopped updating is worse than no briefing.
+   The poller and the email function have no voice, and either dying looks like
+   a week he did not trade. sync_health is their heartbeat and this its one
+   reader. Six hours against the two-minute poll: shorter and a quiet Sunday
+   reads as a fault, longer and a Monday outage reaches him Tuesday. A fact
+   about his instruments, so she leads with it.
    ─────────────────────────────────────────────────────────────────────────── */
 const STALE_HOURS = 6;
 
@@ -3174,15 +2132,10 @@ const WRITERS: Record<string, string> = {
   email:  "the fill emails",
 };
 
-/* THE TWO WRITERS CANNOT BE JUDGED THE SAME WAY, and judging them the same way
-   is a monitor that cries wolf until it is ignored. The poller runs every two
-   minutes on a schedule, so its silence IS evidence — nothing ran. The email
-   function runs only when a fill arrives, so its silence is a quiet week, and a
-   staleness rule over it fires on almost every ordinary day.
-
-   So silence is read for the scheduled writer only. What is read for both is
-   the outcome of the LAST run: an error stamped after the most recent success
-   means the thing is failing now, whichever way it is triggered. */
+/* The two writers cannot be judged alike. The poller is scheduled, so its
+   silence is evidence; the email function runs only on a fill, so its silence
+   is a quiet week. Silence is read for the scheduled writer only; the outcome
+   of the LAST run is read for both. */
 const SCHEDULED = new Set(["poller"]);
 
 type Health = {
@@ -3196,8 +2149,8 @@ export function healthLine(rows: Health[], now = Date.now()): string {
 
   const bad = rows.filter(r => {
     const ok = when(r.last_ok), failed = when(r.last_error_at);
-    // Its most recent outcome was a failure. `!(ok > failed)` rather than
-    // `ok < failed` so a writer that has never succeeded still counts.
+    // Last outcome a failure; `!(ok > failed)` also counts a writer that has
+    // never succeeded.
     if (Number.isFinite(failed) && !(ok > failed)) return true;
     return SCHEDULED.has(r.id) &&
       (!Number.isFinite(ok) || now - ok > STALE_HOURS * 3600_000);
@@ -3207,8 +2160,7 @@ export function healthLine(rows: Health[], now = Date.now()): string {
   return "\nHis journal is not being written:\n" + bad.map(r => {
     const name = WRITERS[r.id] ?? r.id;
     const failing = r.last_error_at && !(when(r.last_ok) > when(r.last_error_at));
-    // Two different states and they read differently to him: a writer erroring
-    // is one he can see the reason for, a writer nobody is calling is not.
+    // A writer erroring has a reason he can see; one nobody calls has not.
     return failing
       ? `· ${name} failed at ${stamp(r.last_error_at!)}: ${r.last_error ?? "no detail recorded"}`
       : `· ${name} ${r.last_ok ? `last completed a run at ${stamp(r.last_ok)}`
@@ -3223,9 +2175,7 @@ export async function healthBlock(): Promise<string> {
       `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error,last_error_at` +
       `&order=id.desc&limit=5`,
       { headers: sbHeaders() });
-    // A database without 008 answers 404 here, and that is a supported state:
-    // the feature is inert until the file is applied rather than being a read
-    // that kills the briefing.
+    // Without 008 this is a 404, and the feature is simply inert.
     if (!res.ok) return "";
     return healthLine(await res.json());
   } catch (err) {
@@ -3236,9 +2186,8 @@ export async function healthBlock(): Promise<string> {
 
 type Loop = { id: number; kind: string; body: string; opened_on: string };
 
-// Twenty of each kind would be a backlog rather than a set of open threads. Ten
-// is more than a fortnight of one-a-briefing, and a list longer than that is
-// itself the finding — she has stopped closing them.
+// Ten is more than a fortnight of one a briefing; a longer list is itself the
+// finding — threads have stopped closing.
 const LOOPS = 10;
 
 async function readLoops(): Promise<Loop[]> {
@@ -3247,10 +2196,8 @@ async function readLoops(): Promise<Loop[]> {
     `&closed_on=is.null&order=id.desc&limit=${LOOPS}`);
 }
 
-/* Pure, so a test can read the shape, and the id is carried for the reason a
-   note's is: a thread she cannot name is a thread she cannot close. The two
-   kinds are labelled separately because they close on different evidence — a
-   watch resolves in the world, a question resolves in him. */
+/* The id carried so a thread can be closed; the kinds apart, because a watch
+   resolves in the world and a question in him. Pure. */
 export function loopsList(rows: Loop[]): string {
   if (!rows.length) return "";
   const of = (kind: string) => rows.filter(r => r.kind === kind);
@@ -3276,10 +2223,9 @@ type Release = {
 };
 
 
-/* A BOUND, AND IT KEEPS THE RIGHT END: read earliest first, a day too heavy
-   for it loses the furthest-ahead rows — tomorrow's, which the next briefing
-   reads and `aheadToday` reads for itself. What a bound must not do is read as
-   the whole list, so a full read says it stopped. */
+/* Read earliest first, so a day too heavy for the bound loses the
+   furthest-ahead rows, which tomorrow's briefing reads anyway. A full read
+   says it stopped. */
 const CAL_ROWS = 40;
 
 async function readCalendar(now = Date.now()): Promise<Release[]> {
@@ -3290,35 +2236,16 @@ async function readCalendar(now = Date.now()): Promise<Release[]> {
     `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
-// Times in ET because that is the clock the prompt asks her to speak in, and
-// the one every scheduled thing in this system is kept in.
+// ET, the clock the prompt has her speak in.
 const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(new Date(iso));
 
-/* A LANDED RELEASE READS DIFFERENTLY FROM A PENDING ONE, and rendering them the
-   same way is how a briefing comes to describe a print that has already
-   happened as something to watch for. `actual` present is the whole test. */
-/* A LINE FROM ANOTHER DAY NAMES THE DAY, `positionsList`'s rule for the same
-   reason: a clock time with no date beside it reads as today's. At a day and a
-   morning forward, tomorrow's 08:30 and today's are two identical-looking lines,
-   and last night's 20:00 read as tonight's — `due` on a release that had already
-   happened, where the prompt forbids describing a print as still to come. Today
-   stays bare, or the date is noise on nearly every line.
-
-   AND A ROW WITH NO FIGURE IS NOT DUE ONCE ITS TIME HAS GONE. `due` was
-   whatever lacked an actual, which is every speech, all day — Barkin at 12:30
-   still read as coming at four — and every print whose number TradingView has
-   not published yet. On 1 October it was also her own pre-018 rows for that
-   morning's claims and ISM, beside TradingView's landed copies: one release
-   listed twice, once as landed and once as still ahead, and she said so. A
-   past row says it is past and that no figure is on file, which is true of all
-   three and claims nothing about which.
-
-   AND THE WEEKDAY IS SAID, NOT LEFT TO HER. The week the Sunday briefing opens
-   is laid out a day per label, and a model turning "2 Oct" into a Friday is a
-   calendar sum done in its head — the kind that comes out a day off and reads
-   as certain. */
+/* Three states, by `actual` and the clock: landed, past with no figure — every
+   speech, and any print not yet published — and due. Rendering a past row as
+   due had her describe a print as still to come. A line from another day names
+   the day, or tomorrow's 08:30 and today's read alike, and the weekday is
+   given rather than left to her arithmetic. */
 const weekday = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC', weekday: 'long',
 }).format(new Date(`${iso}T12:00:00Z`));
@@ -3358,19 +2285,11 @@ export async function calendarBlock(): Promise<string> {
 }
 
 /* ─── The week ahead, for the briefing that opens it ───────────────────────
-   THE SUNDAY BRIEFING WAS THE WEEKDAY ONE AT ANOTHER HOUR, AND IT COULD NOT
-   SEE THE WEEK IT OPENS. Its calendar reached CAL_AHEAD, which is Monday
-   evening, and the week was filed by the nightly pass at 22:00 — five hours
-   after the one message that is about it. So a Thursday CPI or a Friday payrolls
-   reached the Sunday briefing only if a search happened to turn it up.
-
-   THE WEEK, AND HIGH ONLY. Seven days of everything medium is most of a page
-   and none of it moves gold alone; the releases TradingView rates high are the
-   ones R-14 stands him aside for, and the ones the week turns on. Medium still
-   reaches him, in each morning's own calendar. It replaces the rolling calendar
-   on a Sunday rather than sitting beside it, because the week already holds
-   every high release the rolling window would and the same print twice is two
-   lines she reads as two things. */
+   The Sunday briefing's rolling calendar reaches Monday evening, so a Thursday
+   CPI reached it only if a search did. It gets the week instead, high only —
+   the releases R-14 stands him aside for — replacing the rolling list rather
+   than sitting beside it, since one print twice reads as two things.
+   ───────────────────────────────────────────────────────────────────────── */
 export function weekQuery(now: number): string {
   const to = new Date(now + 7 * 86_400_000).toISOString();
   return `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
@@ -3389,24 +2308,16 @@ export async function weekBlock(now = Date.now()): Promise<string> {
 }
 
 /* ─── The market around gold ───────────────────────────────────────────────
-   The dollar, the yields, the real yield, silver, oil, the S&P and the VIX,
-   read through doji-tradingview as bars and handed to the two paths that
-   explain gold against them: the briefing, and the move look. Every briefing
-   walks a chain through real yields and the dollar, and until this she quoted
-   both off a search page.
+   The dollar, yields, real yield, silver, oil, the S&P and the VIX, for the
+   briefing and the move look, which explain gold against them.
 
-   EVERY LINE SAYS WHAT ITS NUMBER IS MEASURED FROM, and no change is computed
-   to be said without it. `quoteLine` exists because a move served bare read as
-   "on the day" at 20:57 about a session under four hours old; so each line is
-   a level now beside the level at a stated time, and the window is inside the
-   sentence rather than beside it. The latest bar's time is given too, since a
-   bar is not a tick. The real yield is a daily series published after the
-   fact, and its line says so and gives dates, never times.
+   Every line is a level now beside the level at a stated time, and no change
+   is computed — quoteLine's lesson, applied here. The latest bar's time is
+   given, a bar not being a tick; the real yield is daily and dated.
 
-   NEVER THROWS, for marketBlock's reason, and a failed read is a sentence: a
-   briefing without these lines will reach for a search page, and she is told
-   not to. A symbol TradingView would not serve is named, not left out — an
-   absent line reads as one nobody thought to ask for. */
+   Never throws, and a failed read is a sentence, or she reaches for a search
+   page. A symbol not served is named: an absent line reads as never asked.
+   ───────────────────────────────────────────────────────────────────────── */
 type Around = {
   name: string; unit: string; daily: boolean;
   from: number; since: string; last: number; at: string;
@@ -3448,23 +2359,13 @@ export async function aroundBlock(): Promise<string> {
 }
 
 /* ─── What the market prices for the Fed ───────────────────────────────────
-   The odds fed funds futures put on the next three meetings, worked out in
-   doji-tradingview the way CME's FedWatch works them — and checked against
-   FedWatch on 1 October, where on its own prices the October odds came out
-   identical and December within a point. She searched a page for these before,
-   and a page twice gave her "cut" in a week the Fed had hiked.
-
-   THE FIRST MEETING GETS ITS ODDS AND THE REST GET WHAT IS PRICED BY THEN,
-   because that is where the two ways of stating odds part. FedWatch shows a
-   later meeting as the chance of each RANGE by then, every path to it summed;
-   the fold's odds for it are that meeting's own, given the one before. Both
-   are right and they are different numbers, so a chance quoted for December
-   would read as wrong beside the screen he checks it on. The first meeting is
-   the same both ways, and basis points priced by a date are what both agree on.
-
-   NEVER THROWS, for aroundBlock's reason, and a read refused because the
-   calendar named a meeting the table does not hold is a failed read like any
-   other: odds against a moved meeting are the wrong number. */
+   Worked out in doji-tradingview as FedWatch works them, and checked against
+   FedWatch on 1 October — a page had twice told her "cut" in a week the Fed
+   hiked. The first meeting gets its odds; later ones get the basis points
+   priced by then, because FedWatch's later odds are cumulative and the fold's
+   are conditional, and a December chance would disagree with the screen he
+   checks. Never throws; a refused read is a failed read.
+   ───────────────────────────────────────────────────────────────────────── */
 type Priced = { date: string; move_bp: number; total_bp: number | null; odds: { bp: number; chance: number }[] };
 
 export function ratesList(answer: { meetings: Priced[]; unread: string[] }): string {
@@ -3497,27 +2398,15 @@ export async function ratesBlock(): Promise<string> {
 }
 
 /* ─── What the wires said ──────────────────────────────────────────────────
-   Gold's and the dollar's headlines, handed to the move look: a move with
-   nothing on the calendar behind it is the one look that has to find its own
-   explanation, and it used to start from a web search with no idea what had
-   crossed the wires in the minutes before. On 1 October the Fed vice chair's
-   remarks were on the dollar's feed within minutes of his saying them.
+   Gold's and the dollar's headlines, for the look at a move nothing on the
+   calendar explains. The last hour for the move look — a morning headline
+   explains nothing a quarter-hour old — and six for a conversation. Titles
+   only: most stories are paywalled.
 
-   THE LAST HOUR, AND THE BLOCK SAYS SO — a headline from the morning is not
-   an explanation for a move a quarter of an hour old, and a window left
-   unsaid is one she fills in herself. Titles only, with their time and their
-   source, because most stories are paywalled and a title is all that was read:
-   she is told not to claim what the article says.
-
-   A CONVERSATION ASKS ABOUT THE MORNING, NOT THE LAST QUARTER HOUR, so
-   `get_around` reads six hours. And six hours is a span the feeds may not
-   hold — each is read to a fixed number of headlines — so where the shorter
-   of the two stops inside the span, the block says how far back it reaches:
-   a quiet stretch and an unread one look the same otherwise. A story both
-   feeds carry is folded under the first, so a feed's reach can read as
-   stopping later than it did and never earlier: it says less was read, which
-   is the direction to be wrong in. A line from another day names it,
-   `calendarList`'s rule. */
+   The feeds are read to a fixed count, so where one stops inside the span the
+   block says how far back it reaches; a story both carry can make a feed look
+   to reach later than it did, never earlier. Another day's line names it.
+   ───────────────────────────────────────────────────────────────────────── */
 const WIRES_MIN = 60;
 const WIRES_CHAT_MIN = 6 * 60;
 
@@ -3565,31 +2454,21 @@ export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
 }
 
 /* ─── Where the speculators stand ──────────────────────────────────────────
-   The CFTC's weekly count of COMEX gold futures held by managed money — the
-   hedge funds and commodity funds whose crowding is why a drop can run further
-   than its news. Read straight from the CFTC's public dataset, which needs no
-   credential, so it is the one market read here that does not pass through
-   another function.
+   The CFTC's weekly count of COMEX gold futures held by managed money, whose
+   crowding is why a drop can outrun its news. Public, no credential. A Tuesday
+   count released days later, so the line carries its date, and the year's
+   range beside it, since crowded is relative to its own past.
 
-   A TUESDAY COUNT RELEASED AT THE END OF THE WEEK, AND THE LINE CARRIES ITS
-   DATE. It is days old the moment it lands, and a shutdown has stopped it for
-   weeks before, so the date is what tells her how old it is rather than a
-   staleness rule here guessing for her. The year's range goes beside it
-   because a net long means nothing alone — crowded is a statement about where
-   it sits against its own past.
-
-   THE SUNDAY BRIEFING AND get_around, AND NOT THE MOVE LOOK. It changes once a
-   week, so a weekday briefing would carry the same lines five mornings running;
-   and it cannot say why gold moved in the last quarter hour, which is the only
-   thing the move look asks — handed to it, it is the plausible cause that path
-   is told not to invent. Never throws, for aroundBlock's reason. */
+   The Sunday briefing and get_around, not the move look: it changes weekly,
+   and handed to a look at a quarter-hour's move it is a plausible cause that
+   path is told not to invent. Never throws.
+   ───────────────────────────────────────────────────────────────────────── */
 const COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json" +
   "?cftc_contract_market_code=088691&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52" +
   "&$select=report_date_as_yyyy_mm_dd,m_money_positions_long_all,m_money_positions_short_all," +
   "change_in_m_money_long_all,change_in_m_money_short_all";
 
-// Every figure arrives as a string, which is the dataset's choice and not a
-// failure; one that does not parse is, and the whole answer goes with it.
+// Strings, as the dataset sends them; one that will not parse refuses all.
 type Cot = {
   report_date_as_yyyy_mm_dd: string;
   m_money_positions_long_all: string; m_money_positions_short_all: string;
@@ -3632,29 +2511,14 @@ export async function positioningBlock(): Promise<string> {
 }
 
 /* ─── What he has on, and where his day stands ─────────────────────────────
-   THE ONE THING SHE COULD NOT SEE. Every other block is about the market or
-   about what he understands, and none of them said whether he is exposed right
-   now — so a briefing could open on an observation about a level while he sat
-   in a position through the print it was describing, and nothing about that
-   read as wrong from anywhere. Six of the seven paths get it, because the
-   message that talks past a live trade is whichever one happens to be next —
-   postTradeEvent is the exception and is reached FROM the position it would
-   otherwise be told about.
+   Whether he is exposed right now, which no other block said — so a briefing
+   could talk about a level he was sitting in a position through. Six paths;
+   postTradeEvent is reached from the position itself.
 
-   ONE READ AND TWO FILTERS, because each half misses the other. An overnight
-   hold is not in today's rows and today's closed trades are not open; either
-   filter alone answers half the question. PostgREST's `or=` asks both at once,
-   and dayStanding does its own civil-day filter over what comes back.
-
-   THE CIVIL DAY IS READ ONCE AND PASSED IN, not taken from the clock at each
-   use. Two reads a few milliseconds apart are the same date every night but
-   one, and on that night the filter would fetch one day while the standing was
-   computed for the next — a wrong day's P&L, once a year, from code that looks
-   right.
-
-   `select=*` rather than the column list, which is the exception here and has a
-   reason: eugenia_trades exists precisely to BE the list of what she may see, so
-   naming the columns again would be a fourth copy of it that nothing compares.
+   One read, two filters, since an overnight hold is not in today's rows and
+   today's closes are not open. The civil day is read once and passed in, or
+   one night a year the filter and the standing straddle midnight. `select=*`
+   because the view IS the list of what she may see.
    ───────────────────────────────────────────────────────────────────────── */
 async function readDesk(day: string): Promise<TradeRow[]> {
   return readRows<TradeRow>('Desk',
@@ -3663,29 +2527,13 @@ async function readDesk(day: string): Promise<TradeRow[]> {
     `&order=entry_time.desc&limit=50`);
 }
 
-/* THE MARK CARRIES ITS AGE AND NO UNREALISED FIGURE IS COMPUTED, which is one
-   decision rather than two. eugenia_price is rewritten quarter-hourly, so the
-   nearest price she holds can be fifteen minutes old — and an unrealised P&L
-   would be both the most anchoring number in this block and the one that
-   staleness gets most wrong. Entry and mark, each labelled as what it is, let
-   her do the subtraction when he asks and leave nothing pre-computed to lean on
-   when he does not.
-
-   A NULL FIELD IS SAID RATHER THAN PRINTED. Every column here is nullable and a
-   journal row he opened by hand carries almost none of them, so an unguarded
-   template puts `from null` in front of her — which reads as a price.
-
-   AND AN ENTRY FROM ANOTHER DAY SAYS WHICH DAY. This read an hour and a minute
-   and nothing else, so a position opened on Monday and still open on Wednesday
-   reached her as `open since 09:15 ET` — a clock time with no date against it,
-   in a block headed by what he has on RIGHT NOW. There is only one way to read
-   that and it is the wrong one. The summary calls his positions "intraday to
-   MULTI-SESSION" and R-15 bounds them at the Friday close rather than at
-   midnight, so a hold spanning days is a shape he trades rather than an edge
-   case — and the failure is a confident wrong fact about his own position,
-   which is the worst place in this block for one. Today stays bare, because
-   naming the date on every intraday fill would bury the one line where it
-   matters. */
+/* The mark carries its age, and no unrealised P&L is computed: the price can be
+   fifteen minutes old, and that figure would be the most anchoring number here
+   and the one staleness gets most wrong. Entry and mark, labelled; she
+   subtracts if asked. A null field is said, never printed — `from null` reads
+   as a price. An entry from another day names the day: his holds run
+   multi-session, and `open since 09:15 ET` on Wednesday for a Monday fill is a
+   confident wrong fact about his own position. Today stays bare. */
 export function positionsList(
   open: TradeRow[], standing: Standing | null, mark: Mark | null, now = Date.now(),
 ): string {
@@ -3699,11 +2547,8 @@ export function positionsList(
     const what = [t.direction, t.size_oz != null ? `${t.size_oz}oz` : null]
       .filter(Boolean).join(" ") || "side and size not recorded";
     const from = t.entry_price != null ? ` from ${t.entry_price}` : "";
-    /* WHICHEVER SIDES WERE SEEN, AND NEVER AN ABSENCE. The poller records each
-       column the first time it sees one, so a stop-only entry now carries its
-       stop — which requiring the pair used to throw away. A null is still not
-       "he set none": it is equally a position the poller never saw open, and
-       nothing here can tell those apart, so the missing half is not named. */
+    // Whichever sides were seen, and never the absence: a null is equally "he
+    // set none" and "never seen open".
     const seen = [
       t.planned_sl != null ? `stop ${t.planned_sl}` : null,
       t.planned_tp != null ? `target ${t.planned_tp}` : null,
@@ -3712,8 +2557,7 @@ export function positionsList(
     return `· ${since} — ${what}${from}${plan}`;
   });
 
-  // Only beside a position: the mark is what she would subtract the entry from,
-  // and on a flat day it is a price with nothing to be a price OF.
+  // Only beside a position; on a flat day it is a price of nothing.
   if (lines.length && mark) {
     lines.push(`· gold was ${mark.bid} ` +
                `${Math.round((now - Date.parse(mark.at)) / 60_000)} minutes ago`);
@@ -3731,41 +2575,19 @@ export function positionsList(
     : "";
 }
 
-/* THE MARK IS CAUGHT SEPARATELY, and that is the point of catching it at all: a
-   price she cannot read costs one line, where the outer catch would cost her the
-   position itself. Read only when something is open, which on most days is not
-   at all. */
-/* WHAT COUNTS AS OPEN, AND IT IS NOT ONE COLUMN. `fill_time` is written by the
-   email and by the poller's writeFill — and the poller stamps only the closes
-   its fold window reaches, so a close older than that with no alert behind it
-   carries an `exit_price` and a null `fill_time` for good. What the poller
-   records on every close is `exit_price`, off the broker's own deals.
-
-   Read off `fill_time` alone, a position that closed without an alert email
-   landing — a manual close, R-15's Friday close-out, a parse that failed —
-   kept reading as open, and this block told him he was in a trade for ever.
-   It did it while citing R-19 and R-15 at him about a position that had not
-   existed since Wednesday, which is the worst thing this block can do: it is the
-   one place she speaks with his own rules behind her.
-
-   Closed on EITHER witness, therefore. Two independent sources see the close and
-   either one is enough — the same shape as `balance` and `direction`, the two
-   columns this schema already arbitrates. A row the poller folded without its
-   entry deal carries a null `exit_price` on a closed trade, and the email
-   catches that one; a close with no email is caught by the poller. Only a row
-   neither has closed is open.
-
-   AND BROKER ROWS ONLY. Pre-sync rows carry client ids, no entry_time and no
-   exit_price, so every one of them read as an open position — permanently, in
-   the same list. `dayStanding` has always filtered them and this never did.
-
-   Exported because it is the decision, and because the filter was the half no
-   test could reach: `positionsList` is pure and was driven from both sides for
-   its whole life, on rows a caller had already decided were open. It renders
-   what it is handed, correctly, and the mistake was upstream of it. */
+/* Open is BOTH witnesses null. fill_time comes from the email and from the
+   poller's writeFill, which stamps only closes its fold window reaches; what
+   the poller records on every close is exit_price. Read off fill_time alone, a
+   close with no alert stayed open for ever, and this block cited R-19 and R-15
+   at him about a position gone since Wednesday. Either witness closes it — the
+   shape balance and direction use. Broker rows only: pre-sync rows carry
+   neither column. Exported because the filter was the half no test reached;
+   positionsList renders correctly whatever it is handed. */
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
 
+// The mark is caught on its own, so a price she cannot read costs one line
+// rather than the position; read only when something is open.
 export async function positionsBlock(): Promise<string> {
   try {
     const day = nyDate(new Date());
@@ -3783,31 +2605,9 @@ export async function positionsBlock(): Promise<string> {
 
 /* ─── The cron half: the briefing, and the quieter second look ───────────── */
 
-// pg_net is fire-and-forget and never retries, so this half may take as long as
-// it takes — the timeout in the cron job only has to outlast the work. That is
-// the whole difference between this caller and Telegram's.
-//
-// The hourly job asks dueNow which of its schedules this hour owes, if any; the
-// two quarter-hourly senses and the person's repair doors each name theirs with
-// a flag. ?force=1 runs a briefing now, ?pulse=1 a pulse and ?consolidate=1 the
-// nightly pass, whatever the clock says — the same flag doji-mcp-sync carries, for the
-// same two jobs: a manual re-run after a failure, and a way to exercise the path
-// without waiting for the hour. ?consolidate=1 is also the only way to SEE what
-// the nightly pass does, since it sends nothing and stores no turn.
-// The answer comes back in the response as well as in Telegram, which is what
-// makes a failure readable.
-/* WHAT THE APOLOGY IS ABOUT, and it used to be a lie four times out of five.
-
-   Every scheduled failure said "No briefing, jefe" — including a pulse, the
-   nightly pass, a release look and a trade event. So a consolidation that died
-   at 22:00 reported itself to him as a missing briefing, sending him to look
-   for the wrong thing at the wrong time of day; and the failure whose actual
-   symptom is that her memory stops growing was described as the one whose
-   symptom is a message that never arrived.
-
-   A map rather than a ternary chain, for the reason SAID is one: these are
-   words paired with the job names above them, and a reader should be able to
-   enumerate them. */
+/* The apology names the job. Every failure once said "No briefing", so a
+   nightly pass that died — whose symptom is a memory that stops growing — sent
+   him looking for a missing message. A map, so the words can be enumerated. */
 export const APOLOGY: Record<string, string> = {
   briefing:     "No briefing, jefe — something broke on my side.",
   pulse:        "My second look at the morning broke, jefe. Nothing is wrong with the briefing.",
@@ -3821,37 +2621,32 @@ export const APOLOGY: Record<string, string> = {
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
 
+/* The scheduled half. The hourly job asks dueNow what this hour owes; the
+   data-driven senses and the repair doors each name theirs with a flag.
+   ?force=1, ?pulse=1 and ?consolidate=1 run now whatever the clock says — a
+   re-run after a failure, and the only way to see the nightly pass, which
+   sends nothing. */
 async function postScheduled(url: URL): Promise<Response> {
-  // Named before the work so the catch can say which job died. Defaulted to the
-  // briefing because that is what an unlabelled failure most likely is, and
-  // because the old message is the right one for it.
+  // Named before the work so the catch can say which job died.
   let job = 'briefing';
   try {
     if (url.searchParams.get("pulse") === "1")       { job = 'pulse';       return await postPulse(); }
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
-    /* THE TWO DATA-DRIVEN SENSES, EACH BEHIND ITS OWN DOOR. Their cron jobs
-       call nothing else, which is also how either is exercised by hand without
-       waiting for a print or a move. They are deliberately not folded into
-       dueNow: it decides from the clock, and these decide from a table. */
+    // The data-driven senses, each behind its own door: decided by a table,
+    // not by the clock, so not in dueNow.
     if (url.searchParams.get("release") === "1")     { job = 'release';     return await postRelease(); }
     if (url.searchParams.get("move") === "1")        { job = 'move';        return await postMove(); }
 
-    /* THE BACKFILL, AND NO CRON JOB CALLS IT. The archive is filled in by hand
-       — call it until it answers `left: 0` — and the trickle a failed vendor
-       call leaves behind is swept by the nightly pass, which already runs and
-       already sees the day. A schedule of its own would be a job doing nothing
-       every hour for the one night a year it had something to do. */
+    // The backfill, called by hand until `left: 0`; the nightly pass sweeps
+    // the trickle a failed vendor call leaves.
     if (url.searchParams.get("embed") === "1")       { job = 'embed';       return await postEmbed(); }
 
-    /* THE CALENDAR'S HISTORY, AND NO CRON JOB CALLS IT EITHER. R-14 and R-19
-       can judge only weeks a whole-week fetch landed for, and the nightly pass
-       starts from the week it first runs in — so the weeks he has already
-       traded are walked once, by hand, from the date given. */
+    // The calendar's history, walked once by hand: R-14 and R-19 judge only
+    // weeks a whole-week fetch covered.
     const history = url.searchParams.get("history");
     if (history) { job = 'history'; return await postHistory(history); }
 
-    // The briefing's second half, opened by postBriefing and by a person
-    // re-sending a briefing that was stored and never reached him.
+    // The briefing's speaking worker, or a person re-sending a stored briefing.
     const speak = url.searchParams.get("speak");
     if (speak) { job = 'speak'; return await postSpeak(speak); }
 
@@ -3860,10 +2655,7 @@ async function postScheduled(url: URL): Promise<Response> {
       return await postBriefing(briefDue(now) ?? briefKind(now));
     }
 
-    // Which hours turn on this is dueNow's rule and is stated there once; a
-    // caller deciding when to bother asking would be the same rule again. Both
-    // reads are one row each and neither depends on the other, so they go
-    // together rather than one after the other.
+    // Which hours these matter in is dueNow's rule, stated there once.
     const [briefed, consolidated] = await Promise.all([briefedToday(), consolidatedToday()]);
     const due = dueNow(now, briefed, consolidated);
     if (due === 'pulse')       { job = 'pulse';       return await postPulse(); }
@@ -3876,34 +2668,16 @@ async function postScheduled(url: URL): Promise<Response> {
   }
 }
 
-/* HOW A JOB THAT DIED BEHIND A 200 SAYS SO, for both of the callers that answer
-   before they work: everything scheduled, and the trade event. The trade event
-   is the one message with no retry anywhere behind it, and it had `APOLOGY.trade`
-   written for it and no path that ever sent it — a read that failed before its
-   model call reached a console and nothing else, which is the absence this whole
-   function exists to end, on the one path it did not reach. */
+/* How a job that died behind a 200 says so — everything scheduled, and the
+   trade event, which has no retry behind it. pg_net discards the response and
+   nobody reads the console, so the message is how he finds out. */
 async function jobFailed(job: string, err: unknown): Promise<Response> {
   const why = err instanceof Error ? err.message : String(err);
   console.error("doji-eugenia:", why);
-  /* THE ONLY WAY HE FINDS OUT, and it took a missing briefing to earn this.
-
-     pg_net discards this response, the console is not somewhere anyone looks,
-     and net._http_response is pruned within hours — so a briefing that died
-     at 08:00 was invisible by lunchtime and the way it surfaced was him
-     noticing nothing had arrived. Silence is the worst thing this system can
-     do, and it had three separate ways of doing it.
-
-     AND THE ROW GOES DOWN FIRST, BEFORE THE MESSAGE, because the message is
-     the half that can fail. ask() records a failed turn, so eugenia_runs
-     could answer "how often does a model call die" — and could say nothing at
-     all about a job that died BEFORE reaching one. Two consolidations died in
-     `turnsSince`, one line into postConsolidation, apologised to him twice and
-     left the table with no row on either night: read afterwards it showed a
-     system that had simply had nothing to do. The apology below is swallowed
-     on failure, deliberately, so a Telegram that is refusing takes the notice
-     with it and leaves nothing anywhere; this is what survives that. `job` is
-     the apology's own vocabulary rather than ask()'s labels, and suffixed so
-     the two can never be confused in a table read months later. */
+  /* The row first, because the message can fail and its catch swallows that:
+     a job that dies before its first model call otherwise leaves no row, and
+     the table reads as a system with nothing to do. `<job> job`, so it is never
+     confused with an ask() label. */
   await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
 
   await tg("sendMessage", {
@@ -3913,21 +2687,13 @@ async function jobFailed(job: string, err: unknown): Promise<Response> {
   return json({ ok: false, error: why, job }, 500);
 }
 
-/* What postBriefing stores instead of the text it sent. One definition, because
-   a retry that could not spot yesterday's shape would send a second briefing
-   every morning. */
+/* What postBriefing stores in place of the text: one definition, or a retry
+   misses yesterday's shape and sends a second briefing. */
 export const briefingMarker = (due: Brief) => `[${due} briefing]`;
 
-/* THE MARKER IS FOUND BY THE DATABASE, NOT BY SCANNING A WINDOW OF TURNS.
-
-   Reading the last thirty user turns and looking for it among them is right on
-   a quiet morning and wrong on a busy one: thirty messages between 08:00 and
-   09:00 push the marker out of that window, the retry concludes no briefing was
-   sent, and generates and sends a second one — a dozen searches at high effort
-   and a duplicate he did not ask for. Filtering on the marker itself is exact
-   whatever was said around it, and returns one row rather than thirty.
-
-   Exported because it is the decision, the same reason tradesQuery is. */
+/* Found by filtering on the marker, not by scanning recent turns: thirty
+   messages in an hour pushed it out of the window and the retry sent a second
+   briefing. Exported because it is the decision. */
 export function briefedQuery(): string {
   const markers = [briefingMarker('weekday'), briefingMarker('sunday')]
     .map(m => `"${encodeURIComponent(m)}"`).join(',');
@@ -3935,21 +2701,10 @@ export function briefedQuery(): string {
          `&order=id.desc&limit=1`;
 }
 
-/* Whether a briefing has already landed today, read off the marker
-   postBriefing stores in place of the sent text. It is written just BEFORE the
-   send, so it exists whenever a briefing was generated — which is the question
-   worth asking here, because the expensive half is the generation and a retry
-   that duplicates it is the failure this guards.
-
-   The day comparison is done HERE, in New York, rather than as a timestamp
-   filter in the query. A `created_at=gte.<date>T00:00:00-05:00` would be an
-   hour wrong for half the year, which is the same mistake briefDue and
-   marketOpen exist to avoid; asking Intl for the civil day of the row is
-   correct in both halves.
-
-   A read failure counts as "yes, already briefed": if the database is unwell
-   the retry cannot check, and sending a second briefing on a guess is worse
-   than skipping one. */
+/* Whether today's briefing was generated — the marker goes down just before
+   the send, and generation is the expensive half. The day is compared in New
+   York here, never as a timestamp filter an hour wrong half the year. A failed
+   read counts as yes: a second briefing on a guess is worse than none. */
 async function briefedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ created_at: string }>('Briefing marker',
@@ -3964,20 +2719,10 @@ async function briefedToday(): Promise<boolean> {
 
 
 /* ─── The feedback keyboard ────────────────────────────────────────────────
-   An instruction note is the only correction channel he has, and it is a good
-   one — but it fires only when something annoys him enough to type. On every
-   ordinary morning there is no signal at all, so the nightly pass judges her
-   own output with no evidence about how any of it landed.
-
-   Two taps is the cheapest real evidence there is, and the mechanism is already
-   proven in this system: Gladys has drawn an inline keyboard and answered its
-   taps since she shipped. `callback_data` stays far under the 64-byte cap for
-   the same reason hers does — it is the entire state a tap carries.
-
-   IT IS NOT A SCORE AND MUST NOT BECOME ONE. The pass reads it as one input
-   beside the day's turns; a bot optimising an average would start writing
-   briefings that flatter rather than teach, which is the failure the
-   prohibitions exist to prevent.
+   Two taps, the cheapest evidence of how a morning landed — an instruction
+   note fires only when something annoys him enough to type. Gladys's
+   mechanism; callback_data far under its 64 bytes. Never a score: a bot
+   optimising an average writes briefings that flatter rather than teach.
    ───────────────────────────────────────────────────────────────────────── */
 export const feedbackKeyboard = (day: string) => ({
   inline_keyboard: [[
@@ -3987,59 +2732,23 @@ export const feedbackKeyboard = (day: string) => ({
 });
 
 /* ─── The second read of the day's one expensive artifact ──────────────────
-   The briefing is researched and written in a single generation, and its
-   quality target lives in prose on the far side of a model call where no test
-   can hold it. That is not a theory about what might go wrong: unmeasured, the
-   briefing grew by a sixth and the way it surfaced was somebody counting the
-   characters by hand.
+   The briefing's quality rules live in prose past a model call, where no test
+   reaches — unmeasured, it grew by a sixth. So it is read once more against
+   them before sending.
 
-   So it is read once more before it is sent, against the rules it was written
-   to — the length, the first sentence being true only today, a term built at a
-   rung that no longer needs it, a chain missing a link. One extra round at
-   medium effort on one artifact a day.
+   The critic is handed his notes and the channel map: asked to enforce his
+   instructions and whether a term was already explained without them, it
+   skipped the first and answered the second from the paragraph in front of
+   it — cutting the build-up the writer had just been told to include. Both are
+   already awaited; agree.test.mjs holds the call site.
 
-   IT IS HANDED HIS NOTES AND THE MAP, AND IT WAS ASKED TO ENFORCE THEM WITHOUT
-   THEM. Its last check is whether the briefing obeys his standing instructions,
-   which are in notes it was never given, and its second was whether a term had
-   already been explained — a fact about last week that a reader of one message
-   cannot possibly hold. Both read as working rules and neither could fire: the
-   first was skipped, and the second was answered from the only evidence in the
-   room, which is the mechanism sitting in the paragraph being judged. So the
-   pass that runs LAST cut the build-up the writer had just been told to put in,
-   every morning, and what he read was the term bare — the exact failure the
-   ladder exists to prevent, arriving after the ladder had been obeyed.
-
-   Both blocks are already awaited in postBriefing, so this costs no read and no
-   round trip. `agree.test.mjs` holds the call site, because a critic missing
-   them still returns a briefing and the briefing still looks right.
-
-   IT CANNOT MAKE THINGS WORSE, AND THAT IS ENFORCED RATHER THAN TRUSTED. A
-   critic that returns nothing, returns an apology, or returns something twice
-   the length has failed, and the draft it was given is better than whatever it
-   did — so the draft goes out. Same direction as the pulse's `isSilent`: the
-   failure that costs a message is worse than the failure that sends the
-   original one. */
-/* RELATIVE, BECAUSE THE GATE NOW READS THREE-SENTENCE MESSAGES TOO. It was a
-   flat four hundred characters — a briefing that came back shorter than that
-   was an apology, and the draft went instead. Applied to a release look, which
-   is two or three sentences and often under four hundred to begin with, that
-   floor rejects almost every revision there is: the gate would run, be paid
-   for, and be overruled every time, and it would look exactly like a gate that
-   agreed with the draft.
-
-   A third is the same judgement made scale-free. On a briefing it is stricter
-   than the four hundred ever was; on a short message it still catches the
-   apology, which is the shape it exists for.
-
-   THE CEILING IS EACH GATE'S OWN, BECAUSE ONLY ONE OF THEM MAY ADD. The critic
-   puts back a missing link or a missing verdict, so a briefing can legitimately
-   grow; twice the draft is where that stops being an edit. `TRIM` checks how a
-   short message is written and is told to change nothing else, so it cuts and
-   swaps words and never builds. Twice was its ceiling too, and on 30 September
-   it returned 852 characters for a 541-character reply — its own notes on the
-   message ("this message looks fine as is…") above the message itself, sent to
-   him and stored as hers. Every other revision it made that fortnight sat
-   within a tenth of the draft. */
+   It cannot make things worse. keepDraft is relative — a third of the draft
+   catches the apology on a short message as well as a long one, where a flat
+   floor overruled every revision and looked like agreement. The ceiling is
+   each gate's own: the critic may add a missing link or verdict, so twice the
+   draft; TRIM only cuts and swaps, and once returned its own notes above the
+   message at 852 characters for 541.
+   ───────────────────────────────────────────────────────────────────────── */
 export const TRIM_MOST = 1.25;
 
 export function keepDraft(draft: string, revised: string, most = 2): boolean {
@@ -4052,52 +2761,23 @@ async function critique(draft: string, notes: string, channels: string, desk: st
   return await gate(draft, `${CRITIC}${notes}${channels}${desk}${story}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
 }
 
-/* THE SAME GATE ON THE MESSAGES THE CRITIC NEVER REACHED. `CRITIC` runs on the
-   briefing alone, so the pulse, the release look and the move look went out
-   unreviewed for their whole lives — which is most of what he receives in a
-   week, and it is where he was reading her and finding her hard. The rules were
-   live and global on those paths and nothing had to answer for them.
+/* The gate on the messages the critic never reached — most of what he gets in
+   a week. TRIM asks only the writing questions; the briefing's checks would
+   ruin three sentences, and it needs no notes or map. It is handed his
+   position and the story, since a read on price turns on the first and a
+   direction is checked against the second.
 
-   `TRIM` asks the writing questions and nothing else: the briefing's own checks
-   are about a chain, a first sentence true only today and a word count, and
-   asked of three sentences they would rewrite a good message into a bad one. It
-   is handed no notes and no channel map, because it is not judging whether a
-   term was built — only whether the sentences obey the rules she writes by.
-
-   IT IS HANDED WHAT HE HAS ON, AND THE STORY SHE HAS BEEN CARRYING. Her read
-   on price is allowed and a view while he is in a position is not, so the gate
-   cannot tell a compliant message from a breaking one without the block that
-   says which it is. And the story is what says which way things are going, the
-   one fact a gate checks rather than a way of writing. Every caller already
-   awaited both for the writer.
-
-   AND WHAT IT RETURNS IS WHAT GETS REMEMBERED, WHICH IS WHY THE THREE CALLERS
-   BIND IT. The draft is what `ask()` produced; the revision is what he read.
-   Storing the draft files a message he never saw as her own words, and hands it
-   back to her as history for the next six exchanges — the stale-copy failure
-   `remember` already refuses for the notes and the week's trades, arriving
-   through the door this gate opened. The briefing never had it: it stores what
-   `critique` returned. The three that GAINED a gate kept storing the draft for
-   as long as they had one. */
+   What it returns is what is remembered: storing the draft files words he
+   never read as hers, resent as history. The three callers bind it. */
 async function trim(draft: string, desk: string, story: string): Promise<string> {
   return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }
 
-/* ONE BODY, BECAUSE THE TWO GATES DIFFER ONLY IN WHAT THEY ASK. Everything that
-   makes a gate safe is the same for both and is the part that must never be
-   copied: a revision that fails `keepDraft` is overruled, and a gate that
-   THROWS costs nothing at all. Both were stated once and would have been stated
-   twice the moment a second gate existed.
-
-   AND WHAT IT DECIDED IS A ROW, BECAUSE IT WAS A CONSOLE LINE. The first days
-   with a gate on every path showed the paragraph rule broken in nearly every
-   message that passed through one — five, six, seven sentences where `WRITING`
-   says three or four — and nothing could say why. `ask` records that the gate
-   RAN; whether it then sent its revision, sent the draft back untouched, or
-   was overruled by `keepDraft` went to a log nobody reads. Those are three
-   different repairs, and a gate paid for on every message whose effect cannot
-   be seen is the cheap-half meter again. One verdict per gated message, on
-   every outcome including the one that threw, so the rows count the messages. */
+/* One body, because what makes a gate safe must never be copied: a revision
+   keepDraft refuses is overruled, and a gate that throws costs nothing. Every
+   outcome is a verdict row — revised, unchanged, overruled, or failed — since
+   whether a gate changed anything was a console line, and the paragraph rule
+   failed through every gate for days with nothing able to say why. */
 async function gate(draft: string, asked: string, label: string, most?: number): Promise<string> {
   const caller = `${label} verdict`;
   try {
@@ -4121,27 +2801,15 @@ async function gate(draft: string, asked: string, label: string, most?: number):
   }
 }
 
-/* THE BRIEFING READS ITS OWN HISTORY, which it did not until now — it wrote to
-   eugenia_turns and never read back, so every morning started from nothing and
-   she could not know what she had said the day before, whether it landed, or
-   that she had already explained a term twice this week. Continuity is most of
-   what separates a person from a feed.
-
-   The stored user turn is a marker, not the sent text: the notes and the week's
-   trades are rebuilt fresh every morning, and storing them would resend a stale
-   copy as history for the next six briefings. */
+/* The briefing reads its own history, so a morning continues from the last
+   rather than starting from nothing. The stored user turn is a marker, not the
+   sent text, which is rebuilt every morning and would resend stale as history. */
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
-  /* Filed before the reads, so the calendar she is handed is this morning's —
-     and on a Sunday the whole week, which the nightly pass would otherwise file
-     five hours after the one briefing that is about it. The week holds every
-     row the rolling window would. */
+  // Filed before the reads, so she is handed this morning's calendar — and on a
+  // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
-  /* EVERY READ THE BRIEFING NEEDS, AT ONCE. They are independent and they are
-     all small, and run one after another they were a round trip each before the
-     first token was asked for. Promise.all is the same argument the tool
-     dispatch makes: a batch should cost its slowest member — which here is the
-     price, since that one leaves the project for the broker. */
+  // Every read at once: independent and small, so the batch costs its slowest.
   const [price, around, rates, crowd, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
     await Promise.all([
       marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", notesBlock(),
@@ -4152,44 +2820,30 @@ async function postBriefing(due: Brief): Promise<Response> {
   const asked = (due === 'sunday'
     ? "Today's briefing, please. It is Sunday evening and the gold week is about to open."
     : "Today's briefing, please.")
-    // `health` first: if the journal stopped being written, everything after it
-    // is computed over rows that may be missing, and she is told to lead with it.
+    // `health` first: if the journal stopped, everything after it may be
+    // missing rows.
     + health + price + around + rates + crowd + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);
   const brief = await critique(draft, notes, channels, desk, story);
 
-  /* THE LENGTH IS LOGGED BECAUSE NOTHING ELSE CAN SEE IT, and it matters more
-     now that the cap is off. The prompt holds the market half near nine hundred
-     characters and lets the teaching run — a figure that lives in prose, on the
-     far side of a model call, where no test can hold it. Unmeasured, the
-     briefing once grew by a sixth and the way it surfaced was someone counting
-     by hand. What this number can no longer tell you on its own is WHY it grew:
-     a briefing that built a term and one that padded look the same from here. */
+  // The length lives in prose past a model call, where nothing else sees it.
   console.log(`doji-eugenia: ${due} briefing — ${brief.length} characters`);
 
-  /* THE MARKER GOES DOWN BEFORE THE SEND, and the order is the whole point.
-     Written after, a remember() that fails leaves a briefing delivered, an
-     apology saying none arrived, and no marker — so 09:00, 10:00 and 11:00 each
-     generate and send another one. Four briefings and four times the bill, from
-     one failed insert.
-
-     Written first, the failure mode inverts: a send that fails after the marker
-     lands costs the retry rather than duplicating it, and he is told. Losing a
-     briefing is cheaper than sending four. */
+  /* The marker goes down before the send. After, a failed insert leaves a
+     delivered briefing unmarked and each retry sends another: four briefings
+     from one failure. Before, a failed send costs the retry instead, and he is
+     told. */
   const checked = Date.now();
   await remember([{ role: 'user', content: briefingMarker(due) },
                   { role: 'assistant', content: brief }]);
   const stored = Date.now();
 
-  /* HANDED TO A SECOND WORKER TO SPEAK, so the voice has a clock of its own —
-     see SPEAK_WORKER_MS. The door answers before it works, so a 2xx here says
-     the worker started and nothing about the voice; postSpeak writes the
-     delivered row once he has it. A worker that would not start — a refused
-     boot, a 546 — is what this checks for, and then the briefing is spoken
-     here, as it was before there were two: losing the second worker must
-     never be losing the briefing. */
+  /* Handed to a second worker to speak, on its own clock. A 2xx says only that
+     it started; postSpeak writes the delivered row. A worker that would not
+     start — a 546 — and the briefing is spoken here instead: losing the second
+     worker must never lose the briefing. */
   const handed = await fetch(`${SB_URL}/functions/v1/doji-eugenia?speak=${due}`, {
     method: "POST", headers: { "x-doji-key": CRON_SECRET },
   }).then(async res => { await res.body?.cancel(); return res.ok ? null : `HTTP ${res.status}`; },
@@ -4204,19 +2858,8 @@ async function postBriefing(due: Brief): Promise<Response> {
 
   const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
 
-  /* A THIRD ROW, AND IT IS THE ARTIFACT RATHER THAN A CALL. ask() has already
-     written one row for the draft and one for the critic — what each of them
-     cost, which is the question a bill asks. This one says what he actually
-     received and how long the whole thing took, which is the question a reader
-     asks. Keeping them apart is what makes "the critic is costing more than it
-     is worth" and "the briefing is drifting long again" two separate answerable
-     questions rather than one blurred figure.
-
-     AND WHAT CAME AFTER THE CRITIC IS SPLIT, because it was the one stretch no
-     row could see. Both model calls have rows of their own; storing the turn
-     embeds it, and speaking it is a vendor call and an upload per part — so
-     the Sunday that took 315s had 155s between the critic's row and this one,
-     where Monday's took 20, with nothing to say which half it was. */
+  // The artifact's row, apart from the two calls': what he received and how
+  // long it all took, with the stretch after the critic split out.
   const spoken = Date.now();
   await recordRun({
     caller: `${due} briefing delivered`, chars: brief.length,
@@ -4227,21 +2870,12 @@ async function postBriefing(due: Brief): Promise<Response> {
   return json({ ok: true, brief: due, chars: brief.length });
 }
 
-/* THE SECOND WORKER: TODAY'S STORED BRIEFING, SPOKEN ON A CLOCK OF ITS OWN.
-   Found the way the retry finds it — by the marker — and paired with its text
-   by the instant the two were written. They go in as one INSERT and share
-   `created_at` to the microsecond, where a turn written by anything else in
-   between would carry its own; adjacent ids would not be proof of that.
-
-   Today's only, because the door is also a repair a person can open: a
-   briefing that was stored and never reached him is sent again with
-   `?speak=weekday`, and yesterday's would arrive as this morning's.
-
-   THE DELIVERED ROW IS WRITTEN HERE NOW, after the send, because it is the
-   statement that he has it: 010 reads its absence as a briefing that never
-   arrived. `ms` is this worker's own time, and `written` is the other's.
-   Exported so the sequence — find, pair, speak, record — is driven rather than
-   read: the pairing is the half a wrong filter would get silently wrong. */
+/* The second worker: today's stored briefing, found by its marker and paired
+   with its text by the instant they were written in one INSERT — adjacent ids
+   would not prove that. Today's only, since the door is also a person's repair
+   and yesterday's would arrive as this morning's. The delivered row is written
+   here, after the send: 010 reads its absence as a briefing that never came.
+   Exported so find, pair, speak, record is driven. */
 export async function postSpeak(due: string): Promise<Response> {
   if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
   const opened = Date.now();
@@ -4266,58 +2900,26 @@ export async function postSpeak(due: string): Promise<Response> {
   return json({ ok: true, spoke: due, heard });
 }
 
-/* How silence is said, since a tool call cannot express "do not send this".
-
-   The whole reply, not a prefix: told to answer with one word a model will
-   sometimes add a full stop, and "NOTHING." means the same thing. But "Nothing
-   much has changed except gold is up forty" is news wearing the word, so it
-   goes through. Erring toward sending is the right direction — a swallowed
-   message is invisible, an extra one is merely an extra one.
-
-   Exported because a pulse that could never go quiet would message him every
-   weekday whether or not anything happened. */
+/* How silence is said. The whole reply, allowing a full stop; "Nothing much
+   has changed except…" is news and goes through. Err toward sending: a
+   swallowed message is invisible. */
 export const isSilent = (text: string) => /^nothing[.!\s]*$/i.test(text.trim());
 
-/* A quiet look, whose right answer is usually nothing at all.
-
-   Nothing is stored when she stays quiet. Twelve turns is the whole window, and
-   a week of "NOTHING" pairs would push the morning's briefing out of it — the
-   one thing a follow-up question actually needs. */
 /* ─── The nightly pass ─────────────────────────────────────────────────────
-   Twelve turns roll over in a morning. Without this, everything a conversation
-   established is reachable only by search and only if someone thinks to look —
-   so what she KNOWS never grows, however much she has been told.
-
-   A FIXED TWENTY-FOUR HOURS, and no watermark anywhere. The window and the gap
-   between runs are the same length, so a run reads exactly the day that has not
-   been read. A missed night loses that day's distillation and never the day
-   itself: the turns stay in the table and stay searchable, which is precisely
-   what makes a lossy pass safe to run unattended.
-
-   NOTHING IS SENT AND NOTHING IS STORED AS A TURN. Her reply here is a line for
-   the log, not a message — and storing it would spend two of the twelve turns
-   she opens tomorrow on bookkeeping she wrote to herself.
+   Without it, what a conversation established is reachable only by search, and
+   what she knows never grows. A fixed twenty-four hours, no watermark — the
+   window and the gap are the same. Nothing is sent and nothing is stored as a
+   turn, which would spend two of tomorrow's twelve on bookkeeping.
    ───────────────────────────────────────────────────────────────────────── */
 const CONSOLIDATE_HOURS = 24;
 
-// Far more than a real day of conversation, and a bound rather than a working
-// limit — every other read in this file has one (400 trades, twelve turns,
-// twenty notes) and this was the only one that did not. A backfill, a loop, or
-// simply a very long day would otherwise put the whole window into a `high`
-// effort call with nothing to stop it.
+// A bound, not a working limit: a backfill or a very long day must not put an
+// unbounded window into a high-effort call.
 const CONSOLIDATE_TURNS = 200;
 
-/* THE LIMIT HAS TO TAKE THE NEWEST, and it was taking the oldest.
-
-   `order=id.asc&limit=200` reads the FIRST two hundred turns of the window, so
-   the one day the bound bites is the day the pass distils the morning and drops
-   the evening — which is where a late instruction lives, and the only thing in
-   a day that must not be lost. Every other bounded read in this file selects
-   newest-first and reverses, which is also what recent() does; this was the one
-   that did not, and the bound looked identical from the outside either way.
-
-   Exported because it is the decision, the same reason tradesQuery and
-   briefedQuery are. */
+/* Newest first, reversed for reading: the oldest two hundred would distil the
+   morning and drop the evening, where a late instruction lives. Exported
+   because it is the decision. */
 export function dayQuery(hours: number, now = Date.now()): string {
   const from = new Date(now - hours * 3600_000).toISOString();
   return `eugenia_turns?select=role,content,created_at` +
@@ -4327,21 +2929,11 @@ export function dayQuery(hours: number, now = Date.now()): string {
 async function turnsSince(hours: number): Promise<Turn[]> {
   const rows = await readRows<Turn & { created_at: string }>('Day',
     `${SB_URL}/rest/v1/${dayQuery(hours)}`);
-  // Reversed back into the order it is read in: the pass is handed the day
-  // oldest first, and only the SELECT needed to run the other way round.
   return dateTurns(rows.reverse());
 }
 
-/* WHETHER TONIGHT'S PASS HAS ALREADY RUN, read off eugenia_runs rather than off
-   a marker turn — because the pass deliberately stores no turn, and giving it
-   one would spend two of tomorrow's twelve on bookkeeping it wrote to itself.
-   The meter that had to exist anyway turns out to be the exact record the retry
-   needs, which is why the retry could not sensibly have come first.
-
-   A read failure counts as "already run", the same way briefedToday's does and
-   for the same reason: if the database is unwell the retry cannot check, and
-   running a second pass on a guess is worse than skipping one. A skipped pass
-   loses that day's distillation and never the day. */
+/* Whether tonight's pass ran, read off eugenia_runs — the pass stores no turn
+   to mark itself. A failed read counts as yes, for briefedToday's reason. */
 async function consolidatedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ at: string }>('Consolidation marker',
@@ -4355,9 +2947,8 @@ async function consolidatedToday(): Promise<boolean> {
   }
 }
 
-/* What he made of the briefings, which until now nothing could say. Two days,
-   because the pass runs nightly and a tap can arrive late; more than that and
-   she would be reading last week's verdict into tonight's decision. */
+/* His taps on recent briefings: two days, since a tap can arrive late; older
+   would read last week's verdict into tonight. */
 export async function feedbackBlock(): Promise<string> {
   try {
     const from = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
@@ -4377,31 +2968,14 @@ export async function feedbackBlock(): Promise<string> {
 async function postConsolidation(): Promise<Response> {
   const day = await turnsSince(CONSOLIDATE_HOURS);
 
-  /* A day nobody spoke on has nothing to distil, and a call that says so costs
-     a model round to be told what an empty array already said. Recorded all the
-     same: a quiet day is a pass that ran and decided nothing, and without the
-     row the 23:00 retry would run it again to reach the same conclusion.
-
-     IT IS A BRANCH RATHER THAN AN EARLY RETURN, AND THAT IS THE WHOLE POINT OF
-     THE SHAPE. The two meters below are about the SYSTEM rather than about the
-     day — whether the embedding vendor still answers, and where the five
-     channels stand — and behind an early return they were skipped on exactly
-     the nights nothing else happened. Quiet nights are ordinary: two of the
-     last four were `nothing said`. So a dead vendor could have survived every
-     one of them with the meter reporting nothing at all, which is the failure
-     that meter was added to end.
-
-     The census cannot simply move to the top instead: it is taken AFTER the
-     pass because the pass is the only thing that can move a rung, and read
-     before it would record the state the pass was about to change. */
+  /* A silent day skips the model call but still leaves a row, or 23:00 runs it
+     again. A branch, not an early return: the meters below are about the
+     system, and an early return skipped them on exactly the quiet nights. The
+     census still runs after the pass, the only thing that moves a rung. */
   if (day.length) {
 
-  /* THE WEEK GOES IN TOO, and without it the pass was asked to notice something
-     it could not see. What earns a note includes "he has started doing
-     something differently" — a claim about his trading, judged against a
-     transcript that on most days does not mention a trade at all. It is the
-     same read the briefing already makes through the same read-only view, so
-     this buys the evidence for that instruction and no new reach. */
+  // His week too: it is asked to notice what he has started doing
+  // differently, which most days' transcripts never mention.
   const [notes, channels, trades, story, loops, calendar, verdicts, desk] = await Promise.all([
     notesBlock(), channelsBlock(), tradesBlock(),
     thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(),
@@ -4412,9 +2986,7 @@ async function postConsolidation(): Promise<Response> {
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
-  // `high`, and it is the one place that is not a latency decision: this writes
-  // the memory every later briefing reasons from, and a careless note outlives
-  // a careless briefing by months.
+  // High: a careless note outlives a careless briefing by months.
   const said = await ask([{ role: 'user', content: asked }], 'high', 'consolidation',
                          CONSOLIDATE_TOOLS);
   console.log("doji-eugenia: consolidated —", said.slice(0, 200));
@@ -4425,11 +2997,8 @@ async function postConsolidation(): Promise<Response> {
 
   await recordChannels();
 
-  /* AND THE SWEEP, WHICH IS BOOKKEEPING RATHER THAN PART OF THE PASS. It runs
-     here because this job already runs nightly, so it needs no schedule of its
-     own — and it runs AFTER, wrapped, because a vendor that is down must not
-     report itself to him as a pass that failed. The rows it misses are still
-     waiting tomorrow. */
+  // The embedding sweep, after the pass and wrapped, so a vendor outage never
+  // reads as a failed pass. Both outcomes are a row.
   try {
     const notes = await fillEmbeddings('eugenia_notes', 'note');
     const turns = await fillEmbeddings('eugenia_turns', 'content');
@@ -4442,44 +3011,19 @@ async function postConsolidation(): Promise<Response> {
     await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
   }
 
-  /* AND THE WEEK, WHOLE, which R-14 and R-19 are judged against. The
-     quarter-hourly filing only ever sees a rolling day and a half, so it marks
-     no week covered; this is what does. Nightly for the sweep's reason — this
-     job already runs every night, weekends included, and on a Sunday night it
-     is already the coming week — and wrapped for the same one: a calendar that
-     will not load must not take the pass down with it. A missed night costs
-     nothing the next night does not recover, and a missed week is what
-     `calendar_weeks` exists to say. */
+  // The whole week, which R-14 and R-19 judge against — the quarter-hourly
+  // filing never marks one covered. Wrapped inside filedWeek.
   await filedWeek(weekOf(new Date()));
 
-  /* ONE EXIT, and it is what the test asserts rather than the branch shape: a
-     second `return` in this function is how the meters got skipped the first
-     time, and it would be again. */
+  // One exit: a second return is how the meters got skipped.
   return day.length ? json({ ok: true, consolidated: day.length })
                     : json({ ok: true, skipped: "nothing said" });
 }
 
-/* THE ONE CLAIM IN THIS SYSTEM THAT HAD NO METER.
-
-   Everything else that cannot be seen is counted where it happens and for that
-   exact reason: ask() logs tokens and searches because the spend cap is a
-   ceiling and not a meter, and postBriefing logs the character count because
-   the length target lives in prose past a model call — unmeasured, it grew by a
-   sixth and somebody found out by counting by hand.
-
-   What she is FOR is that his understanding grows, and the map is the designed
-   instrument for it. Nothing ever read that instrument back. A ladder that has
-   stopped moving looks exactly like one that never had to, and the nightly pass
-   is the only thing that can move a rung — so this is the line that says
-   whether it does, taken at the one moment a rung could just have changed.
-
-   AND IT WENT TO A CONSOLE, WHICH IS THE FAILURE eugenia_runs EXISTS FOR. The
-   argument that moved every cost figure off console.log applies here twice
-   over: a ladder is read by comparing nights, and a line that is discarded
-   within hours cannot be compared with anything. A row per night is the series.
-
-   Never throws: the pass has done its work by the time this runs, and a meter
-   must not turn a good night into a 500. */
+/* The meter on what she is for: his understanding growing. A ladder that
+   stopped moving looks like one with no reason to move, and is read by
+   comparing nights, so a row per night is the series — taken after the pass,
+   the one moment a rung could have changed. Never throws. */
 async function recordChannels() {
   try {
     const rungs = channelsList(await readChannels())
@@ -4493,6 +3037,8 @@ async function recordChannels() {
   }
 }
 
+/* The quiet look. Nothing is stored when she stays quiet: empty pairs would
+   push the briefing out of the twelve turns. */
 async function postPulse(): Promise<Response> {
   const [notes, channels, story, loops, calendar, desk] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
@@ -4512,51 +3058,23 @@ async function postPulse(): Promise<Response> {
 }
 
 /* ─── The look after a number lands ────────────────────────────────────────
-   THE FIRST THING IN THIS SYSTEM THAT IS NOT A CLOCK.
-
-   Everything else here fires at an hour someone chose in advance: 08:00, 10:00,
-   22:00. A print at 08:30 landed into a briefing that had already gone and
-   waited for a 10:00 pulse whose default answer is silence — so the one moment
-   of the day when something genuinely happened was the moment she was least
-   likely to speak.
-
-   This fires off the calendar SHE FILED. The briefing records what is due; the
-   quarter-hourly job asks whether anything high-impact has landed and not yet
-   been looked at; and `looked_at` makes the answer once-only. It is data
-   deciding when she speaks, which is the whole difference between a scheduled
-   feed and something that notices.
-
-   STILL SILENT BY DEFAULT, and that is not timidity — a number landing exactly
-   where everyone expected it is not news, and the pulse's own reasoning applies
-   unchanged. `isSilent` is shared with it rather than reimplemented.
+   The first thing here that is not a clock: an 08:30 print used to land after
+   the briefing and wait for a pulse whose default is silence. This fires off
+   the filed calendar — the quarter-hourly job asks whether anything high has
+   landed unlooked, and `looked_at` makes it once-only. Still silent by
+   default: a number landing where everyone expected is not news.
    ───────────────────────────────────────────────────────────────────────── */
-// Older than this and the moment has gone: a print six hours stale is history,
-// and history belongs in tomorrow's briefing rather than in a message now. It
-// also bounds what a redeploy after a long outage can send — without it, a day
-// of unlooked releases would all arrive at once.
+// Older than this, a print is history for tomorrow's briefing — and a redeploy
+// after an outage cannot send a day of looks at once.
 const RELEASE_STALE_H = 6;
 
-// A bound rather than a working limit, like every other read of a growing table
-// here. Six hours of high-impact prints is a handful; forty is far more than a
-// heavy morning files even when it files the same release five times.
+// A bound, not a working limit.
 const RELEASE_ROWS = 40;
 
-/* ONE LOOK PER RELEASE TIME, WHICH IS NOT WHAT ONE ROW PER LOOK GAVE.
-
-   One time holds several rows: the 08:30 slot is most of a report, and while
-   she typed the calendar `PPI`, `US PPI` and `US PPI (August)` were three rows
-   and one print. Every one of them marked `high` fired its own look, its own
-   model call and its own message — five for a single CPI on 11 September, at
-   12:35, 12:50, 13:05, 13:20 and 13:35.
-
-   So the question this asks is about the TIME rather than the row: the earliest
-   release time nothing has looked at yet, and then every high row standing at
-   it. Where several numbers land together one message covers them, which is
-   how a person reads "the 8:30 data" anyway, and a row arriving later at a time
-   already marked cannot open a second look.
-
-   Exported and pure because the decision is the whole of it, and a query that
-   returns the right rows proves nothing about which of them get looked at. */
+/* One look per release TIME, not per row: the 08:30 slot is most of a report,
+   and her typed rows once fired five looks for one CPI. The earliest time
+   nothing has looked at, and every high row at it, in one message. Exported and
+   pure, since which rows get looked at is the decision. */
 export function dueRelease(rows: Release[]): Release[] {
   const byTime = new Map<string, Release[]>();
   for (const r of rows) (byTime.get(r.at) ?? byTime.set(r.at, []).get(r.at)!).push(r);
@@ -4568,10 +3086,8 @@ export function dueRelease(rows: Release[]): Release[] {
 
 async function pendingRelease(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - RELEASE_STALE_H * 3600_000).toISOString();
-  /* `looked_at` is READ rather than filtered on, because the question is
-     whether anything at this time has been looked at — a filter would hide the
-     mark that makes the rest of the group skippable and hand back the
-     duplicates one at a time, which is the behaviour this replaced. */
+  // looked_at is read, not filtered on: a filter would hide the mark that makes
+  // the rest of the group skippable.
   const rows = await readRows<Release>('Release',
     `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
     `&importance=eq.high` +
@@ -4580,22 +3096,10 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
   return dueRelease(rows);
 }
 
-/* MARKED BEFORE THE LOOK, NOT AFTER, and it is the briefing marker's argument
-   exactly. Marked after, a look that generates and fails to write leaves the
-   release pending — so the next quarter-hour runs it again, and the one after
-   that, each one a model call with web search behind it. Marked first, a
-   failure costs one look. Losing a look is cheaper than looping on one. */
-// EVERY ROW AT THAT TIME, not the one the message happens to name: the others
-// are the same print under another spelling, and one left unmarked is the next
-// hour's duplicate look.
-/* THE LOOK WAITS FOR THE NUMBER, AND NOT FOR EVER. TradingView publishes an
-   actual a minute or two after the print, and a look that runs first spends a
-   web search finding what the next filing would have handed it. So a due group
-   with a figure still missing is left for the next quarter-hour — unmarked,
-   since the mark is what makes a look happen once — until half an hour has
-   passed, and then it looks anyway with `record_actual` as its fallback. A
-   speech has no figure to wait for: no consensus and no prior means nothing
-   is coming, and it is looked at on time. */
+/* The look waits for the number, up to half an hour: TradingView publishes an
+   actual a minute or two late, and a look run first spends a search finding
+   what the next filing would hand it. Left unmarked meanwhile. A speech — no
+   consensus, no prior — has nothing coming and is looked at on time. */
 const ACTUAL_WAIT_MIN = 30;
 
 export function awaitingActual(due: Release[], now: number): boolean {
@@ -4604,18 +3108,11 @@ export function awaitingActual(due: Release[], now: number): boolean {
 }
 
 /* ─── How it usually goes ──────────────────────────────────────────────────
-   The last twelve prints of the same series, each with what was expected, so a
-   release that has just landed is read against its own record: core PCE below
-   consensus for six months running is less of a surprise than its size alone
-   says, and one above it for the first time in a year is more of one. The
-   series is TradingView's `ticker` (020), which ties this month's release to
-   every month before it where the id names one release only.
-
-   LISTED, NOT SCORED. The figures are text — "0.2%", "197K" — and a surprise
-   worked out here would be a parse of text into a sign, with every unit a
-   chance to get it backwards; the record is put in front of her as it stands,
-   and reading it is the judgement she is there for. Oldest first, read
-   newest-first and reversed, as every bounded read here is. */
+   The last twelve prints of the same series (020's ticker), each with its
+   consensus, so a surprise is read against its own record. Listed, not scored:
+   the figures are text, and a surprise computed here would be a parse with
+   every unit a chance to get the sign backwards.
+   ───────────────────────────────────────────────────────────────────────── */
 const RECORD = 12;
 
 export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'consensus' | 'actual'>[]): string {
@@ -4625,18 +3122,11 @@ export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'co
       (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file")).join("\n");
 }
 
-/* WHAT THE LAST PRINT BECAME, read off two rows already filed. A release
-   revises the one before it and TradingView carries the revised figure as this
-   row's `prior`, while last month's row keeps the figure first reported — so
-   the revision is the two disagreeing, and on 2 October it was half the story:
-   payrolls missed by sixty thousand AND August came down from 162K to 133K.
-   She would otherwise have to remember last month's number and compare.
-
-   ONLY AGAINST THE PRINT IMMEDIATELY BEFORE. The newest row on file is last
-   month's only if none is missing, and comparing against an older one would
-   report as a revision what is simply two months apart. A gap half as long
-   again as the one before it is a missing print, whatever the series' rhythm —
-   weekly, monthly or quarterly — and says nothing. */
+/* What the last print became. TradingView carries the revised figure as this
+   row's `prior` while last month's row keeps the first report, so a revision is
+   the two disagreeing — half the story on 2 October, payrolls' August cut from
+   162K to 133K. Only against the print immediately before: a gap half as long
+   again as the one before it is a missing print, and says nothing. */
 export function revisionLine(r: Pick<Release, 'at' | 'prior'>,
                              record: Pick<Release, 'at' | 'name' | 'actual'>[]): string {
   const [last, before] = record;
@@ -4651,8 +3141,7 @@ export function recordQuery(ticker: string, before: string): string {
          `&at=lt.${before}&actual=not.is.null&order=at.desc&limit=${RECORD}`;
 }
 
-/* One read per series in the group, and a read that fails costs its block and
-   nothing else: the look still has the print in front of it. */
+/* One read per series; a failed read costs its block only. */
 async function recordBlock(due: Release[]): Promise<string> {
   const series = [...new Map(due.filter(r => r.ticker).map(r => [r.ticker!, r])).values()];
   const parts = await Promise.all(series.map(async r => {
@@ -4667,6 +3156,9 @@ async function recordBlock(due: Release[]): Promise<string> {
   return parts.join("");
 }
 
+/* Marked before the look, for the briefing marker's reason: a look that fails
+   after generating would otherwise repeat every quarter hour, billed. Every row
+   at that time, or one left unmarked is the next look. */
 async function markLooked(ids: number[]): Promise<void> {
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=in.(${ids.join(',')})`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
@@ -4683,26 +3175,17 @@ async function postRelease(): Promise<Response> {
 
   await markLooked(due.map(r => r.id));
 
-  // THE MAP, because the prompt now asks it to build a term he has never had
-  // built and cannot know which those are without it. Asking her to teach from
-  // a ladder she is not handed is the shape the nightly pass was already fixed
-  // for: an instruction that outruns its inputs.
+  // The channel map, since it is asked to build terms by rung.
   const [notes, channels, story, loops, desk, record] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(), recordBlock(due),
   ]);
-  /* ONE TIME, AND EVERY ROW STANDING AT IT. Where the same print was filed
-     under several names the lines repeat with different figures against them,
-     and saying so is better than picking one: she is being told what the
-     calendar holds, not being handed a fact. */
   const landed = due.map(r =>
     `· ${r.name}` +
     (r.actual ? ` — printed ${r.actual}` : " — not yet published") +
     (r.consensus ? `, ${r.consensus} expected` : "") +
     (r.prior ? `, after ${r.prior}` : "")).join("\n");
-  /* THE UTC STAMP, BECAUSE THE TOOL TAKES IT AND THE HEADING IS IN ET. She was
-     being asked to reconstruct it from a New York clock, which is a conversion
-     standing where an input belongs. Normalised through Date so both sides of
-     the filter spell the same instant the same way. */
+  // The UTC instant beside the ET heading: record_actual takes it, and a
+  // conversion she would do in her head is an input.
   const asked = RELEASE +
     `\n\nWhat landed at ${nyTime(due[0].at)} ET — ${new Date(due[0].at).toISOString()} in UTC, ` +
     `which is what record_actual takes:\n${landed}` +
@@ -4716,37 +3199,23 @@ async function postRelease(): Promise<Response> {
 
   const sent = await trim(said, desk, story);
   await sayAloud(sent);
-  // Stored, unlike a quiet one: this is a thing he read, and a follow-up
-  // question about it needs the exchange it follows.
+  // Stored, unlike a quiet look: a follow-up needs it.
   await remember([{ role: 'user', content: `[${named} landed]` },
                   { role: 'assistant', content: sent }]);
   return json({ ok: true, release: named, said: "sent" });
 }
 
 /* ─── The trade she hears about in two minutes ─────────────────────────────
-   The poller writes a position within two minutes of it opening, and until now
-   nothing told her: a trade taken at 10:47 reached her the next morning as one
-   row inside a week of JSON, by which time there is nothing useful left to say.
+   Still no verdict; she may say only his own rules, at the moment they apply:
 
-   SHE STILL GIVES NO VERDICT, and the two things she may say are both his own
-   rules read back at the moment they apply:
+     opened — a high-impact print is pending and he is now in a position: R-14
+              and R-19. Citing them is hers; deciding what he does is not.
+     closed — that fill took the day past −4%: R-11 says the day ends there.
 
-     opened — a high-impact print is pending and he is now in a position. R-14
-              is about standing aside before one and R-19 about a position
-              inherited into one. Naming the rule is citation; deciding what he
-              should do about it is not hers and the prompt forbids it.
-     closed — that fill took the day past −4% of account. R-11 says the day ends
-              there. It is arithmetic against a threshold he set, and it is the
-              one thing that is both time-critical and not a judgment.
-
-   SILENCE COSTS NOTHING AND IS THE COMMON CASE. Both branches decide from data
-   BEFORE any model call — no pending print, or no breach, and the function
-   returns without spending anything at all. A trade event that always ran a
-   model call would be a bill attached to every fill for a message that usually
-   should not be sent.
+   Both branches decide from data before any model call, so an ordinary fill
+   costs nothing.
    ───────────────────────────────────────────────────────────────────────── */
-// How far ahead a print still counts as pending against a position just opened.
-// Beyond this it is tomorrow's problem and the briefing will carry it.
+// Beyond this a print is tomorrow's, and the briefing carries it.
 const PENDING_AHEAD_H = 8;
 
 async function aheadToday(now = Date.now()): Promise<Release[]> {
@@ -4757,33 +3226,20 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
     `&order=at.asc&limit=5`);
 }
 
-/* Exported so the sequence — read the row, guard, decide — is driven rather
-   than read; every guard here returns before a model call, and a guard that
-   stopped returning reads exactly like one that was never needed. */
+/* Exported so read, guard, decide is driven: every guard returns before a
+   model call, and one that stopped returning looks like one never needed. */
 export async function postTradeEvent(id: string, event: string): Promise<Response> {
   const [row] = await readRows<TradeRow>('Trade',
     `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
-  // Soft-deleted, or not through the view. Nothing to say and nothing wrong.
+  // Soft-deleted: nothing to say.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
-  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY, and neither had anything
-     checking that the trade is. `aheadToday` reads the releases still to come
-     THIS day, and R-11 says the day ends here — a sentence whose whole content
-     is that he should stop trading now.
-
-     The trigger fires on a transition rather than on a clock, so the row it
-     carries is only today's by habit. Anything that stamps an old close fires
-     it for an old day: a `?force=1` repair, a broker email landing late, the
-     backfill that gave the poller the eight closes it had never recorded. That
-     backfill is how this surfaced — two messages arrived saying "today's
-     realised P&L is −61.78" and "the day sits at −318.88", about the 11th and
-     the 19th of August, in the present tense, three weeks late.
-
-     Filed under `open_day`, which is the day the position OPENED — so an
-     overnight hold closing this morning belongs to yesterday and is skipped
-     too. That is right rather than a gap: R-11 forbids an entry LATER than the
-     loss that breached, and a day that is over can have no later entry. There
-     is nothing to warn about and nothing he could do about it. */
+  /* Both things this path may say are about today, and the trigger fires on a
+     transition, not a clock — anything stamping an old close fires it for an
+     old day, and once reported August's losses in the present tense. A
+     property of the event, so it guards both branches. An overnight hold
+     closing this morning is yesterday's and skipped too: R-11 forbids a LATER
+     entry, and a finished day has none. */
   if (row.open_day !== nyDate(new Date())) {
     return json({ ok: true, trade: id, skipped: "not today" });
   }
@@ -4791,14 +3247,8 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
   let situation: string;
 
   if (event === 'opened') {
-    /* OPENED AND ALREADY CLOSED, which the trigger cannot tell apart. It fires
-       on an insert with no fill_time, and a position opened and closed inside
-       one two-minute poll is inserted with its exit price set and its close
-       instant written a moment later — so this event arrives about a position
-       that no longer exists, and the message it would send opens "he has just
-       opened" with his own R-14 cited against a trade he is out of. The close
-       event that follows is the one that is true. `isOpen` is the same two
-       witnesses the desk reads. */
+    // Opened and closed inside one poll arrives as an open event about a
+    // position he is out of; the close event that follows is the true one.
     if (!isOpen(row)) return json({ ok: true, trade: id, skipped: "already closed" });
     const ahead = await aheadToday();
     if (!ahead.length) return json({ ok: true, trade: id, said: "nothing pending" });
@@ -4809,8 +3259,7 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
       ahead.map(r => `· ${nyTime(r.at)} ET ${r.name}` +
                      (r.consensus ? `, ${r.consensus} expected` : "")).join("\n");
   } else {
-    // The day as it now stands, computed rather than asked for — and read from
-    // the same view get_trades uses, so this gains her no reach.
+    // The day as it stands, computed, through the same view.
     const day = row.open_day;
     if (!day) return json({ ok: true, skipped: "no filing day" });
     const standing = dayStanding(await readRows<TradeRow>('Day',
@@ -4824,19 +3273,10 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
       `R-11 sets. Read R-11 in the strategy before you say anything about it.`;
   }
 
-  /* THE TWO READS GO HERE AND NOT AT THE TOP, which is the whole of why this
-     path costs nothing on an ordinary fill. Both branches above return before
-     any of this on the common case — no print pending, no breach — and moving
-     the reads up would spend them on every open and close the poller sees, two
-     minutes apart, for a message that is not going to be sent.
-
-     HISTORY IS THE HALF THAT MATTERS MOST HERE, and it is the one this path
-     never had. The R-14/R-19 message fires on a print pending against an open
-     position — which is exactly what the morning briefing may have already
-     named. Without the window she cannot know she said it two hours ago, so
-     the sharpest thing she sends arrives as a repetition. And notes beside it
-     for the reason they are on every other path: an instruction he gave her is
-     obeyed everywhere except the two messages that reach him mid-trade. */
+  /* The reads come after the early returns, so an ordinary fill costs nothing.
+     History matters most here: the print this warns about is the one the
+     briefing likely named, and without the window she repeats herself. Notes,
+     or his instructions are obeyed everywhere but mid-trade. */
   const [history, notes] = await Promise.all([recent(), notesBlock()]);
 
   const said = await ask(
@@ -4852,84 +3292,36 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
 }
 
 /* ─── The move nobody filed ────────────────────────────────────────────────
-   THE OTHER TWO SENSES ARE EVENTS AND PRICE IS NOT. A release lands and a
-   position opens; both are rows appearing, and both are noticed by asking
-   whether a row is there. Gold is always there. "It moved" is not a fact about
-   the instrument at all — it is a fact about the instrument AND a previous
-   reading — which is why this sense needs a mark and the others need none.
-
-   WHAT MAKES A MOVE WORTH WAKING HER FOR IS THE DAY'S OWN MEASURE, not a number
-   in dollars. Gold at 4,400 and gold at 2,000 are the same market and a fixed
-   $10 threshold means two different things to them; a table of thresholds goes
-   stale the year nobody revises it, and that failure looks exactly like a quiet
-   market. So the test is relative twice over: against the range the session has
-   actually printed, and against the price itself.
-
-   AND A MOVE A PRINT EXPLAINS IS NOT THIS SENSE'S TO REPORT. The release spine
-   is already looking at anything high-impact that landed, so a jump at 08:30 on
-   payrolls would otherwise reach him twice in the same ten minutes, once from
-   each sense, saying the same thing. The calendar she filed is what tells them
-   apart.
-
-   SILENT BY DEFAULT AFTER ALL OF THAT, because the gates decide that something
-   happened and only she can decide whether it is worth a sentence. `isSilent`
-   is shared with the pulse and the release look rather than reimplemented.
+   Releases and positions are rows appearing; gold is always there, so "it
+   moved" is a fact about a price AND a previous reading — hence the mark. The
+   test is relative twice, to the session's range and to the price, because a
+   fixed dollar threshold means different things at 4,400 and at 2,000 and
+   goes stale silently. A move a fresh print explains is the release look's, or
+   payrolls reaches him twice. Silent by default after all of that.
    ───────────────────────────────────────────────────────────────────────── */
-/* THE FIVE NUMBERS THIS SENSE RESTS ON, and every one of them is a decision
-   rather than a fact — which is why they are named here instead of appearing
-   inside the predicate, the same reason CLOSEOUT_MIN and STRETCH are named in
-   adherence.ts. */
-// A third of everything the session has done so far, inside a quarter of an
-// hour. The share binds on an established session, where the range is wide
-// enough for an ordinary swing to clear any fixed floor.
+// Decisions rather than facts, so named here, as CLOSEOUT_MIN and STRETCH are.
+// A third of the session's range inside a quarter of an hour.
 export const MOVE_SHARE = 0.35;
-/* AND THE FLOOR BINDS FOR SEVEN HOURS OF EVERY WEEKDAY, WHICH IS NOT WHAT THIS
-   PAIR WAS BUILT BELIEVING. The share was the real test and the floor was for
-   the ragged hour after the Sunday open — one edge case, once a week. But the
-   range this share is taken against is the BROKER'S session range, and that
-   session restarts at the 17:00 New York roll every single weekday. So from
-   17:00 until the range has been rebuilt the share is measured against a few
-   hours of thin evening trade, it stops binding, and the floor is the whole
-   test — for a third of the week rather than for an hour of it.
-
-   A tenth of a percent was a floor written to be generous, because something
-   above it was expected to be doing the work. It is $4.49 on gold at 4,485,
-   which gold covers in a quarter of an hour on an ordinary afternoon, and it is
-   what let a $7 drift at 20:57 reach him as a sharp move. A quarter of a
-   percent — $11.21 at the same price — is a figure that is an event in the thin
-   hours as well as the busy ones, which is what the floor now has to be, since
-   the thin hours are exactly when it is alone.
-
-   It costs nothing on an established session: a range of $50 asks $17.50 of the
-   share, which is already above the floor. The floor binds only where the range
-   is under about $32, which is to say on a session too young or too quiet for
-   its own range to be a measure of anything. That is the case this is for. */
+/* A quarter of a percent of the price, the least the bar may be. The range is
+   the broker's session's, which restarts at the 17:00 roll, so for hours every
+   evening it is small because the session is young — and a tenth of a percent
+   let a $7 drift at 20:57 through. Applied to the bar, below. */
 export const MOVE_FLOOR = 0.0025;
-// Two missed runs and the gap is no longer a quarter of an hour. A move measured
-// across an outage is a move across an hour, which is a different claim — so the
-// mark is advanced and the reading starts again.
+// Past two missed runs the gap is not a quarter-hour, so the reading restarts.
 export const MARK_STALE_MIN = 40;
-// One message about one move. A market that trends all afternoon is one story,
-// and telling it every fifteen minutes is the failure a threshold alone cannot
-// prevent.
+// One message per move: a trending afternoon is one story.
 export const MOVE_QUIET_H = 2;
-// How recently a high-impact print counts as the explanation. Six hours later a
-// move is its own event again; the release spine's own staleness window is wider
-// because it is asking a different question — whether the print has been looked
-// at, not whether it is what just moved the price.
+// How recently a print counts as the explanation — a different question from
+// the release look's own staleness window.
 const MOVE_EXPLAINED_H = 1;
 
 export interface Mark { bid: number; at: string; looked_at: string | null }
 
-/* PURE, AND THE WHOLE DECISION IS HERE. Every gate can be driven from both
-   sides by a test, which for a sense that is silent by design is the only way
-   to know it can fire at all — a predicate that always answers "not worth it"
-   and a market that is genuinely quiet produce the same empty log for weeks. */
+/* Pure, so every gate is driven both ways: for a sense silent by design, that
+   is the only way to know it can fire. */
 export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
   { worth: true; move: number } | { worth: false; why: string } {
-  // The seeded row, and the only shape that is not a price. It exists so the
-  // first run has something to PATCH rather than a branch that runs once in the
-  // life of the database.
+  // The seeded zero row, the one shape that is not a price.
   if (!(mark.bid > 0)) return { worth: false, why: "no mark yet" };
 
   const age = (now - Date.parse(mark.at)) / 60_000;
@@ -4943,30 +3335,11 @@ export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
   const move = Math.round((spot.bid - mark.bid) * 100) / 100;
   const size = Math.abs(move);
 
-  /* THE BAR IS THE SESSION'S RANGE, AND THE FLOOR NOW SAYS WHEN THAT BAR IS TOO
-     LOW TO MEAN ANYTHING. The two gates used to stand side by side, so a range
-     near zero made the share stop binding and left the floor as the whole test.
-
-     That is not a rare state, and the comment here used to describe it as one.
-     The broker's session restarts at the 17:00 New York roll, so for hours
-     every evening the range is small because the session is YOUNG rather than
-     because the market is quiet — and a thin-liquidity wobble cleared a bar
-     built for a full day's trading.
-
-     It cost three open loops in a week: $13 just after the Sunday roll, $17
-     just after the next one, both filed as unexplained and neither ever closed,
-     because there was nothing to explain. The one real find in that run, $33 at
-     11:12 on a Wednesday, cleared both gates on its own. A sense that
-     manufactures a loop it can never close is worse than a quiet one — the loop
-     then rides into every briefing after it.
-
-     So the floor is applied to the BAR rather than beside it: a session that has
-     not built a range worth judging against is one she cannot judge, and silence
-     is the honest answer rather than a lower standard. A move under MOVE_FLOOR
-     of the price is still never reported, since the bar is never below it —
-     what changed is the composition, not either number. A quote carrying no
-     high or low makes the range zero and lands here too, which is the same
-     statement: nothing to judge against. */
+  /* The floor bounds the bar rather than standing beside it. A session too
+     young to have a range is one she cannot judge, and silence beats a lower
+     standard: beside it, the floor alone let post-roll wobbles of $13 and $17
+     through as loops nothing could ever close. A quote with no range lands
+     here too. */
   const bar = (spot.high - spot.low) * MOVE_SHARE;
   if (bar < spot.bid * MOVE_FLOOR) {
     return { worth: false, why: "no session range to judge against yet" };
@@ -4982,11 +3355,8 @@ async function readMark(): Promise<Mark | null> {
   return row ?? null;
 }
 
-/* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT, which is what makes
-   the window between readings the gap between runs rather than a number anyone
-   chose. Stamped BEFORE the look for markLooked's reason exactly: a look that
-   generates and then fails to write would re-fire on the next run, and on the
-   one after that, each one billed. */
+/* The mark advances every run and looked_at does not, so the window is the gap
+   between runs. Stamped before the look, for markLooked's reason. */
 async function markPrice(bid: number, looked: boolean): Promise<void> {
   const res = await fetch(`${SB_URL}/rest/v1/eugenia_price?id=eq.current`, {
     method: "PATCH", headers: sbHeaders("return=minimal"),
@@ -4998,8 +3368,7 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
   if (!res.ok) throw new Error(`Mark write failed (HTTP ${res.status})`);
 }
 
-// Anything high-impact that printed in the last hour, whether or not the
-// release spine has looked at it yet — either way that message is the one he
+// A high print in the last hour, looked at or not: that message is the one he
 // gets about this move.
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
@@ -5011,10 +3380,7 @@ async function explained(now = Date.now()): Promise<Release | null> {
 }
 
 async function postMove(): Promise<Response> {
-  // The weekend quote is Friday's last, so every reading is the same number and
-  // nothing could fire — but it is still a poll and a broker session every
-  // quarter of an hour for two days. The same rule the poller keeps, from the
-  // same definition.
+  // The weekend quote is Friday's last; the poller's rule, the same function.
   if (!marketOpen()) return json({ ok: true, skipped: "market closed" });
 
   const [spot, mark] = await Promise.all([marketQuote(), readMark()]);
@@ -5039,17 +3405,14 @@ async function postMove(): Promise<Response> {
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), aheadToday(),
     positionsBlock(), aroundBlock(), headlinesBlock(),
   ]);
-  // The window is STATED FROM THE MARK rather than asserted as a quarter of an
-  // hour. A run that fell out and came back reads a thirty-eight-minute gap, and
-  // telling her it was fifteen is a wrong fact from the one place that knows.
+  // The window from the mark, not assumed: a missed run makes it longer.
   const since = Math.round((Date.now() - Date.parse(mark.at)) / 60_000);
   const asked = MOVE +
     `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
     `Nothing high-impact on the calendar has printed in the last hour.` +
-    // The session said the one way it is said anywhere, which matters most on
-    // this path: it is the one that fires in the evening, the only hours when
-    // the broker's session and the calendar day disagree.
+    // quoteLine, which names the session window — this path fires in the
+    // evening, when the session and the calendar day disagree.
     `\n\n${quoteLine(spot, new Date())}` +
     (ahead.length
       ? `\nStill ahead today: ` +
@@ -5071,28 +3434,16 @@ async function postMove(): Promise<Response> {
 
 
 /* ─── What he sends that is not typing ─────────────────────────────────────
-   `if (!msg?.text) return` dropped everything that was not typed, and the two
-   things it dropped are the two he is most likely to send from a desk mid
-   session: a voice note and a chart.
-
-   ONE DOWNLOAD FOR BOTH, because Telegram serves them the same way — getFile
-   turns a file_id into a path, and the path is fetched from the file endpoint
-   with the bot token in it. The token is in the URL rather than a header there;
-   that is Telegram's design, and it is why this does not go through the shared
-   `telegram()` helper, which posts JSON to the method endpoint.
+   A voice note and a chart, the two things he sends mid-session, both used to
+   be dropped. One download serves both: getFile, then the file endpoint with
+   the token in the URL — Telegram's design, and why this is not telegram().
    ───────────────────────────────────────────────────────────────────────── */
-// Telegram's own ceiling for a bot download is 20MB. This is far lower on
-// purpose: an image goes into the request as base64, which is a third larger
-// again — so the ceiling that matters is the one on the far side, and a photo
-// Telegram has already compressed is nowhere near either. It is also paid for
-// as input tokens on every round of the turn it appears in.
+// Well under Telegram's 20MB: an image goes in as base64, a third larger, and
+// is paid as input on every round of its turn.
 const FILE_MAX = 3 * 1024 * 1024;
 
-/* THE FOUR THE API ACCEPTS, checked here rather than discovered as a 400 in the
-   middle of a reply. A photo is always JPEG; a DOCUMENT is whatever he attached,
-   and "send it as a file to keep the quality" is the ordinary way a chart
-   arrives as a PNG — or as a BMP, a HEIC or a TIFF, none of which are readable
-   and all of which would otherwise reach the model as an image block. */
+/* The four image types the API reads, checked here rather than met as a 400
+   mid-reply: a chart sent as a file can be a BMP, HEIC or TIFF. */
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 async function tgDownload(fileId: string): Promise<{ bytes: Uint8Array; path: string } | null> {
@@ -5115,10 +3466,8 @@ async function tgDownload(fileId: string): Promise<{ bytes: Uint8Array; path: st
   return { bytes, path };
 }
 
-/* CHUNKED, BECAUSE THE OBVIOUS ONE-LINER BLOWS THE STACK. `btoa(String
-   .fromCharCode(...bytes))` spreads every byte into an argument list, so a
-   photo of any real size is a RangeError rather than a string — and it would
-   throw on the large images and work on every small one used to test it. */
+/* Chunked: spreading every byte into one argument list is a RangeError on any
+   real photo, and works on every small one a test would use. */
 function base64(bytes: Uint8Array): string {
   let out = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -5128,38 +3477,18 @@ function base64(bytes: Uint8Array): string {
 }
 
 /* ─── Hearing him ──────────────────────────────────────────────────────────
-   THE ONE CAPABILITY HERE THAT NEEDS SOMETHING THIS SYSTEM DOES NOT ALREADY
-   HAVE, and it is worth saying plainly rather than burying: the Messages API
-   takes text and images and not audio, and Telegram does not transcribe for
-   bots. So a voice note needs a speech-to-text service, which is a second
-   vendor and a second key.
-
-   Written against the /audio/transcriptions shape — a multipart POST answering
-   with `{ text }` — because that is the one contract every provider in this
-   space implements, so the endpoint is configuration rather than a vendor baked
-   into the file.
-
-   UNSET IS A FIRST-CLASS STATE, not a broken one. With no STT_URL she says she
-   cannot hear it, which is true, and every other path in this file is
-   unaffected — that is why these are not in the 503 check at the entry point
-   beside the secrets that genuinely stop her working. */
+   The Messages API takes no audio and Telegram does not transcribe for bots,
+   so a voice note needs a second vendor. Written to the /audio/transcriptions
+   shape every provider implements, so the endpoint is configuration. Unset is
+   a first-class state — she says she cannot hear it — and not a boot failure.
+   ───────────────────────────────────────────────────────────────────────── */
 const STT_URL   = env("STT_URL");
 const STT_KEY   = env("STT_KEY");
 const STT_MODEL = env("STT_MODEL") || "whisper-1";
 
-/* FOUR REASONS A VOICE NOTE PRODUCES NO WORDS, AND THEY ARE FOUR SENTENCES.
-
-   They were one. `transcribe` returned null for a rejected key, a wrong URL, an
-   unsupported format and genuinely unclear audio alike, so every one of them
-   reached him as "I could not make that out — send it again", and he would send
-   it again, and again. A misconfigured key is not something he can fix by
-   speaking more clearly, and telling him it is wastes his time on the only
-   failure here he is actually able to act on.
-
-   It is the same rule `readTrades` is written on, one layer up: an empty answer
-   is only an answer when something was read. Each line below says whose problem
-   it is and what to do about it, which is the whole difference. A map rather
-   than a chain of ternaries, for the reason APOLOGY and SAID are. */
+/* Four reasons a voice note yields no words, four sentences: a bad key is not
+   fixed by him speaking more clearly, and one message for all four had him
+   resending. Each says whose problem it is. */
 export const VOICE_TROUBLE: Record<string, string> = {
   unconfigured: "I cannot hear voice notes yet, jefe — type it and I will answer.",
   download:     "That voice note would not come through, jefe. Send it again?",
@@ -5167,29 +3496,20 @@ export const VOICE_TROUBLE: Record<string, string> = {
   empty:        "I could not make out any words in that one, jefe. Send it again, or type it?",
 };
 
-// The reason, or the words. A string is what she heard; anything else names
-// which of the four above he is about to be told.
 type Heard = { said: string } | { trouble: keyof typeof VOICE_TROUBLE & string };
 
 async function transcribe(bytes: Uint8Array, name: string, mime: string): Promise<Heard> {
   if (!STT_URL || !STT_KEY) return { trouble: 'unconfigured' };
   try {
     const form = new FormData();
-    /* THE TYPE COMES FROM TELEGRAM RATHER THAN BEING LEFT OFF. It hands over
-       `audio/ogg` for a voice note and we were discarding it — and providers
-       differ in whether they read the format off the part's content type or off
-       the filename, so giving both is what makes this portable across the ones
-       that speak this shape. The extension is Telegram's own (`.oga` for a
-       voice note, whatever the file was for an audio one) rather than a
-       constant, since `msg.audio` is not always ogg. */
+    // Telegram's type and filename both: providers read the format from one or
+    // the other, and msg.audio is not always ogg.
     form.append("file", new Blob([bytes], { type: mime }), name);
     form.append("model", STT_MODEL);
     const res = await fetch(STT_URL, {
       method: "POST", headers: { Authorization: `Bearer ${STT_KEY}` }, body: form,
     });
-    // The body on a failure, truncated: a 400 from one of these services names
-    // the actual complaint — an unsupported extension, a model that does not
-    // exist — and the status alone would send someone looking at the key.
+    // The body names the actual complaint; the status alone points at the key.
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const said = String((await res.json())?.text ?? "").trim();
     return said ? { said } : { trouble: 'empty' };
@@ -5200,12 +3520,8 @@ async function transcribe(bytes: Uint8Array, name: string, mime: string): Promis
 }
 
 /* ─── The tap under a briefing ─────────────────────────────────────────────
-   Answered from here rather than by the model, exactly as /notes is: it is a
-   fact being recorded, and a model call to store one word would be a full turn
-   with the whole memory attached for something a PATCH does.
-
-   answerCallbackQuery is not optional — Telegram spins the button until it
-   arrives, and a tap that never gets one reads as a bot that hung.
+   Answered here, not by the model: one word to store needs a PATCH, not a
+   turn. answerCallbackQuery is not optional, or the button spins.
    ───────────────────────────────────────────────────────────────────────── */
 export function parseFeedback(data: string): { verdict: string; day: string } | null {
   const [tag, verdict, day] = String(data ?? "").split('|');
@@ -5226,8 +3542,7 @@ async function handleFeedback(query: any): Promise<void> {
   }
 
   try {
-    // ONE VERDICT PER DAY, LAST TAP WINS. He may change his mind, and two
-    // contradictory rows for one briefing is a number nobody can read.
+    // One verdict a day; the last tap wins.
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_feedback?on_conflict=on_day`, {
       method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
       body: JSON.stringify([{ on_day: tap.day, verdict: tap.verdict }]),
@@ -5242,47 +3557,28 @@ async function handleFeedback(query: any): Promise<void> {
 
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
 
-/* THE ANSWER IS NOT WRITTEN INSIDE THE RESPONSE, AND IT CANNOT BE.
-
-   Telegram waits about a minute for a webhook to reply and then gives up with
-   "Read timeout expired" and redelivers the update. A briefing is a dozen web
-   searches and a long generation; it does not fit in that window, and the first
-   attempt proved it. Answering late is worse than slow: the redelivery runs the
-   whole thing again, so the trader gets two briefings and pays for two.
-
-   So the entry point answers 200 immediately and hands the work here.
-   EdgeRuntime.waitUntil is what keeps the worker alive past the response —
-   without it the runtime may reclaim it the moment the 200 is sent, killing the
-   generation halfway. Nothing awaits this, so it carries its own error handling
-   and its own apology; there is no response left to put a failure in. */
+/* Not answered inside the response: Telegram waits about a minute, then
+   redelivers, and a long answer would run — and bill — twice. The entry point
+   answers 200 at once; background() keeps the worker alive. Nothing awaits
+   this, so it carries its own error handling and apology. */
 async function handleMessage(update: any): Promise<void> {
   try {
     const msg = update?.message;
-    // Joins, stickers, and anything carrying nothing she can read. Dropped.
+    // Nothing she can read.
     if (!msg) return;
     if (String(msg.chat?.id) !== CHAT_ID) {
       console.error("doji-eugenia: message from unexpected chat");
       return;
     }
 
-    /* WHAT HE ACTUALLY SENT, resolved before anything else looks at it.
-
-       This used to be `if (!msg.text) return`, which silently dropped the two
-       things a trader at a desk is most likely to send: a voice note, because
-       talking is what people do when their hands are busy, and a chart, because
-       he trades charts. Both were invisible failures — no reply, no log, no
-       sign to him that anything had arrived.
-
-       `text` is what gets stored and what the slash commands read. `blocks` is
-       the image, which exists only for the turn being asked. */
+    // What he sent, resolved first: `text` is stored and read by the commands;
+    // `blocks` is an image, for this turn only.
     let text: string = typeof msg.text === 'string' ? msg.text : "";
     const blocks: any[] = [];
 
     const voice = msg.voice ?? msg.audio;
     if (voice?.file_id) {
-      // The download and the transcription both take seconds, so the indicator
-      // starts here rather than after — otherwise the wait for a voice note is
-      // the one that looks most like nothing happening.
+      // Typing from the start: a voice note's wait is the longest.
       await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
       const file = await tgDownload(voice.file_id);
       const heard: Heard = file
@@ -5291,19 +3587,14 @@ async function handleMessage(update: any): Promise<void> {
         : { trouble: 'download' };
 
       if ('trouble' in heard) { await say(VOICE_TROUBLE[heard.trouble]); return; }
-      // Kept as his words with a marker, so a later search for what he said
-      // finds it and the transcript is never passed off as something typed.
+      // Marked, so a transcript is never passed off as typed.
       text = `[voice note] ${heard.said}`;
     }
 
-    /* A CHART, AND THE LINE IT MAY NOT CROSS IS IN THE PROMPT RATHER THAN HERE.
-       She can describe what is on it and take it as context for the journal;
-       she cannot say whether a setup is valid, which would be a signal on a
-       trade he has not taken yet and is the one prohibition an image makes
-       tempting to break. Largest size last, which is Telegram's ordering. */
+    // A chart. Whether a setup on it is valid would be a signal; that line is in
+    // the prompt. Largest size last, Telegram's order.
     const photo = Array.isArray(msg.photo) && msg.photo.length ? msg.photo[msg.photo.length - 1] : null;
-    // A photo is always JPEG; a document carries whatever he attached, and only
-    // the four the API reads are worth downloading.
+    // A photo is JPEG; a document is whatever he attached.
     const docType = String(msg.document?.mime_type ?? "");
     const asImage = photo ?? (IMAGE_TYPES.includes(docType) ? msg.document : null);
     if (asImage?.file_id) {
@@ -5323,31 +3614,18 @@ async function handleMessage(update: any): Promise<void> {
       });
       text = String(msg.caption ?? "").trim() || "Have a look at this chart.";
     }
-    // An attachment that is neither readable audio nor a readable image. Said
-    // rather than dropped: a silent non-answer is what this whole branch exists
-    // to stop, and "I cannot open that" is a complete reply.
+    // Neither readable audio nor image: said, never dropped.
     if (!blocks.length && !text && msg.document) {
       await say(`I cannot open ${docType || 'that kind of file'}, jefe. A screenshot works.`);
       return;
     }
 
     if (!text) return;
-    /* ANSWERED FROM THE DATABASE, NEVER BY THE MODEL, and that is the whole
-       value of it. This is an audit of what she is keeping, so it has to show
-       the rows themselves — asked to list her own notes she could paraphrase
-       one, drop one, or produce a plausible line that is not in the table, and
-       an audit that can do that audits nothing. It also costs no model call. */
+    // /notes is answered from the database, never by the model, which could
+    // paraphrase or drop a row: an audit that can do that audits nothing.
     if (text.trim().toLowerCase() === '/notes') {
       try {
-        // The map goes out with them: it is the half of her memory he has never
-        // been able to see at all, and the half that says what she is missing.
-        // Read here and rendered by notesList, so the whole audit is one
-        // message written to him rather than his half plus hers.
-        //
-        // The open threads and the running story join it for the same reason.
-        // Everything she keeps that he cannot otherwise see belongs in the one
-        // place he goes to check what she is keeping — an audit that omits two
-        // of the five things it audits is the defect it exists to prevent.
+        // Everything she keeps that he cannot otherwise see, in one message.
         const [told, noticed, channels, loops, story, promised] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
           readNotes('commitment'),
@@ -5360,11 +3638,8 @@ async function handleMessage(update: any): Promise<void> {
       }
       return;
     }
-    /* HIS HALF OF THE LADDER, answered from the database like /notes and for the
-       same reason: a rung is a fact, and a model asked to set one could
-       paraphrase which. `setChannel` is reused rather than rewritten, so the
-       one-way door on the bottom rung and the unseeded-table check hold here
-       exactly as they do for the nightly pass. */
+    // /channel, answered from the database through setChannel, so the bottom
+    // rung's one-way door holds here too.
     const wanted = parseChannel(text);
     if (wanted !== null) {
       await say(typeof wanted === 'string'
@@ -5372,29 +3647,21 @@ async function handleMessage(update: any): Promise<void> {
         : await setChannel(wanted.channel, wanted.state, 'he said so'));
       return;
     }
-    // Any other slash command is addressed to Telegram, not to her, and /start
-    // arrives once per install. Answering one costs a full model call with the
-    // notes attached, so it is answered from here instead — Gladys ignores
-    // everything that is not a tap for the same reason.
+    // Any other command — /start — costs no model call.
     if (text.startsWith('/')) {
       await tg("sendMessage", { chat_id: CHAT_ID,
         text: "Aqui estoy, jefe. Just talk to me — or /notes to see what I have kept." });
       return;
     }
 
-    // TELEGRAM'S TYPING INDICATOR LASTS FIVE SECONDS AND CANNOT BE EXTENDED, so
-    // one call at the start leaves a thirty-second answer looking like a dead
-    // bot for twenty-five of them — which is exactly how it was read the first
-    // time it ran long. Re-sent until there is something to send. It makes
-    // nothing faster; it makes the wait legible. Best effort, so a failed ping
-    // is swallowed rather than taking the answer down with it.
+    // The typing indicator lasts five seconds, so it is re-sent until there is
+    // something to send; best effort.
     const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
     typing();
     const keepTyping = setInterval(typing, 4_500);
 
-    // A reply to one of her own messages names it. A text message carries its
-    // words; a voice note does not, and is found by when it was sent. Optional
-    // like the blocks beside it: a failed read costs the quote, never the answer.
+    // A swipe-reply names the message: its text, or for a voice note the turn
+    // found by time. A failed read costs the quote, never the answer.
     const replied = msg.reply_to_message?.from?.is_bot ? msg.reply_to_message : null;
     const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
       : typeof replied.text === 'string' ? Promise.resolve(replied.text)
@@ -5409,23 +3676,15 @@ async function handleMessage(update: any): Promise<void> {
         recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
         calendarBlock(), positionsBlock(), quoting,
       ]);
-      /* THE MARKER IS STORED, THE QUOTE IS NOT. The nightly pass reads the day's
-         turns, and "too long" with nothing saying under which message is a
-         correction it can only guess at; the opening words are enough to find
-         it there, and are a fact about the message rather than context that
-         goes stale — the `[voice note]` marker's reason. */
+      // A marker with the opening words is stored, so the nightly pass knows
+      // which message "too long" was about; the quote itself is not.
       if (quoted !== null) {
         const words = quoted.trim().split(/\s+/).filter(Boolean);
         const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
         text = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
       }
       const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
-      /* TOLD THAT IT WILL BE HEARD, AND NOT TOLD A LENGTH. The instruction used
-         to carry the cap, so that an answer over it was one she chose rather
-         than one silently left unspoken. There is no cap now — a long answer
-         becomes two voice notes — so a number here would be asking her to write
-         shorter for a limit that no longer exists, which is the one thing this
-         was changed to stop. */
+      // Told it will be heard, and no length: there is no cap to write for.
       const aloud =
         `\n\nYour answer reaches him as a voice note, so write it ` +
         `to be heard: plain sentences, no headings, and nothing that only works ` +
@@ -5434,33 +3693,21 @@ async function handleMessage(update: any): Promise<void> {
       const draft = await ask(
         [...history, {
           role: 'user',
-          // An image rides as a block beside the text; everything else is the
-          // string it always was. The context goes in the text either way, so
-          // the notes reach her whichever shape the turn takes.
+          // An image rides beside the text; the context is in the text either way.
           content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
         }],
         'medium', 'reply');
-      /* GATED INSIDE THE TYPING INDICATOR, which is why it is here rather than
-         beside the send. Cleared first, the ping stops and three silent seconds
-         pass before anything lands, so she reads as having finished and then
-         said nothing. */
+      // Gated while the indicator still runs, or three silent seconds read as
+      // her finishing and saying nothing.
       answer = await trim(draft, desk, story);
     } finally {
-      // Stopped the moment there is something to send, not after sending it —
-      // otherwise a ping fires between the message landing and the write, and
-      // she reads as about to say more.
+      // Stopped before sending, or a ping lands after the message.
       clearInterval(keepTyping);
     }
 
-    // BEFORE THE WRITE, only because the write is the slower of the two and the
-    // audio is the half he is waiting on. The text-then-audio ordering inside
-    // sayAloud is the part that matters and is stated there.
+    // Sent before the write: the message is what he is waiting on.
     await sayAloud(answer);
-    // THE TEXT, NEVER THE BLOCKS. A chart stored as base64 would be a megabyte
-    // of history resent on every turn for the next six exchanges, and the
-    // transcript of a voice note is the part worth searching anyway. What was
-    // SPOKEN is not stored either, for the same reason and more so: it is the
-    // same words, in a megabyte.
+    // The text, never the blocks or the audio: a megabyte resent as history.
     await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
@@ -5470,18 +3717,14 @@ async function handleMessage(update: any): Promise<void> {
   }
 }
 
-// Keeps a promise alive past the response. The catch is not optional: nothing
-// awaits this, so an unhandled rejection is the only trace a failure would
-// otherwise leave.
+// Keeps work alive past the response. The catch matters: nothing awaits it.
 function background(work: Promise<unknown>) {
   const guarded = work.catch(err =>
     console.error("doji-eugenia:", err instanceof Error ? err.message : err));
 
   const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
-  // SAID OUT LOUD, because its absence is otherwise invisible: without it the
-  // worker can be reclaimed the moment the 200 is sent, and the answer dies
-  // mid-generation with no error anywhere. That reads exactly like a model call
-  // that hung, which is the wrong thing to go looking for.
+  // Logged, because without it the worker can be reclaimed at the 200 and the
+  // answer dies mid-generation, reading like a model call that hung.
   if (!waitUntil) {
     console.error("doji-eugenia: EdgeRuntime.waitUntil unavailable — " +
                   "the reply may be killed when this response returns");
@@ -5503,52 +3746,29 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   try {
     if (secretMatches(fromTelegram, WEBHOOK_SECRET)) {
       const update = await req.json();
-      // TWO KINDS OF UPDATE NOW, and the webhook must be registered for both:
-      // allowed_updates = ["message", "callback_query"]. Registered for
-      // "message" alone the taps under a briefing are never delivered, the
-      // button spins, and nothing anywhere reports it — which is exactly the
-      // silent-registration failure Gladys's setWebhook already documents.
-      // Answer first, work after, for both. See handleMessage.
+      // Messages and taps, so the webhook registers both in allowed_updates.
+      // Answer first, work after.
       background(update?.callback_query
         ? handleFeedback(update.callback_query)
         : handleMessage(update));
       return json({ ok: true });
     }
     if (secretMatches(fromCron, CRON_SECRET)) {
-      /* TWO CALLERS BEHIND ONE SECRET, told apart by whether there is a body.
-         The cron jobs post nothing; the trades trigger posts {trade, event}.
-         Read as text and parsed rather than req.json(), because an empty body
-         throws there — and that throw would be every scheduled run. */
+      // Cron posts nothing; the trades trigger posts {trade, event}. Parsed from
+      // text, since req.json() throws on an empty body.
       const raw = (await req.text()).trim();
       const sent = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
       const url  = new URL(req.url);
 
-      /* THE ONE DOOR WHOSE ANSWER IS THE INTERFACE, so it alone still works
-         before it replies. `?embed=1` is called until it answers `left: 0`;
-         handed a 200 up front it would be a loop with nothing to read. It is
-         also the only flag NO cron job calls, which is the same fact from the
-         other side and is what agree.test.mjs holds this against. */
+      // ?embed=1 alone works before answering: it is called until `left: 0`,
+      // and it is the one flag no cron job dispatches — agree.test.mjs holds that.
       if (url.searchParams.get("embed") === "1") return await postScheduled(url);
 
-      /* EVERYTHING SCHEDULED ANSWERS BEFORE IT WORKS, and the reason is a
-         SECOND limit that Pro does not move. The worker's wall clock is 150s
-         free and 400s paid — that one killed the Sunday briefing at 145.4s of
-         drafting, four and a half seconds short. The request idle timeout is
-         150s on EVERY plan: send the caller nothing for that long and the
-         request is closed under you. So a briefing that now completes still
-         hands pg_net a 504, having delivered perfectly.
-
-         That 504 is not cosmetic. It is indistinguishable, in the only table
-         that records dispatches, from a call that never ran — and a monitor
-         that cannot tell a working briefing from a dead one is worse than
-         none. Answering first makes a non-2xx there mean what it says.
-
-         The Telegram half does this to beat a redelivery, which is why the
-         cron half was exempt; this is a different reason arriving at the same
-         shape. `background()` is unchanged and already guards the work.
-
-         The body NAMES the job, because `net._http_response` carries no URL
-         and the flag is otherwise unrecoverable from the row. */
+      /* Everything else answers before it works. The request idle timeout is
+         150s on every plan, so a briefing that completed perfectly still handed
+         pg_net a 504 — indistinguishable in the only dispatch record from a
+         call that never ran. Answering first makes a non-2xx mean what it
+         says. The body names the job, since the response row carries no URL. */
       if (sent?.trade) {
         background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened'))
           .catch(err => jobFailed('trade', err)));
@@ -5559,9 +3779,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
-    // pg_net discards this, so the console and the Telegram message above are
-    // where a failure is reported. postScheduled retries a failed briefing at
-    // 09:00, 10:00 and 11:00; anything reaching here is outside that.
+    // pg_net discards this; only the console sees it.
     console.error("doji-eugenia:", err instanceof Error ? err.message : err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }

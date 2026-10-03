@@ -14,12 +14,11 @@
  * exit price, commission, the New York filing day, the computed P&L — belongs
  * to the poller, and the Edge Function will not accept those columns from here.
  *
- * THIS SCRIPT HOLDS NO ACCOUNT CREDENTIALS. It used to sign in as you, with
- * your Supabase email and password in Script Properties, because Supabase's
- * secret keys reject any client whose user agent looks like a browser and Apps
- * Script's does. The write moved behind an Edge Function instead: what lives
- * here now is one secret whose entire authority is those five columns. If this
- * script is ever compromised, that is the whole of what is lost.
+ * THIS SCRIPT HOLDS NO ACCOUNT CREDENTIALS. Supabase's secret keys refuse a
+ * client whose user agent looks like a browser, as Apps Script's does, so the
+ * write sits behind an Edge Function: the one secret here opens those five
+ * columns and nothing else. If this script is ever compromised, that is the
+ * whole of what is lost.
  *
  * These alerts are also the early warning if the cTrader MCP token is ever
  * misused, so leave the notifications switched on regardless.
@@ -52,11 +51,8 @@ var ALERT_FROM = 'trade@alerts.ctrader.com';
 var DONE_LABEL = 'doji-synced';
 var FAIL_LABEL = 'doji-parse-failed';
 
-// 90 days rather than 30. The label is what stops a message being re-read, so
-// the window only has to be wider than the longest plausible outage — and it is
-// also the reach of the repair path: resetDojiLabels() strips the labels, and
-// this is what decides how far back the next run then re-reads. At 30 days that
-// could not reach anything worth repairing.
+// 90 days: the label stops a message being re-read, so the window need only
+// outlast an outage — and it is how far back resetDojiLabels() can repair.
 var GMAIL_QUERY = 'from:' + ALERT_FROM + ' -label:' + DONE_LABEL +
                   ' -label:' + FAIL_LABEL + ' newer_than:90d';
 
@@ -69,20 +65,17 @@ function syncPepperstone() {
   var threads = GmailApp.search(GMAIL_QUERY, 0, 20);
 
   threads.forEach(function (thread) {
-    // Three outcomes, not two. A PERMANENT failure — this body will never parse,
-    // or the function refused the fill it produced — earns the fail label so the
-    // thread leaves the queue. A TRANSIENT one — a Supabase blip, no network, a
-    // cold start — must leave the thread UNLABELLED so the next run retries it.
-    // Labelling those the same way is how a momentary outage used to discard a
-    // fill's net_pnl and balance forever.
+    // Three outcomes, not two. A PERMANENT failure — a body that will never
+    // parse, or a fill the function refused — is labelled failed and leaves the
+    // queue. A TRANSIENT one — a blip, no network, a cold start — stays
+    // unlabelled so the next run retries it, or its net_pnl is lost for ever.
     var permanent = false, transient = false;
 
     thread.getMessages().forEach(function (msg) {
       var subject = msg.getSubject() || '';
-      // Only closed-trade alerts carry a position id and a P&L. Anything else
-      // from this sender — a margin notice — is skipped, and the thread ends up
-      // labelled synced: nothing was written, but nothing ever will be, and the
-      // label is what stops it being read again every minute for ninety days.
+      // Only closed-trade alerts carry a fill. Anything else from this sender is
+      // skipped and the thread labelled synced, so it is not re-read every
+      // minute for ninety days.
       if (!/filled for/i.test(subject)) return;
 
       var fill = parseAlert_(subject, msg.getBody());
@@ -171,21 +164,14 @@ function parseAlert_(subject, htmlBody) {
     return null;
   })();
 
-  // DAY FIRST. cTrader sends `19/08/2026 20:22:55 (UTC)`, which is the 19th of
-  // August — and the saved fixture is the only thing that says so, because a
-  // day above twelve is the only way the two readings differ visibly. Read as
-  // month-first, every fill on the 1st to the 12th would be filed in the wrong
-  // month and nothing anywhere would report it. A test pins the ambiguous case.
+  // Day first: `19/08/2026 20:22:55 (UTC)` is the 19th of August, and read
+  // month-first every fill on the 1st to the 12th would land in the wrong month
+  // silently. A test pins the ambiguous case. The Z keeps it UTC, as the email
+  // states; without it the runtime reads its own timezone.
   //
-  // The email states UTC explicitly, and the Z is what makes that stick.
-  // Dropping it lets the runtime read the string in its own timezone, which is
-  // how evening trades used to land on the wrong day.
-  //
-  // ONE LABEL, not a list of guesses at one. If cTrader renames the field the
-  // fill is refused, the thread is labelled doji-parse-failed and the subject is
-  // logged — a loud failure with a repair path. An alias nobody has ever seen
-  // trades that for the chance of reading some other line as the fill time,
-  // which would file the trade on the wrong day silently.
+  // One label, not a list of guesses: a renamed field fails loudly into
+  // doji-parse-failed, where an alias nobody has seen could silently read some
+  // other line as the fill time.
   var fillTime = (function () {
     var raw = grab('Fill time') || '';
     var a = raw.match(/(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})/);
@@ -197,14 +183,10 @@ function parseAlert_(subject, htmlBody) {
 
   var netPnl = num(grab('Net P&L'));
 
-  // NET P&L IS REQUIRED, and it is the only optional-looking field that is not.
-  // It is the one figure nothing else in this system can supply — computed_pnl
-  // is arithmetic over the deals and swap appears in none of them — so a fill
-  // written without it is a row that looks complete and carries the wrong P&L
-  // forever. Refusing labels the thread, logs the subject and leaves a repair
-  // path; writing what parsed leaves nothing at all. direction and fill_time
-  // are required for the same reason in reverse: nothing downstream can supply
-  // a direction, and a fill_time that did not parse would move a trade's day.
+  // Net P&L is required: nothing else in this system can supply it — swap is in
+  // none of the deals — and a fill written without it looks complete and
+  // carries the wrong P&L for ever. Refusing leaves a repair path. Direction
+  // and fill time are required for the same reason in reverse.
   if (!direction || !fillTime || netPnl === null) return null;
 
   return {

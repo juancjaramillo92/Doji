@@ -1,67 +1,26 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — the journal/broker boundary, said to the database
 -- ───────────────────────────────────────────────────────────────────────────
--- "Journal columns and broker columns never meet" is the idea the whole design
--- rests on, and until this file it was enforced by a `for` loop. `Data.save()`
--- copies four names out of a patch and sends those; Gladys's `COLUMNS` map
--- names the same four; and that is the entire mechanism. The DATABASE has never
--- been asked to hold it.
+-- 001's policy decides which ROWS a session may write, not which columns, and
+-- Supabase's default privileges grant anon and authenticated everything on a
+-- new table by name. So any signed-in session could update net_pnl directly
+-- through PostgREST. This narrows the app to the columns it owns.
 --
--- WHAT THAT ACTUALLY LEAVES OPEN. `trades` has one policy, `for all using
--- (user_id = auth.uid())`, which decides WHICH ROWS a caller may write and says
--- nothing about WHICH COLUMNS. The publishable key is in index.html because it
--- is meant to be public, so a signed-in session — the trader's own, or anyone
--- who has it — can write any column of any row it owns:
+-- Five, not Data.OWNED's four: delete and undo write `deleted` through
+-- update() directly. agree.test.mjs holds the list against both.
 --
---     supabase.from('trades').update({ net_pnl: 999999 }).eq('id', …)
---
--- and Postgres accepts it. Nothing in the app has to be wrong for that to work;
--- the app is simply not the only thing that can talk to PostgREST. The P&L, the
--- direction, the fill time and the balance are all reachable, and every one of
--- them is a column §8 says the app does not own and cannot repair.
---
--- IT IS THE SAME SHAPE 007 FIXED FOR FUNCTIONS. Supabase's default privileges
--- on the public SCHEMA grant `anon` and `authenticated` everything on a new
--- table, by name — so `trades` arrived writable in full the day it was created,
--- and no statement in 001 says otherwise because no statement had to. The
--- revoke below names PUBLIC as well as both roles for exactly the reason
--- `eugenia_search` needed both: PUBLIC in a revoke is the pseudo-role, and the
--- two named roles hold their privileges separately.
---
--- ── The five columns, and why it is five and not four ──────────────────────
--- `Data.OWNED` holds four. The app writes a fifth: `deleted`, set true by the
--- delete path and false again by undo, both of which call `update()` directly
--- rather than going through `save()`. A grant list built from `Data.OWNED`
--- alone reads as obviously correct and breaks delete and undo the moment it is
--- applied — which is the kind of thing this file exists to stop being found in
--- production. `agree.test.mjs` holds the list here against both.
---
--- ── Not re-runnable in the sense 005 is ────────────────────────────────────
--- It carries no `create table`, so nothing here is destructive, and every
--- statement is idempotent: a revoke of a privilege already revoked and a grant
--- of one already held are both no-ops. Re-applying it is safe.
---
--- ── Rolling it back ────────────────────────────────────────────────────────
--- One statement, and it restores exactly what Supabase's defaults gave:
+-- Idempotent, so re-applying is safe. To roll back, restoring exactly
+-- Supabase's defaults, with RLS still behind them:
 --
 --     grant insert, update, delete on public.trades to anon, authenticated;
---
--- RLS still stands behind that, as it did before this file existed.
 -- ═══════════════════════════════════════════════════════════════════════════
-
--- SELECT is deliberately untouched. The app reads every column — the heatmap,
--- the P&L card and the export all need the broker's figures — and realtime is a
--- read as well, so narrowing it would blank the page rather than protect it.
--- What is being taken away is the ability to WRITE what the app does not own.
+-- SELECT is untouched: the app and realtime read every column. PUBLIC and both
+-- roles by name, for 007's reason.
 revoke insert, update, delete on public.trades from public, anon, authenticated;
 
--- The four journal answers, plus the soft-delete flag the app also owns.
--- Nothing else: a broker column named here would undo the whole file.
+-- The four journal answers and the soft-delete flag.
 grant update (setup, followed_rules, followed_sl, followed_tp, deleted)
   on public.trades to authenticated;
 
--- INSERT stays revoked on purpose. Every row in this table arrives from the
--- poller or the email function, both of which hold the secret key and bypass
--- all of this; the app has never created a trade and must not be able to. The
--- same goes for DELETE — a removal here is the `deleted` flag, never a row
--- leaving the table, because the backup and the fold both need the history.
+-- No INSERT: every row arrives from a broker writer holding the secret key.
+-- No DELETE: a removal is the `deleted` flag, and the history stays.
