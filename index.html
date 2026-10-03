@@ -1966,9 +1966,7 @@ const Dates = {
   weekStart(date = new Date()) {
     const p = Dates.nyParts(date);
     const back = (p.weekday === 0 && p.hour < 17) ? 7 : p.weekday;
-    const base = new Date(Date.UTC(p.y, p.m - 1, p.d));
-    base.setUTCDate(base.getUTCDate() - back);
-    return base.toISOString().slice(0, 10);
+    return new Date(Date.UTC(p.y, p.m - 1, p.d - back)).toISOString().slice(0, 10);
   },
 
   monthStart(date = new Date()) {
@@ -1982,9 +1980,7 @@ const Dates = {
     const p = Dates.nyParts(date);
     let back = (p.weekday - 5 + 7) % 7;               // Fri=0, Sat=1 … Thu=6
     if (p.weekday === 5 && p.hour < 17) back = 7;     // Friday pre-close
-    const base = new Date(Date.UTC(p.y, p.m - 1, p.d));
-    base.setUTCDate(base.getUTCDate() - back);
-    return base.toISOString().slice(0, 10);
+    return new Date(Date.UTC(p.y, p.m - 1, p.d - back)).toISOString().slice(0, 10);
   }
 };
 
@@ -2042,9 +2038,10 @@ const dayOf = t => t.open_day || Dates.nyDay(t.fill_time);
 // closed rather than when they opened. Imperfect and openly so — the
 // alternative is returning nothing. Flag it whenever session data is read for a
 // pattern spanning that boundary.
-const sessionOf = t =>
-  (t.entry_time ? Dates.session(new Date(t.entry_time)) : null)
-  || (t.fill_time ? Dates.session(new Date(t.fill_time)) : null);
+const sessionOf = t => {
+  const at = t.entry_time || t.fill_time;
+  return at ? Dates.session(new Date(at)) : null;
+};
 
 // Everything only the trader can answer: the setup and all three discipline
 // questions. P&L is deliberately not required — an open position can be
