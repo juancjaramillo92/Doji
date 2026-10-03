@@ -43,14 +43,8 @@ export const SB_URL = env("SUPABASE_URL");
 // function answers 503 at its first line rather than reaching for another key.
 export const SB_KEY = env("SB_SECRET_KEY");
 
-export const sbHeaders = (prefer?: string): Record<string, string> => {
-  const headers: Record<string, string> = {
-    apikey: SB_KEY,
-    "Content-Type": "application/json",
-  };
-  if (prefer) headers.Prefer = prefer;
-  return headers;
-};
+export const sbHeaders = (prefer?: string): Record<string, string> =>
+  ({ apikey: SB_KEY, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) });
 
 /* ─── The heartbeat the two silent writers leave ───────────────────────────
    One sync_health row per writer, moved on every completed run. A heartbeat

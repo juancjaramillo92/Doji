@@ -42,8 +42,8 @@ const PAGE = 1000;
    backup that stops after one page is the failure this file exists to avoid. */
 export async function readAll(url, key, table, orderBy, fetchImpl = fetch) {
   const rows = [];
+  const order = [orderBy].flat().map(c => `${c}.asc`).join(',');
   for (let from = 0; ; from += PAGE) {
-    const order = [orderBy].flat().map(c => `${c}.asc`).join(',');
     const res = await fetchImpl(`${url}/rest/v1/${table}?select=*&order=${order}`, {
       headers: {
         apikey: key,

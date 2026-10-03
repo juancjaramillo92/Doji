@@ -110,9 +110,8 @@ export function parseCallback(data: string): Tap | null {
   if (!/^PID\d+$/.test(id)) return null;
 
   if (parts.length === 2) {
-    if (parts[1] === 'edit') return { id, column: null, value: null, action: 'edit' };
-    if (parts[1] === 'done') return { id, column: null, value: null, action: 'done' };
-    return null;
+    const action = parts[1];
+    return action === 'edit' || action === 'done' ? { id, column: null, value: null, action } : null;
   }
   if (parts.length !== 3) return null;
 

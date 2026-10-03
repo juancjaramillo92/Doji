@@ -157,12 +157,8 @@ function parseAlert_(subject, htmlBody) {
   // The POSITION side, not the closing order's. Confirmed against 21 fills the
   // poller never reached, whose direction the app renders correctly with no
   // other source to correct them.
-  var direction = (function () {
-    var d = grab('Direction') || '';
-    if (/sell/i.test(d)) return 'SELL';
-    if (/buy/i.test(d))  return 'BUY';
-    return null;
-  })();
+  var side = grab('Direction') || '';
+  var direction = /sell/i.test(side) ? 'SELL' : /buy/i.test(side) ? 'BUY' : null;
 
   // Day first: `19/08/2026 20:22:55 (UTC)` is the 19th of August, and read
   // month-first every fill on the 1st to the 12th would land in the wrong month
@@ -174,11 +170,10 @@ function parseAlert_(subject, htmlBody) {
   // other line as the fill time.
   var fillTime = (function () {
     var raw = grab('Fill time') || '';
-    var a = raw.match(/(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})/);
-    if (a) return a[3] + '-' + a[2] + '-' + a[1] + 'T' + a[4] + ':' + a[5] + ':' + a[6] + 'Z';
-    var b = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
-    if (b) return b[1] + '-' + b[2] + '-' + b[3] + 'T' + b[4] + ':' + b[5] + ':' + b[6] + 'Z';
-    return null;
+    var a = raw.match(/(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}:\d{2}:\d{2})/);
+    if (a) return a[3] + '-' + a[2] + '-' + a[1] + 'T' + a[4] + 'Z';
+    var b = raw.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+    return b ? b[1] + 'T' + b[2] + 'Z' : null;
   })();
 
   var netPnl = num(grab('Net P&L'));

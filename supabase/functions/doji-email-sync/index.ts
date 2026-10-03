@@ -49,8 +49,6 @@ const USER_ID = env("DOJI_USER_ID");
    ───────────────────────────────────────────────────────────────────────── */
 export type Fill = { row: Record<string, unknown> } | { error: string };
 
-const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v);
-
 export function emailRow(input: unknown, userId: string): Fill {
   if (!input || typeof input !== "object") return { error: "body is not an object" };
   const b = input as Record<string, unknown>;
@@ -72,7 +70,7 @@ export function emailRow(input: unknown, userId: string): Fill {
   // number, until the day it is not.
   for (const k of ["net_pnl", "balance"] as const) {
     if (b[k] === undefined || b[k] === null) continue;
-    if (!finite(b[k])) return { error: `${k} is not a finite number` };
+    if (!Number.isFinite(b[k])) return { error: `${k} is not a finite number` };
     row[k] = b[k];
   }
 
