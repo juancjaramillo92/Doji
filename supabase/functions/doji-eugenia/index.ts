@@ -2567,12 +2567,12 @@ export function positionsList(
 }
 
 /* Open is BOTH witnesses null. fill_time comes from the email and from the
-   poller's writeFill, which stamps only closes its fold window reaches; what
-   the poller records on every close is exit_price. Read off fill_time alone, a
-   close with no alert stayed open for ever, and this block cited R-19 and R-15
-   at him about a position gone since Wednesday. Either witness closes it — the
-   shape balance and direction use. Broker rows only: pre-sync rows carry
-   neither column. Exported because the filter was the half no test reached;
+   poller, which stamps only closes its fold window reaches; what the poller
+   records on every close is exit_price. Read off fill_time alone, a close with
+   no alert stayed open for ever, and this block cited R-19 and R-15 at him
+   about a position gone since Wednesday. Either witness closes it — the shape
+   balance and direction use. Broker rows only: pre-sync rows carry neither
+   column. Exported because the filter was the half no test reached;
    positionsList renders correctly whatever it is handed. */
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
