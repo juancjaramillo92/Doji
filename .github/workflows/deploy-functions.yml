@@ -1,12 +1,6 @@
-# Deploys every Edge Function in supabase/functions on a push to main, so the
-# repository is the source of truth for what is running — the same arrangement
-# Vercel already gives index.html.
-#
-# Before this existed the functions were pasted into the dashboard by hand, and
-# nothing connected the deployed code to the committed code. A repo that claims
-# to describe a running system while the system runs something else is worse
-# than no repo at all: every later change is reasoned about from a file that is
-# not the truth.
+# Deploys every Edge Function on a push to main, so what runs is what is
+# committed — the arrangement Vercel gives index.html. A hand-deployed function
+# can differ from the file with nothing to reveal it.
 name: deploy functions
 
 on:
@@ -48,20 +42,12 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # The floor lives in package.json's engines.node and nowhere else.
-          # A bare `node-version: 22` is a second home for it that no tool
-          # compares: it resolves to the newest 22.x, which is above the floor
-          # today and says nothing about the day the floor moves past it —
-          # jsdom's requirement is what set it, and jsdom is a dependency that
-          # moves. setup-node reads engines.node and resolves the range itself.
+          # The floor lives in package.json's engines.node alone; a version
+          # written here would be a second copy nothing compares.
           node-version-file: package.json
 
-      # THE SUITE GATES THE DEPLOY, in this job rather than in a separate one.
-      # test.yml runs on every push and would have gone red beside this
-      # workflow while it shipped anyway — two green ticks and one red, with
-      # the broken code already live. A failing step here stops the deploy,
-      # which is the only ordering that actually protects anything. It is the
-      # same suite; running it twice on a push to main costs seconds.
+      # The suite gates the deploy here, in this job: test.yml alone would go
+      # red beside a deploy that had already shipped.
       - run: npm ci
       - run: npm test
 
@@ -77,12 +63,9 @@ jobs:
       # No function name: every function under supabase/functions goes, so one
       # of them cannot silently fall behind the others.
       #
-      # --no-verify-jwt duplicates what supabase/config.toml already says, and
-      # deliberately. All five functions authorise their own callers in code,
-      # and if either mechanism stops being honoured on its own, a deploy that
-      # quietly turned JWT verification back on would break the live Telegram
-      # webhooks and the cron poller at once. Two statements of one setting is
-      # the cheaper mistake.
+      # --no-verify-jwt repeats config.toml on purpose: if either stopped being
+      # honoured, JWT verification back on would break the webhooks and the
+      # poller at once. Two statements of one setting is the cheaper mistake.
       - run: supabase functions deploy --project-ref gujhyogvkzjgnrodyuse --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
