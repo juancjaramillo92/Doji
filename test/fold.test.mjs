@@ -4695,7 +4695,9 @@ test('a speech vendor that refuses once is asked again before the text goes', as
    after it. The stub answers a read only when its filter matches a correct
    one, or a pairing that reads the wrong row would pass. */
 test('the speaking worker sends today\'s stored briefing and only then says it was delivered', async () => {
-  const stamp = new Date(Date.now() - 60_000).toISOString().replace('Z', '+00:00');
+  // Now rather than a minute back: a minute back is yesterday in the first
+  // minute of a New York day, and the worker speaks today's briefing only.
+  const stamp = new Date().toISOString().replace('Z', '+00:00');
   const steps = [];
   await stubbed(async () => {
     globalThis.fetch = async (url, init) => {
