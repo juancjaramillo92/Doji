@@ -90,7 +90,7 @@ select 'eugenia_turns', count(*) filter (where embedding is null), count(*)
   from public.eugenia_turns;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
--- Against 004_cron.sql: the schedules and the timeouts.
+-- Against schema.sql's timer section: the schedules and the timeouts.
 select jobid, jobname, schedule, active, command
 from cron.job
 order by jobname;

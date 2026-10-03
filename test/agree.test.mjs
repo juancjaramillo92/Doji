@@ -259,13 +259,13 @@ test('every journal column both writers name exists in the schema', async () => 
   const { app, close } = await boot();
   try {
     for (const column of app.Data.OWNED) {
-      assert.ok(declaresColumn(column), `${column} is not declared in 001_trades.sql`);
+      assert.ok(declaresColumn(column), `${column} is not declared in schema.sql`);
     }
   } finally { close(); }
 });
 
 /* ─── And the two copies inside the redraw trigger ───────────────────────────
-   002_gladys.sql names the four columns twice more. Missing from the WHEN
+   The Gladys section of schema.sql names the four columns twice more. Missing from the WHEN
    clause, an answer never reaches the Telegram message; missing from `before`,
    it reads as unanswered and a correction to a settled trade reopens the form.
    ───────────────────────────────────────────────────────────────────────── */
@@ -278,7 +278,7 @@ test('the redraw trigger watches, and carries, exactly the journal columns', asy
     // Anchored on the trigger itself, so the columns in the payload above it
     // cannot stand in for the ones in the WHEN clause.
     const at = GLADYS_SQL.indexOf('create or replace trigger trades_telegram_on_answer');
-    assert.ok(at > -1, '002_gladys.sql no longer creates trades_telegram_on_answer');
+    assert.ok(at > -1, 'schema.sql no longer creates trades_telegram_on_answer');
 
     const watched = [...GLADYS_SQL.slice(at).matchAll(/new\.(\w+)\s+is distinct from/g)]
       .map(m => m[1]).sort();
@@ -1321,9 +1321,10 @@ const CODE = TRACKED
   .map(f => source(`${f}`)).join('\n');
 
 /* Backticked names that look like code — camelCase, snake_case, hyphenated,
-   dotted or SCREAMING — not short English in a code font. The hyphen and the
-   leading digit matter: `doji-telegram`, `005_cron.sql`. */
-const SYMBOLS = /`([A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_]+)*)`/g;
+   dotted or SCREAMING — not short English in a code font. The hyphen, the
+   leading digit and the slash matter: `doji-telegram`, `005_cron.sql`,
+   `supabase/016_tradingview.sql`. */
+const SYMBOLS = /`([A-Za-z0-9_][A-Za-z0-9_/-]*(?:\.[A-Za-z0-9_]+)*)`/g;
 
 const looksLikeCode = (name) =>
   /[A-Z_.\-]/.test(name) && name.length >= 4 && /[A-Za-z]/.test(name);

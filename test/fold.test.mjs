@@ -1200,12 +1200,12 @@ test('the fourth answer settles the form, and the three before it do not', () =>
 });
 
 /* ─── Telegram: an answer written somewhere else ─────────────────────────────
-   The app writes the same four columns; 002_gladys.sql fires on the update and
-   sends the row with the answers AS THEY STOOD, and doji-gladys decides the
-   redraw from that before-state with answered() — the expression staysOpen()
-   applies to a tap. THEY MUST STAY ONE EXPRESSION: a tap fires both redraws,
-   the trigger's lands second, and a difference would shut a form reopened with
-   [Edit] under the correction being made in it.
+   The app writes the same four columns; trades_telegram_on_answer fires on the
+   update and sends the row with the answers AS THEY STOOD, and doji-gladys
+   decides the redraw from that before-state with answered() — the expression
+   staysOpen() applies to a tap. THEY MUST STAY ONE EXPRESSION: a tap fires both
+   redraws, the trigger's lands second, and a difference would shut a form
+   reopened with [Edit] under the correction being made in it.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('a trade missing any one answer is not answered', () => {

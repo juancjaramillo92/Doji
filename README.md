@@ -392,7 +392,7 @@ when they stop saying the same thing. It also asserts the guarantee rather than
 only the lists: no broker column may appear in `Data.OWNED` or `COLUMNS`.
 
 **The database holds that guarantee too.** RLS on `trades` scopes rows to their
-owner and says nothing about columns, so `011_trades_grants.sql` revokes insert,
+owner and says nothing about columns, so `schema.sql` revokes insert,
 update and delete and grants back update on exactly five columns —
 `Data.OWNED`'s four and `deleted`. The threat it stops is a client already
 holding the session token, a narrow one; it is done because the test above made
@@ -547,7 +547,7 @@ market-closed skip is a completed run and marks itself**, or gold's weekend clos
 reads as a dead sync every Sunday evening. The table is inert until it exists:
 both writers swallow their own heartbeat failure.
 
-**`009_dispatch.sql` sees the call that never ran.** Supabase can refuse a
+**`dispatch_watch` sees the call that never ran.** Supabase can refuse a
 worker with `546 WORKER_RESOURCE_LIMIT` *before* the function exists — nothing
 marks, nothing throws, nothing logs — and the only witness is a row in
 `net._http_response`, pruned within hours and carrying **no url**. So every
@@ -572,7 +572,7 @@ mode with the function it watches.
   settles nothing, so fixing a misspelled Vault name still delivers the outage.
   Past three hours it gives up.
 
-**`010_pace.sql` speaks before the failure, because afterwards nothing can.**
+**`pace_watch` speaks before the failure, because afterwards nothing can.**
 The cron half answers before it works, so a briefing killed at the 400s wall
 clock has already handed pg_net a `200`: the ledger is green, `ask()` never
 reaches its catch, no apology is sent, and every retry redoes the same work.
@@ -800,7 +800,7 @@ place in her Telegram webhook.
 access) and no new secret: it checks `DOJI_CRON_SECRET` and writes with
 `SB_SECRET_KEY`.
 
-1. Run `supabase/016_tradingview.sql`. It is safe to re-run.
+1. Run `supabase/schema.sql`. It is safe to re-run.
 2. Let the deploy workflow ship the function from `main`.
 3. Start a sign-in:
 
@@ -953,7 +953,7 @@ artifact is the account.
 **One renewal at a time, by a lease.** A rotating server may treat a refresh
 token presented twice as stolen and revoke the sign-in, and the briefing and the
 release look can find it stale in the same second. A renewal first takes the
-lease `017_tradingview_lease.sql` adds, by a PATCH filtered on it being empty or
+lease `refreshing_until` holds, by a PATCH filtered on it being empty or
 lapsed — `balance`'s arbitration. A caller without the lease waits for the token
 the holder writes; the holder re-reads the row once it holds the lease, since
 another caller may have renewed; the new token and the release are one write; a
@@ -987,7 +987,7 @@ binds its own token in one line, `const tg = (m, b) => telegram(BOT_TOKEN, m, b)
 
 When a position opens he gets one Telegram message and answers the whole journal
 from it without opening the app; journalling the trade anywhere else redraws that
-message. `supabase/002_gladys.sql` holds both triggers and `doji-gladys` is the
+message. `schema.sql` holds both triggers and `doji-gladys` is the
 function behind them.
 
 **A function is named after who it is, and so are its secrets** — `doji-gladys`,
@@ -1077,9 +1077,8 @@ gold open, so the week's first briefing lands with the market. She says hello
 her own way, Spanish or English, inside the first paragraph, and goes straight to
 the number. Reply and she answers — typed, by voice, or to a chart.
 
-`supabase/003_eugenia.sql` holds her memory and her read of the journal,
-`005_eugenia_senses.sql` her meters, calendar and the trigger that tells her
-about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
+`schema.sql` holds her memory and her read of the journal, her meters,
+calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
 `strategy.ts` what he decided, `adherence.ts` the thirteen rules a row can
 answer; `index.ts` is the wiring.
 
@@ -1253,7 +1252,7 @@ is least likely to speak. The spine is driven by data rather than an hour.
 **The calendar is filed for her, from TradingView.** `fileCalendar` reads
 `doji-tradingview?calendar=1` for the days around now, through the cron secret
 she already holds, and upserts every timed US release rated medium or above into
-`eugenia_calendar` under TradingView's own id (`018_calendar_tradingview.sql`):
+`eugenia_calendar` under TradingView's own id (`tv_id`):
 the time, the name with its period (*Core PCE Price Index MoM (Aug)*), the
 importance, the consensus, the prior, and the actual once it prints. Low-rated
 items are not filed — each would be in front of her on every request and none
@@ -1296,7 +1295,7 @@ hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 `?release=1` is its door.
 
 **The look reads a release against its own record.** Each row carries
-TradingView's `ticker` (`020_calendar_ticker.sql`), the series it belongs to, and
+TradingView's `ticker`, the series it belongs to, and
 the look is handed the last twelve prints of each series in the group, oldest
 first, each against what was expected (`recordList`, read by `recordQuery`).
 Listed, never scored — parsing "0.2%" into a sign is a chance to get every unit
@@ -1473,7 +1472,7 @@ holds the two lists together.
 impact, at v1.20, as a US release TradingView rates high, so one calendar serves
 the briefing, the trade event and the rules. Rows with no TradingView id are not
 read. **A week nobody fetched is not a quiet week**: `calendar_weeks`
-(`019_calendar_weeks.sql`) records each week a whole-week fetch landed for, and
+records each week a whole-week fetch landed for, and
 an entry outside one is `unknown`. Both markers go through `fileWeek`, which
 writes the rows first and the mark after:
 
@@ -1783,8 +1782,7 @@ fudge.
 
 ### Search that survives a different idea
 
-`007_semantic.sql` adds an `embedding` to notes and turns and a second arm to the
-same function. **It is reach, not a sixth memory**: the windows do not move,
+An `embedding` on notes and turns gives the same function a second arm. **It is reach, not a sixth memory**: the windows do not move,
 since every token in a window is paid on every request.
 
 **The lexical arm stays, as the floor.** A vector is worse at exact strings — a
@@ -1989,7 +1987,7 @@ makes the *view* read-only, not the key — she holds the service key for her ow
 tables — so the structural guarantee is the one that matters.
 
 The view is `security_invoker`, which a view is **not** by default: without it,
-RLS would depend on whoever ran `003_eugenia.sql` rather than on who is asking, and
+RLS would depend on whoever ran `schema.sql` rather than on who is asking, and
 a grant widened by mistake would leak every user's trades.
 
 **Context goes in the user turn, not a mid-conversation system message.** That
@@ -2038,7 +2036,7 @@ row. Answering first makes a non-2xx there mean what it says, and the body names
 the job (`accepted: "pulse=1"`), since the row carries no URL. `?embed=1` alone
 waits: its answer *is* its interface — call it until it reports `left: 0` — and
 it is the one flag no cron job dispatches, which `agree.test.mjs` holds against
-`004_cron.sql`.
+the timer section of `schema.sql`.
 
 **The trade event reaches the same catch.** It is dispatched beside
 `postScheduled` rather than through it; both hand a failure to `jobFailed`, which
