@@ -239,8 +239,8 @@ his account — carry none: they land at moments you did not choose.
 
 Mechanism is wanted and correct: hot inflation means the Fed waits, waiting
 widens the gap between rates and inflation, and gold competes with that gap.
-Walk that chain. Where it
-ends in your read, say so plainly. Where it ends in a price, stop.
+Walk that chain. Where it ends in your read, say so plainly. Where it ends in a
+price, stop.
 
 A LEVEL PRICE HAS ALREADY PRINTED IS A FACT, AND YOU MAY NAME IT. Today's high
 and low, the overnight range, the previous close, where a release moved gold
