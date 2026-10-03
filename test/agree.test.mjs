@@ -702,13 +702,19 @@ test('a commitment is recorded, audited, held against his trades and retired', (
 
 const read = (path) => ({ path, text: source(path) });
 
-// The two that name a FUNCTION.
-const CALLERS = ['supabase/schema.sql', 'doji_gmail_sync.gs'].map(read);
+// Everything that names a FUNCTION, each on its own, so one that stops naming
+// any is not covered by the others: Gladys's trigger, the trade event, the
+// schedules, and the Apps Script.
+const CALLERS = [
+  ...['Gladys', 'Her senses', 'Everything that runs on a timer']
+    .map(t => ({ path: `schema.sql (${t})`, text: subject(t) })),
+  read('doji_gmail_sync.gs'),
+];
 
 // Every file that names the PROJECT, which is a longer list: the app connects
 // to it, config.toml links the CLI to it and the deploy workflow pushes to it.
-const PROJECT_FILES = [...CALLERS.map(c => c.path),
-  'index.html', 'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
+const PROJECT_FILES = ['supabase/schema.sql', 'doji_gmail_sync.gs', 'index.html',
+  'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
