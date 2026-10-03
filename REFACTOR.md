@@ -4,7 +4,8 @@
 REGISTER: every move considered and turned down, with the reasoning that decided
 it, so a tempting one is not re-proposed and eventually waved through on a tired
 afternoon. A refusal has no code to attach itself to, which is why it needs a
-document. Read §2 before proposing a simplification.
+document. Read §2 before proposing a simplification; §4 holds the moves
+deferred rather than refused.
 
 Where it disagrees with the README, the README wins and you say so.
 
@@ -243,3 +244,40 @@ None of which blocks anything:
   the pass that cut every comment to its *why* and proved each file
   token-identical afterwards; placement is the judgment half that pass left.
 
+
+---
+
+## 4 · DEFERRED — THE NEXT STEP
+
+Considered in October 2026 and left for later, not refused. The owner calls the
+step these would take *Raptor 3*; the repository stands at 2.5: audited, slimmed,
+its SQL one file, both watchers sending through `tell_him`. Let 2.5 run live
+before starting any of them.
+
+- **The CSS.** About 1,500 lines of `index.html`, the largest block nothing has
+  simplified, and the one lever left that need not change behaviour. No test
+  sees a pixel (§1): the golden snapshot holds the markup, not how it looks, so
+  each step is a device pass by a person, screen by screen.
+- **One rules module for the app and Eugenia.** `journal.ts` copies the app's
+  break-even band, sessions and three P&L rules — about 60 lines, held by one
+  test. Sharing a file saves roughly 110 lines net, but the app's script cannot
+  import a module before it runs, so it changes how the app boots, and with it
+  `boot.mjs`, the type check and the golden snapshot. Worth it only if the copies
+  start to drift. Her win rate differs on purpose — null when nothing is
+  decided, and rounded — and a shared module keeps that difference.
+- **The moves in §2.** Each changes behaviour or breaks a rule `CLAUDE.md`
+  states. Reopen one at a time, with an answer to its reasoning and the owner's
+  sign-off.
+
+Looked at in the same pass and NOT on this list:
+
+- **One cron job for both watchers.** pg_cron runs a job's statements in one
+  transaction, so a raise in one watcher would roll back the other's report.
+- **Cutting a part of Eugenia.** Every optional secret is set, so nothing of hers
+  is dead, and a cut stops her doing something. If one is ever wanted,
+  `eugenia_runs` and his feedback taps say which parts earn their cost.
+- **Dropping the email path.** The settled P&L with swap arrives only by email:
+  deals carry no swap, and cTrader's position details report zero swap and
+  commission even when commission was charged. Deriving it from balance changes
+  is ambiguous across overlapping positions and transfers, and would need a probe
+  and weeks of both paths running side by side before anything is deleted.
