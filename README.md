@@ -430,28 +430,23 @@ minutes — correct day, correct session, purple and pending, P&L blank until it
 closes. Open it and fill in the setup and the three discipline answers.
 
 **There is no manual entry, and no import.** A hand-made row carries no position
-id, so the sync could never match it and it would sit in the log forever as a
-duplicate of a real trade waiting to happen. Historical backfill belongs in the
-SQL editor, run once, not behind a button that can be pressed twice.
+id, so the sync could never match it. Historical backfill belongs in the SQL
+editor, run once, not behind a button that can be pressed twice.
 
 **The journal modal holds only your half.** Direction, P&L, the session and the
-filing date are not offered there at all: the poller rewrites them every two
-minutes, so a control over any of them could only ever lie. The trade log is
-where they are read. The modal is the setup and the three discipline answers,
-and nothing else.
+filing date are not offered: the poller rewrites them every two minutes, so a
+control over any of them could only lie. The trade log is where they are read.
 
-**Deletes** stage with a 7-second undo. The row leaves the screen immediately and
-`deleted` is set at once; undo clears it again. The window forgives the reflex,
-it does not hold the delete back.
+**Deletes** stage with a 7-second undo. The row leaves the screen and `deleted`
+is set at once; undo clears it. The window forgives the reflex, it does not hold
+the delete back.
 
-**Export** lives in the Export panel — labelled Export, since there is no import
-path for it to share: the journal as `.xlsx`, and a full `.json` backup. Both
-are produced as Blob URLs, the same mechanism the weekly auto-backup uses. The backup carries **every** row including the soft-deleted ones, and
-omits `pnl` because it is a generated column and cannot be written back.
-
-It is a genuine restore point. There is deliberately no restore *button* —
-replacing the database from a file is a job for the SQL editor, done knowingly,
-rather than one click away from an export. The procedure:
+**Export** gives the journal as `.xlsx` and a full `.json` backup, both as Blob
+URLs, as the weekly auto-backup does. The backup carries **every** row, the
+soft-deleted ones included — restoring without them lets the poller rebuild
+every trade you removed — and omits the generated `pnl`. It is a genuine restore
+point, and deliberately has no restore *button*: replacing the database from a
+file is a job for the SQL editor, done knowingly.
 
 ```sql
 -- 1. paste the file's `trades` array as the argument
@@ -478,129 +473,61 @@ on conflict (id) do update set
   planned_tp = excluded.planned_tp, best_price = excluded.best_price;
 ```
 
-**The columns are named, and `select *` is the mistake it replaced.** Postgres
-refuses any value for a generated column, a null included, so `insert into
-trades select * from jsonb_populate_recordset(...)` stopped at `pnl` before a
-single row landed. The restore point failed on the day it was needed. The update
-list had also stopped at the columns of its year, so `size_oz`, the plan and
-`best_price` came back as whatever the damaged row held. `agree.test.mjs` reads
-all three lists against the schema, so a column added later fails the suite
-until it is restored too.
-
-The deleted rows matter: restoring without them lets the poller rebuild every
-trade you ever removed.
+The columns are named because Postgres refuses any value for a generated
+column, a null included, so `select *` would stop at `pnl` before a row landed.
+`agree.test.mjs` reads all three lists against the schema, so a column added
+later fails the suite until the restore names it.
 
 **The weekly auto-backup** fires after the Friday 17:00 New York close, keyed on
-the last completed week so it runs once and never twice. Desktop only — a phone's
-Downloads folder is not where a backup belongs, and the marker is per-device so
-skipping on a phone does not consume the laptop's turn. A gesture-less download
-can be blocked silently with no API to detect it, so the toast asks you to verify
-rather than asserting success.
+the last completed week so it runs once. Desktop only, with a per-device marker,
+so a phone does not consume the laptop's turn. A gesture-less download can be
+blocked silently, so the toast asks you to verify rather than claiming success.
 
-**The backup is `trades` and nothing else, and the tables it leaves out are the
-ones that cannot be rebuilt.** Every broker column in `trades` exists in
-cTrader's history and a wide `?force=1` backfill reconstructs it; the journal
-columns and the soft-deleted rows are the part only this file holds, and those
-the backup does carry. Her memory is the other way round. `eugenia_notes`,
-`eugenia_turns`, `eugenia_channels`, `eugenia_thesis`, `eugenia_loops` and
-`eugenia_calendar` have no source anywhere else — the channel map is a year of
-teaching with a `moved_on` date per rung, and the calendar is the one dataset
-here that compounds — and no button in this app reaches them.
+**Her memory is backed up from outside the browser.** The app's backup is
+`trades`, whose broker columns a wide `?force=1` can rebuild and whose journal
+columns only that file holds. Her tables are the other way round — no source
+anywhere else — and `003` and `005` deny the publishable key most of them on
+purpose, so no in-app backup can or should reach them.
+`scripts/backup-memory.mjs`, run every Sunday evening by
+`.github/workflows/backup-memory.yml`, reads the eight tables with no other
+source — the channel map, notes, turns, thesis, open loops, calendar, feedback,
+and every stop and target a position carried — into one JSON artifact.
+`eugenia_runs` is left out: the largest table, and facts about model calls
+rather than about him.
 
-That is not a bug in the backup. `003` denies the publishable key her notes and
-turns deliberately, and `005` grants the app a read on only three of her tables,
-so an in-app backup structurally cannot include them and should not be given the
-policy that would let it. The copy has to be taken with the secret key, from
-outside the browser.
-
-**`scripts/backup-memory.mjs` is that copy, and `.github/workflows/backup-memory.yml`
-runs it every Sunday evening.** It reads the eight tables that have no other
-source — the channel map, the notes, the turns, the thesis, the open loops, the
-calendar and the feedback, and every stop and target a position carried, which
-the broker forgets once it closes — and writes
-one JSON document as a build artifact.
-`eugenia_runs` is deliberately out: it is the cost meter, by far the largest
-table, and every row in it is a fact about a model call rather than about him.
-
-It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets, and nothing
-else — one file, no install step, because a backup that depends on a registry is
-a backup that fails the week the registry does.
-
-**Give it its own `sb_secret_` key rather than the one the functions hold.** Both
-bypass RLS identically, so this is about blast radius rather than capability:
-this is the second secret in the system to live outside the trader's own
-infrastructure, in GitHub's, and the argument is the one `DOJI_EMAIL_SECRET`
-already makes. Leaked, a key used only here is revoked on its own and the
-poller, Gladys and Eugenia keep running; the shared one has to be rotated
-everywhere, under pressure. Supabase allows several named secret keys for
-exactly this — name it for what it does. It can still read every table,
-`trades` included: a key that could not would also be denied her notes, which
-is the whole point of the backup. **The paging is the load-bearing
-part.** PostgREST caps a response at its own `max-rows` whatever is asked for, so
-a single read of `eugenia_turns` returns a page and looks exactly like a complete
-archive: green job, well-formed file, plausible counts, discovered on the day
-someone restores from it. The walk stops on a short page rather than on a count
-it was told, and the job refuses to upload a document holding zero rows.
-
-**Artifacts expire after ninety days**, which is the maximum a free account
-allows, so this is a rolling window rather than an archive. Download one
-occasionally and keep it somewhere that does not expire, or run the script by
-hand for a durable copy:
+It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
+step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
+so this is blast radius — leaked, it is revoked alone while the functions keep
+running. **The paging is the load-bearing part.** PostgREST caps a response at
+its own `max-rows`, so one read of `eugenia_turns` returns a page that looks
+exactly like a complete archive. The walk stops on a short page, not a count it
+was told, and the job refuses to upload a document with zero rows. Artifacts
+expire after ninety days, so download one occasionally, or run it by hand:
 
 ```sh
 SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
 ```
 
 **Signing out** is a double-click on the sync dot, and it deletes the snapshot:
-a full copy of the journal sits in `localStorage` in plaintext, and left behind
-it puts the login screen and the previous session's trades one keypress apart on
-a shared machine. `app.test.mjs` drives that path — removing the delete goes
-red, as does a confirmed load that writes no snapshot or a failed one that
-ignores it.
+a full plaintext copy of the journal in `localStorage`, which left behind puts
+the previous session's trades one keypress from the login screen.
 
-**Run `verify.sql` whole and read the `ok` column.** It is one statement, and
-that is load-bearing rather than tidy. Ten listings used to sit below the
-summary, and a SQL editor shows the result of the **last** statement only — so
-pasting the file in and pressing Run displayed the ten most recent HTTP
-responses and silently discarded every check above them. The file carried a
-paragraph at the bottom explaining that to someone who had already lost their
-result, and told them to scroll up and select a six-hundred-line range by hand.
-It happened to the person who wrote that note, and then to the person it was
-written for. A check that awkward to run is a check that stops being run.
+**Run `verify.sql` whole and read the `ok` column.** It is one statement because
+a SQL editor shows only the **last** statement's result: listings below the
+summary would display and discard every check above them. The summary cannot go
+last instead, because `cron.job`, `net._http_response` and a never-created table
+each raise, and a raise takes every statement after it. So the listings are
+`diagnose.sql`, opened when a row says false — a raise there is that file
+reporting something absent. A `verify_doji()` function in the database would put
+the expectations inside the thing being verified, applied by hand like
+everything else, and blind the tests that read the summary's text.
 
-Moving the summary to the end instead would have been worse. `cron.job` raises
-without pg_cron, `net._http_response` without pg_net, and a direct read of a
-table that was never created raises too — anything that raises takes every
-statement after it, so the summary would vanish on exactly the databases it
-exists for. **Two files is what lets each one's statement be last in its own.**
-The listings are `diagnose.sql`, which you open when a row says false and the
-next question is which object, which grant, which schedule. A raise in there is
-not a fault; it is that file reporting an extension or a table that is absent.
+`diagnose.sql`'s **last** listing is the ordinary-day one: the three monitors in
+one grid. It adds no definition of broken — `dispatch_failures` decides a failed
+dispatch, `pace_line` too slow, and `sync_health`'s judgment is `healthLine`'s.
 
-Its **last** listing is the one to run on an ordinary day: the three monitors in
-one grid, which is what a top-to-bottom run leaves on screen. `008` records
-whether the two silent writers are alive, `009` what pg_net sent and what came
-back, `010` how much of its worker clock a briefing spent — and until that
-listing existed a person wanting the answer had to know all three tables were
-there and read them one at a time. It adds no fourth definition of broken:
-`dispatch_failures` decides what a failed dispatch is and the listing calls it,
-`pace_line` decides what too slow is and the listing quotes it, and
-`sync_health` shows its mark and its age because the judgment there is
-`healthLine`'s and lives in TypeScript.
-
-A function in the database — `verify_doji()` — was the obvious fix and it is
-wrong twice over. It would put the expectations *inside* the thing being
-verified, applied by hand like everything else, so a stale copy reports a stale
-truth with nothing to catch it. And `agree.test.mjs` reads the summary's text in
-eight places; every one goes silently blind the moment those rows leave the file.
-
-`agree.test.mjs` counts the semicolons in `verify.sql` and asserts there is one,
-because the regression is a single appended `select` — the file still runs, every
-check still passes, and the grid shows something else.
-
-**If a trade does not appear**, the cron reporting `succeeded` proves nothing —
-`net.http_post` is asynchronous, so the SQL succeeded in *queuing* the request.
-The function's own answer is here:
+**If a trade does not appear**, cron reporting `succeeded` proves only that the
+request was *queued*. The function's own answer:
 
 ```sql
 select status_code, content, created
@@ -609,180 +536,78 @@ from net._http_response order by created desc limit 10;
 
 ### When a number looks wrong
 
-Every column has exactly one writer or a written arbitration rule, so the first
-question is always *who owns this*, and the second is *what does the repair
-overwrite*. Nothing here is guesswork: a wrong direction cannot be fixed in the
-app, because the app does not own the column.
+Every column has one writer or a filter that arbitrates, so the first question
+is *who owns this*, and the second *what does the repair overwrite*. A wrong
+direction cannot be fixed in the app, which does not own the column.
 
 | The number | Who owns it | How to see the fault | The repair | What that repair also does |
 |---|---|---|---|---|
 | direction, entry time or price, exit price, size, commission, `computed_pnl`, filing day | the poller, alone | `?raw=1&hours=N` — what cTrader actually sent | `?force=1&hours=N` if the fold is wrong for a response that is right; a code change if the response itself is shaped differently | rewrites all ten of those columns for **every** position in the window, so any hand-correction inside it goes back |
 | `net_pnl` — the settled money figure | the email path, alone | the thread is unlabelled, so the next Apps Script run retries it | re-send the alert, or accept `computed_pnl` through `pnl` | nothing; the poller never writes this column |
 | a closed trade with `exit_price is null` | the poller, folded without its entry deal | that combination *is* the signature | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
-| `balance`, `planned_sl`, `planned_tp`, `fill_time` | two claimants, settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
+| `balance`, `planned_sl`, `planned_tp`, `fill_time`, `best_price` | settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
 | setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
 | a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
 
-**The two writers with no voice leave a heartbeat instead.** The poller and the
-email function have no path to Telegram: a 500, a refused write, or a cut deals
-page reaches `console.error` and stops there, and `pg_net` discards the
-response. So `008_sync_health.sql` holds one row each, and both writers move
-`last_ok` on every completed run and record `last_error` on every failure.
+**The two writers with no voice leave a heartbeat.** The poller and the email
+function have no path to Telegram, so `008_sync_health.sql` holds one row each:
+`last_ok` moves on every completed run, `last_error` records every failure. It
+is a heartbeat rather than an alarm because an alarm cannot fire when the run
+stops happening at all — an unscheduled job, a renamed function, a dropped
+deploy — and `last_ok` going cold sees that too. `healthBlock()` puts it in the
+morning briefing and she leads with it. Six hours is set against the two-minute
+poll and the 08:00 delivery.
 
-It is a heartbeat rather than an alarm, and that is the whole design. An alarm
-fires when a run fails, which means it cannot fire when the run stops happening
-at all — an unscheduled cron job, a renamed function, a deploy that dropped one.
-Those are silent under any failure-triggered scheme and they are exactly the
-failures worth catching. `last_ok` going cold answers "running and failing" and
-"not running" with one column.
+**The writers are judged differently.** The poller is scheduled, so its silence
+is evidence; the email function runs only when a fill arrives, so its silence is
+a quiet week. Staleness is read for the poller alone; for both, an error stamped
+after the latest success means failing now, and a success after it clears. **A
+market-closed skip is a completed run and marks itself**, or gold's weekend close
+reads as a dead sync every Sunday evening. The table is inert until `008` is
+applied: both writers swallow their own heartbeat failure.
 
-`healthBlock()` reads it into the morning briefing, and she is told to lead with
-it. Six hours is chosen against the poll's two-minute schedule and the 08:00
-delivery — shorter and a brief outage reads as a fault, longer and a Monday
-outage reaches him on Tuesday.
+**`009_dispatch.sql` sees the call that never ran.** Supabase can refuse a
+worker with `546 WORKER_RESOURCE_LIMIT` *before* the function exists — nothing
+marks, nothing throws, nothing logs — and the only witness is a row in
+`net._http_response`, pruned within hours and carrying **no url**. So every
+`net.http_post` records its request id in a ledger with the job named, and
+`agree.test.mjs` counts calls against ledger rows. `dispatch_watch` runs every
+ten minutes **in Postgres** and posts to Telegram directly, reading
+`eugenia_bot_token` and `telegram_chat_id` from Vault, so it shares no failure
+mode with the function it watches.
 
-**And the heartbeat cannot see a call that never ran, which is what
-`009_dispatch.sql` is for.** `heartbeat()` is written by a function that
-executed. When Supabase refuses a worker it answers `546 WORKER_RESOURCE_LIMIT`
-*before* the function exists — so nothing marks, nothing throws, no apology is
-sent, and the function's own log has no entry at all. The only witness is a row
-in `net._http_response`, which pg_net prunes within hours and nobody reads. A
-Sunday briefing went missing for two hours that way, and was found by hand.
+- **A single lost poll is not reported.** A job that comes round on its own is
+  evidence only in quantity — `dispatch_repeats`, three failures in an hour; a
+  one-shot job (the hourly job, the trade event, Gladys) is evidence alone.
+- **The ledger cannot break the trigger it sits in**: the post goes into a
+  variable and the insert sits behind `exception when others then null`, since
+  a raise inside the UPDATE would fail the journal write.
+- **The judging window has both ends** — fifteen minutes, so a slow call is not
+  dead, and three hours, because pruning makes every older row read as no
+  answer.
+- **Its own report can be lost.** A row is marked with the request id of the
+  message that named it (`reported_by`) and settled only on a `2xx`; anything
+  else clears the mark and it is said again. A sweep that could not send at all
+  settles nothing, so fixing a misspelled Vault name still delivers the outage.
+  Past three hours it gives up.
 
-**`net.http_post` returns the request id and all six callers threw it away.**
-That id is the only link to the response row, and that row carries **no url** —
-so what a failed request was *for* cannot be recovered afterwards. The ledger
-captures it at the moment of the call: one row per dispatch, the job named, and
-`agree.test.mjs` counts `net.http_post` calls against ledger rows so a seventh
-site cannot be added unwatched.
+**`010_pace.sql` speaks before the failure, because afterwards nothing can.**
+The cron half answers before it works, so a briefing killed at the 400s wall
+clock has already handed pg_net a `200`: the ledger is green, `ask()` never
+reaches its catch, no apology is sent, and every retry redoes the same work.
+`pace_line` reads `eugenia_runs.ms` and speaks when the longest run of seven
+days passes three quarters of the ceiling — 300s. Ordinary mornings have swung
+by 77s, so a heavy day cannot reach it and 100s remain when it fires. `ms` is a
+lower bound on the wall clock, so reading the largest row costs lateness and
+never a false alarm. Seven days so the window holds a Sunday briefing.
 
-**The watcher lives in Postgres, and that is the point rather than a
-convenience.** The thing that fails is the Edge Function; a monitor that
-reported a refused worker by asking that same function to send a message would
-share its subject's failure mode. `dispatch_watch` runs every ten minutes and
-posts to Telegram directly, reading `eugenia_bot_token` and `telegram_chat_id`
-from Vault — the third and fourth names in this system that are one value under
-two spellings, and `verify.sql` asks whether both resolve.
-
-**A single lost poll is an ordinary day and is not reported.** The poller runs
-720 times daily with the next one two minutes away, so naming every refused
-worker would put three or four messages a day in front of him about a sync that
-healed before he read them. `dispatch_repeats` is the same split `healthLine`
-makes below, arriving for a second reason: a job that comes round on its own is
-evidence only in *quantity* — three failures in an hour — and a job that does
-not is evidence alone. The hourly job carries the briefing and the nightly pass;
-the trade event has no retry anywhere in this system; Gladys's has none either.
-
-**The ledger may not break the trigger it sits in.** Both trigger sites post
-into a variable first and record it behind `exception when others then null`,
-because they fire inside the UPDATE that set the column — a raise there would
-fail the journal write itself. It was proved by renaming the table away and
-watching the trade still write and all four messages still dispatch.
-
-**The judging window has both ends.** Fifteen minutes at the near end, so a slow
-call is not called dead; three hours at the far end, because pg_net's own
-pruning makes every older row read as *no answer* — which on the one day the
-watcher itself stopped would bring back a hundred invented failures.
-
-**And the report itself can be lost — the first one ever sent was.** pg_net came
-back `timed_out`, the whole twenty-second budget spent in the TCP/SSL handshake
-and nothing at all in the request: the connection to Telegram never opened. The
-rows had already been settled, because pg_net is asynchronous and the function
-cannot learn otherwise inside the same call. A real outage would have been
-reported once, into a dropped connection, and never mentioned again.
-
-So `reported_by` carries the request id of the message that named a row, and the
-row is not settled until that message is known to have arrived. The next sweep
-settles on a `2xx` and clears the mark on anything else, so it is said again. A
-sweep that could not send at all — a Vault name misspelled, which this project
-has had happen twice — settles nothing, so repairing the name still delivers the
-outage. Past three hours it gives up, because a row that can never be
-adjudicated would be announced every ten minutes for the life of the
-deployment.
-
-**And neither of those can see how much of its budget a run spent, which is
-`010_pace.sql`.** Both ask whether something ran. This asks how close it came to
-not being allowed to finish, and it is the only one of the three that can speak
-*before* the failure rather than after it — because after it there is nothing
-left to speak with. Since the cron half began answering before it works, a
-briefing killed at the 400s wall clock has already handed pg_net a `200`: the
-ledger records a healthy dispatch, `ask()` never reaches its catch so no failure
-row is written, `postScheduled`'s apology never runs, and the 09:00, 10:00 and
-11:00 retries redo the same too-long work and die the same way. Three monitors,
-all green, and nothing reaches him — the Sunday `009` was built after, arriving
-again through the door that was opened to fix it.
-
-`eugenia_runs.ms` has been written on every model call since `005` and read by
-nobody. Three unattended days put the briefing at 170.6s, 162.3s and 238.7s:
-sixty per cent of the ceiling on an ordinary Wednesday, swinging two to one on
-work that looks identical from outside.
-
-**It watches from both sides, and the threshold is argued from the spread rather
-than chosen.** `pace_line` speaks when the longest run of the last seven days
-passes three quarters of the ceiling — 300s. The briefing's own swing between
-its fastest and slowest ordinary morning is 77s, so an ordinary heavy day cannot
-reach it, and the 100s still left when it fires is more than one whole swing:
-early enough to act on rather than a description of something already dying. The
-window is seven days because the week has to contain a Sunday briefing, the
-longest and rarest of them.
-
-`ms` is a lower bound on the wall clock and never an overstatement — a row
-measures one model call, or everything `postBriefing` did, while the worker's
-clock started earlier and stops later — so reading the largest row rather than
-reassembling an invocation (there is no invocation id to reassemble one with)
-costs lateness and never a false alarm.
-
-**The second half is the absence, and it is what actually closes the hole.** A
-briefing this day owed, past the last hour it could still have arrived — noon on
-a weekday, 21:00 on a Sunday, both a full ceiling past the final retry — with no
-`<kind> briefing delivered` row saying it did. Asked any earlier it reports a
-briefing that is still being written, which is the ordinary-day false alarm that
-gets a monitor muted in a week.
-
-**A slow run is said once.** The day was once the only guard, and a run stays in
-a seven-day window for seven days — so the first Sunday over the share, at 315s,
-was announced at 17:37 and again at 00:37, on its way to the same sentence every
-midnight until the next Sunday. The watcher hands `pace_line` the time it last
-spoke, and a run at or before that has been said; `diagnose.sql` hands it
-nothing, because a person looking wants the week rather than what is left to
-say. The second argument is a second function to Postgres, so 010 drops the
-one-argument version first — left beside it, `pace_line()` matches both and is
-refused as ambiguous.
-
-**It speaks at most once a New York day, and the row it writes is the guard.**
-Which is what makes one ordering load-bearing: a row written after a send that
-could *not* be made would mark the day as said and swallow the warning for good,
-so repairing a misspelled Vault name would deliver silence. The row goes down
-only where the post was made, and the next hour tries again. A quiet day still
-leaves one row saying `clear` — both outcomes, always, because a meter that
-records only its firings reports a watcher nobody is calling as a system with
-nothing to report.
-
-**The two writers are judged differently, and conflating them is a monitor that
-cries wolf until it is ignored.** The poller runs every two minutes on a
-schedule, so its silence *is* evidence — nothing ran. The email function runs
-only when a fill arrives, so its silence is a quiet week, and a staleness rule
-over it fires on almost every ordinary day. Silence is read for the scheduled
-writer alone; what is read for both is the outcome of the last run, so an error
-stamped after the most recent success means the thing is failing now, and a
-success after an error clears it.
-
-**A market-closed skip is a completed run and marks itself.** Gold closes Friday
-17:00 New York and opens Sunday 17:00, and the poller is still invoked every two
-minutes across that, answering `skipped: "market closed"`. That is everything the
-mark exists to prove: cron fired, the function is deployed, its secrets loaded,
-it decided correctly. Unmarked, forty-eight hours pass against a six-hour window
-and the sync reads as dead every Sunday evening. Whether the broker answers is
-the failure path's question, not this one's.
-
-**It is inert until `008` is applied.** Both writers swallow their own failure
-there, so a database that has not seen the file gets a 404 on the health write
-and keeps folding deals exactly as before, and her read answers nothing. A
-monitoring table that can take down the thing it monitors is worse than no
-table.
-
-Eugenia's scheduled half was always the exception — it messages Telegram on
-failure and retries until the marker lands.
+Its second half is the **absence**: a briefing owed and not delivered by noon on
+a weekday or 21:00 on a Sunday — a full ceiling past the last retry, or it would
+name a briefing still being written. **A slow run is said once**: the watcher
+passes `pace_line` the time it last spoke. It speaks at most once a New York
+day, and **the row it writes is the guard**, so the row goes down only where the
+post was made — written after a failed send, it would swallow the warning for
+good. A quiet day leaves a `clear` row: both outcomes, always.
 
 ---
 
