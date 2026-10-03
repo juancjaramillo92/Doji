@@ -801,67 +801,46 @@ token is ever misused.
 ## TradingView
 
 **`doji-tradingview` holds the TradingView sign-in, and nothing else here does.**
-What TradingView adds is the half of the market the broker cannot serve: the
-economic calendar as data rather than as a page Eugenia transcribes, and the
-dollar and the yields that gold is priced against. Every read of it will come
-through this function. **Her calendar is the first thing she is handed from
-it** — see **The event spine**. `?tools=1` said what the endpoint offers, and
-`?probe=` says what each useful tool returns, raw; each reader is written
-against those answers. That is the
-order the poller's `?market=raw` and `?positions=1` set, and it is how the
-poller's two price scales were found rather than guessed. It earned its keep on
-the first call: the tool names TradingView serves (`mcp-tv-get-economic-calendar`)
-are not the ones its documentation gives.
+TradingView adds the half of the market the broker cannot serve: the economic
+calendar as data, and the dollar and yields gold is priced against. Every read of
+it goes through this function, and each reader was written against what
+`?tools=1` and `?probe=` actually returned — the tool names it serves
+(`mcp-tv-get-economic-calendar`) are not the ones its documentation gives.
 
-**A function of its own, for the poller's reason and one more.** The endpoint
-that serves the calendar and the quotes also serves, on the same credential,
-eleven tools that change his account: alerts created, updated, paused, resumed
-and deleted (`mcp-tv-delete-alert` among them), and watchlists created, renamed,
-edited and deleted (`mcp-watchlist-delete-watchlist`). None of them can trade,
-but all of them are his account, so the token stays out of Eugenia exactly as
-the cTrader token does. And the sign-in ends in a callback that a
-browser reaches carrying no secret, which has no place in the function that is
-her Telegram webhook.
+**A function of its own, for the poller's reason and one more.** The same
+credential serves eleven tools that change his account — alerts created, updated,
+paused, resumed and deleted (`mcp-tv-delete-alert`), watchlists created, renamed,
+edited and deleted (`mcp-watchlist-delete-watchlist`). None can trade, but all of
+them are his account, so the token stays out of Eugenia as the cTrader token
+does. And the sign-in ends in a browser callback carrying no secret, which has no
+place in her Telegram webhook.
 
-**Connecting it.** It needs the Essential plan or above; trials carry no MCP
-access. It needs no new secret either: it checks `DOJI_CRON_SECRET` and writes
-with `SB_SECRET_KEY`.
+**Connecting it.** It needs the Essential plan or above (trials carry no MCP
+access) and no new secret: it checks `DOJI_CRON_SECRET` and writes with
+`SB_SECRET_KEY`.
 
 1. Run `supabase/016_tradingview.sql`. It is safe to re-run.
 2. Let the deploy workflow ship the function from `main`.
-3. Ask it to start a sign-in:
+3. Start a sign-in:
 
    ```
    curl -s -H "x-doji-key: <DOJI_CRON_SECRET>" \
      "https://<project>.supabase.co/functions/v1/doji-tradingview?connect=1"
    ```
 
-   The answer carries `open_this`, the sign-in address. It also says how the
-   function registered itself (`registered_by`), which scopes it asked for
-   (`scopes_asked`) and which ones TradingView offers (`scopes_supported`). If a
-   read-only scope is on that list, it is worth knowing: a token that cannot
-   delete anything would make the function's allow-list a second wall rather
-   than the only one. Asking again starts over, and the sign-in it replaces
-   stops working at once. Dynamic registration mints a new client each time,
-   and an old refresh token kept beside a new client would fail on first use.
-4. Open `open_this` in a browser, sign in to TradingView and approve. The
-   browser comes back to `/callback` carrying `code` and `state`, or `error` if
-   the sign-in was refused, and the page says whether it connected. It also
-   says whether TradingView issued a refresh token. Without one, the sign-in
-   ends when the first access token does.
-5. Ask what TradingView offers:
+   The answer carries `open_this`, the sign-in address, and says how the
+   function registered (`registered_by`), the scopes it asked for
+   (`scopes_asked`) and those offered (`scopes_supported`) — a read-only scope
+   there would make the allow-list a second wall rather than the only one.
+   Asking again starts over, and the sign-in it replaces stops working.
+4. Open `open_this`, sign in and approve. The browser returns to `/callback`
+   with `code` and `state` (or `error`), and the page says whether it connected
+   and whether a refresh token was issued — without one, the sign-in ends with
+   the first access token.
+5. `?tools=1` lists every tool's name, input schema and `readOnlyHint`.
 
-   ```
-   curl -s -H "x-doji-key: <DOJI_CRON_SECRET>" \
-     "https://<project>.supabase.co/functions/v1/doji-tradingview?tools=1"
-   ```
-
-   That answer is what the next readers are written against: every tool's name,
-   its input schema and its `readOnlyHint`.
-
-**Without a terminal, the SQL editor makes the same call.** `pg_net` is what the
-cron jobs use, and the secret comes straight out of Vault, so it is never copied
-anywhere:
+**Without a terminal, the SQL editor makes the same call**, with the secret read
+straight out of Vault:
 
 ```sql
 select net.http_get(
@@ -872,142 +851,94 @@ select net.http_get(
 ) as request_id;
 ```
 
-and a few seconds later, with the number it returned:
+and a few seconds later:
 `select status_code, content from net._http_response where id = <request_id>;`
 
 **What it may read is TradingView's own answer, not a list typed here.** The
 `?tools=1` capture is kept whole in `test/fixtures/tradingview-tools-list.json`:
 35 tools, 24 marked `readOnlyHint`. `ALLOWED_TOOLS` names six of those 24, and
-`agree.test.mjs` holds every name on it against the capture. It also derives the
-eleven that write from the same file, and fails if any of them is named in the
-function at all, so a twelfth in a fresh capture is banned without anyone adding
-it. One of the eleven reads like a read: `mcp-watchlist-get-active-watchlist`
-activates a watchlist, or creates one, when none is active. The technical
-rating, analyst forecasts and the screener are read-only and stay off the list
-anyway, because each is a signal by another name; fundamentals, filings,
-earnings and dividends are about companies, and gold is not one.
+`agree.test.mjs` holds each against the capture, derives the eleven that write
+from the same file, and fails if any is named in the function at all. One of
+them reads like a read: `mcp-watchlist-get-active-watchlist` activates or
+creates a watchlist when none is active. The technical rating, analyst forecasts
+and the screener are read-only and stay off anyway, each being a signal by
+another name; fundamentals and filings are about companies.
 
-**`?calendar=1&from=YYYY-MM-DD&to=YYYY-MM-DD` is the reader,** and the one door
-where a request value reaches a tool. That follows the poller's `?hours=`, but
-refused rather than clamped. `from` and `to` are whole days only, because TradingView rejects other
-formats and was seen to treat a day as inclusive. At most 31 days, which is as
-far forward as it serves and long enough to walk a history a month at a time.
-Nothing before 2003-09-01, where its data starts. US only, because every rule
-that reads a release is about USD. Each event comes back as its permanent `id`,
-the minute it lands, its title, its importance (`high`, `medium` or `low` from
-TradingView's 1, 0 and −1), its period, the consensus, prior and actual as text
-with their unit (`200K`, `0.2%`, `$6.748T`), and its `ticker`. No consensus
-stays null; a consensus of zero is `0%`. `timed` is false for what is on the
-calendar without being a release. A summit was rated high and filed at midnight
-under the indicator `Calendar`, and nothing that counts minutes before a print
-may count it. The paragraph of description each event carries is dropped, since
-she would pay for every one of them on every request.
+**`?calendar=1&from=YYYY-MM-DD&to=YYYY-MM-DD` is the calendar reader** — the one
+door where a request value reaches a tool, refused rather than clamped: `from`
+and `to` are whole days only, at most 31, nothing before 2003-09-01, US only (every rule that reads
+a release is about USD). Each event comes back with its permanent `id`, the
+minute it lands, title, importance (`high`, `medium`, `low` from TradingView's 1,
+0, −1), period, consensus, prior and actual as text with their unit (`200K`,
+`0.2%`, `$6.748T`), and `ticker`. No consensus stays null; zero is `0%`.
+`timed` is false for what is on the calendar without being a release — a summit
+filed at midnight under `Calendar` must not be counted as a print. The event
+descriptions are dropped, since she would pay for each on every request.
 
-**`?market=1` is the market around gold, as bars.** The dollar index, the two-
+**`?market=1` is the market around gold, as bars**: the dollar index, the two-
 and ten-year yields, the ten-year real yield, silver, US crude, the S&P 500 and
-the VIX. The quote batch was the natural read, and it refused on every probe:
-the forex scanner's 429, then the CFD scanner's. The OHLCV read answered for
-every symbol, its last bar inside the current quarter hour. So each symbol is
-twenty-five hourly bars, a day's span with the current hour on the end, folded
-by `foldBars` to where the first bar opened and where the last one stands, each
-with its time. The real yield is FRED's daily series, a day or more behind, so
-it is read in days and marked `daily`. The symbols, their spoken names and
-their units live in one list, `MARKET`; a symbol that fails is named in
-`missing` rather than dropped. Eugenia renders it with `aroundList`, which
-states every line as a level beside the level at a stated time and computes
-no change, because a move served without its window is how an evening's move
-was once called the day's. It is handed to the briefing and the move look, and
-a read that fails is a sentence telling her not to quote the dollar or yields
-from a search.
+the VIX. The quote batch refused on every probe with the scanners' 429, while the
+OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
+`foldBars` to where the first opened and where the last stands, each with its
+time. The real yield is FRED's daily series and is marked `daily`. Symbols, names
+and units live in one list, `MARKET`; a symbol that fails is named in `missing`.
+`aroundList` states every line as a level beside the level at a stated time and
+computes no change, so a move cannot lose its window. A failed read is a sentence
+telling her not to quote the dollar or yields from a search.
 
-**`?news=1` is gold's and the dollar's headlines, for the move look.** A move
-with nothing on the calendar behind it is the one look that has to find its own
-explanation, and it used to start from a web search. `foldHeadlines` merges the
-two feeds — a story carried by both is one headline — newest first, each with
-its title, source and time. Eugenia's `headlinesList` hands her the last hour
-and says it is the last hour; she is told to read them before she searches, to
-cite a headline with its time and source, and never to claim what a paywalled
-story says beyond its title. A feed that fails is said, and a read that fails
-sends her back to her search.
+**`?news=1` is gold's and the dollar's headlines.** `foldHeadlines` merges the
+two feeds, a story on both being one headline, newest first with title, source
+and time. The move look is handed the last hour; she reads them before
+searching, cites a headline with its time and source, and claims nothing about a
+paywalled story beyond its title.
 
-**A conversation reads both through `get_around`.** The briefing and the move
-look were handed the dollar, the yields and the wires and a reply was not, so
-asked why gold fell she had a web search and nothing else, against her own rule
-never to quote those from one. `get_around` serves `aroundBlock` and six hours
-of headlines rather than one, since a question is about the morning. Six hours
-is a span the feeds, each read to a fixed number of headlines, may not hold, so
-where the shorter one stops inside it the block says how far back it reaches;
-a line from another day names the day. No TradingView tool was added: the
-function serves the same `?market=1` and `?news=1` it already did.
+**A conversation reads both through `get_around`** — `aroundBlock` and six hours
+of headlines. Each feed is read to a fixed count and may not hold six hours, so
+where the shorter one stops the block says how far back it reaches; a line from
+another day names the day.
 
-**`?rates=1` is what fed funds futures price for the next three Fed meetings.**
-It reads them the way CME's FedWatch does, so the odds come from prices rather
-than from a page. One such page once called a hike a cut. A thirty-day contract
-settles on the month's average overnight rate, so its price is 100 less that
-average. A month with a meeting averages the rate before the decision and the
-rate after it, weighted by the days each held. A neighbour pins one of the two
-and the price gives the other. The month after is preferred where no meeting
-falls in it, then the month before. Where neither is clear, or the clear one has
-expired, the meeting is solved off the meeting beside it: the rate between two
-decisions is one rate, whichever months it spans. Contracts are named months
+**`?rates=1` is what fed funds futures price for the next three Fed meetings**,
+worked out the way CME's FedWatch does. A thirty-day contract's price is 100 less
+the month's average overnight rate; a meeting month averages the rates before
+and after the decision, weighted by days, and a neighbouring clear month pins one
+of the two. The month after is preferred, then the month before; where neither
+is clear or one has expired, the meeting is solved off the meeting beside it,
+since the rate between two decisions is one rate. Contracts are named months
 (`CBOT:ZQV2026`), never `ZQ1!`, which the `fedfunds` probe showed rolling early.
-For each meeting, `foldRates` returns:
+For each meeting `foldRates` returns the rate before and after, the move in basis
+points, the move since now, and `odds` for the two outcomes either side. An
+unsolvable meeting is named in `unread`. The dates are `FOMC`, the Fed's
+published decision days; a test fails half a year before the table runs out and
+checks every date is a Wednesday, and the last date is never priced. Each read
+also asks the calendar for the month's rate decisions, and one the table does not
+hold refuses the whole answer.
 
-- the rate before and the rate after
-- the move in basis points
-- the move since the rate now
-- `odds`, the two outcomes either side of the move, as FedWatch splits a meeting
+Checked against FedWatch on 1 October, on its own prices the October odds were
+identical (24.9%) and December within a point. `ratesList` states the first
+meeting as odds and later ones as basis points priced by then: FedWatch shows a
+later meeting as the chance of each range BY THEN, the fold that meeting's own
+odds given the one before — both right, different numbers. She quotes rate odds
+from here and never from a search, as futures pricing rather than her forecast,
+at least fifteen minutes old. It reaches the briefing and `get_around`.
 
-A meeting that cannot be solved is named in `unread`. The dates are `FOMC`, the
-Fed's published schedule with the decision day of each meeting. A test fails
-half a year before the table runs out and checks that every date is a
-Wednesday. The table's last date is a boundary and is never priced, because the
-month after it is unknown. Each read also asks TradingView's calendar for the
-month's rate decisions. A decision the table does not hold refuses the whole
-answer, since odds worked out against a moved meeting are a confident wrong
-number. A table date the calendar does not list is a gap in a feed, not a moved
-meeting, and does not refuse.
+**Where the speculators stand is read straight from the CFTC** — the weekly
+Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
+`088691`), which needs no credential, so she reads it herself. `positioningList`
+gives the managed-money net, its sides, the week's change, the net's range over
+52 weeks (crowded means something only against its own past), and the Tuesday it
+was taken. Only the Sunday briefing and `get_around` get it: a weekday briefing
+would repeat it five times, and a weekly count cannot cause a quarter-hour move.
+Background, in one sentence at most, never a reason to trade.
 
-**Eugenia reads it in the briefing and through `get_around`.** It was checked
-against FedWatch on 1 October. On FedWatch's own prices, the October odds came
-out identical (24.9%) and December within a point. The 18:00 read differed by
-two or three points, which is the bars being hours apart rather than the
-arithmetic. `ratesList` states the first meeting as odds. Later meetings are
-stated as basis points priced in all by then, with the share at that meeting.
-That is because FedWatch shows a later meeting as the chance of each range by
-then, every path summed, while the fold's odds are that meeting's own given the
-one before. Both are right, but they are different numbers, so a chance quoted
-for December would read as wrong beside the screen he checks it on. She is told
-to quote rate odds from here and never from a search, to say they are futures
-pricing rather than her forecast, and that they run at least fifteen minutes
-behind. A refused or failed read is a sentence telling her she does not have
-them.
+**A refusal can arrive marked as success.** The quote batch's 429 came inside a
+result marked `isError: false`, with `success: false` in the payload. `unwrap`
+checks both and reads `structuredContent` rather than the duplicate text block.
+`test/fixtures/tradingview-calendar.json` is eight events from the 1 October
+calendar probe, one per shape the fold must handle.
 
-**Where the speculators stand is read straight from the CFTC.** It is the
-weekly Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
-`088691`), and it needs no credential, so Eugenia reads it herself rather than
-through this function. `positioningList` gives the managed-money net, its long
-and short sides, and the week's change. It sets these against the net's range
-over the past 52 weeks, because crowded only means something against its own
-past. It also gives the Tuesday the count was taken, because it is days old
-when it is released and a shutdown has stopped it for weeks. Two readers get
-it: the Sunday briefing and `get_around`. A weekday briefing would carry the
-same lines five mornings running. The move look is left out because a weekly
-count cannot be the cause of a quarter-hour move, and offering it there is the
-plausible cause that path is told not to invent. She is told to use it as
-background, in one sentence at most, and never as a reason to trade.
-
-**A refusal can arrive marked as success.** The quote batch refused with
-TradingView's own 429 inside a result marked `isError: false`, with `success:
-false` in the payload. `unwrap` checks both, and a test holds it to that real
-answer. It reads `structuredContent` rather than the text block, which carries
-the same payload a second time as a string.
-`test/fixtures/tradingview-calendar.json` is eight events cut from the 1 October
-calendar probe, one for each shape the fold has to handle.
-
-**`?probe=` is fixed, and nothing in the request reaches a tool.** It picks one
-of seven and every argument is written in the function. Each call's failure is its
-own answer, as `?bars=raw`'s are:
+**`?probe=` is fixed: nothing in the request reaches a tool.** It picks one of
+seven, every argument is written in the function, and each call's failure is its
+own answer:
 
 | `?probe=` | what it asks |
 |---|---|
@@ -1019,52 +950,39 @@ own answer, as `?bars=raw`'s are:
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 
-**How the sign-in is found.** It is OAuth 2.1 as MCP specifies it, and it is
-discovered rather than configured. The only TradingView address in the file is
-the endpoint itself. Its 401 points at its metadata, the metadata names the
-authorisation server, and that server's metadata names the rest. The function
-registers itself whichever way the server offers. It prefers a client metadata
-document: the `client_id` is the URL `/client` serves, and the server reads who
-Doji is from there. Otherwise it uses dynamic registration. A server that
-offers neither stops `?connect=1` with an error listing what it did advertise.
-It is a public client, so PKCE with S256 carries the proof, and a server that
-does not advertise S256 is refused. `/client` and `/callback` are the only two
-paths that answer without the secret, because neither caller can hold it.
-`/callback` acts only on a `state` that `?connect=1` stored, compares it in
-constant time, and clears it once the sign-in lands.
+**How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
+than configured: the only TradingView address in the file is the endpoint, whose
+401 points at its metadata, which names the authorisation server. The function
+prefers a client metadata document — the `client_id` is the URL `/client`
+serves — and otherwise registers dynamically; a server offering neither stops
+`?connect=1` with what it did advertise. It is a public client, so PKCE with S256
+carries the proof, and a server without S256 is refused. `/client` and
+`/callback` are the only paths answering without the secret, since neither
+caller can hold it; `/callback` acts only on a `state` `?connect=1` stored,
+compares it in constant time, and clears it.
 
-**The tokens live in a table, which the poller's contract says a token never
-does.** An OAuth server may rotate the refresh token on every use, and a
-function cannot rewrite its own Edge secrets. A token kept there would survive
-exactly one refresh. So it is one row in `tradingview_auth`: RLS on, no policy,
-revoked from both public roles, and `verify.sql` asks all three. A refresh that
-brings no new refresh token keeps the one it had. Storing the absence would end
-the connection at the next expiry with nothing to say why, and a test drives
-two refreshes against a rotating server to hold that. The table is not in the
-memory backup and must not be, because a live refresh token in a workflow
-artefact is the account.
+**The tokens live in a table**, because a server may rotate the refresh token on
+every use and a function cannot rewrite its own Edge secrets. One row in
+`tradingview_auth`: RLS on, no policy, revoked from both public roles, and
+`verify.sql` asks all three. A refresh that brings no new refresh token keeps the
+old one — storing the absence would end the connection at the next expiry. The
+table is not in the memory backup and must not be: a live refresh token in an
+artifact is the account.
 
-**One renewal at a time, by a lease.** A server that rotates may treat a
-refresh token presented twice as stolen and revoke the whole sign-in, and the
-briefing and the release look can find the token stale in the same second. So a
-renewal first takes the lease `017_tradingview_lease.sql` adds, with a PATCH
-filtered on it being empty or lapsed. That is `balance`'s arbitration: Postgres
-evaluates the filter inside the UPDATE, so there is no read to lose a race
-against. A caller that does not get the lease waits for the token the holder
-writes. The holder reads the row again once it has the lease, because another
-caller may have renewed in between, and the refresh token it first read would
-then be the one just spent. The new token and the release are one write. A
-holder that dies leaves a lease that lapses on its own after thirty seconds.
-Three tests drive it against a stub that filters the way PostgREST does: two
-refreshes against a rotating server, two callers at once, and a caller that wins
-the lease after someone else renewed.
+**One renewal at a time, by a lease.** A rotating server may treat a refresh
+token presented twice as stolen and revoke the sign-in, and the briefing and the
+release look can find it stale in the same second. A renewal first takes the
+lease `017_tradingview_lease.sql` adds, by a PATCH filtered on it being empty or
+lapsed — `balance`'s arbitration. A caller without the lease waits for the token
+the holder writes; the holder re-reads the row once it holds the lease, since
+another caller may have renewed; the new token and the release are one write; a
+dead holder's lease lapses after thirty seconds. Tests drive all three cases
+against a stub that filters the way PostgREST does.
 
-**Gold's own price is still read from the broker, and that was measured.** The
-gold probe read both in the same second: cTrader's bid at 4162.17 and
-TradingView's Pepperstone feed at 4162.45, off a one-minute bar that had opened
-two seconds earlier. TradingView's feed is the same broker's price and is live,
-not better. The broker's is the price his stops and fills happen on, so it
-stays; what TradingView adds is everything around gold.
+**Gold's own price stays with the broker, measured.** Read in the same second,
+cTrader's bid was 4162.17 and TradingView's Pepperstone feed 4162.45: the same
+broker's price, live, not better. The broker's is the price his stops and fills
+happen on.
 
 ---
 
