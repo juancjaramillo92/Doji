@@ -1080,7 +1080,7 @@ const watching = async ({ calendar = [], thesis = [], loops = [] } = {}) => {
 };
 
 test('the card stays hidden when she has nothing to show', async () => {
-  // A database without 005 applied, or a quiet Sunday. An empty frame captioned
+  // A database without her tables, or a quiet Sunday. An empty frame captioned
   // "no data" is worse than the absence it describes.
   const el = await watching();
   assert.equal(el.style.display, 'none');
@@ -1149,7 +1149,7 @@ test('her prose is escaped before it reaches the page', async () => {
 });
 
 test('a card that cannot be read costs the card and nothing else', async () => {
-  /* 005 NOT APPLIED IS THE LIKELY CAUSE, and it must not reach him. Drawn first,
+  /* HER TABLES MISSING IS THE LIKELY CAUSE, and it must not reach him. Drawn first,
      so the card is visible before the failing read — or this passes against a
      catch that does nothing. */
   await watching({ thesis: [{ thesis: 'A story.', moved_on: null }] });

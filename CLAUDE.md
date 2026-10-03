@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 696 tests, six suites
+npm test      # 692 tests, six suites
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced
@@ -353,9 +353,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   `?force=1` door, and `agree.test.mjs` reads `postScheduled` for the call. **A
   literal that is right by accident of another function's range is the shape to
   look for.**
-- **The data-driven senses are not in `dueNow`.** Each flag is written in 004's
-  URL and in `postScheduled`; `agree.test.mjs` holds both directions, with the
-  doors a person opens declared.
+- **The data-driven senses are not in `dueNow`.** Each flag is written in its
+  cron job's URL and in `postScheduled`; `agree.test.mjs` holds both directions,
+  with the doors a person opens declared.
 - **Both halves answer before they work** (`background()` +
   `EdgeRuntime.waitUntil`), because of Telegram's redelivery and the 150s request
   idle timeout behind the 400s paid wall clock. `?embed=1` is the derived
@@ -446,7 +446,17 @@ is tested, and a refused read throws rather than backing up a blank.
 
 ## The database
 
-- **The files are a claim; `verify.sql` tests it.** It is ONE statement, because a
+- **`schema.sql` is the whole database, and it is applied by re-running all of
+  it** — on a fresh project and on the live one. Every statement outside a
+  function body is `if not exists`, `or replace`, `on conflict do nothing` or
+  guarded by a check, and `agree.test.mjs` holds that shape. **Never write a
+  `drop` into it**: a re-run repeats it on the live database; a drop that is
+  needed is run by hand, once. `create or replace view` may only append a
+  column, and `create or replace function` may not change a return type or an
+  argument list. Prove an edit by replay against a local Postgres 16 with
+  pgvector and stubs for `auth`, `vault`, `net` and `cron`: the old file and the
+  new must dump identically, fresh and re-run over each other.
+- **The file is a claim; `verify.sql` tests it.** It is ONE statement, because a
   SQL editor shows only the last statement's result; `agree.test.mjs` counts its
   semicolons. The listings are `diagnose.sql`, whose header count is also held.
   The checks live in the file, not in a database function.
@@ -455,35 +465,31 @@ is tested, and a refused read throws rather than backing up a blank.
   or a `regprocedure` cast; read a public table only through `query_to_xml` behind
   `to_regclass`. Prefer a row that names (`string_agg`) to one that counts.
   `agree.test.mjs` holds what it asks about against every table, policy, index
-  and trigger the numbered SQL declares, and the count in its header.
+  and trigger `schema.sql` declares, and the count in its header.
 - **`revoke ... from public` is not the whole revoke**: `anon` and `authenticated`
   hold `execute` by name. `verify.sql` asks every callable function.
 - **Every `security definer` function sets `search_path = ''`**; `agree.test.mjs`
   derives them all.
-- **A re-runnable file may not undo a later one**, and 005 onward are re-runnable;
-  `agree.test.mjs` reads them against every later `drop`. `create or replace view`
-  may only append a column, and `create or replace function` may not change a
-  return type or an argument list.
-- **`008_sync_health.sql` must never break what it watches.** `heartbeat()`
-  swallows everything and bounds `last_error` at both ends of 008's constraint.
+- **`sync_health` must never break what it watches.** `heartbeat()`
+  swallows everything and bounds `last_error` at both ends of its constraint.
   Every completed path marks — the market-closed skip included — and the three
   that do not are declared. `SCHEDULED` separates the poller from the email
   writer.
-- **`009_dispatch.sql` captures every `net.http_post`'s request id**; trigger
+- **The dispatch ledger captures every `net.http_post`'s request id**; trigger
   sites post into a variable and record behind `exception when others then null`.
   `dispatch_bad` is the one definition of a failed dispatch, and the repeat gate
   counts rows rather than unsettled ones. `reported_by` keeps a lost report from
   settling its rows.
-- **`010_pace.sql` speaks before the failure.** Its first hour is derived from
+- **`pace_line` speaks before the failure.** Its first hour is derived from
   `retryDue`; it is said once per run; the row is written only where the post
   was made. The ceiling is the 400s paid wall clock, stated once. Replay it
   against a local Postgres (`/usr/lib/postgresql/16/bin`, stubs for `vault` and
   `net`) after any change — `agree.test.mjs` reads its shape and cannot run it.
-- **No numbered file reads into a variable with `select … into`**; use
+- **No SQL file reads into a variable with `select … into`**; use
   `x := (select …)`. When the editor refuses a file, read what it actually received
   first — a truncated paste reads as a broken file.
-- **`004_cron.sql` holds every schedule** and is safe to re-run. `verify.sql`
-  counts the jobs and `agree.test.mjs` holds the count.
+- **Every schedule is in `schema.sql`'s timer section.** `verify.sql` counts the
+  jobs and `agree.test.mjs` holds the count.
 - **A caller's URL is checked twice**: `agree.test.mjs` reads every
   `/functions/v1/<name>` and project ref in the repository, `verify.sql` asks the
   live trigger. A rename means editing a trigger body and a cron job by hand.
