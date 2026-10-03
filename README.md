@@ -1265,285 +1265,153 @@ swallowed message is invisible, an extra one merely extra.
 
 ### The event spine — the first thing here that is not a clock
 
-Every schedule above fires at an hour someone chose in advance. So a print at
-08:30 landed into a briefing that had already gone, and waited for a 10:00 pulse
-whose default answer is silence — the one moment of the day when something
-genuinely happened was the moment she was least likely to speak.
+A print at 08:30 lands after the briefing and before a pulse whose default is
+silence, so the one moment something genuinely happens would be the moment she
+is least likely to speak. The spine is driven by data rather than an hour.
 
 **The calendar is filed for her, from TradingView.** `fileCalendar` reads
 `doji-tradingview?calendar=1` for the days around now, through the cron secret
 she already holds, and upserts every timed US release rated medium or above into
-`eugenia_calendar` under TradingView's own id (`018_calendar_tradingview.sql`).
-Each row carries the time, the name with its period (*Core PCE Price Index MoM
-(Aug)*), the importance, the consensus and the prior, and the actual once it
-prints. Two callers file it: the briefing, before it reads the calendar, and a
-**quarter-hourly job** before it asks one question: **which release time has
-landed and not yet been looked at?** If there is one she reads what those
-printed and decides whether it is worth saying. Low-rated items (mortgage rates,
-rig counts, bill auctions) are not filed, because every one would be in front
-of her on every request and none moves gold on its own. Every filing is a row
-in `eugenia_runs` under `calendar`, failed or not, because a calendar that
-quietly stopped moving looks exactly like a quiet week.
+`eugenia_calendar` under TradingView's own id (`018_calendar_tradingview.sql`):
+the time, the name with its period (*Core PCE Price Index MoM (Aug)*), the
+importance, the consensus, the prior, and the actual once it prints. Low-rated
+items are not filed — each would be in front of her on every request and none
+moves gold alone. The briefing files before it reads, and a **quarter-hourly
+job** files before asking one question: **which release time has landed and not
+yet been looked at?** Every filing is an `eugenia_runs` row under `calendar`,
+failed or not, since a calendar that stopped moving looks like a quiet week.
 
-**She used to type it in, and most of what went wrong here came from the
-typing.** The key was `(at, name)` over a name the model wrote, so one CPI
-arrived as `August CPI`, `core CPI`, `US CPI (core CPI)`, `US CPI (August)` and
-`headline CPI`: five rows laid down by four turns across five days. Her
-importance came off a search page and had to be corrected against Forex
-Factory's folder. TradingView keeps an id for every release, so one release is
-one row whatever it is called, and nothing she can call is able to create one.
-What she had filed for the days ahead was deleted when 018 was applied, since
-TradingView's rows for the same releases arrive under other names; what had
-already printed stays, as the history this table exists to grow. On the day 018
-went in, that meant the morning's claims and ISM were each listed twice, her copy
-beside TradingView's, until they aged out of the window — and hers, carrying no
-actual, read as still **due** hours after the print. `calendarList` marks a row
-with no figure **PAST** once its time has gone, which is also every speech, all
-day, and every print whose number has not reached the calendar yet.
+**One release is one row, whatever it is called**, because the key is
+TradingView's id and nothing she can call creates a row. Keyed on a name the
+model wrote, one CPI once became five rows and five looks. `calendarList` marks a
+row with no figure **PAST** once its time has gone — every speech, and every
+print whose number has not arrived.
 
-**The read is bounded at forty rows, and a full read says it stopped.** It reads
-earliest first, so a day too heavy for the bound loses the furthest-ahead rows —
-tomorrow's, which the next briefing reads and the trade event reads for itself —
-and that end is the right one to lose. What the bound may not do is pass as the
-whole list, so a read that reached it ends with a line telling her later
-releases were not read.
+**The read is bounded at forty rows, earliest first, and a full read says so.** A
+heavy day loses tomorrow's rows, which the next briefing reads — the right end
+to lose — but a cut list must not pass as whole, so it ends with a line saying
+later releases were not read.
 
 **A figure TradingView has not published is left out of the row, never sent as
-null.** `merge-duplicates` writes exactly the keys a payload names, so a filing
-carrying `actual: null` would erase an actual the release look recorded by hand
-fifteen minutes later. Rows go up grouped by the columns they carry, because
-PostgREST refuses a bulk insert whose objects do not all name the same ones.
+null.** `merge-duplicates` writes exactly the keys present, so `actual: null`
+would erase an actual recorded by hand. Rows go up grouped by the columns they
+carry, since PostgREST refuses a bulk insert whose objects differ.
 
-**The look waits for the number, and not for ever.** TradingView publishes an
-actual a minute or two after the print. A due group still missing a figure is
-left unmarked for the next quarter-hour until thirty minutes have passed
-(`awaitingActual`), and then it looks anyway. A speech has no consensus and no
-prior and is looked at on time, since nothing is coming.
+**The window reaches past tomorrow's morning prints.** A trade opened before
+tomorrow's briefing is checked only against what is filed, so the briefing files
+today and tomorrow up to noon New York; filed at twenty-four hours, the London
+session would never hear of the 08:30. Read and write share one bound, and every
+calendar line from another day names its day — two mornings each have an 08:30.
 
-**And the look reads a release against its own record.** Each filed row carries
-TradingView's `ticker` (`020_calendar_ticker.sql`), the series a release belongs
-to, where the id names one release only. The release look is handed the last
-twelve prints of each series in the group, oldest first, each as printed against
-what was expected (`recordList`, read by `recordQuery`). They are listed, never
-scored: the figures are text, and a surprise worked out by parsing "0.2%" into a
-sign is a chance to get every unit backwards. Reading the record is her job.
-`RELEASE` asks her to say whether a miss runs the way the series has been
-missing, or is the first the other way in a long time.
+**One look per release time.** The 08:30 slot is most of a report, so
+`dueRelease` takes the earliest time nothing has looked at and every high row
+standing at it: several numbers landing together are one message. `looked_at` is
+stamped **before** the look, since a look that generates and fails to write would
+repeat every fifteen minutes, each billed. **The look waits for the number, not
+for ever**: a group still missing a figure is left for the next quarter-hour,
+for thirty minutes at most (`awaitingActual`); a speech has no figure coming and
+is looked at on time. It is a second job rather than a faster one, because the
+hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
+`?release=1` is its door.
 
-**And it is handed what the last print became.** A release revises the one
-before it. TradingView carries the revised figure as the new row's `prior`,
-while last month's row keeps the figure first reported, so the revision is the
-two disagreeing. On 2 October payrolls missed by sixty thousand and August came
-down from 162K to 133K in the same report, which is half the story.
-`revisionLine` reads it off the same record read, with no new query: *"Revised:
-Non Farm Payrolls (Aug) was first reported at 162K on 4 Sept, and this release
-revises it to 133K."* It compares only against the print immediately before.
-The newest row on file is last month's only if none is missing, so a gap half as
-long again as the one before it, whatever the series' rhythm, says nothing
-rather than report two months apart as a revision. `RELEASE` tells her to say a
-revision beside the miss and never to work one out herself. The briefing does
-not carry it: a revision is published with the new report, so at 08:00 there is
-none to show yet, and the look right after the print is where it lands.
+**The look reads a release against its own record.** Each row carries
+TradingView's `ticker` (`020_calendar_ticker.sql`), the series it belongs to, and
+the look is handed the last twelve prints of each series in the group, oldest
+first, each against what was expected (`recordList`, read by `recordQuery`).
+Listed, never scored — parsing "0.2%" into a sign is a chance to get every unit
+backwards. `RELEASE` asks whether a miss runs the way the series has been
+missing.
 
-**The question is about the time rather than the row.** The 08:30 slot is most
-of a report, and while she typed the calendar each spelling of one print fired
-its own look, its own model call and its own message — five for a single CPI on
-11 September. `dueRelease` takes the earliest release time nothing has looked at
-and every high row standing at it, so several numbers landing together are one
-message, which is how a person reads "the 8:30 data" anyway. `looked_at` is what
-makes that once-only; it is stamped **before** the look for the reason the
-briefing marker is, since a look that generates and fails to write would
-otherwise repeat every fifteen minutes, each one a billed call.
-
-It is a second schedule rather than a faster one, because the four hourly
-predicates all test `hour ===` and a `*/15` job would have run four briefings
-every morning. `?release=1` is its door and the way to exercise a look by hand.
+**And what the last print became.** A release revises the one before, and
+TradingView carries the revised figure as the new row's `prior` while last
+month's row keeps the first report. `revisionLine` reads the two off the same
+record: *"Revised: Non Farm Payrolls (Aug) was first reported at 162K on 4 Sept,
+and this release revises it to 133K."* It compares only with the print
+immediately before, and a gap half as long again as the series' last says
+nothing. She says a revision beside the miss and never works one out; the
+briefing does not carry it, since at 08:00 there is none yet.
 
 **A look fills a release in and cannot file one.** Where TradingView has not yet
-published a figure, the look searches for it and records it with
-`record_actual`, a **PATCH and nothing else**. It matches an entry on `(at,
-name)`, writes `actual` and `note`, and has no insert path at any spelling. An
-upsert keyed on a name the model writes was once handed `US retail sales
-(August, advance)` and filed the print under `retail sales` — an insert, the
-actual on a row with no consensus and the consensus on a row with no actual. It
-cannot touch `consensus` or `prior` either, which are TradingView's. A name
-matching nothing is a 200 with an empty body, which reads exactly like a write,
-so it answers with the names actually on file. The look is handed the UTC stamp
-beside the ET heading, because the tool matches on the instant and asking her to
-convert is a conversion standing where an input belongs.
+published a figure, the look records one with `record_actual`, a **PATCH and
+nothing else**, matching `(at, name)` and writing `actual` and `note` — no insert
+path, and no write to `consensus` or `prior`, which are TradingView's. A name
+matching nothing is a 200 with an empty body, so it answers with the names
+actually on file. The look is handed the UTC stamp beside the ET heading, since
+the tool matches the instant. **A speech is recorded by its line alone**: either
+half may come without the other, and an absent key is left as it was.
 
-**A speech is recorded by its line alone.** A speech TradingView rates high is
-looked at the moment it lands, and the look is told it may add one line on what
-it meant either way — but the tool demanded a figure, and a speech prints none,
-so a Chair's press conference left no record at all. Either half may come
-alone now, and an absent key is left as it was, so a line written after the
-figure never erases it. A past row with no figure shows its line, which is the
-only thing in the calendar saying what was said. Speakers rated medium get no
-look, and covering them would mean web search in the nightly pass, which has
-nothing to research by design; the next briefing searches them when they matter.
+**The row records when its content was last written.** `updated_at` moves through
+a trigger, but **not on a mark**: `markLooked` writes `looked_at` alone, so the
+column says which of two rows carries the later content rather than when one was
+last handled. The trigger compares the row as `jsonb` less those two columns, so a
+column added later is compared without anyone remembering it.
 
-**And the row records when its content was last written.** Two writers hours
-apart on one row means `created_at` says only when each was first seen — so when
-duplicates disagreed about what a number printed at, nothing could say which
-figure was the later one. `updated_at` moves through a trigger, the same shape
-`trades` has used since `001`, but **not on a mark**: `markLooked` writes
-`looked_at` and nothing else, and an unconditional touch made the column say when
-a row was last *handled*. On 16 September the row carrying the stale prior was
-marked at 12:35:00 and the row carrying the actual was written at 12:36:15 — it
-ordered correctly by seventy-five seconds. Reverse them and the column answers
-the opposite of the truth in the one question it has. The trigger compares the
-row as `jsonb` less `updated_at` and `looked_at`, rather than against a list of
-the other columns, so a column added later is compared without anyone having to
-remember it.
+**Its default is silence**, on the pulse's reasoning: a number landing where
+everyone expected it is not news. `isSilent` is shared.
 
-**Every message she composes is read once more before it is sent, and for most of
-them that is new.** `CRITIC` ran on the briefing *alone*. The pulse, the release
-look, the move look and the reply went out unreviewed for their whole lives —
-which is most of what arrives in a week, and it is exactly where the writing
-rules were being ignored with nothing to answer for it.
+**Every message she composes is read once more before it is sent.** `CRITIC`
+reads the briefing; `TRIM` reads the pulse, the release look, the move look and
+the reply — most of what arrives in a week. The reply is gated inside the typing
+indicator, so she never reads as having finished and said nothing, and `TRIM`
+holds the reply to no short length: a plan checked against his rules can be nine
+findings long.
 
-**The reply was the one with no argument behind it at all.** It was never
-exempted; it simply was not in the list the day the gate was written, and it is
-the busiest thing she sends. The case made for leaving it out afterwards was
-wrong twice over: `TRIM` reads `WRITING`, and `WRITING` is where *English,
-always, whatever he wrote in* lives — so the one path he writes Spanish on was
-the one path with nothing checking the rule written for it. It is gated INSIDE
-the typing indicator, because clearing the ping first leaves three silent
-seconds in which she reads as having finished and then said nothing.
+`TRIM` is **not `CRITIC` with a shorter prompt**. The briefing's checks — a first
+sentence true only today, a complete chain, one chain only, 250–300 words —
+would ruin three sentences. `TRIM` asks the writing questions alone, off the same
+`WRITING` the writer was given; it gets no notes and no channel map, since it is
+not judging whether a term was built, but **is** handed what you have on now,
+because her read on price is allowed and a read while you are in a position is
+not. It runs on Sonnet.
 
-**A reply is not held to the short messages' length.** `TRIM` told every message
-it read that it was two or three sentences, which was right for the messages she
-starts and wrong for the reply that joined them. A plan checked against his rules
-can be nine findings long, and `keepDraft` refuses only a revision under a third
-of the draft, so a reply cut to its last few sentences was accepted. The length
-line now names the messages it is about.
+**Both gates check one fact against the story she carries: the direction.** She
+twice wrote "October rate cut odds" days after a hike, inside reasoning about the
+hike. A "cut" where the story says "hike" is changed to match, unless the message
+says the story changed today and why. The nightly pass writes into the story
+which way the central bank last moved and which way the market is betting. The
+rule is written once, `AGAINST_THE_STORY`, and both gates read it.
 
-**And what is remembered is what the gate returned.** The three callers that
-gained a gate went on storing the DRAFT — a message he never read, filed as her
-own words and resent as history for six exchanges, which is the stale copy
-`remember` already refuses for the notes and the week's trades, arriving through
-the door the gate itself opened. The briefing never had that fault; it stored
-what `critique` returned from the day it existed.
+**The trade event stays out of the gate.** `TRIM` **rewrites**, and this message
+reaches him in a position or just past his day's limit, where a paraphrased
+citation of his rule is how a sentence becomes an order. `TRADE_EVENT` is also
+the most constrained prompt in the file — two sentences, the fact then the rule,
+`NOTHING` as a way out.
 
-`TRIM` is that gate, and it is **not `CRITIC` with a shorter prompt**. The
-briefing's checks ask whether the first sentence is true only today, whether the
-chain is complete in the paragraph that matters, whether there is more than one
-chain, and whether it runs to 250–300 words. Every one is a question about a
-briefing; asked of three sentences they would demand a chain, complain about
-length, and rewrite a good message into a bad one. `TRIM` asks the writing
-questions and nothing else — off the same `WRITING` the writer was given — and is
-handed no notes and no channel map, because it is not judging whether a term was
-built. It **is** handed what you have on right now, because her read on price is
-allowed and a read while you are in a position is not, and a gate cannot tell
-those apart without the block that says which. It runs on Sonnet.
+`gate()` is one function for both: a revision failing `keepDraft` is overruled,
+and a gate that *throws* costs nothing — copied, that catch is where one gate
+loses its message on the day a vendor is slow. **Every outcome is a row** in
+`eugenia_runs` — `trim verdict` or `critic verdict`, reading `revised 1840 →
+1795`, `unchanged`, `kept the draft` or `failed, the draft went` — because
+revised, unchanged and overruled are three different repairs. **`keepDraft` is
+relative to the draft**: a flat floor would overrule every revision of a short
+message, and a gate overruled every time looks exactly like one that agreed. Its
+ceiling is each gate's own — twice the draft for the critic, which may add a
+missing link or verdict; a quarter (`TRIM_MOST`) for `TRIM`, which only cuts and
+swaps, after a reply came back with `TRIM`'s own notes on top of it.
 
-**Both gates are handed the story she has been carrying, and check one fact
-against it: the direction.** Twice in one week she wrote "October rate cut odds"
-while the Fed had just hiked, both times inside a message whose own reasoning was
-about a hike. So she knew, and the phrase she had seen most often came out
-instead. Neither gate could catch it: they judged how she writes and held nothing
-saying which way things were going. Now a "cut" where the story says "hike" is
-changed to match, unless the message says the story itself changed today and why.
-The check is only as good as the story, so the nightly pass is told to write the
-direction into it — which way the central bank last moved, and which way the
-market is betting next. The rule is written once, `AGAINST_THE_STORY`, and both
-gates read it.
+**What is remembered is what the gate returned**, never the draft — a draft
+stored is a message he never read, resent as hers for six exchanges.
 
-**The trade event stays out, and the reason first given for it was wrong.** It
-said there was no composed prose to trim. Both branches do decide *whether to
-speak* from data before any model call — which is why an ordinary fill costs
-nothing — but the one that speaks then calls the model with the conversation
-window, her notes and two tools, and writes two sentences. That is composed
-prose by any reading.
-
-What exempts it is the gate's own shape. `TRIM` **rewrites**, and this message
-reaches him while he is in a position or has just breached his day. The one thing
-that must never happen on this path is a sentence that reads as an instruction,
-and a gate paraphrasing a citation of his rule is how one becomes an order. That is a failure already seen once here — a gate
-not told the no-direction rule could take a compliant message and hand back one
-that broke it. `TRADE_EVENT` is also the most constrained prompt in the file —
-two sentences, the fact then the rule, no greeting, `NOTHING` as an explicit way
-out — so little of what `TRIM` checks is reachable inside it.
-
-`gate()` holds the half that makes either one safe — a revision failing
-`keepDraft` is overruled, and a gate that *throws* costs nothing. Copied, that
-catch is where one gate loses the message it was checking on the day a vendor is
-slow.
-
-**And what a gate decided is a row in `eugenia_runs`, not a console line.** The
-first three days with a gate on every path showed the paragraph rule broken in
-nearly every message that went through one — five, six and seven sentences where
-`WRITING` asks for three or four — and nothing could say why. The model call was
-recorded, so the gate had plainly RUN; whether it then sent its revision, handed
-the draft back unchanged, or was overruled by `keepDraft` was written to a log
-nobody reads. Those are three different repairs. Every gated message now leaves
-one `trim verdict` or `critic verdict` row — `revised 1840 → 1795`,
-`unchanged`, `kept the draft`, or `failed, the draft went` — so the rows count
-the messages, and a gate costing sixty seconds on a long reply can be seen
-earning it or not.
-
-And **`keepDraft` is relative now**. A flat 400 characters is a *briefing's*
-floor: shorter than that and what came back was an apology. A release look is two
-or three sentences and often under 400 to begin with, so that floor overrules
-every revision there is — and a gate overruled every time looks exactly like a
-gate that agreed with the draft.
-
-**And its ceiling is each gate's own.** The critic may put back a missing link or
-a missing verdict, so a briefing can grow, up to twice the draft. `TRIM` only
-cuts and swaps words, so it may grow a quarter (`TRIM_MOST`). At twice, a
-541-character reply came back at 852 on 30 September with `TRIM`'s own notes on
-the message above it — *"this message looks fine as is…"* — and that went out and
-was stored as hers. Every other trim that fortnight stayed within a tenth.
-
-**One chain per briefing, not one per event.** Every scheduled thing that
-matters still gets named — he needs the day, and on Sunday the week — but only
-one of them gets its mechanism walked. Nine subjects each carrying a clause of
-chain is not a thorough briefing, it is a survey, and it drifts there precisely because every
-clause looks justified on its own. The round-up slot now says so itself: named
-and nothing more, no mechanism at all. `CRITIC` holds the same rule, because the
-critic runs last and a rule loosened in one place and left standing in the other
-is a rule the critic puts back every morning.
-
-**Its default is silence**, on the pulse's reasoning exactly: a number landing
-where everyone expected it is not news. `isSilent` is shared with it rather than
-written twice.
-
-**And a trade reaches her in two minutes.** `doji-mcp-sync` writes a position
-almost as it opens, and nothing told her: a trade taken at 10:47 arrived the next
-morning as one row inside a week of JSON. A trigger on `trades` now calls her,
-and the two things she is allowed to say are both **his own rules read back at
-the moment they apply**:
+**A trade reaches her in two minutes.** A trigger on `trades` calls her when the
+poller writes a position, and the two things she may say are both **his own
+rules read back at the moment they apply**:
 
 | Event | What she may say |
 |---|---|
 | opened | a high-impact print is pending and he is now in a position — R-14 is about standing aside before one, R-19 about a position inherited into one |
 | closed | that fill took the day past −4% of the account his size implies, and R-11 says the day ends there |
 
-Naming the rule is citation; saying what he should do about it is not hers and
-the prompt forbids it in those words. **Silence costs nothing and is the common
-case**: both branches decide from data *before* any model call, so no pending
-print and no breach means the function returns having spent nothing. A trade
-event that always ran a model call would be a bill attached to every fill for a
-message that usually should not be sent.
+Naming the rule is citation; saying what he should do is not hers, and the
+prompt says so. **Silence is the common case and costs nothing**: both branches
+decide from data *before* any model call. Both are about **today**, so a trade
+filed under another day returns first — anything stamping an old close would
+otherwise report it in the present tense — and an "opened" event for a trade
+already carrying its exit (a scalp inside one poll) says nothing.
 
-**"Pending" means filed, and the calendar was filed a morning too late for the
-trades that need it most.** The check reads her own calendar, and her calendar
-is filed by the 08:00 briefing — which reached twenty-four hours ahead, so it
-stopped at 08:00 the next day. Tomorrow's 08:30 and 10:00 prints, the biggest
-there are, went in only at tomorrow's own briefing, and every trade opened
-before it checked an empty calendar and said nothing. On 25 September an entry
-around 07:38 was silent about the 10:00 Michigan print while the 09:38 entry
-was warned about the same release. The London session is that window every
-morning. The briefing now files today's calendar and tomorrow's up to noon New
-York, the window she is handed moves with it so she never files what she cannot
-see, and every calendar line from a day other than today names its day — at this
-width two mornings each have an 08:30, and a time with no date reads as today's.
-
-The trigger fires on the transition and not on every poll. `fill_time` is null on
-every open position, so the close clause compares with `is distinct from` — `<>`
-is NULL there, a `WHEN` that is not true does not fire, and the one event it
-exists for would be the one that never happened. The poller re-upserts every
-position in its window every two minutes, which is what the guard is holding off.
+The trigger fires on the transition, not every poll. `fill_time` is null on every
+open position, so the close clause uses `is distinct from` — `<>` is NULL there
+and the event would never fire — and the poller's two-minute re-upserts never
+re-fire it.
 
 ### The price sense — the third thing that wakes her, and the first with no row behind it
 
