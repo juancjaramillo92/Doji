@@ -382,7 +382,7 @@ single-sourced at run time:
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
-| the **`eugenia_trades` column list** | the numbered SQL files (`003_eugenia.sql` creates it, `006_plan.sql` appends the plan; the last definition wins), the README's two quoted copies of that statement, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
+| the **`eugenia_trades` column list** | the numbered SQL files (`003_eugenia.sql` creates it, `006_plan.sql` appends the plan; the last definition wins), the README's quoted copy of that statement, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
 | each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — held in both directions, so a rename and a sense with no job both fail |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search |
@@ -2426,14 +2426,14 @@ references anything defined below it at load time.
 | `Login` | session gate |
 | `Carousel` | mobile swipe position and dots |
 
-`render()` is the orchestrator and holds no drawing of its own. Each step runs in
-isolation, so one widget can degrade without blanking the panel.
+`render()` is the orchestrator and draws nothing itself. Each step runs in its own
+catch, so one widget can degrade without blanking the panel.
 
 ### Palette
 
-Every colour is a CSS custom property on `:root` in `index.html`. Nothing in the
-app writes a literal — Chart.js is the one thing that cannot read a variable, so
-what it needs is resolved once through `cssToken()` into a module constant.
+Every colour is a CSS custom property on `:root`. Nothing in the app writes a
+literal — Chart.js cannot read a variable, so what it needs is resolved once
+through `cssToken()` into a module constant.
 
 | Token | Value | Used for |
 |---|---|---|
@@ -2452,36 +2452,24 @@ what it needs is resolved once through `cssToken()` into a module constant.
 | `--be-tx` | `#9aa4c0` | break-even text — cool, because a break-even is a result |
 | `--seg-be-bg` / `--seg-be-bd` | `#0e1020` / `#333f63` | break-even fill and border |
 
-**The result colours have a house treatment**, and it is worth knowing before
-adding anything that shows a win or a loss: a flat 12% fill against a
-full-strength border. `--seg-win-bg` and `--seg-loss-bg` are `--win` and `--loss`
-at `.12`; the hover pair `--seg-win-hv` / `--seg-loss-hv` are the same at `.22`.
-Break-even is the exception and is a solid colour rather than an alpha, because
-it has to stay legible on a 58px calendar cell where a translucent fill hazes.
+**Results have a house treatment**: a flat 12% fill against a full-strength
+border — `--seg-win-bg` and `--seg-loss-bg` are `--win` and `--loss` at `.12`, the
+hover pair `--seg-win-hv` / `--seg-loss-hv` at `.22`. Break-even is a solid colour
+instead, because a translucent fill hazes on a 58px calendar cell, and the darkest
+of the three because nothing happened; its green runs at or above its red so a
+small tile reads cool rather than mauve.
 
-Break-even is also deliberately the darkest of the three: nothing happened, so it
-recedes furthest. Its green runs at or above its red so a small tile goes cool
-rather than mauve — the rest of the palette has red above green, which reads warm
-on a large card and muddy on a cell.
-
-**Neutral surfaces come from seven alphas of white**, so a change lands in one
-place: `--fill-0` (`.02`, inset panels) through `--fill-3` (`.08`, hover on a
-`--fill-2` surface), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
+**Neutral surfaces come from seven alphas of white**: `--fill-0` (`.02`) through
+`--fill-3` (`.08`), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
 (`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
-`.42`, and `--p-hair` at `.04` for the table row rule.
-
-**Type** is `--ui` (Hanken Grotesk) and `--mono` (JetBrains Mono). **Radii** are
-`--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px —
-the last an exception for calendar tiles, which at the card radius each read as
-their own card and stop scanning as rows.
-
----
+`.42`, and `--p-hair` at `.04`. **Type** is `--ui` and `--mono`. **Radii** are
+`--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px for
+calendar tiles, which at the card radius each read as their own card.
 
 ### The shared primitives
 
-Every wheel and every bar is built from one of these. That is what keeps the
-panels in visual agreement; a hand-rolled Chart config or a new bar markup is how
-a page drifts apart from itself one component at a time.
+Every wheel and every bar is built from one of these, which is what keeps the
+panels in visual agreement:
 
 - `wheelBlock(key, strip, cls)` — the markup for any result wheel
 - `paintWheel(key, counts)` — the figures and arcs for one, from a `counts()`
@@ -2494,167 +2482,90 @@ a page drifts apart from itself one component at a time.
 - `--bar-h` — bar thickness
 - `DONUT_CUTOUT`, `RESULT_FILL`, `RESULT_BORDER` — wheel geometry and palette
 
-The period and setup wheel rows are both `wheelBlock` + `paintWheel`. Each row's
-**shell is emitted once** and only its figures are repainted, which is what lets
-`mountDonut` update an existing Chart instead of destroying and rebuilding every
-one of them on every render.
+Each wheel row's **shell is emitted once** and only its figures are repainted,
+which lets `mountDonut` update a Chart rather than rebuild every one each render.
+`font-family:var(--mono)` is one grouped rule, and every colour in the sheet is a
+token. **A row with no data is a dim placeholder, never a missing row**: these
+blocks are `flex:1` with `space-between`, so a dropped row stretches the rest.
 
-Typography and colour follow the same rule as the wheels. `font-family:var(--mono)`
-is declared in one grouped rule, not in each of the fifty-six components that
-use it, and every colour in the sheet is a token — there are no raw `rgba()` or
-hex literals outside `:root`.
-
-**Empty-state rule:** a row with no data is a dim placeholder, never a missing
-row. These blocks are `flex:1` with `space-between`, so dropping a row makes the
-survivors stretch.
-
-**A calendar cell carries two separate readings in one colour.** The **hue** is
-the result — which way the day went. The **strength of the fill** is size: the
-day's `|net|` against the largest `|net|` **in the month on show**, floored so
-the quietest day is still plainly coloured. The scale is the month's own, so the
-question a cell answers is "how does this day compare with my month" rather than
-"with the loudest day in the account" — rescaling it globally would leave most
-months a grid of near-blanks. It is one custom property, `--hm-i`, mixed in CSS
-rather than three fixed bands, because bands would need an alpha for every band
-*and* every band's hover. Break-even is deliberately not scaled: nothing happened,
-so there is no size to show. Today is marked on the day **number** rather than
-the cell, because purple already means unfinished here. And the **dashed border**
-on the week rail says derived rather than recorded — it is the one cell in the
-grid holding no trade of its own, which is also why it carries no `--sh-2`.
+**A calendar cell carries two readings in one colour.** The **hue** is the result;
+the **strength of the fill** is the day's `|net|` against the largest **in the
+month on show**, floored so the quietest day is still coloured — one property,
+`--hm-i`, mixed in CSS. Break-even is not scaled: there is no size to show. Today
+is marked on the day **number**, because purple already means unfinished. The
+**dashed border** on the week rail says derived rather than recorded, which is
+also why it carries no `--sh-2`.
 
 ### Sync model
 
-Supabase is the data. There is no local write path, so there is no shadow, no
-cursor, no tombstone bookkeeping and no conflict rule — a save is one `UPDATE`,
-and the next read returns what the database holds.
+Supabase is the data. There is no local write path, so no shadow, cursor,
+tombstone or conflict rule — a save is one `UPDATE`, and the next read returns
+what the database holds. The snapshot in `localStorage` is a **read cache** and
+never anything else: painted on open, never written back.
 
-The snapshot in `localStorage` is a **read cache** and can never be anything
-else. It lets the journal open and draw with no connection; it is never written
-back. That is what makes offline cost thirty lines rather than eight hundred.
-
-Realtime is the fast path; the refresh is the floor underneath it. Every
-websocket dies eventually — a phone backgrounds its tab and the socket is killed
-outright — and nothing replays what was missed. So the app also re-reads on
-foreground, on reconnect, and on a slow timer. Correctness lives in the refresh.
-
-A refresh while a modal is open is held rather than dropped, and flushed when the
-modal closes; replacing the rendered set under half-typed input would pull the
-ground out from under it.
+Realtime is the fast path; the refresh is the floor under it. A phone that
+backgrounds its tab kills the socket and nothing replays what was missed, so the
+app re-reads on foreground, on reconnect and on a slow timer. A refresh while a
+modal is open is held and flushed when it closes, rather than replacing the
+rendered set under half-typed input.
 
 ---
 
 ## Deployment
 
-**`index.html` is served by Vercel from `main`, and the Edge Functions follow
-the same rule.** `.github/workflows/deploy-functions.yml` runs
-`supabase functions deploy` on any push to `main` that touches
-`supabase/functions/**` or `supabase/config.toml`. It needs one repository
-secret, `SUPABASE_ACCESS_TOKEN`, generated from the Supabase account page.
-
-All five functions go on each run rather than only the changed one, so none of
-them can drift apart from the others. `adherence.ts` ships inside
-`doji-eugenia` the way `prompt.ts` and `strategy.ts` do — it is a module of that
-function, not a sixth one. `verify_jwt` lives in
-`supabase/config.toml` rather than in a dashboard toggle, which is what makes
-the committed file the whole description of how a function is deployed.
-
-**`supabase/functions/_shared/edge.ts` holds one definition of each primitive**
-— `env`, `secretMatches`, `json`, `sbHeaders`, `mcpInit`, `parseSse`, `telegram`,
-`nyDate` and `nyClock` —
-bundled into every function that imports it. The test is not "could this be
-shared" but **"are there two copies nothing can compare"**, and `secretMatches`
-is why: the function exists to be *constant-time*, so a copy quietly rewritten
-to `presented === expected` returns the same answer to every assertion anyone
-would write while leaking the secret through timing. A behavioural test cannot
-see that, so `agree.test.mjs` reads the body instead — the loop over the longer
-of the two inputs, and the absence of any direct comparison of the two secrets.
-One definition has nothing to drift, and now the definition itself is held.
-
-The rest met the same test and were extracted late. `sbHeaders` and the Telegram
-call were **byte-identical** in both bots. The two New York clocks differed only
-in what they returned when `Intl` failed to emit a part — Monday noon in the
-poller, `-1` in Eugenia — and neither branch can fire, because `formatToParts`
-with `weekday` and `hour` requested always emits both. That is defensive padding
-at a boundary where nothing untrusted enters, so it is gone and an impossible
-response now throws rather than quietly deciding the market is open.
-
-`nyDate` and `nyClock` are separate because they answer separate questions —
-which civil day an instant falls on, and what weekday and hour it is. The poller
-asks the first to file a trade and Eugenia asks it to decide whether today's
-briefing already went; the poller asks the second for market hours and Eugenia
-for both her schedules. Gladys's `nyTime` stays hers: it is a display format with
-one caller, not a third reading of the clock.
-
-Configuration is an argument rather than a capture, which is what makes sharing
-free: each bot binds its own token in one line, and every call site below it is
-unchanged. `sbHeaders(prefer?)` names the `Prefer` at the call site, which also
-keeps an upsert directive off a `PATCH` — the poller's private copy had
-`resolution=merge-duplicates` baked in and sent it on the balance write, where
-it means nothing.
-
-What is deliberately **not** shared is the entry point. All five authorise their
-own callers with the same shape — refuse if a secret is unset, match one, match
-the other, 401 — and extracting that into a router would put the one check
-worth reading behind a helper. Authorisation stays visible in the file being
-read.
+**`index.html` is served by Vercel from `main`, and the Edge Functions follow the
+same rule.** `.github/workflows/deploy-functions.yml` runs `supabase functions
+deploy` on any push to `main` touching `supabase/functions/**` or
+`supabase/config.toml`, with one repository secret, `SUPABASE_ACCESS_TOKEN`. All
+five functions go every run, so none drifts from the others; `adherence.ts`,
+`prompt.ts`, `strategy.ts` and `journal.ts` ship inside `doji-eugenia`.
+`verify_jwt` lives in `config.toml`, so the committed file is the whole
+description of how a function is deployed. A hand-pasted function can differ from
+the committed one with nothing to reveal it — never deploy from the dashboard.
 
 **`npm test` runs first, in the same job, and a red suite stops the deploy.**
-`test.yml` also runs on every push, but it is a *separate* workflow — it would
-have gone red beside the deploy while the deploy shipped anyway, leaving two
-green ticks, one red, and the broken code already live. A failing step inside
-the deploy job is the only ordering that actually holds anything back. It is
-also what makes `_shared/` safe to depend on: the suite imports it by the same
-relative path the functions use, so an extraction that does not resolve fails
-the job instead of shipping five broken functions at once.
+`test.yml` runs on every push too, but as a separate workflow it would go red
+beside a deploy that shipped anyway. The suite also imports `_shared/` by the
+path the functions use, so a broken extraction fails the job.
 
-**This is worth the machinery for one reason.** The poller and Gladys were
-pasted into the dashboard by hand, and nothing tied the running code to the
-committed code — so the repository could describe a system while the system ran
-something else, and every later change would be reasoned about from a file that
-was not the truth. That failure is silent, which is what makes it expensive.
+**`supabase/functions/_shared/edge.ts` holds one definition of each primitive** —
+`env`, `secretMatches`, `json`, `sbHeaders`, `mcpInit`, `parseSse`, `telegram`,
+`nyDate`, `nyClock`, `marketOpen`, `heartbeat` — and the test for extracting
+one is **"are there two copies nothing can compare"**. `secretMatches` is why:
+it exists to be *constant-time*, and a copy rewritten to `presented ===
+expected` answers every behavioural test while leaking the secret through timing,
+so `agree.test.mjs` reads its body. Configuration is an argument rather than a
+capture, so each bot binds its own token in one line, and `sbHeaders(prefer?)`
+names the `Prefer` at the call site. `nyDate` (which civil day) and `nyClock`
+(which weekday and hour) answer separate questions; Gladys's `nyTime` is a
+display format with one caller.
 
-**Two things are still deliberately manual.** The SQL is run knowingly in the
-SQL editor, never by a robot: `001_trades.sql` through `021_calendar_name_key.sql` are not
-under `supabase/migrations/`, so nothing applies them automatically, and a
-schema change that lands because a file was committed is exactly the accident
-the Operating section argues against for restores. The Apps Script is deployed
-from the Apps Script editor; it holds no secrets in the file and nothing reads
-it from here.
+**The entry point is deliberately not shared.** All five authorise their callers
+in the same four lines — refuse if a secret is unset, match one, match the other,
+401 — and that is the one check worth reading in the file being read.
 
-**The editor reads the words and not the language, so no file says `select …
-into`.** Before it runs anything it looks for new tables without RLS, and it
-takes `select … into worst` inside a plpgsql function for `create table worst`.
-It then warns, and its *run with RLS* button appends `alter table worst enable
-row level security` to the END of the paste — a table that does not exist, so
-Postgres refuses the statement and the whole paste, which runs as one
-transaction, rolls back with it. Every function here reads into a variable as
-`x := (select …)` instead, which means the same and cannot be mistaken for a
-table, and `agree.test.mjs` refuses the other form in any numbered file.
+**Two things are deliberately manual.** The SQL is run knowingly in the SQL
+editor: `001_trades.sql` through `021_calendar_name_key.sql` are not under
+`supabase/migrations/`, so nothing applies them because a file was committed. The
+Apps Script is deployed from its own editor.
 
-**Check the paste ends where the file does.** The editor runs its whole contents,
-or only the selection if there is one. A paste that stopped partway — 010 has
-twice arrived cut at line 150 — fails as `unterminated dollar-quoted string`,
-which reads like a fault in the file. The last line in the editor should be the
-file's last line.
+**The editor reads the words, not the language, so no file says `select …
+into`.** It takes `select … into worst` inside plpgsql for `create table worst`,
+and its *run with RLS* button appends `alter table worst enable row level
+security` to the paste — a table that does not exist, so the whole paste rolls
+back. Every function reads into a variable as `x := (select …)`, and
+`agree.test.mjs` refuses the other form. **Check the paste ends where the file
+does**: a paste cut partway fails as `unterminated dollar-quoted string`, which
+reads like a fault in the file.
 
-**Applying by hand means the files are a claim, so `supabase/verify.sql` is how
-the claim gets tested.** It writes nothing: it reads back the columns, the
-constraints, the indexes, the policies, the grants on Eugenia's view, the
-triggers, the realtime publication, every cron job and the last ten function
-responses, to be compared against 001–007 by eye. Run it after any manual change
-and before believing anything here about the database. A CI job cannot stand in
-for it — 002, 003 and 004 need `pg_net`, `vault` and `pg_cron`, none of which a
-plain Postgres container has, so a green pipeline would prove only that 001
-parses.
+**Applied by hand, the files are a claim, and `supabase/verify.sql` tests it.** It
+writes nothing; run it after any manual change. CI cannot stand in for it — the
+files need `pg_net`, `vault` and `pg_cron`, which a plain Postgres container
+lacks.
 
-**001, 002 and 003 are not re-runnable in full, and the reason differs.** 002 is
-a function and two triggers and is entirely `create or replace`, so it re-applies
-cleanly — its closing `drop function if exists` is the old single-purpose name of
-that function, left behind rather than dropped by the triggers being repointed
-above it, and a no-op on a database that never had it. 001 and 003 create tables,
-which stops them at the first statement — so a change to something further down
-is applied by running *that statement* on its own. In 003 those are the `eugenia_trades` view and the three grants under it,
-which is what an existing database needs to pick up `security_invoker`:
+**001 and 003 stop at their first `create table` on a database that has the
+tables**, so a change further down is applied by running *that statement* alone.
+In 003 that is the view and its grants — including `security_invoker`:
 
 ```sql
 create or replace view public.eugenia_trades
@@ -2670,174 +2581,17 @@ grant select on public.eugenia_trades to service_role;
 grant select on public.trades to service_role;
 ```
 
-An existing `trades` needs the column Gladys edits her own message through.
-Without it the redraw trigger's `WHEN` clause is never true, and journalling in
-the app goes on reaching Telegram not at all — silently, because the half that
-posts the message is unaffected:
+`create or replace view` matches columns by position and may only append, so the
+tail of that list is in the order columns were added; reordering or removing one
+needs a `drop view` first, which drops the grants with it — run the grants again
+in the same block. Afterwards, `verify.sql`'s *eugenia_trades is select-only,
+service_role only* answers `none` on a missing view and on one rebuilt without
+its grants. 002 is all `create or replace` and re-applies cleanly; 005 onward are
+written to re-run in full.
 
-```sql
-alter table public.trades add column if not exists tg_message_id bigint;
-```
-
-Apply that **before** 002, which creates the trigger that reads it.
-
-And an existing `eugenia_notes` needs its `kind` column, which is what lets a
-standing instruction outlive twenty observations:
-
-```sql
-alter table public.eugenia_notes
-  add column if not exists kind text not null default 'fact';
-alter table public.eugenia_notes
-  drop constraint if exists eugenia_notes_kind_check,
-  add constraint eugenia_notes_kind_check check (kind in ('fact', 'instruction'));
-
-create index if not exists eugenia_notes_kind_id_desc
-  on public.eugenia_notes (kind, id desc);
-drop index if exists eugenia_notes_id_desc;
-```
-
-A `trades` that carries `planned_stop` and `planned_target` sheds them, and the
-view goes first because it reads them — a column something depends on cannot be
-dropped out from under it. `create or replace view` cannot do this half: it
-matches column by column and may only append, so a shorter list is a drop and a
-rebuild, which is the other side of the trap #30 was fixed for.
-
-**The rebuild is in the same block as the drop, and that is not tidiness.** It
-was written as a drop followed by *"…then re-run the view statement above"* — a
-migration whose second half is a cross-reference, which is a half that gets read
-rather than run. Left undone, the columns are gone and so is the view, and every
-read Eugenia makes of the journal answers `404`: PostgREST's PGRST205, the
-relation is not in the schema cache. That is what 08:00, 09:00, 10:00 and 11:00
-each reported on 2 September, one sentence apiece and no briefing at all.
-
-```sql
-drop view if exists public.eugenia_trades;
-
-alter table public.trades
-  drop column if exists planned_stop,
-  drop column if exists planned_target;
-
-create or replace view public.eugenia_trades
-  with (security_invoker = true) as
-  select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
-         net_pnl, planned_sl, planned_tp, best_price
-  from public.trades
-  where deleted = false;
-
--- A view is dropped with its privileges, so these are not optional either.
-revoke all on public.eugenia_trades from anon, authenticated, service_role;
-grant select on public.eugenia_trades to service_role;
-grant select on public.trades to service_role;
-```
-
-Run `verify.sql` after it. *eugenia_trades is select-only, service_role only*
-answers `none` on a view that is missing and on one rebuilt without its grants,
-which are the two ways this ends badly and the only check that tells them from a
-healthy database.
-
-The two columns held a plan the journal asked *him* to type, and nothing read
-them but Eugenia. **`planned_sl` and `planned_tp` are not those columns coming
-back.** They are broker-owned, written by the poller off the open position, and
-he types neither — which is the distinction §10 turns on, since what was shut is
-the door to journalling a plan by hand.
-
-Search is added to both of Eugenia's tables, and the whole block is idempotent —
-`add column if not exists`, `create index if not exists`, `create or replace
-function` — so it can be re-applied without a drop:
-
-```sql
-alter table public.eugenia_notes
-  add column if not exists search tsvector
-  generated always as (to_tsvector('english', note)) stored;
-
-alter table public.eugenia_turns
-  add column if not exists search tsvector
-  generated always as (to_tsvector('english', content)) stored;
-
-create index if not exists eugenia_notes_search on public.eugenia_notes using gin (search);
-create index if not exists eugenia_turns_search on public.eugenia_turns using gin (search);
-```
-
-…then the `create or replace function public.eugenia_search` statement from
-`003_eugenia.sql`, **including the `revoke` and `grant` under it** — EXECUTE is
-granted to PUBLIC by default and `anon` inherits it, so skipping those two lines
-leaves a public entry point to her memory with only RLS behind it.
-
-The generated columns backfill on the `alter`, so the whole archive is
-searchable the moment it runs — this is the one change today that works on
-history rather than only going forward.
-
-**`eugenia_search` has changed since, and a database that already has it needs
-that statement run again.** Its turn arm now reads `role` and labels each hit
-`you` or `him` instead of `turn`; until it is re-applied she is still handed his
-messages as her own words, and nothing about that is visible from the app or the
-logs. `create or replace function` is the whole migration — the signature is
-unchanged, deliberately, so the `revoke` and `grant` under it are untouched and
-no grant is dropped. `verify.sql` confirms the function exists; that it reads
-`role` is a fact only the source shows, so re-run the statement rather than
-checking for it.
-
-An existing `eugenia_notes` needs its `superseded_by` column, and the index has
-to be replaced with the partial one the read now matches:
-
-```sql
-alter table public.eugenia_notes
-  add column if not exists superseded_by bigint references public.eugenia_notes(id);
-
-drop index if exists eugenia_notes_kind_id_desc;
-create index eugenia_notes_kind_id_desc on public.eugenia_notes (kind, id desc)
-  where superseded_by is null;
-```
-
-Without the column the read's `superseded_by=is.null` is a 400 on every turn,
-and `notesBlock()` swallows it — she loses her whole memory and says nothing.
-
-An existing `trades` needs its `size_oz` column, and Eugenia's view has to be
-replaced to expose it — the view statement in `003_eugenia.sql` is `or replace`
-precisely so it can be re-applied on its own:
-
-```sql
-alter table public.trades add column if not exists size_oz numeric;
-```
-
-Then re-run the `create or replace view public.eugenia_trades` statement from
-`003_eugenia.sql`.
-
-**`net_pnl` was appended to that same list**, so an existing database picks it up
-by re-running the one statement and nothing else — no column to add, no grant to
-restore. It is there because `pnl` alone cannot be summed honestly: `pnl` is
-`coalesce(net_pnl, computed_pnl)`, so on a position whose broker email has not
-landed it is the folded figure and carries no swap. Served `pnl` alone, Eugenia
-followed the strategy's monthly instruction against a column she could not read
-and produced totals short by an unknown amount, on rows she could not identify.
-With both she sums the settled ones and says how many fell back.
-
-**The tail of that select list is in the order columns were added, on purpose.**
-`create or replace view` matches the existing view position by position and may
-only append, so a column inserted mid-list reads as renaming whatever used to sit
-at that position — `cannot change name of view column "open_day" to "size_oz"`.
-Moving `size_oz` or `net_pnl` up beside the other broker columns, where they
-belong by sense, is the tidy that breaks re-application on every database that
-already has the view.
-Reordering or removing needs a `drop view` first, which also drops the grants
-under it.
-
-The alter is the half that fails quietly. PostgREST drops a key the table does
-not have from a `merge-duplicates` payload instead of refusing the row, so a
-database that missed it keeps accepting fills and keeps storing no size.
-
-`verify.sql` answers whether it took.
-
-**`004_cron.sql` is safe to re-run**, and that is the point: `cron.schedule`
-upserts on the job name, so applying the file makes the database match it rather
-than describing what the database might hold. The poller's job was not in this
-repository at all until then — its schedule, its timeout and the secret it
-presents were readable only by querying the live database, which is the same
-silent drift `deploy-functions.yml` exists to prevent for the functions.
-
-Seven jobs, and `select jobname, schedule, active from cron.job order by
-jobname` is how you read them back:
+**`004_cron.sql` is safe to re-run**: `cron.schedule` upserts on the job name, so
+applying it makes the database match the file. Seven jobs —
+`select jobname, schedule, active from cron.job order by jobname` reads them back:
 
 | Job | Schedule | What it drives |
 |---|---|---|
@@ -2850,10 +2604,8 @@ jobname` is how you read them back:
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
 
 Only the first four call a function; the two watchers post to Telegram
-themselves, which is what keeps a watchdog off the thing it watches, and the
-last touches nothing outside pg_cron. `verify.sql` counts them, and
-`agree.test.mjs` holds that count against this file — a row that had already
-been wrong once, reporting a correct database as broken.
+themselves, which keeps a watchdog off the thing it watches. `verify.sql` counts
+the jobs, and `agree.test.mjs` holds that count against this file.
 
 ---
 

@@ -78,9 +78,8 @@ const viewColumns = (text, where) => {
   });
 };
 
-/* EVERY COPY IN THE README. The second runs straight after a `drop view`, so a
-   stale column list there rebuilds the wrong view on a database that has just
-   lost the right one. */
+/* EVERY COPY IN THE README, not the first: a copy run after a `drop view` with a
+   stale list rebuilds the wrong view on a database that just lost the right one. */
 /* THE LAST DEFINITION APPLIED IS THE ONE THE DATABASE HOLDS: the numbered files
    are read in order and the last statement wins, as Postgres resolves it, so a
    later file appending a column simply joins. */
