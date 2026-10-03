@@ -1415,21 +1415,16 @@ re-fire it.
 
 ### The price sense — the third thing that wakes her, and the first with no row behind it
 
-The two senses above are events: a print she filed lands, a position opens. Both
-are noticed by asking whether a row is there. **Gold is always there.** "It
-moved" is not a fact about the instrument at all — it is a fact about the
-instrument *and* a previous reading — which is why this one needs a mark and the
-other two need none.
+A release landing and a position opening are rows appearing. **Gold is always
+there**, so "it moved" is a fact about the instrument *and* a previous reading,
+which is why this sense needs a mark. `eugenia_price` is that mark: one row,
+`bid` and `at`, rewritten every quarter hour by its own job (`?move=1`). The move
+is a subtraction over the gap between firings.
 
-`eugenia_price` is that mark: one row, `bid` and `at`, rewritten every quarter
-hour by its own cron job. The move is a subtraction, and the window it is
-measured over is the gap between firings rather than a number anyone chose.
-
-**What makes a move worth waking her for is the day's own measure.** Gold at
-4,400 and gold at 2,000 are the same market, and a fixed $10 threshold means two
-different things to them; a table of thresholds goes stale the year nobody
-revises it, and that failure looks exactly like a quiet market. So the test is
-relative twice over, and the two halves bind at opposite ends of the day:
+**What makes a move worth waking her for is the day's own measure.** A fixed
+dollar threshold means two things to gold at 4,400 and at 2,000, and the year
+nobody revises it the sense fires constantly or never — and never looks exactly
+like a quiet market. So both gates are relative:
 
 | Gate | Value | What it is for |
 |---|---|---|
@@ -1438,248 +1433,127 @@ relative twice over, and the two halves bind at opposite ends of the day:
 | `MARK_STALE_MIN` | 40 minutes | two missed runs and the gap is no longer a quarter of an hour — $15 in fifteen minutes is an event, $15 across an hour is a session |
 | `MOVE_QUIET_H` | 2 hours | one message about one move; a market that trends all afternoon is one story, and this is the only thing between it and eight messages before lunch |
 
-**The share is measured against the BROKER'S session, and that session restarts
-every weekday at 17:00.** From the roll until the range has been rebuilt, the
-share is taken against a few hours of thin evening trade — so the range is small
-because the session is *young*, not because the market is quiet.
+**The floor bounds the bar rather than standing beside it.** The share is taken
+against the BROKER'S session, which restarts at 17:00 New York, so for hours
+every evening the range is small because the session is *young*, not because the
+market is quiet. If `range × MOVE_SHARE` is under `price × MOVE_FLOOR`, the
+session cannot be measured against and she says nothing: **refusing to judge
+beats a lower standard.** A move under a quarter percent of the price is never
+reported, and the evening bar is higher than the midday one by intent — a real
+evening move is the range, and clears its own bar. **A sense that manufactures a
+loop it cannot close is worse than a quiet one**: the loop rides into every
+briefing after it.
 
-**The two gates used to stand side by side, and that is what broke it.** A range
-near zero made the share stop binding, leaving the floor as the whole test for a
-third of the week: a bar written for a full day's trading, carried alone through
-the thinnest hours. An earlier pass saw this and reasoned that the share could
-not be fixed from here, since nothing this system reads spans the calendar day,
-so the floor had to be raised until it was an event in the thin hours too. That
-was the wrong of two options, and there was a third: **refuse to judge.** A
-session with no range yet is one the share cannot be applied to, and silence is
-a better answer than a lower standard.
+**A move a print explains belongs to the spine.** Anything `high` on her calendar
+inside the last hour hands the move over, or payrolls would reach him twice in
+ten minutes from two senses.
 
-So the floor bounds the **bar** rather than standing beside it. If
-`range × MOVE_SHARE` is under `price × MOVE_FLOOR`, the session is too young and
-she says nothing. A move under a quarter percent of the price is still never
-reported, since the bar is never below it — what changed is the composition
-rather than either number.
-
-What the old shape cost is in his own `/notes`: a $13 drop just after the Sunday
-roll on 6 September and a $17 one just after the next roll on the 13th, both
-filed as unexplained open threads and neither ever closed, because there was
-nothing to explain. The one real find in that run — $33 at 11:12 on a
-Wednesday — cleared both gates on its own and still does. **A sense that
-manufactures a loop it cannot close is worse than a quiet one**, because the
-loop then rides into every briefing after it.
-
-The evening bar is now *higher* than the midday one, which is the intent rather
-than a side effect. A real evening move is not silenced by it, because a real
-move is the range: a $35 fall takes the low with it and clears its own bar.
-
-**Both things the trade look may say are about today, and it checks.** The
-trigger fires on a transition rather than on a clock, so anything that stamps an
-old close — a `?force=1` repair, an email landing late, the poller's first
-`fill_time` backfill — used to fire it for a finished day. It reported the 11th
-and 19th of August in the present tense, three weeks on. `open_day` against
-today's New York date returns before either branch. An overnight hold closing
-this morning is filed under yesterday and is skipped with them, which is correct:
-R-11 forbids an entry *later* than the breaching loss, and a day that is over can
-have no later entry.
-
-**And "opened" is checked against the row, because the trigger cannot tell.** It
-fires on an insert with no `fill_time`, and a position opened and closed inside
-one two-minute poll is inserted already carrying its exit price, with the close
-instant stamped a moment later. That event arrived about a trade that was over,
-and with a print pending she would have cited R-14 at a position he was out of.
-The opened branch returns unless `isOpen` reads the row as open; the closed
-event that follows is the true one.
-
-**And a move a print explains is not this sense's to report.** The spine is
-already looking at anything high-impact that landed, so a jump at 08:30 on
-payrolls would otherwise reach him twice in ten minutes saying the same thing.
-The calendar she filed is what tells them apart — anything `high` inside the last
-hour hands the move to the spine and this stays quiet.
-
-`looked_at` on that same row is the quiet window, and it is the one column
-written conditionally: the mark advances on **every** run and `looked_at` only
-when a move cleared the gates. Written unconditionally the window would never
-reopen and she would say one thing about a move and then nothing for the life of
-the deployment.
+`looked_at` on the same row is the quiet window and the one column written
+conditionally: the mark advances every run, `looked_at` only when a move cleared
+the gates. Written unconditionally the window would never reopen.
 
 **Silent by default after all of that.** The gates decide something happened;
-only she decides whether it is worth a sentence, and `isSilent` is shared with
-the pulse and the release look. The prompt pushes hard against the failure that
-belongs to this path specifically: a search will always return *something*, so an
-unexplained move must be told as an unexplained move — what it did, and that she
-cannot yet see why — rather than as a cause she reached for. That is what
-`open_loop` is for.
+she decides whether it is worth a sentence. **A move with no cause under it is
+not sent**: without a cause, all that is left is the price, which is on his
+screen in more detail, and this path exists to teach what moved gold. Nor is it
+filed as an open thread, since nothing will arrive to close it. When there is a
+cause, she builds from the channel map on the release look's terms — build where
+the channel is thin; where he owns it, say what moved and stop.
+
+It runs only while the market is open, by the same `marketOpen` the poller uses,
+and most firings cost one quote and one indexed read: **no model call unless a
+move clears every gate.**
 
 **A thread that cannot close fills the list that holds the ones that can.**
-`readLoops` takes the newest ten, and the window filled: six watches and four
-questions. The eleventh loop pushes the oldest out of what she is *handed* while
-leaving it open in the table — so it can never be closed by anyone who cannot
-see it. That limit takes the newest rows, which is the right end; what the rule
-assumed underneath it is that threads close at all.
+`readLoops` hands her the newest ten, so a loop that never closes pushes the
+oldest out of view while leaving it open — closable by nobody. **A question he
+has not answered in a week he has answered**: it closes, with a line saying so,
+and a note is still written. A watch is untouched, since age proves nothing
+about an odd reaction.
 
-Two kinds could not. A move filed as unexplained when nothing had actually
-moved, which the gate above now prevents. And a question he does not answer,
-which closed only on an answer: the nightly pass was told to write a *note*
-about a week-old question rather than close it, so it wrote one — *"he engages
-by instruction, not by reply"* — and nothing acted on it. **A question he has not
-answered in a week he has answered.** It closes now, with a line saying so, and
-the note is still written. A watch is untouched by that: age proves nothing
-about an odd reaction, which may still explain itself.
-
-**And the briefing has stopped asking altogether.** The slot existed to learn
-what he actually holds, and over eleven days it produced four questions, four
-open threads and no answers — a slot whose only output is an open thread is not
-measuring anything. He reads the briefing on a phone and engages by *instruction*
-rather than by reply, which is a channel that works and needs no slot.
-
-The scope is the half that matters. Cutting questions everywhere would take the
-trade conversation with it — where asking one thing and waiting is the whole
-method, and where he does answer, because he started the exchange. So the
-briefing is silent and the reply path is untouched, and `agree.test.mjs` reads
-both halves: a briefing that asks again, and a reply that has stopped.
-
-**And it teaches, which for a long time it was the only unscheduled look that
-did not.** The print look builds a mechanism he has never had built before saying
-what a number changed; this one only reported. But what moves gold runs through a
-channel as surely as what a print changes does — a message saying the dollar came
-off teaches nothing to someone for whom the dollar is `unseen`, and that is the
-likeliest message this path sends. It is handed the map and told to build from it
-on the release look's own terms: build where the channel is thin, and where he
-owns it say what moved and stop.
-
-It runs only while the market is open, by the same `marketOpen` the poller keeps
-— one definition in `_shared/edge.ts`, since both now ask it. Most firings cost
-one quote and one indexed read: **no model call at all unless a move clears every
-gate.**
+**The briefing asks him nothing.** A slot whose only output is an open thread
+measures nothing; he engages by *instruction*, a channel that works. The reply
+path keeps its questions — in the trade conversation one question and then
+silence is the method, and he answers there because he started it.
+`agree.test.mjs` reads both halves.
 
 ### Checking his rules
 
-§7 of the strategy writes a concrete predicate for all eighteen rules and §8
-writes the population filters and the three verdicts. **Nothing executed any of
-it.** She was handed up to four hundred rows of JSON and expected to apply seven
-filters and three-state logic in her head on the way to producing a number —
-which is the one thing a model is worst at, and where a wrong answer is least
-visible, because a rate computed over the wrong population looks exactly like one
-computed over the right one. That is §8's own opening sentence.
-
+§7 of the strategy writes a predicate for all eighteen rules and §8 the
+population filters and the three verdicts. Applying seven filters and
+three-state logic over four hundred rows by eye is what a model does worst, and
+a rate over the wrong population looks exactly like one over the right.
 `adherence.ts` evaluates the thirteen rules a row can answer — **R-01, R-02,
 R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16, R-18 and R-19** — and
-`check_rules` serves it. The set is not a choice: §7's `Evaluable` column decides it, and `agree` holds the two lists
-against each other, because a rule marked `journal` and never implemented is a
-check she cites that nobody runs, and one marked `judgment` and implemented
-anyway starts reporting `pass` for something nothing stored can see.
+`check_rules` serves it. §7's `Evaluable` column decides the set, and `agree`
+holds the two lists together.
 
-**R-14 and R-19 are judged against TradingView's calendar.** He defined high
-impact, at v1.20 of the strategy, as a US release TradingView rates high, so one
-calendar serves the briefing, the trade-event warning and the rules. The rows are
-the ones `eugenia_calendar` already holds under TradingView's id; what she typed
-in before 018 carries no id, was never a rating he chose, and is not read.
-**A week nobody fetched is not a quiet week.** Both have no releases stored, and
-every entry in the unfetched one would pass, so `calendar_weeks`
+**R-14 and R-19 are judged against TradingView's calendar** — he defined high
+impact, at v1.20, as a US release TradingView rates high, so one calendar serves
+the briefing, the trade event and the rules. Rows with no TradingView id are not
+read. **A week nobody fetched is not a quiet week**: `calendar_weeks`
 (`019_calendar_weeks.sql`) records each week a whole-week fetch landed for, and
-an entry outside one is `unknown`. Two things mark a week, and both go through
-`fileWeek`, which writes the week's rows first and the mark only after:
-- **the nightly pass,** which files the current week;
-- **the history door,** `?history=YYYY-MM-DD` on `doji-eugenia`, which walks
-  every week from that date, up to two years a run. It answers first and works
-  behind the 200 like every other door, so its result is read off
-  `eugenia_runs`: one row per week under `calendar week`, both outcomes.
-  TradingView refuses past about thirty reads a minute, so a refused week is
-  asked again once after a pause; refused twice, the walk stops, and its last
-  row names the week to start the next run from.
+an entry outside one is `unknown`. Both markers go through `fileWeek`, which
+writes the rows first and the mark after:
 
-**And a week the read did not reach is not covered either.** `check_rules` reads
-the releases newest first, bounded at five hundred rows over a window of up to a
-year. Filled, it leaves the oldest weeks marked fetched with their releases
-never read, which is the quiet week again arriving through the limit: every entry
-in them would pass R-14 for want of a print. So a full read covers only the
-weeks after the one its oldest release falls in.
+- **the nightly pass** files the current week;
+- **the history door**, `?history=YYYY-MM-DD` on `doji-eugenia`, walks every
+  week from that date, up to two years a run, back to TradingView's 2003. It
+  answers first and works behind the 200, so its result is one `eugenia_runs`
+  row per week under `calendar week`. A refused week is asked again once after a
+  pause; refused twice, the walk stops and its last row names where to resume.
 
-**The trades read has the same bound and says so.** Every tool over the journal
-reads the newest four hundred trades in its window. A year he traded more than
-that is cut at its oldest end, and `get_trades`, `get_stats` and `check_rules`
-all went on calling the answer the last 365 days. `reachLine` adds one sentence
-when a read comes back full: the day it actually reaches, and that she must say
-so before quoting a figure over the window. On an ordinary window it adds nothing.
+**A week the read did not reach is not covered either.** `check_rules` reads
+releases newest first, bounded at five hundred over up to a year, so a full read
+covers only the weeks after the one its oldest release falls in. **The trades
+read has the same bound and says so**: every tool over the journal reads the
+newest four hundred trades in its window, and when a read comes back full
+`reachLine` adds the day it actually reaches.
 
-The quarter-hourly filing sees a rolling day and a half and marks nothing.
-TradingView's data goes back to 2003, so the weeks already traded can be judged.
-Forex Factory's export only ever held the current one.
+**`unknown` is not a pass**, in the code rather than the prompt: the verdict is
+the worst outcome present, and an empty population is `unknown`. A Friday
+close-out under $25, a second entry inside the fifteen-minute sweep window, a
+day with no size to derive an account from — each is reported as undecidable with
+its count. It is pure, so every rule is driven from a test in **both**
+directions.
 
-**`unknown` is not a pass**, and the code says so rather than the prompt: the
-verdict is the worst outcome present, and an empty population is `unknown`. A
-Friday close-out under $25, a second entry inside the fifteen-minute sweep
-window, a day with no size to derive an account from — each is undecidable by
-construction, and each is reported as undecidable with its count beside it.
+**A verdict is not the whole answer — the counts and the ids are.** R-10 once
+compared each span with the one before it, so the second trade inside a long
+hold came back a pass, named nowhere, while the verdict still read `fail`. It
+sweeps from both ends now, naming every span that overlaps any other, and its
+test asserts on the counts and the list — the rows `check_rules` promises so a
+finding can be checked rather than believed.
 
-It is pure, so every rule is driven from a test in **both** directions. A
-predicate only ever seen to return `pass` has been shown to be reachable, not to
-work, and three "clean" results in this repository's history turned out to mean
-exactly that.
-
-**And a verdict is not the whole answer, which is how R-10 hid a miscount.** It
-asked whether each span overlapped *the one before it* in entry order — which is
-not the rule. A multi-session hold covers everything opened inside it, so the
-second short trade taken within one sat beside a `to` already left behind and
-came back **counted as a pass**, named nowhere, while genuinely breaching. The
-verdict survived it every time: a span nested inside an earlier one always has a
-neighbour that overlaps too, so something was always flagged and the rule always
-said `fail`. What was wrong was the counts and the ids — the rows `check_rules`
-promises so a finding can be checked rather than believed. Two sweeps now, one
-from each end, naming every span that overlaps any other. **A test asserting only
-on the verdict could never have found it**, which is why the one that replaces it
-asserts on the counts and the list.
-
-**It gives no verdict on a trade and could not.** It reports whether a row
-satisfies a predicate he wrote. *"Two entries eleven days ago were 41 minutes
+**It gives no verdict on a trade.** *"Two entries eleven days ago were 41 minutes
 apart, and R-12 allows fifteen"* is a fact about his own rule; what it meant is
 his to say.
 
-Two figures in it are operational readings rather than facts, and both are named
-constants so they can be argued with: `CLOSEOUT_MIN` is thirty minutes, giving
-§6's *"at or very near"* the Friday close a number; `STRETCH` is 24–31 December,
-giving §5's *"Christmas-to-New-Year stretch"* one. The holiday calendar is
-computed rather than listed — including Good Friday, and including the
-observance shift that closes the market on Friday 3 July 2026 — because a table
-of dates stops being true the year nobody extends it, and that failure looks
-exactly like perfect compliance.
-
-**It holds the banks' holidays as well as the market's**, as R-16 always said:
-Columbus Day and Veterans Day, the two the exchanges trade through, are no-trade
-days since v1.21 of the strategy. Veterans Day follows the Fed's observance — a
-Sunday moves to the Monday, a Saturday is not moved.
-
-**And R-12 fails a second entry taken while the first was still open**, also
-since v1.21. It read as `unknown`, because a gap that comes out negative counted
-as "within fifteen minutes" of the first close. A sweep re-entry follows the first
-trade closing; one taken before that is a second position, and he trades one entry
-at a time.
+Two figures are readings rather than facts, named so they can be argued with:
+`CLOSEOUT_MIN`, thirty minutes, gives §6's *"at or very near"* the Friday close a
+number; `STRETCH`, 24–31 December, gives §5's *"Christmas-to-New-Year stretch"*
+one. The holiday calendar is computed — Good Friday, the Saturday observance
+that closes the market on Friday 3 July 2026, and, since v1.21, the banks'
+Columbus Day and Veterans Day (on the Fed's observance) — because a table stops
+being true the year nobody extends it, which looks exactly like perfect
+compliance. **R-12 fails a second entry taken while the first was still open**:
+a sweep re-entry follows a close, and he trades one entry at a time.
 
 ### The second read
 
 The briefing is researched and written in one generation, and its quality target
-lives in prose on the far side of a model call where no test can reach it. That
-is not hypothetical: unmeasured, it grew by a sixth and the way anyone found out
-was by counting the characters by hand.
-
-So it is read once more before it goes, at `medium` effort with no tools, against
-the rules it was written to — is the first sentence only true today, is a term
-built at a rung that no longer needs building, is the chain missing a link, is
-there a forward call in it, is it inside the budget, does it obey his standing
-instructions. It returns the briefing, not notes about it.
+lives on the far side of a model call. So `CRITIC` reads it once more before it
+goes, at `medium` effort with no tools: is the first sentence true only today,
+is a term built at a rung that no longer needs it, is a link missing from the
+chain, is there a forward call, is it inside the budget, does it obey his
+standing instructions. It returns the briefing, not notes about it.
 
 **It is handed his notes and the channel map, because two of those checks read
-them.** The last one names his standing instructions, which live in notes; the
-second names the ladder. Given neither, the first check is skipped and the second
-is answered from the only evidence in the room — the mechanism sitting in the
-paragraph being judged — so a build-up the map had just required came out as a
-redefinition, last, every morning. What arrived was the term bare: shorter,
-fluent, correct, and with the teaching removed. Both blocks are already read for
-the briefing itself, so the second pass costs nothing extra.
+them.** Without the map, the mechanism sitting in the paragraph reads as a
+redefinition, and the build-up `PITCH` required is cut — last, fluently.
 
-**It cannot make things worse, and that is enforced rather than trusted.** A
-revision that comes back empty, apologetic, or twice the length is a critic that
-failed, and the draft is kept. Same direction as the pulse: the failure that
-sends the original is better than the failure that sends nothing.
+**It cannot make things worse, and that is enforced.** A revision that comes back
+empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the
+draft goes.
 
 ### Hearing him, and seeing what he sees
 
