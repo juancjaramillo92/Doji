@@ -178,6 +178,7 @@ export interface Stats {
 export function journalStats(rows: TradeRow[]): Stats {
   const avg = averages(rows);
   const priced = rows.filter(t => t.pnl != null);
+  const sessions = sliceBy(rows, sessionOf);
   return {
     n: rows.length,
     journalled: rows.filter(isJournalled).length,
@@ -188,11 +189,9 @@ export function journalStats(rows: TradeRow[]): Stats {
     settled: priced.filter(t => t.net_pnl != null).length,
     fellBack: priced.filter(t => t.net_pnl == null).length,
     seam: rows.filter(t => t.entry_time == null && t.fill_time != null).length,
-    // One slice pass, ordered by the app's list, so the sessions read as he
-    // sees them and an empty one is absent.
-    bySession: (bySession => SESSIONS
-      .map(s => bySession.find(x => x.key === s))
-      .filter((x): x is Slice => !!x))(sliceBy(rows, sessionOf)),
+    // Ordered by the app's list, so the sessions read as he sees them and an
+    // empty one is absent.
+    bySession: SESSIONS.flatMap(s => sessions.filter(x => x.key === s)),
     bySetup: sliceBy(rows, t => t.setup),
   };
 }

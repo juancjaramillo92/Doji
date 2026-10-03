@@ -1966,9 +1966,7 @@ const Dates = {
   weekStart(date = new Date()) {
     const p = Dates.nyParts(date);
     const back = (p.weekday === 0 && p.hour < 17) ? 7 : p.weekday;
-    const base = new Date(Date.UTC(p.y, p.m - 1, p.d));
-    base.setUTCDate(base.getUTCDate() - back);
-    return base.toISOString().slice(0, 10);
+    return new Date(Date.UTC(p.y, p.m - 1, p.d - back)).toISOString().slice(0, 10);
   },
 
   monthStart(date = new Date()) {
@@ -1982,9 +1980,7 @@ const Dates = {
     const p = Dates.nyParts(date);
     let back = (p.weekday - 5 + 7) % 7;               // Fri=0, Sat=1 … Thu=6
     if (p.weekday === 5 && p.hour < 17) back = 7;     // Friday pre-close
-    const base = new Date(Date.UTC(p.y, p.m - 1, p.d));
-    base.setUTCDate(base.getUTCDate() - back);
-    return base.toISOString().slice(0, 10);
+    return new Date(Date.UTC(p.y, p.m - 1, p.d - back)).toISOString().slice(0, 10);
   }
 };
 
@@ -2042,9 +2038,10 @@ const dayOf = t => t.open_day || Dates.nyDay(t.fill_time);
 // closed rather than when they opened. Imperfect and openly so — the
 // alternative is returning nothing. Flag it whenever session data is read for a
 // pattern spanning that boundary.
-const sessionOf = t =>
-  (t.entry_time ? Dates.session(new Date(t.entry_time)) : null)
-  || (t.fill_time ? Dates.session(new Date(t.fill_time)) : null);
+const sessionOf = t => {
+  const at = t.entry_time || t.fill_time;
+  return at ? Dates.session(new Date(at)) : null;
+};
 
 // Everything only the trader can answer: the setup and all three discipline
 // questions. P&L is deliberately not required — an open position can be
@@ -2166,7 +2163,7 @@ function latestBefore(list, field, day = null) {
 const Data = {
   sb: null,
   all: [],          // every row, deleted included — the backup needs them
-  rows: [],         // what renders: the live ones
+  rows: [],         // what renders: the live ones, derived from `all` by index()
   byId: new Map(),
   byDay: new Map(),
   offline: false,
@@ -2204,8 +2201,7 @@ const Data = {
       const { data, error } = await this.sb
         .from('trades').select('*');
       if (error) throw error;
-      this.all  = data || [];
-      this.rows = this.all.filter(t => !t.deleted);
+      this.all = data || [];
       this.offline = false;
       try { localStorage.setItem(CONFIG.SNAPSHOT, JSON.stringify(this.all)); } catch (e) {}
       setSyncStatus('ok');
@@ -2223,15 +2219,16 @@ const Data = {
   cached() {
     try { this.all = JSON.parse(localStorage.getItem(CONFIG.SNAPSHOT)) || []; }
     catch (err) { this.all = []; }
-    this.rows = this.all.filter(t => !t.deleted);
     this.offline = true;
     setSyncStatus('offline');
     this.index();
   },
 
   // One pass for both lookups, so renders run in O(trades) and the heatmap does
-  // not rescan the set once per day drawn.
+  // not rescan the set once per day drawn. `rows` is rebuilt here too, so every
+  // writer edits `all` alone and the two cannot disagree.
   index() {
+    this.rows = this.all.filter(t => !t.deleted);
     this.byId = new Map();
     this.byDay = new Map();
     for (const t of this.rows) {
@@ -2287,8 +2284,8 @@ const Data = {
     setSyncStatus('busy');
     const { error } = await this.sb.from('trades').update({ deleted: true }).eq('id', id);
     if (error) return this.failed('delete', 'Delete failed.', error);
-    this.rows = this.rows.filter(t => t.id !== id);
-    this.mark(id, true);
+    const row = this.all.find(t => t.id === id);
+    if (row) row.deleted = true;
     this.index();
     setSyncStatus('ok');
     return true;
@@ -2302,23 +2299,15 @@ const Data = {
     return true;
   },
 
-  /* `all` is what the backup exports; `rows` is what renders, and both move
-     together here. Written only by load(), `all` would hold the pre-edit value
-     after a save or delete — realtime usually reloads within a second and hides
-     it, but with the socket down a backup taken straight after an edit exports
-     the old row. That is the one thing a restore point cannot get wrong. */
+  /* Into `all`, which the backup exports, and not only what renders. Written
+     only by load(), `all` would hold the pre-edit value after a save or delete —
+     realtime usually reloads within a second and hides it, but with the socket
+     down a backup taken straight after an edit exports the old row. That is the
+     one thing a restore point cannot get wrong. */
   replace(row) {
-    const i = this.rows.findIndex(t => t.id === row.id);
-    if (i === -1) this.rows.push(row); else this.rows[i] = row;
-    const j = this.all.findIndex(t => t.id === row.id);
-    if (j === -1) this.all.push(row); else this.all[j] = row;
+    const i = this.all.findIndex(t => t.id === row.id);
+    if (i === -1) this.all.push(row); else this.all[i] = row;
     this.index();
-  },
-
-  // Soft-delete flag, applied to the backup copy as well as the rendered one.
-  mark(id, deleted) {
-    const row = this.all.find(t => t.id === id);
-    if (row) row.deleted = deleted;
   },
 
   /* Realtime is the fast path; refresh is the floor. Every websocket dies
@@ -2747,26 +2736,20 @@ function renderPnLCard(rows) {
 
   for (const [id, v] of [['pnl-week-prev', weekWas], ['pnl-week-cur', week],
                          ['pnl-month-prev', monthWas], ['pnl-month-cur', month]]) {
-    const el = $(id);
-    if (!el) continue;
     const amt = round2(v);
-    el.textContent = m.n ? fmtMoney(amt) : DASH;
-    el.classList.remove('win','loss');
-    if (m.n && amt) el.classList.add(amt > 0 ? 'win' : 'loss');
+    setFigure(id, m.n ? fmtMoney(amt) : DASH, m.n ? amt : 0);
   }
 }
 
-// Parsed at UTC midnight and formatted back the same way, so nothing shifts
-// across a timezone on the round trip.
+// Built and formatted in UTC, so nothing shifts across a timezone on the round
+// trip.
 function prevWeek(day) {
-  const d = new Date(day + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() - 7);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 7)).toISOString().slice(0, 10);
 }
 function shiftMonth(day, by) {
   const [y, m] = day.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return d.toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 10);
 }
 
 /* ─── Cumulative curve ───────────────────────────────────────────────────── */
@@ -3039,6 +3022,10 @@ function heatmapDays(y, m) {
   return { days, satTrades, peak };
 }
 
+// A day's or a week's count, the word in its own span so the phone drops it.
+const tradeCount = n =>
+  n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
+
 // Week by week: `cols` day slots then that week's summary. `slot` counts
 // positions rather than dates, so the summary lands in the last column
 // whichever weekday the month opens on.
@@ -3052,7 +3039,6 @@ function heatmapGrid(visible, cols, first, dows, peak) {
   const flushWeek = () => {
     wkN++;
     const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN, wkBe);
-    const count = wkTrades ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
     const abs   = fmtMoney(wkPnl);
     // Separate spans so the phone stylesheet can drop the tail.
     const pnl   = wkPnlN ? `$${abs.slice(0, -3)}<span class="hm-cents">${abs.slice(-3)}</span>`
@@ -3060,7 +3046,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     html += `
       <div class="heatmap-week ${cls}">
         <div class="heatmap-week-lbl">W${wkN}</div>
-        <div class="heatmap-week-count">${count}</div>
+        <div class="heatmap-week-count">${tradeCount(wkTrades)}</div>
         <div class="heatmap-week-pnl">${pnl}</div>
       </div>`;
     wkPnl = 0; wkPnlN = 0; wkBe = 0; wkTrades = 0;
@@ -3080,7 +3066,6 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     if (iso === today) cls += ' today';
 
     const pnlText   = data.pnlN ? '$' + fmtMoney(data.pnl) : n ? DASH : '';
-    const countText = n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
     // Focusable only when the cell opens something, or thirty-one tab stops sit
     // in front of the trade log.
     const opens = n ? ` role="button" tabindex="0" aria-label="${iso}"` : '';
@@ -3093,7 +3078,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
       <div class="heatmap-cell ${cls}" data-day="${iso}"${opens}${intensity}>
         <div class="heatmap-cell-day">${d}</div>
         <div class="heatmap-cell-body">
-          <div class="heatmap-cell-count">${countText}</div>
+          <div class="heatmap-cell-count">${tradeCount(n)}</div>
           <div class="heatmap-cell-pnl">${pnlText}</div>
         </div>
       </div>`;
@@ -3126,8 +3111,7 @@ function renderHeatmap() {
   const showSat = !Phone.matches || satTrades > 0;
   const visible = showSat ? days : days.filter(x => x.wd !== 6);
   const cols    = showSat ? 7 : 6;
-  const dows    = showSat ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-                          : ['Sun','Mon','Tue','Wed','Thu','Fri'];
+  const dows    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].slice(0, cols);
 
   const grid = $('heatmap-grid');
   if (grid) {
@@ -3299,7 +3283,6 @@ function renderRollForward(rows) {
     </div>`;
 }
 
-/* ─── Trade log ──────────────────────────────────────────────────────────── */
 /* ─── What Eugenia is watching ───────────────────────────────────────────────
    The only place her work and this app meet, and deliberately narrow: what
    lands today, the story she is carrying, what is still open — three tables,
@@ -3321,13 +3304,10 @@ const Watch = {
   // hours back and a day forward hold this morning's 08:30 and tomorrow's, which
   // otherwise read identically, and last night's 20:00 reads as tonight's.
   when(iso) {
-    const at = new Date(iso);
-    const time = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-    }).format(at);
+    const time = Dates.nyTime(iso);
     if (Dates.nyDay(iso) === Dates.today()) return time;
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short' })
-      .format(at) + ' ' + time;
+      .format(new Date(iso)) + ' ' + time;
   },
 
   async draw() {
@@ -3407,6 +3387,7 @@ const Watch = {
   }
 };
 
+/* ─── Trade log ──────────────────────────────────────────────────────────── */
 function renderTable(rows) {
   const host = $('trade-table'), pag = $('tlog-pagination');
   if (!rows.length) {
@@ -3510,7 +3491,7 @@ function pickYN(name) {
   const v = pickRadio(name);
   return v === 'yes' ? true : v === 'no' ? false : null;
 }
-const pickRadio  = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
+const pickRadio = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
 
 function journalForm(t) {
   const setups = CONFIG.SETUPS.map(s => {

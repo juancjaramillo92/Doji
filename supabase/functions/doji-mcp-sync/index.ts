@@ -24,7 +24,7 @@
 
 import {
   env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
-  SB_URL, SB_KEY,
+  SB_URL, SB_KEY, why
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -159,6 +159,10 @@ const MCP_HEADERS = {
 /* The request alone, so ?raw=1 can have the body whole and mcpCall unwrapped,
    from one statement of the request. The allow-list check is here because
    this is where a tool name becomes a request. */
+// The debug doors answer as text, so the SSE framing they are about is visible.
+const text = (body: string) =>
+  new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+
 async function mcpPost(session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
 
@@ -321,24 +325,31 @@ async function upsert(rows: Record<string, unknown>[]) {
   return rows.length;
 }
 
-/* `balance=is.null` in the filter is the whole arbitration with the email,
-   whose figure — printed by the broker on the fill — is the better one.
-   Postgres evaluates it inside the UPDATE, so there is no read to race. A
-   PATCH rather than an upsert key, because merge-duplicates would overwrite
-   the email's figure on every later re-upsert. */
-async function writeBalance(id: string, balance: number) {
-  const res = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${id}&balance=is.null`, {
-    method: "PATCH", headers: sbHeaders(), body: JSON.stringify({ balance }),
+/* One column, written once. `<column>=is.null` in the filter is the whole
+   arbitration — Postgres evaluates it inside the UPDATE, so there is no read to
+   race — and a PATCH rather than an upsert, because merge-duplicates would set
+   the column on every later re-upsert. It is how the poller yields `balance`
+   and `fill_time` to the email, which owns them, and keeps the plan and
+   `best_price` at their first sighting.
+
+   It answers whether it wrote. A PATCH filtered to nothing is a 200 with no
+   rows, so only `return=representation` tells a write from a skip; without it
+   every count beside this reads 0 for ever, which looks healthy. */
+async function writeOnce(id: string, column: string, value: unknown): Promise<boolean> {
+  const res = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${id}&${column}=is.null`, {
+    method: "PATCH", headers: sbHeaders("return=representation"),
+    body: JSON.stringify({ [column]: value }),
   });
-  if (!res.ok) throw new Error(`Balance write failed (HTTP ${res.status}): ${await res.text()}`);
+  if (!res.ok) throw new Error(`${column} write failed (HTTP ${res.status}): ${await res.text()}`);
+  return ((await res.json()) as unknown[]).length > 0;
 }
 
 /* ─── The plan, taken off the position while it is still open ──────────────
    A closed position reports only its final stop; a live one carries both, and
    the poller sees almost every position open. So the first sighting is the
-   plan, and `where planned_sl is null` is the whole arbitration — any later
-   write would file R-04's break-even stop as the plan. As first seen, never as
-   set: up to two minutes separate entry from poll.
+   plan, written once — any later write would file R-04's break-even stop as
+   the plan. As first seen, never as set: up to two minutes separate entry from
+   poll.
 
    It never throws the poll away: the deals are written first, and a plan that
    fails is one trade with a null.
@@ -368,24 +379,12 @@ export function openPlans(positions: any[]): OpenPlan[] {
   });
 }
 
-/* Answers whether it wrote. A PATCH filtered to nothing is a 200 with no rows,
-   so only `return=representation` tells a recorded plan from a skipped one;
-   without it this reads 0 for ever, which looks healthy. A test reads for it. */
+// One write per column, each on its own filter: a filter cannot arbitrate a
+// column it does not name.
 async function writePlan(plan: OpenPlan): Promise<number> {
-  // One PATCH per column on its own filter: a filter cannot arbitrate a
-  // column it does not name.
   let wrote = 0;
   for (const col of ["planned_sl", "planned_tp"] as const) {
-    const value = plan[col];
-    if (value === undefined) continue;
-
-    const res = await fetch(
-      `${SB_URL}/rest/v1/trades?id=eq.${plan.id}&${col}=is.null`, {
-        method: "PATCH", headers: sbHeaders("return=representation"),
-        body: JSON.stringify({ [col]: value }),
-      });
-    if (!res.ok) throw new Error(`Plan write failed (HTTP ${res.status}): ${await res.text()}`);
-    if (((await res.json()) as unknown[]).length > 0) wrote++;
+    if (plan[col] !== undefined && await writeOnce(plan.id, col, plan[col])) wrote++;
   }
   return wrote;
 }
@@ -426,26 +425,6 @@ async function recordStops(plans: OpenPlan[]): Promise<number> {
   });
   if (!put.ok) throw new Error(`Stop write failed (HTTP ${put.status}): ${await put.text()}`);
   return moved.length;
-}
-
-/* ─── The close instant ────────────────────────────────────────────────────
-   fill_time had one writer, the alert email, so a close with no alert left it
-   null for ever and everything reading it as "still open" said so. This sees
-   every close within two minutes, and stamps it under `where fill_time is
-   null` — the email still wins wherever it lands. The caller passes only
-   positions with an exit price, so the latest deal is the closing one.
-
-   Counted on the answer, for writePlan's reason; steady state is 0. The
-   trigger this sets off is the point: trades_eugenia_closed fires on exactly
-   this transition, and it is how she learns a position closed. */
-async function writeFill(id: string, closedAt: number): Promise<boolean> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/trades?id=eq.${id}&fill_time=is.null`, {
-      method: "PATCH", headers: sbHeaders("return=representation"),
-      body: JSON.stringify({ fill_time: new Date(closedAt).toISOString() }),
-    });
-  if (!res.ok) throw new Error(`Fill write failed (HTTP ${res.status}): ${await res.text()}`);
-  return ((await res.json()) as unknown[]).length > 0;
 }
 
 /* ─── How far the trade ran in his favour ──────────────────────────────────
@@ -523,12 +502,7 @@ async function fillExcursions(session: Record<string, string>): Promise<number> 
     const span = barSpan(t.entry, t.close) as { from: number; to: number };
     const best = bestPrice(await readBars(session, span.from, span.to), t.direction, t.entry, t.close);
     if (best === null) continue;
-    const patch = await fetch(`${SB_URL}/rest/v1/trades?id=eq.${t.id}&best_price=is.null`, {
-      method: "PATCH", headers: sbHeaders("return=representation"),
-      body: JSON.stringify({ best_price: best }),
-    });
-    if (!patch.ok) throw new Error(`Excursion write failed (HTTP ${patch.status}): ${await patch.text()}`);
-    if (((await patch.json()) as unknown[]).length > 0) wrote++;
+    if (await writeOnce(t.id, "best_price", best)) wrote++;
   }
   return wrote;
 }
@@ -588,8 +562,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       });
       // For mcpPost's reason.
       if (!listed.ok) throw new Error(`MCP tools/list: HTTP ${listed.status}`);
-      return new Response(await listed.text(),
-        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return text(await listed.text());
     }
 
     /* ?positions=1 — get_positions raw: whether a live position carries its
@@ -597,7 +570,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        plan. */
     if (posns) {
       const body = await mcpPost(session, "get_positions", {});
-      return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return text(body);
     }
 
     /* ?market=1 is the folded quote; ?market=raw the spot and daily bars
@@ -616,8 +589,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
           mcpPost(session, "get_spot_prices", { symbolId: SYMBOL_IDS }),
           mcpPost(session, "get_trendbars", barArgs),
         ]);
-        return new Response(`--- get_spot_prices ---\n${spot}\n--- get_trendbars D_1 by range ---\n${bars}`,
-          { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+        return text(`--- get_spot_prices ---\n${spot}\n--- get_trendbars D_1 by range ---\n${bars}`);
       }
 
       const quoted = await mcpCall(session, "get_spot_prices", { symbolId: SYMBOL_IDS });
@@ -647,12 +619,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
         const body = await mcpPost(session, "get_trendbars", {
           symbolId: SYMBOL_IDS[0], period: "M_1",
           fromTimestamp: String(w.from), toTimestamp: String(w.from + 15 * 60_000),
-        }).catch((err: unknown) => `FAILED: ${err instanceof Error ? err.message : err}`);
+        }).catch((err: unknown) => `FAILED: ${why(err)}`);
         parts.push(`--- get_trendbars M_1, ${w.days} days back, from ` +
           `${new Date(w.from).toISOString()}, ${Date.now() - began} ms ---\n${body}`);
       }
-      return new Response(parts.join("\n"),
-        { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return text(parts.join("\n"));
     }
 
     const dealArgs = {
@@ -667,7 +638,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        framing and the double encoding are often what is in question. */
     if (raw) {
       const body = await mcpPost(session, "get_deals", dealArgs);
-      return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return text(body);
     }
 
     const data = await mcpCall(session, "get_deals", dealArgs);
@@ -705,17 +676,21 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }));
     const n = await upsert(folded.map(f => f.row));
 
-    /* After the upsert, because a PATCH on an id not yet inserted matches
-       nothing and reports success. It never takes the poll down: the deals are
-       already written. */
+    /* The close instant, which the email owns: this stamps every close it saw
+       that no alert covered, so the email still wins wherever it lands. Only
+       positions with an exit price, so the latest deal is the closing one; and
+       the close trigger firing on this transition is how she learns a position
+       closed. After the upsert, because a PATCH on an id not yet inserted
+       matches nothing and reports success. It never takes the poll down: the
+       deals are already written. */
     let stamped = 0;
     try {
       for (const f of folded.filter(f => f.row.exit_price !== null)) {
-        if (await writeFill(f.row.id, f.closedAt)) stamped++;
+        if (await writeOnce(f.row.id, "fill_time", new Date(f.closedAt).toISOString())) stamped++;
       }
     } catch (err) {
       console.error("doji-mcp-sync: close instant not recorded —",
-        err instanceof Error ? err.message : err);
+        why(err));
     }
 
     // get_balance is the only source of a balance — get_deals carries none —
@@ -731,7 +706,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       if (typeof account.moneyDigits !== "number") {
         throw new Error("get_balance returned no moneyDigits — balance scale unknown");
       }
-      await writeBalance(target, Math.round(account.balance / 10 ** account.moneyDigits * 100) / 100);
+      await writeOnce(target, "balance", Math.round(account.balance / 10 ** account.moneyDigits * 100) / 100);
     }
 
     // The plan and the stops: after the upsert and never fatal, for the close
@@ -746,7 +721,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       stops = await recordStops(plans);
     } catch (err) {
       console.error("doji-mcp-sync: plan not recorded —",
-        err instanceof Error ? err.message : err);
+        why(err));
     }
 
     // Last, being the one step that reads the table; never fatal either.
@@ -755,7 +730,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       excursions = await fillExcursions(session);
     } catch (err) {
       console.error("doji-mcp-sync: excursion not recorded —",
-        err instanceof Error ? err.message : err);
+        why(err));
     }
 
     // Marked after every step, so it means the deals landed.
@@ -768,7 +743,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       has_more: data.hasMore ?? null,
     });
   } catch (err) {
-    console.error("doji-mcp-sync:", err instanceof Error ? err.message : err);
+    console.error("doji-mcp-sync:", why(err));
     // The only record of a poll that failed at 03:00.
     await heartbeat("poller", err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

@@ -303,9 +303,10 @@ function capture({ app, $, win, charts }) {
   for (const id of PANELS) {
     const el = $(id);
     // A panel that vanished is recorded as absent rather than skipped, which is
-    // the point on a refactor that renames an id.
+    // the point on a refactor that renames an id. Its own class too: a figure's
+    // win or loss colour sits on the element, where innerHTML cannot see it.
     panels[id] = el === null ? null
-      : { display: el.style.display || '', html: el.innerHTML };
+      : { display: el.style.display || '', cls: el.className, html: el.innerHTML };
   }
 
   /* THE CHARTS ARE THE HALF NOTHING ELSE CAN SEE: a canvas has no markup. The

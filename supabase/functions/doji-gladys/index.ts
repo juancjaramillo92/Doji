@@ -39,7 +39,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
-  env, secretMatches, json, telegram, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, telegram, sbHeaders, SB_URL, SB_KEY, why
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("GLADYS_BOT_TOKEN");
@@ -110,9 +110,8 @@ export function parseCallback(data: string): Tap | null {
   if (!/^PID\d+$/.test(id)) return null;
 
   if (parts.length === 2) {
-    if (parts[1] === 'edit') return { id, column: null, value: null, action: 'edit' };
-    if (parts[1] === 'done') return { id, column: null, value: null, action: 'done' };
-    return null;
+    const action = parts[1];
+    return action === 'edit' || action === 'done' ? { id, column: null, value: null, action } : null;
   }
   if (parts.length !== 3) return null;
 
@@ -323,7 +322,7 @@ async function handleTap(req: Request): Promise<Response> {
     if (replaced) await patchRow(tap.id, { tg_message_id: replaced });
     return json({ ok: true, id: tap.id, column: tap.column });
   } catch (err) {
-    console.error("doji-gladys:", err instanceof Error ? err.message : err);
+    console.error("doji-gladys:", why(err));
     // Guarded: reporting the failure must not cause a redelivery loop.
     if (cq?.id) {
       await tg("answerCallbackQuery",
@@ -357,7 +356,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   } catch (err) {
     // pg_net discards the response, so this line is the only report. The
     // journal row is committed before either trigger runs.
-    console.error("doji-gladys:", err instanceof Error ? err.message : err);
+    console.error("doji-gladys:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });

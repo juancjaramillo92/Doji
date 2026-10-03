@@ -21,7 +21,7 @@
 // Deploy:  supabase functions deploy doji-email-sync --no-verify-jwt
 // Secrets: DOJI_EMAIL_SECRET, DOJI_USER_ID, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { env, secretMatches, json, sbHeaders, heartbeat, SB_URL, SB_KEY }
+import { env, secretMatches, json, sbHeaders, heartbeat, SB_URL, SB_KEY, why }
   from "../_shared/edge.ts";
 
 const EMAIL_SECRET = env("DOJI_EMAIL_SECRET");
@@ -49,8 +49,6 @@ const USER_ID = env("DOJI_USER_ID");
    ───────────────────────────────────────────────────────────────────────── */
 export type Fill = { row: Record<string, unknown> } | { error: string };
 
-const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v);
-
 export function emailRow(input: unknown, userId: string): Fill {
   if (!input || typeof input !== "object") return { error: "body is not an object" };
   const b = input as Record<string, unknown>;
@@ -72,7 +70,7 @@ export function emailRow(input: unknown, userId: string): Fill {
   // number, until the day it is not.
   for (const k of ["net_pnl", "balance"] as const) {
     if (b[k] === undefined || b[k] === null) continue;
-    if (!finite(b[k])) return { error: `${k} is not a finite number` };
+    if (!Number.isFinite(b[k])) return { error: `${k} is not a finite number` };
     row[k] = b[k];
   }
 
@@ -145,7 +143,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     res = await upsert(fill.row);
   } catch (err) {
     // No response at all — DNS, a dropped connection. Always worth retrying.
-    console.error("doji-email-sync:", err instanceof Error ? err.message : err);
+    console.error("doji-email-sync:", why(err));
     await heartbeat("email", err);
     return json({ ok: false, error: "write unreachable" }, 500);
   }

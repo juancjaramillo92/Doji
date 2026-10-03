@@ -59,8 +59,8 @@ Every change is:
   New code goes in its own section, under the right banner.
 - **Efficient by structure.** Renders are O(trades) because `Data.index()` builds
   both lookups in one pass. Never scan `Data.rows` inside a loop — use
-  `Data.byId`, `Data.byDay` or `Data.day(iso)` — and call `Data.index()` after any
-  mutation of `Data.rows`.
+  `Data.byId`, `Data.byDay` or `Data.day(iso)`. A write changes `Data.all` and
+  then calls `Data.index()`, which derives `Data.rows` from it.
 - **Commented for *why*, never for *what*.**
 - **Deployed from `main`, never from a dashboard.** A hand-deployed function can
   differ from the committed one with nothing to reveal it. The SQL stays manual
@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 695 tests, six suites
+npm test      # 696 tests, six suites
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced

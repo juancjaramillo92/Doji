@@ -36,7 +36,7 @@ import {
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
 import {
-  env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -265,7 +265,7 @@ const STRATEGY_TOOL = {
     "The reasoning behind his trading rules. You already hold the summary and the " +
     "rules table; this is the rest of the document — why a rule exists, how a " +
     "journal column is meant to be read, what a term means precisely. Sections: " +
-    Object.keys(SECTIONS).map(k => `${k}`).join(", ") + ". " +
+    Object.keys(SECTIONS).join(", ") + ". " +
     "Read the section a rule cites before explaining that rule, rather than " +
     "reconstructing it from the one-line summary.",
   input_schema: {
@@ -432,7 +432,7 @@ async function searchMemory(query: unknown): Promise<string> {
 
     return searchList(hits);
   } catch (err) {
-    console.error("doji-eugenia: search failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: search failed —", why(err));
     return "Your memory could not be searched just now. Say you cannot check rather than answering as though you had.";
   }
 }
@@ -445,8 +445,8 @@ const NOTES = 20;
    because PostgREST answers a missing table with a 404 whose JSON body parses
    fine, and a copy that skips the status check hands back an object for rows.
    fillEmbeddings stays out: it needs the response's content-range. */
-async function readRows<T>(what: string, url: string): Promise<T[]> {
-  const res = await fetch(url, { headers: sbHeaders() });
+async function readRows<T>(what: string, path: string): Promise<T[]> {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`${what} read failed (HTTP ${res.status})`);
   return await res.json();
 }
@@ -455,7 +455,7 @@ async function readRows<T>(what: string, url: string): Promise<T[]> {
 // correction beside what it corrected. The id comes back so she can retire one.
 async function readNotes(kind: string): Promise<Note[]> {
   return readRows<Note>('Notes',
-    `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
+    `eugenia_notes?select=id,note&kind=eq.${kind}` +
     `&superseded_by=is.null&order=id.desc&limit=${NOTES}`);
 }
 
@@ -463,6 +463,10 @@ type Note = { id: number; note: string };
 
 // The number is how a note is named when one is retired — in both renderings.
 const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
+
+// What every tool that writes answers when the write failed and the failure is
+// not his to hear about.
+const UNSAVED = "That did not save. Carry on and do not mention it.";
 
 /* Truncated rather than refused, and never throws: the reply she is writing
    matters more than the note, and a throw would cost the whole of it. That is
@@ -519,10 +523,10 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     }
     return "Remembered.";
   } catch (err) {
-    console.error("doji-eugenia: note not written —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: note not written —", why(err));
     return k !== 'fact'
       ? "That did NOT save. Tell him it did not stick and that he will have to say it again."
-      : "That did not save. Carry on and do not mention it.";
+      : UNSAVED;
   }
 }
 
@@ -564,9 +568,8 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
     }
     return `${id} is now ${to}.`;
   } catch (err) {
-    console.error("doji-eugenia: channel not moved —",
-      err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    console.error("doji-eugenia: channel not moved —", why(err));
+    return UNSAVED;
   }
 }
 
@@ -601,9 +604,7 @@ function windowStart(days: unknown, now: number, back: number): string {
   const n = windowDays(days);
 
   const [y, m, d] = nyDate(new Date(now)).split('-').map(Number);
-  const from = new Date(Date.UTC(y, m - 1, d));
-  from.setUTCDate(from.getUTCDate() - n - back);
-  return from.toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1, d - n - back)).toISOString().slice(0, 10);
 }
 
 /* R-14's reads over check_rules' window: TradingView's high-rated releases —
@@ -645,10 +646,10 @@ export function weeksQuery(days: unknown, now = Date.now()): string {
    Friday", a false statement about his own week. */
 async function readTrades(days: unknown): Promise<string> {
   try {
-    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
+    const rows = await readRows<TradeRow>('Trades', tradesQuery(days));
     return rows.length ? JSON.stringify(rows) + reachLine(rows, days) : "No trades in that window.";
   } catch (err) {
-    console.error("doji-eugenia: trades read failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: trades read failed —", why(err));
     return "His journal could not be read just now. Say you cannot see it rather than saying he has not traded.";
   }
 }
@@ -686,10 +687,10 @@ const CHECK_TOOL = {
 async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
     Promise<{ results: RuleResult[] | null; reach: string }> {
   const [rows, releases, weeks, moves] = await Promise.all([
-    readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
-    readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
-    readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
-    readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
+    readRows<TradeRow>('Trades', tradesQuery(days)),
+    readRows<{ at: string }>('Releases', releasesQuery(days)),
+    readRows<{ week: string }>('Weeks', weeksQuery(days)),
+    readRows<Stop & { id: string }>('Stops', stopsQuery(days)),
   ]);
   const kept = rows.filter(keep);
   const reach = reachLine(rows, days);
@@ -708,7 +709,7 @@ async function checkAdherence(days: unknown): Promise<string> {
     if (!results) return "No trades in that window, so there is nothing to check.";
     return adherenceList(results) + reach;
   } catch (err) {
-    console.error("doji-eugenia: rule check failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: rule check failed —", why(err));
     return "His journal could not be read just now, so the rules were not checked. Say you could not check rather than saying nothing was broken.";
   }
 }
@@ -747,10 +748,10 @@ const STATS_TOOL = {
    trader who has not traded. */
 async function readStats(days: unknown): Promise<string> {
   try {
-    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
+    const rows = await readRows<TradeRow>('Trades', tradesQuery(days));
     return statsList(journalStats(rows), windowDays(days)) + reachLine(rows, days);
   } catch (err) {
-    console.error("doji-eugenia: stats read failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: stats read failed —", why(err));
     return "His journal could not be read just now, so nothing was computed. Say you cannot see it rather than saying he has not traded.";
   }
 }
@@ -770,7 +771,15 @@ async function readStats(days: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
-const TV_CALENDAR = `${SB_URL}/functions/v1/doji-tradingview?calendar=1`;
+/* Every door of doji-tradingview she reads, behind the cron secret: its
+   answer, or a throw naming the door and the reason it gave. */
+async function tvRead(door: string, query = ""): Promise<any> {
+  const res = await fetch(`${SB_URL}/functions/v1/doji-tradingview?${door}=1${query}`,
+                          { headers: { "x-doji-key": CRON_SECRET } });
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok || !answer.ok) throw new Error(`TradingView ${door}: ${answer.error ?? `HTTP ${res.status}`}`);
+  return answer;
+}
 
 // What doji-tradingview's `foldCalendar` answers, one release each.
 interface TvEvent {
@@ -808,10 +817,7 @@ export function calendarRows(events: TvEvent[], from: number, to: number) {
 const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 async function readTvCalendar(from: string, to: string): Promise<TvEvent[]> {
-  const res = await fetch(`${TV_CALENDAR}&from=${from}&to=${to}`, { headers: { "x-doji-key": CRON_SECRET } });
-  const answer = await res.json().catch(() => ({}));
-  if (!res.ok || !answer.ok) throw new Error(`TradingView calendar: ${answer.error ?? `HTTP ${res.status}`}`);
-  return answer.events;
+  return (await tvRead("calendar", `&from=${from}&to=${to}`)).events;
 }
 
 /* Grouped by the keys each row carries: PostgREST refuses a bulk insert whose
@@ -864,9 +870,9 @@ async function filedWeek(week: string): Promise<boolean> {
     await recordRun({ caller: 'calendar week', ok: true, detail: `${week}: ${await fileWeek(week)} filed` });
     return true;
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error(`doji-eugenia: week ${week} not filed —`, why);
-    await recordRun({ caller: 'calendar week', ok: false, detail: `${week}: ${why}`.slice(0, 500) });
+    const reason = why(err);
+    console.error(`doji-eugenia: week ${week} not filed —`, reason);
+    await recordRun({ caller: 'calendar week', ok: false, detail: `${week}: ${reason}`.slice(0, 500) });
     return false;
   }
 }
@@ -910,9 +916,9 @@ async function filed(now = Date.now()): Promise<void> {
   try {
     await recordRun({ caller: 'calendar', ok: true, detail: `${await fileCalendar(now)} filed` });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: calendar not filed —", why);
-    await recordRun({ caller: 'calendar', ok: false, detail: why.slice(0, 500) });
+    const reason = why(err);
+    console.error("doji-eugenia: calendar not filed —", reason);
+    await recordRun({ caller: 'calendar', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
@@ -953,14 +959,14 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
 
     // Bounded: the 08:30 slot holds most of a report.
     const standing = await readRows<Release>('Release',
-      `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
+      `eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
     return standing.length
       ? `Nothing at that time is called "${called}". On file: ` +
         `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
       : "Nothing is on file at that time, so there is no entry to fill in. Leave it.";
   } catch (err) {
-    console.error("doji-eugenia: actual not written —", err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    console.error("doji-eugenia: actual not written —", why(err));
+    return UNSAVED;
   }
 }
 
@@ -1044,7 +1050,7 @@ async function marketQuote(): Promise<Quote | null> {
     if (!quote?.ok || typeof quote.bid !== 'number') throw new Error("no readable quote");
     return quote as Quote;
   } catch (err) {
-    console.error("doji-eugenia: market read failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: market read failed —", why(err));
     return null;
   }
 }
@@ -1146,8 +1152,8 @@ async function setThesis(thesis: unknown): Promise<string> {
     }
     return "Thesis updated.";
   } catch (err) {
-    console.error("doji-eugenia: thesis not written —", err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    console.error("doji-eugenia: thesis not written —", why(err));
+    return UNSAVED;
   }
 }
 
@@ -1214,8 +1220,8 @@ async function openLoop(kind: unknown, body: unknown): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return "Kept open.";
   } catch (err) {
-    console.error("doji-eugenia: loop not opened —", err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    console.error("doji-eugenia: loop not opened —", why(err));
+    return UNSAVED;
   }
 }
 
@@ -1237,8 +1243,8 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
     }
     return "Closed.";
   } catch (err) {
-    console.error("doji-eugenia: loop not closed —", err instanceof Error ? err.message : err);
-    return "That did not save. Carry on and do not mention it.";
+    console.error("doji-eugenia: loop not closed —", why(err));
+    return UNSAVED;
   }
 }
 
@@ -1448,12 +1454,20 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   const called: Record<string, number> = {};
   const toolLine = () =>
     Object.entries(called).map(([name, n]) => `${name}×${n}`).join(', ') || null;
+  // One row for both endings, so the turn that threw is filed like the one that
+  // finished.
+  const run = (ok: boolean, detail: string | null) => recordRun({
+    caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
+    wrote_1h: wrote1h, wrote_5m: wrote5m,
+    out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
+    ms: Date.now() - started, ok, detail,
+  });
   // The tool_result carrying the loop's cache breakpoint.
   let marked: any;
 
   try {
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    rounds = round + 1;
+  while (rounds < MAX_ROUNDS) {
+    rounds++;
     const body = await call(convo, effort, tools, model, container);
     container = body.container?.id ?? container;
 
@@ -1527,29 +1541,17 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     if (!text) throw new Error("Claude returned no text");
     // The console line to watch one turn; the row, because nobody reads Edge
     // logs. The catch records the turns that never got here.
-    console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
+    console.log(`doji-eugenia: ${label} — ${model}, ${rounds} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es), ${fetches} fetch(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
-    await recordRun({
-      caller: label, model, effort, rounds: round + 1, in_tokens: inTok, cached,
-      wrote_1h: wrote1h, wrote_5m: wrote5m,
-      out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
-      ms: Date.now() - started, ok: true, detail: toolLine(),
-    });
+    await run(true, toolLine());
     return text;
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
   } catch (err) {
     // A failed turn is a row too — the one that never existed. Rethrown.
-    await recordRun({
-      caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
-      wrote_1h: wrote1h, wrote_5m: wrote5m,
-      out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
-      ms: Date.now() - started, ok: false,
-      detail: [err instanceof Error ? err.message : String(err), toolLine()]
-        .filter(Boolean).join(' · tools: ').slice(0, 500),
-    });
+    await run(false, [why(err), toolLine()].filter(Boolean).join(' · tools: ').slice(0, 500));
     throw err;
   }
 }
@@ -1564,7 +1566,7 @@ async function recordRun(row: Record<string, unknown>): Promise<void> {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {
-    console.error("doji-eugenia: run not recorded —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: run not recorded —", why(err));
   }
 }
 
@@ -1603,7 +1605,7 @@ export function openOnUser(turns: Turn[]): Turn[] {
 
 async function recent(): Promise<Turn[]> {
   const rows = await readRows<Turn & { created_at: string }>('History',
-    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`);
+    `eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`);
   return openOnUser(dateTurns(rows.reverse()));
 }
 
@@ -1686,16 +1688,14 @@ async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   // unset key arrives here, and then the rows wait for it.
   if (!vecs) return { filled: 0, left };
 
-  let filled = 0;
   for (const [i, row] of rows.entries()) {
     const done = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${row.id}`, {
       method: "PATCH", headers: sbHeaders("return=minimal"),
       body: JSON.stringify({ embedding: vecs[i] }),
     });
     if (!done.ok) throw new Error(`${table} embedding write failed (HTTP ${done.status})`);
-    filled++;
   }
-  return { filled, left: left - filled };
+  return { filled: rows.length, left: left - rows.length };
 }
 
 async function postEmbed(): Promise<Response> {
@@ -1821,7 +1821,7 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
     if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
     return true;
   } catch (err) {
-    console.error("doji-eugenia: could not speak —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: could not speak —", why(err));
     return false;
   }
 }
@@ -1927,7 +1927,7 @@ export async function notesBlock(): Promise<string> {
              ? `\n\nWhat you have noticed about him, newest first:${list(noticed)}`
              : "");
   } catch (err) {
-    console.error("doji-eugenia: notes unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: notes unavailable —", why(err));
     return "";
   }
 }
@@ -2026,7 +2026,7 @@ async function readChannels(): Promise<Channel[]> {
   return readRows<Channel>('Channels',
     // A limit that can never bite — the key sits on a five-value check — kept
     // because every read here carries one.
-    `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence,moved_on` +
+    `eugenia_channels?select=channel,state,evidence,moved_on` +
     `&limit=${CHANNELS.length}`);
 }
 
@@ -2035,8 +2035,7 @@ export async function channelsBlock(): Promise<string> {
   try {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
   } catch (err) {
-    console.error("doji-eugenia: channels unavailable —",
-      err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: channels unavailable —", why(err));
     return "";
   }
 }
@@ -2079,12 +2078,12 @@ export function breachesList(results: RuleResult[] | null): string {
 export async function breachesBlock(): Promise<string> {
   try {
     const [last] = await readRows<{ created_at: string }>('Briefing marker',
-      `${SB_URL}/rest/v1/${briefedQuery()}`);
+      briefedQuery());
     const at = last?.created_at ?? new Date(Date.now() - 86_400_000).toISOString();
     const { results, reach } = await readRules(BREACH_DAYS, t => sinceBriefing(t, at));
     return breachesList(results) + reach;
   } catch (err) {
-    console.error("doji-eugenia: breaches unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: breaches unavailable —", why(err));
     return "\n\nWhich rules his recent trades broke could not be checked just now. Say nothing about a broken rule rather than working it out from the rows.";
   }
 }
@@ -2097,7 +2096,7 @@ type Thesis = { thesis: string; moved_on: string | null };
 
 async function readThesis(): Promise<Thesis | null> {
   const [row] = await readRows<Thesis>('Thesis',
-    `${SB_URL}/rest/v1/eugenia_thesis?select=thesis,moved_on&id=eq.current&limit=1`);
+    `eugenia_thesis?select=thesis,moved_on&id=eq.current&limit=1`);
   return row ?? null;
 }
 
@@ -2113,7 +2112,7 @@ export async function thesisBlock(): Promise<string> {
   try {
     return thesisLine(await readThesis());
   } catch (err) {
-    console.error("doji-eugenia: thesis unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: thesis unavailable —", why(err));
     return "";
   }
 }
@@ -2179,7 +2178,7 @@ export async function healthBlock(): Promise<string> {
     if (!res.ok) return "";
     return healthLine(await res.json());
   } catch (err) {
-    console.error("doji-eugenia: health unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: health unavailable —", why(err));
     return "";
   }
 }
@@ -2192,7 +2191,7 @@ const LOOPS = 10;
 
 async function readLoops(): Promise<Loop[]> {
   return readRows<Loop>('Loops',
-    `${SB_URL}/rest/v1/eugenia_loops?select=id,kind,body,opened_on` +
+    `eugenia_loops?select=id,kind,body,opened_on` +
     `&closed_on=is.null&order=id.desc&limit=${LOOPS}`);
 }
 
@@ -2211,7 +2210,7 @@ export async function loopsBlock(): Promise<string> {
   try {
     return loopsList(await readLoops());
   } catch (err) {
-    console.error("doji-eugenia: loops unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: loops unavailable —", why(err));
     return "";
   }
 }
@@ -2222,6 +2221,8 @@ type Release = {
   looked_at?: string | null; ticker?: string | null;
 };
 
+// The columns every calendar read asks for; the spine adds the two optional ones.
+const RELEASE_COLUMNS = "id,at,name,importance,consensus,prior,actual,note";
 
 /* Read earliest first, so a day too heavy for the bound loses the
    furthest-ahead rows, which tomorrow's briefing reads anyway. A full read
@@ -2232,7 +2233,7 @@ async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();
   const to   = new Date(now + CAL_AHEAD * 3600_000).toISOString();
   return readRows<Release>('Calendar',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
     `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
@@ -2279,7 +2280,7 @@ export async function calendarBlock(): Promise<string> {
         `Do not say nothing else is due after the last one.`
       : "");
   } catch (err) {
-    console.error("doji-eugenia: calendar unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: calendar unavailable —", why(err));
     return "";
   }
 }
@@ -2292,17 +2293,17 @@ export async function calendarBlock(): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 export function weekQuery(now: number): string {
   const to = new Date(now + 7 * 86_400_000).toISOString();
-  return `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+  return `eugenia_calendar?select=${RELEASE_COLUMNS}` +
          `&importance=eq.${HIGH}&at=gte.${new Date(now).toISOString()}&at=lte.${to}` +
          `&order=at.asc&limit=40`;
 }
 
 export async function weekBlock(now = Date.now()): Promise<string> {
   try {
-    const rows = await readRows<Release>('Week', `${SB_URL}/rest/v1/${weekQuery(now)}`);
+    const rows = await readRows<Release>('Week', weekQuery(now));
     return calendarList(rows, now, "The week ahead, every release TradingView rates high");
   } catch (err) {
-    console.error("doji-eugenia: week unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: week unavailable —", why(err));
     return "";
   }
 }
@@ -2343,17 +2344,13 @@ export function aroundList(answer: { market: Around[]; missing: { name: string }
   return `\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n${lines.join("\n")}`;
 }
 
-const TV_MARKET = `${SB_URL}/functions/v1/doji-tradingview?market=1`;
-const TV_NEWS = `${SB_URL}/functions/v1/doji-tradingview?news=1`;
-
 export async function aroundBlock(): Promise<string> {
   try {
-    const res = await fetch(TV_MARKET, { headers: { "x-doji-key": CRON_SECRET } });
-    const answer = await res.json();
-    if (!res.ok || !answer.ok || !answer.market?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    const answer = await tvRead("market");
+    if (!answer.market?.length) throw new Error("no symbol served");
     return aroundList(answer);
   } catch (err) {
-    console.error("doji-eugenia: market around gold unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: market around gold unavailable —", why(err));
     return NO_AROUND;
   }
 }
@@ -2382,16 +2379,13 @@ export function ratesList(answer: { meetings: Priced[]; unread: string[] }): str
     `works them, from daily bars at least fifteen minutes behind:\n${lines.join("\n")}`;
 }
 
-const TV_RATES = `${SB_URL}/functions/v1/doji-tradingview?rates=1`;
-
 export async function ratesBlock(): Promise<string> {
   try {
-    const res = await fetch(TV_RATES, { headers: { "x-doji-key": CRON_SECRET } });
-    const answer = await res.json();
-    if (!res.ok || !answer.ok || !answer.meetings?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    const answer = await tvRead("rates");
+    if (!answer.meetings?.length) throw new Error("no meeting served");
     return ratesList(answer);
   } catch (err) {
-    console.error("doji-eugenia: rate odds unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: rate odds unavailable —", why(err));
     return "\n\nWhat the futures price for the Fed could not be read just now. Do not quote rate " +
       "odds from a search; say you do not have them.";
   }
@@ -2443,12 +2437,9 @@ export function headlinesList(answer: { headlines: Headline[]; missing: { symbol
 
 export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
   try {
-    const res = await fetch(TV_NEWS, { headers: { "x-doji-key": CRON_SECRET } });
-    const answer = await res.json();
-    if (!res.ok || !answer.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
-    return headlinesList(answer, Date.now(), minutes);
+    return headlinesList(await tvRead("news"), Date.now(), minutes);
   } catch (err) {
-    console.error("doji-eugenia: headlines unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: headlines unavailable —", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
   }
 }
@@ -2505,7 +2496,7 @@ export async function positioningBlock(): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return positioningList(await res.json());
   } catch (err) {
-    console.error("doji-eugenia: positioning unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: positioning unavailable —", why(err));
     return "\n\nWhere the speculators stand could not be read just now; do not quote it from a search.";
   }
 }
@@ -2522,7 +2513,7 @@ export async function positioningBlock(): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 async function readDesk(day: string): Promise<TradeRow[]> {
   return readRows<TradeRow>('Desk',
-    `${SB_URL}/rest/v1/eugenia_trades?select=*` +
+    `eugenia_trades?select=*` +
     `&or=(open_day.gte.${day},and(exit_price.is.null,fill_time.is.null))` +
     `&order=entry_time.desc&limit=50`);
 }
@@ -2576,12 +2567,12 @@ export function positionsList(
 }
 
 /* Open is BOTH witnesses null. fill_time comes from the email and from the
-   poller's writeFill, which stamps only closes its fold window reaches; what
-   the poller records on every close is exit_price. Read off fill_time alone, a
-   close with no alert stayed open for ever, and this block cited R-19 and R-15
-   at him about a position gone since Wednesday. Either witness closes it — the
-   shape balance and direction use. Broker rows only: pre-sync rows carry
-   neither column. Exported because the filter was the half no test reached;
+   poller, which stamps only closes its fold window reaches; what the poller
+   records on every close is exit_price. Read off fill_time alone, a close with
+   no alert stayed open for ever, and this block cited R-19 and R-15 at him
+   about a position gone since Wednesday. Either witness closes it — the shape
+   balance and direction use. Broker rows only: pre-sync rows carry neither
+   column. Exported because the filter was the half no test reached;
    positionsList renders correctly whatever it is handed. */
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
@@ -2598,7 +2589,7 @@ export async function positionsBlock(): Promise<string> {
       dayStanding(rows, day),
       open.length ? await readMark().catch(() => null) : null);
   } catch (err) {
-    console.error("doji-eugenia: positions unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: positions unavailable —", why(err));
     return "";
   }
 }
@@ -2672,19 +2663,19 @@ async function postScheduled(url: URL): Promise<Response> {
    trade event, which has no retry behind it. pg_net discards the response and
    nobody reads the console, so the message is how he finds out. */
 async function jobFailed(job: string, err: unknown): Promise<Response> {
-  const why = err instanceof Error ? err.message : String(err);
-  console.error("doji-eugenia:", why);
+  const reason = why(err);
+  console.error("doji-eugenia:", reason);
   /* The row first, because the message can fail and its catch swallows that:
      a job that dies before its first model call otherwise leaves no row, and
      the table reads as a system with nothing to do. `<job> job`, so it is never
      confused with an ask() label. */
-  await recordRun({ caller: `${job} job`, ok: false, detail: why.slice(0, 500) });
+  await recordRun({ caller: `${job} job`, ok: false, detail: reason.slice(0, 500) });
 
   await tg("sendMessage", {
     chat_id: CHAT_ID,
-    text: `${apologyFor(job)}\n\n${why.slice(0, 600)}`,
+    text: `${apologyFor(job)}\n\n${reason.slice(0, 600)}`,
   }).catch(() => {});
-  return json({ ok: false, error: why, job }, 500);
+  return json({ ok: false, error: reason, job }, 500);
 }
 
 /* What postBriefing stores in place of the text: one definition, or a retry
@@ -2708,11 +2699,10 @@ export function briefedQuery(): string {
 async function briefedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ created_at: string }>('Briefing marker',
-      `${SB_URL}/rest/v1/${briefedQuery()}`);
+      briefedQuery());
     return !!latest && nyDate(new Date(latest.created_at)) === nyDate(new Date());
   } catch (err) {
-    console.error("doji-eugenia: could not check for today's briefing —",
-      err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: could not check for today's briefing —", why(err));
     return true;
   }
 }
@@ -2793,10 +2783,10 @@ async function gate(draft: string, asked: string, label: string, most?: number):
     return sent;
   } catch (err) {
     // A gate that fails must never cost the message it was checking.
-    const why = err instanceof Error ? err.message : String(err);
-    console.error(`doji-eugenia: ${label} failed —`, why);
+    const reason = why(err);
+    console.error(`doji-eugenia: ${label} failed —`, reason);
     await recordRun({ caller, ok: false, chars: draft.length,
-                      detail: `failed, the draft went — ${why}`.slice(0, 500) });
+                      detail: `failed, the draft went — ${reason}`.slice(0, 500) });
     return draft;
   }
 }
@@ -2847,7 +2837,7 @@ async function postBriefing(due: Brief): Promise<Response> {
   const handed = await fetch(`${SB_URL}/functions/v1/doji-eugenia?speak=${due}`, {
     method: "POST", headers: { "x-doji-key": CRON_SECRET },
   }).then(async res => { await res.body?.cancel(); return res.ok ? null : `HTTP ${res.status}`; },
-          (err: unknown) => err instanceof Error ? err.message : String(err));
+          (err: unknown) => why(err));
   if (handed === null) {
     await recordRun({
       caller: `${due} briefing written`, chars: brief.length, ms: Date.now() - opened, ok: true,
@@ -2880,14 +2870,14 @@ export async function postSpeak(due: string): Promise<Response> {
   if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
   const opened = Date.now();
   const [marker] = await readRows<{ created_at: string }>('Briefing marker',
-    `${SB_URL}/rest/v1/eugenia_turns?select=created_at&role=eq.user` +
+    `eugenia_turns?select=created_at&role=eq.user` +
     `&content=eq.${encodeURIComponent(briefingMarker(due))}&order=id.desc&limit=1`);
   const today = nyDate(new Date());
   if (!marker || nyDate(new Date(marker.created_at)) !== today) {
     throw new Error(`no ${due} briefing is stored for ${today}`);
   }
   const [turn] = await readRows<{ content: string }>('Briefing',
-    `${SB_URL}/rest/v1/eugenia_turns?select=content&role=eq.assistant` +
+    `eugenia_turns?select=content&role=eq.assistant` +
     `&created_at=eq.${encodeURIComponent(marker.created_at)}&order=id.desc&limit=1`);
   if (!turn) throw new Error(`the ${due} briefing's marker is stored and its text is not`);
 
@@ -2928,7 +2918,7 @@ export function dayQuery(hours: number, now = Date.now()): string {
 
 async function turnsSince(hours: number): Promise<Turn[]> {
   const rows = await readRows<Turn & { created_at: string }>('Day',
-    `${SB_URL}/rest/v1/${dayQuery(hours)}`);
+    dayQuery(hours));
   return dateTurns(rows.reverse());
 }
 
@@ -2937,12 +2927,11 @@ async function turnsSince(hours: number): Promise<Turn[]> {
 async function consolidatedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ at: string }>('Consolidation marker',
-      `${SB_URL}/rest/v1/eugenia_runs?select=at&caller=eq.consolidation&ok=is.true` +
+      `eugenia_runs?select=at&caller=eq.consolidation&ok=is.true` +
       `&order=id.desc&limit=1`);
     return !!latest && nyDate(new Date(latest.at)) === nyDate(new Date());
   } catch (err) {
-    console.error("doji-eugenia: could not check for tonight's pass —",
-      err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: could not check for tonight's pass —", why(err));
     return true;
   }
 }
@@ -2953,14 +2942,14 @@ export async function feedbackBlock(): Promise<string> {
   try {
     const from = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
     const rows = await readRows<{ on_day: string; verdict: string }>('Feedback',
-      `${SB_URL}/rest/v1/eugenia_feedback?select=on_day,verdict&on_day=gte.${from}` +
+      `eugenia_feedback?select=on_day,verdict&on_day=gte.${from}` +
       `&order=on_day.desc&limit=5`);
     if (!rows.length) return "";
     const said = rows.map(r => `· ${civilDay(r.on_day)}: he marked it ${r.verdict === 'good' ? 'useful' : 'off'}`);
     return `\n\nWhat he made of the recent briefings:\n${said.join("\n")}\n` +
            `Read this as one signal beside the day, never as a score to raise.`;
   } catch (err) {
-    console.error("doji-eugenia: feedback unavailable —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: feedback unavailable —", why(err));
     return "";
   }
 }
@@ -3006,9 +2995,9 @@ async function postConsolidation(): Promise<Response> {
     console.log("doji-eugenia: embeddings swept —", swept);
     await recordRun({ caller: 'embeddings', ok: true, detail: swept });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: embedding sweep failed —", why);
-    await recordRun({ caller: 'embeddings', ok: false, detail: why.slice(0, 500) });
+    const reason = why(err);
+    console.error("doji-eugenia: embedding sweep failed —", reason);
+    await recordRun({ caller: 'embeddings', ok: false, detail: reason.slice(0, 500) });
   }
 
   // The whole week, which R-14 and R-19 judge against — the quarter-hourly
@@ -3031,9 +3020,9 @@ async function recordChannels() {
     console.log(`doji-eugenia: channels — ${rungs}`);
     await recordRun({ caller: 'channels', ok: true, detail: rungs });
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.error("doji-eugenia: channels unavailable —", why);
-    await recordRun({ caller: 'channels', ok: false, detail: why.slice(0, 500) });
+    const reason = why(err);
+    console.error("doji-eugenia: channels unavailable —", reason);
+    await recordRun({ caller: 'channels', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
@@ -3089,7 +3078,7 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
   // looked_at is read, not filtered on: a filter would hide the mark that makes
   // the rest of the group skippable.
   const rows = await readRows<Release>('Release',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS},looked_at,ticker` +
     `&importance=eq.high` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
     `&order=at.asc&limit=${RELEASE_ROWS}`);
@@ -3146,10 +3135,10 @@ async function recordBlock(due: Release[]): Promise<string> {
   const series = [...new Map(due.filter(r => r.ticker).map(r => [r.ticker!, r])).values()];
   const parts = await Promise.all(series.map(async r => {
     try {
-      const rows = await readRows<Release>('Record', `${SB_URL}/rest/v1/${recordQuery(r.ticker!, r.at)}`);
+      const rows = await readRows<Release>('Record', recordQuery(r.ticker!, r.at));
       return recordList(r.name, [...rows].reverse()) + revisionLine(r, rows);
     } catch (err) {
-      console.error("doji-eugenia: track record unavailable —", err instanceof Error ? err.message : err);
+      console.error("doji-eugenia: track record unavailable —", why(err));
       return "";
     }
   }));
@@ -3221,7 +3210,7 @@ const PENDING_AHEAD_H = 8;
 async function aheadToday(now = Date.now()): Promise<Release[]> {
   const to = new Date(now + PENDING_AHEAD_H * 3600_000).toISOString();
   return readRows<Release>('Calendar',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
     `&importance=eq.high&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
     `&order=at.asc&limit=5`);
 }
@@ -3230,7 +3219,7 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
    model call, and one that stopped returning looks like one never needed. */
 export async function postTradeEvent(id: string, event: string): Promise<Response> {
   const [row] = await readRows<TradeRow>('Trade',
-    `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
+    `eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
   // Soft-deleted: nothing to say.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
@@ -3263,7 +3252,7 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
     const day = row.open_day;
     if (!day) return json({ ok: true, skipped: "no filing day" });
     const standing = dayStanding(await readRows<TradeRow>('Day',
-      `${SB_URL}/rest/v1/eugenia_trades?open_day=eq.${day}&limit=50`), day);
+      `eugenia_trades?open_day=eq.${day}&limit=50`), day);
     if (!standing || !standing.breached) {
       return json({ ok: true, trade: id, said: "day is inside its limit" });
     }
@@ -3351,7 +3340,7 @@ export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
 
 async function readMark(): Promise<Mark | null> {
   const [row] = await readRows<Mark>('Mark',
-    `${SB_URL}/rest/v1/eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`);
+    `eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`);
   return row ?? null;
 }
 
@@ -3373,7 +3362,7 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
   const [row] = await readRows<Release>('Calendar',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
     `&importance=eq.high&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
     `&order=at.desc&limit=1`);
   return row ?? null;
@@ -3514,7 +3503,7 @@ async function transcribe(bytes: Uint8Array, name: string, mime: string): Promis
     const said = String((await res.json())?.text ?? "").trim();
     return said ? { said } : { trouble: 'empty' };
   } catch (err) {
-    console.error("doji-eugenia: transcription failed —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: transcription failed —", why(err));
     return { trouble: 'failed' };
   }
 }
@@ -3550,7 +3539,7 @@ async function handleFeedback(query: any): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     await ack(tap.verdict === 'good' ? "Noted, gracias." : "Noted — I will look at that tonight.");
   } catch (err) {
-    console.error("doji-eugenia: feedback not written —", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia: feedback not written —", why(err));
     await ack("That did not save, jefe.");
   }
 }
@@ -3571,6 +3560,9 @@ async function handleMessage(update: any): Promise<void> {
       return;
     }
 
+    // Best effort; it lasts five seconds, so the answer re-sends it below.
+    const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+
     // What he sent, resolved first: `text` is stored and read by the commands;
     // `blocks` is an image, for this turn only.
     let text: string = typeof msg.text === 'string' ? msg.text : "";
@@ -3579,7 +3571,7 @@ async function handleMessage(update: any): Promise<void> {
     const voice = msg.voice ?? msg.audio;
     if (voice?.file_id) {
       // Typing from the start: a voice note's wait is the longest.
-      await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+      await typing();
       const file = await tgDownload(voice.file_id);
       const heard: Heard = file
         ? await transcribe(file.bytes, file.path.split('/').pop() ?? "voice.oga",
@@ -3598,7 +3590,7 @@ async function handleMessage(update: any): Promise<void> {
     const docType = String(msg.document?.mime_type ?? "");
     const asImage = photo ?? (IMAGE_TYPES.includes(docType) ? msg.document : null);
     if (asImage?.file_id) {
-      await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+      await typing();
       const file = await tgDownload(asImage.file_id);
       if (!file) {
         await say("That picture would not come through, jefe. Try sending it smaller?");
@@ -3632,8 +3624,7 @@ async function handleMessage(update: any): Promise<void> {
         ]);
         await say(notesList(told, noticed, channels, loops, story, promised));
       } catch (err) {
-        console.error("doji-eugenia: notes unavailable —",
-          err instanceof Error ? err.message : err);
+        console.error("doji-eugenia: notes unavailable —", why(err));
         await say("I cannot read my notes just now, jefe.");
       }
       return;
@@ -3654,9 +3645,7 @@ async function handleMessage(update: any): Promise<void> {
       return;
     }
 
-    // The typing indicator lasts five seconds, so it is re-sent until there is
-    // something to send; best effort.
-    const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+    // Re-sent until there is something to send.
     typing();
     const keepTyping = setInterval(typing, 4_500);
 
@@ -3665,9 +3654,9 @@ async function handleMessage(update: any): Promise<void> {
     const replied = msg.reply_to_message?.from?.is_bot ? msg.reply_to_message : null;
     const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
       : typeof replied.text === 'string' ? Promise.resolve(replied.text)
-      : readRows<{ content: string }>('Replied-to', `${SB_URL}/rest/v1/${repliedQuery(replied.date)}`)
+      : readRows<{ content: string }>('Replied-to', repliedQuery(replied.date))
           .then(async ([turn]) => turn?.content ?? spokenBriefing(await readRows<Turn & { created_at: string }>(
-            'Replied-to briefing', `${SB_URL}/rest/v1/${spokenQuery(replied.date)}`)) ?? "")
+            'Replied-to briefing', spokenQuery(replied.date))) ?? "")
           .catch(() => "");
 
     let answer: string;
@@ -3710,7 +3699,7 @@ async function handleMessage(update: any): Promise<void> {
     // The text, never the blocks or the audio: a megabyte resent as history.
     await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
   } catch (err) {
-    console.error("doji-eugenia:", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia:", why(err));
     await tg("sendMessage",
       { chat_id: CHAT_ID, text: "Something broke on my side, jefe. Try again in a moment." })
       .catch(() => {});
@@ -3719,8 +3708,7 @@ async function handleMessage(update: any): Promise<void> {
 
 // Keeps work alive past the response. The catch matters: nothing awaits it.
 function background(work: Promise<unknown>) {
-  const guarded = work.catch(err =>
-    console.error("doji-eugenia:", err instanceof Error ? err.message : err));
+  const guarded = work.catch(err => console.error("doji-eugenia:", why(err)));
 
   const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
   // Logged, because without it the worker can be reclaimed at the 200 and the
@@ -3780,7 +3768,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
     // pg_net discards this; only the console sees it.
-    console.error("doji-eugenia:", err instanceof Error ? err.message : err);
+    console.error("doji-eugenia:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
 });

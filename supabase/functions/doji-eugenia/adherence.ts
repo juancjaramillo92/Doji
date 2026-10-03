@@ -152,8 +152,7 @@ const bankObserved = (y: number, m: number, d: number): string =>
 function observed(y: number, m: number, d: number): string {
   const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   const shift = wd === 6 ? -1 : wd === 0 ? 1 : 0;
-  const moved = new Date(Date.UTC(y, m - 1, d + shift));
-  return iso(moved.getUTCFullYear(), moved.getUTCMonth() + 1, moved.getUTCDate());
+  return new Date(Date.UTC(y, m - 1, d + shift)).toISOString().slice(0, 10);
 }
 
 /* §5's "Christmas-to-New-Year stretch" given dates: the 24th to the 31st. A
@@ -163,13 +162,12 @@ export const STRETCH = { from: 24, to: 31 };
 
 export function lowVolumeDays(y: number): Set<string> {
   const gf = easter(y);
-  const good = new Date(Date.UTC(y, gf.m - 1, gf.d - 2));
 
   const days = new Set<string>([
     observed(y, 1, 1),                                  // New Year's Day
     iso(y, 1, nthWeekday(y, 1, 1, 3)),                  // Martin Luther King Jr Day
     iso(y, 2, nthWeekday(y, 2, 1, 3)),                  // Washington's Birthday
-    iso(good.getUTCFullYear(), good.getUTCMonth() + 1, good.getUTCDate()),
+    new Date(Date.UTC(y, gf.m - 1, gf.d - 2)).toISOString().slice(0, 10),   // Good Friday
     iso(y, 5, lastWeekday(y, 5, 1)),                    // Memorial Day
     observed(y, 6, 19),                                 // Juneteenth
     observed(y, 7, 4),                                  // Independence Day
@@ -479,8 +477,7 @@ export interface Calendar { releases: string[]; weeks: Set<string> }
 // The Sunday, New York, the week began on — calendar_weeks' key.
 export function weekOf(at: Date): string {
   const w = nyWall(at);
-  const d = new Date(Date.UTC(w.y, w.m - 1, w.d - w.wd));
-  return iso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  return new Date(Date.UTC(w.y, w.m - 1, w.d - w.wd)).toISOString().slice(0, 10);
 }
 
 function r14(rows: TradeRow[], cal: Calendar): RuleResult {
