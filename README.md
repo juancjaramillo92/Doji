@@ -988,158 +988,102 @@ happen on.
 
 ## The two bots
 
-**Gladys** collects the journal. **Eugenia** does macro. They are separate bots
-with separate tokens and separate threads, and they share nothing but a chat id
-and the cron secret — Gladys writes four journal columns and reads no market;
-Eugenia reads the web and writes no trade.
+**Gladys** collects the journal. **Eugenia** does macro. Separate bots, tokens
+and threads, sharing only a chat id and the cron secret — Gladys writes four
+journal columns and reads no market; Eugenia reads the web and writes no trade.
+Gladys is deterministic, answers in milliseconds and should never change;
+Eugenia calls a model, costs money per message and is tuned constantly. One
+function would redeploy the thing that writes to `trades` every time a prompt is
+reworded.
 
-That split is deliberate. Gladys is deterministic, answers in milliseconds and
-must never change; Eugenia calls a model, takes seconds, costs money per message
-and will be tuned constantly. Putting them in one function would mean
-redeploying the thing that writes to `trades` every time a prompt is reworded.
-
-What they do share is a definition rather than a copy. `_shared/edge.ts` holds
-`env`, `secretMatches`, `json`, `sbHeaders`, `telegram` and `nyClock`, and each
-bot binds its own token in one line: `const tg = (m, b) => telegram(BOT_TOKEN, m, b)`.
-The test is not "could this be shared" but "are there two copies nothing can
-compare" — `sbHeaders` and the Telegram call were byte-identical in both bots,
-and the two New York clocks differed only in fallbacks neither could reach.
+What they share is a definition, not a copy: `_shared/edge.ts` holds `env`,
+`secretMatches`, `json`, `sbHeaders`, `telegram` and `nyClock`, and each bot
+binds its own token in one line, `const tg = (m, b) => telegram(BOT_TOKEN, m, b)`.
 
 ---
 
 ## Gladys — the Telegram journal
 
-When a position opens, the trader gets one Telegram message and answers the
-whole journal from it — setup and all three discipline booleans — without
-opening the app. Journalling the same trade anywhere else redraws that message
-rather than leaving it behind. `supabase/002_gladys.sql` holds both triggers and
-`doji-gladys` is the Edge Function behind them.
+When a position opens he gets one Telegram message and answers the whole journal
+from it without opening the app; journalling the trade anywhere else redraws that
+message. `supabase/002_gladys.sql` holds both triggers and `doji-gladys` is the
+function behind them.
 
 **A function is named after who it is, and so are its secrets** — `doji-gladys`,
-`GLADYS_BOT_TOKEN`, `GLADYS_WEBHOOK_SECRET`. Naming a bot after the wire it
-speaks over leaves no rule anybody could apply to the next one. `TELEGRAM_CHAT_ID`
-is the exception and earns it: it is the one value the two bots genuinely share,
-because there is one trader and one chat, with a thread each.
+`GLADYS_BOT_TOKEN`, `GLADYS_WEBHOOK_SECRET`. `TELEGRAM_CHAT_ID` is the exception:
+the one value the two bots share, since there is one trader and one chat.
 
-**One function, two callers**, told apart by which secret they present:
-`x-doji-key` is the database — a position opened, or its journal answers moved —
-and `x-telegram-bot-api-secret-token` is Telegram reporting a tap. They were
-briefly two functions and share everything that matters — the keyboard, the
-message, the `callback_data` grammar — so splitting them meant deploying that
-code twice and keeping the copies in step.
+**One function, two callers**, told apart by the secret presented: `x-doji-key`
+is the database (a position opened, or its answers moved) and
+`x-telegram-bot-api-secret-token` is Telegram reporting a tap. They share the
+keyboard, the message and the `callback_data` grammar.
 
-She opens with `Hola Jefe, new fill below`.
+**One message, edited in place.** It opens `Hola Jefe, new fill below`, with four
+rows of buttons — the two setups, then Rules, Stop Loss and Take Profit —
+answerable in any order. Each tap writes one column and redraws; the fourth
+answer settles it to a two-line summary with `[Edit]`. There is no text-reply
+path. `[Edit]` reopens the form with a fifth row, `[Done]`, which collapses it —
+needed because once every answer is in, no tap can be the fourth. It appears only
+on a complete journal, where it cannot abandon one.
 
-**One message, edited in place.** Four rows of buttons — the two setups, then
-Rules, Stop Loss and Take Profit — answerable in any order. Each tap writes one
-column and redraws the message, and the fourth answer settles it to a two-line
-summary with an `[Edit]` button. One thread entry per trade, not five. There is
-no text-reply path: a tap is the whole vocabulary.
-
-`[Edit]` reopens the form and adds a fifth row, `[Done]`, which collapses it
-again. That button exists because nothing else could: once every answer is in,
-no tap can be the fourth, so without it a reopened message stayed open forever
-even if you re-picked the same values. It appears only on a complete journal —
-on an unfinished one it would be a button for abandoning it.
-
-**It fires at open, not at close.** The poller mints the row from the entry deal
-alone, so all four answers are null at that point and the message asks for all
-four. The app has always allowed journalling an open position; this is that,
-from the notification.
+**It fires at open, not at close**: the poller mints the row from the entry deal,
+so all four answers are null and the message asks for all four.
 
 **`callback_data` is the entire state a tap needs.** `PID562780708|setup|Break &
-Retest`, `PID562780708|sl|1`, `PID562780708|edit` — the trade, the field and the
-value, in 39 bytes at worst against Telegram's 64-byte cap. So there is no
-session table and no schema change on the tap path: the callback also carries
-the chat and message ids that `editMessageText` needs. A tap is self-describing,
-and a redeploy in the middle of answering costs nothing.
+Retest`, `PID562780708|sl|1`, `PID562780708|edit` — the trade, field and value,
+39 bytes at worst against Telegram's 64-byte cap. The callback also carries the
+chat and message ids `editMessageText` needs, so there is no session table and a
+redeploy mid-answer costs nothing.
 
-**A write from anywhere else has none of that, which is why the message id is
-kept.** Journalling a trade in the app used to reach Telegram not at all — the
-message sat on `Setup: —` for the life of the trade, because nothing knew which
-message to edit. So `postOpen` stores what `sendMessage` hands back in
-`trades.tg_message_id`, and a second trigger, `trades_telegram_on_answer`, fires
-whenever any of the four journal columns actually changes on a row that has one.
-The answers now travel in both directions: a tap reaches the app through the
-realtime subscription it already holds, and a save reaches Telegram through this.
+**A write from anywhere else reaches the message through the id.** `postOpen`
+stores what `sendMessage` returns in `trades.tg_message_id`, and a second
+trigger, `trades_telegram_on_answer`, fires when any of the four columns changes
+on a row that has one. A tap reaches the app through realtime; a save reaches
+Telegram through this. The trigger compares with `is distinct from`, not `<>`:
+the columns are three-state, `<>` is `NULL` against an unanswered one, and a
+`WHEN` that is not true does not fire — so the *first* answer to every question
+would never redraw. It needs no time guard, since a restore asking Telegram to
+redraw a message to what it already says is refused as `message is not
+modified`. A row with no message id stays silent: there was never a message.
 
-That trigger watches the four columns with `is distinct from` rather than `<>`,
-because they are three-state — `<>` is `NULL` against an unanswered one, a `WHEN`
-clause that is not true does not fire, and the *first* answer to every question
-would be the one redraw that never happened. It needs no time guard, unlike the
-open trigger: this edits a message rather than posting one, so a restore from
-backup asks Telegram to redraw each message to what it already says, which is
-refused as `message is not modified`. A row with no message id fails the clause
-outright, so an email-first trade stays silent for good — correctly, there was
-never a message.
+**Whether a tap settles the form is decided from the row as it stood before the
+tap** — one extra read. Already complete means a correction inside a reopened
+form, so it stays open; incomplete means this may be the fourth answer. The
+keyboard cannot decide it, since an open form and a reopened one both draw four
+rows. That is `staysOpen`, exported, and a test replays the taps against it.
 
-`[Edit]` and `[Done]` say plainly which way the form should move. An **answer**
-is the case that has to be decided, and it is decided from the row **as it stood
-before the tap** — which costs one extra read per tap and is what the question
-is really about: already complete means a correction inside a reopened form, so
-it stays open; incomplete means this tap may be the fourth answer, and the
-fourth answer settles it. That is what lets a two-field correction happen
-without pressing `[Edit]` twice.
+**The two redraws a tap sets off agree by construction.** A tap writes, so it
+fires the redraw trigger as well as redrawing the message itself, and the
+trigger's lands second. Both decide from the same before-state — the trigger
+sends it as `before`, the webhook has already read it — so `answered(before)` and
+`staysOpen` are one expression and Telegram answers the second `message is not
+modified`. Decided any other way, a form reopened with `[Edit]` would shut under
+the correction being made in it. `agree.test.mjs` reads `postAnswer`'s body for
+that call, since nothing can drive it.
 
-That decision shipped wrong once — read off the keyboard's row count, which is
-true on every tap, so the message never settled and the summary, the `[Edit]`
-button and the read path were all unreachable. It is `staysOpen`, it is
-exported, and a test replays all four taps against it.
+**The write stays in the journal half.** A button's field maps to a column
+through the same four names as `Data.OWNED`, so no broker column is nameable from
+a tap. `tg_message_id` is on neither list, so nothing can point her at another
+message.
 
-**Which is why the two redraws a tap sets off agree by construction.** A tap
-writes, so it fires the redraw trigger as well as redrawing the message itself —
-two redraws, and the trigger's is the one that lands. They cannot be allowed to
-differ, so neither decides from the writer: both decide from that same
-before-state, which the trigger sends as `before` and the webhook has already
-read. `answered(before)` and `staysOpen` are one expression, the two messages
-come out identical, and Telegram answers the second `message is not modified`.
-Decide it any other way and the trigger's answer wins — so a form reopened with
-`[Edit]` would shut under the very correction being made in it. `agree.test.mjs`
-reads `postAnswer`'s body for that call, because nothing in the suite can drive
-the function itself.
+**The open trigger's guard is load-bearing**: `when (new.entry_time > now() -
+interval '1 hour')`. A live fill is seconds old; a restore, an `on conflict do
+update`, a `?force=1` backfill and the poller's re-upserts all fail it, so
+restoring from backup does not message you once per row. A row the email parser
+minted has no `entry_time`, `null > anything` is NULL, and it gets no message —
+there was no open event.
 
-**The write is the fourth writer and it stays in the journal half.** The webhook
-maps a button's field to a column through the same four names as `Data.OWNED`,
-so no broker column is nameable from a tap and there is nothing to arbitrate.
-`updated_at` moves, and the realtime subscription the app already holds
-re-renders any open tab for free. `tg_message_id` is on neither list, which is
-what keeps the column Gladys's own: no tap and no save can point her at another
-message, or take a trade's own away.
+**`followed_sl` and `followed_tp` answered at open record intent, not outcome.**
+The message arrives seconds after the fill, so those columns measure respect only
+where he goes back and corrects one; a missed correction reads as compliance and
+both bars lean upward. That is said where the question is asked, in
+`disciplineBars` where the figure is produced, and in Eugenia's prompt, since she
+is served both columns — `agree.test.mjs` reads the prompt for it.
 
-**The open trigger's guard is load-bearing.** `when (new.entry_time > now() -
-interval '1 hour')`. Without it, restoring from backup messages you once per row
-in the file. A live fill is seconds old; everything else fails the test — restored rows
-carry historical `entry_time`, an `on conflict do update` is not an insert at
-all, a `?force=1` backfill updates existing ids, and the poller's own re-upserts
-inside its six-hour write window are updates too. One message per trade, and the
-mechanism is Postgres's rather than a de-dupe check.
-
-A row the poller never reached — minted by the email parser, which sends no
-`entry_time` — gets no message, ever. `null > anything` is NULL, so the trigger
-stays silent. That is right: there was no open event to prompt from.
-
-**Answering `followed_sl` and `followed_tp` at open records intent, not
-outcome.** The message arrives seconds after the fill, long before either level
-is anywhere near. Those two columns only measure respect if the edit is actually
-made on the occasions it is needed — a missed edit reads as compliance, so those
-two bars bias upward and nothing in the data shows it. It is the same shape as
-the `null`-is-not-`no` rule: an answer nobody gave must not be counted as one.
-
-It is said at all three places the columns are used, not only here. The trigger
-that asks the question carries it; `disciplineBars` carries it, because that is
-where the figure is produced and a schema comment is not in front of anyone
-reading a renderer; and Eugenia's prompt carries it, because she is served both
-columns through `eugenia_trades` and could otherwise report a stop-discipline
-rate as a measurement. `agree.test.mjs` reads the prompt for it — deleting the
-paragraph breaks nothing else, and the rate she gives still reads as a fact.
-
-**Two failure modes are coded for rather than discovered.** A double tap sends
-the identical update twice and the second `editMessageText` returns `400 message
-is not modified` — the correct outcome, reported as an error, and treated as
-success. Any *other* edit failure falls back to a fresh message, which is also
-the answer if Telegram caps how long a bot may edit its own message. And every
-path answers 200: Telegram redelivers anything else, and a write that failed is
-better retried by the trader's own second tap than by a redelivery loop.
+**Two failure modes are coded for.** A double tap's second `editMessageText`
+returns `400 message is not modified` and is treated as success. Any other edit
+failure falls back to a fresh message. Every path answers 200, because Telegram
+redelivers anything else, and a failed write is better retried by his second tap.
 
 ---
 
