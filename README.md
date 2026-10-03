@@ -1092,331 +1092,176 @@ redelivers anything else, and a failed write is better retried by his second tap
 A daily XAU/USD briefing, a quieter look later in the morning, a look at any
 number that actually lands, a word when a position opens into one, and a
 conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
-second is the gold open, so the week's first briefing lands exactly as the
-market does. She says hello her own way — Spanish or English, whatever fits the
-hour and the market — inside the first paragraph, and goes straight to the
-number.
+gold open, so the week's first briefing lands with the market. She says hello
+her own way, Spanish or English, inside the first paragraph, and goes straight to
+the number. Reply and she answers — typed, by voice, or to a chart.
 
-Reply to her and she answers — by typing, by voice, or by sending a chart.
 `supabase/003_eugenia.sql` holds her memory and her read of the journal,
-`005_eugenia_senses.sql` her meters, her calendar and the trigger that tells her
+`005_eugenia_senses.sql` her meters, calendar and the trigger that tells her
 about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
-`strategy.ts` what he decided, `adherence.ts` the thirteen rules a row can answer;
-`index.ts` is the wiring.
+`strategy.ts` what he decided, `adherence.ts` the thirteen rules a row can
+answer; `index.ts` is the wiring.
 
 **The conversation and what she remembers are two tables, and stay two.**
-`eugenia_turns` is the conversation window, `eugenia_notes` is what she
-remembers, and `eugenia_trades` beside them is a view — a saved `select`, no
-rows of its own. The two tables stay two because nothing ever reads them together: notes go
-in at the top of a turn, turns at the end, with different windows, different
-shapes and different constraints. Merged, they would need a `kind` column, a
-nullable `role`, two constraints that each say "unless this is the other kind"
-and two partial indexes — more parts to hold one idea, not fewer.
+`eugenia_turns` is the conversation window, `eugenia_notes` what she remembers,
+and `eugenia_trades` a view beside them. Nothing reads the two tables together —
+notes go in at the top of a turn, turns at the end, with different windows,
+shapes and constraints — so merging them would add parts, not remove them.
 
-**She tidies her own memory at 22:00, every day.** Notes written mid-conversation
-are decided while she is busy answering, which is the worst moment to judge what
-will matter in November. The nightly pass is the only point at which she sees a
-whole day at once: it reads the last twenty-four hours of turns against the notes
-she is holding, writes what changed and will stay changed, and retires what is no
-longer true.
+**She tidies her own memory at 22:00, every day.** A note written mid-answer is
+decided at the worst moment; the nightly pass is the only point she sees a whole
+day. It reads the last twenty-four hours of turns against the notes she holds,
+writes what changed and will stay changed, and retires what is no longer true.
+Its default is almost nothing — most days deserve no note, and the visible
+window is twenty, so five mediocre notes push five good ones out. It is given
+what it judges with: the week's trades, since it is asked what he has started
+doing differently, and `search_memory`, since it is asked to supersede rather
+than add. No web search — a bookkeeping pass has nothing to research.
 
-**It is given what it is asked to judge with**, which for two of its
-instructions it was not. It is told to notice what he has started doing
-differently — a claim about his trading, judged from a transcript that on most
-days never mentions a trade — so the week's trades go in beside the day, the same
-read the briefing already makes. And it is told to prefer superseding to adding
-while holding twenty notes out of an archive it had no way to look at, so
-`search_memory` is in its tool set. Still no web search: a bookkeeping pass has
-nothing to research, and that argument has not moved.
+- **Its window takes the newest turns.** Two hundred is more than a real day; a
+  limit at the oldest end would distil the morning and drop the evening, where a
+  late instruction lives. `agree.test.mjs` refuses `order=id.asc` under a limit
+  on every read of her tables. Ordering by a clock is a different question — the
+  spine reads `at.asc` because the next release is the earliest.
+- **Twenty-four hours, no watermark**, since the window and the gap between runs
+  are the same length. A missed night loses that day's distillation and never
+  the day: the turns stay in the table, searchable.
+- **Nothing is sent and no turn is stored**; storing one would spend two of
+  tomorrow's twelve turns on bookkeeping. `?consolidate=1` runs it on demand.
+- **It records where the five channels stand**, at the one moment a rung could
+  have moved — the only meter on whether his understanding grows. A ladder that
+  stopped moving looks exactly like one that never had to.
+- **It moves the story and closes what resolved.** `set_thesis` rewrites the
+  running thesis — *moved*, since most nights it is the same story a day on —
+  and `close_loop` closes a thread that resolved. Both are nightly-only, like
+  `set_channel`: judgments across days.
+- **It retries at 23:00**, gated on whether tonight's pass already ran, read off
+  `eugenia_runs` (the pass stores no turn to read). A read failure counts as
+  *already run*, and a quiet day records itself, so the retry never re-runs a
+  pass that correctly decided nothing.
 
-**The window's limit takes the newest turns, not the oldest.** Two hundred is far
-more than a real day, so it bites only on a backfill or a very long day — and
-`order=id.asc&limit=200` read the *first* two hundred, which is a pass that
-distils the morning and drops the evening, where a late instruction lives. The
-select runs newest-first and is reversed for reading, exactly as `recent()` does.
-The two are indistinguishable from outside, which is why nothing caught it — so
-`agree.test.mjs` now refuses `order=id.asc` under a limit on *every* read of her
-own tables rather than on the two that have already gone wrong. Ordering by a
-clock is left alone: the event spine reads `at.asc` because the next release is
-the earliest one.
-
-**Its default is almost nothing.** Most days deserve no note — a conversation
-about today's data leaves nothing durable, and that is the normal outcome. The
-prompt pulls toward superseding rather than adding, because the visible window is
-twenty and five mediocre notes push five good ones out of it.
-
-Nothing is sent and no turn is stored: her reply is a line for the log, and
-storing it would spend two of tomorrow's twelve turns on bookkeeping she wrote to
-herself. `?consolidate=1` runs it on demand and is the only way to see what it
-does.
-
-**And it prints where the five channels stand, at the one moment a rung could
-just have moved.** Everything else here that cannot be seen is counted where it
-happens and for that exact reason — `ask()` logs tokens because the spend cap is
-a ceiling and not a meter, `postBriefing` logs characters because the length
-target lives past a model call. What she is *for* is that his understanding
-grows, the map is the instrument built to measure it, and nothing ever read that
-instrument back. A ladder that has stopped moving looks exactly like one that
-never had to.
-
-**A fixed twenty-four hours and no watermark anywhere**, because the window and
-the gap between runs are the same length. A missed night loses that day's
-distillation and never the day — the turns stay in the table and stay searchable,
-which is what makes a lossy pass safe to run unattended.
-
-**And it finally gets the retry the briefing has always had.** It was the one
-schedule here with no meter and no second chance: a briefing that dies is retried
-three times and apologised for, while a pass that died was silent, and its
-symptom is that her memory quietly stops growing — which looks exactly like a bot
-with nothing worth remembering. That is the same invisible-absence shape `unseen`
-and `moved_on` exist to defeat, arriving a third time in a different place.
-
-23:00 New York, still inside the same civil day, gated on whether tonight's pass
-already ran. The check reads `eugenia_runs` rather than a marker turn, because
-the pass deliberately stores no turn and giving it one would spend two of
-tomorrow's twelve on bookkeeping it wrote to itself — so the meter that had to
-exist anyway turns out to be exactly the record the retry needs. A read failure
-counts as *already run*, as `briefedToday`'s does: a second pass on a guess is
-worse than a skipped one. A quiet day records itself too, so the retry does not
-re-run a pass that correctly decided nothing.
-
-**It also moves the story and closes what resolved.** `set_thesis` rewrites the
-running thesis — *moved* rather than replaced, since most nights it should read
-as the same story one day further on — and `close_loop` closes a thread that
-actually resolved. Both are nightly-only for the reason `set_channel` is: they
-are judgments across days, and one exchange should not be able to redirect the
-week's story.
-
-**The schedule is decided in the function, not in cron.** pg_cron schedules in
-UTC, so any fixed expression is an hour wrong for half the year and needs
-editing twice a year forever. The job runs hourly and the function asks
-America/New_York for its own clock — `briefDue()` for the briefing, `pulseDue()`
-for the pulse, `consolidateDue()` for the nightly pass — and most of those calls
-find nothing due and spend nothing. Adding the fourth schedule needed no cron
-change at all, the job having always been `0 * * * *`, which is also how a
-schedule could be answered correctly and dispatched by nobody: `agree.test.mjs`
-reads `postScheduled` for a branch per answer `dueNow` can give. It
-is the same trade `marketOpen()` makes for the poller. A test walks every hour
-of a week and asserts the two never both fire, because one call cannot owe two
-answers.
+**The schedule is decided in the function, not in cron.** pg_cron is UTC, so a
+fixed expression is an hour wrong for half the year. The job runs hourly and the
+function asks America/New_York for its own clock — `briefDue()`, `pulseDue()`,
+`consolidateDue()` and their retries, composed by `dueNow` — and most calls find
+nothing due. Because the job is `0 * * * *`, a new schedule costs nothing in cron,
+which is also how one could be answered correctly and dispatched by nobody:
+`agree.test.mjs` reads `postScheduled` for a branch per answer. A test walks every
+hour of a week through the composition.
 
 ### The briefing is prose, with one list in it
 
-Five slots. What happened, in two or three sentences with the conclusion first;
+Five slots: what happened, in two or three sentences with the conclusion first;
 **why that matters for gold**, walked link by link, one sentence per step; the
-calendar; one context line; one thing worth noticing.
+calendar; one context line; one thing worth noticing. Numbered sections with
+headings are a report whatever the vocabulary inside them, which is why there
+are none.
 
-**The calendar is the one place the prose rule is deliberately relaxed** — a plain
-day label and one line per item, times in ET, one fact each. On a weekday it is
-that day's releases and nothing more; tomorrow's belong to tomorrow's briefing.
-Sunday's is the week, below. It reads better than
-the prose around it did, which is the whole argument for it. The relaxation is
-narrow and stated: the list holds times and names, `NAMED AND NOTHING MORE`, and
-no mechanism goes in it. That slot is where a second chain hides.
+**The calendar is the one place the prose rule is relaxed** — a plain day label
+and one line per item, times in ET, one fact each. On a weekday it is that day's
+releases. The list holds times and names, `NAMED AND NOTHING MORE`: no mechanism
+goes in it, because that slot is where a second chain hides.
 
-**On Sunday the briefing is about the week it opens** (`weekBlock`). It was the
-weekday briefing at another hour, and it could not see the week: its
-calendar reached Monday evening, and the week was filed by the nightly pass at
-22:00, five hours after the one briefing about it. So Sunday files the whole week
-first (`filedWeek`, the nightly pass's own filing, which holds every row the
-rolling window would) and is handed every release TradingView rates high for the
-seven days ahead, in place of the rolling calendar rather than beside it. High
-only, because seven days of medium is most of a page and none of it moves gold
-alone; medium still reaches each morning's own calendar. The first paragraph is
-where the story stands as the market opens, the teaching block walks the one
-release most likely to move it, and the calendar slot is the week, a day label
-per line. The week's list is not counted toward the length, in `SYSTEM` and in
-`CRITIC`. It is deliberately not a look back at his week: his trades get what
-they get every morning.
+**On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
+whole week first (`filedWeek`, the nightly pass's own filing) and is handed every
+release TradingView rates high for the seven days ahead, in place of the rolling
+calendar — high only, since seven days of medium is a page and none of it moves
+gold alone. The first paragraph is where the story stands as the market opens,
+the teaching block walks the release most likely to move it, and the calendar is
+the week, a day label per line. The week's list is not counted toward the
+length, in `SYSTEM` and in `CRITIC`.
 
-It used to be seven numbered sections with impact emoji, and plain-Englishing
-the words inside them did not help — **seven numbered sections with headings
-*are* a report**, whatever the vocabulary. The scaffolding was doing the
-talking.
+**Length is a rule, and what makes it safe is what sits beside it.** A ceiling
+with nothing saying what to lose cuts the teaching block, the longest thing on
+the page — and with channels at `unseen`, where §0 says build the term before
+using it, that is the part that matters. So the budget is 250–300 words, 400 at
+the outside, and beside it a fixed order of what comes out: numbers he cannot act
+on, then levels he can read off his own screen, then any market sentence that
+could have been written on any morning. **Never the teaching block and never an
+event.** Still over means the briefing is about too many things. Four thousand
+characters is the separate mechanical bound, Telegram's. `agree.test.mjs` reads
+both the writer's copy and the critic's for the count **and** the protection.
 
-**Length is a rule again, and what makes it safe is what sits beside it.** It was
-once a flat nine hundred to fourteen hundred characters, and with four of the
-five channels at `unseen` — where §0 says *build it before using it* — that
-number was the thing deciding she could not. A briefing has room for four
-paragraphs of market or three plus a term built from the ground up, and a single
-ceiling silently chose the first every morning.
+**The writing rules bound a sentence, not only a word.** Plain words alone still
+read as hard when one sentence carries three ideas. The rules, in `WRITING`:
 
-The lesson was not *no ceiling*. It was that **a ceiling with nothing saying what
-to lose cuts the teaching block**, because the teaching block is the longest
-thing on the page. So the budget is 250–300 words, 400 at the outside, and beside
-it a fixed order of what comes out: numbers he cannot act on, then levels he can
-read off his own screen, then any sentence in the market read that could have
-been written on any morning. **Never the teaching block and never an event.**
-Still over means the briefing is about too many things, and the answer is to
-decide which one rather than to shave the chain. Four thousand characters remains
-the separate mechanical bound — it is where Telegram stops delivering one
-message.
-
-`agree.test.mjs` reads both the writer's copy and the critic's for the count
-**and** for the protection, because a copy holding the count alone is exactly the
-arrangement that stopped her teaching the first time.
-
-**And what was missing was a bound on a sentence, not on a word.** Every rule
-here governed vocabulary — *the gap between rates and inflation* before *real
-yields*, the short name only once the long one has been said — and nothing
-governed how many ideas one sentence could carry. So a briefing built entirely of
-plain words still read as hard, and no rule was being broken. The rules now:
-
-- **One idea per sentence.** Two `because` clauses or two `and` clauses make two
-  sentences. Twenty words is the ceiling.
-- **No em-dash aside, no stacked subordinate clause.** Short beats elegant.
-- **No punchlines.** A line that is satisfying to read and takes a second to
-  decode is a line he reads twice, and he will not read it twice.
-- **No term used bare, and the test is whether the name explains itself.** *The
-  leftover* tells a reader nothing; *the genuine part* tells them everything. The
-  old rule banned inventing a name at all — and the approved draft it was written
-  from leans on *the genuine part* three times, so read literally the prompt
-  forbade the register it existed to produce. The case it actually fails on is
-  not an invented word: it is a **market term used bare**. *"Oil has handed back
-  most of the war premium"* is four plain words and one that does all the damage.
-  Two ways out and no third — plain words instead, or the term with its own
-  sentence saying what it is. Real names he will meet elsewhere stay: dot plot,
-  retail sales, jobless claims, the ten-year.
-- **Use the word you would text.** *Dearer fuel* fails that; *expensive fuel*
-  passes. So does *makes gold a harder sell* over *stiffer competition for gold*.
+- **One idea per sentence**, twenty words at most.
+- **No em-dash aside, no stacked subordinate clause.**
+- **No punchlines** — a line that takes a second to decode is a line he reads
+  twice, and he will not.
+- **No term used bare; a name must explain itself.** *The genuine part* tells a
+  reader everything; *the leftover* nothing. The usual failure is a **market
+  term used bare** — *"Oil has handed back most of the war premium"*. Plain
+  words instead, or the term with its own sentence saying what it is. Real names
+  he will meet elsewhere stay: dot plot, retail sales, jobless claims, the
+  ten-year.
+- **Use the word you would text** — *expensive fuel*, not *dearer fuel*; *a
+  harder sell*, not *stiffer competition*.
 - **No figures of speech.** *The relief in gold has been contained rather than
-  clean* obeys every countable rule and still has to be decoded; *gold has only
-  risen a little* does not. The rule carries that example and four more from
-  her own messages, because a worked example moved her register where a
-  description did not.
-- **A paragraph is three or four sentences.** Sixteen easy sentences in one block
-  is still a wall. The critic COUNTS this one as its last step, and every
-  em-dash with it, rather than reading for it among the rest: three briefings in
-  a row went through it with six-sentence paragraphs while the verdict row read
-  `revised` every time. It worked: the next briefing had none over four. `TRIM`
-  counts the same way now, as its last step too, because the short messages that
-  week still carried paragraphs of five to seven.
-- **Four to six numbers in the whole briefing**, and a number that cannot be said
-  to *mean* something is one of the ones to cut. Fourteen true figures is a page
-  he skims; four he remembers by lunch.
+  clean* obeys every countable rule and still has to be decoded.
+- **A paragraph is three or four sentences.** Sixteen easy sentences in one
+  block is a wall. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
+  their last step rather than reading for it among the rest.
+- **A number earns its place** by meaning something he can use; the briefing
+  holds four to six.
 
-**The countable rules landed and the judgement rules did not, which is why
-`WRITING` carries a worked example.** The first briefing under these rules had
-twenty prose sentences, none over the twenty-word cap, the longest eighteen
-words, no em-dash asides — counted, not eyeballed. The same message said *war
-premium*, *dearer fuel*, *the basket* and *measured inflation*. A gate can count
-words; it cannot adjudicate *is this the plainest word* from an adjective. *Use
-the plainest available word* had been in the rules for days and produced *dearer
-fuel lifts measured inflation twice over*.
+**The judgement rules carry worked examples.** The countable rules landed at once
+— a first briefing with no sentence over twenty words — while the same message
+said *war premium*, *dearer fuel* and *measured inflation*. A gate can count; it
+cannot adjudicate *the plainest word* from an adjective, and a model matches an
+example where it ignores a description. The examples live in `WRITING`, so the
+writer, `CRITIC` and `TRIM` all see them.
 
-So the rules end with a passage in the target register rather than more
-adjectives about it — a model matches an example where it ignores a description.
-It lives in `WRITING`, so the writer, `CRITIC` and `TRIM` are all shown the same
-one.
+**She answers in English whatever he wrote in.** He is a native Spanish speaker
+building an English market vocabulary, and the same idea in Spanish hands it to
+him in words he cannot reuse. **A word of Spanish now and then, though** — a
+greeting, an aside — never a market term, a number or the sentence carrying the
+mechanism; most messages have none. Both rules live in `WRITING`, so the gates
+that read it do not strip the Spanish back out. And it is said as a native says
+it: `WRITING` asks for the accents and the ñ, since the voice stresses off the
+spelling, and `TTS_STYLE` asks for native Latin American Spanish at speed, as
+code-switching in both directions, so no Spanish accent leaks onto the English.
 
-**She answers in English whatever he wrote in, and that is the opposite of the
-instinct.** He is a native Spanish speaker and writes to her in it, or sends a
-voice note in it, and a model's reflex is to mirror the language it was given.
-The markets he reads are in English and the vocabulary he is building is
-English, so the same idea in Spanish hands it to him in words he cannot reuse
-anywhere he will meet it again.
+**She teaches, and that is a rule about depth rather than length.** The day's one
+thing is stated as a chain — *hot inflation, so the Fed waits, so the gap between
+rates and inflation widens, so gold is a harder sell* — because a cause named with
+no chain under it is something to memorise rather than understand. **One chain
+per briefing**: every scheduled thing still gets named, but only one gets its
+mechanism walked. A term explained this week is **used** the next time rather
+than redefined; a simplification is signposted in a clause (*that is the clean
+version*); and what he has shown he understands is recorded, since it is the
+only thing that says what **not** to explain.
 
-**A word of Spanish now and then, though, because she is not a terminal.** A
-greeting, an aside, something said with a shrug — never a market term, never a
-number, never the sentence carrying the mechanism, because those are the words
-he is building. Most messages have none at all: it is seasoning, and the way it
-fails is trying. Both rules live in `WRITING` rather than in `SYSTEM`, and that
-placement is the whole of what makes the second one survive — `CRITIC` and
-`TRIM` read the same block, and a gate that had only been told to prefer the
-plainest word would take every Spanish word back out, last, every morning.
+**One chain is exempt from the rung, the one under everything else.** Gold pays
+no interest, so it competes with what a bond pays once inflation is taken out.
+`PITCH` says a channel at `owns` gets its term bare — right for every term but
+this, which sits under nearly every briefing. Writer and critic are both told,
+the critic especially, since it decides what counts as a repetition.
 
-**And the Spanish is said as a native says it, which takes two halves.** The
-voice can only pronounce what is written, so `WRITING` asks for the accents and
-the ñ — its stress comes off the spelling. `TTS_STYLE` then asks for native
-Latin American Spanish at speed: *not read as English letters* ruled out the
-worst reading and asked for nothing better, and a correct, careful Spanish word
-in an American mouth is still the gringo version. Slowing down to get it right
-is the tell itself, and a native speaker is quickest in their own language. It
-is asked for as code-switching in both directions, because the other failure is
-a Spanish accent leaking onto the English around it.
-
-**One chain is exempt from the rung, and it is the one under everything else.**
-Gold pays no interest, so it competes with what a bond pays once inflation is
-taken out rather than with the headline rate. `PITCH` says a channel at `owns`
-gets its term bare, which is right for every term but this one: it sits under
-nearly every briefing written, and a reader who has lost it has lost all of them.
-Both the writer and the critic are told the map does not apply to it — the critic
-especially, since it is the half that decides a mechanism it can see inside one
-briefing is a repetition, which is the failure that once cut the build-up `PITCH`
-had just required.
-
-**She teaches, and that is a rule about depth rather than length.** He is
-learning macro deliberately, so the paragraph on the day's one thing states its
-chain link by link — *hot inflation, so the Fed waits, so the gap between rates
-and inflation widens, so gold has stiffer competition* — because a cause named
-with no chain under it is something to memorise rather than understand. Depth is
-not word count — a longer briefing that names a cause and skips its chain has
-taught nothing — but where the chain genuinely costs words, it gets them.
-
-Three rules keep that from turning into a lecture. A term explained this week is
-**used** the next time rather than redefined, since the second exposure is what
-turns vocabulary into something he thinks with. A simplification is signposted
-in a clause — *that is the clean version* — so he can tell a compressed story
-from a complete one. And what he has shown he understands is recorded as a note,
-because it is the only thing that says what **not** to explain; the five
-channels double as the map of which he reasons with unaided and which he has
-never once used himself.
-
-The single closing question is sometimes one he has to reason to answer rather
-than agree with. His answer is evidence about what he actually has, which no
-amount of explaining produces.
-
-**She remembers what she told you yesterday.** The briefing reads the last
-twelve turns, so it opens with how yesterday's print landed rather than from
-nothing. It did not until now — it wrote to `eugenia_turns` and never read back,
-so every morning started blank and she could not know she had explained the same
-term three times that week. A briefing that could have been written on any
-morning is a failure.
-
-The stored turn is a marker (`[weekday briefing]`), not the text that was sent:
-the memory and the week's trades are rebuilt fresh each morning, and storing
-them would resend a stale copy as history for the next six briefings.
+**She remembers yesterday.** The briefing reads the last twelve turns, so it
+opens with how yesterday's print landed rather than from nothing. What is stored
+is a marker (`[weekday briefing]`) as his turn and the briefing as hers — never
+the augmented prompt: the notes and the week's trades are rebuilt each morning,
+and storing them would resend a stale copy as history for six briefings.
 
 **She sees your week without being asked.** The last seven New York days of
-trades go in with the briefing, so *"you have not traded since Tuesday"* costs
-no tool round. Mentioned only when there is something real to say, in a clause.
-The one verdict that earns a line in the morning is a closed trade since the last
-briefing that broke one of your rules or repeated a mistake she has seen before —
-the fact, her verdict and the lesson in three short sentences, saying so if it is
-not the first time, then back to the market. Most mornings the right amount to say
-about your trading is nothing.
-
-**Which rules broke is computed, not read off the rows** (`breachesBlock`). It was
-"yesterday", and on a Monday yesterday is Sunday, so a rule Friday's trades broke
-was never raised unless you asked. The window is now every closed trade since the
-last briefing that went out — Sunday's evening briefing covers Friday — plus any
-trade that CLOSED since then, which is a Friday hold closed on Monday, R-15's
-whole case, open on both briefings either side of the weekend. The rules are
-`check_rules`' own evaluation over that set (`readRules`, one reader for both),
-so she is handed the failures rather than working them out by eye, and told so
-when nothing broke. Closed trades only: a verdict on an open one is a hard
-prohibition. Narrowing the set can lose a day-level failure on a partial day and
-cannot invent one. Your commitments are still hers to hold the trades against.
+trades go in with the briefing, mentioned only when there is something real to
+say. **Which rules broke is computed, not read off the rows** (`breachesBlock`):
+every closed trade since the last briefing that went out — so Sunday's covers
+Friday — plus any trade that CLOSED since then, R-15's Friday hold. The rules are
+`check_rules`' own evaluation (`readRules`, one reader for both), so she is
+handed the failures and told when nothing broke. A breach gets the fact, her
+verdict and the lesson in three short sentences, then back to the market. Closed
+trades only: a verdict on an open one is a hard prohibition.
 
 ### The pulse
 
-Weekdays at 10:00 ET, past the 08:30 data window and into the session. **Its
-default answer is silence:** she replies with the single word `NOTHING` and the
-function sends nothing at all, storing nothing either — twelve turns is the
-whole window and a week of empty pairs would push the morning's briefing out of
-it, which is the one thing a follow-up needs.
-
-One extra call a day rather than a check every hour. An hourly watch is
-twenty-three model calls with web search behind them, which is not worth a
-feature whose right answer is usually "nothing happened" — so this is **not
-event-driven**, and calling it that would be a lie. It is a second scheduled
-look that usually says nothing. A second hour is one line if the first proves
-useful.
-
-`isSilent()` matches the bare word and nothing else, so *"Nothing much has
-changed, except gold is up forty"* is news wearing the word and gets sent. The
-failure direction is deliberate: a swallowed message is invisible, an extra one
-is merely extra.
+Weekdays at 10:00 ET, past the 08:30 data window. **Its default answer is
+silence:** she replies with the single word `NOTHING`, and nothing is sent or
+stored — empty pairs would push the briefing out of the twelve-turn window. It is
+a second scheduled look, not an event-driven one. `isSilent()` matches the bare
+word only, so *"Nothing much has changed, except gold is up forty"* is sent: a
+swallowed message is invisible, an extra one merely extra.
 
 ### The event spine — the first thing here that is not a clock
 
