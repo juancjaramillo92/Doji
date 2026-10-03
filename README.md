@@ -1557,264 +1557,126 @@ draft goes.
 
 ### Hearing him, and seeing what he sees
 
-`if (!msg.text) return` silently dropped the two things a trader at a desk is
-most likely to send.
+**A voice note** reaches her as text marked `[voice note]`, and she reads it as
+him talking rather than writing — it will ramble, and it is likely to be about
+how a trade felt, which is when she slows down and asks one thing. The Messages
+API takes no audio and Telegram does not transcribe for bots, so `STT_URL` and
+`STT_KEY` are optional secrets written against the `/audio/transcriptions`
+shape. **Unset is a first-class state**: she says she cannot hear it and nothing
+else is affected, which is why they are not in the boot guard — and `agree`
+makes that exemption cost something: an optional secret must be guarded where
+it is used.
 
-**A voice note** now reaches her as text marked `[voice note]`, and the prompt
-tells her to read it as him talking rather than writing — it will ramble, and it
-is likely to be about how a trade felt, which is exactly when she slows down and
-asks one thing. This is the one capability here that needs something the system
-does not otherwise have: the Messages API takes text and images and not audio,
-and Telegram does not transcribe for bots. `STT_URL` and `STT_KEY` are therefore
-optional secrets, written against the `/audio/transcriptions` shape so the
-provider is configuration. **Unset is a first-class state** — she says she cannot
-hear it, and nothing else is affected, which is why they are deliberately not in
-the boot guard beside the secrets whose absence stops her working. `agree`
-enforces the exemption rather than waving it through: an optional secret must be
-guarded where it is used.
+**When a voice note produces no words, she says which of four things
+happened.** A rejected key, a wrong URL, an unsupported format and unclear audio
+each have a line in `VOICE_TROUBLE` naming whose problem it is, and none asks him
+to repeat himself for a fault that is not his. The audio goes to the vendor with
+**both** its extension and its `audio/ogg` type, since providers differ in which
+they read.
 
-**Everything she writes is spoken as well as written**, and that reversed a rule
-that was sound. It was *she answers in the channel he used* — a voice note
-answered aloud, a typed line in text, no setting and no stored preference,
-because he speaks when his hands are busy and the point is over the moment he has
-to look at a phone.
-
-What that rule actually decided was a **reply**. Everything she *starts* was
-silent as a side effect of it rather than as a decision, so the morning briefing
-— the one message he wanted read to him — was the one the rule could never reach.
-He decided it the other way, and the cost is about a dollar a month.
-
-**Six paths speak**: both briefings, the pulse, the release look, the trade event
-and the move look, plus the reply. `say()` keeps three things deliberately — the
-`/notes` audit, which is a rendered table and unlistenable; the apologies, which
-are failure notices rather than messages she wrote; and the short operational
-lines.
-
-**The voice note is the message, and the text is what happens when it is not.**
-Sending both worked, and both arrived — two notifications and two bubbles for one
-thing she said. He asked for the voice note alone.
-
-The objection to audio-only was real, and the fallback is the answer to it rather
-than a climb-down. An unset key, a vendor that refused, a format Telegram will
-not render: audio alone turns each of those into a **missing** message, which is
-the failure shape this whole system is built against. So `say()` is still
-reachable and fires only when the audio did not land — in full rather than in
-part, because a message he heard three quarters of is worse than either.
-
-**What is stored is untouched.** `remember()` writes the transcript whatever
-happened on the wire, so her memory, `search_memory` and the nightly pass read
-exactly what they always did. The briefing's keyboard rides on the last voice
-note, since there is no text message under it to carry one.
-
-`fold.test.mjs` **drives** the fallback rather than reading it — the one property
-a source read cannot settle. With no TTS key every `speak()` answers false, which
-is exactly the shape of a vendor that refused, so the real sequence replays and
-the text must still go out.
-
-**A vendor that never answers is the other shape, and it cost a briefing.** On
-2 October the briefing was stored at 08:02:23. The speech request then never
-answered, and at 08:06:40, four hundred seconds after boot, the platform shut
-the worker down. A worker that is killed runs no catch. So there was no text, no
-row, no apology and no retry, because the marker had already gone down.
-
-**So the briefing is written in one worker and spoken in another.** Writing and
-speaking shared one four-hundred-second clock, and a slow morning in either was
-taken out of the other. `postBriefing` writes, runs the critic and stores the
-briefing, then opens `?speak=weekday` (or `sunday`) on its own function and
-ends. That door answers before it works, like every scheduled door, and starts
-`postSpeak` on a clock of its own. `postSpeak` finds today's stored briefing by
-its marker, pairs it with its text by the instant both were written (one INSERT,
-one `created_at`), and speaks it. If the second worker will not start, which is
-any non-2xx from the door such as a refused boot, `postBriefing` speaks the
-briefing itself as it did before there were two. Losing the second worker must
-never be losing the briefing.
-
-**Every request in `speak()` carries a budget, and a part that fails gets a
-second attempt.** The budget covers the whole message, not each part, since a
-per-request limit multiplies by the parts.
-
-- **`SPEAK_MS`, 150 seconds,** for the paths that write and speak in one worker,
-  which is everything but the briefing. That is the slowest speaking that ever
-  landed (a Sunday at 155s, storing included).
-- **`SPEAK_WORKER_MS`, 330 seconds,** for the speaking worker, which has nothing
-  else to do.
-- **`ATTEMPT_MS`, 150 seconds per attempt.** A vendor that stalls has stalled on
-  one request, and the next is a fresh connection. So on the speaking worker a
-  stall costs one attempt rather than the voice. On `SPEAK_MS` a stalled first
-  attempt has spent the budget, so only a quick refusal is tried twice there.
-
-A part that has not landed when the budget runs out has failed like any other,
-and the full text goes. `fold.test.mjs` drives both a vendor that never settles
-and one that refuses once and then answers, on a fresh instance of the module
-read with a key.
-
-**`?speak=weekday` is also a repair.** A briefing that was stored and never
-reached him is sent again by opening it by hand, the same way the cron secret
-opens any door. It speaks today's only, since yesterday's would arrive as this
-morning's.
-
-That ordering lives in **`sayAloud`** rather than in six copies of two lines —
-five of which nothing would be guarding, and the failure of getting it backwards
-is that the audio arrives and the text does not. A test reads the order inside it
-*and* counts the six call sites, because a path that drops back to `say()` still
-reaches him and is simply silent.
-
-**There was a cap, and there is not one now.** It was 700 characters — fifty
-seconds — on the reasoning that past that a voice note stops being a reply and
-becomes a recording to scrub through. That is right about a reply and fatal
-here: a briefing is 250–400 words by its own rule, so it would have been over
-the cap **every single morning** and would have arrived silently, correctly,
-forever.
-
-Raising it to 4,000 fixed that morning and left the shape of the mistake in
-place — a cap decides that past some length a message is not worth hearing, and
-**nothing she writes should be shortened to fit a voice note or go unspoken for
-being long**. So a long message becomes *several* voice notes, exactly as it
-already becomes several text messages, split by the same `chunk()` with the same
-paragraph preference so each part is a whole thought. The only number left is
-what the speech vendor accepts in one request, and it is a chunk size rather
-than a gate. The prompt is told no length at all.
-
-**The markdown is stripped on the way to the vendor.** She is told plain text —
-Telegram is sent no parse mode, so a bold label arrives as asterisks — but the
-text is model-written, and the calendar slot is a list where a model reaches for
-one anyway. `**Today:**` read aloud is a gamble on what an asterisk becomes, so
-the boundary takes off what the instruction only asks for.
-
-`TTS_URL` and `TTS_KEY` are optional on the same terms as `STT_*`; `TTS_VOICE`
-and `TTS_MODEL` are environment with defaults, unlike the pinned embedding model,
-because nothing is stored — a change alters one message rather than what is
-comparable to what, and which voice she has is his to change without a deploy.
-**The two are coupled, and the vendor decides how**: the older `tts-1` serves a
-smaller set of voices and takes no delivery instruction, so overriding the model
-alone can name a voice it does not have. That is a 400 costing the audio and not
-the answer, and it is why both defaults name the current model's own recommended
-pairing rather than the safest-looking one.
-
-**How it is read is pinned, where which voice reads it is not.** `TTS_STYLE`
-carries it, because the prompt spends most of its length keeping her off signals
-and verdicts and a breathless delivery of a deliberately unexcited paragraph
-contradicts all of it. The register has to survive the trip through audio. Voice
-is taste; delivery is the product.
-
-**It asked for the register and not for the delivery, and that is why it read as
-a machine.** It was two sentences and both of them said what *not* to do — not
-breathless, not selling. Given only prohibitions the model returns the null
-reading: every sentence taking the same length of time, every sentence shaped the
-same way, and no beat at a paragraph break. That is what a person means by
-robotic, and none of it was ruled out. It says the positive half now — and it is
-the only dial there is. The defaults above already name the newest model the
-speech endpoint serves and one of the two voices the vendor recommends for it,
-so a better read was never going to come from moving either.
-
-**That first repair asked for a per-sentence shape, over text that is sixteen
-near-identical sentences.** It said *sentences finish downward*, which is right
-about one sentence and is the metronome itself against the register `WRITING`
-produces — measured over the approved example: sixteen sentences, mean 9.2
-words, fourteen of them between 5 and 13. Sixteen identical falls in a row, each
-resetting to the same place to start the next. The rule was aimed at news-reader
-uplift and it bought that at the price of the thing it was written to fix.
-
-**So the arc moved up a level, to the paragraph**, which is the one rhythm
-variable still free. The words cannot carry it: sentence length is fixed by
-rules that exist for the eye, and those rules are staying — he read a draft
-under them, and they are why the page works. What is left is where the pitch
-sits across four sentences and how long she rests between them, and neither was
-being asked for. Only the last sentence of a paragraph fully lands now; the ones
-before it stay open, which is what a person does when something is still coming.
-
-**The last line of it is pronunciation, and it is there on real text rather than
-on a guess.** A calendar line is `08:30 ET <name>`, the trade event reads R-11
-and R-14/R-19 back at him, and a level is a comma'd figure — read as glyphs,
-those are three stumbles in the middle of a fluent paragraph. They are said in
-the instruction rather than rewritten on the way out, because the text `remember`
-stores has to stay the text he can read: a rewriter would either touch the
-transcript or become a second copy of it.
-
-**The tempo is his ear rather than a default.** At 1.0 he was playing every
-voice note at 1.5x in Telegram and calling 1.5 a shade fast, so `TTS_SPEED` is
-1.3 and it is read off what he was already doing. It sits at generation rather
-than in a player setting he has to remember on each message, and it is pinned
-where `TTS_VOICE` is not, for `TTS_STYLE`'s reason: how fast she is heard is the
-product.
-
-**It may also be ignored, and that has to be known before a result here is
-read.** `speed` is documented for this endpoint across 0.25–4.0, and
-`gpt-4o-mini-tts` has been reported to disregard it where `tts-1` honours it —
-no error, no header, audio at 1.0 and a constant in the file claiming otherwise.
-Nothing in the suite can see it, because the suite never calls the vendor. If
-the tempo is unchanged, that is the first thing to suspect, and the fallback is
-to ask for pace in `TTS_STYLE` instead.
-
-**The hello is hers, and no longer scripted.** It was a fixed `Buenos días
-jefesito.` put in front of every briefing by code, and it was the line that
-sounded worst: the same words every morning, with a tempo and pauses that three
-rounds of punctuation and voice instructions never fixed. She now opens with a
-greeting of her own, in one breath, inside the first paragraph. On a line of its
-own a hello is read aloud as a paragraph, with every rule about a paragraph's
-closing breath landing on it, which is how the old one dragged. `CRITIC` runs
-last, so it is told the hello is hers and stays as written, that the
-first-sentence test applies to the sentence after it, and that a split never
-leaves it on its own. A test reads the call site, so nothing gets put back in
-front of the briefing.
-
-**The audio is requested as OGG/Opus, and this is the one thing on the path that
-would fail quietly.** The vendor's default is mp3, and mp3 *works* — the request
-succeeds, Telegram accepts the file, and it arrives as an **attachment**: no
-waveform, no speed control, nothing you can play with a phone at your ear.
-Nothing errors and nothing logs. A test reads the request for `opus` and the
-upload for both its `audio/ogg` type and its `.ogg` filename.
-
-**Their policy requires the listener to know the voice is synthetic.** Here the
-only listener is the person who built the bot, so the disclosure is the context —
-but a voice note forwarded to anyone else carries no such context, and that is
-worth knowing before forwarding one.
-
-**A chart** she can now see, and the prohibitions do not move an inch because she
-can. She may describe what is on it and take it as context; on a trade not yet
-taken she may not say whether a setup is valid or a level will hold, and the
-prompt says so in those words, because a picture is the most tempting place in
-this system to give a signal. A chart of a trade that has closed she judges the
+**A chart** she can see, and the prohibitions do not move because she can. She
+may describe it and take it as context; on a trade not yet taken she may not say
+whether a setup is valid or a level will hold — a picture is the most tempting
+place in this system to give a signal. A chart of a closed trade she judges the
 way she judges the journal.
 
-**And when it produces no words, she says which of four things happened.** They
-were one sentence: a rejected key, a wrong URL, an unsupported format and
-genuinely unclear audio all reached him as *"I could not make that out — send it
-again"*, so the one failure he cannot fix by speaking more clearly was the one he
-was being told to speak more clearly for. `VOICE_TROUBLE` is four lines, each
-naming whose problem it is, and a test asserts none of them asks him to repeat
-himself for a fault that is not his. It is the same rule `readTrades` is written
-on, one layer up: an empty answer is only an answer when something was read.
+Neither is stored as sent: the transcript is kept, the image is not — a megabyte
+of base64 would be resent as history for six exchanges. `stamped` appends the
+New York time as a trailing text block, since concatenating against an array
+gives `[object Object]` on exactly the turns carrying most context.
 
-The audio is sent with **both** its filename extension and its content type,
-because Telegram supplies both and the services that speak this API shape differ
-in which one they detect the format from. Sending only one is a bet on which
-provider is behind `STT_URL`.
+**Everything she writes is spoken.** The old rule — answer in the channel he
+used — only ever decided a reply, so the briefing, the one message he wanted read
+to him, was never spoken. He decided it the other way. Seven call sites speak:
+the briefing twice (its speaking worker, and its own fallback), the pulse, the
+release look, the trade event, the move look and the reply. `say()` keeps the
+`/notes` audit (a table, unlistenable), the apologies (failure notices, not her
+words) and the short operational lines.
 
-Neither is stored as sent. The transcript is kept and the image is not — a chart
-in `eugenia_turns` would be a megabyte of base64 resent as history for the next
-six exchanges. And the clock reaches a picture turn: `stamped` appends the New
-York time as a trailing text block rather than concatenating against an array,
-which would have produced `[object Object]` on exactly the turns carrying the
-most context.
+**The voice note is the message, and the text is the fallback.** Both together
+were two notifications for one thing she said. But an unset key, a refusing
+vendor or a format Telegram will not render would make audio alone a
+**missing** message, so `say()` fires whenever the audio did not land — in full,
+since three quarters heard is worse than either. That ordering lives once, in
+**`sayAloud`**, and a test reads it and counts the call sites; `fold.test.mjs`
+**drives** it, since with no TTS key every `speak()` answers false, exactly as a
+refusing vendor does. **What is stored is untouched**: `remember()` writes the
+transcript whatever happened on the wire. The briefing's keyboard rides on the
+last voice note.
+
+**There is no length cap.** A briefing is 250–400 words by its own rule, and a
+cap decides that past some length a message is not worth hearing. A long message
+becomes *several* voice notes, split by `chunk()` with its paragraph preference
+so each part is a whole thought; the only number is what the vendor accepts per
+request. The prompt is told no length.
+
+**The briefing is written in one worker and spoken in another.** A speech request
+that never answered once held the worker until the platform killed it at four
+hundred seconds — no catch ran, so no text, no row, no apology. So
+`postBriefing` writes, runs the critic and stores the briefing, then opens
+`?speak=weekday` (or `sunday`) on its own function, which answers before it
+works and runs `postSpeak` on a clock of its own. `postSpeak` finds today's
+briefing by its marker, pairs it with its text by the instant both were written,
+and speaks it. If the second worker will not start, `postBriefing` speaks it
+itself. Opened by hand, `?speak=weekday` resends a stored briefing that never
+reached him — today's only.
+
+**Every request in `speak()` carries a budget, and a failed part gets a second
+attempt.** The budget covers the whole message: **`SPEAK_MS`**, 150 seconds, on
+paths that write and speak in one worker; **`SPEAK_WORKER_MS`**, 330 seconds, on
+the speaking worker. **`ATTEMPT_MS`** bounds each attempt at 150 seconds — a
+stall is one request, the next a fresh connection — so on the speaking worker a
+stall costs an attempt rather than the voice. A part that has not landed when
+the budget runs out fails like any other, and the full text goes. The Telegram
+upload carries the budget too.
+
+**The markdown is stripped on the way to the vendor.** No parse mode is sent, so
+she is asked for plain text, but the calendar slot is where a model writes a
+bold label anyway, and `**Today:**` read aloud is a gamble.
+
+**The audio is requested as OGG/Opus — the one thing here that fails quietly.**
+The vendor's default mp3 *works* and arrives as an **attachment**: no waveform, no
+speed control, nothing to play at your ear. A test reads `speak()` for `opus`,
+`audio/ogg` and the `.ogg` filename.
+
+**Which voice is taste; how it is read is the product.** `TTS_URL` and `TTS_KEY`
+are optional like `STT_*`. `TTS_VOICE` and `TTS_MODEL` are environment with
+defaults — nothing is stored, so a change alters one message — but they are
+**coupled**: `tts-1` serves fewer voices and takes no delivery instruction, so
+overriding the model alone can name a voice it lacks, a 400 costing the audio.
+`TTS_STYLE` is pinned, because a breathless delivery of a deliberately unexcited
+paragraph contradicts the whole prompt. It asks for the delivery, not only what
+to avoid — given only prohibitions the model reads every sentence the same
+length and shape. The arc is set at the **paragraph**, since the writing rules
+fix sentence length and sixteen identical falls are the metronome itself: only
+a paragraph's last sentence fully lands. Its last line is pronunciation — `08:30
+ET`, R-11, R-14/R-19, comma'd levels — said in the instruction rather than
+rewritten, so the stored text stays the text he reads.
+
+**`TTS_SPEED` is 1.3**, off what he was already doing: playing every note at 1.5x
+and calling it a shade fast. It is pinned for `TTS_STYLE`'s reason. `speed` has
+been reported ignored by `gpt-4o-mini-tts` — no error, audio at 1.0 — and nothing
+here calls the vendor to see it, so if the tempo is unchanged that is the first
+suspect, with pace in `TTS_STYLE` as the fallback.
+
+**The hello is hers.** A greeting prepended in code was the same words every
+morning with a tempo no punctuation fixed. She now greets in one breath inside
+the first paragraph — on a line of its own a hello is read as a paragraph — and
+`CRITIC` is told it stays, that the first-sentence test applies after it, and
+that no split strands it. A test reads the call site.
+
+The vendor's policy requires the listener to know the voice is synthetic. Here
+the listener built the bot; a forwarded note carries no such context.
 
 ### Whether it landed
 
-An instruction note is the only correction channel he has, and it is a good one —
-but it fires only when something annoys him enough to type. On every ordinary
-morning there was no signal at all, so the nightly pass judged her own output
-with no evidence about how any of it went.
-
-Two buttons ride under the briefing — the mechanism Gladys has used since she
-shipped — and the nightly pass reads the last two days of them. `callback_data`
-stays far under Telegram's 64 bytes for the same reason hers does. **It is not a
-score and the prompt forbids treating it as one**: a bot optimising a thumbs-up
-average writes briefings that flatter rather than teach, and what he *told* her
-always outranks what he tapped.
-
-Registering the webhook for `["message"]` alone means the taps are never
-delivered, the button spins, and nothing reports it — `allowed_updates` must name
-`callback_query` too.
+An instruction note is the only correction channel he has, and it fires only
+when something annoys him enough to type. So two buttons ride under the briefing
+— Gladys's mechanism — and the nightly pass reads the last two days of them.
+**It is not a score and the prompt forbids treating it as one**: a bot optimising
+a thumbs-up average flatters rather than teaches, and what he *told* her always
+outranks what he tapped. Registering the webhook for `["message"]` alone means
+the taps are never delivered — `allowed_updates` must name `callback_query` too.
 
 ### What she remembers
 
