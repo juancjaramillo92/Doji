@@ -1866,22 +1866,13 @@ const Dates = {
     ny:     { tz: 'America/New_York',  open: 8, close: 17 }
   },
 
-  // hourCycle rather than hour12, which leaves the cycle to the locale and can
-  // resolve to h24 — midnight arriving as 24. It never bit here: 24 fails
-  // `h < close` exactly as 0 fails `h >= open`. It bit through nyParts, whose
-  // hour IS compared against 17. Stating h23 removes the case in both rather
-  // than correcting for it in each, which is what _shared/edge.ts and Eugenia's
-  // clock do — one answer across all four runtimes.
+  // h23 rather than hour12, which can resolve to h24 and make midnight 24 — as
+  // _shared/edge.ts and Eugenia's clock state it. It is also this file's browser
+  // floor (Safari 14): an engine without hourCycle ignores it and falls back to
+  // h12, and every session label and 17:00 boundary is silently wrong.
   //
-  // It is also the file's browser floor: hourCycle is Safari 14 / iOS 14, above
-  // the ?. and ?? everywhere else here. An engine below it IGNORES the option
-  // and en-US falls back to h12, so hours arrive 1–12 and every session label
-  // and every 17:00 boundary is wrong without saying so.
-  /* BUILDING one of these is what costs; formatting with it is cheap, and it
-     holds no state between calls. There are four timezones in MARKETS and this
-     was constructing a formatter per call — `sessionBars` alone asked for
-     sixteen thousand of them per render, which is most of what a render spent
-     its time on. Built on first use and kept. */
+  // Formatters held per zone: building one is the cost, using it is cheap, and
+  // sessionBars asks thousands of times a render.
   HOUR_FMT: {},
 
   hourIn(tz, date) {
@@ -2144,10 +2135,9 @@ const sortKey = t => t.entry_time || t.fill_time || (dayOf(t) || '') + 'T00:00:0
 // a day ties on the filing date alone — which is the whole reason this is a
 // scan rather than a sort: the answer is one row, and finding it costs one pass.
 //
-// TWO COLUMNS ASK THIS, and they asked it in two identical loops until they
-// didn't: `balance` for the account the broker reported, `size_oz` for the size
-// he last traded. A second copy is how the two would come to disagree about
-// which row is latest.
+// Two columns ask it — `balance` for the account the broker reported, `size_oz`
+// for the size he last traded — so they cannot disagree about which row is
+// latest.
 function latestBefore(list, field, day = null) {
   let value = null, at = '';
   for (const t of list) {
@@ -2906,15 +2896,10 @@ function renderPeriods(rows) {
 // The three compliance bars for any list — the same computation the during-
 // trade card and the Positive column run over a different population.
 //
-// TWO OF THESE THREE BIAS UPWARD AND THE BAR CANNOT SHOW IT. followed_sl and
-// followed_tp are answered at open, seconds after the fill and long before
-// either level is anywhere near — so they record INTENT. They measure respect
-// only if the trader goes back and edits on the occasions it was not given, and
-// a missed edit reads as compliance. Nothing in the data separates the two, so
-// a high stop bar is a claim about answering, not only about discipline. Stated
-// here as well as at the trigger that asks the question, because this is where
-// the number is produced and the schema comment is not in front of anyone
-// reading it.
+// Two of the three bias upward, and the bar cannot show it: followed_sl and
+// followed_tp are answered at open, so they record intent, and a missed later
+// edit reads as compliance. A high stop bar is a claim about answering as much
+// as about discipline.
 function disciplineBars(list) {
   const bar = (label, key) => {
     const answered = list.filter(t => t[key] != null);
@@ -2953,14 +2938,9 @@ function rrBar(list) {
     return `<div class="period-disc-row"><div class="bar-empty"></div>${head(DASH)}</div>`;
   }
 
-  /* No losses means no ratio, only a direction. The figure caps rather than
-     dividing by zero — a ceiling, not a value.
-
-     ONE BRANCH, because the other was unreachable. `averages` labels a loss off
-     `resultOf`, which needs `pnl < 0` and a move past the scratch band, so
-     avgLoss is null or positive and never zero; and the early return above has
-     already taken the case where both are null. So a falsy avgLoss here means
-     wins with nothing to divide them by, and nothing else. */
+  /* No losses means no ratio, only a direction: the figure caps rather than
+     dividing by zero. avgLoss is never zero — a loss is past the scratch band —
+     and both-null returned above, so a falsy avgLoss here means wins alone. */
   const RR_CAP = 9.99;
   const ratio = avgLoss ? (avgWin || 0) / avgLoss : RR_CAP;
   const total = ratio + 1;
@@ -3321,22 +3301,14 @@ function renderRollForward(rows) {
 
 /* ─── Trade log ──────────────────────────────────────────────────────────── */
 /* ─── What Eugenia is watching ───────────────────────────────────────────────
-   THE ONLY PLACE HER WORK AND THIS APP MEET, and it is deliberately narrow.
+   The only place her work and this app meet, and deliberately narrow: what
+   lands today, the story she is carrying, what is still open — three tables,
+   three lists. Not her notes or turns, which stay denied to the publishable key;
+   his audit of those is `/notes` in her thread.
 
-   She and this page have shared a database and nothing else: everything she
-   knows has lived in a Telegram thread, so the three things worth a glance in
-   the morning — what lands today, what story she is carrying, what is still
-   open — were readable only by scrolling a chat. Three tables, three lists.
-
-   NOT HER NOTES AND NOT HER TURNS. Those stay denied to the publishable key
-   exactly as 003 left them. Her notes are working memory, and his audit of them
-   is `/notes` in her own thread, where an answer can be asked a question back.
-
-   ONE READ, AFTER THE RENDER, AND NEVER IN FRONT OF IT. The journal is what
-   this page is for. A failure here — 005 not applied, the policy missing, the
-   network gone — leaves the card hidden and everything else untouched, which is
-   the same trade the snapshot makes and the opposite of the roll-forward's:
-   nothing on this card is the reason anyone opened the app.
+   One read, after the render and never in front of it. A failure here leaves
+   the card hidden and the journal untouched: nothing on it is why anyone
+   opened the app.
    ─────────────────────────────────────────────────────────────────────────── */
 const Watch = {
   // A rolling window, for the reason her briefing reads one: a civil-day filter
@@ -3375,15 +3347,10 @@ const Watch = {
           .select('kind,body').is('closed_on', null).order('id', { ascending: false }).limit(8)
       ]);
 
-      /* AN ERROR IS NOT AN EMPTY LIST, and the client will not tell you the
-         difference unless you ask. supabase-js resolves rather than throwing —
-         a missing table, a policy that denies the row, an expired session all
-         come back as `{ data: null, error }`. Read as `data || []` that is
-         three failures wearing the same face as a quiet Sunday: the card hides
-         itself, nothing is logged, and the reason it is blank is unknowable.
-
-         The same rule readTrades follows on her side of the wire, in the same
-         words: an empty answer is only an answer when something was read. */
+      /* An error is not an empty list. supabase-js resolves rather than throws,
+         so a missing table, a refusing policy and an expired session all come
+         back as `{ data: null, error }` — read as `data || []`, three failures
+         wearing the face of a quiet Sunday. */
       for (const [what, res] of [['calendar', cal], ['thesis', story], ['loops', loops]]) {
         if (res.error) throw Object.assign(new Error(`${what}: ${res.error.message}`), { cause: res.error });
       }
@@ -4049,12 +4016,11 @@ function bootState(text, failed) {
   el.classList.remove('done');
 }
 
-/* UNREACHABLE IS NOT SIGNED OUT. supabase-js answers a server it could not
-   reach with the same `error` it uses for a refusal, and an access token lasts
-   an hour — so most opens without a network failed the session check before the
-   journal was asked for, and showed the login screen, where nothing can be done
-   offline, in place of the cached copy the README promises. Drawn read-only
-   instead, and booted properly the moment the network is back. */
+/* Unreachable is not signed out. supabase-js answers a server it could not
+   reach with the same `error` as a refusal, and offline the session check
+   fails before the journal is asked for — so the cached copy is drawn
+   read-only instead of the login screen, and the app boots properly when the
+   network returns. */
 const unreachable = e => e?.name === 'AuthRetryableFetchError';
 
 function openOffline() {
