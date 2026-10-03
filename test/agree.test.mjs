@@ -26,25 +26,44 @@ import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyb
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS } from '../supabase/functions/doji-eugenia/journal.ts';
 
-const SCHEMA = readFileSync(new URL('../supabase/001_trades.sql', import.meta.url), 'utf8');
-const GLADYS_SQL = readFileSync(new URL('../supabase/002_gladys.sql', import.meta.url), 'utf8');
-const EUGENIA_SQL = readFileSync(new URL('../supabase/003_eugenia.sql', import.meta.url), 'utf8');
-const SENSES_SQL = readFileSync(new URL('../supabase/005_eugenia_senses.sql', import.meta.url), 'utf8');
-const CRON_SQL = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8');
-const SEMANTIC_SQL = readFileSync(new URL('../supabase/007_semantic.sql', import.meta.url), 'utf8');
-const SCHEMA_008 = readFileSync(new URL('../supabase/008_sync_health.sql', import.meta.url), 'utf8');
-const EUGENIA_TS = readFileSync(
-  new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-const EUGENIA_PROMPT = readFileSync(
-  new URL('../supabase/functions/doji-eugenia/prompt.ts', import.meta.url), 'utf8');
+// A repository file, read once however many tests ask for it.
+const READ = new Map();
+const source = (path) => {
+  if (!READ.has(path)) READ.set(path, readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'));
+  return READ.get(path);
+};
+
+/* A declaration through its closing brace at the start of a line, which is how
+   every body here is read. Either end missing fails rather than reading wrong:
+   sliced from -1 an absent declaration is an empty string every doesNotMatch
+   passes, and sliced to -1 a body runs on to the end of the file. */
+function bodyOf(text, decl, missing = `${decl} is gone`) {
+  const at = text.indexOf(decl);
+  assert.ok(at > -1, missing);
+  const end = text.indexOf('\n}', at);
+  assert.ok(end > at, `could not read the body of ${decl}`);
+  return text.slice(at, end);
+}
+
+// Line comments out, so the prose above a call is never read as the call.
+const uncomment = (text) => text.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+
+const SCHEMA = source('supabase/001_trades.sql');
+const GLADYS_SQL = source('supabase/002_gladys.sql');
+const EUGENIA_SQL = source('supabase/003_eugenia.sql');
+const SENSES_SQL = source('supabase/005_eugenia_senses.sql');
+const CRON_SQL = source('supabase/004_cron.sql');
+const SEMANTIC_SQL = source('supabase/007_semantic.sql');
+const SCHEMA_008 = source('supabase/008_sync_health.sql');
+const EUGENIA_TS = source('supabase/functions/doji-eugenia/index.ts');
+const EUGENIA_PROMPT = source('supabase/functions/doji-eugenia/prompt.ts');
 
 // The functions as the DIRECTORY holds them, not a list typed here.
 const DEPLOYED = readdirSync(new URL('../supabase/functions', import.meta.url),
   { withFileTypes: true })
   .filter(e => e.isDirectory() && !e.name.startsWith('_')).map(e => e.name).sort();
 
-const FUNCTIONS = DEPLOYED.map(name => ({ name, text: readFileSync(
-  new URL(`../supabase/functions/${name}/index.ts`, import.meta.url), 'utf8') }));
+const FUNCTIONS = DEPLOYED.map(name => ({ name, text: source(`supabase/functions/${name}/index.ts`) }));
 
 /* Read out of the constraint, anchored on its NAME: a pattern hunting quoted
    strings would find the direction vocabulary as happily as this one. */
@@ -88,7 +107,7 @@ const viewColumns = (text, where) => {
 const NUMBERED = readdirSync(new URL('../supabase', import.meta.url))
   .filter(f => /^\d{3}_.*\.sql$/.test(f))
   .sort()
-  .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8'))
+  .map(f => source(`supabase/${f}`))
   .join('\n');
 
 /* Every column `trades` has, from 001 and every later `add column`, with
@@ -110,7 +129,7 @@ const servedView = () => {
 };
 
 test('every eugenia_trades view the README states is the one the SQL ends with', () => {
-  const README = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const README = source('README.md');
   for (const cols of viewColumns(README, 'README.md')) {
     assert.deepEqual(cols, servedView(),
       'the README quotes a view with a different column list than the numbered SQL ' +
@@ -126,8 +145,7 @@ test('every eugenia_trades view the README states is the one the SQL ends with',
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('TradeRow names exactly the columns the view serves', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/adherence.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/adherence.ts');
   const declared = src.match(/export interface TradeRow \{([\s\S]*?)\n\}/);
   assert.ok(declared, 'adherence.ts no longer declares TradeRow');
 
@@ -295,15 +313,11 @@ test('the redraw trigger watches, and carries, exactly the journal columns', asy
    the one that lands. */
 
 test('the redraw decides from the before-state, not from a constant', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-gladys/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-gladys/index.ts');
 
-  const at = src.indexOf('async function postAnswer(');
-  assert.ok(at > -1, 'doji-gladys no longer has postAnswer()');
   // Comments stripped: the expression named in the prose above the call is not
   // the call.
-  const body = src.slice(at, src.indexOf('\n}', at))
-    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const body = uncomment(bodyOf(src, 'async function postAnswer(', 'doji-gladys no longer has postAnswer()'));
 
   assert.match(body, /redraw\([^)]*answered\(before\)\)/,
     'postAnswer no longer redraws on answered(before) — it and the tap that fired ' +
@@ -342,8 +356,8 @@ test('no broker column is reachable through either writer', async () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the columns 009 grants are exactly the columns the app writes', async () => {
-  const grants = readFileSync(new URL('../supabase/011_trades_grants.sql', import.meta.url), 'utf8');
-  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const grants = source('supabase/011_trades_grants.sql');
+  const verify = source('supabase/verify.sql');
 
   const stated = grants.match(/grant update \(([^)]*)\)\s*\n?\s*on public\.trades/);
   assert.ok(stated, '009 no longer grants update on any column of trades');
@@ -359,7 +373,7 @@ test('the columns 009 grants are exactly the columns the app writes', async () =
 
     // The app writes `deleted` outside OWNED, which is the whole reason the list
     // is five. If that stopped being true the fifth grant would be dead.
-    const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    const src = source('index.html');
     assert.match(src, /update\(\{ deleted: true \}\)/,
       'nothing sets deleted any more, so 009 grants a column the app never writes');
     assert.match(src, /update\(\{ deleted: false \}\)/, 'undo no longer clears deleted');
@@ -482,9 +496,7 @@ test('the five rows are seeded, or a channel is invisible rather than unseen', (
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a demotion can reach every rung but the bottom one', () => {
-  const at = EUGENIA_TS.indexOf('async function setChannel(');
-  assert.ok(at > -1, 'doji-eugenia no longer has setChannel()');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function setChannel(', 'doji-eugenia no longer has setChannel()');
 
   // Before the write, not after it: a PATCH that has already landed cannot be
   // refused, and `unseen` written once is indistinguishable from never taught.
@@ -509,7 +521,7 @@ test('verify.sql expects exactly the triggers the numbered SQL creates on trades
   /* THE TRIGGERS ROW NAMES THEM. Both halves are read out of files — what
      verify.sql expects, and every `create trigger` on public.trades in the
      numbered SQL — so adding a trigger without the check fails here. */
-  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const sql = source('supabase/verify.sql');
 
   const expected = sql.match(
     /\('exactly the five triggers on trades'[\s\S]*?\),\s*\n((?:\s*'[^']*'(?:\s*\|\|)?\s*\n?)+)\),/);
@@ -533,7 +545,7 @@ test('verify.sql expects exactly the triggers the numbered SQL creates on trades
 });
 
 test('verify.sql names no function in a form that throws when it is gone', () => {
-  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const sql = source('supabase/verify.sql');
   assert.ok(sql.length > 1000, 'verify.sql could not be read — the reader has gone blind');
 
   /* A quoted `public.name(args)` is what has_function_privilege takes and throws
@@ -703,8 +715,7 @@ test('a commitment is recorded, audited, held against his trades and retired', (
    caller in the repository names a function that exists.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const read = (path) =>
-  ({ path, text: readFileSync(new URL(`../${path}`, import.meta.url), 'utf8') });
+const read = (path) => ({ path, text: source(path) });
 
 // The three that name a FUNCTION.
 const CALLERS = ['supabase/002_gladys.sql', 'supabase/004_cron.sql',
@@ -801,7 +812,7 @@ export function deadRules(src) {
 }
 
 test('every CSS rule in the client is reachable from the markup or the script', () => {
-  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const src = source('index.html');
   const got = deadRules(src);
 
   // WITHOUT THESE THE ASSERTION BELOW PASSES ON A PARSER THAT FOUND NOTHING.
@@ -817,7 +828,7 @@ test('every CSS rule in the client is reachable from the markup or the script', 
 });
 
 test('the dead-rule scan can actually find a dead rule', () => {
-  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const src = source('index.html');
   const plant = (css, js = '') =>
     src.replace('</style>', `${css}\n</style>`).replace('const $ = id =>', `${js}\nconst $ = id =>`);
 
@@ -882,7 +893,7 @@ export function unreferenced(src) {
 }
 
 test('every top-level declaration in the client is referenced somewhere', () => {
-  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const src = source('index.html');
   const got = unreferenced(src);
 
   assert.ok(got.declared > 80,
@@ -894,7 +905,7 @@ test('every top-level declaration in the client is referenced somewhere', () => 
 });
 
 test('the unreferenced-declaration scan can actually find one', () => {
-  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const src = source('index.html');
   const at = (find, add) => src.replace(find, add + find);
 
   assert.ok(unreferenced(at('function render() {', 'const dojiUnusedThing = 42;\n\n')).dead
@@ -923,7 +934,7 @@ test('the unreferenced-declaration scan can actually find one', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql says how many checks it runs, and runs that many', () => {
-  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const sql = source('supabase/verify.sql');
 
   const from = sql.indexOf('select check_name, actual, expected');
   const to   = sql.indexOf(') as t(check_name, actual, expected);', from);
@@ -959,7 +970,7 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the client writes no colour of its own, and reads them all through cssToken', () => {
-  const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const src = source('index.html');
   const js = src.slice(src.lastIndexOf('<script>') + 8, src.lastIndexOf('</script>'));
   assert.ok(js.length > 50_000, `only ${js.length} chars of script found — the reader has gone blind`);
 
@@ -987,12 +998,11 @@ test('the client writes no colour of its own, and reads them all through cssToke
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every door a function opens is written down in the README', () => {
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const readme = source('README.md');
 
   const doors = new Set();
   for (const fn of DEPLOYED) {
-    const src = readFileSync(
-      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    const src = source(`supabase/functions/${fn}/index.ts`);
     for (const [, d] of src.matchAll(/searchParams\.get\("([a-zA-Z]+)"\)/g)) doors.add(d);
   }
 
@@ -1018,8 +1028,7 @@ test('every door a function opens is written down in the README', () => {
 
 test('no passage of the prompt or the strategy is stated twice', () => {
   for (const file of ['prompt.ts', 'strategy.ts']) {
-    const text = readFileSync(
-      new URL(`../supabase/functions/doji-eugenia/${file}`, import.meta.url), 'utf8');
+    const text = source(`supabase/functions/doji-eugenia/${file}`);
 
     // Prose lines only: a repeated `\`\`\`` fence or a blank line is not a
     // repeated passage, and the rules table legitimately repeats its shape.
@@ -1053,8 +1062,7 @@ test('no passage of the prompt or the strategy is stated twice', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every read of her tables goes through readRows', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   assert.match(src, /async function readRows<T>\(what: string, path: string\)/,
     'readRows is gone — every read is hand-written again');
@@ -1111,7 +1119,7 @@ const WORKFLOWS = ['.github/workflows/test.yml',
                    '.github/workflows/backup-memory.yml'].map(read);
 
 test('every workflow takes its Node version from the one file that states it', () => {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const pkg = JSON.parse(source('package.json'));
   assert.match(pkg.engines?.node ?? '', /^>=\d+\.\d+\.\d+$/,
     'package.json no longer states a Node floor, so node-version-file resolves ' +
     'to nothing and every workflow below is reading an empty decision');
@@ -1119,7 +1127,7 @@ test('every workflow takes its Node version from the one file that states it', (
   // engines alone is a note npm prints past (proved: a floor of >=99 installed
   // happily). engine-strict makes it a gate, so a green CI run means the Node
   // installed is above the floor.
-  const npmrc = readFileSync(new URL('../.npmrc', import.meta.url), 'utf8');
+  const npmrc = source('.npmrc');
   assert.match(npmrc, /^engine-strict\s*=\s*true$/m,
     '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
     'and npm installs on any version without a word');
@@ -1265,11 +1273,8 @@ test('a function refuses to run without every secret it reads', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the secret comparison cannot stop early, whatever its answer', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/_shared/edge.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('export function secretMatches(');
-  assert.ok(at > -1, '_shared/edge.ts no longer has secretMatches()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/_shared/edge.ts');
+  const body = bodyOf(src, 'export function secretMatches(', '_shared/edge.ts no longer has secretMatches()');
 
   assert.match(body, /for \([^)]*Math\.max\(a\.length, b\.length\)/,
     'secretMatches no longer walks the longer of the two inputs — a loop that ' +
@@ -1294,7 +1299,7 @@ test('the secret comparison cannot stop early, whatever its answer', () => {
 test('config.toml turns the gateway off for every function that exists', () => {
   // Comments stripped: a `verify_jwt` in prose would satisfy every assertion
   // below while the gateway was on.
-  const toml = readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8')
+  const toml = source('supabase/config.toml')
     .split('\n').map(l => l.replace(/#.*$/, '')).join('\n');
 
   for (const name of DEPLOYED) {
@@ -1326,7 +1331,7 @@ const TRACKED = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filte
    in the corpus, every entry below would validate against its own exception. */
 const CODE = TRACKED
   .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f) && f !== 'test/agree.test.mjs')
-  .map(f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
+  .map(f => source(`${f}`)).join('\n');
 
 /* Backticked names that look like code — camelCase, snake_case, hyphenated,
    dotted or SCREAMING — not short English in a code font. The hyphen and the
@@ -1368,7 +1373,7 @@ test('the documents name only symbols the repository has', () => {
 
   /* REFACTOR.md too: its value is that a cold session can trust it. */
   for (const doc of ['README.md', 'CLAUDE.md', 'REFACTOR.md']) {
-    const text = readFileSync(new URL(`../${doc}`, import.meta.url), 'utf8');
+    const text = source(`${doc}`);
     const named = new Set();
 
     for (const [, name] of text.matchAll(SYMBOLS)) {
@@ -1414,7 +1419,7 @@ test('the Data model names every column the trades table has, and no other', () 
   assert.ok(columns.length >= 20,
     `only ${columns.length} columns read out of the schema — the reader has gone blind`);
 
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const readme = source('README.md');
   const from = readme.indexOf('## Data model');
   const to   = readme.indexOf('## What is derived');
   assert.ok(from > -1 && to > from, 'the README has no Data model section to read');
@@ -1443,13 +1448,13 @@ test('the Data model names every column the trades table has, and no other', () 
    what the damaged one held. Read against the schema.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the restore procedure writes every column the table lets it write', () => {
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const readme = source('README.md');
   const sql = readme.match(/```sql\n-- 1\. paste the file's `trades` array[\s\S]*?```/)?.[0];
   assert.ok(sql, 'the README no longer carries the restore procedure');
 
   const list = (text) => text.split(',').map(c => c.trim()).filter(Boolean);
   const target = list(sql.match(/insert into trades \(([^)]*)\)/)?.[1] ?? '');
-  const source = list(sql.match(/\nselect ([\s\S]*?)\nfrom jsonb_populate_recordset/)?.[1] ?? '');
+  const selected = list(sql.match(/\nselect ([\s\S]*?)\nfrom jsonb_populate_recordset/)?.[1] ?? '');
   const updated = [...sql.matchAll(/(\w+) = excluded\.(\w+)/g)]
     .map(m => { assert.equal(m[1], m[2], `${m[1]} is restored from ${m[2]}`); return m[1]; });
 
@@ -1462,7 +1467,7 @@ test('the restore procedure writes every column the table lets it write', () => 
   assert.deepEqual([...target].sort(), writable,
     'the restore does not insert exactly the writable columns — a generated one ' +
     'refuses the whole statement, and a missing one is lost on a fresh restore');
-  assert.deepEqual(source, target, 'the select does not line up with the insert list');
+  assert.deepEqual(selected, target, 'the select does not line up with the insert list');
   // Identity, ownership and creation stand on a row that already exists.
   const kept = ['id', 'user_id', 'created_at', 'updated_at'];
   assert.deepEqual([...updated].sort(), writable.filter(c => !kept.includes(c)),
@@ -1478,7 +1483,7 @@ test('the restore procedure writes every column the table lets it write', () => 
 /* A path, whitespace, prose. An INDENTED entry is a detail under the directory
    above it, checked for existence rather than counted as coverage. */
 const layoutBlock = () => {
-  const found = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
+  const found = source('README.md')
     .match(/\n## Layout\n+```\n([\s\S]*?)\n```\n/);
   assert.ok(found, 'README.md has no Layout block');
 
@@ -1537,7 +1542,7 @@ test('every clock in the repository states the same hour cycle', () => {
   let asked = 0;
   for (const path of TRACKED) {
     if (!/\.(html|ts|mjs|gs)$/.test(path) || path.startsWith('test/')) continue;
-    const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+    const text = source(path);
 
     for (const args of formatters(text)) {
       assert.doesNotMatch(args, /hour12/,
@@ -1572,8 +1577,7 @@ test('every clock in the repository states the same hour cycle', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the strategy rides on the cached system prompt, not on a message', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // In the system block AND cached. In a message it is paid every turn and
   // breaks the prefix on each edit.
@@ -1627,11 +1631,8 @@ test('what is summarised into every turn can also be read in full', () => {
 });
 
 test('an unknown section is answered, never silently empty', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('function readStrategy(');
-  assert.ok(at > -1, 'doji-eugenia no longer has readStrategy()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const body = bodyOf(src, 'function readStrategy(', 'doji-eugenia no longer has readStrategy()');
 
   // The number arrives from the model. An empty result is a blank she fills in
   // herself, the one outcome worse than saying it is missing.
@@ -1662,8 +1663,7 @@ test('the version the document states is the version she is handed', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a forced briefing asks what the day takes, not a literal', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   const at = src.indexOf('async function postScheduled(');
   const body = src.slice(at, src.indexOf('\n}\n', at))
     .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
@@ -1682,8 +1682,7 @@ test('a forced briefing asks what the day takes, not a literal', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a scheduled job that dies records it, and records it before it apologises', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   const bodyOf = (fn) => {
     const at = src.indexOf(`async function ${fn}(`);
     assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
@@ -1714,8 +1713,7 @@ test('a scheduled job that dies records it, and records it before it apologises'
 });
 
 test('every answer dueNow can give is dispatched by postScheduled', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // The literals in dueNow's return type, which is the one statement of what it
   // can answer. 'weekday' and 'sunday' arrive as Brief and are handled together.
@@ -1724,9 +1722,7 @@ test('every answer dueNow can give is dispatched by postScheduled', () => {
   const answers = [...sig[1].matchAll(/'(\w+)'/g)].map(m => m[1]);
   assert.ok(answers.length, 'dueNow now returns no named answers — the reader has gone blind');
 
-  const at = src.indexOf('async function postScheduled(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function postScheduled(', 'doji-eugenia no longer has postScheduled()');
 
   for (const a of answers) {
     assert.match(body, new RegExp(`due === '${a}'`),
@@ -1775,8 +1771,7 @@ test('web fetch is bounded by size as well as by count', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the tools she is offered are exactly the tools the loop can run', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // Read from the DEFINITIONS rather than from a tools array, because there are
   // two arrays now and a tool belonging to either still has to be executable.
@@ -1816,13 +1811,9 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the nightly pass sees his week and can reach past its own window', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  const at = src.indexOf('async function postConsolidation(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postConsolidation()');
-  const code = src.slice(at, src.indexOf('\n}', at))
-    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const code = uncomment(bodyOf(src, 'async function postConsolidation(', 'doji-eugenia no longer has postConsolidation()'));
 
   assert.ok(reaches(code, 'tradesBlock'),
     'the pass is asked what he has started doing differently and is handed no ' +
@@ -1847,19 +1838,14 @@ test('the nightly pass sees his week and can reach past its own window', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the nightly pass reports the map it may just have moved', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  const at = src.indexOf('async function postConsolidation(');
-  const code = src.slice(at, src.indexOf('\n}', at))
-    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const code = uncomment(bodyOf(src, 'async function postConsolidation('));
   assert.match(code, /await\s+recordChannels\(\)/,
     'nothing records where the channels stand, so the only claim this design ' +
     'rests on is the only one with no meter on it');
 
-  const fn = src.indexOf('async function recordChannels(');
-  assert.ok(fn > -1, 'doji-eugenia no longer has recordChannels()');
-  const body = src.slice(fn, src.indexOf('\n}', fn));
+  const body = bodyOf(src, 'async function recordChannels(', 'doji-eugenia no longer has recordChannels()');
   // It runs after the pass has already written memory, so a throw here would
   // turn a good night into a 500.
   assert.match(body, /catch\s*\(/,
@@ -1876,10 +1862,8 @@ test('the nightly pass reports the map it may just have moved', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the sweep and the census both reach the table, however they end', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const strip = (t) => uncomment(t.replace(/\/\*[\s\S]*?\*\//g, ''));
 
   for (const [fn, caller, what] of [
     ['async function postConsolidation(', 'embeddings',
@@ -1888,9 +1872,7 @@ test('the sweep and the census both reach the table, however they end', () => {
     ['async function recordChannels(', 'channels',
      'the only meter on the one claim this whole design rests on'],
   ]) {
-    const at = src.indexOf(fn);
-    assert.ok(at > -1, `doji-eugenia no longer has ${fn}`);
-    const body = strip(src.slice(at, src.indexOf('\n}', at)));
+    const body = strip(bodyOf(src, fn, `doji-eugenia no longer has ${fn}`));
 
     for (const [ok, half] of [['true', 'success'], ['false', 'failure']]) {
       assert.match(body, new RegExp(`recordRun\\(\\{[^}]*caller: '${caller}'[^}]*ok: ${ok}`),
@@ -1900,8 +1882,7 @@ test('the sweep and the census both reach the table, however they end', () => {
 
   // The sweep's own line is what separates an unset key from a vendor that
   // refused, and it is only in the row if the row carries it.
-  const at = src.indexOf('async function postConsolidation(');
-  assert.match(strip(src.slice(at, src.indexOf('\n}', at))), /detail: swept/,
+  assert.match(strip(bodyOf(src, 'async function postConsolidation(')), /detail: swept/,
     'the sweep records that it ran and not what it found, which is the ' +
     'question it exists to answer');
 });
@@ -1913,8 +1894,7 @@ test('the sweep and the census both reach the table, however they end', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the nightly meters sit past every branch, not behind an early return', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   const at = src.indexOf('async function postConsolidation(');
   const body = src.slice(at, src.indexOf('\n}\n', at))
     .replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
@@ -1944,8 +1924,7 @@ test('the nightly meters sit past every branch, not behind an early return', () 
 });
 
 test('the search tool names the function the database actually defines', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // The RPC path is a string in one file and a function in another; a rename is a
   // 404 that reads as the database being down.
@@ -2168,8 +2147,7 @@ test('the prompt states no preference of his', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every row-returning read of her own tables carries a limit', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   /* URLs are template literals joined by `+`, so they are joined first. A PATCH
      on one key is not a read and needs no limit. THE TABLE IS WHATEVER STANDS
@@ -2185,12 +2163,8 @@ test('every row-returning read of her own tables carries a limit', () => {
   /* THE PATH-BUILDERS ARE RESOLVED RATHER THAN EXEMPTED. Any `…Query()` in the
      argument is replaced by its body, so a limit deleted from a builder fails
      here rather than widening every call site at once. */
-  const bodyOf = (fn) => {
-    const at = joined.indexOf(`function ${fn}(`);
-    assert.ok(at > -1, `the read helper names ${fn}(), which no longer exists`);
-    return joined.slice(at, joined.indexOf('\n}', at));
-  };
-  const resolve = (arg) => arg.replace(/(\w+Query)\(/g, (_, fn) => bodyOf(fn));
+  const resolve = (arg) => arg.replace(/(\w+Query)\(/g, (_, fn) =>
+    bodyOf(joined, `function ${fn}(`, `the read helper names ${fn}(), which no longer exists`));
 
   const helper = [...joined.matchAll(/readRows<[^>]*>\(\s*'[^']*',\s*([\s\S]{0,240}?)\);/g)]
     .map(m => resolve(m[1]))
@@ -2230,11 +2204,8 @@ test('every row-returning read of her own tables carries a limit', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the notes read asks for live notes only, and for the id that names one', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function readNotes(');
-  assert.ok(at > -1, 'doji-eugenia no longer has readNotes()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const body = bodyOf(src, 'async function readNotes(', 'doji-eugenia no longer has readNotes()');
 
   assert.match(body, /superseded_by=is\.null/,
     'readNotes no longer filters out retired notes — every correction she has ' +
@@ -2245,8 +2216,7 @@ test('the notes read asks for live notes only, and for the id that names one', (
 });
 
 test('the column, the filter and the tool parameter all exist together', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   assert.match(EUGENIA_SQL, /superseded_by\s+bigint\s+references\s+public\.eugenia_notes\(id\)/,
     '003_eugenia.sql has no superseded_by column — the filter in the read would ' +
@@ -2265,11 +2235,8 @@ test('the column, the filter and the tool parameter all exist together', () => {
    honest "note N is not there to retire" can never be said. */
 
 test('the supersede write may only retire a note that is still live', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function writeNote(');
-  assert.ok(at > -1, 'doji-eugenia no longer has writeNote()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const body = bodyOf(src, 'async function writeNote(', 'doji-eugenia no longer has writeNote()');
   const retire = body.slice(body.indexOf('if (retiring) {'));
   assert.ok(retire.length && retire.length < body.length,
     'writeNote no longer has a retirement branch to check');
@@ -2309,17 +2276,10 @@ const reaches = (code, fn) => {
 };
 
 test('every path that speaks to him reads his notes, the map and his desk', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // The function bodies, so a call anywhere else in the file cannot satisfy this.
-  const body = (name) => {
-    const at = src.indexOf(`async function ${name}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
-    const end = src.indexOf('\n}', at);
-    assert.ok(end > at, `could not read the body of ${name}()`);
-    return src.slice(at, end);
-  };
+  const body = (name) => bodyOf(src, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
 
   /* postConsolidation is the worst to lose: without its notes she cannot see what
      she holds, never supersedes, and writes the same fact nightly. postRelease
@@ -2334,13 +2294,12 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
   const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
                  'postMove', 'postTradeEvent'];
 
-  const reads = (fn) =>
-    body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const reads = (fn) => uncomment(body(fn));
 
   for (const fn of TEACHES) {
     // Comments stripped, and `await` required: an un-awaited notesBlock
     // interpolates "[object Promise]" into the prompt as text.
-    const code = body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    const code = reads(fn);
     assert.ok(reaches(code, 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
       `he gave would be ignored, with nothing anywhere reporting it`);
@@ -2398,13 +2357,9 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the critic is handed his notes, the map and the desk it is asked to enforce', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  const at = src.indexOf('async function critique(');
-  assert.ok(at > -1, 'doji-eugenia no longer has critique()');
-  const body = src.slice(at, src.indexOf('\n}', at))
-    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const body = uncomment(bodyOf(src, 'async function critique(', 'doji-eugenia no longer has critique()'));
 
   /* In the message, not merely the signature, read from the template literal
      critique() hands to gate(). */
@@ -2425,8 +2380,7 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
 
   // And postBriefing hands over the three it has already awaited, rather than
   // the critic opening reads of its own on the far side of a briefing.
-  const brief = src.slice(src.indexOf('async function postBriefing('));
-  assert.match(brief.slice(0, brief.indexOf('\n}')), /critique\(draft,\s*notes,\s*channels,\s*desk,\s*story\)/,
+  assert.match(bodyOf(src, 'async function postBriefing('), /critique\(draft,\s*notes,\s*channels,\s*desk,\s*story\)/,
     'postBriefing no longer passes the notes, the map, the desk and the story it already ' +
     'holds into critique() — the critic is back to judging without them');
 });
@@ -2469,7 +2423,7 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README registers each bot for the updates its code actually handles', () => {
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const readme = source('README.md');
   const wanted = {
     'doji-eugenia': ['message', 'callback_query'],
     'doji-gladys':  ['callback_query'],
@@ -2494,8 +2448,7 @@ test('the README registers each bot for the updates its code actually handles', 
     }
     /* Read as a PROPERTY of the update: a bare word matches "poll" in prose about
        the poller. */
-    const src = readFileSync(
-      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    const src = source(`supabase/functions/${fn}/index.ts`);
     for (const kind of [...line[0].matchAll(/"(\w+)"/g)].map(m => m[1])) {
       assert.match(src, new RegExp(`\\.${kind}\\b`),
         `the README registers ${fn} for "${kind}" and the function never reads ` +
@@ -2535,8 +2488,7 @@ test('the two writers with no voice record both outcomes', () => {
     `008 constrains sync_health.id to ${accepted?.length ?? 0} names, not two`);
 
   for (const [fn, who] of [['doji-mcp-sync', 'poller'], ['doji-email-sync', 'email']]) {
-    const src = readFileSync(
-      new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
+    const src = source(`supabase/functions/${fn}/index.ts`);
     // Comments stripped: the name in prose about the call is not the call.
     const code = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
       .map(l => l.replace(/\/\/.*$/, '')).join('\n');
@@ -2643,11 +2595,11 @@ test('the test count the instructions state is the count the suite runs', () => 
   assert.ok(files.length >= 4, `only ${files.length} suites found — the reader has gone blind`);
 
   const total = files.reduce((n, f) => n +
-    (readFileSync(new URL(`../test/${f}`, import.meta.url), 'utf8')
+    (source(`test/${f}`)
       .match(/^test\(/gm) || []).length, 0);
   assert.ok(total > 100, `counted ${total} tests — the pattern has stopped matching`);
 
-  const doc = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');
+  const doc = source('CLAUDE.md');
   const stated = doc.match(/npm test\s+# (\d+) tests, (\w+) suites/);
   assert.ok(stated, 'CLAUDE.md no longer states what npm test prints');
   assert.equal(Number(stated[1]), total,
@@ -2699,7 +2651,7 @@ test('every table the backup reads is ordered by a column it has', async () => {
 
 // NUMBERED is already the numbered files as one string, read at the top of this
 // file for the same reason it is needed here.
-const VERIFY = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+const VERIFY = source('supabase/verify.sql');
 
 test('verify.sql asks about every table, policy and index the files declare', () => {
   const tables = [...NUMBERED.matchAll(/create table (?:if not exists )?public\.(\w+)/g)].map(m => m[1]);
@@ -2777,7 +2729,7 @@ test('every table the numbered files create has row level security on', () => {
   const files = readdirSync(new URL('../supabase', import.meta.url))
     .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
   const sql = files
-    .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')).join('\n');
+    .map(f => source(`supabase/${f}`)).join('\n');
 
   const created = [...sql.matchAll(/create table (?:if not exists )?public\.(\w+)/g)]
     .map(m => m[1]);
@@ -2805,7 +2757,7 @@ test('the sides a trade may have are the sides every writer writes', () => {
     'index.html',
   ];
   for (const path of writers) {
-    const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+    const text = source(path);
     const named = [...new Set([...text.matchAll(/["'](BUY|SELL)["']/g)].map(m => m[1]))];
     assert.ok(named.length,
       `${path} names no side at all — it used to, so either it stopped writing ` +
@@ -2842,13 +2794,11 @@ test('the importance a release may carry is the one the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_calendar_importance_check');
   assert.ok(declared, '005 no longer constrains eugenia_calendar.importance');
 
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   /* TRADINGVIEW'S THREE LEVELS MAP ONTO THE SAME THREE; one the table refuses is
      a 400 on every filing it touches. */
-  const tv = readFileSync(
-    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+  const tv = source('supabase/functions/doji-tradingview/index.ts');
   const mapped = tv.match(/const IMPORTANCE[^=]*= \{([^}]+)\}/);
   assert.ok(mapped, "doji-tradingview no longer maps TradingView's importance to her words");
   assert.deepEqual([...mapped[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
@@ -2860,9 +2810,7 @@ test('the importance a release may carry is the one the table accepts', () => {
 
   /* READ OUT OF pendingRelease ITSELF: aheadToday filters on the same value, so
      a whole-file match stays green with the spine's own filter deleted. */
-  const at = src.indexOf('async function pendingRelease(');
-  assert.ok(at > -1, 'doji-eugenia no longer has pendingRelease()');
-  const spine = src.slice(at, src.indexOf('\n}', at));
+  const spine = bodyOf(src, 'async function pendingRelease(', 'doji-eugenia no longer has pendingRelease()');
   assert.match(spine, /importance=eq\.high/,
     'the release spine no longer filters on importance, so every medium and low ' +
     'entry filed all week would wake her');
@@ -2885,9 +2833,7 @@ test('the importance a release may carry is the one the table accepts', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every row at the release time is marked, not the one the message names', () => {
-  const at = EUGENIA_TS.indexOf('async function postRelease(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postRelease()');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function postRelease(', 'doji-eugenia no longer has postRelease()');
 
   assert.match(body, /markLooked\(due\.map\(r => r\.id\)\)/,
     'postRelease marks something other than the whole group, so the duplicates ' +
@@ -3026,8 +2972,7 @@ test('the thesis budget is one number on both sides of the wire', () => {
 });
 
 test('every table she reads or writes is one the schema creates', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   const created = new Set([
     ...[...EUGENIA_SQL.matchAll(/create table public\.(\w+)/g)].map(m => m[1]),
     ...[...EUGENIA_SQL.matchAll(/create or replace view public\.(\w+)/g)].map(m => m[1]),
@@ -3045,8 +2990,7 @@ test('every table she reads or writes is one the schema creates', () => {
 });
 
 test('every column the cost meter writes is a column the table has', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   const table = SENSES_SQL.match(/create table if not exists public\.eugenia_runs \(([\s\S]*?)\n\);/);
   assert.ok(table, '005 no longer creates eugenia_runs');
@@ -3062,8 +3006,7 @@ test('every column the cost meter writes is a column the table has', () => {
      first, since `.slice(0, 500)` carries commas that separate arguments. */
   const group = /\([^()[\]{}]*\)|\[[^()[\]{}]*\]|\{[^()[\]{}]*\}/g;
   const keysOf = (body) => {
-    let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
-      .replace(/`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''");
+    let flat = uncomment(body).replace(/`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''");
     // Until nothing changes, not `group.test(flat)`: a g-flag regex keeps its
     // position between calls.
     for (let i = 0; i < 8; i++) {
@@ -3096,7 +3039,7 @@ test('every column the cost meter writes is a column the table has', () => {
 
   /* AND verify.sql NAMES THEM A THIRD TIME: a row asking after an undeclared
      column comes back false on a correct database. */
-  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const verify = source('supabase/verify.sql');
   const asked = verify.match(
     /table_name = 'eugenia_runs'\s*\n\s*and column_name in \(([^)]*)\)/);
   assert.ok(asked, 'verify.sql no longer asks whether eugenia_runs has its later columns');
@@ -3291,9 +3234,7 @@ test('her read on price is fenced in the writer and in both gates', () => {
 
   // Both gates are handed what he has on, on every path that runs one.
   for (const gate of ['critique', 'trim']) {
-    const at = EUGENIA_TS.indexOf(`async function ${gate}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${gate}()`);
-    const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+    const body = bodyOf(EUGENIA_TS, `async function ${gate}(`, `doji-eugenia no longer has ${gate}()`);
     assert.match(body, /\$\{desk\}/,
       `${gate}() no longer puts his open positions in front of the gate, which ` +
       `is asked whether a view was given while he was in one`);
@@ -3306,8 +3247,7 @@ test('her read on price is fenced in the writer and in both gates', () => {
       `a compliant read from one given while he is in a position, nor a "cut" ` +
       `from the "hike" the story says`);
   }
-  const trimBody = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function trim('));
-  assert.match(trimBody.slice(0, trimBody.indexOf('\n}')), /\$\{story\}/,
+  assert.match(bodyOf(EUGENIA_TS, 'async function trim('), /\$\{story\}/,
     'trim() takes the story and never puts it in front of the gate');
 });
 
@@ -3354,8 +3294,7 @@ test('a verdict judges the decision rather than the result, and never an open tr
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('diagnose.sql says how many listings it holds, and holds that many', () => {
-  const sql = readFileSync(
-    new URL('../supabase/diagnose.sql', import.meta.url), 'utf8');
+  const sql = source('supabase/diagnose.sql');
 
   // Statements, not `select` keywords: one listing unions two tables, and a
   // count of the keyword would read it as two.
@@ -3386,8 +3325,7 @@ test('every security definer function empties its search_path', () => {
   let seen = 0;
 
   for (const f of files) {
-    const sql = readFileSync(
-      new URL(`../supabase/${f}.sql`, import.meta.url), 'utf8')
+    const sql = source(`supabase/${f}.sql`)
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
 
@@ -3412,8 +3350,7 @@ test('every security definer function empties its search_path', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql asks eugenia_search which arguments it takes', () => {
-  const verify = readFileSync(
-    new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const verify = source('supabase/verify.sql');
   const row = verify.match(
     /\('eugenia_search[^']*',\s*\(select ([\s\S]*?)\),\s*'([^']*)'\)/);
   assert.ok(row, 'verify.sql no longer asks after eugenia_search at all');
@@ -3442,16 +3379,12 @@ test('verify.sql asks eugenia_search which arguments it takes', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('heartbeat cannot write a detail the column refuses', () => {
-  const health = readFileSync(
-    new URL('../supabase/008_sync_health.sql', import.meta.url), 'utf8');
+  const health = source('supabase/008_sync_health.sql');
   const bound = health.match(/char_length\(last_error\) between (\d+) and (\d+)/);
   assert.ok(bound, '008 no longer bounds last_error — the reader has gone blind');
 
-  const edge = readFileSync(
-    new URL('../supabase/functions/_shared/edge.ts', import.meta.url), 'utf8');
-  const at = edge.indexOf('export async function heartbeat(');
-  assert.ok(at > -1, '_shared no longer exports heartbeat()');
-  const body = edge.slice(at, edge.indexOf('\n}', at));
+  const edge = source('supabase/functions/_shared/edge.ts');
+  const body = bodyOf(edge, 'export async function heartbeat(', '_shared no longer exports heartbeat()');
 
   assert.match(body, new RegExp(`slice\\(0, ${bound[2]}\\)`),
     `heartbeat does not truncate at ${bound[2]}, so a long message is refused ` +
@@ -3472,9 +3405,8 @@ test('heartbeat cannot write a detail the column refuses', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('010 waits until the last retry hour has passed, in both languages', () => {
-  const retry = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export function retryDue('));
   const last = Object.fromEntries(
-    [...retry.slice(0, retry.indexOf('\n}')).matchAll(
+    [...bodyOf(EUGENIA_TS, 'export function retryDue(').matchAll(
       /hour >= \d+ && hour <= (\d+)\) return '(weekday|sunday)'/g)]
       .map(m => [m[2], +m[1]]));
   assert.deepEqual(Object.keys(last).sort(), ['sunday', 'weekday'],
@@ -3505,8 +3437,7 @@ test('010 waits until the last retry hour has passed, in both languages', () => 
 test('both readers of "a failed dispatch" ask the same function', () => {
   // Comments stripped first: the restatement this forbids is DESCRIBED in the
   // comment above the gate, and prose about a predicate is not the predicate.
-  const sql = readFileSync(
-    new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')
+  const sql = source('supabase/009_dispatch.sql')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
 
@@ -3552,16 +3483,13 @@ test('both readers of "a failed dispatch" ask the same function', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every flag a cron job calls with is a flag the function reads', () => {
-  const eugenia = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const eugenia = source('supabase/functions/doji-eugenia/index.ts');
 
   const called = [...CRON_SQL.matchAll(/functions\/v1\/([\w-]+)\?(\w+)=(\w+)/g)];
   assert.ok(called.length >= 2,
     `only ${called.length} flagged cron URLs read — the reader has gone blind`);
 
-  const at = eugenia.indexOf('async function postScheduled(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
-  const body = eugenia.slice(at, eugenia.indexOf('\n}', at));
+  const body = bodyOf(eugenia, 'async function postScheduled(', 'doji-eugenia no longer has postScheduled()');
 
   for (const [, fn, flag, value] of called) {
     assert.equal(fn, 'doji-eugenia',
@@ -3602,12 +3530,9 @@ const BY_HAND = {
 };
 
 test('every door the function reads is opened by a cron job or by a person', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  const at = src.indexOf('async function postScheduled(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postScheduled()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function postScheduled(', 'doji-eugenia no longer has postScheduled()');
 
   const read = [...new Set([...body.matchAll(/searchParams\.get\("(\w+)"\)/g)].map(m => m[1]))];
   assert.ok(read.length >= 4,
@@ -3650,7 +3575,7 @@ test('every door the function reads is opened by a cron job or by a person', () 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a failure is settled when its report lands, not when it is sent', () => {
-  const sql = readFileSync(new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')
+  const sql = source('supabase/009_dispatch.sql')
     .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
 
   assert.match(sql, /alter table public\.dispatch add column if not exists reported_by bigint;/,
@@ -3702,7 +3627,7 @@ test('every pg_net dispatch records a job the ledger declares', () => {
     .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
 
   const declared = new Set(
-    [...readFileSync(new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')
+    [...source('supabase/009_dispatch.sql')
       .match(/dispatch_job_check check \(job in \(([\s\S]*?)\)\)/)[1]
       .matchAll(/'([a-z-]+)'/g)].map(m => m[1]));
   assert.ok(declared.size >= 5,
@@ -3711,7 +3636,7 @@ test('every pg_net dispatch records a job the ledger declares', () => {
   const used = [];
   let posts = 0;
   for (const f of files) {
-    const sql = readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')
+    const sql = source(`supabase/${f}`)
       .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
     /* A POST ADDRESSED TO TELEGRAM IS A REPORT, NOT A DISPATCH, and must not reach
        the ledger it reports on, or the next sweep would judge it. Parted by where
@@ -3760,11 +3685,10 @@ test('a trigger that cannot record its dispatch still makes it', () => {
    the message it decides — each a copy that fails silently on its own.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const PACE_SQL = readFileSync(new URL('../supabase/010_pace.sql', import.meta.url), 'utf8');
+const PACE_SQL = source('supabase/010_pace.sql');
 
 test('the row 010 looks for is the row postBriefing writes', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // The two kinds, off the type rather than off a literal here.
   const kinds = [...src.match(/export type Brief = ([^;]+);/)[1]
@@ -3812,7 +3736,7 @@ test('010 states its ceiling once and quotes that one', () => {
 
   /* AND THE PROSE HOLDS THE SAME NUMBER, a platform fact, so a plan change moves
      both or neither. */
-  const claude = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');
+  const claude = source('CLAUDE.md');
   assert.ok(claude.includes(`${ms / 1000}s paid`),
     `CLAUDE.md does not name ${ms / 1000}s as the paid wall clock that 010 watches ` +
     `— one of the two has been changed without the other`);
@@ -3824,7 +3748,7 @@ test('010 states its ceiling once and quotes that one', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README names every cron job 004 schedules, on its stated schedule', () => {
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const readme = source('README.md');
 
   const scheduled = new Map(
     [...CRON_SQL.matchAll(/cron\.schedule\(\s*'([\w-]+)',\s*'([^']+)'/g)]
@@ -3854,12 +3778,12 @@ test('the README names every cron job 004 schedules, on its stated schedule', ()
 });
 
 test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
-  const cron = readFileSync(new URL('../supabase/004_cron.sql', import.meta.url), 'utf8')
+  const cron = source('supabase/004_cron.sql')
     .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
   const scheduled = (cron.match(/cron\.schedule\(/g) || []).length;
   assert.ok(scheduled >= 5, `read ${scheduled} schedules out of 004 — the reader has gone blind`);
 
-  const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const verify = source('supabase/verify.sql');
   const stated = Number(verify.match(
     /\('\w+ cron jobs, all active',[\s\S]*?'(\d+)'\),/)[1]);
 
@@ -3873,8 +3797,7 @@ test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
   const called = [...cron.matchAll(/select public\.(\w+)\(\)/g)].map(m => m[1]);
   for (const fn of called) {
     assert.ok(new RegExp(`create or replace function public\\.${fn}\\(`)
-                .test(PACE_SQL + readFileSync(
-                  new URL('../supabase/009_dispatch.sql', import.meta.url), 'utf8')),
+                .test(PACE_SQL + source('supabase/009_dispatch.sql')),
       `004 schedules public.${fn}(), which no numbered file creates — every ` +
       `firing raises into cron.job_run_details, which this file's own ` +
       `housekeeping prunes and nobody reads`);
@@ -3989,8 +3912,7 @@ test('010 says a slow run once, and the week stays visible to diagnose', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a cron-dispatched call answers first, and only the backfill door waits', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   const at = src.indexOf('secretMatches(fromCron, CRON_SECRET)');
   assert.ok(at > -1, 'doji-eugenia no longer authorises a cron caller');
   const branch = src.slice(at, src.indexOf('\n    return json({ ok: false, error: "unauthorized"', at))
@@ -4037,8 +3959,7 @@ test('a vendor that refuses costs the vector, never the note or the turn', () =>
      WHICH MAKES THE WRITE PATHS THE ONES THAT MUST SWALLOW IT. Backwards, a
      vendor outage stops her remembering anything, silently, while the door
      stays quiet. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   /* BY LINE, not a regex over the call: `embed(turns.map(t => String(t.content)))`
      closes three parens. */
@@ -4055,9 +3976,7 @@ test('a vendor that refuses costs the vector, never the note or the turn', () =>
 
   // AND THE ONE THAT DOES NOT CATCH IS THE SWEEP, reached only by the door and
   // the nightly pass — which wraps it itself, for the same reason the writers do.
-  const at = src.indexOf('async function fillEmbeddings(');
-  assert.ok(at > -1, 'doji-eugenia no longer has fillEmbeddings()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function fillEmbeddings(', 'doji-eugenia no longer has fillEmbeddings()');
   assert.ok(!/\.catch\(/.test(body),
     'fillEmbeddings swallows the vendor error, so ?embed=1 is back to answering ' +
     'ok with no reason');
@@ -4073,10 +3992,8 @@ test('the quote she reads is the quote the poller serves', () => {
   /* TWO FILES, ONE OBJECT, NO BUILD STEP. The poller serves `Spot`; doji-eugenia
      reads `Quote` by name. A renamed field reaches her as undefined — "against a
      previous close of undefined" — rather than failing. */
-  const poller = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
-  const eugenia = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const poller = source('supabase/functions/doji-mcp-sync/index.ts');
+  const eugenia = source('supabase/functions/doji-eugenia/index.ts');
 
   const fields = (src, name) => {
     const m = src.match(new RegExp(`interface ${name} \\{([\\s\\S]*?)\\n\\}`));
@@ -4103,15 +4020,10 @@ test('every number off the quote reaches her with the window it was measured ove
      it `change` is the overnight move, after it a few hours of evening, and a
      bare number reads as "on the day" either way. Nothing else breaks if the
      label goes, so it is read on both paths that carry it. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  const body = (name, kind = 'async function') => {
-    const at = src.indexOf(`${kind} ${name}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
-    const end = src.indexOf('\n}', at);
-    return src.slice(at, end).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
-  };
+  const body = (name, kind = 'async function') =>
+    uncomment(bodyOf(src, `${kind} ${name}(`, `doji-eugenia no longer has ${name}()`));
 
   /* THE WINDOW IS INSIDE THE RENDERING: one `quoteLine` carries the label, so a
      quote cannot be said without it. */
@@ -4148,8 +4060,7 @@ test('the two unscheduled looks both build a term before they use one', () => {
   /* THE PRINT LOOK AND THE MOVE LOOK ARE TOLD TO BUILD FROM THE MAP they are
      handed. A ladder without the instruction fails exactly as the instruction
      without the ladder: she teaches well about whatever the message is about. */
-  const prompts = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/prompt.ts', import.meta.url), 'utf8');
+  const prompts = source('supabase/functions/doji-eugenia/prompt.ts');
 
   const section = (name) => {
     const m = prompts.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`));
@@ -4188,7 +4099,7 @@ test('the two unscheduled looks both build a term before they use one', () => {
    and his screen's differ, with nothing saying which is which.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the journal stats agree with the app they were ported from', () => {
-  const app = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const app = source('index.html');
 
   const appBE = app.match(/BE:\s*([\d.]+)/);
   assert.ok(appBE, 'index.html no longer states CONFIG.BE, so nothing can be compared to it');
@@ -4213,8 +4124,7 @@ test('the journal stats agree with the app they were ported from', () => {
   /* THE SUBTLE DEFINITIONS, read as SHAPE: each is half of a pair that parts on
      one case — a scratch in price rather than dollars, money on the sign rather
      than the label, averages on the label rather than the sign. */
-  const mod = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/journal.ts', import.meta.url), 'utf8');
+  const mod = source('supabase/functions/doji-eugenia/journal.ts');
 
   for (const [what, re] of [
     ['the scratch band against the entry PRICE', /Math\.abs\(t\.exit_price - t\.entry_price\) <= BE/],
@@ -4239,8 +4149,7 @@ test('the journal stats agree with the app they were ported from', () => {
 });
 
 test('the stats tool is offered wherever the journal is reasoned about', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   /* A CONVERSATION AND THE NIGHTLY PASS, which judges a stretch of trading and
      needs the arithmetic over the rows it is given. */
@@ -4258,8 +4167,7 @@ test('the stats tool is offered wherever the journal is reasoned about', () => {
 });
 
 test('every column the price mark writes is a column the table has', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   const table = SENSES_SQL.match(/create table if not exists public\.eugenia_price \(([\s\S]*?)\n\);/);
   assert.ok(table, '005 no longer creates eugenia_price');
@@ -4270,9 +4178,7 @@ test('every column the price mark writes is a column the table has', () => {
   /* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT: written
      unconditionally the quiet gate never reopens and the sense fires once ever.
      Read out of markPrice, since the calendar has its own looked_at. */
-  const at = src.indexOf('async function markPrice(');
-  assert.ok(at > -1, 'doji-eugenia no longer has markPrice()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function markPrice(', 'doji-eugenia no longer has markPrice()');
   assert.match(body, /\.\.\.\(looked \? \{ looked_at:/,
     'markPrice writes looked_at unconditionally — every run stamps it, the quiet ' +
     'window never opens again, and she says one thing about a move and then ' +
@@ -4316,7 +4222,7 @@ test('the trigger reads the cron secret under the spelling Vault holds', () => {
 });
 
 test('the app reads only the three tables it was given a policy for', () => {
-  const app = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const app = source('index.html');
   const read = new Set([...app.matchAll(/\.from\('(eugenia_\w+)'\)/g)].map(m => m[1]));
   assert.ok(read.size, 'the app no longer reads anything of hers — the card is dead');
 
@@ -4397,7 +4303,7 @@ test('no numbered file recreates an object a later one drops', () => {
     .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
   assert.ok(files.length >= 6, `only ${files.length} numbered files found — the reader has gone blind`);
 
-  const text = (f) => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8');
+  const text = (f) => source(`supabase/${f}`);
   const dropped = [];
   for (const f of files) {
     for (const [, kind, name] of text(f).matchAll(
@@ -4538,11 +4444,8 @@ test('the text is sent only when the audio did not land', () => {
   /* THE VOICE NOTE IS THE MESSAGE, and `say` is the fallback. An unset key, a
      refusing vendor or an unrenderable format would make audio alone a MISSING
      message, so the property is that `say` is still reachable. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('export async function sayAloud(');
-  assert.ok(at > -1, 'doji-eugenia no longer has sayAloud()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const body = bodyOf(src, 'export async function sayAloud(', 'doji-eugenia no longer has sayAloud()');
 
   const spoke = body.indexOf('await speak(');
   const said = body.indexOf('await say(');
@@ -4565,9 +4468,7 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
   /* THE HELLO IS HERS. A greeting prepended in code was the same words every
      morning; undone by putting one back, or by a critic that cuts her hello as
      an opening true on any morning. */
-  const at = EUGENIA_TS.indexOf('async function postBriefing(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postBriefing()');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function postBriefing(', 'doji-eugenia no longer has postBriefing()');
   assert.match(body, /sayAloud\(brief, /,
     'something is put in front of the briefing again — the hello is hers to say');
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
@@ -4586,8 +4487,7 @@ test('every message she writes goes out through sayAloud', () => {
      postBriefing's fallback), then the pulse, the release look, the trade event,
      the move look and the reply. `/notes`, the apologies and the short
      operational lines keep `say` deliberately. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 7,
     `${spoken} call sites speak where seven should — a message she writes that goes ` +
@@ -4599,13 +4499,10 @@ test('the three gated paths remember what the gate returned, not the draft', () 
      would put words he never saw in her history, resent as hers for six
      exchanges. `postBriefing` stores what `critique` returned. Read from the
      source, since nothing here drives a path that sends. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   for (const fn of ['postPulse', 'postRelease', 'postMove']) {
-    const at = src.indexOf(`async function ${fn}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${fn}()`);
-    const body = src.slice(at, src.indexOf('\n}', at));
+    const body = bodyOf(src, `async function ${fn}(`, `doji-eugenia no longer has ${fn}()`);
 
     assert.match(body, /const sent = await trim\(said, desk, story\);/,
       `${fn} no longer binds the revision — inlined into sayAloud it cannot ` +
@@ -4623,11 +4520,8 @@ test('the three gated paths remember what the gate returned, not the draft', () 
 test('the audio is asked for in the one format Telegram renders as a voice note', () => {
   /* THE ONE THING HERE THAT FAILS QUIETLY: the vendor's default mp3 WORKS, and
      arrives as an attachment rather than a voice note — nothing errors. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function speak(');
-  assert.ok(at > -1, 'doji-eugenia no longer has speak()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const body = bodyOf(src, 'async function speak(', 'doji-eugenia no longer has speak()');
 
   assert.match(body, /response_format: "opus"/,
     'the speech request no longer asks for opus — mp3 succeeds and arrives as a ' +
@@ -4647,8 +4541,7 @@ test('the audio is asked for in the one format Telegram renders as a voice note'
 test('the length she is told to write to is the length that is spoken', () => {
   /* THERE IS NO CAP, SO THE PROMPT STATES NO LENGTH: a number there would ask her
      to write shorter for a limit that does not exist. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
   assert.doesNotMatch(src, /Keep it under \$\{[A-Z_]*MAX[A-Z_]*\} characters/,
     'the prompt asks her to write shorter to fit a voice note again — there is ' +
     'no cap for it to fit, so that is a shorter answer bought for nothing');
@@ -4657,8 +4550,7 @@ test('the length she is told to write to is the length that is spoken', () => {
 test('every reason a voice note fails is one the handler can actually reach', () => {
   /* A sentence nothing selects is never read, and a key looked up and not defined
      renders `undefined` to him. Both halves. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
   const block = src.match(/export const VOICE_TROUBLE: Record<string, string> = \{([\s\S]*?)\n\};/);
   assert.ok(block, 'doji-eugenia no longer defines VOICE_TROUBLE');
@@ -4697,8 +4589,7 @@ test('every query flag the poller reads is one the market gate considers', () =>
   /* A READ-ONLY FLAG LEFT OUT OF THE GATE ANSWERS "market closed" AT THE WEEKEND,
      exactly when a suspicious row gets looked at. Every flag the entry point
      reads must appear in the gate. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
 
   // Any compared value, not only "1": ?market=raw shares its parameter.
   const flags = [...src.matchAll(/const (\w+)\s*=\s*url\.searchParams\.get\("(\w+)"\) === "[^"]+"/g)]
@@ -4718,8 +4609,7 @@ test('every query flag the poller reads is one the market gate considers', () =>
 test('the poller answers its debug flags before it writes anything', () => {
   // Both read-only flags return before the fold and the upsert: a debug surface
   // that writes on the way to answering is not one.
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
 
   const write = src.indexOf('const data = await mcpCall(session, "get_deals", dealArgs)');
   assert.ok(write > -1, 'the poller no longer folds the deals it was about to write');
@@ -4748,8 +4638,7 @@ test('the poller answers its debug flags before it writes anything', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the poller can call nothing that would place, move or close a trade', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
 
   const list = src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/);
   assert.ok(list, 'doji-mcp-sync no longer declares ALLOWED_TOOLS');
@@ -4790,8 +4679,7 @@ test('the poller can call nothing that would place, move or close a trade', () =
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('doji-tradingview may call only what TradingView itself marks read-only', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-tradingview/index.ts');
   const listed = JSON.parse(readFileSync(
     new URL('./fixtures/tradingview-tools-list.json', import.meta.url), 'utf8')).result.tools;
   const reads = listed.filter(t => t.annotations?.readOnlyHint === true).map(t => t.name);
@@ -4825,8 +4713,7 @@ test('doji-tradingview may call only what TradingView itself marks read-only', (
 test('every tool doji-tradingview may call is one a probe or a reader calls', () => {
   // The poller's rule: a permitted name nothing reaches is a widening with no
   // feature behind it, and that is the shape a write would arrive in.
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-tradingview/index.ts');
   const allowed = [...src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/)[1]
     .matchAll(/"([\w-]+)"/g)].map(m => m[1]);
   const body = src.slice(src.indexOf('as const;', src.indexOf('const ALLOWED_TOOLS')));
@@ -4838,8 +4725,7 @@ test('every tool doji-tradingview may call is one a probe or a reader calls', ()
 test('every tool the poller may call is one it actually calls or probes', () => {
   // A name in the array nothing reaches is a widening with no feature — the shape
   // a destructive tool would arrive in, added "for later".
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
   const allowed = [...src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/)[1]
     .matchAll(/"(\w+)"/g)].map(m => m[1]);
 
@@ -4857,13 +4743,10 @@ test('every tool the poller may call is one it actually calls or probes', () => 
    function body: a whole-file match is answered by another function's copy. */
 
 test('every column the poller writes once is filtered inside the UPDATE', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
 
   // ONE WRITER, so the filter lives in one place and every caller inherits it.
-  const at = src.indexOf('async function writeOnce(');
-  assert.ok(at > -1, 'doji-mcp-sync no longer has writeOnce()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function writeOnce(', 'doji-mcp-sync no longer has writeOnce()');
   assert.match(body, /trades\?id=eq\.\$\{id\}&\$\{column\}=is\.null/,
     'writeOnce writes with no `<column>=is.null` filter, so it writes on every ' +
     'poll — the last sighting wins a column where the first one is the whole point');
@@ -4889,12 +4772,9 @@ test('the trade look speaks only about the day it is happening on', () => {
      old day — a backfill would report August's losses in the present tense.
      Guarded BEFORE either branch, being a property of the event; after them it
      would be two guards, with the second to be forgotten. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  const at = src.indexOf('async function postTradeEvent(');
-  assert.ok(at > -1, 'doji-eugenia no longer has postTradeEvent()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function postTradeEvent(', 'doji-eugenia no longer has postTradeEvent()');
 
   assert.match(body, /row\.open_day !== nyDate\(new Date\(\)\)/,
     'the trade look no longer checks the trade is today, so any late stamp — a ' +
@@ -4913,8 +4793,7 @@ test('the close instant is written only where the deals say it closed', () => {
      closing deal. A partial close has no exit price and no close to stamp —
      writing one would file a running position as finished. Read out of the
      handler, since the helper cannot see which rows it is called for. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
 
   assert.match(src, /folded\.filter\(f => f\.row\.exit_price !== null\)[\s\S]{0,120}writeOnce\(f\.row\.id, "fill_time", new Date\(f\.closedAt\)/,
     'the close instant is no longer confined to positions the deals show closed — ' +
@@ -4953,13 +4832,11 @@ test('the close instant is written only where the deals say it closed', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the poller counts the plans it wrote, not the plans it tried', () => {
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
 
   /* THE ONE WRITER answers whether it wrote, and every count is taken from that
      answer: the silent half is a property of the shape, so it is held once. */
-  const at = src.indexOf('async function writeOnce(');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const body = bodyOf(src, 'async function writeOnce(');
   assert.match(body, /Promise<boolean>/,
     'writeOnce no longer answers whether it wrote, so every count beside it is ' +
     'back to counting calls');
@@ -4986,11 +4863,8 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
   /* bestPrice can be right on every bar while the poll never reaches it, reads the
      backlog oldest first, or overwrites every two minutes — none a wrong number
      a test of the function could see. So the call site is read. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function fillExcursions(');
-  assert.ok(at > -1, 'doji-mcp-sync no longer has fillExcursions()');
-  const body = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
+  const body = bodyOf(src, 'async function fillExcursions(', 'doji-mcp-sync no longer has fillExcursions()');
 
   assert.match(body, /order=entry_time\.desc&limit=\d+/,
     'the excursion read is no longer newest first with a limit — a fresh close ' +
@@ -5008,14 +4882,11 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
   /* fileWeek and r14 are driven in fold.test.mjs; a pass that stopped filing
      leaves R-14 unknown on every trade with nothing erroring. The call sites,
      both meters and the calendar handed to the rules are read. */
-  const src = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('async function postConsolidation(');
-  const pass = src.slice(at, src.indexOf('\n}', at));
+  const src = source('supabase/functions/doji-eugenia/index.ts');
+  const pass = bodyOf(src, 'async function postConsolidation(');
   assert.match(pass, /await filedWeek\(weekOf\(new Date\(\)\)\)/,
     'the nightly pass no longer files the week R-14 is judged against');
-  const meter = src.slice(src.indexOf('async function filedWeek('));
-  const week = meter.slice(0, meter.indexOf('\n}'));
+  const week = bodyOf(src, 'async function filedWeek(');
   assert.match(week, /caller: 'calendar week', ok: true/, 'the week filing records no success');
   assert.match(week, /caller: 'calendar week', ok: false/, 'the week filing records no failure');
 
@@ -5031,8 +4902,7 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
 
   /* AND THE POLLER WRITES THE HISTORY, inside the step that already read the
      open positions — a pure stopChanges proves nothing about being called. */
-  const poller = readFileSync(
-    new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
+  const poller = source('supabase/functions/doji-mcp-sync/index.ts');
   assert.match(poller, /planned \+= await writePlan\(plan\);\s*stops = await recordStops\(plans\);/,
     'the poll no longer records stop moves, so trade_stops stops growing and R-19 goes unknown');
 });
@@ -5042,8 +4912,7 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
      holds the token and only ever answers with a quote; she presents the cron
      secret she has. The token in her hands would put a market order one prompt
      injection away. Structural, not instructed. */
-  const eugenia = readFileSync(
-    new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const eugenia = source('supabase/functions/doji-eugenia/index.ts');
 
   /* THE READ, NOT THE MENTION: the comment explaining why she does not hold the
      token names it. */
@@ -5130,11 +4999,8 @@ test('the release prompt asks for the tool the release look actually has', () =>
 test('the market around gold reaches both paths that explain gold against it, and only from one list', () => {
   /* aroundList is driven in fold.test.mjs and cannot see its callers. A briefing
      that stopped reading the market still reads well, off a search page. */
-  const body = (name) => {
-    const at = EUGENIA_TS.indexOf(`async function ${name}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
-    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
-  };
+  const body = (name) =>
+    bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
   for (const fn of ['postBriefing', 'postMove']) {
     const b = body(fn);
     assert.match(b, /aroundBlock\(\)/, `${fn} no longer reads the market around gold`);
@@ -5155,8 +5021,7 @@ test('the market around gold reaches both paths that explain gold against it, an
 
 test('the move look reads the wires before it searches, and claims no more than a title', () => {
   // headlinesList is pure and driven in fold.test.mjs; the call site is not.
-  const at = EUGENIA_TS.indexOf('async function postMove(');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function postMove(');
   assert.match(body, /headlinesBlock\(\)/, 'the move look no longer reads the headlines');
   assert.match(body, /\+ wires \+/, 'the move look reads the headlines and never hands them to her');
   const move = EUGENIA_PROMPT.match(/export const MOVE = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
@@ -5170,9 +5035,7 @@ test('the move look reads the wires before it searches, and claims no more than 
    `breachesBlock` is driven in fold.test.mjs; whether the briefing reads it is
    read here. */
 test('the briefing is handed the rules his trades broke, and told to take them from there', () => {
-  const at = EUGENIA_TS.indexOf('async function postBriefing(');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at))
-    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const body = uncomment(bodyOf(EUGENIA_TS, 'async function postBriefing('));
   assert.ok(reaches(body, 'breachesBlock'),
     'the briefing no longer reads what his trades broke, so a Friday breach is never raised');
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
@@ -5181,8 +5044,7 @@ test('the briefing is handed the rules his trades broke, and told to take them f
   assert.match(system, /never call a rule broken that it does not list/,
     'SYSTEM no longer holds her to the computed breaches, so she reads them off the rows');
   // One reader for the tool and the block, so the two cannot be fed differently.
-  const block = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export async function breachesBlock('));
-  assert.match(block.slice(0, block.indexOf('\n}')), /readRules\(/,
+  assert.match(bodyOf(EUGENIA_TS, 'export async function breachesBlock('), /readRules\(/,
     'the briefing evaluates the rules through a reader check_rules does not use');
 });
 
@@ -5196,15 +5058,13 @@ test('the release look is told a speech is recorded by its line alone', () => {
 
 test('the release look is handed the release\'s own record, and told to read against it', () => {
   // recordList is pure and driven in fold.test.mjs; whether the look reads it is not.
-  const at = EUGENIA_TS.indexOf('async function postRelease(');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function postRelease(');
   assert.match(body, /recordBlock\(due\)/, 'the release look no longer reads the track record');
   assert.match(body, /\brecord \+ notes/, 'the release look reads the record and never hands it to her');
   const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
   assert.match(release, /READ IT AGAINST ITS OWN RECORD/, 'RELEASE no longer asks her to use the record');
   // And the filing writes the series, or the record stays empty for ever.
-  const rows = EUGENIA_TS.slice(EUGENIA_TS.indexOf('export function calendarRows('));
-  assert.match(rows.slice(0, rows.indexOf('\n}')), /'ticker'/, 'calendarRows no longer files the ticker');
+  assert.match(bodyOf(EUGENIA_TS, 'export function calendarRows('), /'ticker'/, 'calendarRows no longer files the ticker');
 });
 
 /* ─── The briefing that opens the week ───────────────────────────────────────
@@ -5212,8 +5072,7 @@ test('the release look is handed the release\'s own record, and told to read aga
    the critic counting the week's list against the words — or the prose is cut
    to make room every Sunday. */
 test('the Sunday briefing reads the week, is told it is about the week, and the critic does not count it', () => {
-  const at = EUGENIA_TS.indexOf('async function postBriefing(');
-  const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
   assert.match(brief, /due === 'sunday' \? weekBlock\(\) : calendarBlock\(\)/,
     'the Sunday briefing no longer reads the week, so it sees only to Monday evening');
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
@@ -5254,11 +5113,8 @@ test('a reply can read the market around gold, and is told to before searching f
    plausible cause it cannot be — both an ordinary edit away, both reading as
    better informed. */
 test('the speculators\' weekly count reaches the Sunday briefing and a conversation, and nothing else', () => {
-  const body = (name) => {
-    const at = EUGENIA_TS.indexOf(`async function ${name}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
-    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
-  };
+  const body = (name) =>
+    bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
   const calls = [...EUGENIA_TS.matchAll(/(?<!function )positioningBlock\(\)/g)].length;
   assert.equal(calls, 2, `positioningBlock() is called ${calls} times — a new reader was given the weekly count`);
   assert.match(body('postBriefing'), /due === 'sunday' \? positioningBlock\(\) : ""/,
@@ -5280,8 +5136,7 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
    later meeting is never a chance — the half that keeps her figure matching
    his FedWatch screen. */
 test('the rate odds reach the briefing and a conversation, said the way FedWatch shows them', () => {
-  const at = EUGENIA_TS.indexOf('async function postBriefing(');
-  const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
   assert.equal([...EUGENIA_TS.matchAll(/(?<!function )ratesBlock\(\)/g)].length, 2,
     'ratesBlock() is called somewhere other than the briefing and get_around');
   assert.match(brief, /aroundBlock\(\), ratesBlock\(\),/, 'the briefing no longer reads the rate odds');
@@ -5299,9 +5154,7 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
    newest first and recordList oldest first; `rows.reverse()` reverses in
    place, so reversing first hands revisionLine the OLDEST print. */
 test('the release look is handed the revision, off the record read newest first', () => {
-  const at = EUGENIA_TS.indexOf('async function recordBlock(');
-  assert.ok(at > -1, 'doji-eugenia no longer has recordBlock()');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function recordBlock(', 'doji-eugenia no longer has recordBlock()');
   assert.match(body, /recordList\(r\.name, \[\.\.\.rows\]\.reverse\(\)\) \+ revisionLine\(r, rows\)/,
     'the record is reversed in place before the revision reads it, or the revision is not handed over');
   const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
@@ -5314,11 +5167,8 @@ test('the calendar is filed before the briefing reads it and before the look dec
   /* A briefing that reads before it files hands her yesterday's calendar; a look
      that decides before it files never sees the actual, and waits out the half
      hour on every print. */
-  const body = (name) => {
-    const at = EUGENIA_TS.indexOf(`async function ${name}(`);
-    assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
-    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
-  };
+  const body = (name) =>
+    bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
   const brief = body('postBriefing');
   /* AND ON A SUNDAY THE WEEK, which the nightly pass files five hours after the
      one briefing about it. */
@@ -5342,8 +5192,7 @@ test('the calendar is filed before the briefing reads it and before the look dec
 test('the release look is handed the stamp its tool takes', () => {
   /* THE HEADING IS IN ET AND THE TOOL TAKES UTC. Asked to convert, she converts
      from words — an instant an hour out for half the year, silently. */
-  const at = EUGENIA_TS.indexOf('async function postRelease(');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function postRelease(');
   assert.match(body, /toISOString\(\)[\s\S]{0,80}record_actual/,
     'postRelease no longer hands her the UTC stamp record_actual matches on');
 });
@@ -5359,8 +5208,7 @@ test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () 
     'marking a stale row makes it read as the later one');
   /* AND THE WRITER IS THE OTHER HALF: a mark PATCH naming `updated_at` moves it
      whatever the trigger compares. Proved by adding it and watching this go red. */
-  const mark = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function markLooked'));
-  const sent = mark.slice(0, mark.indexOf('\n}')).match(/JSON\.stringify\(\{([^}]*)\}/);
+  const sent = bodyOf(EUGENIA_TS, 'async function markLooked').match(/JSON\.stringify\(\{([^}]*)\}/);
   assert.ok(sent, 'markLooked no longer PATCHes a literal body this can read');
   assert.deepEqual([...sent[1].matchAll(/(\w+):/g)].map(m => m[1]), ['looked_at'],
     'markLooked writes a column other than looked_at, so a mark is an edit — ' +
@@ -5480,7 +5328,7 @@ test('the rules carry a worked example, because no description of them worked', 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql runs exactly one statement, so the editor shows the checks', () => {
-  const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
+  const sql = source('supabase/verify.sql');
 
   /* Comments first, then strings: an apostrophe in a comment desynchronises
      quote matching. */
@@ -5499,7 +5347,7 @@ test('verify.sql runs exactly one statement, so the editor shows the checks', ()
 test('the listings still exist, in the file that can afford to raise', () => {
   // Deleting them instead of moving them would pass the test above and lose the
   // eye pass — the thing you reach for at the moment a check says false.
-  const diag = readFileSync(new URL('../supabase/diagnose.sql', import.meta.url), 'utf8');
+  const diag = source('supabase/diagnose.sql');
   for (const read of ['cron.job', 'net._http_response', 'information_schema.columns']) {
     assert.ok(diag.includes(read),
       `diagnose.sql no longer reads ${read}, so "which schedule, which column" ` +
@@ -5721,9 +5569,7 @@ test('the two gates share the half that makes a gate safe', () => {
   /* ONE GATE: a revision failing `keepDraft` is overruled, and a gate that THROWS
      costs nothing. A copied catch is where one gate loses its message on the day
      a vendor is slow. */
-  const at = EUGENIA_TS.indexOf('async function gate(');
-  assert.ok(at > -1, 'the shared gate body is gone, so each gate holds its own copy');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function gate(', 'the shared gate body is gone, so each gate holds its own copy');
 
   /* THE FIRST RETURN IN EACH BRANCH, not a character window, which measures the
      branch's length. */
@@ -5746,8 +5592,7 @@ test('the two gates share the half that makes a gate safe', () => {
    its own mark. */
 
 test('every message a gate decides leaves one verdict row, on all three outcomes', () => {
-  const at = EUGENIA_TS.indexOf('async function gate(');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
+  const body = bodyOf(EUGENIA_TS, 'async function gate(');
   assert.match(body, /const caller = `\$\{label\} verdict`;/,
     'the verdict is no longer filed under the gate\'s own label, so a query ' +
     'for what TRIM decided cannot be told from one for what CRITIC decided');
@@ -5778,8 +5623,7 @@ test('keepDraft is relative, because it now reads three-sentence messages', () =
     'keepDraft no longer scales with the draft it is judging');
   /* AND TRIM'S CEILING IS ITS OWN, held at the call: without it the fallback is
      twice the draft. */
-  const at = EUGENIA_TS.indexOf('async function trim(');
-  assert.match(EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at)), /'trim', TRIM_MOST\)/,
+  assert.match(bodyOf(EUGENIA_TS, 'async function trim('), /'trim', TRIM_MOST\)/,
     'TRIM is judged by the critic\'s ceiling again, so its notes on a message can reach him with it');
 });
 
