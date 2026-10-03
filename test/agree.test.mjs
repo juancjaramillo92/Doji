@@ -5782,12 +5782,13 @@ test('keepDraft is relative, because it now reads three-sentence messages', () =
 test('every run row records the model that answered it', () => {
   const calls = [...EUGENIA_TS.matchAll(/recordRun\(\{([\s\S]*?)\}\)/g)]
     .map(m => m[1])
-    // ask()'s two — the turn that finished and the turn that threw. The briefing
-    // marker and the two sweep meters write no model because they make no call.
+    // ask()'s one, which files the turn that finished and the turn that threw.
+    // The briefing marker and the two sweep meters write no model because they
+    // make no call.
     .filter(body => /in_tokens/.test(body));
-  assert.equal(calls.length, 2,
-    `${calls.length} recordRun call sites carry token counts where two should — ` +
-    `the reader has gone blind, or a third model call is recording nothing`);
+  assert.equal(calls.length, 1,
+    `${calls.length} recordRun call sites carry token counts where one should — ` +
+    `the reader has gone blind, or a second model call is recording nothing`);
 
   for (const body of calls) {
     assert.match(body, /\bmodel\b/,

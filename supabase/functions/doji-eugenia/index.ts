@@ -1446,12 +1446,20 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   const called: Record<string, number> = {};
   const toolLine = () =>
     Object.entries(called).map(([name, n]) => `${name}×${n}`).join(', ') || null;
+  // One row for both endings, so the turn that threw is filed like the one that
+  // finished.
+  const run = (ok: boolean, detail: string | null) => recordRun({
+    caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
+    wrote_1h: wrote1h, wrote_5m: wrote5m,
+    out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
+    ms: Date.now() - started, ok, detail,
+  });
   // The tool_result carrying the loop's cache breakpoint.
   let marked: any;
 
   try {
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    rounds = round + 1;
+  while (rounds < MAX_ROUNDS) {
+    rounds++;
     const body = await call(convo, effort, tools, model, container);
     container = body.container?.id ?? container;
 
@@ -1525,29 +1533,17 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     if (!text) throw new Error("Claude returned no text");
     // The console line to watch one turn; the row, because nobody reads Edge
     // logs. The catch records the turns that never got here.
-    console.log(`doji-eugenia: ${label} — ${model}, ${round + 1} round(s), ${effort} effort, ` +
+    console.log(`doji-eugenia: ${label} — ${model}, ${rounds} round(s), ${effort} effort, ` +
                 `${inTok} in (${cached} cached, ${wrote1h}+${wrote5m} written), ` +
                 `${outTok} out, ${searches} search(es), ${fetches} fetch(es)` +
                 (fellBack ? `, FELL BACK TO ${fellBack}` : ""));
-    await recordRun({
-      caller: label, model, effort, rounds: round + 1, in_tokens: inTok, cached,
-      wrote_1h: wrote1h, wrote_5m: wrote5m,
-      out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
-      ms: Date.now() - started, ok: true, detail: toolLine(),
-    });
+    await run(true, toolLine());
     return text;
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
   } catch (err) {
     // A failed turn is a row too — the one that never existed. Rethrown.
-    await recordRun({
-      caller: label, model, effort, rounds: rounds || null, in_tokens: inTok, cached,
-      wrote_1h: wrote1h, wrote_5m: wrote5m,
-      out_tokens: outTok, searches, fetches, fell_back: fellBack || null,
-      ms: Date.now() - started, ok: false,
-      detail: [why(err), toolLine()]
-        .filter(Boolean).join(' · tools: ').slice(0, 500),
-    });
+    await run(false, [why(err), toolLine()].filter(Boolean).join(' · tools: ').slice(0, 500));
     throw err;
   }
 }
