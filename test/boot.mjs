@@ -20,7 +20,7 @@ const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const EXPOSED = [
   'CONFIG', 'Data', 'Dates', 'IO', 'Journal', 'Login',
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
-  'counts', 'money', 'pctSplit', 'byKey', 'round2',
+  'counts', 'money', 'pctSplit', 'byKey', 'round2', 'prevWeek', 'shiftMonth',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
   'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch',
   // The undo window around a delete: its rules are about ORDER, and none is

@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 695 tests, six suites
+npm test      # 696 tests, six suites
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced

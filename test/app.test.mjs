@@ -514,6 +514,16 @@ test('the backup key is the Friday whose 17:00 New York close last passed', () =
   assert.equal(key('2026-08-27T12:00:00Z'), '2026-08-21');
 });
 
+test('the P&L card steps back a whole week and a whole month, across a year end', () => {
+  // Driven directly: no fixture sits on either boundary, so an off-by-one moves
+  // no figure the snapshot holds.
+  assert.equal(app.prevWeek('2026-08-16'), '2026-08-09');
+  assert.equal(app.prevWeek('2026-03-01'), '2026-02-22');
+  assert.equal(app.prevWeek('2026-01-04'), '2025-12-28');
+  assert.equal(app.shiftMonth('2026-01-01', -1), '2025-12-01');
+  assert.equal(app.shiftMonth('2026-12-01', 1), '2027-01-01');
+});
+
 /* ─── Filing and sessions ────────────────────────────────────────────────── */
 
 test('open_day is the filing anchor, the closing fill only its fallback', () => {

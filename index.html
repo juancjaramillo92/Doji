@@ -2736,26 +2736,20 @@ function renderPnLCard(rows) {
 
   for (const [id, v] of [['pnl-week-prev', weekWas], ['pnl-week-cur', week],
                          ['pnl-month-prev', monthWas], ['pnl-month-cur', month]]) {
-    const el = $(id);
-    if (!el) continue;
     const amt = round2(v);
-    el.textContent = m.n ? fmtMoney(amt) : DASH;
-    el.classList.remove('win','loss');
-    if (m.n && amt) el.classList.add(amt > 0 ? 'win' : 'loss');
+    setFigure(id, m.n ? fmtMoney(amt) : DASH, m.n ? amt : 0);
   }
 }
 
-// Parsed at UTC midnight and formatted back the same way, so nothing shifts
-// across a timezone on the round trip.
+// Built and formatted in UTC, so nothing shifts across a timezone on the round
+// trip.
 function prevWeek(day) {
-  const d = new Date(day + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() - 7);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 7)).toISOString().slice(0, 10);
 }
 function shiftMonth(day, by) {
   const [y, m] = day.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return d.toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 10);
 }
 
 /* ─── Cumulative curve ───────────────────────────────────────────────────── */
