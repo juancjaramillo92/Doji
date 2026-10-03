@@ -5,9 +5,9 @@ app behaves; this file is how to work on it, and holds only what the README does
 not. Where the two disagree, the README wins and you say so.
 
 `REFACTOR.md` is the register: every move considered and REFUSED, with the
-reasoning that decided it, and what no test reaches. Read it before proposing a
-simplification — most of what looks like duplication here has already been
-looked at.
+reasoning that decided it, what no test reaches, and what was deferred. Read it
+before proposing a simplification — most of what looks like duplication here
+has already been looked at.
 
 Doji is a personal XAUUSD trading journal: one `index.html`, one flat namespace,
 **no build step, no bundler**. Four writers share one Supabase table — the app,
