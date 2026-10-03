@@ -1,19 +1,10 @@
 # REFACTOR.md — what was refused, and why
 
-`README.md` is the contract and `CLAUDE.md` is how to work here. This is
-neither. It is the REGISTER: every move considered and turned down, with the
-reasoning that decided it, so a tempting one is not re-proposed every few months
-and eventually waved through on a tired afternoon. Read §2 before proposing a
-simplification — most of what looks like duplication here has already been
-looked at.
-
-It began as the running state of one long refactoring pass and carried that
-pass's protocol, its move catalogue and a ledger of everything it had proved.
-All of that is finished, and a record of a finished pass is archaeology by this
-repository's own standard: the proofs live in the test banners that hold them,
-where a reader meets them at the moment they matter. What could not live
-anywhere else is what is left — a refusal has no code to attach itself to, which
-is exactly why it needs a document.
+`README.md` is the contract and `CLAUDE.md` is how to work here. This is the
+REGISTER: every move considered and turned down, with the reasoning that decided
+it, so a tempting one is not re-proposed and eventually waved through on a tired
+afternoon. A refusal has no code to attach itself to, which is why it needs a
+document. Read §2 before proposing a simplification.
 
 Where it disagrees with the README, the README wins and you say so.
 
@@ -21,9 +12,8 @@ Where it disagrees with the README, the README wins and you say so.
 
 ## 1 · WHAT NO TEST REACHES
 
-`npm test` is the net, and `CLAUDE.md` describes what each suite holds. This is
-the other half of that answer — what a green run says nothing about, and what
-therefore must be stated on any change that touches it.
+What a green `npm test` says nothing about, and what must therefore be stated on
+any change that touches it.
 
 | Blind spot | What settles it instead |
 |---|---|
@@ -40,15 +30,8 @@ therefore must be stated on any change that touches it.
 
 ## 2 · THE REJECTED REGISTER
 
-Every move considered and NOT made, so a tempting one is not re-proposed every
-few months and eventually waved through on a tired afternoon.
-
-Nine of them are already refused by a rule `CLAUDE.md` states, and are named
-here rather than argued: the reason belongs in the document every session reads,
-once. Two of the nine WERE argued here as well, in the same words — R-3 and
-R-10 — and a reader of either file had no way to know the other existed. The
-prose guard cannot see that shape: it reads within a file, by exact line, and
-this was an argument restated across two.
+Nine are refused by a rule `CLAUDE.md` states, and are named here rather than
+argued, so the reason lives once, in the document every session reads.
 
 | Move | Refused by, in `CLAUDE.md` |
 |---|---|
@@ -56,14 +39,14 @@ this was an argument restated across two.
 | R-2 — single-sourcing the setup vocabulary | where a copy is unavoidable, a test holds the copies together |
 | R-3 — deleting `MARKETS.sydney` | the two branches of `session()` that decide nothing, and why the entry stays |
 | R-4 — reordering the branches of `sessionOf` | the same paragraph: the order of the first two is unobservable |
-| R-5 — collapsing the poller's two windows | which positions get written and which deals get read are different questions |
+| R-5 — collapsing the poller's two windows | the poller's two windows are different questions |
 | R-6 — making the offline snapshot writable | the snapshot is a read cache and can never be anything else |
-| R-7 — deciding a Telegram redraw from the keyboard | never read whether a message should settle off its keyboard |
+| R-7 — deciding a Telegram redraw from the keyboard | never decide whether a message settles off its keyboard |
 | R-8 — moving a `drop` into an earlier numbered SQL file | a re-runnable file may not undo a later one |
 | R-10 — regenerating `golden.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 
-The five below are refused by something no other document holds, so they carry
-their reasoning here.
+The rest are refused by something no other document holds, so they carry their
+reasoning here.
 
 ### R-15 — giving the critic the briefing's tool array so it rides its cache
 **Why refused:** it was tried, shipped, and measured, and it does not work. This
@@ -98,7 +81,7 @@ tool schemas the critic cannot call, in a prefix it pays 2× to write.
 
 That the same morning's release looks read theirs four times over
 (`wrote_1h` 21,466 then 0, 0, 0, 0) is what rules out a broken cache and leaves
-effort holding the bag.
+effort as the cause.
 
 **Revisit if:** the critic's effort is ever raised to the briefing's — then the
 prefix is genuinely shared and the array is worth revisiting in the same pass.
@@ -167,8 +150,8 @@ here: Deno has real modules, `import` needs nothing built, and this repository
 already does it five times — `_shared/edge.ts`, `prompt.ts`, `strategy.ts`,
 `journal.ts`, `adherence.ts`. The banner comments already name the seams.
 
-What decides it is that the move finds nothing. Four and a half thousand lines
-is hard to hold in one head and easy to lose a helper inside, which is a real
+What decides it is that the move finds nothing. Nearly four thousand lines is
+hard to hold in one head and easy to lose a helper inside, which is a real
 cost — but it is a cost paid by a reader, and every defect found in this file
 was found by reading it with a question, not by its being shorter. Against that:
 load-order safety is free in one file and stops being free across five, and
@@ -246,11 +229,9 @@ whether an index can serve it, and that is a measurement rather than a reading.
 
 ---
 
----
-
 ## 3 · WHAT IS STILL OPEN
 
-Three things, none of which blocks anything:
+None of which blocks anything:
 
 - **Pure-logic goldens.** `Dates.session` has one. `foldPosition`, the email
   parser and `adherence.ts` are covered by `fold.test.mjs` and by nothing that
@@ -258,6 +239,7 @@ Three things, none of which blocks anything:
 - **Doc coverage, code to doc.** The maintenance doors are held by a test and
   the doc-to-code direction has been run; whether every feature has a paragraph
   has not.
-- **Comment register and section placement.** Never swept. Both are judgment
-  passes rather than scans, which is why they keep not happening.
+- **Section placement.** Never swept. The comment register was swept once, in
+  the pass that cut every comment to its *why* and proved each file
+  token-identical afterwards; placement is the judgment half that pass left.
 
