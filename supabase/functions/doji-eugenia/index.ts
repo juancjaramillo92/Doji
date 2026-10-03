@@ -768,7 +768,15 @@ async function readStats(days: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
-const TV_CALENDAR = `${SB_URL}/functions/v1/doji-tradingview?calendar=1`;
+/* Every door of doji-tradingview she reads, behind the cron secret: its
+   answer, or a throw naming the door and the reason it gave. */
+async function tvRead(door: string, query = ""): Promise<any> {
+  const res = await fetch(`${SB_URL}/functions/v1/doji-tradingview?${door}=1${query}`,
+                          { headers: { "x-doji-key": CRON_SECRET } });
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok || !answer.ok) throw new Error(`TradingView ${door}: ${answer.error ?? `HTTP ${res.status}`}`);
+  return answer;
+}
 
 // What doji-tradingview's `foldCalendar` answers, one release each.
 interface TvEvent {
@@ -806,10 +814,7 @@ export function calendarRows(events: TvEvent[], from: number, to: number) {
 const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 async function readTvCalendar(from: string, to: string): Promise<TvEvent[]> {
-  const res = await fetch(`${TV_CALENDAR}&from=${from}&to=${to}`, { headers: { "x-doji-key": CRON_SECRET } });
-  const answer = await res.json().catch(() => ({}));
-  if (!res.ok || !answer.ok) throw new Error(`TradingView calendar: ${answer.error ?? `HTTP ${res.status}`}`);
-  return answer.events;
+  return (await tvRead("calendar", `&from=${from}&to=${to}`)).events;
 }
 
 /* Grouped by the keys each row carries: PostgREST refuses a bulk insert whose
@@ -2334,14 +2339,10 @@ export function aroundList(answer: { market: Around[]; missing: { name: string }
   return `\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n${lines.join("\n")}`;
 }
 
-const TV_MARKET = `${SB_URL}/functions/v1/doji-tradingview?market=1`;
-const TV_NEWS = `${SB_URL}/functions/v1/doji-tradingview?news=1`;
-
 export async function aroundBlock(): Promise<string> {
   try {
-    const res = await fetch(TV_MARKET, { headers: { "x-doji-key": CRON_SECRET } });
-    const answer = await res.json();
-    if (!res.ok || !answer.ok || !answer.market?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    const answer = await tvRead("market");
+    if (!answer.market?.length) throw new Error("no symbol served");
     return aroundList(answer);
   } catch (err) {
     console.error("doji-eugenia: market around gold unavailable —", why(err));
@@ -2373,13 +2374,10 @@ export function ratesList(answer: { meetings: Priced[]; unread: string[] }): str
     `works them, from daily bars at least fifteen minutes behind:\n${lines.join("\n")}`;
 }
 
-const TV_RATES = `${SB_URL}/functions/v1/doji-tradingview?rates=1`;
-
 export async function ratesBlock(): Promise<string> {
   try {
-    const res = await fetch(TV_RATES, { headers: { "x-doji-key": CRON_SECRET } });
-    const answer = await res.json();
-    if (!res.ok || !answer.ok || !answer.meetings?.length) throw new Error(answer.error ?? `HTTP ${res.status}`);
+    const answer = await tvRead("rates");
+    if (!answer.meetings?.length) throw new Error("no meeting served");
     return ratesList(answer);
   } catch (err) {
     console.error("doji-eugenia: rate odds unavailable —", why(err));
@@ -2434,10 +2432,7 @@ export function headlinesList(answer: { headlines: Headline[]; missing: { symbol
 
 export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
   try {
-    const res = await fetch(TV_NEWS, { headers: { "x-doji-key": CRON_SECRET } });
-    const answer = await res.json();
-    if (!res.ok || !answer.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
-    return headlinesList(answer, Date.now(), minutes);
+    return headlinesList(await tvRead("news"), Date.now(), minutes);
   } catch (err) {
     console.error("doji-eugenia: headlines unavailable —", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
