@@ -128,7 +128,8 @@ export function averages(rows: TradeRow[]): Averages {
 }
 
 /* Realised, never planned: average win over average loss. The planned ratio is
-   R-08 step 4, arithmetic he runs. Null with no loss to divide by. */
+   R-08 step 4, readable only off rows carrying the plan as first seen, and not
+   computed here. Null with no loss to divide by. */
 export const realisedRR = (a: Averages): number | null =>
   a.avgWin !== null && a.avgLoss ? round2(a.avgWin / a.avgLoss) : null;
 
