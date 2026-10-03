@@ -3556,6 +3556,9 @@ async function handleMessage(update: any): Promise<void> {
       return;
     }
 
+    // Best effort; it lasts five seconds, so the answer re-sends it below.
+    const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+
     // What he sent, resolved first: `text` is stored and read by the commands;
     // `blocks` is an image, for this turn only.
     let text: string = typeof msg.text === 'string' ? msg.text : "";
@@ -3564,7 +3567,7 @@ async function handleMessage(update: any): Promise<void> {
     const voice = msg.voice ?? msg.audio;
     if (voice?.file_id) {
       // Typing from the start: a voice note's wait is the longest.
-      await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+      await typing();
       const file = await tgDownload(voice.file_id);
       const heard: Heard = file
         ? await transcribe(file.bytes, file.path.split('/').pop() ?? "voice.oga",
@@ -3583,7 +3586,7 @@ async function handleMessage(update: any): Promise<void> {
     const docType = String(msg.document?.mime_type ?? "");
     const asImage = photo ?? (IMAGE_TYPES.includes(docType) ? msg.document : null);
     if (asImage?.file_id) {
-      await tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+      await typing();
       const file = await tgDownload(asImage.file_id);
       if (!file) {
         await say("That picture would not come through, jefe. Try sending it smaller?");
@@ -3638,9 +3641,7 @@ async function handleMessage(update: any): Promise<void> {
       return;
     }
 
-    // The typing indicator lasts five seconds, so it is re-sent until there is
-    // something to send; best effort.
-    const typing = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "typing" }).catch(() => {});
+    // Re-sent until there is something to send.
     typing();
     const keepTyping = setInterval(typing, 4_500);
 
@@ -3703,8 +3704,7 @@ async function handleMessage(update: any): Promise<void> {
 
 // Keeps work alive past the response. The catch matters: nothing awaits it.
 function background(work: Promise<unknown>) {
-  const guarded = work.catch(err =>
-    console.error("doji-eugenia:", why(err)));
+  const guarded = work.catch(err => console.error("doji-eugenia:", why(err)));
 
   const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
   // Logged, because without it the worker can be reclaimed at the 200 and the
