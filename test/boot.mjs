@@ -1,54 +1,43 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — jsdom harness for index.html
    ───────────────────────────────────────────────────────────────────────────
-   The app is one file, one flat namespace and no build step, so there is
-   nothing to import. This boots the real page instead: the markup is parsed by
-   jsdom, the inline script is evaluated inside it, and a probe appended to that
-   same script hands the top-level declarations back out.
+   One file, one flat namespace, no build step — so the real page is booted:
+   jsdom parses the markup, the inline script runs inside it, and a probe
+   appended to that same script hands the top-level declarations back out.
+   Appended to the TEXT, because a top-level `const` lands in the global lexical
+   scope, never on `window`, and a second eval could not see it.
 
-   The probe has to be appended to the script TEXT rather than evaluated
-   separately, because `const` at the top level of a classic script lands in the
-   global lexical scope and never on `window` — a second eval could not see it.
-
-   The three CDN tags are never fetched: jsdom loads no external resources by
-   default and the inline script is the only one executed. window.supabase and
-   window.Chart are stubbed instead, which is also what makes the assertions
-   meaningful — a stubbed Chart records what the renderers asked it to draw.
+   The CDN tags are never fetched. window.supabase and window.Chart are stubbed,
+   and the stubbed Chart records what the renderers asked it to draw.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-// The names the tests reach for. Kept explicit rather than scraped, so a rename
-// in the app fails here loudly instead of leaving a test silently asserting on
-// `undefined`.
+// Explicit rather than scraped, so a rename in the app fails here loudly
+// instead of a test asserting on `undefined`.
 const EXPOSED = [
   'CONFIG', 'Data', 'Dates', 'IO', 'Journal', 'Login',
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'pctSplit', 'byKey', 'round2',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
   'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch',
-  // The undo window around a delete. Its rules are all about ORDER — stage
-  // finalising the previous one, a second undo being inert — and none of
-  // them is reachable through Data alone.
+  // The undo window around a delete: its rules are about ORDER, and none is
+  // reachable through Data alone.
   'PendingDelete'
 ];
 
-/* THE INLINE SCRIPT, WHICH IS THE WHOLE APP. Exported because types.test.mjs
-   compiles this same text: two readers slicing the page by hand is two chances
-   for one of them to be reading a different program than the other, and the
-   one that drifts would go on passing about a file nobody is running. The
-   three `<script src>` tags come before it, so the LAST opening tag is the
-   inline one. */
+/* The inline script, which is the whole app — the last opening tag, the three
+   `<script src>` tags coming first. Exported so types.test.mjs compiles the
+   same text this boots. */
 export function appScript() {
   return HTML.slice(HTML.lastIndexOf('<script>') + 8, HTML.lastIndexOf('</script>'));
 }
 
-/* `auth` replaces the two session answers, so a boot can be driven down the
-   path a real device takes — signed in, signed out, or unable to reach the
-   server to ask. `snapshot` is what the device already holds from its last
-   confirmed read, written before the script runs as a real device's would be. */
+/* `auth` replaces the two session answers — signed in, signed out, or unable
+   to reach the server. `snapshot` is what the device already holds, written
+   before the script runs. */
 export async function boot({ now, auth = {}, snapshot } = {}) {
   const dom = new JSDOM(HTML, {
     url: 'https://doji.test/',
@@ -57,17 +46,12 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   });
   const win = dom.window;
 
-  /* THE CLOCK IS FROZEN BEFORE THE SCRIPT RUNS, NOT AFTER, and the ordering is
-     the whole of it: the app reads the clock at LOAD time as well as at render
-     time. `View.heatmap` is set from `Dates.nyMonth()` while the script is
-     evaluating, so a clock frozen afterwards would leave the grid opened on
-     whatever month the machine happened to be in — and a golden file that moves
-     with the calendar is not a golden file, it is a diff nobody can read.
-
-     A subclass rather than a stub, because `Date` is called every other way in
-     this app too: `new Date(iso)`, `Date.UTC`, `Date.parse`. Only the no-arg
-     constructor and `now()` are answered; everything else is the real thing,
-     inherited. */
+  /* The clock is frozen BEFORE the script runs: `View.heatmap` is set from
+     `Dates.nyMonth()` at load, so a later freeze opens the grid on the machine's
+     month and the golden file moves with the calendar.
+  
+     A subclass rather than a stub: only the no-arg constructor and `now()` are
+     answered, and `new Date(iso)`, `Date.UTC` and `Date.parse` are inherited. */
   if (now != null) {
     const Real = win.Date;
     const fixed = typeof now === 'number' ? now : Real.parse(now);
@@ -85,12 +69,8 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   class ChartStub {
     constructor(ctx, cfg) {
       this.ctx = ctx;
-      // Real Chart.js exposes the canvas it was mounted on, and mountDonut
-      // reads it: `existing.canvas === canvas` is how a wheel decides between
-      // updating in place and being rebuilt. Without it that check was always
-      // false, so every render tore down and rebuilt all five wheels — the
-      // exact path the app has a comment explaining it avoids, exercised by
-      // nothing.
+      // Real Chart.js exposes its canvas, and mountDonut's `existing.canvas ===
+      // canvas` decides between updating and rebuilding a wheel.
       this.canvas = ctx?.canvas;
       this.config = cfg;
       this.data = cfg.data;
@@ -102,27 +82,21 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   win.Chart = ChartStub;
   win.__charts = charts;
 
-  // A recording stand-in for the Supabase client. boot() reaches its "no
-  // session" branch and stops, but load and save are real code paths whose
-  // failures are silent — a throw inside load() falls through to the snapshot
-  // and shows as an empty panel behind a stuck sync dot, which reads as a
-  // connection problem rather than a bug. So the table calls are answered here
-  // rather than stubbed away.
+  // A recording stand-in for the Supabase client. Load and save are real paths
+  // whose failures are silent — a throw in load() falls back to the snapshot and
+  // looks like a connection problem — so table calls are answered, not stubbed
+  // away.
   const db = { rows: [], error: null, patches: [] };
   win.__db = db;
 
-  // A real PostgrestFilterBuilder is thenable, so a query is awaited wherever
-  // the caller stops chaining — with or without an order() on the end. `then`
-  // rather than a promise-returning order(): a stub that only resolves on one
-  // terminal method silently answers `undefined` the day a query drops it.
+  // A real query builder is thenable, so it is awaited wherever the caller stops
+  // chaining; a stub resolving on one terminal method answers `undefined` the day
+  // a query drops it.
   const answer = () => Promise.resolve(
     db.error ? { data: null, error: db.error } : { data: db.rows, error: null });
 
-  /* PER-TABLE ANSWERS, because there are five of her tables now and one shared
-     row set would hand `trades` back to a query for the calendar — which reads
-     as a card that renders nonsense rather than as a stub that was never told
-     about the table. `db.tables[name]` when it exists, `db.rows` otherwise, so
-     every existing test is untouched. */
+  /* Per-table answers, so a query for the calendar is never handed `trades`.
+     `db.tables[name]` where set, `db.rows` otherwise. */
   db.tables = {};
   db.read = [];
 
@@ -133,17 +107,12 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
     const t = {
       select: () => t,
       order:  () => t,
-      // The filter methods the app actually chains. Each returns the builder,
-      // because a stub that resolves on only one terminal method silently
-      // answers `undefined` the day a query drops it.
+      // The filter methods the app chains, each returning the builder.
       eq: () => t, gte: () => t, lte: () => t, is: () => t, limit: () => t,
       then: (ok, no) => reply().then(ok, no),
       update(patch) { db.patches.push(patch); return t; },
-      // db.error honoured here as well as in maybeSingle. It was not, so any
-      // path ending in .single() — Data.save() and Data.restore() are both —
-      // had an unreachable failure branch: the stub answered success however
-      // the test was set up, and a test for the error path would have passed
-      // while proving the opposite of what it claimed.
+      // db.error honoured here too, or the failure branch of every .single() path —
+      // save and restore — is unreachable and its test proves the opposite.
       single: () => Promise.resolve(
         db.error ? { data: null, error: db.error } : { data: rows()[0] ?? null, error: null }),
       maybeSingle: () => Promise.resolve(
@@ -158,9 +127,7 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
     createClient: () => ({
       auth: {
         getSession: auth.getSession ?? (async () => ({ data: { session: null } })),
-        // Sign-out is a real path with a real consequence — it is what clears
-        // the offline snapshot off the device — so it is answered rather than
-        // stubbed away.
+        // Sign-out clears the offline snapshot, so it is a real path.
         signOut: async () => ({ error: null }),
         getUser: auth.getUser ?? (async () => ({ data: { user: { id: 'u' } }, error: null })),
         signInWithPassword: auth.signInWithPassword ?? (async () => ({ error: null })),
@@ -172,18 +139,15 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
     })
   };
 
-  // jsdom implements none of these and the app touches all of them: matchMedia
-  // at load time (the Carousel's breakpoint), getContext on every wheel, and
-  // createObjectURL from the weekly backup, which the boot timer fires on its
-  // own schedule whether or not a test asked for it.
+  // jsdom has none of these and the app touches all three: matchMedia at load,
+  // getContext on every wheel, createObjectURL from the weekly backup's timer.
   win.matchMedia = q => ({
     matches: false, media: q, addEventListener() {}, removeEventListener() {},
     addListener() {}, removeListener() {}
   });
-  // Chart.js is stubbed, but the app calls clearRect itself on the placeholder
-  // ring, so the context needs to be a no-op surface rather than a bare object.
-  // `canvas` is the one real property on it: a 2d context carries the element
-  // it came from, and both Chart.js and the wheel-reuse check read it back.
+  // The app clears the placeholder ring itself, so the context is a no-op
+  // surface; `canvas` is the one real property, read back by the wheel-reuse
+  // check.
   win.HTMLCanvasElement.prototype.getContext = function () {
     const canvas = this;
     return new Proxy({}, {
@@ -193,12 +157,9 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   win.URL.createObjectURL = () => 'blob:doji-test';
   win.URL.revokeObjectURL = () => {};
 
-  /* SheetJS, recorded rather than fetched. loadXLSX() returns immediately when
-     window.XLSX is already present, so the export runs its own row-building
-     code — the column names, the formatters and the three-state answers — and
-     hands the finished rows to json_to_sheet, which is where they are caught.
-     Only the four entry points the export actually calls are here: a wider
-     stub would be describing SheetJS rather than the app. */
+  /* SheetJS, recorded rather than fetched: with window.XLSX present, loadXLSX()
+     returns at once, the export builds its own rows, and json_to_sheet catches
+     them. Only the four entry points the export calls. */
   const sheets = [];
   win.XLSX = {
     utils: {
@@ -227,10 +188,8 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
     return rows;
   };
 
-  // The app's own boot() is an async IIFE: it awaits Data.init(), finds no
-  // session and hands over to the login overlay. Letting it finish before the
-  // harness returns is what stops a test closing the window mid-flight and
-  // seeing the crash rather than the assertion it came for.
+  // Let the app's async boot finish before returning, so a test never closes
+  // the window mid-flight.
   await new Promise(r => setTimeout(r, 0));
 
   // boot() also sets a 30-second interval that outlives the test file and keeps
@@ -240,14 +199,12 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   return { dom, win, app, seed, charts, sheets, close, db: win.__db, $: id => win.document.getElementById(id) };
 }
 
-// A trade in the shape the app actually receives one: broker columns from the
-// poller, journal columns null until the trader fills them. No tag arrays —
-// their absence is deliberate and is itself asserted.
+// A trade as the app receives one: broker columns filled, journal columns
+// null. No tag arrays — their absence is asserted.
 export function trade(o = {}) {
   return {
-    // `in` rather than ?? throughout: null is a meaningful value for most of
-    // these columns, and a factory that silently replaced it with its default
-    // would make every null-path test assert on the default instead.
+    // `in` rather than ??: null is meaningful for most of these columns, and a
+    // factory replacing it would make every null-path test assert on the default.
     id: 'id' in o ? o.id : 'PID1',
     user_id: 'u',
     direction: 'direction' in o ? o.direction : 'BUY',
