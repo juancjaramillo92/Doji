@@ -616,363 +616,185 @@ good. A quiet day leaves a `clear` row: both outcomes, always.
 ### The MCP poller
 
 A Supabase Edge Function calls cTrader's `get_deals` every two minutes, folds
-deals into positions, and upserts one row per position.
+deals into positions, and upserts one row per position. `get_deals` is a durable
+execution ledger, not a snapshot of open positions, so a trade that opens and
+closes between two polls is still there, and a skipped run self-heals on the
+next.
 
-**The write window is six hours, not thirty days.** It was 720h, which meant
-every run rewrote every position of the last month — around forty rows, ~28,800
-pointless row-rewrites a day, each one firing the `updated_at` trigger and
-broadcasting a realtime UPDATE that made every open tab reload and re-render.
-Six hours still tolerates 180 consecutive missed runs. Backfills pass
-`?force=1&hours=168` instead of editing the secret and putting it back.
+**The write window is six hours.** Every upsert fires the `updated_at` trigger
+and a realtime UPDATE that makes every open tab re-render, so a month-wide window
+rewrote some 28,800 rows a day for nothing. Six hours tolerates 180 missed runs;
+backfills pass `?force=1&hours=168`.
 
-**The read window is wider than the write window, and has to be.** Deals are
-fetched over `write window + MAX_POSITION_HOURS` (72h by default) and folded
-from that; a position is upserted only if one of its deals falls inside the
-narrow window. Reading at six hours returned a long position's closing deal
-without its entry, so `foldPosition` read direction off a close — a short
-reported `BUY` — and overwrote `entry_time`, `entry_price` and `open_day` with
-the exit's values, which silently moved the trade's session and its calendar
-day. Nothing was truncated, so the truncation guard never fired: the entry deal
-was simply never requested. Reading wide costs one identical MCP call; the
-28,800 rewrites were always a write problem. Anything held longer than
-`MAX_POSITION_HOURS` still slices, so that constant is a bound on position
-lifetime rather than a guess at a window.
-
-`get_deals` is a durable execution ledger, not a snapshot of open positions.
-That distinction is what makes the design work: a trade that opens and closes
-between two polls is still in the ledger waiting, so nothing is missed and a
-skipped run self-heals on the next pass.
+**The read window is wider, and has to be.** Deals are fetched over `write window
++ MAX_POSITION_HOURS` (72h by default) and folded from that; a position is
+upserted only if one of its deals falls inside the narrow window. Read at six
+hours, a long position's closing deal arrives without its entry, and the fold
+reads direction, entry time, entry price and filing day off the exit — silently.
+Anything held longer than `MAX_POSITION_HOURS` still slices, so the constant is a
+bound on position lifetime. The signature of a slice is **`exit_price is null`
+on a closed trade**.
 
 Four things about the data are easy to get wrong and invisible afterwards:
 
-**Direction must come from the earliest deal.** `get_position_details` reports
-`tradeSide` on the position object, but for a *closed* position that object is
-hollow — `volume: 0`, `entryPrice: 0` — and its `tradeSide` is the closing side.
-A short reports `BUY`. Reading it there mirrors every directional statistic.
+- **Direction comes from the earliest deal.** `get_position_details` reports
+  `tradeSide`, but a *closed* position's object is hollow — `volume: 0`,
+  `entryPrice: 0` — and its side is the closing one. A short reports `BUY`.
+- **Closes are the opposite-side deals**, not simply the ones after the first. A
+  same-side deal is a scale-in; counted as a close it fabricates an exit and a
+  P&L on a live position.
+- **Position ids are normalised.** The email writes `PID562780708`; MCP returns
+  the integer. Unprefixed, one position mints two rows.
+- **Units are hundredths.** `volume: 200` is 2.00 oz; `commission: -7` is
+  −$0.07. Both are converted before writing.
 
-**Closes are the deals on the opposite side, not simply the ones after the
-first.** A same-side deal is a scale-in. Counting it as a close averages it into
-the exit price and can trip a live position into a fabricated "closed" state
-with a fabricated P&L.
+**A cut page is an error, checked before anything is written.** If `get_deals`
+returns `maxRows` deals the function throws ahead of the upsert, because a cut
+page can carry a position's closes without its entry. The test is our own cap,
+not the vendor's `hasMore`, which says more deals exist beyond the window — true
+of almost every run — and travels in the answer as `has_more`. Five hundred deals
+in a 78-hour window is an order of magnitude past this account, so hitting the
+cap means the window is wrong.
 
-**Position IDs must be normalised.** The email writes `PID562780708`; MCP returns
-the integer. Unprefixed, the same position mints two rows.
+**A forced backfill overwrites a hand-corrected row.** The fold rewrites
+`direction`, `entry_time`, `entry_price`, `exit_price`, `size_oz`, `commission`,
+`computed_pnl` and `open_day` for every position the window reaches. The journal
+columns, `net_pnl` and the `is null`-filtered columns survive. Widen `hours` to
+the smallest window that covers the row you mean.
 
-**Units are hundredths.** `volume: 200` is 2.00 oz; `commission: -7` is −$0.07.
-Both are plausible integers that are wrong by 100× if misread. The Edge Function
-converts before writing, so `commission` in the database is already dollars.
+**The doors.** Each answers the cron secret, writes nothing, and answers when the
+market is shut — a test holds every flag the entry point reads against the market
+gate, since one left out replies `market closed` all weekend, which is exactly
+when a suspicious row gets looked at.
 
-**A cut page is an error, not a field, and it is checked before anything is
-written.** If `get_deals` comes back holding `maxRows` deals, the function
-throws — ahead of the upsert, because a cut page can return a position's closing
-deals without its entry and those are exactly the rows that would land. It used
-to throw after the write, on the reasoning that the write had already happened;
-that is backwards.
-
-**The test is our own cap, not the vendor's flag.** `hasMore` says more deals
-exist beyond the window asked for, which is true of almost every run and says
-nothing about whether this page was cut. Reading it as truncation would hand
-cTrader the ability to halt the journal by changing what a field means — and
-silently, since `net.http_post` discards the response. It travels in the answer
-instead, as `has_more`.
-
-Five hundred *deals* is roughly two hundred trades inside a 78-hour window, an
-order of magnitude beyond this account and not reachable on the two-minute
-schedule. Hitting the cap means something is wrong with the window rather than
-that the trader had a busy week, and the last thing to do then is write rows
-folded from a partial history.
-
-**`?raw=1` returns what the broker actually sent.** A trade with an inverted
-direction or a missing entry price is either a fold this function got wrong or a
-response cTrader shaped differently, and the two repairs are opposite — a
-`?force=1&hours=N` backfill for the first, a code change for the second. Nothing
-else in the system can tell them apart.
-
-**A forced backfill overwrites a hand-corrected row, and that is the one thing
-to know before running one.** Every broker column is rewritten from the deals as
-they fold today, so a row edited in the dashboard to fix a direction or a price
-goes back to what the fold produces — silently, and for every position the
-window reaches, not only the one being repaired. The journal columns are never
-touched, `net_pnl` is not among the columns the fold writes at all, and the
-arbitrated columns keep their `is null` filters — so the money figure the email
-owns, `balance`, `planned_sl`, `planned_tp` and `fill_time` all survive it. The
-ten the fold does write are `direction`, `entry_time`, `entry_price`,
-`exit_price`, `size_oz`, `commission`, `computed_pnl` and `open_day`, and those
-do not.
-Widen `hours` to the smallest window that covers the row you mean, and expect a
-correction older than that window to stand only until the next backfill reaches
-back past it. The flag writes nothing, makes the same
-`get_deals` call the poll was about to make, and returns the body as text: the
-SSE framing and the double-encoded payload are half of what is being looked at,
-so parsing them away would hide the layer the question is usually about.
+- **`?raw=1`** returns what the broker sent for the deals, SSE framing and
+  double-encoded payload included. A wrong row is either a fold this function
+  got wrong or a response cTrader shaped differently, and the repairs are
+  opposite — `?force=1` for the first, a code change for the second.
+- **`?tools=1`** lists what the broker offers. It is a JSON-RPC **method**, not a
+  tool call, so it goes past the allow-list, which guards a tool *name* becoming
+  a request.
+- **`?positions=1`** returns the open positions as served.
+- **`?market=1`** returns the folded price; **`?market=raw`** what the broker
+  sent.
+- **`?bars=raw`** returns fifteen minutes of `M_1` bars at six ages — now, and
+  7, 30, 90, 180 and 365 days back, each moved to a Tuesday–Thursday 14:00 UTC —
+  one request at a time, since a single `504` took the batch with it.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
      -H "x-doji-key: $DOJI_CRON_SECRET"
 ```
 
-**`?tools=1` asks the broker what it actually offers.** `ALLOWED_TOOLS` names the
-two this function calls, and it has never said anything about what *exists*: the
-poller needs deals and a balance, so those are what it asked for, and whether
-cTrader also serves a quote, a symbol list or an open-position feed was never
-established either way. That gap decides real things — whether Eugenia can read a
-price off the broker this system is already connected to, or has to reach for a
-third-party feed and the vendor decision that comes with it.
+**Nothing here can place a trade, and that is one array, not the key.** The
+endpoint serves `get_spot_prices`, `get_trendbars`, `get_positions`,
+`get_symbols`, `get_assets`, `get_pending_orders`, `get_order_history` and
+`get_version` — and `create_order`, `close_position`, `amend_position`,
+`amend_order` and `cancel_order`, **on the same credential**. `ALLOWED_TOOLS`
+names what this function may call, each carrying `readOnlyHint: true` on the
+broker's own listing; `DESTRUCTIVE_TOOLS` names the five that do not, so a test
+asserts none is reachable through the list or around it, and fails a permitted
+name nothing calls, since that is how a destructive one would arrive. A
+read-only token would retire the array; none exists.
 
-It is a JSON-RPC **method**, not a tool call, so it goes past the allow-list
-rather than through it: the list guards a tool *name* becoming a request, and
-`tools/list` names none. It writes nothing, calls nothing it discovers, and
-answers at any hour — the same standing as `?raw=1`, and there for the same
-reason, which is that guessing has cost a day more than once.
+**The endpoint uses two scales and documents neither.** `get_spot_prices` and
+`get_trendbars` serve **pipettes** — `bid: 441982000` is 4419.82.
+`get_positions` serves **display prices** on the same account and symbol —
+`entryPrice: 4402.71`. The tool descriptions say *"DISPLAY price (not
+pipettes)"* about their inputs only. `PIPETTES` is named once and applied to the
+spot and bar reads, and both folds are tested against real captures.
+`get_trendbars` also documents a `count`-only call it refuses with
+`fromTimestamp: must not be null`; the range form is what it accepts.
 
-```sh
-curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?tools=1" \
-     -H "x-doji-key: $DOJI_CRON_SECRET"
-```
+**A quote names its window.** `sessionClose` is the previous session's close —
+the 17:00 New York roll — so the overnight move is one request and a
+subtraction. But `high`, `low`, `prev_close` and `change` are all measured from
+that roll, so the same `change` is the overnight move before 17:00 and only the
+evening's after it, and a bare number reads as *on the day* either way. Nothing
+here sees the calendar day — daily bars roll on the same boundary — so
+`quoteWindow` names the window rather than computing one. `quoteLine` is the only
+place a quote becomes words, with that sentence inside it, for its three callers:
+the `get_market` tool, `marketBlock()` (the briefing is handed the price rather
+than asked to fetch it — a level off a search page is four digits and looks like
+gold), and the price sense.
 
-**What it offers, established rather than assumed.** `?tools=1` was run, and the
-answer changed two things. It serves prices — `get_spot_prices` for bid/ask,
-`get_trendbars` for OHLCV candles from `M_1` to `MN_1` — which is what lets a
-briefing quote a number read off the instrument rather than paraphrased from a
-news page. It also serves `get_positions`, `get_symbols`, `get_assets`,
-`get_pending_orders`, `get_order_history` and `get_version`.
+**Minute bars go back a year.** Every age `?bars=raw` asked answered sixteen bars
+in under half a second; a bar carries `timestamp` (the minute it opens), `open`,
+`high`, `low`, `close` and `volume`, a range is inclusive at both ends, and it is
+in pipettes. That is what `best_price` is built on, and
+`test/fixtures/ctrader-get-trendbars.txt` is one such window, unchanged.
 
-And it serves `create_order`, `close_position`, `amend_position`, `amend_order`
-and `cancel_order`, **on the same credential**.
+**The plan is read off the open position.** A live position carries `stopLoss`
+and `takeProfit`, so the poller records both as first seen and every change in
+`trade_stops` (see **Data model**).
 
-**So the read-only guarantee is one array, not the key.** `ALLOWED_TOOLS` names
-what this function may call; every entry carries `readOnlyHint: true` on the
-broker's own listing, and `DESTRUCTIVE_TOOLS` names the five that do not so a
-test can assert none of them is ever reachable — through the list, or around it
-by a direct call. It also fails a name permitted but never called, because a
-destructive tool would arrive that way: added "for later" rather than used.
+**Balance comes from `get_balance`, and only for a close just seen.**
+`get_deals` carries no balance, and `get_position_details` reports it as zero on
+a closed position. `get_balance` answers *now*, which equals *after that fill*
+only while nothing has happened between, so `balanceTarget` offers it to the
+most recent close alone, and only if it closed inside `BALANCE_MAX_AGE_MS` (10
+minutes). Anything older gets nothing — a missing balance is honest — which is
+also what makes `?force=1&hours=200` safe for historical balances.
 
-The credential is the better place for that guarantee and is not where it lives.
-If cTrader can issue a read-only token, this array stops being load-bearing.
-Until then it is, and it should be read as such rather than as configuration.
+**And a close it sees is stamped.** `fill_time` is written off the same close
+instant, under `where fill_time is null`, so the email still owns the column
+wherever it lands; that transition is also how Eugenia learns a position closed.
+Only rows the fold window reaches are stamped, so the historical gap needs
+`?force=1&hours=N`.
 
-**`?positions=1` answered a question §8 had closed, and answered it the other
-way.** A live position carries `entryPrice`, `stopLoss` and `takeProfit`. So the
-plan *is* available from the broker — for an **open** position. §8's claim was
-formed against closed ones, where it remains true, and the poller had never
-looked at an open one because it had no reason to.
-
-That is not a documentation fix: §8 is the trader's own document, and four of
-its unanswerable questions rest on that sentence. **Changing it is his call**,
-and what would follow from it — sampling the stop at open, where
-`trades_eugenia_opened` already fires — is a schema change to a table with four
-writers. Neither is done here.
-
-**The original question, for the record.** §8 says it is not —
-*where the stop and target were set at entry* is called unavailable from the
-broker, and four questions are marked unanswerable because of it, R-02's
-*respect* half among them. That claim was formed against `get_deals` and
-`get_position_details` on a **closed** position, where the broker reports only
-the final stop, and about those it is right. A **live** position was never asked:
-`amend_position` takes `stopLoss` and `takeProfit`, so positions carry them, and
-whether `get_positions` *serves* them is what this settles. If it does, the
-`trades_eugenia_opened` trigger already fires at the one moment worth sampling,
-and a stop recorded at open is the plan.
-
-**`?market=1` returns the price; `?market=raw` returns what the broker sent.**
-The same split `?raw=1` makes for the deals, and it earned itself immediately.
-
-**The endpoint uses two scales, and its documentation mentions neither.**
-`get_spot_prices` serves **pipettes** — `bid: 441982000` is 4419.82, a hundred
-thousandth of what it prints. `get_positions` serves **display prices** on the
-same account and the same symbol — `entryPrice: 4402.71` is 4402.71. cTrader's
-tool descriptions say *"DISPLAY price (not pipettes)"* about their **inputs**
-and nothing at all about their outputs. A parser written from the documentation
-would have been a hundred thousand out on one of the two, and would still have
-produced a four-digit number that looked like gold.
-
-`PIPETTES` is named once and applied in one place, and `foldSpot` is tested
-against the real capture rather than an invented shape.
-
-**The overnight move needs no second call.** `sessionClose` is the previous
-session's close — the 17:00 New York roll for gold — so *where it is, with the
-overnight move* is one request and a subtraction. That is the whole of the
-briefing's opening line.
-
-**And that roll is a window, which the quote used not to say.** `high`, `low`,
-`prev_close` and `change` are all measured from the session open, so the same
-`change` is the overnight move for the sixteen hours before 17:00 New York and
-only the evening's move for the seven after it. Served as bare JSON it read as
-neither, which is to say it read as *on the day* — and at 20:57 Eugenia said
-gold was up $12 on the day when the calendar day was up more than $40. Both
-figures were real; the label was not. `quoteWindow` states which side of the
-roll the reading is on, and `readMarket` and the price sense both carry it.
-
-Nothing here can see the calendar day. `get_trendbars` serves the broker's daily
-bars, which roll on the same boundary, so the honest answer is to name the window
-rather than to compute a figure out of numbers that cannot carry one.
-
-**One rendering, three callers.** `quoteLine` is the only place a quote becomes
-words — the `get_market` tool, the block the briefing is handed, and the price
-sense — and the window sentence is inside it rather than beside it. A quote said
-three ways is three chances to print `change` without saying what it changed
-from, which is the whole of what went wrong. The tool used to return raw JSON,
-which is the same failure with the field name doing the talking.
-
-**And the briefing is handed the price rather than asked to fetch it.** Notes,
-the channel map, his week of trades, the thesis, the open threads, the calendar
-and his desk are all read before the call. The price — the opening line, and the
-one figure he checks against his own screen — was a *tool she had to remember to
-reach for*: an instruction standing where an input belongs, failing the way
-instructions here always fail, with a level off a search page that is four digits
-and looks like gold. The tool stays for replies, where most turns do not need it;
-`marketBlock()` is the briefing's, and `agree` reads `postBriefing` for it.
-
-**And `get_trendbars` documents a call shape it refuses.** Its own description
-offers *"(count) → last N bars ending now"*; sending exactly that answers
-`fromTimestamp: must not be null`. The range form is what it accepts, so that is
-what is sent. Worth knowing before trusting any other combination it lists.
-
-**`?bars=raw` asks whether a closed trade's path can be read back.** §7 calls
-R-04 uncheckable because how far a trade ran in his favour is *"stored nowhere,
-including at the broker"* — and `get_trendbars` serves minute bars, which are that
-path. Nobody has read one: which fields a bar carries, which of the two scales
-above it is on, or how far back the broker keeps them, and that last one decides
-whether R-04 could reach the trades already closed or only the ones after. So it
-returns fifteen minutes of `M_1` bars at six ages — now, and 7, 30, 90, 180 and
-365 days back, each aged window moved to 14:00 UTC on a Tuesday to Thursday so a
-weekend cannot read as missing history — raw, for `?market=raw`'s reason. One at
-a time: sent together, one `504` from the broker took the other five answers
-with it.
-
-**What it found, on 25 September 2026.** Every age answered all sixteen bars in
-under half a second, the year-old one included. A bar carries `timestamp` (the
-minute it opens, in ms), `open`, `high`, `low`, `close` and `volume`, and a range
-is inclusive at both ends. And it is in **pipettes** — `high: 428834000` beside a
-spot of the same order — so it sits with `get_spot_prices` on the scaled side of
-the endpoint, not with `get_positions`. That is what `best_price` is built on,
-and `test/fixtures/ctrader-get-trendbars.txt` is one of those windows, unchanged.
-
-```sh
-curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?positions=1" \
-     -H "x-doji-key: $DOJI_CRON_SECRET"
-curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?market=1" \
-     -H "x-doji-key: $DOJI_CRON_SECRET"
-curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?bars=raw" \
-     -H "x-doji-key: $DOJI_CRON_SECRET"
-```
-
-**Every read-only flag answers when the market is shut**, and a test holds that:
-every flag the entry point reads must appear in the market gate. One left out
-replies `market closed` all weekend — which is exactly when a suspicious row gets
-looked at — and it fails silently, looks like the flag working, and is invisible
-five days a week.
-
-**Balance is read from a second tool, and only for a close just seen.**
-`get_deals` carries no balance — eleven fields, none of them the account — and
-`get_position_details` reports `balance`, `commission` and `swap` as zero on a
-closed position, beside two deals that each charged 7. `get_balance` is the only
-source and it answers *now*, not *after that fill*. Those are the same number
-only while nothing has happened in between, so `balanceTarget` offers the figure
-to one position: the most recent close, and only if it closed inside
-`BALANCE_MAX_AGE_MS` (10 minutes, against a two-minute cron). Anything older
-gets nothing, because a missing balance is honest and the next close supplies
-one. That bound is also what makes `?force=1&hours=200` safe — a backfill folds
-positions that closed days ago, every one fails the test, and no historical
-balance is touched. When two positions close inside one run only the later one
-is offered the balance: there is a single figure to hand and only that close
-actually ended at it.
-
-The function is whitelisted to two read tools, both carrying `readOnlyHint` on
-cTrader's own tool listing, and contains no code path that constructs an order. It needs `DOJI_USER_ID` in secrets: `trades.user_id`
-defaults to `auth.uid()`, which is null under the service role.
+It needs `DOJI_USER_ID` in secrets: `trades.user_id` defaults to `auth.uid()`,
+which is null under the service role.
 
 ### The email parser
 
 An Apps Script reads cTrader's TP/SL alerts, parses the fill, and posts it to
-`doji-email-sync`, which merges four values: `net_pnl` (which includes swap),
-`balance`, `fill_time`, and `direction` for a position the poller never reached.
+`doji-email-sync`, which merges `net_pnl` (which includes swap), `balance`,
+`fill_time`, and `direction` for a position the poller never reached.
 
-**cTrader sends an alert when a stop or a target fills, and nothing when he
-closes a position by hand.** It is a fact about the broker rather than about this
-code, it was known to him and written down nowhere, and it cost a day: eight closes
-with no `net_pnl` looked like a sync losing alerts until Gmail was searched for
-their position ids and held nothing. So a closed row with `net_pnl` null is a hand
-close — R-15's Friday close-out, or a breach of R-18 — and that is exactly what
-`check_rules` reads it as. The only other way to reach that state is an alert the
-email path lost, which is why R-18 names the trade rather than just counting it.
+**cTrader sends an alert when a stop or target fills, and nothing on a hand
+close.** So a closed row with `net_pnl` null is a hand close — R-15's Friday
+close-out, or a breach of R-18 — and `check_rules` reads it so. The only other
+way to that state is an alert the email path lost, which is why R-18 names the
+trade rather than only counting it.
 
-**The write is in an Edge Function because of where the alternative put a
-password.** Supabase's `sb_secret_` keys refuse any client whose user agent
-looks like a browser and Apps Script's does, so the obvious alternative is for
-the script to sign in *as the trader*, with the account password sitting in
-Script Properties. That constraint is about who may write, not about
-where the write happens. Moving it leaves the script holding one secret whose
-entire authority is five columns of one table, instead of holding the account,
-and takes about fifty lines of session machinery out of the file with it.
-
-It also puts the column whitelist somewhere it can be tested. `emailRow` is the
-boundary: it builds the payload from five names rather than filtering one, so a
-key that is not one of them cannot survive, and it type-checks each — an id that
-is not `PID\d+`, a direction that is not `BUY`/`SELL`, a `fill_time` that does
-not parse, or a figure that is not a finite number is refused rather than
+**The write is in an Edge Function so the script holds no password.**
+`sb_secret_` keys refuse a browser-like user agent, and Apps Script's is one, so
+the alternative is the script signing in *as the trader*. Instead it holds one
+secret whose entire authority is five columns of one table. `emailRow` is the
+boundary: it builds the payload from five names rather than filtering one, and
+type-checks each — an id that is not `PID\d+`, a direction that is not
+`BUY`/`SELL`, an unparseable `fill_time`, a non-finite figure is refused, not
 coerced. A **missing** figure is dropped rather than sent as null, because
 `merge-duplicates` writes exactly the keys present and `direction: null` would
-erase a correct direction rather than leave it alone.
+erase a correct one.
 
-**The script refuses a fill it cannot read in full.** Four of the five values
-are required — `id`, `direction`, `fill_time` and `net_pnl` — and if any of them
-does not parse, nothing is sent: the thread is labelled `doji-parse-failed`, the
-subject is logged, and the repair is to fix the parser and run
-`resetDojiLabels()`. `net_pnl` is required for the reason given below, and a row
-written without it would look complete while carrying the computed figure
-forever. `balance` is the one value allowed to go missing, and the one that can
-afford to: the poller writes that column too, `where balance is null`, so a
-dropped balance is repaired on the next poll.
+**The script refuses a fill it cannot read in full.** `id`, `direction`,
+`fill_time` and `net_pnl` are required; if any fails to parse, nothing is sent,
+the thread is labelled `doji-parse-failed`, and the repair is to fix the parser
+and run `resetDojiLabels()`. `balance` alone may go missing, since the poller
+fills it `where balance is null`. Each value is read from **one** label, so a
+rename fails loudly rather than an alias matching some other line.
 
-That is also why each value is read from **one** label rather than a list of
-candidates. A rename then fails loudly instead of half-writing, where an alias
-nobody has ever seen might match some other line and file the trade wrongly.
+**The fill time is day first.** `19/08/2026` is the 19th of August. A swapped
+reading of that date is not a date and fails; the silent case is both numbers
+being plausible months, so a test pins `05/08/2026` to the 5th of August.
 
-**The fill time is day first.** cTrader writes `19/08/2026`, which is August the
-19th, and the saved alert cannot prove that on its own: a parser that swapped the
-two would produce `2026-19-08`, which is not a date at all and which the fixture
-tests already reject. What they cannot see is a reading that is wrong only when
-both numbers are plausible months — every fill from the 1st to the 12th, filed in
-the wrong month with every other figure correct. A separate test pins `05/08/2026`
-to the 5th of August for exactly that.
+**`net_pnl` is the one nothing else can supply.** Swap appears in no deal, so a
+position carried through the 17:00 rollover is settled correctly only by the
+email. `get_position_details` reports a `swap` of zero, but also a zero
+commission against deals that charged 7: the object is hollow. The other three
+values the poller can reach; a second path into the table costs nothing and
+keeps the poller from being a single point of failure.
 
-**`net_pnl` is the one nothing else can supply, and it is why this script
-stays.** `computed_pnl` is arithmetic over the deals — entry, exit, volume,
-commission — and swap appears in none of them, so a position carried through the
-17:00 New York rollover is only ever settled correctly from the email.
-`get_position_details` does report a `swap` field and it reads zero, but so does
-its `commission` against deals that charged 7: the object is hollow rather than
-genuinely swap-free, and nothing has yet tested it on a position actually held
-overnight. Until something does, the email is the only settled P&L in the
-system.
+**Three outcomes, not two.** A body that will not parse, and a `400`, `409` or
+`422` from the function — Postgres examined the row and will never take it — are
+permanent and label the thread. Anything else, including no response, is
+transient and leaves the thread *unlabelled* so the next run retries. A rotated
+`SB_SECRET_KEY` answers `401`, and treating that as permanent would discard every
+queued fill's P&L for a fault that has nothing to do with the fill.
 
-The other three the poller could now reach — `balance` from `get_balance`,
-`fill_time` and `direction` from the deals themselves. They stay here because a
-second independent path into the table costs nothing and the poller is otherwise
-a single point of failure for everything.
-
-**Permanent failures and transient failures are different, and there are now
-three answers rather than two.** A body that does not parse is permanent and
-labels the thread so it leaves the queue. A `400` from the function is also
-permanent — it means this fill will never be accepted, and retrying it every
-minute for ninety days is the only alternative. Anything else, including no
-response at all, is transient and leaves the thread *unlabelled* so the next run
-retries it. Treating a transient failure as permanent is how a momentary outage
-used to discard a fill's P&L forever, and it is the case
-`test/parse.test.mjs` was broken against on purpose to confirm the check fires.
-
-**Permanent is a statement about the row, not about the caller**, and the list
-is short on purpose: `400`, `409` and `422` — malformed, a constraint, an
-unprocessable value. Postgres examined that row and will never take it.
-Everything else is the caller, the connection or the deployment: a rotated
-`SB_SECRET_KEY` answers `401`, and treating that as permanent would label every
-queued thread failed and discard each fill's P&L for a fault that has nothing to
-do with the fill. The two mistakes are not symmetrical — retrying something
-permanent costs a thread sitting in the queue, which is visible and harmless.
-
-The alerts are also the early warning if the MCP token is ever misused, so leave
-the notifications on regardless of whether you read them.
+Leave the alert notifications on: they are also the early warning if the MCP
+token is ever misused.
 
 ---
 
