@@ -1680,16 +1680,14 @@ async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
   // unset key arrives here, and then the rows wait for it.
   if (!vecs) return { filled: 0, left };
 
-  let filled = 0;
   for (const [i, row] of rows.entries()) {
     const done = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${row.id}`, {
       method: "PATCH", headers: sbHeaders("return=minimal"),
       body: JSON.stringify({ embedding: vecs[i] }),
     });
     if (!done.ok) throw new Error(`${table} embedding write failed (HTTP ${done.status})`);
-    filled++;
   }
-  return { filled, left: left - filled };
+  return { filled: rows.length, left: left - rows.length };
 }
 
 async function postEmbed(): Promise<Response> {
