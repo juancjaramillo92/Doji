@@ -61,6 +61,17 @@ import { backup, readAll, TABLES } from '../scripts/backup-memory.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
+/* Runs `work` with the console quiet, and puts fetch and the console back however
+   it ends: a stub left installed answers the next test's requests. `work`
+   installs its own stub, and a test that reads the log lines sets console.log
+   there. */
+async function stubbed(work) {
+  const real = [globalThis.fetch, console.log, console.error];
+  console.log = console.error = () => {};
+  try { return await work(); }
+  finally { [globalThis.fetch, console.log, console.error] = real; }
+}
+
 // One deal. Timestamps are minutes past a fixed instant so a test reads as a
 // sequence rather than as thirteen-digit noise.
 const T0 = Date.UTC(2026, 6, 30, 14, 0, 0);   // 30 Jul 2026, 10:00 New York
@@ -672,9 +683,7 @@ test('every line of the market says what its number is measured from, and comput
 });
 
 test('a market that will not read is a sentence telling her not to reach for a search', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
     globalThis.fetch = async () => new Response(JSON.stringify({ ok: false, error: 'not connected' }), { status: 500 });
     assert.match(await aroundBlock(), /could not be read just now\. Do not quote the dollar or yields from a search/);
     // An answer with nothing in it is the same: zero lines is not a market.
@@ -682,10 +691,7 @@ test('a market that will not read is a sentence telling her not to reach for a s
     assert.match(await aroundBlock(), /could not be read just now/);
     globalThis.fetch = async () => new Response(JSON.stringify(AROUND), { status: 200 });
     assert.match(await aroundBlock(), /Dollar index 102\.16/);
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
 });
 
 /* ─── What the wires said ────────────────────────────────────────────────────
@@ -752,15 +758,10 @@ test('the conversation reads six hours of headlines, names another day, and says
 });
 
 test('headlines that will not read send her to search, and never take the look down', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  globalThis.fetch = async () => new Response('not json', { status: 502 });
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async () => new Response('not json', { status: 502 });
     assert.match(await headlinesBlock(), /could not be read just now; search for what moved it/);
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
 });
 
 /* ─── What the market prices for the Fed ────────────────────────────────────
@@ -861,19 +862,14 @@ test('the first meeting is said as odds and the later ones as what is priced by 
 });
 
 test('odds refused or unreadable are a sentence, and never take the briefing down', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
     // Meetings carried alongside, so it is the refusal that decides and not their absence.
     globalThis.fetch = async () => Response.json({ ok: false, error: 'the calendar lists a decision on 2026-10-21',
                                                   meetings: RATES.meetings, unread: [] });
     assert.match(await ratesBlock(), /could not be read just now\. Do not quote rate\s+odds from a search/);
     globalThis.fetch = async () => new Response('not json', { status: 502 });
     assert.match(await ratesBlock(), /could not be read just now/);
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
 });
 
 /* ─── What the last print became ────────────────────────────────────────────
@@ -938,15 +934,10 @@ test('positioning is dated, netted, and set against its own range', () => {
 });
 
 test('positioning that will not read is a sentence, and never takes the briefing down', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  globalThis.fetch = async () => new Response('[]', { status: 200 });
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async () => new Response('[]', { status: 200 });
     assert.match(await positioningBlock(), /could not be read just now; do not quote it from a search/);
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
 });
 
 /* ─── How a release usually goes ─────────────────────────────────────────── */
@@ -2200,17 +2191,13 @@ const asksForStrategy = (model) =>
 
 // The cost line ask() printed while those responses were served, in order.
 async function costLines(responses) {
-  const realFetch = globalThis.fetch, realLog = console.log;
   const lines = [];
   let n = 0;
-  globalThis.fetch = async () => responses[n++];
-  console.log = (line) => lines.push(line);
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async () => responses[n++];
+    console.log = (line) => lines.push(line);
     await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.log = realLog;
-  }
+  });
   return lines;
 }
 
@@ -2224,16 +2211,12 @@ test('a caller on a cheaper model does not read as having fallen back', async ()
   /* The fallback column compares what answered against what THIS caller asked
      for. A file-wide constant would report a fallback on every Sonnet call. Driven
      through `ask`, because the comparison is inside the loop. */
-  const realFetch = globalThis.fetch, realLog = console.log;
   const lines = [];
-  globalThis.fetch = async () => answers('claude-sonnet-5');
-  console.log = (line) => lines.push(line);
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async () => answers('claude-sonnet-5');
+    console.log = (line) => lines.push(line);
     await ask([{ role: 'user', content: 'anything' }], 'medium', 'trim');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.log = realLog;
-  }
+  });
   assert.match(lines[0], /trim — claude-sonnet-5/,
     'the trim did not ask for Sonnet, so the model map is not reaching the request');
   assert.doesNotMatch(lines[0], /FELL BACK/,
@@ -2268,23 +2251,16 @@ const asksForTrades = (model) =>
 // Every request body ask() sent, with the journal read answering `status`.
 // SB_URL is "" under Node, so PostgREST is the caller whose path starts /rest.
 async function turnWithJournal(status, responses) {
-  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
   const sent = [];
   let n = 0;
-  globalThis.fetch = async (url, init) =>
-    String(url).startsWith('/rest/')
-      ? { ok: status === 200, status, json: async () => [] }
-      : (sent.push(JSON.parse(init.body)), responses[n++]);
-  console.log = () => {};
-  console.error = () => {};
-  try {
+  return await stubbed(async () => {
+    globalThis.fetch = async (url, init) =>
+      String(url).startsWith('/rest/')
+        ? { ok: status === 200, status, json: async () => [] }
+        : (sent.push(JSON.parse(init.body)), responses[n++]);
     const text = await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
     return { text, answered: sent[1].messages.at(-1).content[0].content };
-  } finally {
-    globalThis.fetch = realFetch;
-    console.log = realLog;
-    console.error = realErr;
-  }
+  });
 }
 
 const twoRounds = [asksForTrades('claude-opus-5'), answers('claude-opus-5')];
@@ -2314,7 +2290,6 @@ test('an empty window still says it is empty, because that is an answer', async 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a tool the caller was not offered is answered as unknown and never runs', async () => {
-  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
   const db = [], sent = [];
   const responses = [
     served('claude-opus-5', { stop_reason: 'tool_use', content: [
@@ -2323,18 +2298,12 @@ test('a tool the caller was not offered is answered as unknown and never runs', 
     answers('claude-opus-5'),
   ];
   let n = 0;
-  globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
-    ? (db.push(String(url)), { ok: true, status: 200, json: async () => [{}] })
-    : (sent.push(JSON.parse(init.body)), responses[n++]);
-  console.log = () => {};
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
+      ? (db.push(String(url)), { ok: true, status: 200, json: async () => [{}] })
+      : (sent.push(JSON.parse(init.body)), responses[n++]);
     await ask([{ role: 'user', content: 'I get real rates now' }], 'medium', 'reply');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.log = realLog;
-    console.error = realErr;
-  }
+  });
   assert.match(sent[1].messages.at(-1).content[0].content, /no tool called "set_channel"/);
   assert.ok(!db.some(u => u.includes('eugenia_channels')),
     'a reply moved a rung, which only the nightly pass may do');
@@ -2361,20 +2330,15 @@ test('a paused turn is resumed, not sent as the answer', async () => {
 });
 
 test('a turn cut off at max_tokens fails rather than sending half an answer', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
   const rows = [];
-  globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
-    ? (rows.push(JSON.parse(init.body)[0]), { ok: true, status: 201 })
-    : served('claude-opus-5', { stop_reason: 'max_tokens',
-        content: [{ type: 'text', text: 'Gold opened the week at' }] });
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
+      ? (rows.push(JSON.parse(init.body)[0]), { ok: true, status: 201 })
+      : served('claude-opus-5', { stop_reason: 'max_tokens',
+          content: [{ type: 'text', text: 'Gold opened the week at' }] });
     await assert.rejects(ask([{ role: 'user', content: 'anything' }], 'medium', 'test'),
       /max_tokens/);
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].ok, false);
   assert.match(rows[0].detail, /max_tokens/, 'the failure row does not say why the turn died');
@@ -2390,22 +2354,16 @@ test('a turn cut off at max_tokens fails rather than sending half an answer', as
 
 // The same two-round shape as above, with the request bodies kept.
 async function bodiesOf(responses) {
-  const realFetch = globalThis.fetch, realLog = console.log, realErr = console.error;
   const sent = [], lines = [];
   let n = 0;
-  globalThis.fetch = async (url, init) =>
-    String(url).startsWith('/rest/')
-      ? { ok: true, status: 200, json: async () => [] }
-      : (sent.push(JSON.parse(init.body)), responses[n++]);
-  console.log = (line) => lines.push(line);
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) =>
+      String(url).startsWith('/rest/')
+        ? { ok: true, status: 200, json: async () => [] }
+        : (sent.push(JSON.parse(init.body)), responses[n++]);
+    console.log = (line) => lines.push(line);
     await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.log = realLog;
-    console.error = realErr;
-  }
+  });
   return { sent, lines };
 }
 
@@ -2585,24 +2543,19 @@ test('nothing standing unlooked is no look at all', () => {
    `in.(…)`. A stub that answered every PATCH with a match would hold the tool
    to a filter that can never match, green. */
 async function actualWrites(input, onFile) {
-  const realFetch = globalThis.fetch, realErr = console.error;
   const sent = [];
-  globalThis.fetch = async (url, init) => {
-    sent.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null });
-    const eq = Object.fromEntries(String(url).split('?')[1].split('&')
-      .map(p => p.split('=')).filter(([, v]) => v.startsWith('eq.'))
-      .map(([k, v]) => [k, decodeURIComponent(v.slice(3))]));
-    const hits = onFile.filter(r => +new Date(r.at) === +new Date(eq.at)
-                                 && (!('name' in eq) || r.name === eq.name));
-    return { ok: true, status: 200, json: async () => hits };
-  };
-  console.error = () => {};
-  try {
+  return await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      sent.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null });
+      const eq = Object.fromEntries(String(url).split('?')[1].split('&')
+        .map(p => p.split('=')).filter(([, v]) => v.startsWith('eq.'))
+        .map(([k, v]) => [k, decodeURIComponent(v.slice(3))]));
+      const hits = onFile.filter(r => +new Date(r.at) === +new Date(eq.at)
+                                   && (!('name' in eq) || r.name === eq.name));
+      return { ok: true, status: 200, json: async () => hits };
+    };
     return { said: await serve('record_actual', input), sent };
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
 }
 
 const RETAIL = { at: '2026-09-16T12:30:00Z', name: 'US retail sales (August, advance)',
@@ -2716,20 +2669,17 @@ test('a figure TradingView has not published is left out of the row, never sent 
 
 test('the filing goes up in groups that carry the same columns, keyed on the id', async () => {
   const sent = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init = {}) => {
-    if (String(url).includes('doji-tradingview')) {
-      sent.push({ read: String(url) });
-      return new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 });
-    }
-    sent.push({ url: String(url), rows: JSON.parse(init.body) });
-    return new Response('', { status: 201 });
-  };
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init = {}) => {
+      if (String(url).includes('doji-tradingview')) {
+        sent.push({ read: String(url) });
+        return new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 });
+      }
+      sent.push({ url: String(url), rows: JSON.parse(init.body) });
+      return new Response('', { status: 201 });
+    };
     assert.equal(await fileCalendar(OCT1_3PM), 3);
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  });
   // The read asks for whole days covering the window: twelve hours back from
   // 15:00 is still the 1st, and twenty-eight forward is the 2nd.
   assert.match(sent[0].read, /calendar=1&from=2026-10-01&to=2026-10-02$/);
@@ -2743,16 +2693,13 @@ test('the filing goes up in groups that carry the same columns, keyed on the id'
 });
 
 test('the quarter-hourly filing keeps to twelve hours back and twenty-eight ahead', async () => {
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => String(url).includes('doji-tradingview')
-    ? new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 })
-    : new Response('', { status: 201 });
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url) => String(url).includes('doji-tradingview')
+      ? new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 })
+      : new Response('', { status: 201 });
     // A day and a half on, the 1st's claims and speech are past the twelve hours back.
     assert.equal(await fileCalendar(Date.parse('2026-10-02T20:00:00Z')), 1);
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  });
 });
 
 /* A WEEK IS MARKED COVERED ONLY AFTER ITS ROWS. A mark in front of rows that
@@ -2760,20 +2707,17 @@ test('the quarter-hourly filing keeps to twelve hours back and twenty-eight ahea
    entry in. */
 async function weekWrites(week, failRows = false) {
   const sent = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init = {}) => {
-    if (String(url).includes('doji-tradingview')) {
-      sent.push({ read: String(url) });
-      return new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 });
-    }
-    sent.push({ url: String(url), rows: JSON.parse(init.body) });
-    return new Response('', { status: failRows && String(url).includes('eugenia_calendar') ? 500 : 201 });
-  };
-  try {
+  return await stubbed(async () => {
+    globalThis.fetch = async (url, init = {}) => {
+      if (String(url).includes('doji-tradingview')) {
+        sent.push({ read: String(url) });
+        return new Response(JSON.stringify({ ok: true, events: FOLDED }), { status: 200 });
+      }
+      sent.push({ url: String(url), rows: JSON.parse(init.body) });
+      return new Response('', { status: failRows && String(url).includes('eugenia_calendar') ? 500 : 201 });
+    };
     return { filed: await fileWeek(week, Date.parse('2026-10-03T03:00:00Z')).catch(e => e), sent };
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  });
 }
 
 test('a week is fetched whole, filed, and only then marked covered', async () => {
@@ -2817,26 +2761,23 @@ test('the history walks Sundays in New York from the date given, through a clock
 test('the history asks a refused week again once, and a second refusal ends the walk', async () => {
   const reads = [], runs = [];
   const refusals = new Map([['2026-09-13', 1], ['2026-09-20', 2]]);
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init = {}) => {
-    const u = String(url);
-    if (u.includes('doji-tradingview')) {
-      const week = u.match(/from=([\d-]+)/)[1];
-      reads.push(week);
-      if (refusals.get(week)) {
-        refusals.set(week, refusals.get(week) - 1);
-        return new Response(JSON.stringify({ ok: false, error: 'Rate limit exceeded' }), { status: 200 });
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init = {}) => {
+      const u = String(url);
+      if (u.includes('doji-tradingview')) {
+        const week = u.match(/from=([\d-]+)/)[1];
+        reads.push(week);
+        if (refusals.get(week)) {
+          refusals.set(week, refusals.get(week) - 1);
+          return new Response(JSON.stringify({ ok: false, error: 'Rate limit exceeded' }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
       }
-      return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
-    }
-    if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
-    return new Response('', { status: 201 });
-  };
-  try {
+      if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
+      return new Response('', { status: 201 });
+    };
     await postHistory('2026-09-06', 0);
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  });
   assert.deepEqual(reads, ['2026-09-06', '2026-09-13', '2026-09-13', '2026-09-20', '2026-09-20'],
     'the walk did not retry a refused week once, or carried on past a second refusal');
   assert.deepEqual(runs.map(r => r.ok), [true, false, true, false, false],
@@ -2845,13 +2786,10 @@ test('the history asks a refused week again once, and a second refusal ends the 
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ ok: false, error: 'TradingView calendar: 429' }), { status: 500 });
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: false, error: 'TradingView calendar: 429' }), { status: 500 });
     await assert.rejects(fileCalendar(OCT1_3PM), /429/);
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  });
 });
 
 test('the release look waits for a missing figure, but not past half an hour, and never for a speech', () => {
@@ -3313,16 +3251,15 @@ test("a full release read covers only the weeks it reached, so R-14 cannot pass 
   const recent = (n) => Array.from({ length: n }, (_, i) => ({ at: day(1 + i / 40).toISOString() }));
   const weeks = [{ week: weekOf(entry) }, { week: weekOf(day(1)) }];
   const r14 = async (releases) => {
-    const realFetch = globalThis.fetch;
-    globalThis.fetch = async (url) => {
-      const u = String(url);
-      const rows = u.includes('eugenia_trades') ? [trade] : u.includes('eugenia_calendar') ? releases
-        : u.includes('calendar_weeks') ? weeks : [];
-      return { ok: true, status: 200, json: async () => rows };
-    };
-    try {
+    return await stubbed(async () => {
+      globalThis.fetch = async (url) => {
+        const u = String(url);
+        const rows = u.includes('eugenia_trades') ? [trade] : u.includes('eugenia_calendar') ? releases
+          : u.includes('calendar_weeks') ? weeks : [];
+        return { ok: true, status: 200, json: async () => rows };
+      };
       return (await serve('check_rules', { days: 365 })).split('\n').find(l => l.startsWith('R-14'));
-    } finally { globalThis.fetch = realFetch; }
+    });
   };
   assert.match(await r14(recent(RULE_RELEASES - 1)), /^R-14: PASS/,
     'a read short of its bound covers every week it was handed, and this entry has no print near it');
@@ -4057,19 +3994,18 @@ test('his audit shows what he committed to, between what he told her and what sh
 });
 
 test('the notes she is handed carry his commitments, asked for by their kind', async () => {
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => {
-    const kind = String(url).match(/kind=eq\.(\w+)/)?.[1];
-    const rows = { commitment: [{ id: 9, note: 'this week I stop after two losses' }] }[kind] ?? [];
-    return new Response(JSON.stringify(rows), {
-      status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url) => {
+      const kind = String(url).match(/kind=eq\.(\w+)/)?.[1];
+      const rows = { commitment: [{ id: 9, note: 'this week I stop after two losses' }] }[kind] ?? [];
+      return new Response(JSON.stringify(rows), {
+        status: 200, headers: { 'content-type': 'application/json' } });
+    };
     const out = await notesBlock();
     assert.match(out, /What he has committed to/,
       'notesBlock no longer reads commitments, so nothing is ever held against one');
     assert.match(out, /\[9\] this week I stop after two losses/);
-  } finally { globalThis.fetch = realFetch; }
+  });
 });
 
 test('the nightly pass gets a retry hour, and it is inside the same day', () => {
@@ -4653,19 +4589,14 @@ test('a speech vendor that cannot answer still leaves him the message', async ()
      otherwise make audio-only a MISSING message. With no TTS key `speak` answers
      false without a request — the shape of a vendor that refused — so this
      replays the real sequence: every part fails, and the text must still go. */
-  const realFetch = globalThis.fetch, realErr = console.error;
   const sent = [];
-  globalThis.fetch = async (url, init) => {
-    sent.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
-    return { ok: true, status: 200, json: async () => ({ ok: true }) };
-  };
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      sent.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
     await sayAloud('Gold is holding 4,410 into the close.');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
 
   const texts = sent.filter(r => r.url.includes('sendMessage'));
   assert.equal(texts.length, 1,
@@ -4730,7 +4661,7 @@ test('a speech vendor that refuses once is asked again before the text goes', as
   /* THE SECOND ATTEMPT turns a vendor's bad minute into a voice note rather than
      text. A refusal that answers at once needs no clock; the stall is the budget
      test's to hold. */
-  const realFetch = globalThis.fetch, realErr = console.error, realDeno = globalThis.Deno;
+  const realDeno = globalThis.Deno;
   globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
   const fresh = await import('../supabase/functions/doji-eugenia/index.ts?retry');
   delete globalThis.Deno;
@@ -4738,25 +4669,20 @@ test('a speech vendor that refuses once is asked again before the text goes', as
 
   let asked = 0;
   const sent = [];
-  globalThis.fetch = async (url, init) => {
-    const u = String(url);
-    if (u.includes('/audio/speech')) {
-      asked++;
-      return asked === 1
-        ? { ok: false, status: 503, arrayBuffer: async () => new ArrayBuffer(0) }
-        : { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) };
-    }
-    sent.push(u);
-    return { ok: true, status: 200, json: async () => ({ ok: true }) };
-  };
-  console.error = () => {};
-  let heard;
-  try {
-    heard = await fresh.sayAloud('Gold is holding 4,410 into the close.');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  const heard = await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      const u = String(url);
+      if (u.includes('/audio/speech')) {
+        asked++;
+        return asked === 1
+          ? { ok: false, status: 503, arrayBuffer: async () => new ArrayBuffer(0) }
+          : { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) };
+      }
+      sent.push(u);
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+    return await fresh.sayAloud('Gold is holding 4,410 into the close.');
+  });
   assert.equal(asked, 2, 'a part that failed once was not asked for again');
   assert.equal(heard, true, 'the second attempt landed and the voice is reported as not heard');
   assert.equal(sent.filter(u => u.includes('sendVoice')).length, 1);
@@ -4769,54 +4695,46 @@ test('a speech vendor that refuses once is asked again before the text goes', as
    after it. The stub answers a read only when its filter matches a correct
    one, or a pairing that reads the wrong row would pass. */
 test('the speaking worker sends today\'s stored briefing and only then says it was delivered', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
   const stamp = new Date(Date.now() - 60_000).toISOString().replace('Z', '+00:00');
   const steps = [];
-  globalThis.fetch = async (url, init) => {
-    const u = decodeURIComponent(String(url));
-    if (u.includes('/eugenia_turns?select=created_at')) {
-      steps.push('marker');
-      assert.match(u, /role=eq\.user&content=eq\.\[weekday briefing\]&order=id\.desc&limit=1/);
-      return Response.json([{ created_at: stamp }]);
-    }
-    if (u.includes('/eugenia_turns?select=content')) {
-      steps.push('text');
-      return Response.json(u.includes(`created_at=eq.${stamp}`) && u.includes('role=eq.assistant')
-        ? [{ content: 'Buenos días. Payrolls lands at 08:30.' }] : []);
-    }
-    if (u.includes('sendMessage')) {
-      steps.push(`sent:${JSON.parse(init.body).text}`);
-      return Response.json({ ok: true });
-    }
-    if (u.includes('/eugenia_runs')) {
-      steps.push(`row:${JSON.parse(init.body)[0].caller}`);
-      return new Response(null, { status: 201 });
-    }
-    throw new Error(`unexpected request ${u}`);
-  };
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      const u = decodeURIComponent(String(url));
+      if (u.includes('/eugenia_turns?select=created_at')) {
+        steps.push('marker');
+        assert.match(u, /role=eq\.user&content=eq\.\[weekday briefing\]&order=id\.desc&limit=1/);
+        return Response.json([{ created_at: stamp }]);
+      }
+      if (u.includes('/eugenia_turns?select=content')) {
+        steps.push('text');
+        return Response.json(u.includes(`created_at=eq.${stamp}`) && u.includes('role=eq.assistant')
+          ? [{ content: 'Buenos días. Payrolls lands at 08:30.' }] : []);
+      }
+      if (u.includes('sendMessage')) {
+        steps.push(`sent:${JSON.parse(init.body).text}`);
+        return Response.json({ ok: true });
+      }
+      if (u.includes('/eugenia_runs')) {
+        steps.push(`row:${JSON.parse(init.body)[0].caller}`);
+        return new Response(null, { status: 201 });
+      }
+      throw new Error(`unexpected request ${u}`);
+    };
     const res = await postSpeak('weekday');
     assert.equal((await res.json()).heard, false, 'with no voice key the text went, and it reads as heard');
-  } finally {
-    globalThis.fetch = realFetch;
-    console.error = realErr;
-  }
+  });
   assert.deepEqual(steps, ['marker', 'text', 'sent:Buenos días. Payrolls lands at 08:30.',
                            'row:weekday briefing delivered'],
     'the speaking worker did not find, pair, send and then record, in that order');
 });
 
 test('the speaking worker refuses a briefing that is not today\'s, and a door that names no briefing', async () => {
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => Response.json([{ created_at: '2026-09-30T12:02:23.4243+00:00' }]);
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async () => Response.json([{ created_at: '2026-09-30T12:02:23.4243+00:00' }]);
     await assert.rejects(postSpeak('weekday'), /no weekday briefing is stored for/,
       "yesterday's briefing would arrive as this morning's");
     await assert.rejects(postSpeak('pulse'), /no such briefing to speak: pulse/);
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  });
 });
 
 test('nothing she writes is left unspoken for being long', () => {
@@ -5233,9 +5151,7 @@ const REFUSALS = {
 // One test rather than four generated ones: the suite's count is read off
 // `test(` declarations, and a test made in a loop is invisible to it.
 test('every tool answers with a sentence however the database refuses', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
     for (const [how, refuse] of Object.entries(REFUSALS)) {
       globalThis.fetch = async () => refuse();
       for (const [name, input] of TOOL_CALLS) {
@@ -5251,7 +5167,7 @@ test('every tool answers with a sentence however the database refuses', async ()
           `kills the turn as surely as a throw`);
       }
     }
-  } finally { globalThis.fetch = realFetch; console.error = realErr; }
+  });
 });
 
 test('a tool name the file has no handler for is answered, not thrown', async () => {
@@ -5278,9 +5194,7 @@ const BLOCKS = {
 };
 
 test('every block degrades to nothing when its read fails, and never throws', async () => {
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  try {
+  await stubbed(async () => {
     for (const [how, refuse] of Object.entries(REFUSALS)) {
       globalThis.fetch = async () => refuse();
       for (const [name, block] of Object.entries(BLOCKS)) {
@@ -5292,7 +5206,7 @@ test('every block degrades to nothing when its read fails, and never throws', as
           `${name} answered with something that is not a string when the database was ${how}`);
       }
     }
-  } finally { globalThis.fetch = realFetch; console.error = realErr; }
+  });
 });
 
 /* AND THE OTHER HALF: a block swallowing its content along with its failure is
@@ -5313,14 +5227,12 @@ test('every block says something when its read succeeds', async () => {
                          planned_sl: 3380, planned_tp: 3450 }],
     doji_sync_health: [{ who: 'poller', last_ok: new Date().toISOString(), last_run: new Date().toISOString(), ok: true }],
   };
-  const realFetch = globalThis.fetch, realErr = console.error;
-  console.error = () => {};
-  globalThis.fetch = async (url) => {
-    const table = String(url).match(/rest\/v1\/(\w+)/)?.[1];
-    return new Response(JSON.stringify(rows[table] ?? []), {
-      status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url) => {
+      const table = String(url).match(/rest\/v1\/(\w+)/)?.[1];
+      return new Response(JSON.stringify(rows[table] ?? []), {
+        status: 200, headers: { 'content-type': 'application/json' } });
+    };
     for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'loopsBlock', 'calendarBlock']) {
       const out = await BLOCKS[name]();
       assert.ok(out.trim().length > 0,
@@ -5328,7 +5240,7 @@ test('every block says something when its read succeeds', async () => {
         `is indistinguishable from one whose read failed, and passes every test that ` +
         `only asks whether it threw`);
     }
-  } finally { globalThis.fetch = realFetch; console.error = realErr; }
+  });
 });
 
 /* ─── What broke since the last briefing ─────────────────────────────────────
@@ -5356,19 +5268,18 @@ test('the Sunday briefing is handed the week ahead, high releases only, each wit
     { id: 2, at: '2026-10-02T12:30:00Z', name: 'Nonfarm Payrolls (Sep)', importance: 'high',
       consensus: '45K', prior: '22K', actual: null, note: null },
   ];
-  const realFetch = globalThis.fetch;
   let asked = '';
-  globalThis.fetch = async (url) => {
-    asked = String(url);
-    return new Response(JSON.stringify(rows), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  try {
+  await stubbed(async () => {
+    globalThis.fetch = async (url) => {
+      asked = String(url);
+      return new Response(JSON.stringify(rows), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
     const out = await weekBlock(sunday);
     assert.match(asked, /eugenia_calendar\?/, 'the week is not read from her calendar');
     assert.match(out, /The week ahead/, 'the week arrives under the rolling calendar\'s heading');
     assert.match(out, /Nonfarm Payrolls \(Sep\)[^\n]*due, 45K expected/, 'Friday\'s payrolls does not reach the Sunday briefing');
     assert.match(out, / on Friday 2 Oct Nonfarm Payrolls/, 'a release later in the week does not name its day');
-  } finally { globalThis.fetch = realFetch; }
+  });
 });
 
 test('sinceBriefing keeps closed trades from the last briefing on, and the hold that closed after it', () => {
@@ -5404,14 +5315,13 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
     closed('PID13', '2026-09-25', '2026-09-25T15:40:00Z', '2026-09-25T15:50:00Z'),
   ];
   const held = closed('PID14', '2026-09-25', '2026-09-25T19:00:00Z', '2026-09-28T11:00:00Z');
-  const realFetch = globalThis.fetch;
   const serve = (marker, trades) => async (url) => {
     const table = String(url).match(/rest\/v1\/(\w+)/)?.[1];
     const body = table === 'eugenia_turns' ? [{ created_at: marker }]
                : table === 'eugenia_trades' ? trades : [];
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   };
-  try {
+  await stubbed(async () => {
     globalThis.fetch = serve('2026-09-25T12:00:00Z', friday);   // Friday's 08:00 briefing
     const sunday = await breachesBlock();
     assert.match(sunday, /R-12: FAIL/, 'three entries on Friday never reach Sunday\'s briefing');
@@ -5421,7 +5331,7 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
     const monday = await breachesBlock();
     assert.match(monday, /R-15: FAIL/, 'a hold across the Friday close never reaches a briefing');
     assert.doesNotMatch(monday, /R-12/, 'Monday judges Friday\'s entries a second time');
-  } finally { globalThis.fetch = realFetch; }
+  });
 });
 
 /* ─── A calendar read that reached its bound says so ─────────────────────────
@@ -5430,15 +5340,14 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
    sentence she can write. */
 
 test('a full calendar read says it stopped, and a short one says nothing', async () => {
-  const realFetch = globalThis.fetch;
   const at = (i) => new Date(Date.now() + (i + 1) * 60_000).toISOString();
   const rows = (n) => Array.from({ length: n }, (_, i) =>
     ({ id: i, at: at(i), name: `release ${i}`, importance: 'medium',
        consensus: null, prior: null, actual: null, note: null }));
-  const block = async (n) => {
+  const block = (n) => stubbed(async () => {
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rows(n) });
-    try { return await calendarBlock(); } finally { globalThis.fetch = realFetch; }
-  };
+    return await calendarBlock();
+  });
   assert.match(await block(40), /The list stops at 40 entries/);
   assert.doesNotMatch(await block(39), /stops at/);
 });
