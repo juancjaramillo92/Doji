@@ -15,35 +15,24 @@ the broker supplies, and the discipline record, which only you can.
 Open `index.html`. That is the whole application — no build step, no bundler, no
 dependencies to install.
 
-Three libraries load from a CDN. Chart.js and the Supabase client are blocking
-scripts in the page; SheetJS is fetched on the first export, because it is the
-largest of the three and is needed only there. All three come from jsDelivr,
-pinned to an exact version — Chart.js and SheetJS with an SRI hash beside the
-pin, the Supabase client deliberately without one, for the reason given where
-the tag is.
+Three libraries load from jsDelivr, each pinned to an exact version. Chart.js and
+the Supabase client are blocking scripts; SheetJS, the largest, is fetched on the
+first export. Chart.js and SheetJS carry an SRI hash; the Supabase client does
+not, for the reason given beside its tag. Two typefaces come from Google Fonts —
+Hanken Grotesk for the interface, JetBrains Mono for every figure — and `--ui`
+and `--mono` both carry a system fallback, so a network that blocks the fonts
+costs the typeface and nothing else.
 
-**Two typefaces load from Google Fonts** — Hanken Grotesk for the interface and
-JetBrains Mono for every figure — which is the fourth and fifth external host
-the page reaches, and the only ones that are not a library. Both `--ui` and
-`--mono` carry a full system fallback stack, so a network that blocks Google
-Fonts costs the typeface and nothing else: the app opens, draws and saves
-exactly as before, in the platform's own faces.
-
-You need a connection to sign in and to save. Without one the journal still
-opens and draws from a cached copy of the last successful read; saving is
-refused until the connection returns. The sync dot goes amber to say so.
+Signing in and saving need a connection. Without one the journal still opens and
+draws from a cached copy of the last successful read, saving is refused, and the
+sync dot goes amber.
 
 Added to an iOS home screen it runs standalone, with the icon from
 `apple-touch-icon` and the label from `<title>`. iOS reads both once, when the
-shortcut is created, so changing the icon means deleting it from the home screen
-and adding it back.
-
-There is a brief grey frame on launch, between iOS handing over and the first
-paint. It belongs to the web view starting up, not to this file: a web app
-manifest with a `background_color`, a dark `color-scheme` and an
-`apple-touch-startup-image` were each tried and none of them reach it. The
-manifest was removed afterwards — every other field in it either matched an iOS
-default or duplicated something already in the head. Left alone deliberately.
+shortcut is created, so a new icon means removing the shortcut and adding it
+back. The brief grey frame on launch belongs to the web view starting up: a
+manifest `background_color`, a dark `color-scheme` and an
+`apple-touch-startup-image` were each tried and none reaches it.
 
 ---
 
@@ -139,11 +128,11 @@ it.
       └──────────────┘
 ```
 
-**And the other half has no write path into any of it.** Eugenia reads the
-journal through `eugenia_trades`, a view granted `select` alone, and writes only
-tables of her own. She is woken by three things and never by a clock she keeps
-herself — a schedule in pg_cron, a message he sent, or a trigger on `trades`
-firing the moment a position opens or closes.
+**The other half has no write path into any of it.** Eugenia reads the journal
+through `eugenia_trades`, a view granted `select` alone, and writes only tables
+of her own. She is woken by a schedule in pg_cron, a message he sent, or a
+trigger on `trades` firing when a position opens or closes — never by a clock
+she keeps herself.
 
 ```
    WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
@@ -174,53 +163,46 @@ firing the moment a position opens or closes.
                       └──────────────────┘
 ```
 
-Four writers, one table. Journal columns and broker columns never meet, so
-between the journal half and the broker half there is nothing to arbitrate at
-all — that is the single idea the whole design rests on. Gladys is a writer on
-the journal side, the app's side, and reaches the same four columns through the
-same list.
+Journal columns and broker columns never meet, so between the two halves there
+is nothing to arbitrate — the single idea the whole design rests on. Gladys
+writes on the journal side and reaches the same four columns through the same
+list as the app. Every writer but the app is an Edge Function deployed from
+`main`; the email path posts its fill to `doji-email-sync` rather than holding
+any account credential (see **The email parser**).
 
-Every writer but the app is an Edge Function deployed from `main`. The email
-parser used to be the exception — it signed in as the trader from Apps Script,
-with the account password in Script Properties — and now posts its fill to
-`doji-email-sync` instead. See **The email parser**.
+**A few columns are written by two sources, or by one source more than once,
+and each is arbitrated by a filter or by construction — never by a rule someone
+has to remember.**
 
-**Two columns have two claimants, and they are arbitrated differently.**
-
-`balance` is settled by a filter rather than by a rule anybody has to remember:
-the poller writes it only `where balance is null`, and Postgres evaluates that
-inside the UPDATE, so an email landing mid-run cannot lose a race — there is no
-read to race with. The email's figure is the balance the broker itself printed
-on the fill, so it is the better number and it always wins; the poller fills
-only the gap the email leaves, which is every manually closed trade.
-
-`direction` has no filter at all: last write wins. The poller re-upserts every
-position inside its six-hour write window, so the poller's reading wins for
-anything it can see, and the email's survives only on a position the poller
-never reached. That is safe for one reason and it is worth stating rather than
-trusting — **both sources read the side off the OPENING deal**, so they agree by
-construction. If either ever started reading it off a close, this column would
-disagree with itself depending on how old the trade was.
+- `balance` — the poller writes it only `where balance is null`, evaluated by
+  Postgres inside the UPDATE, so an email landing mid-run cannot lose a race.
+  The email's figure is the balance the broker printed on the fill and always
+  wins; the poller fills the gap the email leaves on a manual close.
+- `planned_sl`, `planned_tp` — the poller's, each written once under its own
+  `is null` filter, so later stop moves never overwrite the plan.
+- `fill_time` — the email's; the poller stamps a close the email never covered,
+  under `where fill_time is null`.
+- `direction` — last write wins, and that is safe only because **both sources
+  read the side off the OPENING deal**. If either ever read it off a close, the
+  column would disagree with itself depending on the trade's age.
 
 Nothing else is shared. `id` is the join, not a value.
 
-She would be the fifth writer to `trades` and is deliberately not one: a
-document that decides whether he followed his rules cannot be edited by the
-thing checking them, and the same reasoning keeps her off the journal. The
-guarantee is structural rather than a grant — one database read of the journal,
-and no write path to it anywhere in the file.
+She would be the fifth writer and is deliberately not one: a document that
+decides whether he followed his rules cannot be edited by the thing checking
+them. The guarantee is structural — one database read of the journal, no write
+path to it anywhere in her file.
 
-**Three monitors watch the parts that fail silently**, and each is written where
-the thing it watches cannot take it down with it. `sync_health` is marked by the
-two writers with no voice; `dispatch` is a ledger of what pg_net sent and what
-came back, and posts to Telegram itself rather than through the function it
-watches; `pace` speaks before a briefing runs out of wall clock, because
-afterwards there is nothing left to speak with. `diagnose.sql` reads all three
-in one grid. See **Deployment**.
+**Three monitors watch the parts that fail silently**, each placed where the
+thing it watches cannot take it down. `sync_health` is marked by the two writers
+with no voice; `dispatch` records what pg_net sent and what came back, and posts
+to Telegram itself; `pace` speaks before a briefing runs out of wall clock,
+because afterwards nothing can. `diagnose.sql` reads all three in one grid. See
+**Deployment**.
 
-**A fifth function holds the TradingView sign-in and writes nowhere but its own
-row.** It is how the calendar and the market around gold will reach her, through
-a credential she never holds. See **TradingView**.
+**A fifth function holds the TradingView sign-in** and writes nowhere but its
+own row. It is how the calendar and the market around gold reach her, through a
+credential she never holds. See **TradingView**.
 
 ---
 
@@ -238,7 +220,7 @@ Written by the poller and the email parser. **The app never writes these.**
 | `user_id` | owner; defaults to `auth.uid()` — the poller supplies it explicitly, since that default is null under the service role |
 | `direction` | `BUY` / `SELL` — the **position** side |
 | `entry_time` | true execution instant of the opening deal |
-| `fill_time` | closing instant, email only — the `open_day` fallback |
+| `fill_time` | closing instant — the email's, or the poller's for a close no alert covered; the `open_day` fallback |
 | `entry_price`, `exit_price` | volume-weighted where the fill was scaled |
 | `size_oz` | position size in **ounces**, as opened — poller only |
 | `planned_sl`, `planned_tp` | the stop and target as **first seen** on the open position — poller only |
@@ -250,100 +232,64 @@ Written by the poller and the email parser. **The app never writes these.**
 | `computed_pnl` | derived from the deals — no swap |
 | `pnl` | **generated**: `coalesce(net_pnl, computed_pnl)` |
 
-`pnl` is a generated column so the email-beats-computed rule is stated once, in
-the schema, rather than reimplemented in every client that reads a P&L.
+`pnl` is generated so the email-beats-computed rule is stated once, in the
+schema, rather than in every client that reads a P&L.
 
 **`balance` and the account are different numbers, and the card shows both.**
-`balance` is the cash at the broker — the portion deployed. The account is the
-base the sizing ladder was applied to, which includes whatever is held off the
-broker ready to be moved across, and Doji never sees that directly.
-
-It is recoverable anyway, because the ladder is 0.02 lots per 1,000 continuous:
+`balance` is the cash at the broker. The account is the base the sizing ladder
+was applied to, including whatever is held off the broker, and Doji never sees it
+directly — but the ladder is 0.02 lots per 1,000, continuous, so a size is a
+readout of it:
 
     lots     = size_oz / 100
     account  = size_oz * 500
 
-So a size is a readout of the capital it was sized against. The caption under
-Balance at broker reads `0.04 lots — sizing for 2000`, and *sizing for* is doing
-real work in that sentence — it is what the ladder implies, not a figure anyone
-reported. It uses the **latest** size rather than an average, because rungs are
-stepped and a mean across a month describes no account that ever existed.
+The caption under Balance at broker reads `0.04 lots — sizing for 2000`, and
+*sizing for* is the point: it is what the ladder implies, not a figure anyone
+reported. It uses the **latest** size, because rungs are stepped and a mean
+describes no account that existed. An implied account well above the balance is
+the reserve off-broker, and it is the only thing that would show a size drifting
+off the ladder. With no balance at all, the notice explaining the dash takes the
+caption.
 
-Which makes the gap between the two worth reading: an implied account well above
-the balance is the reserve sitting off-broker. It is also the only thing that
-would show a size drifting off the ladder, since nothing else in the system
-knows what the ladder is.
+`size_oz` is in ounces because both broker sources state ounces: cTrader sends a
+volume the poller divides by a hundred, and the alert prints `Volume  Oz 4.00`.
+It is the size **opened**, the quantity `computed_pnl` is calculated over. **The
+email does not write it**: its boundary is five columns on purpose, so the secret
+held in Google's infrastructure opens five columns and not the account. A
+position the poller never saw carries no size, and a reader must tolerate null.
 
-The notice wins the caption when there is no balance at all. It explains the
-dash directly above it, and a caption belongs to the figure it sits under.
+**`planned_sl` and `planned_tp` are the plan, readable only while the position is
+open.** A closed position reports its *final* stop, so a stop moved to break-even
+under R-04 has overwritten the original. `get_positions` carries `stopLoss` and
+`takeProfit`, and the poller sees almost every position while it is open. Each
+side is written once, under its own `where … is null` — the `balance`
+arbitration — because every later poll would otherwise file the break-even stop
+as the plan. **As first seen, never as set:** up to two minutes separate the
+entry from the poll that catches it, which is immaterial to R-04's +$20 trigger.
+It looks forward only, so §7's `Evaluable` column is unchanged: almost no row
+carries a plan yet.
 
-`size_oz` is in ounces because that is the unit **both** broker sources state:
-cTrader sends the poller a volume it divides by a hundred, and the alert email
-prints `Volume  Oz 4.00`. Lots are ounces over a hundred. It is the size the
-position was **opened** at, which is the quantity `computed_pnl` is calculated
-over — equal to the closed size on a full exit, and the honest number on a
-partial.
+**`trade_stops` keeps every move the plan columns refuse to.** Where the stop
+sat when a print landed is all of R-19, so `stopChanges` writes a row whenever a
+position's stop or target differs from its last row — a pulled side as null, both
+sides pulled together included — and seven hundred polls of an unmoved stop are
+one row. It is a history rather than a column, so it sits outside
+`eugenia_trades`, and `check_rules` reads it beside the trades.
 
-**The poller writes it and the email does not.** The email boundary is five
-columns on purpose, and widening it would trade a stated property of that
-design — the secret in Google's infrastructure opens five columns, not the
-account — for coverage of trades the poller never reached. So a position it
-never saw carries no size, permanently, and anything reading sizes has to
-tolerate a null rather than assume one.
+**`best_price` is how far the trade ran in his favour, and it reaches
+backwards** — the broker's minute bars go back a year, so every trade can carry
+one. The highest bid on a buy, the lowest on a sell; R-04 turns on it, since a
+loss after the trade had been $20 his way is a stop not moved to break-even.
+**Only whole minutes inside the trade are read**: the entry minute holds prices
+from before he was in, the exit minute prices from after, so the figure can fall
+short of what happened and never exceed it, and a trade under a minute carries
+none. The poller fills it newest first, three a poll, under `where best_price is
+null`.
 
-**`planned_sl` and `planned_tp` are the plan, and it is only readable while the
-position is open.** A closed position reports its *final* stop, so one moved to
-break-even under R-04 has overwritten the original in everything the broker
-serves afterwards — which is why §8 of the strategy called the plan
-unrecoverable, and it is right about every closed trade. A live position is a
-different question: `get_positions` carries `stopLoss` and `takeProfit`, and the
-poller runs every two minutes, so it sees almost every position while it is
-still open.
-
-**Written once, and the filter in the URL is the whole of it.** `where planned_sl
-is null` inside the UPDATE, the same arbitration `balance` uses and for the same
-reason: the poller re-reads every open position on every run, and any write after
-the first would file the break-even stop as the plan — the thing the plan exists
-to be compared against.
-
-**As first seen, never as set.** Up to two minutes separate the entry from the
-poll that catches it. For R-04, which moves a stop only after +$20, that gap is
-immaterial; a stop moved inside the first two minutes would be recorded wrong and
-nothing here can tell that case apart. And it only ever looks forward — every
-trade that closed before these columns existed carries null for good, which is why
-§7's `Evaluable` column is unchanged: a rule is `journal` when a row can answer
-it, and today almost no row can.
-
-**`trade_stops` keeps every move the plan columns refuse to.** The plan is the
-first sighting and a closed position reports only its final stop, so where the
-stop sat when a print landed — which is all of R-19 — was seen every two minutes
-and kept nowhere. `stopChanges` writes a row only when a position's stop or target
-differs from the last row written for it, a side the broker stopped carrying as
-null — both sides too, so a stop and target pulled together are not read as the
-last ones still resting — so seven hundred polls of a stop that never moved are one row. A move is
-recorded up to two minutes after it is made, the plan's own *as first seen*. The
-table is outside `eugenia_trades` because it is a history rather than a column;
-`check_rules` reads it beside the trades.
-
-**`best_price` is how far the trade ran in his favour, and unlike the plan it
-reaches backwards.** The highest bid on a buy, the lowest on a sell, read off the
-broker's minute bars — which `?bars=raw` showed go back a full year, so every
-trade in the journal can carry one, not only the ones after this column. It is
-what R-04 turns on: a loss taken after the trade had already been $20 his way is
-a stop that was not moved to break-even. The poller fills it newest first, three
-trades a poll, so a fresh close is never queued behind the backlog and the
-backlog drains in minutes without a door anyone has to call. **Only whole minutes
-inside the trade are read**, because the minute he entered in holds prices from
-before he was in and the minute he left in holds prices from after — so the
-figure can fall short of what happened and can never exceed it, and a trade under
-a minute long carries none. Written once, under `where best_price is null`: the
-bars of a closed trade do not change.
-
-`commission` is recorded and never displayed. The P&L this app stores is already
-net of it — `net_pnl` includes costs and swap, `computed_pnl` is derived from
-deals that carry them — so subtracting it would double-count. It is captured
-because the value exists only at sync time, so a panel that wants it later can
-have history rather than starting from the day it was added.
+`commission` is recorded and never displayed. Both P&L figures already carry
+costs, so subtracting it would double-count; it is captured because the value
+exists only at sync time.
 
 ### Journal-owned
 
@@ -357,192 +303,123 @@ these keys.
 | `followed_sl` | did you **respect** your stop |
 | `followed_tp` | did you **respect** your target |
 
-The three discipline answers are booleans: `null` is unanswered, which is a
-third state and not the same as `no`. Every broker fill arrives with all three
-null, so a blank must never count as a miss — otherwise an entry you never got
-round to would permanently depress every compliance rate it touches.
-
-Note the polarity. The journal asks whether the stop and the target were
-**respected**, not whether they were moved.
+The three discipline answers are booleans and `null` is unanswered — a third
+state, not `no`. Every fill arrives with all three null, so a blank must never
+count as a miss. Note the polarity: the journal asks whether the stop and target
+were **respected**, not whether they were moved.
 
 ### Bookkeeping
 
-`deleted` is a soft delete and has to be. The poller re-upserts every position
-inside its window, so a hard delete would be undone within two minutes. The
-poller never sends the column, so the flag survives every later write. That one
-boolean is the entire resurrection guard.
+`deleted` is a soft delete and has to be: the poller re-upserts every position in
+its window, so a hard delete would be undone within two minutes. The poller never
+sends the column, so the flag survives every later write.
 
-`created_at` is when this row was first written — the moment the poller or the
-email parser first saw the position, which is not the moment it was opened.
-`entry_time` is that, and is the column every reading of the trade uses.
-Nothing reads `created_at` on `trades`; it is the audit floor under a table
-four writers share.
+`created_at` is when the row was first written — when a writer first saw the
+position, not when it opened (`entry_time` is that). Nothing reads it; it is the
+audit floor under a table four writers share.
 
-`updated_at` is maintained by a trigger, not by call sites that each have to
-remember. Read it as "when the poller last touched this row", not "when this row
-last changed" — the poller re-upserts every position in its window on every run,
-and Postgres does not skip no-op updates. Nothing reads the column today; the
-distinction matters the first time anything does.
+`updated_at` is maintained by a trigger. Read it as "when the poller last touched
+this row": the poller re-upserts its window every run and Postgres does not skip
+no-op updates. Nothing reads it today.
 
 `tg_message_id` is the Telegram message Gladys posted for the trade, and it is
 hers alone — in neither `Data.OWNED` nor her `COLUMNS`, so nothing can name it
-from a save or from a tap. It exists so a journal answer written **anywhere**
-reaches the message she already sent; `null` simply means there is nothing to
-edit, which is every row the poller never opened.
+from a save or a tap. It lets a journal answer written **anywhere** reach the
+message she sent; `null` means there is nothing to edit.
 
 ---
 
 ## What is derived, not stored
 
 Four things every surface needs, each computed by one function, because storing
-them is what lets them drift from the values they come from.
+them is what lets them drift.
 
 **`result`** — win / loss / break-even. A scratch is measured in **price**: an
-exit within **±$3 of the entry price** went nowhere, whatever size was on. A
-P&L band cannot say that, because $3 of P&L is $3 of gold at 0.01 lots and three
-cents of gold at 1.00 — the same rule would mean something different every time
-the account scaled. Win and loss still come from the **sign of the P&L**: price
-distance is unsigned, and it is the account that decides which way a trade went.
+exit within **±$3 of the entry price** went nowhere, whatever size was on. A P&L
+band cannot say that — $3 of P&L is $3 of gold at 0.01 lots and three cents at
+1.00. Win and loss come from the **sign of the P&L**. A P&L of **exactly zero**
+is a break-even too: a trade can move sixty dollars and come back to nothing once
+commission is in, and zero needs no scaling. It is a point, not a second band.
 
-It changes the label only, and the dollars still flow into every money figure,
-which is what keeps gross profit − gross loss equal to net. Break-evens sit in
-the win-rate **denominator**, so scratches drag it down rather than vanishing.
-`null` when there is no P&L yet — a trade can be journalled before it closes, and
-a missing figure is not a break-even.
+The label changes and the dollars do not: a scratch's money still flows into
+every figure, which keeps gross profit − gross loss equal to net, and
+break-evens sit in the win-rate **denominator**. `null` when there is no P&L yet.
+Pre-sync rows carry no prices, so their $3 is read against P&L — the only measure
+they ever had; an open position, with no exit, is the same case.
 
-**A P&L of exactly zero is a break-even too, and the price band cannot say so.**
-A trade can move sixty dollars and come back to nothing once commission is in:
-the price went somewhere, the account did not. That is a break-even at any lot
-size — which is the very property the band is measured in price to protect, and
-zero is the value that needs no scaling. It is a *point* and not a second band,
-so the cent either side is still decided on its sign.
-
-The pre-sync rows carry no prices, so the rule cannot be evaluated for them and
-the same $3 is read against their P&L instead — the only measure they have ever
-had. An open position has an entry price and no exit, which is the same case.
-
-**An aggregate result** — the colour of a calendar day, a week cell or a month
-tile — **inherits rather than re-bands.** Several trades share no single entry
-and exit, so there is no price distance to measure across them: a cell is a
-scratch when *every* decided trade inside it was one, **or when the trades
-inside it cancelled out exactly**, and otherwise takes the sign of its total.
-
-A total of exactly zero has no sign, so the sign rule cannot answer it, and a
-day that ends precisely where it started went nowhere — which is what
-break-even means. One real win and one real loss of the same size is a
-break-even day, not a red one. There is still deliberately no separate dead band
-for cells: zero is a point, so a day that nets a few dollars off two real losses
-is two real losses, exactly as before. The two levels agree by construction —
-without that, a day holding a single trade that netted zero would read
-break-even on the calendar and a loss in the log, on one screen.
+**An aggregate result** — a calendar day, a week cell, a month tile —
+**inherits rather than re-bands.** Several trades share no entry and exit, so a
+cell is a scratch when *every* decided trade in it was one, **or when its total
+is exactly zero**, and otherwise takes the sign of its total. A win and a loss
+that cancel went nowhere; a day netting a few dollars off two losses is two
+losses. The levels agree by construction, so a day of one zero-P&L trade reads
+break-even on the calendar and in the log alike.
 
 **The filing day** — `open_day` when the poller supplied one, otherwise the New
 York civil day of the closing fill.
 
-**`session`** — derived from `entry_time` against each financial centre's own
-local hours, so London's boundary moves with its own daylight saving rather than
-New York's. Derived at read time rather than stored, so a fill nobody has opened
-yet still shows one, nothing can go stale against the times it came from, and a
-fill the poller backfills later corrects itself. There is no override.
+**`session`** — derived from `entry_time` against each centre's own local hours,
+so London's boundary moves with its own daylight saving. Derived at read time, so
+nothing can go stale and a backfilled fill corrects itself. There is no override.
 
-**Completeness** — setup and all three discipline answers. P&L is deliberately
-not required.
+**Completeness** — setup and all three discipline answers. P&L is not required.
 
 ---
 
 ## Facts that live in more than one file
 
-Four runtimes, five languages and no build step, so some things genuinely cannot
-be single-sourced at run time:
+Four runtimes, five languages and no build step, so some things cannot be
+single-sourced at run time:
 
 | The fact | Where its copies live |
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
-| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns themselves, and twice inside `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
-| the **five columns the app may WRITE** | the `grant update (…)` in `011_trades_grants.sql`, and both lists in `verify.sql` — the exclusion and the positive one. Four of them are `Data.OWNED`; the fifth is `deleted`, which no tap or save may name but `remove()` and `undo()` write directly, so a grant list built from `Data.OWNED` alone reads as correct and takes soft delete out on the day it is applied |
-| the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its short/long P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, and the app's Long/Short label — narrowing the constraint refuses every SELL at PostgREST and the poller reports it to the console only |
-| the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes — her own turns are half of every pair, so a constraint that refuses `assistant` leaves a history of his messages alone |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
+| the **five columns the app may WRITE** | the `grant update (…)` in `011_trades_grants.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
+| the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
+| the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
-| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` again, and §2's headings in the strategy — the tool's enum reads `CHANNELS` rather than holding its own |
-| the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` — which is one constant interpolated into both the cached prefix and §0, so the rungs are a copy and the table is not |
-| Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and the three branches `searchList` renders them with — a value on one side and not the other is a hit silently attributed to the wrong person |
-| the **`eugenia_trades` column list** | the numbered SQL files — `003_eugenia.sql` creates it and `006_plan.sql` appends the plan, so the last definition is the one the database ends up with — the README's two quoted copies of that statement — the one an existing database runs on its own and the one inside the drop-and-rebuild migration — §8's inventory of a row in the strategy, the section she is told to read before producing any number, which named four columns the view does not serve for five versions of the document, and `TradeRow` in `adherence.ts`, which calls itself the row the view serves and is what every rule is written against — so a column it does not name is one no rule can be written against, and `readDesk` asking for `select=*` makes it the only description of what comes back |
+| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
+| the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` |
+| Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
+| the **`eugenia_trades` column list** | the numbered SQL files (`003_eugenia.sql` creates it, `006_plan.sql` appends the plan; the last definition wins), the README's two quoted copies of that statement, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
-| each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — the one rename in this system that fails in complete silence, since pg_net discards the 200 the unread flag still answers. Held in BOTH directions: every flag `004` calls with is read, and every flag read is either scheduled in `004` or declared as a door a person opens, so a sense can no longer ship with no job behind it |
-| the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search — a disagreement is a 400 on every write, reported to a console nobody reads |
-| the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port of all six so she can reach them — the break-even band, the session names and all four sets of market hours are read out of both files, and so is the SHAPE of the three definitions that look identical in every ordinary case and part on one |
-| the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, and one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys` and two in `doji-eugenia` — every one stating `hourCycle: 'h23'`, because `hour12: false` leaves the choice to the locale and a locale resolving to h24 renders midnight as hour 24. Harmless in the two `hourIn` ports, where 24 fails `h < close` as 0 fails `h >= open`; wrong in `nyParts` and `nyWall`, which compare the hour against 17 and feed it to `Date.UTC` |
-| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, which closes Friday and opens Sunday on it, and `ROLL_HOUR` in `index.ts`, which decides whether a quote is describing the night or the evening — one boundary, and a disagreement is a window labelled wrong for an hour a day |
-| the **columns of `eugenia_price`** | the table, and what `markPrice` PATCHes — and `looked_at` written unconditionally is the quiet window that never reopens |
-| the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, which carries TradingView's 1, 0 and −1 into her words, the check constraint, and the `importance=eq.high` the event spine selects on — a rename on any side is a spine that files everything and wakes for nothing, or a quarter-hourly filing refused whole |
-| the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, and the check constraint |
+| each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — held in both directions, so a rename and a sense with no job both fail |
+| the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search |
+| the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case |
+| the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
+| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
+| the **columns of `eugenia_price`** | the table and what `markPrice` PATCHes |
+| the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the spine's `importance=eq.high` |
+| the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
-| the **two writers' names** | `sync_health_id_check`, the seed beside it, and the `heartbeat("…")` call in each of the two functions — an unaccepted name is a 400 the writer swallows, an unseeded one is a PATCH landing on nothing, and both read as a writer that died |
-| the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the two `verify.sql` names in the row that asks whether a database has the cache-write columns — a key with no column is a row PostgREST refuses whole, so the meter goes quiet for every caller at once |
-| **which rules a row can answer** | §7's `Evaluable` column in the strategy, and the thirteen predicates `adherence.ts` implements — a rule marked `journal` and never implemented is a check she cites that nobody runs; one marked `judgment` and implemented anyway starts reporting `pass` for something §8 says nothing stored can see |
-| the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union it interpolates, and `010`'s `owed \|\| ' briefing delivered'` — the two halves are in two languages with no build step between them, and a watcher looking for a caller nobody writes reports a briefing missing every single day |
-| the **number of scheduled jobs** | the `cron.schedule` calls in `004` and the count `verify.sql` asserts — a row that has been wrong once already, reporting a correct database as broken |
-| the **paid worker wall clock** | `ceiling_ms` in `010`, which is also what its message quotes back, and the sentence in `CLAUDE.md` explaining why the cron half answers before it works — a fact about the plan rather than about this repository, so it moves in both places or neither |
+| the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
+| the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
+| **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
+| the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `010`'s `owed \|\| ' briefing delivered'` |
+| the **number of scheduled jobs** | the `cron.schedule` calls in `004` and the count `verify.sql` asserts |
+| the **paid worker wall clock** | `ceiling_ms` in `010` and the sentence in `CLAUDE.md` on why the cron half answers first |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
-| the **project ref** | every `net.http_post` URL in the SQL, plus `index.html`, `config.toml`, the deploy workflow and the Apps Script — the middle two name it without a URL |
+| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow and the Apps Script |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 
-Copies are the cost. Copies that can *disagree* were the risk, and that is what
-`test/agree.test.mjs` closes: it reads every copy of each — the app out of
-`index.html` through the same jsdom harness the render tests use, the function
-exports directly, the constraint and the cron jobs out of the SQL as text, the
-project ref out of the workflow and `config.toml` — and fails when they stop
-saying the same thing.
+Copies are the cost; copies that can *disagree* are the risk.
+`test/agree.test.mjs` reads every copy of each — the app through the jsdom
+harness, the function exports directly, the SQL and workflows as text — and fails
+when they stop saying the same thing. It also asserts the guarantee rather than
+only the lists: no broker column may appear in `Data.OWNED` or `COLUMNS`.
 
-Every one of those values was already tested before, and every one of those
-tests asserted against a literal typed into the file beside it — so changing a
-list and its own test in one pass left the other copies untouched and the suite
-green.
-
-It also asserts the guarantee rather than only the lists: no broker column may
-appear in `Data.OWNED` or in `COLUMNS`, which is the sentence the whole design
-rests on, tested rather than repeated.
-
-**And the database holds it too, since `011_trades_grants.sql`.** The RLS policy
-on `trades` scopes rows to their owner and says nothing about columns, so a
-client signed in as the trader could write any column of its own rows —
-`net_pnl`, `direction`, `fill_time`, every figure the app does not own and
-cannot repair. 011 revokes insert, update and delete on the table and grants
-back update on exactly five columns: `Data.OWNED`'s four, plus `deleted`.
-
-This paragraph used to argue the other way, and the argument is worth keeping
-because two thirds of it were dissolved rather than overruled. It said the grant
-list would be a fifth copy of the boundary *in the one place nothing here can
-test*, and that getting it wrong would *silently break soft delete rather than
-failing loudly*. Both are now false: `agree.test.mjs` reads the grant out of 011
-and both of `verify.sql`'s lists, holds all three against `Data.OWNED`, and goes
-red on a list that is too narrow, too wide, or drifting in either file. The
-missing-`deleted` case — the exact silent breakage that was predicted — is one
-of the five it is proved against.
-
-What was NOT dissolved is the value: the threat it stops is a client that
-already holds the session token, which is a narrow one. It is done because the
-cost fell away, not because the threat grew.
-
-`updated_at` is not in the grant, though the earlier version of this paragraph
-listed it. Column-level UPDATE is checked against the columns a statement NAMES
-in its SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`, which
-needs no privilege of the caller's.
-
-That was reasoning rather than a result, and it has since been run. On a
-throwaway Postgres 16 carrying this table, this trigger and 009's two statements
-verbatim, `set role authenticated` then a journal save SUCCEEDS and
-`updated_at` moves — with nothing granting that column to that role. The same
-save against `net_pnl` is refused, as are an insert and a hard delete, and the
-soft delete and its undo both pass. The refusals are what make the success worth
-having: a run where everything is permitted would prove only that the grants had
-not been applied.
-
-It is not in `npm test` and will not be. The suite installs jsdom and nothing
-else, and a database dependency would cost that for one assertion. What is on
-the live database is `verify.sql`'s business, and its three rows there answer the
-privileges rather than this — a privilege check is not a write.
+**The database holds that guarantee too.** RLS on `trades` scopes rows to their
+owner and says nothing about columns, so `011_trades_grants.sql` revokes insert,
+update and delete and grants back update on exactly five columns —
+`Data.OWNED`'s four and `deleted`. The threat it stops is a client already
+holding the session token, a narrow one; it is done because the test above made
+it cheap. `updated_at` needs no grant: column privileges are checked against the
+SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`. Run on a
+throwaway Postgres 16 with this table and the grants verbatim: a journal save as
+`authenticated` succeeds and moves `updated_at`; a write to `net_pnl`, an insert
+and a hard delete are refused; soft delete and undo pass.
 
 ---
 
