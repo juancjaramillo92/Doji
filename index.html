@@ -3022,6 +3022,10 @@ function heatmapDays(y, m) {
   return { days, satTrades, peak };
 }
 
+// A day's or a week's count, the word in its own span so the phone drops it.
+const tradeCount = n =>
+  n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
+
 // Week by week: `cols` day slots then that week's summary. `slot` counts
 // positions rather than dates, so the summary lands in the last column
 // whichever weekday the month opens on.
@@ -3035,7 +3039,6 @@ function heatmapGrid(visible, cols, first, dows, peak) {
   const flushWeek = () => {
     wkN++;
     const cls   = wkTrades === 0 ? '' : aggregateResult(wkPnl, wkPnlN, wkBe);
-    const count = wkTrades ? `${wkTrades}<span class="heatmap-cell-count-word"> trade${wkTrades > 1 ? 's' : ''}</span>` : '';
     const abs   = fmtMoney(wkPnl);
     // Separate spans so the phone stylesheet can drop the tail.
     const pnl   = wkPnlN ? `$${abs.slice(0, -3)}<span class="hm-cents">${abs.slice(-3)}</span>`
@@ -3043,7 +3046,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     html += `
       <div class="heatmap-week ${cls}">
         <div class="heatmap-week-lbl">W${wkN}</div>
-        <div class="heatmap-week-count">${count}</div>
+        <div class="heatmap-week-count">${tradeCount(wkTrades)}</div>
         <div class="heatmap-week-pnl">${pnl}</div>
       </div>`;
     wkPnl = 0; wkPnlN = 0; wkBe = 0; wkTrades = 0;
@@ -3063,7 +3066,6 @@ function heatmapGrid(visible, cols, first, dows, peak) {
     if (iso === today) cls += ' today';
 
     const pnlText   = data.pnlN ? '$' + fmtMoney(data.pnl) : n ? DASH : '';
-    const countText = n ? `${n}<span class="heatmap-cell-count-word"> trade${n > 1 ? 's' : ''}</span>` : '';
     // Focusable only when the cell opens something, or thirty-one tab stops sit
     // in front of the trade log.
     const opens = n ? ` role="button" tabindex="0" aria-label="${iso}"` : '';
@@ -3076,7 +3078,7 @@ function heatmapGrid(visible, cols, first, dows, peak) {
       <div class="heatmap-cell ${cls}" data-day="${iso}"${opens}${intensity}>
         <div class="heatmap-cell-day">${d}</div>
         <div class="heatmap-cell-body">
-          <div class="heatmap-cell-count">${countText}</div>
+          <div class="heatmap-cell-count">${tradeCount(n)}</div>
           <div class="heatmap-cell-pnl">${pnlText}</div>
         </div>
       </div>`;
@@ -3109,8 +3111,7 @@ function renderHeatmap() {
   const showSat = !Phone.matches || satTrades > 0;
   const visible = showSat ? days : days.filter(x => x.wd !== 6);
   const cols    = showSat ? 7 : 6;
-  const dows    = showSat ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-                          : ['Sun','Mon','Tue','Wed','Thu','Fri'];
+  const dows    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].slice(0, cols);
 
   const grid = $('heatmap-grid');
   if (grid) {
