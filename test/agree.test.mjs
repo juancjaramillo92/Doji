@@ -4846,25 +4846,30 @@ test('every tool the poller may call is one it actually calls or probes', () => 
    overwrites the figure the broker printed on the fill. Read out of each
    function body: a whole-file match is answered by another function's copy. */
 
-test('the three columns with two claimants are filtered inside the UPDATE', () => {
+test('every column the poller writes once is filtered inside the UPDATE', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  /* `fill_time` IS THE THIRD. The email owns it; the poller stamps a close it has
-     already seen under the same filter, so the email still wins wherever it
-     lands and the poller fills only the gaps. */
-  for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', '\\$\\{col\\}'],
-                           ['writeFill', 'fill_time']]) {
-    const at = src.indexOf(`function ${fn}(`);
-    assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
-    const body = src.slice(at, src.indexOf('\n}', at));
+  // ONE WRITER, so the filter lives in one place and every caller inherits it.
+  const at = src.indexOf('async function writeOnce(');
+  assert.ok(at > -1, 'doji-mcp-sync no longer has writeOnce()');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  assert.match(body, /trades\?id=eq\.\$\{id\}&\$\{column\}=is\.null/,
+    'writeOnce writes with no `<column>=is.null` filter, so it writes on every ' +
+    'poll — the last sighting wins a column where the first one is the whole point');
+  assert.match(body, /method: "PATCH"/,
+    'writeOnce no longer PATCHes, and an upsert under merge-duplicates sets every ' +
+    'key it is handed — the filter in the URL would not be consulted at all');
 
-    assert.match(body, new RegExp(`${col}=is\\.null`),
-      `${fn} writes with no ${col}=is.null filter, so it writes on every poll — ` +
-      `the last sighting wins a column where the first one is the whole point`);
-    assert.match(body, /method: "PATCH"/,
-      `${fn} no longer PATCHes, and an upsert under merge-duplicates sets every ` +
-      `key it is handed — the filter in the URL would not be consulted at all`);
+  /* AND NOTHING WRITES AROUND IT. A second PATCH in the file is a column written
+     with whatever filter its author remembered. `fill_time` is the email's and
+     the poller stamps only the gaps; `balance` likewise; the plan and
+     `best_price` are their first sighting. */
+  assert.equal((src.match(/method: "PATCH"/g) || []).length, 1,
+    'doji-mcp-sync PATCHes trades somewhere other than writeOnce');
+  for (const call of ['writeOnce(target, "balance"', 'writeOnce(plan.id, col, plan[col])',
+                      'writeOnce(f.row.id, "fill_time"', 'writeOnce(t.id, "best_price", best)']) {
+    assert.ok(src.includes(call), `the poller no longer writes through ${call}`);
   }
 });
 
@@ -4901,14 +4906,14 @@ test('the close instant is written only where the deals say it closed', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  assert.match(src, /folded\.filter\(f => f\.row\.exit_price !== null\)[\s\S]{0,120}writeFill\(f\.row\.id, f\.closedAt\)/,
+  assert.match(src, /folded\.filter\(f => f\.row\.exit_price !== null\)[\s\S]{0,120}writeOnce\(f\.row\.id, "fill_time", new Date\(f\.closedAt\)/,
     'the close instant is no longer confined to positions the deals show closed — ' +
     'an open position stamped with a fill_time is reported as finished, and the ' +
     'close trigger fires for a trade that is still running');
 
   // AFTER the upsert, for writePlan's reason: a PATCH against an id nothing has
   // inserted matches nothing and reports success.
-  assert.ok(src.indexOf('await upsert(folded.map(f => f.row))') < src.indexOf('writeFill(f.row.id'),
+  assert.ok(src.indexOf('await upsert(folded.map(f => f.row))') < src.indexOf('writeOnce(f.row.id'),
     'the close instant is written before the row exists, so every first sighting ' +
     'of a close is silently skipped');
 
@@ -4921,7 +4926,7 @@ test('the close instant is written only where the deals say it closed', () => {
 
   // Counted on the ANSWER rather than the attempt: a PATCH filtered to nothing is
   // a 200.
-  assert.match(src.slice(at, at + 400), /if \(await writeFill\([^)]*\)\) stamped\+\+;/,
+  assert.match(src.slice(at, at + 400), /if \(await writeOnce\(f\.row\.id, "fill_time", .*\)\) stamped\+\+;/,
     'stamped counts calls made rather than rows written — the number would read ' +
     'the same whether the filter works or has stopped filtering');
   assert.match(src, /balance_for: target, planned, stamped,/,
@@ -4941,26 +4946,22 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  /* BOTH FILTERED WRITERS: the silent half is a property of the shape, not of
-     one function. */
-  for (const fn of ['writePlan', 'writeFill']) {
-    const at = src.indexOf(`function ${fn}(`);
-    assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
-    const body = src.slice(at, src.indexOf('\n}', at));
-
-    // A count or a yes/no, DERIVED from the representation. writeFill stamps one
-    // column; writePlan may stamp two.
-    assert.match(body, /Promise<(boolean|number)>/,
-      `${fn} no longer answers whether it wrote, so the count beside it is ` +
-      `back to counting calls`);
-    assert.match(body, /\(\(await res\.json\(\)\) as unknown\[\]\)\.length > 0/,
-      `${fn} stopped reading the rows it got back, so its answer is no longer ` +
-      `about what the database did`);
-    assert.match(body, /sbHeaders\("return=representation"\)/,
-      `${fn} asks for no representation, so a PATCH that matched nothing and ` +
-      `one that wrote come back identical — the meter reads 0 forever, which ` +
-      `is indistinguishable from a quiet poll`);
-  }
+  /* THE ONE WRITER answers whether it wrote, and every count is taken from that
+     answer: the silent half is a property of the shape, so it is held once. */
+  const at = src.indexOf('async function writeOnce(');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  assert.match(body, /Promise<boolean>/,
+    'writeOnce no longer answers whether it wrote, so every count beside it is ' +
+    'back to counting calls');
+  assert.match(body, /\(\(await res\.json\(\)\) as unknown\[\]\)\.length > 0/,
+    'writeOnce stopped reading the rows it got back, so its answer is no longer ' +
+    'about what the database did');
+  assert.match(body, /sbHeaders\("return=representation"\)/,
+    'writeOnce asks for no representation, so a PATCH that matched nothing and ' +
+    'one that wrote come back identical — every meter reads 0 forever, which is ' +
+    'indistinguishable from a quiet poll');
+  assert.match(src, /if \(plan\[col\] !== undefined && await writeOnce\(plan\.id, col, plan\[col\]\)\) wrote\+\+;/,
+    'writePlan counts the calls it made rather than the rows written');
 
   assert.match(src, /planned \+= await writePlan\(/,
     'the poller increments its plan count on the call rather than on the answer, ' +
@@ -4984,14 +4985,10 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
   assert.match(body, /order=entry_time\.desc&limit=\d+/,
     'the excursion read is no longer newest first with a limit — a fresh close ' +
     'queues behind the backlog, or the read grows with the table');
-  assert.match(body, /trades\?id=eq\.\$\{t\.id\}&best_price=is\.null/,
-    'the excursion write lost its `best_price is null` filter, so a figure is ' +
-    'rewritten on every poll rather than written once');
-  assert.match(body, /sbHeaders\("return=representation"\)/,
-    'the excursion PATCH asks for no representation, so its count reads 0 for ' +
-    'ever — the healthy steady state, whether or not anything was written');
-  assert.match(body, /\(\(await patch\.json\(\)\) as unknown\[\]\)\.length > 0/,
-    'the excursion count is taken from the call rather than the rows written');
+  assert.match(body, /if \(await writeOnce\(t\.id, "best_price", best\)\) wrote\+\+;/,
+    'the excursion write no longer goes through writeOnce, or its count is taken ' +
+    'from the call rather than the rows written — a figure rewritten every poll, ' +
+    'or a meter reading 0 for ever');
   assert.match(src, /excursions = await fillExcursions\(session\)/,
     'the poll no longer calls fillExcursions, so best_price is never written ' +
     'and R-04 is unknown on every trade for ever');
