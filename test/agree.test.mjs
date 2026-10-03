@@ -1059,6 +1059,16 @@ test('every read of her tables goes through readRows', () => {
   assert.match(src, /async function readRows<T>\(what: string, path: string\)/,
     'readRows is gone — every read is hand-written again');
 
+  /* AND IT IS HANDED A PATH: it builds the `${SB_URL}/rest/v1/` prefix itself,
+     so a full URL doubles it — a 404 on every read in production that nothing
+     here can see, since SB_URL is "" under Node and every stub answers /rest/. */
+  const calls = [...src.matchAll(/readRows<[^>]*>\(\s*'[^']*',([\s\S]{0,300}?)\);/g)];
+  assert.ok(calls.length >= 15, `only ${calls.length} readRows calls found — the reader has gone blind`);
+  for (const [, arg] of calls) {
+    assert.doesNotMatch(arg, /SB_URL|rest\/v1/,
+      `readRows is handed a full URL, so the prefix is doubled and the read 404s:${arg}`);
+  }
+
   /* NAMED, NOT COUNTED: a count stays three while one exemption goes and a bypass
      arrives. Each raw GET is attributed to its function, and the set must match. */
   const fns = [...src.matchAll(/^(?:export )?(?:async )?function (\w+)/gm)]

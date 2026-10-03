@@ -2020,7 +2020,7 @@ async function readChannels(): Promise<Channel[]> {
   return readRows<Channel>('Channels',
     // A limit that can never bite — the key sits on a five-value check — kept
     // because every read here carries one.
-    `${SB_URL}/rest/v1/eugenia_channels?select=channel,state,evidence,moved_on` +
+    `eugenia_channels?select=channel,state,evidence,moved_on` +
     `&limit=${CHANNELS.length}`);
 }
 
@@ -2029,8 +2029,7 @@ export async function channelsBlock(): Promise<string> {
   try {
     return `\n\nWhere he stands on each channel:\n${channelsList(await readChannels())}`;
   } catch (err) {
-    console.error("doji-eugenia: channels unavailable —",
-      why(err));
+    console.error("doji-eugenia: channels unavailable —", why(err));
     return "";
   }
 }
