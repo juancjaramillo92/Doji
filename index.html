@@ -3283,7 +3283,6 @@ function renderRollForward(rows) {
     </div>`;
 }
 
-/* ─── Trade log ──────────────────────────────────────────────────────────── */
 /* ─── What Eugenia is watching ───────────────────────────────────────────────
    The only place her work and this app meet, and deliberately narrow: what
    lands today, the story she is carrying, what is still open — three tables,
@@ -3305,13 +3304,10 @@ const Watch = {
   // hours back and a day forward hold this morning's 08:30 and tomorrow's, which
   // otherwise read identically, and last night's 20:00 reads as tonight's.
   when(iso) {
-    const at = new Date(iso);
-    const time = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-    }).format(at);
+    const time = Dates.nyTime(iso);
     if (Dates.nyDay(iso) === Dates.today()) return time;
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short' })
-      .format(at) + ' ' + time;
+      .format(new Date(iso)) + ' ' + time;
   },
 
   async draw() {
@@ -3391,6 +3387,7 @@ const Watch = {
   }
 };
 
+/* ─── Trade log ──────────────────────────────────────────────────────────── */
 function renderTable(rows) {
   const host = $('trade-table'), pag = $('tlog-pagination');
   if (!rows.length) {
@@ -3494,7 +3491,7 @@ function pickYN(name) {
   const v = pickRadio(name);
   return v === 'yes' ? true : v === 'no' ? false : null;
 }
-const pickRadio  = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
+const pickRadio = name => $('jm-body')?.querySelector(`input[name="${name}"]:checked`)?.value || '';
 
 function journalForm(t) {
   const setups = CONFIG.SETUPS.map(s => {
