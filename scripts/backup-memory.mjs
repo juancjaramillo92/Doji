@@ -2,7 +2,7 @@
    DOJI — a copy of everything about him that exists nowhere else
    ───────────────────────────────────────────────────────────────────────────
    `trades` can be rebuilt from cTrader with a wide `?force=1`; her memory has
-   no other source, and the app cannot reach it — 003 denies the publishable
+   no other source, and the app cannot reach it — RLS denies the publishable
    key her notes and turns, rightly. So the copy is taken with the secret key,
    from outside the browser: each table read through PostgREST, paged to the
    end, written as one JSON document.

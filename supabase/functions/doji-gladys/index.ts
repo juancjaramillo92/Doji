@@ -3,7 +3,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // One function, two callers, told apart by the secret they present:
 //
-//   x-doji-key                        002's triggers — a position opened, post
+//   x-doji-key                        its triggers — a position opened, post
 //                                     the message; its answers moved, redraw it.
 //   x-telegram-bot-api-secret-token   Telegram — a button was tapped, write the
 //                                     column and redraw the message.

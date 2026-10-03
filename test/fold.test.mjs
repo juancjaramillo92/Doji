@@ -1200,12 +1200,12 @@ test('the fourth answer settles the form, and the three before it do not', () =>
 });
 
 /* ─── Telegram: an answer written somewhere else ─────────────────────────────
-   The app writes the same four columns; 002_gladys.sql fires on the update and
-   sends the row with the answers AS THEY STOOD, and doji-gladys decides the
-   redraw from that before-state with answered() — the expression staysOpen()
-   applies to a tap. THEY MUST STAY ONE EXPRESSION: a tap fires both redraws,
-   the trigger's lands second, and a difference would shut a form reopened with
-   [Edit] under the correction being made in it.
+   The app writes the same four columns; trades_telegram_on_answer fires on the
+   update and sends the row with the answers AS THEY STOOD, and doji-gladys
+   decides the redraw from that before-state with answered() — the expression
+   staysOpen() applies to a tap. THEY MUST STAY ONE EXPRESSION: a tap fires both
+   redraws, the trigger's lands second, and a difference would shut a form
+   reopened with [Edit] under the correction being made in it.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('a trade missing any one answer is not answered', () => {
@@ -3227,7 +3227,8 @@ test("R-14's reads cover the trades' window, TradingView's high-rated releases o
   const since = tradesQuery(30, now).match(/open_day=gte\.([\d-]+)/)[1];
   const rel = releasesQuery(30, now), wk = weeksQuery(30, now);
   assert.match(rel, new RegExp(`^eugenia_calendar\\?select=at&importance=eq\\.${HIGH}&tv_id=not\\.is\\.null`));
-  // What she typed in before 018 carries no id and was never a rating he chose.
+  // What she typed in before the TradingView filing carries no id and was
+  // never a rating he chose.
   assert.match(wk, /^calendar_weeks\?select=week/);
   // A day earlier than the trades, and a week earlier for the weeks.
   assert.ok(rel.match(/at=gte\.([\d-]+)/)[1] < since);
@@ -3961,7 +3962,7 @@ test('the audit he asks for carries everything she keeps', () => {
 });
 
 test('the audit still works before any of the newer memory exists', () => {
-  // The two new arguments default, so a database with 003 and not 005 answers
+  // The two new arguments default, so a database without her newer tables answers
   // /notes rather than throwing on a read that returns nothing.
   const out = notesList([], [{ id: 2, note: 'he trades the London open' }],
     [{ channel: 'dollar', state: 'used', evidence: null, moved_on: null }]);
@@ -4341,7 +4342,7 @@ test('a move large by the day own measure is worth waking her for', () => {
 });
 
 test('the mark seeded at zero is not a price, and cannot be a move of 4,400', () => {
-  /* 005 SEEDS THE ROW so the first run has something to PATCH. Read as a price,
+  /* schema.sql SEEDS THE ROW so the first run has something to PATCH. Read as a price,
      the seed is a move of gold's entire value after any rebuild. */
   const out = moveWorth(QUOTE, { ...MARK, bid: 0 }, LOOKED);
   assert.equal(out.worth, false);
@@ -4695,7 +4696,9 @@ test('a speech vendor that refuses once is asked again before the text goes', as
    after it. The stub answers a read only when its filter matches a correct
    one, or a pairing that reads the wrong row would pass. */
 test('the speaking worker sends today\'s stored briefing and only then says it was delivered', async () => {
-  const stamp = new Date(Date.now() - 60_000).toISOString().replace('Z', '+00:00');
+  // Now rather than a minute back: a minute back is yesterday in the first
+  // minute of a New York day, and the worker speaks today's briefing only.
+  const stamp = new Date().toISOString().replace('Z', '+00:00');
   const steps = [];
   await stubbed(async () => {
     globalThis.fetch = async (url, init) => {

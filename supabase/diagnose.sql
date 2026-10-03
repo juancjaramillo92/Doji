@@ -63,7 +63,7 @@ order by grantee, privilege_type;
 
 -- ─── Triggers ──────────────────────────────────────────────────────────────
 -- verify.sql names the five on trades. Both of Gladys's must call
--- trades_telegram, and read their WHEN clauses against 002.
+-- trades_telegram, and read their WHEN clauses against schema.sql.
 select event_object_table as table_name, trigger_name, action_timing, event_manipulation,
        pg_get_triggerdef(t.oid) as definition
 from information_schema.triggers ist
@@ -90,7 +90,7 @@ select 'eugenia_turns', count(*) filter (where embedding is null), count(*)
   from public.eugenia_turns;
 
 -- ─── Scheduled jobs ────────────────────────────────────────────────────────
--- Against 004_cron.sql: the schedules and the timeouts.
+-- Against schema.sql's timer section: the schedules and the timeouts.
 select jobid, jobname, schedule, active, command
 from cron.job
 order by jobname;
@@ -145,5 +145,5 @@ select 'dispatch', '(unsettled rows)', count(*)::text,
  where not d.settled
 union all
 select 'pace', '(the briefing)', coalesce(public.pace_line(), 'clear'),
-       'read against the paid worker ceiling 010 states'
+       'read against the paid worker ceiling pace_line states'
  order by monitor, subject;

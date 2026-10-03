@@ -48,13 +48,28 @@ function bodyOf(text, decl, missing = `${decl} is gone`) {
 // Line comments out, so the prose above a call is never read as the call.
 const uncomment = (text) => text.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
 
-const SCHEMA = source('supabase/001_trades.sql');
-const GLADYS_SQL = source('supabase/002_gladys.sql');
-const EUGENIA_SQL = source('supabase/003_eugenia.sql');
-const SENSES_SQL = source('supabase/005_eugenia_senses.sql');
-const CRON_SQL = source('supabase/004_cron.sql');
-const SEMANTIC_SQL = source('supabase/007_semantic.sql');
-const SCHEMA_008 = source('supabase/008_sync_health.sql');
+/* The database is one file, and each subject in it sits under a banner. A
+   check about one subject reads that subject alone, so a pattern cannot pass
+   on text that belongs to another. */
+const SCHEMA_SQL = source('supabase/schema.sql');
+// A table's own column list, from its create to the closing parenthesis.
+const tableBody = (sql, table) => {
+  const at = sql.indexOf(`create table if not exists public.${table} (`);
+  return at === -1 ? '' : sql.slice(at, sql.indexOf('\n);', at));
+};
+function subject(title) {
+  const at = SCHEMA_SQL.indexOf(`-- ═══ ${title} `);
+  assert.ok(at > -1, `schema.sql has no "${title}" section`);
+  const next = SCHEMA_SQL.indexOf('\n-- ═══ ', at + 1);
+  return SCHEMA_SQL.slice(at, next === -1 ? undefined : next);
+}
+const SCHEMA = subject('Trades');
+const GLADYS_SQL = subject('Gladys');
+const EUGENIA_SQL = subject('Her memory');
+const SENSES_SQL = subject('Her senses');
+const CRON_SQL = subject('Everything that runs on a timer');
+const SEMANTIC_SQL = subject('Searching her memory');
+const SCHEMA_008 = subject('Whether the silent writers are writing');
 const EUGENIA_TS = source('supabase/functions/doji-eugenia/index.ts');
 const EUGENIA_PROMPT = source('supabase/functions/doji-eugenia/prompt.ts');
 
@@ -69,7 +84,7 @@ const FUNCTIONS = DEPLOYED.map(name => ({ name, text: source(`supabase/functions
    strings would find the direction vocabulary as happily as this one. */
 function setupsInSchema() {
   const line = SCHEMA.match(/constraint\s+trades_setup_check\s+check\s*\(([^)]*)\)/i);
-  assert.ok(line, 'trades_setup_check is not in 001_trades.sql at all');
+  assert.ok(line, 'trades_setup_check is not in schema.sql at all');
   return [...line[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
 }
 
@@ -78,13 +93,8 @@ function setupsInSchema() {
 const declaresColumn = (name) =>
   new RegExp(`^\\s*${name}\\s+(text|boolean)\\b`, 'mi').test(SCHEMA);
 
-/* ─── Eugenia's view, and the README's copy of it ────────────────────────────
-   The README quotes the whole `create or replace view`, because 003 stops at
-   its first CREATE TABLE on a database that has the tables — so a person
-   re-applies the view from there. A column in 003 and not the README hands
-   them a view missing the column they came to add. Compared as a list, so
-   reformatting is free.
-   ───────────────────────────────────────────────────────────────────────── */
+// The columns of each eugenia_trades view a text states, as a list, so
+// reformatting is free.
 const viewColumns = (text, where) => {
   const stmts = [...text.matchAll(
     /create or replace view public\.eugenia_trades[\s\S]*?select([\s\S]*?)from public\.trades/ig)];
@@ -97,45 +107,22 @@ const viewColumns = (text, where) => {
   });
 };
 
-/* EVERY COPY IN THE README, not the first: a copy run after a `drop view` with a
-   stale list rebuilds the wrong view on a database that just lost the right one. */
-/* THE LAST DEFINITION APPLIED IS THE ONE THE DATABASE HOLDS: the numbered files
-   are read in order and the last statement wins, as Postgres resolves it, so a
-   later file appending a column simply joins. */
-// Read from the directory rather than from TRACKED, which is defined further
-// down this file — nothing may reference anything below it at load time.
-const NUMBERED = readdirSync(new URL('../supabase', import.meta.url))
-  .filter(f => /^\d{3}_.*\.sql$/.test(f))
-  .sort()
-  .map(f => source(`supabase/${f}`))
-  .join('\n');
-
-/* Every column `trades` has, from 001 and every later `add column`, with
-   whether Postgres generates it — every file, not the one that added the last. */
+// Every column `trades` has, with whether Postgres generates it.
 const tradesColumns = () => {
-  const schema = SCHEMA.slice(SCHEMA.indexOf('create table public.trades'));
-  const declared = schema.slice(0, schema.indexOf('\n);'))
+  const at = SCHEMA.indexOf('create table if not exists public.trades');
+  assert.ok(at > -1, 'schema.sql no longer creates public.trades');
+  const schema = SCHEMA.slice(at);
+  return schema.slice(0, schema.indexOf('\n);'))
     .split('\n').map(l => l.match(/^ {2}([a-z_]+)\s+[a-z].*?(generated always)?/))
     .filter(m => m && m[1] !== 'constraint')
     .map(m => ({ name: m[1], generated: /generated always/.test(m.input) }));
-  const added = [...NUMBERED.matchAll(/alter table public\.trades add column if not exists (\w+)/g)]
-    .map(m => ({ name: m[1], generated: false }));
-  return [...new Map([...declared, ...added].map(c => [c.name, c])).values()];
 };
 
 const servedView = () => {
-  const all = viewColumns(NUMBERED, 'the numbered SQL files');
-  return all[all.length - 1];
+  const all = viewColumns(SCHEMA_SQL, 'schema.sql');
+  assert.equal(all.length, 1, `schema.sql states the eugenia_trades view ${all.length} times where it states it once`);
+  return all[0];
 };
-
-test('every eugenia_trades view the README states is the one the SQL ends with', () => {
-  const README = source('README.md');
-  for (const cols of viewColumns(README, 'README.md')) {
-    assert.deepEqual(cols, servedView(),
-      'the README quotes a view with a different column list than the numbered SQL ' +
-      'ends up with — following the README would build the wrong view');
-  }
-});
 
 /* ─── The row as TWO files describe it ───────────────────────────────────────
    `TradeRow` is the row eugenia_trades serves and the type every rule in
@@ -272,13 +259,13 @@ test('every journal column both writers name exists in the schema', async () => 
   const { app, close } = await boot();
   try {
     for (const column of app.Data.OWNED) {
-      assert.ok(declaresColumn(column), `${column} is not declared in 001_trades.sql`);
+      assert.ok(declaresColumn(column), `${column} is not declared in schema.sql`);
     }
   } finally { close(); }
 });
 
 /* ─── And the two copies inside the redraw trigger ───────────────────────────
-   002_gladys.sql names the four columns twice more. Missing from the WHEN
+   The Gladys section of schema.sql names the four columns twice more. Missing from the WHEN
    clause, an answer never reaches the Telegram message; missing from `before`,
    it reads as unanswered and a correction to a settled trade reopens the form.
    ───────────────────────────────────────────────────────────────────────── */
@@ -291,7 +278,7 @@ test('the redraw trigger watches, and carries, exactly the journal columns', asy
     // Anchored on the trigger itself, so the columns in the payload above it
     // cannot stand in for the ones in the WHEN clause.
     const at = GLADYS_SQL.indexOf('create or replace trigger trades_telegram_on_answer');
-    assert.ok(at > -1, '002_gladys.sql no longer creates trades_telegram_on_answer');
+    assert.ok(at > -1, 'schema.sql no longer creates trades_telegram_on_answer');
 
     const watched = [...GLADYS_SQL.slice(at).matchAll(/new\.(\w+)\s+is distinct from/g)]
       .map(m => m[1]).sort();
@@ -355,19 +342,19 @@ test('no broker column is reachable through either writer', async () => {
    from `Data.OWNED` alone looks right and breaks delete and undo.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the columns 009 grants are exactly the columns the app writes', async () => {
-  const grants = source('supabase/011_trades_grants.sql');
+test('the columns schema.sql grants are exactly the columns the app writes', async () => {
+  const grants = subject('What the app may write');
   const verify = source('supabase/verify.sql');
 
   const stated = grants.match(/grant update \(([^)]*)\)\s*\n?\s*on public\.trades/);
-  assert.ok(stated, '009 no longer grants update on any column of trades');
+  assert.ok(stated, 'schema.sql no longer grants update on any column of trades');
   const granted = stated[1].split(',').map(c => c.trim()).sort();
 
   const { app, close } = await boot();
   try {
     const want = [...app.Data.OWNED, 'deleted'].sort();
     assert.deepEqual(granted, want,
-      'the grant in 009 and what the app actually writes have parted — too narrow ' +
+      'the grant in schema.sql and what the app actually writes have parted — too narrow ' +
       'and the journal cannot be saved, too wide and a broker column is writable ' +
       'from the browser again');
 
@@ -375,7 +362,7 @@ test('the columns 009 grants are exactly the columns the app writes', async () =
     // is five. If that stopped being true the fifth grant would be dead.
     const src = source('index.html');
     assert.match(src, /update\(\{ deleted: true \}\)/,
-      'nothing sets deleted any more, so 009 grants a column the app never writes');
+      'nothing sets deleted any more, so schema.sql grants a column the app never writes');
     assert.match(src, /update\(\{ deleted: false \}\)/, 'undo no longer clears deleted');
   } finally { close(); }
 
@@ -394,9 +381,9 @@ test('the columns 009 grants are exactly the columns the app writes', async () =
   }
 
   // The revoke has to name PUBLIC as well as both roles. Revoking from one is
-  // not revoking from the others — the lesson `eugenia_search` cost 007.
+  // not revoking from the others — the lesson `eugenia_search` once cost.
   assert.match(grants, /revoke insert, update, delete on public\.trades\s+from public, anon, authenticated;/,
-    '009 revokes from fewer than all three of PUBLIC, anon and authenticated, so ' +
+    'schema.sql revokes from fewer than all three of PUBLIC, anon and authenticated, so ' +
     'the privilege survives under whichever name was left out');
 });
 
@@ -517,10 +504,10 @@ test('a demotion can reach every rung but the bottom one', () => {
    cast) do not belong in a file whose errors take the rest with them.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('verify.sql expects exactly the triggers the numbered SQL creates on trades', () => {
+test('verify.sql expects exactly the triggers schema.sql creates on trades', () => {
   /* THE TRIGGERS ROW NAMES THEM. Both halves are read out of files — what
-     verify.sql expects, and every `create trigger` on public.trades in the
-     numbered SQL — so adding a trigger without the check fails here. */
+     verify.sql expects, and every `create trigger` on public.trades in
+     schema.sql — so adding a trigger without the check fails here. */
   const sql = source('supabase/verify.sql');
 
   const expected = sql.match(
@@ -529,9 +516,9 @@ test('verify.sql expects exactly the triggers the numbered SQL creates on trades
   const named = expected[1].match(/'([^']*)'/g).join('').replace(/'/g, '')
     .split(',').map(t => t.trim()).filter(Boolean).sort();
 
-  /* Both create forms; 002 uses `or replace` because a plain create is not atomic
+  /* Both create forms; Gladys's trigger uses `or replace` because a plain create is not atomic
      against an existing trigger. The target is on a later line. */
-  const created = [...NUMBERED.matchAll(
+  const created = [...SCHEMA_SQL.matchAll(
     /create\s+(?:or\s+replace\s+)?trigger\s+(\w+)\s+[\s\S]{0,120}?\bon\s+public\.trades\b/gi)]
     .map(m => m[1]).sort();
 
@@ -539,8 +526,8 @@ test('verify.sql expects exactly the triggers the numbered SQL creates on trades
     `only ${created.length} triggers on trades read out of the SQL — the reader has gone blind`);
 
   assert.deepEqual(named, created,
-    'verify.sql expects a different set of triggers on trades than the numbered ' +
-    'SQL creates — run against a correct database it reports a fault, and run ' +
+    'verify.sql expects a different set of triggers on trades than schema.sql ' +
+    'creates — run against a correct database it reports a fault, and run ' +
     'against a database missing one it reports nothing');
 });
 
@@ -662,12 +649,10 @@ test('the rule that decides how a term is pitched is in her context, not fetchab
 test('the note kinds are the same three words in the tool and the constraint', () => {
   const offered = [...EUGENIA_TS.matchAll(/NOTE_KINDS = \[([^\]]*)\]/g)]
     .flatMap(m => [...m[1].matchAll(/'([a-z]+)'/g)].map(k => k[1])).sort();
-  /* THE LAST DECLARATION across the numbered files, because that is the one
-     Postgres holds. */
-  const declared = [...NUMBERED.matchAll(/eugenia_notes_kind_check\s+check \(kind in \(([^)]*)\)/gi)];
-  assert.ok(declared.length >= 2,
-    `found ${declared.length} declarations of eugenia_notes_kind_check — the reader has gone blind`);
-  const enforced = [...declared[declared.length - 1][1].matchAll(/'([a-z]+)'/g)]
+  const declared = [...SCHEMA_SQL.matchAll(/eugenia_notes_kind_check\s+check \(kind in \(([^)]*)\)/gi)];
+  assert.equal(declared.length, 1,
+    `found ${declared.length} declarations of eugenia_notes_kind_check where there is one`);
+  const enforced = [...declared[0][1].matchAll(/'([a-z]+)'/g)]
     .map(m => m[1]).sort();
 
   assert.deepEqual(offered, ['commitment', 'fact', 'instruction'],
@@ -717,15 +702,19 @@ test('a commitment is recorded, audited, held against his trades and retired', (
 
 const read = (path) => ({ path, text: source(path) });
 
-// The three that name a FUNCTION.
-const CALLERS = ['supabase/002_gladys.sql', 'supabase/004_cron.sql',
-                'supabase/005_eugenia_senses.sql', 'doji_gmail_sync.gs']
-  .map(read);
+// Everything that names a FUNCTION, each on its own, so one that stops naming
+// any is not covered by the others: Gladys's trigger, the trade event, the
+// schedules, and the Apps Script.
+const CALLERS = [
+  ...['Gladys', 'Her senses', 'Everything that runs on a timer']
+    .map(t => ({ path: `schema.sql (${t})`, text: subject(t) })),
+  read('doji_gmail_sync.gs'),
+];
 
 // Every file that names the PROJECT, which is a longer list: the app connects
 // to it, config.toml links the CLI to it and the deploy workflow pushes to it.
-const PROJECT_FILES = [...CALLERS.map(c => c.path),
-  'index.html', 'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
+const PROJECT_FILES = ['supabase/schema.sql', 'doji_gmail_sync.gs', 'index.html',
+  'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
@@ -952,10 +941,8 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
     `the header says ${stated[1]} checks and the summary holds ${rows} — the file ` +
     `is wrong about itself in the paragraph read before it is run`);
 
-  /* AND ONCE: a second copy of the count is held together by nothing. The
-     numbered files named in the header are not counts, so they come out first,
-     by their three-digit shape. */
-  const others = (header.replace(/\b0\d{2}\b/g, '').match(/\b\d{2,}\b/g) || [])
+  // AND ONCE: a second copy of the count is held together by nothing.
+  const others = (header.match(/\b\d{2,}\b/g) || [])
     .filter(n => n !== stated[1]);
   assert.deepEqual(others, [],
     `the header states a second number (${others.join(', ')}) beside its count of ` +
@@ -1098,7 +1085,7 @@ test('every read of her tables goes through readRows', () => {
   
        readRows        it IS the helper
        fillEmbeddings  reads `content-range` to report backlog
-       healthBlock     a 404 is a SUPPORTED state — 008 not applied — so it
+       healthBlock     a 404 is a SUPPORTED state — sync_health not applied — so it
                        returns "" where readRows throws */
   assert.deepEqual(where, ['fillEmbeddings', 'healthBlock', 'readRows'],
     `these functions read her tables without readRows: ${where.join(', ')}. A missing ` +
@@ -1334,9 +1321,10 @@ const CODE = TRACKED
   .map(f => source(`${f}`)).join('\n');
 
 /* Backticked names that look like code — camelCase, snake_case, hyphenated,
-   dotted or SCREAMING — not short English in a code font. The hyphen and the
-   leading digit matter: `doji-telegram`, `005_cron.sql`. */
-const SYMBOLS = /`([A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_]+)*)`/g;
+   dotted or SCREAMING — not short English in a code font. The hyphen, the
+   leading digit and the slash matter: `doji-telegram`, `005_cron.sql`,
+   `supabase/016_tradingview.sql`. */
+const SYMBOLS = /`([A-Za-z0-9_][A-Za-z0-9_/-]*(?:\.[A-Za-z0-9_]+)*)`/g;
 
 const looksLikeCode = (name) =>
   /[A-Z_.\-]/.test(name) && name.length >= 4 && /[A-Za-z]/.test(name);
@@ -1930,14 +1918,13 @@ test('the search tool names the function the database actually defines', () => {
   // 404 that reads as the database being down.
   const rpc = src.match(/rest\/v1\/rpc\/(\w+)/);
   assert.ok(rpc, 'doji-eugenia no longer calls an RPC at all');
-  assert.match(EUGENIA_SQL,
+  assert.match(SEMANTIC_SQL,
     new RegExp(`create or replace function public\\.${rpc[1]}\\(`),
-    `doji-eugenia calls ${rpc[1]}() but 003_eugenia.sql does not define it`);
+    `doji-eugenia calls ${rpc[1]}() but schema.sql does not define it`);
 
   // Both search columns have to exist or the function body references nothing.
   for (const table of ['eugenia_notes', 'eugenia_turns']) {
-    assert.match(EUGENIA_SQL,
-      new RegExp(`alter table public\\.${table}[\\s\\S]{0,120}add column if not exists search tsvector`),
+    assert.match(tableBody(EUGENIA_SQL, table), /\n\s+search\s+tsvector generated always/,
       `${table} has no generated search column, so eugenia_search cannot match against it`);
   }
 });
@@ -1949,9 +1936,9 @@ test('the search tool names the function the database actually defines', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every source the search can return is a source the renderer knows', () => {
-  const fn = EUGENIA_SQL.match(
+  const fn = SEMANTIC_SQL.match(
     /create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
-  assert.ok(fn, '003_eugenia.sql no longer defines eugenia_search');
+  assert.ok(fn, 'schema.sql no longer defines eugenia_search');
 
   /* The literals in the two select lists: 'note', and both arms of the CASE on the
      turn's role. */
@@ -1976,19 +1963,10 @@ test('every source the search can return is a source the renderer knows', () => 
 test('the turn arm reads the column that says who was speaking', () => {
   // eugenia_turns.role exists and was simply never selected, which is why the
   // failure was silent: the query was valid and the answer was wrong.
-  assert.match(EUGENIA_SQL, /from public\.eugenia_turns t/);
-  assert.match(EUGENIA_SQL, /case when t\.role = 'user'/,
+  assert.match(SEMANTIC_SQL, /from public\.eugenia_turns t/);
+  assert.match(SEMANTIC_SQL, /case when t\.role = 'user'/,
     'eugenia_search does not read t.role, so nothing downstream can tell his ' +
     'messages from hers');
-});
-
-test('the search function is not reachable by a public key', () => {
-  // EXECUTE on a function is granted to PUBLIC by default, and anon inherits it.
-  // Left alone that is a public entry point to her whole memory.
-  assert.match(EUGENIA_SQL, /revoke execute on function public\.eugenia_search\(text, int\) from public/,
-    'eugenia_search is still executable by PUBLIC');
-  assert.match(EUGENIA_SQL, /grant execute on function public\.eugenia_search\(text, int\) to service_role/,
-    'eugenia_search is not granted to the one role that should call it');
 });
 
 /* ─── The pre-trade sequence ─────────────────────────────────────────────────
@@ -2219,13 +2197,13 @@ test('the column, the filter and the tool parameter all exist together', () => {
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
   assert.match(EUGENIA_SQL, /superseded_by\s+bigint\s+references\s+public\.eugenia_notes\(id\)/,
-    '003_eugenia.sql has no superseded_by column — the filter in the read would ' +
+    'schema.sql has no superseded_by column — the filter in the read would ' +
     'match nothing and PostgREST would refuse it');
   assert.match(src, /supersedes:\s*\{[\s\S]{0,80}type:\s*"integer"/,
     'the remember tool no longer offers supersedes, so she cannot retire a note ' +
     'however many she is shown');
   // The index has to match the read or it stops being used for it.
-  assert.match(EUGENIA_SQL, /create index eugenia_notes_kind_id_desc[\s\S]*?where superseded_by is null/,
+  assert.match(EUGENIA_SQL, /create index if not exists eugenia_notes_kind_id_desc[\s\S]*?where superseded_by is null/,
     'the notes index no longer matches the read it exists for');
 });
 
@@ -2402,7 +2380,7 @@ const checkValues = (sql, constraint) => {
 
 test('the kinds a loop may have are the kinds the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_loops_kind_check');
-  assert.ok(declared, '005 no longer constrains eugenia_loops.kind');
+  assert.ok(declared, 'schema.sql no longer constrains eugenia_loops.kind');
   assert.deepEqual([...LOOP_KINDS].sort(), declared,
     'index.ts offers a loop kind the table refuses, or the reverse — the first ' +
     'is a 400 she reports to nobody, the second is a value nothing can write');
@@ -2485,7 +2463,7 @@ const UNMARKED = {
 test('the two writers with no voice record both outcomes', () => {
   const accepted = checkValues(SCHEMA_008, 'sync_health_id_check');
   assert.ok(accepted?.length === 2,
-    `008 constrains sync_health.id to ${accepted?.length ?? 0} names, not two`);
+    `schema.sql constrains sync_health.id to ${accepted?.length ?? 0} names, not two`);
 
   for (const [fn, who] of [['doji-mcp-sync', 'poller'], ['doji-email-sync', 'email']]) {
     const src = source(`supabase/functions/${fn}/index.ts`);
@@ -2578,7 +2556,7 @@ test('the two writers with no voice record both outcomes', () => {
       `sync_health_id_check refuses '${who}', so every heartbeat ${fn} sends is ` +
       `a 400 it swallows — indistinguishable from one that never fired`);
     assert.match(SCHEMA_008, new RegExp(`values[\\s\\S]*?'${who}'`),
-      `008 never seeds '${who}', and these writers PATCH by primary key — a ` +
+      `schema.sql never seeds '${who}', and these writers PATCH by primary key — a ` +
       `missing row is a 200 with an empty array and the mark is dropped`);
   }
 });
@@ -2624,9 +2602,9 @@ test('every table the backup reads is ordered by a column it has', async () => {
   assert.ok(TABLES.length >= 6, `only ${TABLES.length} tables in the backup`);
 
   for (const [table, orderBy] of TABLES) {
-    const created = NUMBERED.match(
+    const created = SCHEMA_SQL.match(
       new RegExp(`create table (?:if not exists )?public\\.${table}\\s*\\(([\\s\\S]*?)\\n\\s*\\);`));
-    assert.ok(created, `${table} is in the backup and no numbered file creates it`);
+    assert.ok(created, `${table} is in the backup and schema.sql never creates it`);
 
     // The column as DECLARED — a name in a constraint or a comment is not one.
     const columns = created[1].split('\n')
@@ -2649,16 +2627,14 @@ test('every table the backup reads is ordered by a column it has', async () => {
    same rows off a sequential scan, slower every week.
    ─────────────────────────────────────────────────────────────────────────── */
 
-// NUMBERED is already the numbered files as one string, read at the top of this
-// file for the same reason it is needed here.
 const VERIFY = source('supabase/verify.sql');
 
 test('verify.sql asks about every table, policy and index the files declare', () => {
-  const tables = [...NUMBERED.matchAll(/create table (?:if not exists )?public\.(\w+)/g)].map(m => m[1]);
-  const policies = [...NUMBERED.matchAll(/create policy (\w+) on/g)].map(m => m[1]);
+  const tables = [...SCHEMA_SQL.matchAll(/create table (?:if not exists )?public\.(\w+)/g)].map(m => m[1]);
+  const policies = [...SCHEMA_SQL.matchAll(/create policy (\w+) on/g)].map(m => m[1]);
   // `unique` too: a reader matching `create index` alone was blind to the one
-  // kind of index a write depends on, which is how 018's would have gone unasked.
-  const indexes = [...NUMBERED.matchAll(/create (?:unique )?index (?:if not exists )?(\w+)/g)].map(m => m[1]);
+  // kind of index a write depends on, which is how the tv_id index would have gone unasked.
+  const indexes = [...SCHEMA_SQL.matchAll(/create (?:unique )?index (?:if not exists )?(\w+)/g)].map(m => m[1]);
   assert.ok(tables.length >= 8 && indexes.length >= 8,
     `read ${tables.length} tables and ${indexes.length} indexes — the reader has gone blind`);
 
@@ -2725,16 +2701,13 @@ test('no summary row reads a table in a way that would throw', () => {
    security` simply answers anyone. Read out of the SQL.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('every table the numbered files create has row level security on', () => {
-  const files = readdirSync(new URL('../supabase', import.meta.url))
-    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
-  const sql = files
-    .map(f => source(`supabase/${f}`)).join('\n');
+test('every table the schema creates has row level security on', () => {
+  const sql = SCHEMA_SQL;
 
   const created = [...sql.matchAll(/create table (?:if not exists )?public\.(\w+)/g)]
     .map(m => m[1]);
   assert.ok(created.length >= 8,
-    `only ${created.length} tables read out of the numbered SQL — the reader has gone blind`);
+    `only ${created.length} tables read out of schema.sql — the reader has gone blind`);
 
   for (const t of created) {
     assert.match(sql, new RegExp(`alter table public\\.${t} enable row level security`),
@@ -2746,7 +2719,7 @@ test('every table the numbered files create has row level security on', () => {
 
 test('the sides a trade may have are the sides every writer writes', () => {
   const declared = checkValues(SCHEMA, 'trades_direction_check');
-  assert.ok(declared, '001 no longer constrains trades.direction');
+  assert.ok(declared, 'schema.sql no longer constrains trades.direction');
   assert.deepEqual(declared, ['BUY', 'SELL']);
 
   // Every file that names a side, and each must name only sides the table takes.
@@ -2771,7 +2744,7 @@ test('the sides a trade may have are the sides every writer writes', () => {
 
 test('the roles a turn may have are the roles she actually writes', () => {
   const declared = checkValues(EUGENIA_SQL, 'eugenia_turns_role_check');
-  assert.ok(declared, '003 no longer constrains eugenia_turns.role');
+  assert.ok(declared, 'schema.sql no longer constrains eugenia_turns.role');
 
   const named = [...new Set([...EUGENIA_TS.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
   assert.ok(named.length >= 2,
@@ -2792,7 +2765,7 @@ test('the roles a turn may have are the roles she actually writes', () => {
 
 test('the importance a release may carry is the one the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_calendar_importance_check');
-  assert.ok(declared, '005 no longer constrains eugenia_calendar.importance');
+  assert.ok(declared, 'schema.sql no longer constrains eugenia_calendar.importance');
 
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
@@ -2948,7 +2921,7 @@ test('and a reply may still ask, because that is a conversation he is in', () =>
 
 test('the verdicts a tap can carry are the verdicts the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_feedback_verdict_check');
-  assert.ok(declared, '005 no longer constrains eugenia_feedback.verdict');
+  assert.ok(declared, 'schema.sql no longer constrains eugenia_feedback.verdict');
   for (const v of declared) {
     assert.ok(parseFeedback(`fb|${v}|2026-03-12`),
       `the table accepts a verdict of "${v}" and parseFeedback refuses it, so ` +
@@ -2965,7 +2938,7 @@ test('the verdicts a tap can carry are the verdicts the table accepts', () => {
 
 test('the thesis budget is one number on both sides of the wire', () => {
   const declared = SENSES_SQL.match(/eugenia_thesis_length check \(char_length\(thesis\) between 1 and (\d+)\)/);
-  assert.ok(declared, '005 no longer bounds the thesis');
+  assert.ok(declared, 'schema.sql no longer bounds the thesis');
   assert.equal(THESIS_MAX, Number(declared[1]),
     'index.ts truncates the thesis at a different length than the table accepts — ' +
     'the longer side is a 400 on a write she reports as saved');
@@ -2974,9 +2947,8 @@ test('the thesis budget is one number on both sides of the wire', () => {
 test('every table she reads or writes is one the schema creates', () => {
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const created = new Set([
-    ...[...EUGENIA_SQL.matchAll(/create table public\.(\w+)/g)].map(m => m[1]),
-    ...[...EUGENIA_SQL.matchAll(/create or replace view public\.(\w+)/g)].map(m => m[1]),
-    ...[...SENSES_SQL.matchAll(/create table if not exists public\.(\w+)/g)].map(m => m[1]),
+    ...[...SCHEMA_SQL.matchAll(/create table if not exists public\.(\w+)/g)].map(m => m[1]),
+    ...[...SCHEMA_SQL.matchAll(/create or replace view public\.(\w+)/g)].map(m => m[1]),
   ]);
   assert.ok(created.size >= 7, `only ${created.size} objects read out of the schema — the reader has gone blind`);
 
@@ -2984,7 +2956,7 @@ test('every table she reads or writes is one the schema creates', () => {
   assert.ok(touched.size >= 6, `only ${touched.size} tables read out of the function — the reader has gone blind`);
   for (const t of touched) {
     assert.ok(created.has(t),
-      `doji-eugenia reads or writes ${t}, which neither 003 nor 005 creates — ` +
+      `doji-eugenia reads or writes ${t}, which schema.sql never creates — ` +
       `every call against it is a 404 the tool handlers turn into "that did not save"`);
   }
 });
@@ -2993,7 +2965,7 @@ test('every column the cost meter writes is a column the table has', () => {
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
   const table = SENSES_SQL.match(/create table if not exists public\.eugenia_runs \(([\s\S]*?)\n\);/);
-  assert.ok(table, '005 no longer creates eugenia_runs');
+  assert.ok(table, 'schema.sql no longer creates eugenia_runs');
   const columns = new Set([...table[1].matchAll(/^\s{2}(\w+)\s+\w/gm)].map(m => m[1]));
   assert.ok(columns.size >= 8, `only ${columns.size} columns read out of eugenia_runs — the reader has gone blind`);
 
@@ -3045,7 +3017,7 @@ test('every column the cost meter writes is a column the table has', () => {
   assert.ok(asked, 'verify.sql no longer asks whether eugenia_runs has its later columns');
   for (const name of asked[1].match(/'(\w+)'/g).map(q => q.slice(1, -1))) {
     assert.ok(columns.has(name),
-      `verify.sql asks eugenia_runs for "${name}", which 005 does not declare — ` +
+      `verify.sql asks eugenia_runs for "${name}", which schema.sql does not declare — ` +
       `the row reports false against a database that is in fact correct`);
   }
 });
@@ -3320,33 +3292,29 @@ test('diagnose.sql says how many listings it holds, and holds that many', () => 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every security definer function empties its search_path', () => {
-  const files = ['001_trades', '002_gladys', '003_eugenia', '005_eugenia_senses',
-                 '006_plan', '007_semantic', '008_sync_health', '009_dispatch', '010_pace'];
   let seen = 0;
+  const sql = SCHEMA_SQL
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
 
-  for (const f of files) {
-    const sql = source(`supabase/${f}.sql`)
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
-
-    for (const m of sql.matchAll(/create (?:or replace )?function public\.(\w+)[\s\S]*?\bas \$\$/g)) {
-      if (!/security definer/.test(m[0])) continue;
-      seen++;
-      assert.match(m[0], /set search_path = ''/,
-        `${f}.sql: ${m[1]} is security definer and does not empty its ` +
-        `search_path — it runs as the owner, so any name it resolves through a ` +
-        `schema someone else can create in resolves with the owner's rights`);
-    }
+  for (const m of sql.matchAll(/create (?:or replace )?function public\.(\w+)[\s\S]*?\bas \$\$/g)) {
+    if (!/security definer/.test(m[0])) continue;
+    seen++;
+    assert.match(m[0], /set search_path = ''/,
+      `${m[1]} is security definer and does not empty its ` +
+      `search_path — it runs as the owner, so any name it resolves through a ` +
+      `schema someone else can create in resolves with the owner's rights`);
   }
   assert.ok(seen >= 2,
-    `only ${seen} security definer functions read out of the numbered SQL — ` +
+    `only ${seen} security definer functions read out of schema.sql — ` +
     `the reader has gone blind`);
 });
 
-/* ─── The search 007 built, not merely one by that name ──────────────────────
-   007 drops 003's two-argument eugenia_search, since side by side they are an
-   overload a two-argument call cannot resolve. A check COUNTING functions by
-   name answers 1 on a database where 007 never ran, so the row names arities.
+/* ─── The search with the query vector, not merely one by that name ────────
+   An older database can hold the two-argument eugenia_search, and side by side
+   with this one they are an overload a two-argument call cannot resolve. A
+   check COUNTING functions by name answers 1 on a database holding the old one
+   alone, so the row names arities.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql asks eugenia_search which arguments it takes', () => {
@@ -3356,32 +3324,32 @@ test('verify.sql asks eugenia_search which arguments it takes', () => {
   assert.ok(row, 'verify.sql no longer asks after eugenia_search at all');
 
   assert.match(row[1], /pronargs/,
-    'the row counts functions by NAME again — 003 leaves a two-argument ' +
-    'eugenia_search that 007 drops, and a count answers 1 for a database ' +
+    'the row counts functions by NAME again — an older database holds a ' +
+    'two-argument eugenia_search, and a count answers 1 for a database ' +
     'holding either one');
   assert.equal(row[2], '3',
-    `it expects "${row[2]}" where 007's signature takes three arguments`);
+    `it expects "${row[2]}" where the search's signature takes three arguments`);
 
-  // The three-argument function is the one 007 creates and the one her search
+  // The three-argument function is the one schema.sql creates and the one her search
   // calls, so the expected value is read out of the file rather than typed.
   const created = SEMANTIC_SQL.match(
-    /create function public\.eugenia_search\(([^)]*)\)/);
-  assert.ok(created, '007 no longer creates eugenia_search');
+    /create or replace function public\.eugenia_search\(([^)]*)\)/);
+  assert.ok(created, 'schema.sql no longer creates eugenia_search');
   assert.equal(created[1].split(',').length, 3,
-    "007's eugenia_search no longer takes three arguments, so verify.sql now " +
+    "eugenia_search no longer takes three arguments, so verify.sql now " +
     'asks for an arity the file does not produce');
 });
 
 /* ─── The detail column is bounded at both ends ──────────────────────────────
-   008 constrains `last_error` to `between 1 and 500`. An empty message —
+   schema.sql constrains `last_error` to `between 1 and 500`. An empty message —
    `new Error()` carries one — is refused, and `last_error_at` with it, being
    one PATCH: the failure most needing a record leaves none.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('heartbeat cannot write a detail the column refuses', () => {
-  const health = source('supabase/008_sync_health.sql');
+  const health = subject('Whether the silent writers are writing');
   const bound = health.match(/char_length\(last_error\) between (\d+) and (\d+)/);
-  assert.ok(bound, '008 no longer bounds last_error — the reader has gone blind');
+  assert.ok(bound, 'schema.sql no longer bounds last_error — the reader has gone blind');
 
   const edge = source('supabase/functions/_shared/edge.ts');
   const body = bodyOf(edge, 'export async function heartbeat(', '_shared no longer exports heartbeat()');
@@ -3392,19 +3360,19 @@ test('heartbeat cannot write a detail the column refuses', () => {
 
   if (+bound[1] > 0) {
     assert.match(body, /\|\| "no detail"/,
-      `008 refuses a last_error shorter than ${bound[1]} characters and heartbeat ` +
+      `schema.sql refuses a last_error shorter than ${bound[1]} characters and heartbeat ` +
       `can produce one — new Error() carries an empty message — so the PATCH is ` +
       `refused and last_error_at is lost with it`);
   }
 });
 
 /* ─── When a briefing has stopped being possible ─────────────────────────────
-   010 reports an ABSENCE, and asked while a retry is still running it names a
+   pace_line reports an ABSENCE, and asked while a retry is still running it names a
    briefing being written as one that never came. Its first hour is the last
-   RETRY hour plus one, so it is derived from `retryDue` and held against 010.
+   RETRY hour plus one, so it is derived from `retryDue` and held against pace_line.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('010 waits until the last retry hour has passed, in both languages', () => {
+test('pace_line waits until the last retry hour has passed, in both languages', () => {
   const last = Object.fromEntries(
     [...bodyOf(EUGENIA_TS, 'export function retryDue(').matchAll(
       /hour >= \d+ && hour <= (\d+)\) return '(weekday|sunday)'/g)]
@@ -3416,11 +3384,11 @@ test('010 waits until the last retry hour has passed, in both languages', () => 
     [...PACE_SQL.matchAll(/hour >= (\d+) then '(weekday|sunday)'/g)]
       .map(m => [m[2], +m[1]]));
   assert.deepEqual(Object.keys(judged).sort(), ['sunday', 'weekday'],
-    '010 no longer judges both briefings for absence');
+    'pace_line no longer judges both briefings for absence');
 
   for (const kind of ['weekday', 'sunday']) {
     assert.equal(judged[kind], last[kind] + 1,
-      `010 judges the ${kind} briefing missing from ${judged[kind]}:00 while ` +
+      `pace_line judges the ${kind} briefing missing from ${judged[kind]}:00 while ` +
       `retryDue still sends one at ${last[kind]}:00 — a retry that is running ` +
       `is reported as a briefing that never arrived`);
   }
@@ -3437,13 +3405,13 @@ test('010 waits until the last retry hour has passed, in both languages', () => 
 test('both readers of "a failed dispatch" ask the same function', () => {
   // Comments stripped first: the restatement this forbids is DESCRIBED in the
   // comment above the gate, and prose about a predicate is not the predicate.
-  const sql = source('supabase/009_dispatch.sql')
+  const sql = subject('What pg_net sent, and what came back')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
 
   const fn = (name) => {
     const at = sql.indexOf(`create or replace function public.${name}`);
-    assert.ok(at > -1, `009 no longer defines ${name}`);
+    assert.ok(at > -1, `schema.sql no longer defines ${name}`);
     const end = sql.indexOf('$$;', at);
     return sql.slice(at, end === -1 ? undefined : end);
   };
@@ -3507,7 +3475,7 @@ test('every flag a cron job calls with is a flag the function reads', () => {
 
 /* ─── And the same census from the other side ────────────────────────────────
    A door in postScheduled with no job behind it is answered correctly by
-   nobody. A scheduled sense needs a job in 004; a door a PERSON opens must not
+   nobody. A scheduled sense needs a job in schema.sql; a door a PERSON opens must not
    have one. Nothing in the source tells them apart, so they are declared, and
    a new flag fails this suite until someone says which it is.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -3545,11 +3513,11 @@ test('every door the function reads is opened by a cron job or by a person', () 
 
   for (const flag of read) {
     assert.ok(dispatched.has(flag) || BY_HAND[flag],
-      `?${flag}=1 is a door postScheduled reads, no cron job in 004 calls it, and ` +
+      `?${flag}=1 is a door postScheduled reads, no cron job in schema.sql calls it, and ` +
       `BY_HAND does not say why — so either a schedule is missing and that sense ` +
       `never runs, or it is a repair door and nothing says so`);
     assert.ok(!(dispatched.has(flag) && BY_HAND[flag]),
-      `?${flag}=1 is declared by hand AND scheduled in 004 — one of the two is ` +
+      `?${flag}=1 is declared by hand AND scheduled in schema.sql — one of the two is ` +
       `stale, and the reason in BY_HAND is the one nothing else would contradict`);
   }
 
@@ -3575,12 +3543,11 @@ test('every door the function reads is opened by a cron job or by a person', () 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a failure is settled when its report lands, not when it is sent', () => {
-  const sql = source('supabase/009_dispatch.sql')
+  const sql = subject('What pg_net sent, and what came back')
     .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
 
-  assert.match(sql, /alter table public\.dispatch add column if not exists reported_by bigint;/,
-    '009 is re-runnable, so a database that already has the table gets nothing ' +
-    'from the create — the column needs its own idempotent statement');
+  assert.match(tableBody(sql, 'dispatch'), /\n\s+reported_by bigint/,
+    'the ledger has no reported_by column, so a report cannot be tied to the rows it named');
 
   // Confirm and release, and both must exist: only one of them and a report
   // either finishes rows it never delivered or never finishes them at all.
@@ -3615,7 +3582,7 @@ test('a failure is settled when its report lands, not when it is sent', () => {
    A 546 comes back BEFORE the worker exists, so the only witness is a row in
    `net._http_response` — no url, pruned within hours. What a failed request
    was FOR is recoverable only if its id is captured as it is made, which is
-   009's ledger. Job names are held against the check constraint.
+   the ledger. Job names are held against the check constraint.
 
    AND THE TRIGGER SITES MUST NOT BREAK THEIR OWN WRITE: they fire inside the
    UPDATE that set the column, so the post goes into a variable first and the
@@ -3623,33 +3590,27 @@ test('a failure is settled when its report lands, not when it is sent', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every pg_net dispatch records a job the ledger declares', () => {
-  const files = readdirSync(new URL('../supabase', import.meta.url))
-    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
-
   const declared = new Set(
-    [...source('supabase/009_dispatch.sql')
+    [...subject('What pg_net sent, and what came back')
       .match(/dispatch_job_check check \(job in \(([\s\S]*?)\)\)/)[1]
       .matchAll(/'([a-z-]+)'/g)].map(m => m[1]));
   assert.ok(declared.size >= 5,
-    `009 declares ${declared.size} jobs — the reader has gone blind`);
+    `the ledger declares ${declared.size} jobs — the reader has gone blind`);
 
   const used = [];
   let posts = 0;
-  for (const f of files) {
-    const sql = source(`supabase/${f}`)
-      .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
-    /* A POST ADDRESSED TO TELEGRAM IS A REPORT, NOT A DISPATCH, and must not reach
-       the ledger it reports on, or the next sweep would judge it. Parted by where
-       the call GOES, not by filename; the url is the first argument. */
-    for (const tail of sql.split('net.http_post(').slice(1)) {
-      if (!/api\.telegram\.org/.test(tail.slice(0, 300))) posts += 1;
-    }
-    /* The job is the LAST argument of either shape — `), 'poller';` closing a
-       select, or `values (req, 'gladys')` in a trigger. */
-    for (const m of sql.matchAll(
-        /insert into public\.dispatch[\s\S]{0,900}?(?:\),|values \(req,)\s*'([a-z-]+)'\s*[;)]/g)) {
-      used.push([f, m[1]]);
-    }
+  const sql = SCHEMA_SQL.split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+  /* A POST ADDRESSED TO TELEGRAM IS A REPORT, NOT A DISPATCH, and must not reach
+     the ledger it reports on, or the next sweep would judge it. Parted by where
+     the call GOES; the url is the first argument. */
+  for (const tail of sql.split('net.http_post(').slice(1)) {
+    if (!/api\.telegram\.org/.test(tail.slice(0, 300))) posts += 1;
+  }
+  /* The job is the LAST argument of either shape — `), 'poller';` closing a
+     select, or `values (req, 'gladys')` in a trigger. */
+  for (const m of sql.matchAll(
+      /insert into public\.dispatch[\s\S]{0,900}?(?:\),|values \(req,)\s*'([a-z-]+)'\s*[;)]/g)) {
+    used.push(m[1]);
   }
 
   assert.equal(used.length, posts,
@@ -3658,15 +3619,15 @@ test('every pg_net dispatch records a job the ledger declares', () => {
     `to say it ever existed`);
   assert.ok(posts >= 6, `only ${posts} dispatch sites found — the reader has gone blind`);
 
-  for (const [f, job] of used) {
+  for (const job of used) {
     assert.ok(declared.has(job),
-      `${f} records dispatches as '${job}', which 009's check constraint does not ` +
+      `schema.sql records dispatches as '${job}', which the ledger's check constraint does not ` +
       `allow — every row it writes will be rejected and the job goes unwatched`);
   }
 });
 
 test('a trigger that cannot record its dispatch still makes it', () => {
-  for (const [f, sql] of [['002_gladys.sql', GLADYS_SQL], ['005_eugenia_senses.sql', SENSES_SQL]]) {
+  for (const [f, sql] of [['Gladys', GLADYS_SQL], ['the trade event', SENSES_SQL]]) {
     assert.match(sql, /req := net\.http_post\(/,
       `${f} inlines net.http_post into the ledger insert, so a ledger that ` +
       `refuses the row takes the message with it`);
@@ -3677,68 +3638,68 @@ test('a trigger that cannot record its dispatch still makes it', () => {
 });
 
 /* ─── The clock the workers run on, and the copies that watch it ─────────────
-   010 speaks BEFORE the failure because afterwards nothing can: a briefing
+   pace_line speaks BEFORE the failure because afterwards nothing can: a briefing
    killed at the wall clock has already handed pg_net its 200, so the ledger
    records health, `ask()` never reaches its catch and no apology is sent. The
    caller it looks for is written in TypeScript and read in SQL, the job count
-   is declared in 004 and asserted in verify.sql, and the ceiling is quoted in
+   is declared in schema.sql and asserted in verify.sql, and the ceiling is quoted in
    the message it decides — each a copy that fails silently on its own.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const PACE_SQL = source('supabase/010_pace.sql');
+const PACE_SQL = subject("How much of the worker's clock the briefing spends");
 
-test('the row 010 looks for is the row postBriefing writes', () => {
+test('the row pace_line looks for is the row postBriefing writes', () => {
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
   // The two kinds, off the type rather than off a literal here.
   const kinds = [...src.match(/export type Brief = ([^;]+);/)[1]
     .matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
   assert.deepEqual(kinds, ['sunday', 'weekday'],
-    `Brief now names ${kinds.join(', ')} — 010 asks for a briefing per kind and ` +
+    `Brief now names ${kinds.join(', ')} — pace_line asks for a briefing per kind and ` +
     `would stop asking about one of them`);
 
   // And the suffix, which is half of the caller and the half a rename touches.
   assert.match(src, /caller: `\$\{due\} briefing delivered`/,
-    'postBriefing no longer writes `<kind> briefing delivered` — 010 reads that ' +
+    'postBriefing no longer writes `<kind> briefing delivered` — pace_line reads that ' +
     'caller to decide whether a briefing reached him, so it would report every ' +
     'day as a day nothing arrived');
   assert.match(PACE_SQL, /owed \|\| ' briefing delivered'/,
-    '010 no longer builds the caller it looks for out of the kind and that ' +
+    'pace_line no longer builds the caller it looks for out of the kind and that ' +
     'suffix — the two halves of this name are in two languages with no build ' +
     'step between them');
 
-  /* THE KINDS 010 CAN NAME, held against the type: a Brief it never assigns to
+  /* THE KINDS pace_line CAN NAME, held against the type: a Brief it never assigns to
      `owed` is a briefing whose absence nobody watches. */
   const owed = [...PACE_SQL.match(/owed := case([\s\S]*?)end;/)[1]
     .matchAll(/then '(\w+)'/g)].map(m => m[1]).sort();
   assert.deepEqual(owed, kinds,
-    `010 judges the absence of ${owed.join(', ')} where Brief names ` +
+    `pace_line judges the absence of ${owed.join(', ')} where Brief names ` +
     `${kinds.join(', ')} — the difference is a briefing that can go missing unwatched`);
 });
 
-test('010 states its ceiling once and quotes that one', () => {
+test('pace_line states its ceiling once and quotes that one', () => {
   const ms = Number(PACE_SQL.match(/ceiling_ms constant int := (\d+);/)[1]);
-  assert.ok(ms > 0, '010 no longer declares ceiling_ms — the reader has gone blind');
+  assert.ok(ms > 0, 'pace_line no longer declares ceiling_ms — the reader has gone blind');
 
   /* THE MESSAGE MAY NOT SPELL THE NUMBER OUT AGAIN, or the threshold moves while
      the sentence names the old one. */
   const body = PACE_SQL.slice(PACE_SQL.indexOf('lines := lines || format(\n      \'Longest'));
   assert.ok(!new RegExp(`\\b${ms / 1000}s\\b`).test(body.slice(0, 600)),
-    `010's message writes ${ms / 1000}s as a literal beside a ceiling it already ` +
+    `pace_line's message writes ${ms / 1000}s as a literal beside a ceiling it already ` +
     `holds in ceiling_ms — move the threshold and the sentence still names the old one`);
   assert.match(PACE_SQL, /ceiling_ms \/ 1000/,
-    '010 no longer interpolates ceiling_ms into what it tells him');
+    'pace_line no longer interpolates ceiling_ms into what it tells him');
 
   // And the share is a share, not a second ceiling.
   assert.match(PACE_SQL, /speak_at\s+constant int := ceiling_ms \*/,
-    '010 no longer derives its threshold from the ceiling — the two would drift, ' +
+    'pace_line no longer derives its threshold from the ceiling — the two would drift, ' +
     'and a threshold above the ceiling is a watcher that can never speak');
 
   /* AND THE PROSE HOLDS THE SAME NUMBER, a platform fact, so a plan change moves
      both or neither. */
   const claude = source('CLAUDE.md');
   assert.ok(claude.includes(`${ms / 1000}s paid`),
-    `CLAUDE.md does not name ${ms / 1000}s as the paid wall clock that 010 watches ` +
+    `CLAUDE.md does not name ${ms / 1000}s as the paid wall clock that pace_line watches ` +
     `— one of the two has been changed without the other`);
 });
 
@@ -3747,14 +3708,14 @@ test('010 states its ceiling once and quotes that one', () => {
    since a row that quietly vanishes is as bad as one that lies.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the README names every cron job 004 schedules, on its stated schedule', () => {
+test('the README names every cron job schema.sql schedules, on its stated schedule', () => {
   const readme = source('README.md');
 
   const scheduled = new Map(
     [...CRON_SQL.matchAll(/cron\.schedule\(\s*'([\w-]+)',\s*'([^']+)'/g)]
       .map(m => [m[1], m[2]]));
   assert.ok(scheduled.size >= 5,
-    `only ${scheduled.size} cron jobs read out of 004 — the reader has gone blind`);
+    `only ${scheduled.size} cron jobs read out of schema.sql — the reader has gone blind`);
 
   /* SLICED TO THE TABLE: the palette table has three backticked cells too. */
   const table = readme.slice(readme.indexOf('| Job | Schedule | What it drives |'));
@@ -3767,21 +3728,21 @@ test('the README names every cron job 004 schedules, on its stated schedule', ()
     `only ${listed.size} job rows parsed out of the README — the table has moved`);
 
   assert.deepEqual([...listed.keys()].sort(), [...scheduled.keys()].sort(),
-    'the README\'s job table and 004 name different jobs');
+    'the README\'s job table and schema.sql name different jobs');
 
   for (const [job, when] of listed) {
     assert.equal(when, scheduled.get(job),
-      `the README says ${job} runs on \`${when}\` and 004 schedules it on ` +
+      `the README says ${job} runs on \`${when}\` and schema.sql schedules it on ` +
       `\`${scheduled.get(job)}\` — the table is how a person knows what is ` +
       `supposed to be running, and pg_cron answers to the file`);
   }
 });
 
-test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
-  const cron = source('supabase/004_cron.sql')
+test('the cron jobs verify.sql counts are the ones schema.sql schedules', () => {
+  const cron = subject('Everything that runs on a timer')
     .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
   const scheduled = (cron.match(/cron\.schedule\(/g) || []).length;
-  assert.ok(scheduled >= 5, `read ${scheduled} schedules out of 004 — the reader has gone blind`);
+  assert.ok(scheduled >= 5, `read ${scheduled} schedules out of schema.sql — the reader has gone blind`);
 
   const verify = source('supabase/verify.sql');
   const stated = Number(verify.match(
@@ -3789,51 +3750,46 @@ test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
 
   /* A count typed by hand goes stale the day a job is added; this compares it. */
   assert.equal(stated, scheduled,
-    `verify.sql expects ${stated} cron jobs and 004 schedules ${scheduled} — run ` +
+    `verify.sql expects ${stated} cron jobs and schema.sql schedules ${scheduled} — run ` +
     `against a correct database this row reports a fault, and a job dropped from ` +
-    `004 would slip past it`);
+    `schema.sql would slip past it`);
 
-  // And the job it schedules has to name a function 010 actually creates.
+  // And the job it schedules has to name a function schema.sql actually creates.
   const called = [...cron.matchAll(/select public\.(\w+)\(\)/g)].map(m => m[1]);
   for (const fn of called) {
     assert.ok(new RegExp(`create or replace function public\\.${fn}\\(`)
-                .test(PACE_SQL + source('supabase/009_dispatch.sql')),
-      `004 schedules public.${fn}(), which no numbered file creates — every ` +
+                .test(PACE_SQL + subject('What pg_net sent, and what came back')),
+      `schema.sql schedules public.${fn}(), which schema.sql never creates — every ` +
       `firing raises into cron.job_run_details, which this file's own ` +
       `housekeeping prunes and nobody reads`);
   }
 });
 
-test('010 marks the day said only where the message was actually sent', () => {
+test('pace_watch marks the day said only where the message was actually sent', () => {
   const body = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_watch('));
 
   /* THE ROW IS THE GUARD. `pace_watch` speaks at most once a New York day and
      decides that by finding its own row, so a row written after a send that
      could not be made swallows the warning for good. Written only where the post
      was made. */
-  const post = body.indexOf('net.http_post(');
+  const unsent = body.search(/if public\.tell_him\(said\) is null then\s*return null;/);
   const mark = body.indexOf("values ('pace', false");
-  const warn = body.indexOf('raise warning');
-  assert.ok(post > -1 && mark > -1 && warn > -1,
-    'pace_watch no longer has all three of a post, a said-row and a warning');
-  assert.ok(post < mark,
-    'pace_watch records the day as said before it has posted — a Vault name that ' +
-    'does not resolve would mark the day and swallow the warning for good');
-  assert.ok(mark < warn,
-    'the said-row has moved past the branch that could not send — it would be ' +
-    'written on a failed send, which is the same silence from the other side');
+  assert.ok(unsent > -1 && mark > -1,
+    'pace_watch no longer has both a send that can come back unsent and a said-row');
+  assert.ok(unsent < mark,
+    'pace_watch records the day as said before it knows the message went — a Vault ' +
+    'name that does not resolve would mark the day and swallow the warning for good');
 });
 
-test('no numbered SQL file reads into a variable with SELECT … INTO', () => {
+test('no SQL file reads into a variable with SELECT … INTO', () => {
   /* THE DASHBOARD READS THE WORDS AND NOT THE LANGUAGE. The SQL editor takes
      `select … into worst` inside plpgsql for `create table worst`, and its *run
      with RLS* button appends an `alter table` for a table that does not exist —
      rolling the whole paste back. `x := (select …)` cannot be mistaken. */
-  const dir = new URL('../supabase/', import.meta.url);
-  const files = readdirSync(dir).filter(f => /^\d{3}_.*\.sql$/.test(f));
-  assert.ok(files.length >= 13, `only ${files.length} numbered SQL files read — the reader has gone blind`);
+  const files = readdirSync(new URL('../supabase/', import.meta.url)).filter(f => f.endsWith('.sql'));
+  assert.ok(files.includes('schema.sql') && files.length >= 3, `only ${files.length} SQL files read — the reader has gone blind`);
   for (const f of files) {
-    const sql = readFileSync(new URL(f, dir), 'utf8')
+    const sql = source(`supabase/${f}`)
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '').replace(/'(?:[^']|'')*'/g, "''");
     const hit = sql.match(/\bselect\b[^;]*?(?<!\binsert\s+)\binto\s+\w+/i);
     assert.ok(!hit, `${f} has \`${hit?.[0].replace(/\s+/g, ' ').slice(-60)}\` — the SQL editor ` +
@@ -3868,14 +3824,14 @@ test('the briefing is written in one worker and spoken in another, and never los
   assert.match(speak, /sayAloud\(turn\.content, feedbackKeyboard\(today\), SPEAK_WORKER_MS\)/,
     'the speaking worker speaks on the one-worker budget, which is the clock it was split off to escape');
   assert.ok(at(speak, 'await sayAloud(') < at(speak, "caller: `${due} briefing delivered`"),
-    'the delivered row is written before the send — 010 reads it as the statement that he has it');
+    'the delivered row is written before the send — pace_line reads it as the statement that he has it');
   assert.match(speak, /created_at=eq\.\$\{encodeURIComponent\(marker\.created_at\)\}/,
     'the text is no longer paired with its marker by the instant both were written');
   assert.match(EUGENIA_TS, /if \(speak\) \{ job = 'speak'; return await postSpeak\(speak\); \}/,
     'postScheduled no longer opens the speaking worker\'s door');
 });
 
-test('010 says a slow run once, and the week stays visible to diagnose', () => {
+test('pace_line says a slow run once, and the week stays visible to diagnose', () => {
   /* A RUN IS SAID ONCE. It stays in a seven-day window for seven days, so a day
      guard alone announces it nightly. Replayed against a real Postgres: eight
      sends before, one after. This reads for the three pieces that replay
@@ -3890,16 +3846,11 @@ test('010 says a slow run once, and the week stays visible to diagnose', () => {
     "pace_watch no longer hands pace_line the time it last spoke, off its own " +
     "'pace' rows — the filter above then has nothing to filter with");
 
-  /* THE SECOND ARGUMENT IS A SECOND FUNCTION. Without the drop the old version
-     survives and `pace_line()` in diagnose.sql is refused as ambiguous; the
-     revoke must name the signature that exists, or it raises mid-file. */
-  const drop = PACE_SQL.indexOf('drop function if exists public.pace_line(timestamptz);');
-  assert.ok(drop > -1 && drop < PACE_SQL.indexOf('create or replace function public.pace_line('),
-    '010 no longer drops the one-argument pace_line before creating the two-argument one');
+  /* The revoke must name the signature that exists, or it raises mid-file. */
   const args = line.match(/public\.pace_line\(([\s\S]*?)\)\s*returns/)[1]
     .split(',').map(a => a.trim().split(/\s+/)[1]).join(', ');
   assert.ok(PACE_SQL.includes(`revoke execute on function public.pace_line(${args}) from`),
-    `010 revokes a pace_line signature other than the (${args}) it creates`);
+    `schema.sql revokes a pace_line signature other than the (${args}) it creates`);
 });
 
 /* ─── Everything a cron job dispatches answers before it works ───────────────
@@ -3948,7 +3899,7 @@ test('a cron-dispatched call answers first, and only the backfill door waits', (
     `backfill earns that, because only its answer is what the caller came for`);
   for (const flag of waits) {
     assert.ok(!dispatched.has(flag),
-      `?${flag}=1 waits for its work AND has a cron job in 004 — that job will ` +
+      `?${flag}=1 waits for its work AND has a cron job in schema.sql — that job will ` +
       `collect a 504 on every run long enough to matter`);
   }
 });
@@ -4170,7 +4121,7 @@ test('every column the price mark writes is a column the table has', () => {
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
   const table = SENSES_SQL.match(/create table if not exists public\.eugenia_price \(([\s\S]*?)\n\);/);
-  assert.ok(table, '005 no longer creates eugenia_price');
+  assert.ok(table, 'schema.sql no longer creates eugenia_price');
   const columns = new Set([...table[1].matchAll(/^\s{2}(\w+)\s+\w/gm)].map(m => m[1]));
   assert.deepEqual([...columns].sort(), ['at', 'bid', 'id', 'looked_at'],
     'eugenia_price has changed shape and the sense reading it has not');
@@ -4192,8 +4143,8 @@ test('the trades trigger fires on the transition, not on every poll', () => {
   /* `is distinct from`, NEVER `<>`: fill_time is null on an open position, so
      `<>` is NULL on exactly the transition this trigger exists for, and a WHEN
      that is not true does not fire. */
-  const closed = SENSES_SQL.match(/create trigger trades_eugenia_closed[\s\S]*?execute function/);
-  assert.ok(closed, '005 no longer creates trades_eugenia_closed');
+  const closed = SENSES_SQL.match(/create or replace trigger trades_eugenia_closed[\s\S]*?execute function/);
+  assert.ok(closed, 'schema.sql no longer creates trades_eugenia_closed');
   assert.match(closed[0], /old\.fill_time is null/);
   assert.match(closed[0], /is distinct from/);
   assert.ok(!/fill_time\s*<>/.test(closed[0]),
@@ -4202,8 +4153,8 @@ test('the trades trigger fires on the transition, not on every poll', () => {
 
   /* AND THE POLLER MUST NOT RE-FIRE IT: the two-minute re-upsert without a
      transition guard is a model call every two minutes. */
-  const opened = SENSES_SQL.match(/create trigger trades_eugenia_opened[\s\S]*?execute function/);
-  assert.ok(opened, '005 no longer creates trades_eugenia_opened');
+  const opened = SENSES_SQL.match(/create or replace trigger trades_eugenia_opened[\s\S]*?execute function/);
+  assert.ok(opened, 'schema.sql no longer creates trades_eugenia_opened');
   assert.match(opened[0], /after insert/);
   for (const t of [opened[0], closed[0]]) {
     assert.match(t, /new\.id like 'PID%'/, 'the trigger fires on pre-sync rows too');
@@ -4215,10 +4166,10 @@ test('the trigger reads the cron secret under the spelling Vault holds', () => {
   // One value, two stores, two spellings; Postgres compares the Vault name
   // case-sensitively.
   assert.match(SENSES_SQL, /where name = 'doji_cron_secret'/,
-    '005 reads the cron secret under a name Vault does not hold, so the trigger ' +
+    'schema.sql reads the cron secret under a name Vault does not hold, so the trigger ' +
     'presents null and doji-eugenia answers 401 — silently, to nobody');
   assert.ok(!/DOJI_CRON_SECRET/.test(SENSES_SQL),
-    '005 uses the Edge-secret spelling against Vault, which yields null');
+    'schema.sql uses the Edge-secret spelling against Vault, which yields null');
 });
 
 test('the app reads only the three tables it was given a policy for', () => {
@@ -4228,10 +4179,10 @@ test('the app reads only the three tables it was given a policy for', () => {
 
   for (const t of read) {
     assert.match(SENSES_SQL, new RegExp(`create policy ${t}_app_read on public\\.${t}`),
-      `index.html reads ${t} and 005 grants the app no policy on it, so RLS ` +
+      `index.html reads ${t} and schema.sql grants the app no policy on it, so RLS ` +
       `returns an empty list and the card silently shows nothing`);
     assert.match(SENSES_SQL, new RegExp(`grant select on public\\.${t} to authenticated`),
-      `index.html reads ${t} and 005 never grants select on it`);
+      `index.html reads ${t} and schema.sql never grants select on it`);
   }
 
   /* AND HER NOTES STAY OUT OF IT: his window into them is /notes, where an answer
@@ -4239,19 +4190,18 @@ test('the app reads only the three tables it was given a policy for', () => {
   for (const shut of ['eugenia_notes', 'eugenia_turns']) {
     assert.ok(!read.has(shut), `index.html now reads ${shut}, which is her memory`);
     assert.ok(!new RegExp(`create policy .*on public\\.${shut}`).test(SENSES_SQL),
-      `005 opens ${shut} to the app, which 003 denies on purpose`);
+      `schema.sql opens ${shut} to the app, which RLS denies on purpose`);
   }
 });
 
 test('the hybrid search still answers in the shape the function reads', () => {
-  /* THE FUNCTION IS 007's ALONE: a definition left in 005, which is re-applied,
-     would sit beside it as an overload. The return type stays load-bearing,
-     since widening it needs another drop. */
-  const fn = SEMANTIC_SQL.match(/create function public\.eugenia_search[\s\S]*?\$\$;/);
-  assert.ok(fn, '007 no longer defines eugenia_search');
-  assert.doesNotMatch(SENSES_SQL, /function public\.eugenia_search/,
-    '005 defines eugenia_search again — re-applying it would recreate the ' +
-    'two-argument overload 007 exists to drop, executable by anon');
+  /* ONE DEFINITION: a second signature beside it is an overload a call cannot
+     resolve, created executable by anon. The return type stays load-bearing,
+     since widening it needs a drop. */
+  const fn = SEMANTIC_SQL.match(/create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
+  assert.ok(fn, 'schema.sql no longer defines eugenia_search');
+  assert.equal([...SCHEMA_SQL.matchAll(/create (or replace )?function public\.eugenia_search\(/g)].length, 1,
+    'schema.sql defines eugenia_search twice — an overload a call cannot resolve');
   assert.match(fn[0], /returns table \(source text, id bigint, at timestamptz, retired boolean, body text\)/,
     'the hybrid search changed the return type, which create or replace cannot do');
 
@@ -4262,83 +4212,54 @@ test('the hybrid search still answers in the shape the function reads', () => {
   assert.ok(!/\bsimilarity\(q,/.test(fn[0]),
     'plain similarity() normalises over both trigram sets, so a short question ' +
     'against a briefing-length turn scores near zero and every long turn is lost');
-  assert.match(SENSES_SQL, /create extension if not exists pg_trgm/);
+  assert.match(SCHEMA_SQL, /create extension if not exists pg_trgm/);
   for (const idx of ['eugenia_notes_trgm', 'eugenia_turns_trgm']) {
     assert.match(SENSES_SQL, new RegExp(`create index if not exists ${idx}[\\s\\S]*?gin_trgm_ops`),
       `${idx} is missing, so <% falls back to a sequential scan of the archive`);
   }
 });
 
-/* ─── The number IS the apply order ──────────────────────────────────────────
-   A person pastes these one at a time in the order the digits give. Two files
-   sharing a number make "earlier" arbitrary, invisibly, until the day they
-   touch the same object.
+/* ─── The database is applied by running the whole file again ───────────────
+   That is the only way schema.sql is applied, to a fresh project or to the
+   live one, so every statement outside a function body must be one a second
+   run leaves alone. A bare `create table` refuses and rolls the paste back; a
+   bare `create policy` or a publication `add` raises on the second run; a
+   seed without `on conflict` duplicates or refuses; a `drop` re-run on the
+   live database takes whatever it names with it. The replay that proves the
+   file against the database is a person's (README); this is the shape.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('no two numbered SQL files claim the same position', () => {
-  const files = readdirSync(new URL('../supabase', import.meta.url))
-    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
-  assert.ok(files.length >= 6, `only ${files.length} numbered files found — the reader has gone blind`);
+test('schema.sql is safe to re-run in full', () => {
+  const code = SCHEMA_SQL.split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
+  // Outside function bodies and cron commands, which run later, not on apply.
+  const top = code.replace(/\$\$[\s\S]*?\$\$/g, '$$$$');
+  const statements = top.split(';').map(t => t.trim()).filter(Boolean);
+  assert.ok(statements.length >= 60, `only ${statements.length} statements read — the reader has gone blind`);
 
-  const seen = new Map();
-  for (const f of files) {
-    const n = f.slice(0, 3);
-    assert.ok(!seen.has(n),
-      `${seen.get(n)} and ${f} are both numbered ${n} — the number is the apply ` +
-      `order, and two files at one number leave it to whoever reads the directory`);
-    seen.set(n, f);
-  }
-});
-
-/* ─── A re-runnable file may not undo a later one ────────────────────────────
-   Some files are applied AGAIN as they grow, which works only while nothing in
-   an earlier file recreates what a later one dropped. Re-creating 007's
-   dropped signature from 005 would leave an ambiguous overload and a function
-   executable by `anon` — granted BY NAME through the schema's defaults, which a
-   `revoke ... from public` does not touch. The file would apply cleanly.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-test('no numbered file recreates an object a later one drops', () => {
-  const files = readdirSync(new URL('../supabase', import.meta.url))
-    .filter(f => /^\d{3}_.*\.sql$/.test(f)).sort();
-  assert.ok(files.length >= 6, `only ${files.length} numbered files found — the reader has gone blind`);
-
-  const text = (f) => source(`supabase/${f}`);
-  const dropped = [];
-  for (const f of files) {
-    for (const [, kind, name] of text(f).matchAll(
-      /^drop (function|view|table|trigger) if exists (?:public\.)?([a-z0-9_]+)/gm)) {
-      dropped.push({ file: f, kind, name });
+  for (const st of statements) {
+    const head = st.split('\n')[0];
+    assert.doesNotMatch(st, /^create (unique )?(table|index) (?!if not exists)/,
+      `a bare create refuses on the second run: ${head}`);
+    assert.doesNotMatch(st, /^create (function|view|trigger) /,
+      `a create without "or replace" refuses on the second run: ${head}`);
+    assert.doesNotMatch(st, /^(create policy|alter publication)/,
+      `this raises on the second run unless it is guarded: ${head}`);
+    assert.doesNotMatch(st, /^alter table [\s\S]* add (column|constraint) (?!if not exists)/,
+      `an add without "if not exists" refuses on the second run: ${head}`);
+    assert.doesNotMatch(st, /^drop /,
+      `a drop re-run on the live database takes what it names: ${head}`);
+    if (/^insert into/.test(st)) {
+      assert.match(st, /on conflict/, `a seed without "on conflict" refuses or doubles on the second run: ${head}`);
     }
   }
-  assert.ok(dropped.length >= 1, 'no drops read at all — the reader has gone blind');
 
-  /* ONLY FILES THAT CAN BE APPLIED AGAIN: a bare `create table` refuses on the
-     second run. Derived, so a file that becomes re-runnable is covered at once. */
-  const rerunnable = (f) => !/^create table (?!if not exists)/m.test(text(f));
-
-  for (const d of dropped) {
-    for (const f of files.filter(f => f < d.file && rerunnable(f))) {
-      assert.doesNotMatch(text(f), new RegExp(`create (or replace )?${d.kind} (public\\.)?${d.name}\\b`),
-        `${f} creates ${d.kind} ${d.name} and ${d.file} drops it — applying ${f} ` +
-        `again on a database that has had ${d.file} puts back the thing ${d.file} ` +
-        `was written to remove, and says nothing`);
+  // The guarded ones are guarded: each sits in a `do` block behind a check.
+  for (const m of code.matchAll(/\$\$([\s\S]*?)\$\$/g)) {
+    if (/\b(create policy|alter publication)\b/.test(m[1])) {
+      assert.match(m[1], /if not exists \(select 1 from pg_(policies|publication_tables)/,
+        `a policy or publication change inside a block runs unguarded: ${m[1].trim().slice(0, 80)}`);
     }
   }
-});
-
-test('005 is safe to re-run, because it is the file that will grow', () => {
-  // 003's CREATE TABLEs make it run-once by design. This one is meant to be
-  // applied again, so anything that would refuse a second time is a bug.
-  const creates = [...SENSES_SQL.matchAll(/^create (table|index|policy|trigger|extension|or replace)/gm)];
-  assert.ok(creates.length >= 8, `only ${creates.length} statements read — the reader has gone blind`);
-  for (const line of SENSES_SQL.split('\n')) {
-    if (/^create (table|index) (?!if not exists)/.test(line)) {
-      assert.fail(`005 has a bare "${line.split(' ')[1]}" — it would refuse on a ` +
-                  `second run: ${line.trim()}`);
-    }
-  }
-  assert.match(SENSES_SQL, /on conflict \(id\) do nothing/, 'the thesis seed is not idempotent');
 });
 
 /* ─── Semantic search, and the three ways it fails without saying so ─────────
@@ -4349,9 +4270,9 @@ test('005 is safe to re-run, because it is the file that will grow', () => {
 test('the width the vendor is asked for is the width the column accepts', () => {
   // A disagreement is a 400 on every write — every note, every turn, forever —
   // and the only place it would surface is a console nobody reads.
-  const declared = SEMANTIC_SQL.match(/add column if not exists embedding vector\((\d+)\)/g);
+  const declared = EUGENIA_SQL.match(/\n\s+embedding\s+vector\((\d+)\)/g);
   assert.ok(declared?.length === 2,
-    `${declared?.length ?? 0} embedding columns declared in 007 — notes and turns both need one`);
+    `${declared?.length ?? 0} embedding columns declared — notes and turns both need one`);
   for (const line of declared) {
     assert.equal(Number(line.match(/vector\((\d+)\)/)[1]), EMBED_DIMS,
       'doji-eugenia asks the vendor for a different width than the column takes');
@@ -4366,7 +4287,7 @@ test('the width the vendor is asked for is the width the column accepts', () => 
 test('the lexical arm survives, because a null embedding vanishes silently', () => {
   /* THE FLOOR UNDER THE SEMANTIC ARM. A null embedding is absent from a
      nearest-neighbour query, so the lexical arm is fused, never replaced. */
-  const fn = SEMANTIC_SQL.slice(SEMANTIC_SQL.indexOf('create function public.eugenia_search'));
+  const fn = SEMANTIC_SQL.slice(SEMANTIC_SQL.indexOf('create or replace function public.eugenia_search'));
   assert.match(fn, /websearch_to_tsquery/, 'the full-text arm is gone from the search');
   assert.match(fn, /word_similarity\(q,/, 'the trigram arm is gone from the search');
   assert.match(fn, /<%/, 'the trigram operator is gone, so its index is unused');
@@ -4384,48 +4305,29 @@ test('the lexical arm survives, because a null embedding vanishes silently', () 
     'a semantic arm is numbered by something other than its distance');
 });
 
-test('the search that is dropped is granted again in the same file', () => {
-  /* THE DROP TAKES THE GRANTS, and a bare `create function` carries EXECUTE to
-     PUBLIC, which `anon` inherits. These two lines keep her memory off the
-     publishable key. */
-  const at = SEMANTIC_SQL.indexOf('create function public.eugenia_search');
-  assert.ok(at > -1, '007 no longer creates eugenia_search');
-  /* `> -1` MAKES THIS A CHECK: indexOf answers -1 for a deleted drop, which is
-     less than everything. */
-  const dropped = SEMANTIC_SQL.indexOf('drop function if exists public.eugenia_search(text, int)');
-  assert.ok(dropped > -1 && dropped < at,
-    'the old two-argument search is not dropped before the new one is created — ' +
-    'the two are an overload, and a two-argument call matches both, which ' +
-    'Postgres refuses as ambiguous');
+test('the search is revoked from the public keys and granted to her alone', () => {
+  /* A new function carries EXECUTE to PUBLIC, which `anon` inherits. These
+     lines keep her memory off the publishable key. */
+  const at = SEMANTIC_SQL.indexOf('create or replace function public.eugenia_search');
+  assert.ok(at > -1, 'schema.sql no longer creates eugenia_search');
 
   const after = SEMANTIC_SQL.slice(at);
   assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from public/,
-    '007 creates the search and leaves EXECUTE granted to PUBLIC');
+    'schema.sql creates the search and leaves EXECUTE granted to PUBLIC');
 
   /* AND FROM anon AND authenticated BY NAME — a SECOND revoke. `public` is the
      pseudo-role; these two hold EXECUTE separately from the schema's default
      privileges. */
   assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from anon, authenticated/,
-    "007 revokes the search from PUBLIC and leaves it granted to anon and " +
+    "schema.sql revokes the search from PUBLIC and leaves it granted to anon and " +
     "authenticated, which is what Supabase's default privileges give every new " +
     'function in the public schema');
   assert.match(after, /grant execute on function public\.eugenia_search\(text, int, text\) to service_role/,
-    '007 revokes the search from PUBLIC and never grants it to the one caller ' +
+    'schema.sql revokes the search from PUBLIC and never grants it to the one caller ' +
     'that needs it — every search would come back 403');
 });
 
-test('007 is safe to re-run, and the sweep names columns that exist', () => {
-  for (const line of SEMANTIC_SQL.split('\n')) {
-    if (/^create (table|index|extension) (?!if not exists)/.test(line)) {
-      assert.fail(`007 has a bare "${line.split(' ')[1]}": ${line.trim()}`);
-    }
-  }
-  // The function is create-not-replace, which is only re-runnable because the
-  // drop above it is unconditional.
-  assert.match(SEMANTIC_SQL, /drop function if exists public\.eugenia_search\(text, int, text\)/,
-    '007 creates the three-argument search without dropping it first, so a ' +
-    'second run refuses');
-
+test('the embedding sweep names columns that exist', () => {
   /* THE BACKFILL BUILDS ITS URL FROM ARGUMENTS, so the reader of
      `rest/v1/eugenia_*` cannot see the table and column; each is checked here. */
   const calls = [...EUGENIA_TS.matchAll(/fillEmbeddings\('(\w+)', '(\w+)'\)/g)]
@@ -4434,9 +4336,9 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
   for (const pair of new Set(calls)) {
     const [table, column] = pair.split('.');
     assert.match(EUGENIA_SQL, new RegExp(`create table[^;]*?public\\.${table}[^;]*?\\n\\s+${column}\\s`),
-      `the sweep reads ${table}.${column} and 003 creates no such column`);
-    assert.match(SEMANTIC_SQL, new RegExp(`alter table public\\.${table} add column if not exists embedding`),
-      `the sweep fills ${table}.embedding and 007 never adds it`);
+      `the sweep reads ${table}.${column} and schema.sql creates no such column`);
+    assert.match(tableBody(EUGENIA_SQL, table), /\n\s+embedding\s+vector/,
+      `the sweep fills ${table}.embedding and schema.sql never creates it`);
   }
 });
 

@@ -46,27 +46,8 @@ index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
 supabase/config.toml                    Edge Function deploy settings
-supabase/001_trades.sql                 the schema
-supabase/002_gladys.sql                 Gladys's trade-open trigger
-supabase/003_eugenia.sql                Eugenia's tables, her view of the journal
-supabase/004_cron.sql                   every scheduled job
-supabase/005_eugenia_senses.sql         Eugenia's meters, her calendar, her senses
-supabase/006_plan.sql                   where a trade was aimed, off the open position
-supabase/007_semantic.sql               her memory searchable by meaning
-supabase/008_sync_health.sql            the heartbeat the two silent writers mark
-supabase/009_dispatch.sql               what pg_net sent, and what came back
-supabase/010_pace.sql                   how much of its clock a briefing spends
-supabase/011_trades_grants.sql          which columns the app may write
-supabase/012_excursion.sql              how far a trade ran in his favour
-supabase/014_stops.sql                  every stop and target a position carried, which R-19 reads
-supabase/015_commitments.sql            what he committed to, as a third kind of note
-supabase/016_tradingview.sql            the TradingView sign-in, one row
-supabase/017_tradingview_lease.sql      one renewal of that sign-in at a time
-supabase/018_calendar_tradingview.sql   her calendar keyed by TradingView's id
-supabase/019_calendar_weeks.sql         the weeks R-14 can judge; Forex Factory dropped
-supabase/020_calendar_ticker.sql        which series a release belongs to
-supabase/021_calendar_name_key.sql      the calendar's old key by name, dropped
-supabase/verify.sql                     read-only: does the database match these?
+supabase/schema.sql                     the whole database, safe to re-run in full
+supabase/verify.sql                     read-only: does the database match it?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
 supabase/functions/doji-mcp-sync/       Edge Function: cTrader poller
@@ -375,17 +356,17 @@ single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
-| the **five columns the app may WRITE** | the `grant update (…)` in `011_trades_grants.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
+| the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
-| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `003_eugenia.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
+| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `schema.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
-| the **`eugenia_trades` column list** | the numbered SQL files (`003_eugenia.sql` creates it, `006_plan.sql` appends the plan; the last definition wins), the README's quoted copy of that statement, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
-| the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `005` |
-| each **sense's query flag** | the cron job's URL in `004` and the branch in `postScheduled` — held in both directions, so a rename and a sense with no job both fail |
-| the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `007`, and the cast inside the search |
+| the **`eugenia_trades` column list** | the view in `schema.sql`, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
+| the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `schema.sql` |
+| each **sense's query flag** | the cron job's URL in `schema.sql` and the branch in `postScheduled` — held in both directions, so a rename and a sense with no job both fail |
+| the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
@@ -396,9 +377,9 @@ single-sourced at run time:
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
-| the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `010`'s `owed \|\| ' briefing delivered'` |
-| the **number of scheduled jobs** | the `cron.schedule` calls in `004` and the count `verify.sql` asserts |
-| the **paid worker wall clock** | `ceiling_ms` in `010` and the sentence in `CLAUDE.md` on why the cron half answers first |
+| the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
+| the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
+| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow and the Apps Script |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -411,7 +392,7 @@ when they stop saying the same thing. It also asserts the guarantee rather than
 only the lists: no broker column may appear in `Data.OWNED` or `COLUMNS`.
 
 **The database holds that guarantee too.** RLS on `trades` scopes rows to their
-owner and says nothing about columns, so `011_trades_grants.sql` revokes insert,
+owner and says nothing about columns, so `schema.sql` revokes insert,
 update and delete and grants back update on exactly five columns —
 `Data.OWNED`'s four and `deleted`. The threat it stops is a client already
 holding the session token, a narrow one; it is done because the test above made
@@ -486,7 +467,7 @@ blocked silently, so the toast asks you to verify rather than claiming success.
 **Her memory is backed up from outside the browser.** The app's backup is
 `trades`, whose broker columns a wide `?force=1` can rebuild and whose journal
 columns only that file holds. Her tables are the other way round — no source
-anywhere else — and `003` and `005` deny the publishable key most of them on
+anywhere else — and RLS denies the publishable key most of them on
 purpose, so no in-app backup can or should reach them.
 `scripts/backup-memory.mjs`, run every Sunday evening by
 `.github/workflows/backup-memory.yml`, reads the eight tables with no other
@@ -550,7 +531,7 @@ direction cannot be fixed in the app, which does not own the column.
 | a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
 
 **The two writers with no voice leave a heartbeat.** The poller and the email
-function have no path to Telegram, so `008_sync_health.sql` holds one row each:
+function have no path to Telegram, so `sync_health` holds one row each:
 `last_ok` moves on every completed run, `last_error` records every failure. It
 is a heartbeat rather than an alarm because an alarm cannot fire when the run
 stops happening at all — an unscheduled job, a renamed function, a dropped
@@ -563,10 +544,10 @@ is evidence; the email function runs only when a fill arrives, so its silence is
 a quiet week. Staleness is read for the poller alone; for both, an error stamped
 after the latest success means failing now, and a success after it clears. **A
 market-closed skip is a completed run and marks itself**, or gold's weekend close
-reads as a dead sync every Sunday evening. The table is inert until `008` is
-applied: both writers swallow their own heartbeat failure.
+reads as a dead sync every Sunday evening. The table is inert until it exists:
+both writers swallow their own heartbeat failure.
 
-**`009_dispatch.sql` sees the call that never ran.** Supabase can refuse a
+**`dispatch_watch` sees the call that never ran.** Supabase can refuse a
 worker with `546 WORKER_RESOURCE_LIMIT` *before* the function exists — nothing
 marks, nothing throws, nothing logs — and the only witness is a row in
 `net._http_response`, pruned within hours and carrying **no url**. So every
@@ -591,7 +572,7 @@ mode with the function it watches.
   settles nothing, so fixing a misspelled Vault name still delivers the outage.
   Past three hours it gives up.
 
-**`010_pace.sql` speaks before the failure, because afterwards nothing can.**
+**`pace_watch` speaks before the failure, because afterwards nothing can.**
 The cron half answers before it works, so a briefing killed at the 400s wall
 clock has already handed pg_net a `200`: the ledger is green, `ask()` never
 reaches its catch, no apology is sent, and every retry redoes the same work.
@@ -819,7 +800,7 @@ place in her Telegram webhook.
 access) and no new secret: it checks `DOJI_CRON_SECRET` and writes with
 `SB_SECRET_KEY`.
 
-1. Run `supabase/016_tradingview.sql`. It is safe to re-run.
+1. Run `supabase/schema.sql`. It is safe to re-run.
 2. Let the deploy workflow ship the function from `main`.
 3. Start a sign-in:
 
@@ -972,7 +953,7 @@ artifact is the account.
 **One renewal at a time, by a lease.** A rotating server may treat a refresh
 token presented twice as stolen and revoke the sign-in, and the briefing and the
 release look can find it stale in the same second. A renewal first takes the
-lease `017_tradingview_lease.sql` adds, by a PATCH filtered on it being empty or
+lease `refreshing_until` holds, by a PATCH filtered on it being empty or
 lapsed — `balance`'s arbitration. A caller without the lease waits for the token
 the holder writes; the holder re-reads the row once it holds the lease, since
 another caller may have renewed; the new token and the release are one write; a
@@ -1006,7 +987,7 @@ binds its own token in one line, `const tg = (m, b) => telegram(BOT_TOKEN, m, b)
 
 When a position opens he gets one Telegram message and answers the whole journal
 from it without opening the app; journalling the trade anywhere else redraws that
-message. `supabase/002_gladys.sql` holds both triggers and `doji-gladys` is the
+message. `schema.sql` holds both triggers and `doji-gladys` is the
 function behind them.
 
 **A function is named after who it is, and so are its secrets** — `doji-gladys`,
@@ -1096,9 +1077,8 @@ gold open, so the week's first briefing lands with the market. She says hello
 her own way, Spanish or English, inside the first paragraph, and goes straight to
 the number. Reply and she answers — typed, by voice, or to a chart.
 
-`supabase/003_eugenia.sql` holds her memory and her read of the journal,
-`005_eugenia_senses.sql` her meters, calendar and the trigger that tells her
-about a trade, `004_cron.sql` her clock; `prompt.ts` holds who she is,
+`schema.sql` holds her memory and her read of the journal, her meters,
+calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
 `strategy.ts` what he decided, `adherence.ts` the thirteen rules a row can
 answer; `index.ts` is the wiring.
 
@@ -1272,7 +1252,7 @@ is least likely to speak. The spine is driven by data rather than an hour.
 **The calendar is filed for her, from TradingView.** `fileCalendar` reads
 `doji-tradingview?calendar=1` for the days around now, through the cron secret
 she already holds, and upserts every timed US release rated medium or above into
-`eugenia_calendar` under TradingView's own id (`018_calendar_tradingview.sql`):
+`eugenia_calendar` under TradingView's own id (`tv_id`):
 the time, the name with its period (*Core PCE Price Index MoM (Aug)*), the
 importance, the consensus, the prior, and the actual once it prints. Low-rated
 items are not filed — each would be in front of her on every request and none
@@ -1315,7 +1295,7 @@ hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 `?release=1` is its door.
 
 **The look reads a release against its own record.** Each row carries
-TradingView's `ticker` (`020_calendar_ticker.sql`), the series it belongs to, and
+TradingView's `ticker`, the series it belongs to, and
 the look is handed the last twelve prints of each series in the group, oldest
 first, each against what was expected (`recordList`, read by `recordQuery`).
 Listed, never scored — parsing "0.2%" into a sign is a chance to get every unit
@@ -1492,7 +1472,7 @@ holds the two lists together.
 impact, at v1.20, as a US release TradingView rates high, so one calendar serves
 the briefing, the trade event and the rules. Rows with no TradingView id are not
 read. **A week nobody fetched is not a quiet week**: `calendar_weeks`
-(`019_calendar_weeks.sql`) records each week a whole-week fetch landed for, and
+records each week a whole-week fetch landed for, and
 an entry outside one is `unknown`. Both markers go through `fileWeek`, which
 writes the rows first and the mark after:
 
@@ -1802,8 +1782,7 @@ fudge.
 
 ### Search that survives a different idea
 
-`007_semantic.sql` adds an `embedding` to notes and turns and a second arm to the
-same function. **It is reach, not a sixth memory**: the windows do not move,
+An `embedding` on notes and turns gives the same function a second arm. **It is reach, not a sixth memory**: the windows do not move,
 since every token in a window is paid on every request.
 
 **The lexical arm stays, as the floor.** A vector is worse at exact strings — a
@@ -1823,11 +1802,12 @@ vectors from two models are not comparable, the column catches a change of width
 but not one at the same width, and the ranking would degrade into noise. A change
 means re-embedding both tables.
 
-**The function is dropped and recreated.** The query vector is a new argument,
-`create or replace` cannot change an argument list, and the old form beside the
-new is an overload a two-argument call cannot resolve. A drop takes the grants,
-so the `revoke` and `grant` are part of the statement. **And `revoke … from
-public` is not the whole revoke**: `public` is the PUBLIC pseudo-role, while
+**One signature, revoked and granted where it is created.** `create or
+replace` cannot change an argument list, and a second form beside this one would
+be an overload a call cannot resolve — so a change to its arguments is a `drop`
+run by hand, which takes the grants, and the `revoke` and `grant` beside the
+function put them back on the re-run. **And `revoke … from public` is not the
+whole revoke**: `public` is the PUBLIC pseudo-role, while
 `anon` and `authenticated` hold `EXECUTE` separately, from the default
 privileges Supabase sets on the `public` **schema**. `verify.sql` asks it of
 every callable function through `has_function_privilege`, which answers however
@@ -2007,7 +1987,7 @@ makes the *view* read-only, not the key — she holds the service key for her ow
 tables — so the structural guarantee is the one that matters.
 
 The view is `security_invoker`, which a view is **not** by default: without it,
-RLS would depend on whoever ran `003_eugenia.sql` rather than on who is asking, and
+RLS would depend on whoever ran `schema.sql` rather than on who is asking, and
 a grant widened by mistake would leak every user's trades.
 
 **Context goes in the user turn, not a mid-conversation system message.** That
@@ -2056,7 +2036,7 @@ row. Answering first makes a non-2xx there mean what it says, and the body names
 the job (`accepted: "pulse=1"`), since the row carries no URL. `?embed=1` alone
 waits: its answer *is* its interface — call it until it reports `left: 0` — and
 it is the one flag no cron job dispatches, which `agree.test.mjs` holds against
-`004_cron.sql`.
+the timer section of `schema.sql`.
 
 **The trade event reaches the same catch.** It is dispatched beside
 `postScheduled` rather than through it; both hand a failure to `jobFailed`, which
@@ -2096,36 +2076,28 @@ because the apology carries `.catch(() => {})` and a refusing Telegram would
 otherwise take the only notice with it.
 
 `recordRun` never throws and never blocks the answer: a briefing written, paid
-for and delivered is not lost to an instrumentation insert, or to `005` not
+for and delivered is not lost to an instrumentation insert, or to its table not
 being applied yet.
 
-### Applying her files to an existing database
+### Applying her schema to an existing database
 
-Each file below is **safe to re-run** unless it says otherwise, and the
-general rule is **run the SQL before the deploy that uses it**: a function
-reaching for a column that is not there gets a `400` it swallows, and the only
-sign is a meter reading `0`. `verify.sql` names a row for each, which is how to
-tell an unapplied file from a quiet day.
+`schema.sql` is applied whole and is **safe to re-run**, and the rule is **run
+the SQL before the deploy that uses it**: a function reaching for a column that
+is not there gets a `400` it swallows, and the only sign is a meter reading `0`
+— `planned`, `excursions` and `stops` in the poller's answer all read `0` on a
+healthy poll and on a missing column alike. `verify.sql` names a row for each,
+which is how to tell an unapplied change from a quiet day. Then check its row
+for **all five channels**: `setChannel` PATCHes by key, so a missing row is a
+`200` with an empty body, and that channel would sit at the bottom rung for ever,
+looking like one he has never used.
 
-**003's channel map.** `003_eugenia.sql` ends with `eugenia_channels`, and that
-block alone is the migration — the seed is `on conflict do nothing`. Then check
-`verify.sql` for all five rows: `setChannel` PATCHes by key, so a missing row is
-a `200` with an empty body, and that channel would sit at the bottom rung for
-ever, looking like one he has never used.
+Three things outside the SQL, none of which fails loudly:
 
-**005, the senses and meters**, is the file meant to grow, so every statement is
-`if not exists`, `or replace` or `on conflict do nothing`, and a test asserts it.
-**Being re-runnable means it may not undo a later file**: `eugenia_search` is
-007's alone, since re-creating 005's old signature beside it would be an
-ambiguous overload executable by `anon` — granted by name through the schema's
-defaults, which `revoke ... from public` does not touch. A test reads every
-re-runnable file against every later `drop`. Three things outside the SQL move
-with it, and none fails loudly:
-
-- **Two quarter-hourly jobs in `004_cron.sql`**: `doji-eugenia-spine` calling
-  `?release=1`, and `doji-eugenia-price` calling `?move=1`, offset from each
-  other because the two read the calendar for opposite purposes. Without the
-  price job the mark never advances, which reads as a market that has not moved.
+- **The quarter-hourly jobs** are in `schema.sql`'s timer section with every
+  other schedule: `doji-eugenia-spine` calling `?release=1` and
+  `doji-eugenia-price` calling `?move=1`, offset from each other because the two
+  read the calendar for opposite purposes. Without the price job the mark never
+  advances, which reads as a market that has not moved.
 - **The webhook must allow `callback_query`**: re-register with
   `allowed_updates = ["message", "callback_query"]`, or the taps under a
   briefing are never delivered.
@@ -2139,16 +2111,10 @@ with it, and none fails loudly:
   supabase secrets set EMBED_KEY=<key>
   ```
 
-**006, the plan columns.** Deployed first, the poller's filtered PATCH is a `400`
-and no plan is stored, while the deals keep landing. `planned` in the poller's
-answer counts rows written, so it reads `0` both on a healthy poll and on a
-missing column — `verify.sql`'s **`trades has its plan columns`** row is the
-check.
-
-**007, semantic search**, drops and recreates `eugenia_search` (its argument list
-changed). It changes nothing until `EMBED_KEY` is set (`EMBED_URL` is optional and
-defaults to the vendor's embeddings endpoint). Then backfill, calling until both
-tables report `left: 0`:
+**Two backfills, each a door called by hand.** Semantic search changes nothing
+until `EMBED_KEY` is set (`EMBED_URL` is optional and defaults to the vendor's
+embeddings endpoint); then fill the archive, calling until both tables report
+`left: 0`:
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-eugenia?embed=1" \
@@ -2168,20 +2134,10 @@ backlog waiting* means the key is unset, and a drained archive (`0 filled, 0
 left`) accuses nobody. `verify.sql` ends with the count still unembedded, which
 should fall to zero and stay there.
 
-**012, `best_price`.** Deployed first, the measuring read names the column, the
-step gives way, `excursions` reads `0` and R-04 is `unknown` on every trade —
-which looks like a journal with nothing to check. Once applied the backlog fills
-itself, three trades a poll.
-
-**014, `trade_stops`.** Forward only: a closed trade has no stop history and
-R-19 reads it `unknown`. Deployed first, `stops` reads `0`.
-
-**015, commitments**, recreates the `kind` check with `commitment`. Deployed
-first, a commitment she records is refused and she says it did not save.
-
-**019, the weeks R-14 can judge**, creates `calendar_weeks` and drops Forex
-Factory's tables. R-14 is `unknown` on every trade until a week is marked, so run
-the history door once from his first trade (`select min(open_day) from trades`):
+R-14 is `unknown` on every trade until a week is marked in `calendar_weeks`, and
+a release carries its series `ticker` only once filed, so walk the history door
+once from a year back, or from his first trade if that is earlier (`select
+min(open_day) from trades`):
 
 ```sql
 select net.http_get(
@@ -2194,14 +2150,6 @@ select net.http_get(
 
 Each week lands as a `calendar week` row in `eugenia_runs`; a longer history, or
 a walk stopped by two refusals, is a second run from the week its last row names.
-
-**020, each release's series**, adds `ticker`. Rows filed before it carry none
-until re-filed, so walk the history door from a year back and the release look
-has a year of each series behind it.
-
-**021** drops `eugenia_calendar_unique`, the `(at, name)` key from the days she
-typed the calendar. Nothing writes by name now, and one row colliding with an old
-name would refuse a whole bulk filing every quarter hour.
 
 ### Programmatic tool calls need their container
 
@@ -2356,9 +2304,9 @@ today, the story she is carrying, what is still open — and none is private to
 her. **Not her notes or turns**: those stay denied to the publishable key, and his
 window into them is `/notes`. The three tables the card reads carry no `user_id`,
 so `using (true)` for `authenticated` is the honest policy; a test asserts the
-card reads only those three and that `005` opens nothing on the other two.
+card reads only those three and that `schema.sql` opens nothing on the other two.
 
-**One read, after the render.** A failure — `005` not applied, a missing policy,
+**One read, after the render.** A failure — her tables not applied, a missing policy,
 no network — hides the card and touches nothing else, and is logged:
 `supabase-js` resolves a failed read as `{ data: null, error }`, so `data || []`
 would turn a missing table into an empty calendar. **An empty answer is only an
@@ -2545,9 +2493,9 @@ in the same four lines — refuse if a secret is unset, match one, match the oth
 401 — and that is the one check worth reading in the file being read.
 
 **Two things are deliberately manual.** The SQL is run knowingly in the SQL
-editor: `001_trades.sql` through `021_calendar_name_key.sql` are not under
-`supabase/migrations/`, so nothing applies them because a file was committed. The
-Apps Script is deployed from its own editor.
+editor: `supabase/schema.sql` is not under `supabase/migrations/`, so nothing
+applies it because a file was committed. The Apps Script is deployed from its
+own editor.
 
 **The editor reads the words, not the language, so no file says `select …
 into`.** It takes `select … into worst` inside plpgsql for `create table worst`,
@@ -2563,34 +2511,20 @@ writes nothing; run it after any manual change. CI cannot stand in for it — th
 files need `pg_net`, `vault` and `pg_cron`, which a plain Postgres container
 lacks.
 
-**001 and 003 stop at their first `create table` on a database that has the
-tables**, so a change further down is applied by running *that statement* alone.
-In 003 that is the view and its grants — including `security_invoker`:
+**`schema.sql` is the whole database, and it is applied by running all of it
+again.** Every statement is `if not exists`, `or replace`, `on conflict do
+nothing` or guarded by a check, so a fresh project and the live one both end up
+matching the file, and a change is an edit to the file followed by a re-run.
+`agree.test.mjs` holds that shape; a run against a throwaway Postgres holding
+`pg_net`, `vault` and `pg_cron` stubs is what proves an edit to it. Two
+constraints come from Postgres itself: `create or replace view` may only append
+a column, so the view's list is in the order columns were added, and `create or
+replace function` cannot change an argument list or a return type — either needs
+a `drop` first, run by hand once, never written into the file, because a re-run
+would repeat it on the live database.
 
-```sql
-create or replace view public.eugenia_trades
-  with (security_invoker = true) as
-  select id, direction, entry_time, fill_time, entry_price, exit_price, pnl,
-         open_day, setup, followed_rules, followed_sl, followed_tp, size_oz,
-         net_pnl, planned_sl, planned_tp, best_price
-  from public.trades
-  where deleted = false;
-
-revoke all on public.eugenia_trades from anon, authenticated, service_role;
-grant select on public.eugenia_trades to service_role;
-grant select on public.trades to service_role;
-```
-
-`create or replace view` matches columns by position and may only append, so the
-tail of that list is in the order columns were added; reordering or removing one
-needs a `drop view` first, which drops the grants with it — run the grants again
-in the same block. Afterwards, `verify.sql`'s *eugenia_trades is select-only,
-service_role only* answers `none` on a missing view and on one rebuilt without
-its grants. 002 is all `create or replace` and re-applies cleanly; 005 onward are
-written to re-run in full.
-
-**`004_cron.sql` is safe to re-run**: `cron.schedule` upserts on the job name, so
-applying it makes the database match the file. Seven jobs —
+**The schedules re-run like everything else**: `cron.schedule` upserts on the
+job name, so a re-run makes the jobs match the file. Seven jobs —
 `select jobname, schedule, active from cron.job order by jobname` reads them back:
 
 | Job | Schedule | What it drives |
@@ -2599,37 +2533,35 @@ applying it makes the database match the file. Seven jobs —
 | `doji-eugenia` | `0 * * * *` | the briefing, the pulse and the nightly pass — the function decides which, or neither |
 | `doji-eugenia-spine` | `5,20,35,50 * * * *` | the release look |
 | `doji-eugenia-price` | `12,27,42,57 * * * *` | the price mark and the move look |
-| `doji-dispatch-watch` | `*/10 * * * *` | `009`'s sweep |
-| `doji-pace-watch` | `37 * * * *` | `010`'s one-a-day warning |
+| `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
+| `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
 
 Only the first four call a function; the two watchers post to Telegram
 themselves, which keeps a watchdog off the thing it watches. `verify.sql` counts
-the jobs, and `agree.test.mjs` holds that count against this file.
+the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
 
 ---
 
 ## Setup from scratch
 
-1. Run `supabase/001_trades.sql` in the SQL editor, and confirm `trades` is in
-   the `supabase_realtime` publication with RLS enabled.
-2. Put the project URL and publishable key in `SUPABASE` in `index.html`.
-3. Let the deploy workflow ship the functions (see **Deployment**), and set
+1. Put the project URL and publishable key in `SUPABASE` in `index.html`.
+2. Let the deploy workflow ship the functions (see **Deployment**), and set
    `CTRADER_MCP_TOKEN`, `DOJI_USER_ID` and **`SB_SECRET_KEY`** in Edge Function
    secrets. `SB_SECRET_KEY` holds an `sb_secret_` key; Supabase owns the
    `SUPABASE_` prefix, so a secret cannot be created under it and a function
    reading `SUPABASE_SECRET_KEY` gets `""`. Unset, every function answers 503.
-4. **Generate one cron secret and store it twice**: `DOJI_CRON_SECRET` in Edge
+3. **Generate one cron secret and store it twice**: `DOJI_CRON_SECRET` in Edge
    Function secrets, which the functions check, and `doji_cron_secret` in Vault,
    which the cron jobs and triggers present. Postgres compares the Vault name
    case-sensitively, so a wrong spelling is a trigger that gives up silently.
-5. Deploy the Apps Script. Generate a second secret, `DOJI_EMAIL_SECRET`, and
+4. Deploy the Apps Script. Generate a second secret, `DOJI_EMAIL_SECRET`, and
    store it in Edge Function secrets and in the script's Script Properties —
    never in the file. It is separate from the cron secret because it is the only
    one living outside your own infrastructure, so it opens the narrowest door
    there is. Run `testParse`, then `testSecret`, then trigger `syncPepperstone`
    every minute.
-6. For Gladys: create the bot with BotFather and send it `/start`, set
+5. For Gladys: create the bot with BotFather and send it `/start`, set
    `GLADYS_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `GLADYS_WEBHOOK_SECRET`, and point
    Telegram at her function:
 
@@ -2640,18 +2572,18 @@ the jobs, and `agree.test.mjs` holds that count against this file.
         allowed_updates=["callback_query"]
    ```
 
-   Then run `supabase/002_gladys.sql`.
-7. For Eugenia: a second bot, `/start` it, and set `EUGENIA_BOT_TOKEN`,
+6. For Eugenia: a second bot, `/start` it, and set `EUGENIA_BOT_TOKEN`,
    `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY`. Point Telegram at
    `/functions/v1/doji-eugenia` with that secret and `allowed_updates=["message",
    "callback_query"]` — both, or the taps under a briefing are never delivered.
    **Set a spend cap on the API key**: it is the only enforceable bound on what
    she can cost. Store `eugenia_bot_token` and `telegram_chat_id` in Vault too,
    lower-case — the watchers post to Telegram themselves.
-8. Run `003_eugenia.sql`, `004_cron.sql`, then `005` through `021` in order (013
-   is unused), connecting TradingView after `017` — see **TradingView**. Walk the
-   history door once from a year back — see **Applying her files**.
-9. Run `supabase/verify.sql`. Nothing is set up until it agrees.
+7. Run `supabase/schema.sql` in the SQL editor — last, because its triggers and
+   schedules call the functions and secrets above from the moment it lands.
+   Connect TradingView (see **TradingView**), then walk the history door once
+   from a year back — see **Applying her schema**.
+8. Run `supabase/verify.sql`. Nothing is set up until it agrees.
 
 ---
 

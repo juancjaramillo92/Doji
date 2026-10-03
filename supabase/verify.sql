@@ -7,7 +7,7 @@
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
--- A CI job cannot stand in: 002–004 need pg_net, vault and pg_cron.
+-- A CI job cannot stand in: schema.sql needs pg_net, vault and pg_cron.
 --
 -- A row may come back false; it must never raise, or every row stops with it.
 -- So functions are asked by name or oid, never by written signature, and a
@@ -25,9 +25,8 @@ from (values
                           'eugenia_channels')),
    '5'),
 
-  -- Apart from the row above: 003 without 005 is a real state, and a count is
-  -- its only sign.
-  ('005 tables exist',
+  -- Apart from the row above, and counted, so a table missing is a number short.
+  ('her sense tables exist',
    (select count(*)::text from information_schema.tables
      where table_schema = 'public'
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
@@ -55,7 +54,6 @@ from (values
    (select count(*)::text from pg_extension where extname = 'pg_trgm'),
    '1'),
 
-  -- 007.
   ('pgvector is installed',
    (select count(*)::text from pg_extension where extname = 'vector'),
    '1'),
@@ -65,7 +63,7 @@ from (values
        and table_name in ('eugenia_notes','eugenia_turns')),
    '2'),
 
-  -- 007's drop took the grants; a bare create carries EXECUTE to PUBLIC.
+  -- A new function carries EXECUTE to PUBLIC until it is revoked.
   ('the search is executable by service_role alone',
    (select count(*)::text from information_schema.routine_privileges
      where routine_schema = 'public' and routine_name = 'eugenia_search'
@@ -88,7 +86,7 @@ from (values
          or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
    '0'),
 
-  /* ─── The journal/broker boundary (011) ──────────────────────────────────
+  /* ─── The journal/broker boundary ────────────────────────────────────────
      Three rows, because they fail differently: no broker column writable,
      the app's five still writable, and no insert or delete at all. */
   ('no broker column of trades is writable by the publishable key',
@@ -159,7 +157,7 @@ from (values
        and column_name in ('user_id','balance','commission','computed_pnl')),
    '0'),
 
-  -- 006. Missing, the plan PATCH is a 400 the poller swallows.
+  -- Missing, the plan PATCH is a 400 the poller swallows.
   ('trades has its plan columns',
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'trades'
@@ -171,7 +169,7 @@ from (values
        and column_name in ('planned_sl','planned_tp')),
    '2'),
 
-  -- 012. Missing, R-04 reads unknown on every trade.
+  -- Missing, R-04 reads unknown on every trade.
   ('trades has its best_price column',
    (select data_type from information_schema.columns
      where table_schema = 'public' and table_name = 'trades' and column_name = 'best_price'),
@@ -208,8 +206,8 @@ from (values
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_channels')),
    '0'),
 
-  -- agree.test.mjs reads 003's insert; only the database knows the rows are
-  -- there. A missing one renders at the bottom rung forever.
+  -- agree.test.mjs reads schema.sql's insert; only the database knows the
+  -- rows are there. A missing one renders at the bottom rung forever.
   ('all five channels are seeded',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from public.eugenia_channels',
@@ -237,7 +235,6 @@ from (values
      where table_schema = 'public' and table_name = 'eugenia_notes' and column_name = 'kind'),
    'text'),
 
-  -- 015.
   ('eugenia_notes accepts a commitment',
    (select (pg_get_constraintdef(oid) like '%commitment%')::text
       from pg_constraint where conname = 'eugenia_notes_kind_check'),
@@ -257,8 +254,9 @@ from (values
        and indexdef ilike '%where (superseded_by IS NULL)%'),
    '1'),
 
-  -- By arity: '3' is right, '2' is 007 unapplied, '2,3' the overload 007
-  -- removes, NULL no function. A count of 1 could not part them.
+  -- By arity: '3' is right, '2' is the old search without the query vector,
+  -- '2,3' an overload of the two, NULL no function. A count of 1 could not
+  -- part them.
   ('eugenia_search exists, and takes the query vector',
    (select string_agg(p.pronargs::text, ',' order by p.pronargs)
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -309,8 +307,8 @@ from (values
      where pubname = 'supabase_realtime' and tablename = 'trades'),
    '1'),
 
-  -- agree.test.mjs holds this count against 004. Through query_to_xml, so a
-  -- database without pg_cron answers false rather than raising.
+  -- agree.test.mjs holds this count against schema.sql. Through query_to_xml,
+  -- so a database without pg_cron answers false rather than raising.
   ('seven cron jobs, all active',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from cron.job where active',
@@ -345,7 +343,7 @@ from (values
       from pg_constraint where conname = 'trades_setup_check'),
    'true'),
 
-  -- ─── 005's later columns, and its tables ───────────────────────────────
+  -- ─── Her meters' columns, and her other tables ───────────────────────────
   -- recordRun posts every key in one object, so a missing column refuses the
   -- whole row and the meter goes quiet for every caller.
   ('eugenia_runs counts what the cache cost to fill',
@@ -389,12 +387,12 @@ from (values
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_loops')),
    'true'),
 
-  -- 009. No policy on purpose.
+  -- The dispatch ledger. No policy on purpose.
   ('RLS on dispatch',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.dispatch')),
    'true'),
 
-  -- 019. Without it R-14 is unknown on every trade.
+  -- Without it R-14 is unknown on every trade.
   ('RLS on calendar_weeks',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.calendar_weeks')),
    'true'),
@@ -403,12 +401,12 @@ from (values
         and to_regclass('public.ff_weeks') is null)::text),
    'true'),
 
-  -- 014. Without it R-19 is unknown on every trade.
+  -- Without it R-19 is unknown on every trade.
   ('RLS on trade_stops',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.trade_stops')),
    'true'),
 
-  -- ─── 016, the one table holding a live credential ──────────────────────
+  -- ─── The one table holding a live credential ────────────────────────────
   ('RLS on tradingview_auth',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.tradingview_auth')),
    'true'),
@@ -416,14 +414,14 @@ from (values
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.tradingview_auth')),
    '0'),
 
-  -- 017. Without it every renewal is a 400 and the sign-in lapses.
+  -- Without it every renewal is a 400 and the sign-in lapses.
   ('tradingview_auth has its renewal lease',
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'tradingview_auth'
        and column_name = 'refreshing_until'),
    '1'),
 
-  -- 018 and 020. Without either column every filing is refused and the
+  -- Without either column every filing is refused and the
   -- calendar stops moving.
   ('eugenia_calendar has its TradingView id',
    (select count(*)::text from information_schema.columns
@@ -431,7 +429,8 @@ from (values
        and column_name = 'tv_id'),
    '1'),
 
-  -- 021. Present, one clash refuses a whole filing, every quarter hour.
+  -- The old key by name. Present, one clash refuses a whole filing, every
+  -- quarter hour.
   ('the calendar has no key by name',
    (select count(*)::text from pg_constraint
      where conname = 'eugenia_calendar_unique'),
@@ -480,7 +479,7 @@ from (values
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_price')),
    'true'),
 
-  -- 008. No policy: only secret-key writers and Eugenia.
+  -- No policy: only secret-key writers and Eugenia.
   ('RLS on sync_health',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.sync_health')),
    'true'),

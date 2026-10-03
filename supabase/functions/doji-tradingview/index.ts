@@ -161,7 +161,7 @@ async function connect() {
 
 /* ─── The tokens ───────────────────────────────────────────────────────────
    In a table, not an Edge secret: the refresh token may rotate on every use
-   and a function cannot rewrite its own secrets. 016 walls the row off.
+   and a function cannot rewrite its own secrets. No policy walls the row off.
    ───────────────────────────────────────────────────────────────────────── */
 interface Auth {
   client_id: string; token_endpoint: string; resource: string;
@@ -172,7 +172,7 @@ interface Auth {
 async function readAuth(): Promise<Auth | null> {
   const res = await fetch(`${SB_URL}/rest/v1/tradingview_auth?id=eq.current&select=*`,
     { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has 016 been applied?`);
+  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has schema.sql been applied?`);
   return (await res.json())[0] ?? null;
 }
 
@@ -182,7 +182,7 @@ async function saveAuth(fields: Partial<Auth>) {
     method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
     body: JSON.stringify({ id: "current", ...fields }),
   });
-  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has 016 been applied?`);
+  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has schema.sql been applied?`);
 }
 
 /* A server that rotates sends a new refresh token; one that does not sends
@@ -218,11 +218,12 @@ async function tokenRequest(auth: Auth, grant: Record<string, string>) {
   return answer;
 }
 
-/* One renewal at a time, through 017's lease: a rotating server may revoke the
-   sign-in on a refresh token presented twice. Taken by a PATCH filtered on the
-   lease being free or lapsed; a caller that misses waits for the holder's
-   token. The row is read AGAIN once the lease is held — another caller may
-   have renewed in between, and the first read's refresh token is then spent. */
+/* One renewal at a time, through refreshing_until's lease: a rotating server
+   may revoke the sign-in on a refresh token presented twice. Taken by a PATCH
+   filtered on the lease being free or lapsed; a caller that misses waits for
+   the holder's token. The row is read AGAIN once the lease is held — another
+   caller may have renewed in between, and the first read's refresh token is
+   then spent. */
 const LEASE_MS = 30_000;
 const LEASE_POLL_MS = 250, LEASE_POLLS = 40;
 
@@ -233,7 +234,7 @@ async function takeLease(): Promise<boolean> {
     method: "PATCH", headers: sbHeaders("return=representation"),
     body: JSON.stringify({ refreshing_until: new Date(Date.now() + LEASE_MS).toISOString() }),
   });
-  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has 017 been applied?`);
+  if (!res.ok) throw new Error(`tradingview_auth: HTTP ${res.status} — has schema.sql been applied?`);
   return (await res.json()).length > 0;
 }
 

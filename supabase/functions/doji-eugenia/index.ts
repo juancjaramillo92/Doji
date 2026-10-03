@@ -4,9 +4,10 @@
 // The second bot: Gladys collects the journal, Eugenia does macro. Two
 // callers, told apart by the secret they present:
 //
-//   x-doji-key                        the scheduled jobs in 004, the trades
-//                                     trigger in 005, and her own speaking
-//                                     worker — postScheduled reads which.
+//   x-doji-key                        the scheduled jobs and the trades
+//                                     trigger in schema.sql, and her own
+//                                     speaking worker — postScheduled reads
+//                                     which.
 //   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
 //
 // She owns no column of `trades` and has no write path to it: she reads the
@@ -561,7 +562,7 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // An empty answer means 003's seed rows are missing and every move drops.
+    // Empty means the channels' seed rows are missing and every move drops.
     if ((await res.json()).length === 0) {
       return `No row for ${id} — the channels table has not been seeded, so ` +
              `nothing was saved. Say nothing about this to him.`;
@@ -757,7 +758,7 @@ async function readStats(days: unknown): Promise<string> {
 }
 
 /* ─── What lands today ─────────────────────────────────────────────────────
-   Filed from TradingView, keyed on its id (018), so nothing she writes can mint
+   Filed from TradingView, keyed on its id, so nothing she writes can mint
    a second row for one release. Two callers file it: the briefing, before it
    reads, and the quarter-hourly release job, which is how an actual lands
    within fifteen minutes of publication. Read through doji-tradingview with
@@ -844,11 +845,11 @@ export async function fileCalendar(now: number): Promise<number> {
   return upsertCalendar(calendarRows(await readTvCalendar(utcDay(from), utcDay(to)), from, to));
 }
 
-/* A whole week, then the mark that says so (019). `week` is a New York Sunday;
-   TradingView is asked in UTC days, so the read runs to the next Sunday and
-   keeps what weekOf files under this week. The mark goes down only after the
-   rows, so a failure between leaves the week unknown rather than covered and
-   empty. */
+/* A whole week, then the mark that says so (calendar_weeks). `week` is a New
+   York Sunday; TradingView is asked in UTC days, so the read runs to the next
+   Sunday and keeps what weekOf files under this week. The mark goes down only
+   after the rows, so a failure between leaves the week unknown rather than
+   covered and empty. */
 export async function fileWeek(week: string, now = Date.now()): Promise<number> {
   const next = utcDay(Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000);
   const rows = calendarRows(await readTvCalendar(week, next), 0, Infinity)
@@ -858,7 +859,7 @@ export async function fileWeek(week: string, now = Date.now()): Promise<number> 
     method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
     body: JSON.stringify([{ week, fetched_at: new Date(now).toISOString() }]),
   });
-  if (!res.ok) throw new Error(`week ${week} filed and not marked (HTTP ${res.status}) — has 019 been applied?`);
+  if (!res.ok) throw new Error(`week ${week} filed and not marked (HTTP ${res.status}) — has schema.sql been applied?`);
   return filed;
 }
 
@@ -1146,9 +1147,9 @@ async function setThesis(thesis: unknown): Promise<string> {
       body: JSON.stringify({ thesis: text, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // Empty means 005's seed row is missing, as with setChannel.
+    // Empty means the thesis seed row is missing, as with setChannel.
     if ((await res.json()).length === 0) {
-      return "There is no thesis row — 005 has not been applied, so nothing was saved. Say nothing about this to him.";
+      return "There is no thesis row — schema.sql has not been applied, so nothing was saved. Say nothing about this to him.";
     }
     return "Thesis updated.";
   } catch (err) {
@@ -1667,10 +1668,10 @@ export function sweepLine(notes: Sweep, turns: Sweep): string {
 }
 
 /* ─── What the vendor missed ───────────────────────────────────────────────
-   Rows with no embedding — everything before 007, and any whose vendor call
-   failed — are never found by meaning, silently. One PATCH per row, for
-   EMBED_BATCH's reason. count=exact makes it resumable: repeat until it
-   answers zero. Newest first: an outage's fortnight should come back before
+   Rows with no embedding — everything written before the column, and any whose
+   vendor call failed — are never found by meaning, silently. One PATCH per
+   row, for EMBED_BATCH's reason. count=exact makes it resumable: repeat until
+   it answers zero. Newest first: an outage's fortnight should come back before
    last month's archive, being what he is likeliest to ask about.
    ───────────────────────────────────────────────────────────────────────── */
 async function fillEmbeddings(table: string, column: string): Promise<Sweep> {
@@ -2174,7 +2175,7 @@ export async function healthBlock(): Promise<string> {
       `${SB_URL}/rest/v1/sync_health?select=id,last_ok,last_error,last_error_at` +
       `&order=id.desc&limit=5`,
       { headers: sbHeaders() });
-    // Without 008 this is a 404, and the feature is simply inert.
+    // Without sync_health this is a 404, and the feature is simply inert.
     if (!res.ok) return "";
     return healthLine(await res.json());
   } catch (err) {
@@ -2864,7 +2865,7 @@ async function postBriefing(due: Brief): Promise<Response> {
    with its text by the instant they were written in one INSERT — adjacent ids
    would not prove that. Today's only, since the door is also a person's repair
    and yesterday's would arrive as this morning's. The delivered row is written
-   here, after the send: 010 reads its absence as a briefing that never came.
+   here, after the send: pace_line reads its absence as a missing briefing.
    Exported so find, pair, speak, record is driven. */
 export async function postSpeak(due: string): Promise<Response> {
   if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
@@ -3374,7 +3375,7 @@ async function postMove(): Promise<Response> {
 
   const [spot, mark] = await Promise.all([marketQuote(), readMark()]);
   if (!spot) return json({ ok: true, skipped: "no readable quote" });
-  if (!mark) throw new Error("eugenia_price has no row — 005 has not been applied");
+  if (!mark) throw new Error("eugenia_price has no row — schema.sql has not been applied");
 
   const worth = moveWorth(spot, mark);
   if (!worth.worth) {

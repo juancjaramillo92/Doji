@@ -61,7 +61,7 @@ export async function heartbeat(who: "poller" | "email", failure?: unknown) {
     ? { last_ok: new Date().toISOString() }
     : {
         last_error_at: new Date().toISOString(),
-        // Both ends of 008's `between 1 and 500`: an empty message — `new
+        // Both ends of the column's `between 1 and 500`: an empty message — `new
         // Error()` — is refused too, and takes last_error_at with it.
         last_error: why(failure).slice(0, 500) || "no detail",
       };

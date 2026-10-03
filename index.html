@@ -1632,7 +1632,7 @@ tr.broker-pending td:first-child {
     </div>
 
     <!-- What Eugenia is watching. Hidden until there is something in it, so a
-         database without 005 applied, or a quiet Sunday, shows nothing rather
+         database without her tables, or a quiet Sunday, shows nothing rather
          than an empty frame. -->
     <div id="watch-card" class="cbox section watch-card" style="display:none;"></div>
 
@@ -3380,7 +3380,7 @@ const Watch = {
       host.style.display = 'flex';
     } catch (e) {
       // Warned rather than surfaced: a card that cannot draw is not a reason to
-      // tell him anything, and 005 not being applied yet is the likely cause.
+      // tell him anything, and her tables not yet applied is the likely cause.
       console.warn('Doji: Eugenia card unavailable', e);
       host.style.display = 'none';
     }
