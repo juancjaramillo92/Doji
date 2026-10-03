@@ -2099,231 +2099,89 @@ otherwise take the only notice with it.
 for and delivered is not lost to an instrumentation insert, or to `005` not
 being applied yet.
 
-### Adding the channel map to an existing database
+### Applying her files to an existing database
 
-`003_eugenia.sql` now ends with `eugenia_channels`. The statements are safe to
-re-run as they stand — the seed is `on conflict do nothing` — so applying just
-that block is the whole migration, and `verify.sql` then answers whether all
-five rows are actually there. That last check is the one `agree.test.mjs` cannot
-make: it reads the insert statement and confirms it names five channels, but
-whether five rows exist is a fact about the database.
+Each file below is **safe to re-run** unless it says otherwise, and the
+general rule is **run the SQL before the deploy that uses it**: a function
+reaching for a column that is not there gets a `400` it swallows, and the only
+sign is a meter reading `0`. `verify.sql` names a row for each, which is how to
+tell an unapplied file from a quiet day.
 
-It matters more than it looks. `setChannel` PATCHes by primary key, so a missing
-row is a `200` with an empty array — the move is dropped silently, and that
-channel then renders at the bottom rung forever, which is indistinguishable from
-a channel he has genuinely never used. The function reports that case back to
-her rather than claiming success, but nothing reaches him.
+**003's channel map.** `003_eugenia.sql` ends with `eugenia_channels`, and that
+block alone is the migration — the seed is `on conflict do nothing`. Then check
+`verify.sql` for all five rows: `setChannel` PATCHes by key, so a missing row is
+a `200` with an empty body, and that channel would sit at the bottom rung for
+ever, looking like one he has never used.
 
-### Applying 005, and the wiring it needs
+**005, the senses and meters**, is the file meant to grow, so every statement is
+`if not exists`, `or replace` or `on conflict do nothing`, and a test asserts it.
+**Being re-runnable means it may not undo a later file**: `eugenia_search` is
+007's alone, since re-creating 005's old signature beside it would be an
+ambiguous overload executable by `anon` — granted by name through the schema's
+defaults, which `revoke ... from public` does not touch. A test reads every
+re-runnable file against every later `drop`. Three things outside the SQL move
+with it, and none fails loudly:
 
-`005_eugenia_senses.sql` is the senses, the meters and the compounding half. It
-is **safe to re-run in full** — every statement is `if not exists`, `or replace`
-or `on conflict do nothing` — which `003` deliberately is not, because this is
-the file that will grow. A test asserts that: a bare `create table` or
-`create index` in it would refuse on the second run.
+- **Two quarter-hourly jobs in `004_cron.sql`**: `doji-eugenia-spine` calling
+  `?release=1`, and `doji-eugenia-price` calling `?move=1`, offset from each
+  other because the two read the calendar for opposite purposes. Without the
+  price job the mark never advances, which reads as a market that has not moved.
+- **The webhook must allow `callback_query`**: re-register with
+  `allowed_updates = ["message", "callback_query"]`, or the taps under a
+  briefing are never delivered.
+- **The optional secrets.** Unset, each capability is simply absent — she says
+  she cannot hear, the text goes, the search is lexical:
 
-**Being re-runnable also means it may not undo a later file**, which is the half
-that has already been wrong once. 005 carried the two-argument `eugenia_search`
-until `007` dropped that signature to make room for the query vector, and
-re-applying 005 afterwards would have put the old function back *beside* the new
-one — an ambiguous two-argument call, and a bare `create` taking `execute` from
-the schema's default privileges, which Supabase grants to `anon` and
-`authenticated` by name. The `revoke ... from public` sitting under it does not
-touch either. Nothing would have failed; the file applies cleanly and the damage
-is a privilege nobody asked about. The function is 007's alone now, 005 keeps
-only the extension and the two trigram indexes it still owes it, and a test
-reads every re-runnable file against every `drop` a later one makes.
+  ```sh
+  supabase secrets set STT_KEY=<key> STT_URL=https://api.openai.com/v1/audio/transcriptions
+  supabase secrets set STT_MODEL=whisper-1     # optional, the default
+  supabase secrets set TTS_KEY=<key>
+  supabase secrets set EMBED_KEY=<key>
+  ```
 
-Three things outside the SQL have to move with it, and none of them fails loudly:
+**006, the plan columns.** Deployed first, the poller's filtered PATCH is a `400`
+and no plan is stored, while the deals keep landing. `planned` in the poller's
+answer counts rows written, so it reads `0` both on a healthy poll and on a
+missing column — `verify.sql`'s **`trades has its plan columns`** row is the
+check.
 
-**The event spine needs its own cron job.** `004_cron.sql` gains a
-quarter-hourly `doji-eugenia-spine` calling `?release=1`. It is a second job
-rather than a faster one because the four hourly predicates all test `hour ===`
-— a `*/15` on the existing job would run four briefings every morning. It is
-offset off the hour so it never collides with the 08:00 briefing.
-
-**The price sense needs the second quarter-hourly job.** `004_cron.sql` gains
-`doji-eugenia-price` calling `?move=1`, offset from the spine rather than sharing
-its minutes: the two read the same calendar table for opposite purposes — the
-spine for a print to look at, this for a print that would *explain* a move — and
-running them together would have one deciding nothing explains it in the same
-second the other is writing what does. Without the job the mark never advances,
-which reads from every other surface as a market that has not moved.
-
-**The webhook has to allow `callback_query`.** Re-register with
-`allowed_updates = ["message", "callback_query"]`, or the taps under a briefing
-are never delivered, the button spins, and nothing reports it.
-
-**Four optional secrets, and one key serves all of them.** `STT_URL`/`STT_KEY`
-enable hearing a voice note, `TTS_URL`/`TTS_KEY` enable answering in one, and
-`EMBED_KEY` enables semantic search. Unset, each capability is simply absent —
-she says she cannot hear, she answers in text, the search is lexical — and
-everything else is unaffected, which is why none of them is in the boot guard.
-An exemption from that guard is not free: each has to be guarded where the
-secret is *used*, and a test holds all three to it.
-
-```sh
-supabase secrets set STT_KEY=<key> STT_URL=https://api.openai.com/v1/audio/transcriptions
-supabase secrets set TTS_KEY=<key>
-supabase secrets set EMBED_KEY=<key>
-```
-
-```sh
-supabase secrets set STT_URL=https://<provider>/v1/audio/transcriptions
-supabase secrets set STT_KEY=<key>
-supabase secrets set STT_MODEL=whisper-1     # optional, defaults to whisper-1
-```
-
-`verify.sql` answers whether every table, trigger, policy, index and function
-the numbered files declare is actually there, which is the half no test in the
-repository can reach — and what it asks about is derived from those files by
-`agree.test.mjs` rather than typed here, so a number in this paragraph would go
-stale on the release that adds a row while the file itself stayed right. Read
-the count in its own header and the `ok` column in its grid. Several of its
-rows have been wrong that way already: it counted the cron jobs a mismatch on a
-correct database from the day the spine was added, and it named three triggers
-on `trades` while five existed, which is the worst thing a check can do.
-
-### Applying 006, which is two columns and one view
-
-`006_plan.sql` adds `planned_sl` and `planned_tp` to `trades` and appends them to
-`eugenia_trades`. It is **safe to re-run**: both alters are `if not exists` and
-the view statement appends rather than reorders. Nothing outside the SQL moves
-with it — the poller writes the columns the moment it is deployed, and the app
-never names them.
-
-**Deploying the poller before running this file is the failure to watch for.**
-The plan write is a PATCH filtered on `planned_sl=is.null`, so against a table
-without the column PostgREST answers `400` and nothing is stored. It does not
-take the poll down — the deals are why that function exists and they are written
-by the time this runs — so the fills keep landing and the only sign is a line in
-an Edge log nobody reads.
-
-**`planned` in the poller's answer is not that sign, and used to be read as
-one.** It counts rows written rather than calls made, so on a healthy run with a
-position whose plan was recorded hours ago it is `0` — the same `0` the missing
-column produces. That is the right trade: counting calls made it `1` every two
-minutes, which a working filter, a filter that had stopped filtering, and a row
-the upsert had not yet reached all produced alike, so the meter could not see
-the failure it sits beside. What it reports now is `1` exactly once per position,
-on the poll that first sees it, and `1` on every poll only if the arbitration has
-broken.
-
-So the check for whether this file has been applied is `verify.sql`'s **`trades
-has its plan columns`** row, which asks the database directly. That is what
-`verify.sql` is for.
-
-### Applying 007, and the one call you have to repeat
-
-`007_semantic.sql` adds `pgvector`, an `embedding` column and an HNSW index to
-each of her two memories, and replaces `eugenia_search` with the two-armed
-version. **Safe to re-run**: the alters and indexes are `if not exists`, and the
-function is dropped before it is created rather than replaced in place — which
-it cannot be, since the query vector is a new argument.
-
-**It changes nothing until `EMBED_KEY` is set.** Unset, every write stores its
-row without a vector and the search runs exactly as it did.
-
-```sh
-supabase secrets set EMBED_KEY=<key>
-supabase secrets set EMBED_URL=https://api.openai.com/v1/embeddings   # optional, this is the default
-```
-
-**And it says why when it fills nothing.** `embed()` throws where the two write
-paths swallow it — a vendor failure must never cost a note or a turn, and the
-search still answers on words alone — but the door does not, because a door you
-run by hand and read the answer of is the one place a swallowed reason is
-indefensible. The first version replied `ok: true, filled: 0` to a missing
-credit, a key without the permission and a mistyped secret alike, with the reason
-written only to the Edge log this README already says nobody reads. The error now
-carries the vendor's own body, since those are three different repairs and a bare
-status sends you to the wrong one.
-
-**Then backfill, and keep calling until it says zero.** Every row written before
-this ran has a null embedding, which is invisible from the outside — the row is
-there, the search still answers, and that row simply never comes back from the
-semantic arm.
+**007, semantic search**, drops and recreates `eugenia_search` (its argument list
+changed). It changes nothing until `EMBED_KEY` is set (`EMBED_URL` is optional and
+defaults to the vendor's embeddings endpoint). Then backfill, calling until both
+tables report `left: 0`:
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-eugenia?embed=1" \
      -H "x-doji-key: $DOJI_CRON_SECRET"
 ```
 
-Each call fills fifty rows per table and answers `{"notes":{"filled":…,"left":…},
-"turns":{…}}`. No cron job calls it: the archive is a one-off, and the trickle a
-failed vendor call leaves behind is swept by the nightly pass, which already runs
-and already reads the day. A schedule of its own would be a job doing nothing
-every hour for the one night a year it had something to do.
+Each call fills fifty rows per table, newest first — a backlog drained oldest
+first returns last month before last week — and answers
+`{"notes":{"filled":…,"left":…},"turns":{…}}`. **It says why when it fills
+nothing**: `embed()` throws with the vendor's own body, since a missing credit, a
+key without permission and a mistyped secret are three repairs; the write paths
+swallow the same throw, so a vendor failure never costs a note or a turn. No
+cron job calls it: the nightly pass sweeps what a failed vendor call leaves, and
+writes a `caller: 'embeddings'` row either way. `sweepLine` parts the three
+states — a refusing vendor arrives as its own message, *nothing filled with a
+backlog waiting* means the key is unset, and a drained archive (`0 filled, 0
+left`) accuses nobody. `verify.sql` ends with the count still unembedded, which
+should fall to zero and stay there.
 
-**It drains newest first, which is the same decision the day's window got wrong.**
-The sweep took `id.asc`, and since the backlog empties either way that looked
-like a choice with no consequence — exactly how `order=id.asc&limit=200` looked
-on the nightly turns. It was also the one read the bounded-read test could not
-see, because it reads `rest/v1/${table}` for two tables through one function and
-that test named its subjects; it matches whatever stands before the `?` now. The consequence is *when*: at fifty rows a night, a vendor
-outage that left a fortnight without vectors became searchable oldest-first, so
-last month's archive came back before last week's conversation and the rows he is
-likeliest to ask about arrived last.
+**012, `best_price`.** Deployed first, the measuring read names the column, the
+step gives way, `excursions` reads `0` and R-04 is `unknown` on every trade —
+which looks like a journal with nothing to check. Once applied the backlog fills
+itself, three trades a poll.
 
-`verify.sql` ends with the count that matters — how many rows in each table are
-still without an embedding. It should fall to zero and stay there. A number that
-climbs day after day means the key is unset or the vendor is refusing.
+**014, `trade_stops`.** Forward only: a closed trade has no stop history and
+R-19 reads it `unknown`. Deployed first, `stops` reads `0`.
 
-**And the nightly sweep now says which, without being asked.** It writes a
-`caller: 'embeddings'` row to `eugenia_runs` on both outcomes, and the three
-states it has to part are three different repairs. A vendor that refuses throws,
-so it arrives as its own message. An unset key does not throw — `embed()` returns
-null and the rows are left exactly where they were — so *nothing filled with a
-backlog still waiting* is an exact statement about the key rather than a guess,
-and `sweepLine` says it in those words. A drained archive answers `0 filled, 0
-left` and accuses nobody, which is the false alarm that would otherwise fire
-every night for the life of the deployment.
+**015, commitments**, recreates the `kind` check with `commitment`. Deployed
+first, a commitment she records is refused and she says it did not save.
 
-Until this the whole account of a dead embedding vendor was a `console.error` in
-a log nobody reads, while `eugenia_search` carried on answering off its lexical
-arm and looked perfectly healthy. Half of `search_memory` could have been gone
-for a fortnight with nothing anywhere to say so.
-
-### Applying 012, which is one column and one view
-
-`012_excursion.sql` adds `best_price` to `trades` and appends it to
-`eugenia_trades`. **Safe to re-run**, for 006's reasons: the alter is `if not
-exists` and the view statement appends rather than reorders.
-
-**Deploying the poller before running this file is the failure to watch for**,
-and it is quieter than 006's. The read that picks which trades to measure names
-`best_price` in its filter, so against a table without the column PostgREST
-answers `400`, the step logs and gives way, and the poll carries on — the deals
-land, `excursions` reads `0`, and R-04 comes back `unknown` on every trade, which
-looks exactly like a journal with nothing to check. `verify.sql`'s **`trades has
-its best_price column`** row is what says which.
-
-Once it is applied the backlog fills itself at three trades every two minutes.
-`excursions` in the poller's answer counts rows written, for `planned`'s reason,
-and reads `0` once every trade that can be measured has been.
-
-### Applying 015, which is his commitments
-
-`015_commitments.sql` recreates the check on `eugenia_notes.kind` with a third
-word, `commitment`. **Safe to re-run.** Deploying the function first costs one
-thing: a commitment she tries to record is refused by the old constraint, and she
-tells him it did not save — so run the file first. `verify.sql`'s **`eugenia_notes
-accepts a commitment`** row is what says which.
-
-### Applying 014, which is the stop history
-
-`014_stops.sql` creates `trade_stops`. **Safe to re-run.** It looks forward only:
-every trade already closed has no history and R-19 reads it `unknown`, as it does
-any position whose first recorded stop is later than the print it is judged at.
-Deploying the poller first costs the same way the plan did — the read is a `400`
-the step swallows, and `stops` in the poller's answer reads `0`.
-
-### Applying 019, which is the weeks R-14 can judge
-
-`019_calendar_weeks.sql` creates `calendar_weeks` and drops Forex Factory's two
-tables and its function. **Safe to re-run.** R-14 answers `unknown` on every trade
-until a week is marked, so run the history door once from his first trade.
-`select min(open_day) from trades` gives the date:
+**019, the weeks R-14 can judge**, creates `calendar_weeks` and drops Forex
+Factory's tables. R-14 is `unknown` on every trade until a week is marked, so run
+the history door once from his first trade (`select min(open_day) from trades`):
 
 ```sql
 select net.http_get(
@@ -2334,28 +2192,16 @@ select net.http_get(
 ) as request_id;
 ```
 
-Each week lands as a `calendar week` row in `eugenia_runs`, with how many
-releases it filed, or why it could not. A history longer than two years, or a
-walk that met TradingView's refusal twice running, is a second run from the
-week its last row names.
+Each week lands as a `calendar week` row in `eugenia_runs`; a longer history, or
+a walk stopped by two refusals, is a second run from the week its last row names.
 
-### Applying 020, which is each release's series
+**020, each release's series**, adds `ticker`. Rows filed before it carry none
+until re-filed, so walk the history door from a year back and the release look
+has a year of each series behind it.
 
-`020_calendar_ticker.sql` adds `ticker` to `eugenia_calendar` and the index the
-track record reads. **Safe to re-run.** Rows filed before it carry no ticker
-until a filing writes them again, and the history door re-files every week it
-walks. So walk it from a year back, `?history=` with a date twelve months ago,
-and the release look has a year of each series behind it from the next print
-on.
-
-### Applying 021, which drops the calendar's key by name
-
-`021_calendar_name_key.sql` drops `eugenia_calendar_unique`, the `(at, name)`
-key 005 carried from the days she typed the calendar in. **Safe to re-run.**
-Since 018 one release is one row by TradingView's id, and nothing writes by name.
-The old key could only refuse. A filing goes up as one bulk insert, so one row
-colliding with a name she typed long ago would be refused with every row beside
-it. That would recur every quarter hour, and the calendar would stop moving.
+**021** drops `eugenia_calendar_unique`, the `(at, name)` key from the days she
+typed the calendar. Nothing writes by name now, and one row colliding with an old
+name would refuse a whole bulk filing every quarter hour.
 
 ### Programmatic tool calls need their container
 
