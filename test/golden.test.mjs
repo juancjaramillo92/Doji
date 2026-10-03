@@ -1,70 +1,39 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — the golden snapshot
    ───────────────────────────────────────────────────────────────────────────
-   THE OTHER FOUR SUITES ASSERT ON NAMED THINGS. This one asserts on everything
-   else. A refactor does not break the thing a test was written about — it
-   breaks an attribute nobody named, a label whose whitespace collapsed, a class
-   that stopped being emitted, a derived value something renders and nothing
-   asserts. Those are the defects whose answer to "when would this have been
-   noticed" is never, and they are exactly what a rewrite-in-disguise leaves
-   behind.
-
-   So: boot the real page against a fixed fixture set on a frozen clock, and
-   write down every derived value AND the rendered markup of every panel. The
-   file beside this one is that record. It is not a description of correct
-   behaviour — it is a description of CURRENT behaviour, which is a different
-   and more useful thing while refactoring: any diff at all means the change was
-   not behaviour-preserving, whether or not the new behaviour is better.
+   THE OTHER SUITES ASSERT ON NAMED THINGS; THIS ONE ASSERTS ON EVERYTHING
+   ELSE. A refactor breaks what nobody named — an attribute, a label whose
+   whitespace collapsed, a class that stopped being emitted, a derived value
+   something renders and nothing asserts. So: boot the real page against fixed
+   fixtures on a frozen clock, and record every derived value AND every panel's
+   markup. golden.json is CURRENT behaviour, not correct behaviour: any diff
+   means the change was not behaviour-preserving, better or not.
 
    ── Reading a failure ──────────────────────────────────────────────────────
-   A diff here is one of three things, and they are not equally welcome:
-
      1. A refactor that changed behaviour. It is not a refactor. Split it.
-     2. A deliberate behaviour change. Then the golden file is regenerated in
-        the SAME commit as the code, and the commit message says what moved and
-        why. This is the only legitimate way the file changes.
-     3. The snapshot itself became non-deterministic. That is a defect in this
-        file, not in the app, and it is the one that quietly destroys the whole
-        instrument — see the hazard below.
+     2. A deliberate behaviour change. Regenerate in the SAME commit, and the
+        message says what moved and why — the only legitimate way it changes.
+     3. The snapshot became non-deterministic: a defect in this file, and the
+        one that quietly destroys the instrument.
 
-   ── The hazard, stated so it cannot be forgotten ───────────────────────────
-   A GOLDEN FILE REGENERATED WHENEVER IT FAILS IS WORSE THAN NO GOLDEN FILE.
-   It costs the same to run, it reports green, and it proves nothing — while
-   reading as though something is being checked. Regenerating is a deliberate
-   act with a written reason:
+   A GOLDEN FILE REGENERATED WHENEVER IT FAILS IS WORSE THAN NONE: it reports
+   green and proves nothing. Regenerating is a deliberate act with a reason:
 
        GOLDEN=write npm test
 
-   ── Attribute order: decided deliberately ──────────────────────────────────
-   §0.1 of the framework asks whether reordering two attributes in a template
-   should be red. IT SHOULD, and this file makes it so, because the markup is
-   captured verbatim. The reasoning: the app builds HTML by string template, so
-   attribute order is something an author typed rather than something a
-   serialiser chose — there is no such thing here as an incidental reordering.
-   Making it visible costs one line in a diff that is trivially read and waved
-   through; making it invisible means the snapshot cannot see template edits at
-   all, which is most of what the client is. Red, then reclassified by a human.
+   ATTRIBUTE ORDER IS RED, deliberately. The app builds HTML by string
+   template, so attribute order is something an author typed; hiding it would
+   hide template edits, which are most of what the client is.
 
    ── What this cannot see ───────────────────────────────────────────────────
-   Pixels. It holds the markup and the class names, so a rule that stops being
-   emitted is caught and a rule whose COLOUR changed is not. Every CSS move
-   still needs a device pass, and says so.
-
-   AND TWO OF `esc`'s FIVE REPLACEMENTS, for a reason worth knowing before
-   trusting a green run here. The capture is `innerHTML`, which is the DOM
-   RE-SERIALISED rather than the string the app built: `&`, `<` and `>` come
-   back escaped because a serialiser must escape them in text, and `"` and `'`
-   come back literal because it must not. So `esc` losing its quote handling is
-   invisible in every text context, and visible in an attribute one only
-   because the attribute would break and change the parsed shape. That is not a
-   hole to be widened away — it is what innerHTML IS — so the two are held by
-   the direct test at the foot of this file instead.
+   Pixels: a class that stops being emitted is caught, a colour that changed is
+   not. And two of `esc`'s five replacements: the capture is `innerHTML`, the
+   DOM re-serialised, so `"` and `'` come back literal in text whatever the app
+   built. The direct test at the foot of this file holds those.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-// Before anything creates a Date. `Dates.fmt` parses `YYYY-MM-DDT12:00:00` as
-// LOCAL time and formats with toLocaleDateString, so the midday anchor absorbs
-// any offset inside ±12h — but the runner is not the place to find out that
-// somewhere is +13. Pinned rather than relied upon.
+// Before anything creates a Date. The midday anchor absorbs any offset inside
+// ±12h, but the runner is not the place to find a +13. Pinned.
 process.env.TZ = 'UTC';
 
 import { test } from 'node:test';
@@ -76,30 +45,21 @@ const GOLDEN = new URL('./golden.json', import.meta.url);
 const WRITE  = process.env.GOLDEN === 'write';
 
 /* ─── The clock ──────────────────────────────────────────────────────────────
-   Thursday 30 July 2026, 14:00 in New York. Chosen rather than arbitrary: it is
-   a weekday inside the trading week, so the week and month windows both hold
-   rows and both have a populated predecessor; it is mid-afternoon in New York,
-   which puts it inside the London+NY overlap so the session logic is exercised
-   at a boundary rather than in the middle of a quiet one; and it is a Thursday,
-   so `weekStart` counts back over a plain run of days rather than through the
-   Sunday-before-17:00 special case, which `fold.test.mjs` already drives.
+   Thursday 30 July 2026, 14:00 in New York: inside the trading week, so the
+   week and month windows and their predecessors all hold rows; inside the
+   London+NY overlap; and a Thursday, so `weekStart` counts back over plain days
+   rather than through the Sunday-before-17:00 case fold.test.mjs drives.
    ─────────────────────────────────────────────────────────────────────────── */
 const NOW = '2026-07-30T18:00:00.000Z';
 
 /* ─── The fixture set ────────────────────────────────────────────────────────
-   Built to cover the derived space rather than to look like a real month. Every
-   row below is here because it is the ONLY row that reaches some branch:
-
-     a win, a loss, and both kinds of scratch — the price band and exact zero,
-     which are separate rules in resultOf and part on a trade that moved and
-     came back; a row with no P&L at all, which is absent from the win rate
-     rather than counted as a loss; an open position, which is BOTH fill_time
-     and balance null and nothing else; a journalled row and an unjournalled
-     one, so `pending` and the broker banner both have something to say; a
-     deleted row, which must appear in no render; rows in each session; both
-     setups; last week and last month, so the P&L card's four comparisons are
-     not all reading the same rows; and a row whose P&L came from net_pnl beside
-     one that fell back to computed_pnl.
+   Built to cover the derived space, not to look like a real month. Each row is
+   the ONLY one reaching some branch: a win, a loss, both kinds of scratch (the
+   price band and exact zero); a row with no P&L, absent from the win rate
+   rather than a loss; an open position; journalled and unjournalled rows; a
+   deleted row, which must appear in no render; every session; both setups;
+   last week and last month for the P&L card's comparisons; and net_pnl beside
+   the computed_pnl fallback.
    ─────────────────────────────────────────────────────────────────────────── */
 const FIXTURES = [
   // ── This week (Mon 27th – Thu 30th July 2026) ────────────────────────────
@@ -118,9 +78,9 @@ const FIXTURES = [
           balance: 10030.22, size_oz: 2, setup: 'Support & Resistance',
           followed_rules: false, followed_sl: false, followed_tp: true }),
 
-  // A SCRATCH BY PRICE: it moved $2.10, inside CONFIG.BE, but made $18.40.
-  // The label is 'be' and the money still flows into gross profit — which is
-  // the single thing that keeps profit minus loss equal to net.
+  // A SCRATCH BY PRICE: it moved $2.10, inside CONFIG.BE, but made $18.40. The
+  // label is 'be' and the money still flows into gross profit — which keeps
+  // profit minus loss equal to net.
   trade({ id: 'P-003', open_day: '2026-07-29', entry_time: '2026-07-29T13:00:00.000Z',
           fill_time: '2026-07-29T13:40:00.000Z', direction: 'BUY',
           entry_price: 3450, exit_price: 3452.1, pnl: 18.4, net_pnl: 18.4,
@@ -151,8 +111,8 @@ const FIXTURES = [
           computed_pnl: null, size_oz: 2, commission: null,
           setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: true }),
 
-  // DELETED. It must appear in nothing below — not a figure, not a cell, not a
-  // row of the log — and it is the only way to notice if the filter is dropped.
+  // DELETED. It must appear in nothing below, and it is the only way to notice
+  // the filter being dropped.
   trade({ id: 'P-007', open_day: '2026-07-28', entry_time: '2026-07-28T15:00:00.000Z',
           fill_time: '2026-07-28T15:30:00.000Z', pnl: 999.99, net_pnl: 999.99,
           entry_price: 3400, exit_price: 3500, balance: 99999, deleted: true,
@@ -174,30 +134,23 @@ const FIXTURES = [
           computed_pnl: null, balance: 9975.4, size_oz: 1,
           setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: true }),
 
-  /* ── The three below were added because the mutation matrix said they were
-        missing, which is the only reason a fixture should ever be added ──── */
+  /* ── Each of the three below exists because a planted defect stayed green
+           without it ────────────────────────────────────────────────────────── */
 
-  // STRADDLES THE SCRATCH BAND. It moved exactly $4.00, so it is a win at
-  // CONFIG.BE = 3 and a scratch at 5. Without it every fixture sat well inside
-  // or well outside the band, and moving BE changed nothing on screen — the
-  // snapshot was green on a mutation that redefines what a scratch IS.
+  // STRADDLES THE SCRATCH BAND. It moved exactly $4.00: a win at CONFIG.BE = 3
+  // and a scratch at 5. Without it, redefining what a scratch IS changed nothing
+  // on screen.
   trade({ id: 'P-012', open_day: '2026-07-21', entry_time: '2026-07-21T13:15:00.000Z',
           fill_time: '2026-07-21T13:55:00.000Z', direction: 'BUY',
           entry_price: 3400, exit_price: 3404, pnl: 7.5, net_pnl: 7.5,
           balance: 9982.9, size_oz: 1, setup: 'Break & Retest',
           followed_rules: true, followed_sl: true, followed_tp: true }),
 
-  /* A SCALP TAKEN WHILE A SWING IS OPEN, and the pair exists to give the two
-     time columns different opinions about order. P-013 is entered first and
-     closed last; P-014 is entered second and closed first. `sortKey` prefers
-     entry_time and falls back to fill_time, so swapping that preference
-     reorders these two and nothing else — with every other fixture on its own
-     day, the preference was unobservable and the snapshot passed a mutation to
-     the ordering rule.
-
-     This is the audit's own blind spot arriving again: a sort proved by rows
-     that could not disagree. Any fixture set for an ordering rule needs two
-     rows that ORDER DIFFERENTLY under the two candidate keys. */
+  /* A SCALP TAKEN WHILE A SWING IS OPEN. P-013 is entered first and closed
+     last; P-014 entered second and closed first. `sortKey` prefers entry_time and
+     falls back to fill_time, so swapping that preference reorders these two and
+     nothing else. An ordering rule needs two rows that ORDER DIFFERENTLY under
+     the candidate keys, or no fixture can see it. */
   trade({ id: 'P-013', open_day: '2026-07-23', entry_time: '2026-07-23T14:00:00.000Z',
           fill_time: '2026-07-23T19:45:00.000Z', direction: 'BUY',
           entry_price: 3410, exit_price: 3427.3, pnl: 33.9, net_pnl: 33.9,
@@ -227,17 +180,10 @@ const FIXTURES = [
 
 // Eugenia's three reads behind the watch card. Fixed like everything else — the
 // card is markup the client owns, however the rows got there.
-/* THE ONLY UNTRUSTED TEXT THE CLIENT RENDERS, and the fixtures say so. The
-   trade columns come from a broker and a fixed setup vocabulary; these three
-   tables are written by a model that reads the web, so `thesis` and a loop
-   `body` are the two strings on this page whose content nobody chose. They are
-   escaped at eleven of `esc`'s eighteen call sites and one of those is an
-   attribute context.
-
-   The characters below are here because the mutation matrix found `esc` with no
-   coverage at all — deleting its `"` replacement outright was green across all
-   447 tests. A fixture of well-behaved prose cannot see that: escaping is only
-   observable on input that needs escaping. */
+/* THE ONLY UNTRUSTED TEXT THE CLIENT RENDERS. These tables are written by a
+   model that reads the web, so `thesis` and a loop `body` are the strings on
+   this page whose content nobody chose. Escaping is only observable on input
+   that needs escaping, so the fixture carries every character `esc` replaces. */
 const HOSTILE = `<script>alert("x")</script> & 'quotes' "double" <b>`;
 
 const DESK = {
@@ -253,16 +199,14 @@ const DESK = {
 };
 
 /* ─── What gets written down ─────────────────────────────────────────────────
-   Two halves. The derived half is every value the app computes and something
-   downstream depends on; the markup half is what a human would actually see.
-   Both, because either alone has a blind spot: the derived values would miss a
-   template that stopped emitting a class, and the markup would miss a figure
-   that is right on screen and wrong in the object the export reads.
+   Derived values AND markup, because each alone has a blind spot: the values
+   miss a template that stopped emitting a class, the markup misses a figure
+   right on screen and wrong in the object the export reads.
    ─────────────────────────────────────────────────────────────────────────── */
 
-// Every panel the client renders, by the id it renders into. innerHTML rather
-// than textContent: the class names ARE the behaviour here — a result colour, a
-// pending flag and a today marker are all classes and nothing else.
+// Every panel, by the id it renders into. innerHTML rather than textContent:
+// a result colour, a pending flag and a today marker are classes and nothing
+// else.
 const PANELS = [
   'broker-banner', 'pnl-net-number', 'pnl-net-count', 'pnl-gross-profit',
   'pnl-gross-loss', 'pnl-week-cur', 'pnl-week-prev', 'pnl-month-cur',
@@ -273,19 +217,12 @@ const PANELS = [
 ];
 
 /* ─── The session map, swept rather than sampled ─────────────────────────────
-   `sessionOf` is four market windows and a precedence order, and every one of
-   those is a table of hours that DST moves twice a year — on different dates in
-   New York and London. The three weeks where the two are out of step are where
-   the London+NY overlap shifts by an hour, and they are the only place a wrong
-   boundary shows up as a wrong session rather than as nothing at all.
-
-   Spot-checked, that is invisible: a test that asks about 14:00 on a Tuesday in
-   July gets the same answer under almost any plausible mistake. So this walks
-   the clock and records the TRANSITIONS — the instant each session gives way to
-   the next — which is the whole content of the rule in a form a human can read
-   in a diff. The windows below are chosen, not arbitrary: both US changeovers,
-   both EU ones, and one ordinary week from each half of the year to prove the
-   steady state has not moved either.
+   Every market window is a table of hours DST moves twice a year, on different
+   dates in New York and London. In the weeks the two are out of step the
+   London+NY overlap shifts by an hour, and a spot check at 14:00 on a Tuesday
+   in July passes almost any mistake there. So this walks the clock and records
+   the TRANSITIONS, over both US changeovers, both EU ones, and one ordinary
+   week from each half of the year.
    ─────────────────────────────────────────────────────────────────────────── */
 const SWEEPS = [
   ['us-spring',  '2026-03-07', 4],   // US forward 8 Mar; EU has not yet
@@ -354,9 +291,7 @@ function capture({ app, $, win, charts }) {
     weekStart: wk, monthStart: mo, lastClose: A.Dates.lastClose(),
   };
 
-  // Both indexes: the keys and, for byDay, the whole per-day object. `index()`
-  // builds them in one pass and every render reads them, so a change here is a
-  // change everywhere at once.
+  // Both indexes, whole: every render reads them.
   const indexes = {
     byId:  [...A.Data.byId.keys()].sort(),
     byDay: Object.fromEntries([...A.Data.byDay.entries()].sort()
@@ -367,17 +302,15 @@ function capture({ app, $, win, charts }) {
   const panels = {};
   for (const id of PANELS) {
     const el = $(id);
-    // A panel that vanished is recorded as absent rather than skipped — the
-    // difference is the whole point on a refactor that renames an id.
+    // A panel that vanished is recorded as absent rather than skipped, which is
+    // the point on a refactor that renames an id.
     panels[id] = el === null ? null
       : { display: el.style.display || '', html: el.innerHTML };
   }
 
-  /* THE CHARTS ARE THE HALF NOTHING ELSE CAN SEE. A canvas has no markup, so
-     five wheels and the equity curve would be a blank in a markup snapshot. The
-     stub records what the renderers ASKED for, which is the app's half of the
-     contract and the only half it owns. Options are not captured — they hold
-     functions, and Chart.js's own defaults are not this app's behaviour. */
+  /* THE CHARTS ARE THE HALF NOTHING ELSE CAN SEE: a canvas has no markup. The
+     stub records what the renderers ASKED for, the half of the contract the app
+     owns. Options are not captured — they hold functions. */
   const drawn = charts.map(c => ({
     type: c.config?.type ?? null,
     labels: c.data?.labels ?? null,
@@ -387,17 +320,10 @@ function capture({ app, $, win, charts }) {
     })),
   }));
 
-  /* THROUGH JSON, AND NOT AS A CONVENIENCE. Every object above was built inside
-     the jsdom realm — `counts()` returns a jsdom object, not a Node one — and
-     `deepStrictEqual` compares prototypes, so two boots of identical fixtures
-     compare unequal while every value in them matches. The determinism test
-     below found exactly that, which is the whole reason it exists.
-
-     It is also the honest comparison rather than a way around the symptom: the
-     golden file IS JSON, so what a run must match is what survives the round
-     trip. Anything that does not — an undefined, a Map, a function — would be
-     absent from the file and present in the capture, and would have compared
-     unequal against the file for ever. */
+  /* THROUGH JSON, AND NOT AS A CONVENIENCE. Every object here was built in the
+     jsdom realm and `deepStrictEqual` compares prototypes, so two identical boots
+     would compare unequal. And golden.json IS JSON, so what survives the round
+     trip is what a run must match. */
   return JSON.parse(JSON.stringify(
     { clock, derived, aggregates, sessions: sweepSessions(A), indexes, panels,
       charts: drawn }));
@@ -408,10 +334,9 @@ test('the client renders the fixture set exactly as it is written down', async (
   try {
     for (const [name, rows] of Object.entries(DESK)) h.db.tables[name] = rows;
 
-    // Seeded the way a landed fetch leaves it: `all` is everything including
-    // the deleted row, `rows` is what renders. The harness's own seed() sets
-    // both to one array, which would put the deleted row on screen and quietly
-    // make the fixture that exists to catch that unable to.
+    // Seeded the way a landed fetch leaves it: `all` includes the deleted row,
+    // `rows` is what renders. The harness's seed() sets both to one array, which
+    // would put the deleted row on screen.
     h.app.Data.all  = FIXTURES;
     h.app.Data.rows = FIXTURES.filter(t => !t.deleted);
     h.app.Data.index();
@@ -423,8 +348,8 @@ test('the client renders the fixture set exactly as it is written down', async (
 
     if (WRITE) {
       writeFileSync(GOLDEN, JSON.stringify(shot, null, 2) + '\n');
-      // Not a silent pass: a run that WROTE the file has checked nothing, and
-      // saying so is what stops `GOLDEN=write` becoming the way it is always run.
+      // A run that WROTE the file has checked nothing, and says so — or
+      // `GOLDEN=write` becomes the way it is always run.
       console.log('golden.json rewritten — this run asserted nothing');
       return;
     }
@@ -439,15 +364,15 @@ test('the client renders the fixture set exactly as it is written down', async (
         `if this was a refactor, it changed behaviour and is not a refactor`);
     }
 
-    // Panels one at a time and by name: a whole-object compare on twenty-five
-    // panels of markup prints a diff nobody reads.
+    // Panels one at a time and by name: a whole-object diff of twenty-five panels
+    // of markup is one nobody reads.
     for (const id of PANELS) {
       assert.deepEqual(shot.panels[id], want.panels[id],
         `#${id} does not render what golden.json records`);
     }
 
-    // Caught last, and deliberately: the loop above cannot see a panel that was
-    // ADDED to PANELS without the file being regenerated.
+    // Last, because the loop above cannot see a panel ADDED to PANELS without the
+    // file being regenerated.
     assert.deepEqual(Object.keys(shot.panels).sort(), Object.keys(want.panels).sort(),
       'the set of panels captured is not the set golden.json holds');
   } finally {
@@ -456,14 +381,10 @@ test('the client renders the fixture set exactly as it is written down', async (
 });
 
 /* ─── The snapshot has to be the same twice ──────────────────────────────────
-   A golden file that drifts on its own is the third failure mode in the header,
-   and it is the one that destroys the instrument rather than reporting on it:
-   it goes red for no reason, gets regenerated, and after two or three of those
-   nobody reads a red run here again. Two boots on the same frozen clock, from
-   the same fixtures, compared against each other — so a Map iterating in
-   insertion order, a Set, a timestamp or an unsorted key that got into the
-   capture is caught HERE, by a test about determinism, rather than showing up
-   next week as a mystery diff in a commit that touched nothing near it.
+   Drift is the failure that destroys the instrument: red for no reason,
+   regenerated, and after a few of those nobody reads a red run here. Two boots
+   compared against each other catch a Map, a Set, a timestamp or an unsorted
+   key HERE, rather than as a mystery diff next week.
    ─────────────────────────────────────────────────────────────────────────── */
 test('two boots of the same fixtures on the same clock capture the same thing', async () => {
   const run = async () => {
@@ -484,38 +405,30 @@ test('two boots of the same fixtures on the same clock capture the same thing', 
 });
 
 /* ─── The clock is frozen, and that is worth its own test ────────────────────
-   Everything above rests on it. If `now` stopped being honoured the whole file
-   would still pass on the day it was regenerated and fail every day after,
-   which reads as flakiness rather than as the harness having broken.
+   If `now` stopped being honoured the file would pass on the day it was
+   regenerated and fail every day after, reading as flakiness.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the frozen clock is the clock the app reads', async () => {
   const h = await boot({ now: NOW });
   try {
     assert.equal(h.win.Date.now(), Date.parse(NOW), 'Date.now() is not frozen');
     assert.equal(new h.win.Date().toISOString(), NOW, 'new Date() is not frozen');
-    // The other three forms have to keep working, or freezing the clock would
-    // silently break every date the app parses rather than the one it asks for.
+    // The other Date forms must keep working, or freezing the clock breaks every
+    // date the app parses.
     assert.equal(new h.win.Date('2026-01-02T03:04:05.000Z').toISOString(),
       '2026-01-02T03:04:05.000Z', 'new Date(iso) stopped parsing');
     assert.equal(h.win.Date.UTC(2026, 0, 2), Date.UTC(2026, 0, 2), 'Date.UTC is gone');
     assert.equal(h.win.Date.parse(NOW), Date.parse(NOW), 'Date.parse is gone');
-    // And the app's own reading of it, which is the value that actually decides
-    // which month the grid opens on.
+    // And the app's own reading of it, which decides the month the grid opens on.
     assert.equal(h.app.Dates.today(), '2026-07-30',
       'the app reads a different day from the one the clock was frozen to');
   } finally { h.close(); }
 });
 
 /* ─── `esc`, held directly, because the snapshot cannot hold all of it ───────
-   It guards eighteen call sites and had no test of any kind — deleting its `"`
-   replacement outright was green across all 447 tests, which is how this got
-   written. Eleven of those sites render text nobody chose: `eugenia_thesis`
-   and `eugenia_loops` are written by a model that reads the web, and the watch
-   card puts both on the page.
-
-   Driven both ways rather than asserted at: each replacement is checked, and
-   the input is checked to still contain the character being replaced, so a
-   fixture that quietly stopped carrying a `<` cannot pass this as a clean run.
+   Eleven of its call sites render text a model wrote off the web. Driven both
+   ways: each replacement is checked, and the input is checked to still carry
+   the character replaced, so a fixture that lost its `<` cannot pass clean.
    ─────────────────────────────────────────────────────────────────────────── */
 test('esc neutralises every character it claims to, in both contexts', async () => {
   const h = await boot({ now: NOW });
@@ -536,15 +449,12 @@ test('esc neutralises every character it claims to, in both contexts', async () 
     assert.equal(esc(null), '', 'esc(null) stopped being empty');
     assert.equal(esc(undefined), '', 'esc(undefined) stopped being empty');
 
-    /* THE ATTRIBUTE CONTEXT, DRIVEN RATHER THAN ASSERTED. `data-trade` is the
-       one attribute built from an escaped value, and the failure it prevents is
-       not a wrong string — it is a second attribute appearing, or the row
-       losing the id the trade log reads back on a click. So this parses the
-       markup and asks the DOM what it got, which is the only question that
-       matters and the one a string compare cannot ask. */
+    /* THE ATTRIBUTE CONTEXT, DRIVEN. `data-trade` is the one attribute built from
+       an escaped value, and the failure is a second attribute appearing or the row
+       losing the id a click reads back — so this asks the DOM what it parsed. */
     const nasty = `x" onclick="steal()" data-x="`;
-    // In a real table context: a bare <tr> inside a <div> is dropped by the
-    // HTML parser, which reads as esc failing and is nothing of the sort.
+    // In a real table: a bare <tr> inside a <div> is dropped by the HTML parser,
+    // which would read as esc failing.
     const el = h.win.document.createElement('div');
     el.innerHTML = `<table><tbody><tr data-trade="${esc(nasty)}"><td>c</td></tr></tbody></table>`;
     const row = el.querySelector('[data-trade]');
@@ -557,28 +467,16 @@ test('esc neutralises every character it claims to, in both contexts', async () 
   } finally { h.close(); }
 });
 
-/* ─── Two things in `session()` decide nothing, and that is now checked ──────
-   A mutation sweep found both: swapping the precedence of `London+NY` and
-   `Asia+London`, and dropping Sydney out of the `asia` term, each left every
-   test in the repository green — the golden sweep above included.
+/* ─── Two things in `session()` decide nothing, and that is checked ──────────
+   Walked at fifteen-minute resolution across 2026, `london && ny && asia` is
+   true at ZERO instants, so the order of those two branches is unobservable;
+   and Sydney is open without Tokyo at 5,112 instants but never while London is
+   open, so `M.sydney` cannot change what `session()` returns. The term stays:
+   it says any Asian centre is open, which is true of the world.
 
-   Neither is a coverage hole. Walked at fifteen-minute resolution across all of
-   2026, `london && ny && asia` is true at ZERO instants, so the order of those
-   two branches cannot be observed; and Sydney is open while Tokyo is shut at
-   5,112 of them but never once while London is open, so the only branch `asia`
-   reaches — `london && asia` — has the same value with Sydney and without it.
-   `M.sydney` cannot change what `session()` returns.
-
-   THAT MAKES THE SYDNEY TERM DEAD, and it is recorded here rather than deleted:
-   `MARKETS` is held against journal.ts by agree.test.mjs, so removing it is a
-   cross-runtime change and belongs in the dead-code pass with the rest, not in
-   a commit about test coverage.
-
-   What this test is for is the other direction. Both properties are accidents
-   of four hour-tables that DST moves twice a year, not decisions anyone wrote
-   down — so widening a window by an hour could make the precedence order start
-   deciding real answers, silently, in a commit about something else. Then this
-   goes red and says which of the two woke up.
+   Both are accidents of four hour-tables DST moves twice a year. Widening a
+   window could make either start deciding real answers in a commit about
+   something else — and then this goes red and says which woke up.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the two branches of session() that decide nothing still decide nothing', async () => {
   const h = await boot({ now: NOW });
