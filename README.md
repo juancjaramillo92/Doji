@@ -2017,187 +2017,87 @@ untrusted: his journal, and notes that are her sentences or his.
 
 ### When it breaks, she says so
 
-**The briefing went silent once and nothing reported it.** `pg_net` discards the
-function's response, `console.error` goes to logs nobody has open, and
-`net._http_response` is pruned within hours — so a briefing that died at 08:00
-was unrecoverable by lunchtime, and the way it surfaced was the trader noticing
-nothing had arrived. The cron half now sends a short Telegram message naming the
-error instead. Silence is the worst thing this system can do and it had three
-separate ways of doing it.
+**A failure must reach him, not the console.** `pg_net` discards the function's
+response, nobody reads Edge logs, and `net._http_response` is pruned within
+hours, so the cron half sends a short Telegram message naming the error. **The
+apology names the job that died** — `APOLOGY` is a word per job, and a test
+asserts no two are alike — because a nightly pass that dies is her memory not
+growing, not a missing briefing.
 
-**A read that fails does not take the briefing with it.** `get_trades`,
-`search_memory`, `remember` and `set_channel` all run inside the tool loop,
-where an exception ends the turn outright: the model has asked a question and
-there is no answer to hand back. So each of them catches and returns a sentence
-instead — *his journal could not be read just now*, *your memory could not be
-searched* — and she writes around the gap and says what she could not see. The
-morning `eugenia_trades` was dropped and not rebuilt, the journal read threw
-rather than answering, and a failure that cost only the trades cost the whole
-day: four apologies, one an hour, and no briefing at all.
+**A read that fails does not take the turn with it.** Everything the tool loop
+serves — `get_trades`, `search_memory`, `remember`, `set_channel` and the rest —
+catches and returns a sentence (*his journal could not be read just now*), and
+she writes around the gap; an exception there would end the turn with a question
+unanswered. **The sentence matters as much as the catch**: *no trades in that
+window* from a window nothing looked at is a false statement about his own week,
+in her voice. An empty answer is an answer only when something was read.
 
-**The sentence matters as much as the catch.** A read that comes back *no trades
-in that window* from a window nothing looked at is a briefing telling him he has
-not traded since Friday — a false statement about his own week, in her voice,
-with nothing anywhere reporting that the read never happened. An empty answer is
-only an answer when something was actually read.
+**A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
+at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the
+22:00 pass — and stops once one has landed. `retryDue` answers **which**
+briefing, so a retry sends the shape the failed one would have. At 10:00 the
+retry takes the pulse's hour. `briefedToday()` reads the marker `postBriefing`
+stores *before* the send, so a failed insert cannot produce four briefings and
+four bills, and a read failure counts as *already briefed*. `briefedQuery()`
+filters on the two marker strings rather than scanning recent turns, which a
+talkative morning would crowd the marker out of.
 
-**A failed briefing tries again**, at 09:00, 10:00 and 11:00 ET — and on a
-Sunday at 18:00, 19:00 and 20:00, the same three hours after its own 17:00 open —
-and stops the moment one has landed. `briefedToday()` reads the marker `postBriefing` stores
-— written *before* the send, so it exists whenever a briefing was generated. The
-generation is the expensive half, and a marker written after it would let a
-failed insert produce four briefings and four bills. A read failure counts as
-*already briefed* for the same reason: if the database is unwell the retry
-cannot check, and a second briefing sent on a guess is worse than a skipped one.
+**`?force=1` falls back to the day, not a constant**: `briefDue(now) ??
+briefKind(now)`, so the door for the hour a briefing did *not* arrive can send a
+Sunday one on Sunday evening. `briefKind` is driven from both sides, and
+`agree.test.mjs` reads `postScheduled` for the call.
 
-**The database finds the marker; nothing scans a window of turns for it.**
-`briefedQuery()` filters on the two marker strings and returns one row, because
-the obvious alternative — read the last thirty user turns and look for it among
-them — is correct on a quiet morning and wrong on a talkative one. Thirty
-messages between 08:00 and 09:00 push the marker out of that window, the retry
-concludes nothing was sent, and generates and delivers a second briefing: a
-dozen searches at `high` effort, and a duplicate he did not ask for. A filter on
-the marker itself cannot be crowded out by whatever was said around it.
+**Everything a cron secret reaches answers before it works.** Two limits: the
+worker's wall clock (150s free, 400s paid) and a **request idle timeout of 150s
+on every plan** — send the caller nothing that long and the request is closed, so
+a briefing that delivers perfectly still hands pg_net a `504 IDLE_TIMEOUT`, and in
+`net._http_response` a good briefing and a call that never ran become the same
+row. Answering first makes a non-2xx there mean what it says, and the body names
+the job (`accepted: "pulse=1"`), since the row carries no URL. `?embed=1` alone
+waits: its answer *is* its interface — call it until it reports `left: 0` — and
+it is the one flag no cron job dispatches, which `agree.test.mjs` holds against
+`004_cron.sql`.
 
-At 10:00 the retry window and the pulse overlap, and `dueNow()` gives that hour
-to the retry — on a day the briefing failed, a second look at a morning he was
-never told about is not what is wanted.
-
-**Sunday had no second chance at all until it needed one**, which was the wrong
-way round twice over: it is the only briefing of the week that could not be
-retried, and the one whose absence takes seven days to come round again rather
-than one. It went missing on the first Sunday the branch existed for. The three
-hours are chosen the same way the weekday ones are — late enough to still be an
-evening about a week that is opening, and two clear of the 22:00 pass.
-
-`retryDue` answers **which** briefing rather than whether one is due, because a
-retry has to send the shape the failed one would have. `dueNow` named `'weekday'`
-itself, which was correct only for as long as the window was weekdays-only: a
-literal that is right by accident of another function's range breaks the first
-time that range moves, and this is the commit that moved it.
-
-**`?force=1` falls back to the day, not to a constant.** It reads
-`briefDue(now) ?? briefKind(now)`, and it used to read `?? 'weekday'` — so the
-door that exists for the hour a briefing did *not* arrive could not produce a
-Sunday one outside the single hour it was already due. Forced on a Sunday
-evening it sent *Buenos dias* and a weekday shape into a market that had just
-opened for the week. `briefKind` is pure and driven from both sides by a test,
-and every one of those assertions passed while the constant was still there —
-so `agree.test.mjs` reads `postScheduled` for the call as well, which is the
-half that was missing.
-
-**Everything a cron secret reaches answers before it works, and there are two
-limits behind that.** The worker's wall clock is 150s on the Free plan and 400s
-on paid — that is what killed the first Sunday briefing, at 145.4 seconds of
-drafting, four and a half short of done. The **request idle timeout is 150s on
-every plan**: send the caller nothing for that long and the request is closed
-under you. So the same briefing, completing and delivering perfectly, still
-handed pg_net a `504 IDLE_TIMEOUT`.
-
-That is not cosmetic. `net._http_response` is the only record of a dispatch, and
-in it a good briefing and a call that never ran are the same row — so a watcher
-built on that table would report every working briefing as a failure, which is
-exactly the ordinary-day false alarm that gets a monitor ignored. Answering
-first makes a non-2xx there mean what it says, and the body names the job
-(`accepted: "pulse=1"`) because the table carries no URL.
-
-`?embed=1` is the only door that still waits, and the entitlement is derived
-rather than typed: its answer *is* its interface — you call it until it reports
-`left: 0` — and it is the one flag no cron job dispatches. `agree.test.mjs`
-holds that against `004_cron.sql`, so giving it a schedule fails the suite.
-
-**And the apology names the job that actually died.** Every scheduled failure said
-*"No briefing, jefe"* — including a pulse, the nightly pass, a release look and a
-trade event. So a consolidation that died at 22:00 reported itself to him as a
-missing briefing, sending him to look for the wrong thing at the wrong time of
-day; and the failure whose real symptom is that her memory stops growing was
-described as the one whose symptom is a message that never arrived. `APOLOGY` is
-a word per job, and a test asserts no two of them are the same sentence.
-
-**The trade event reaches the same catch.** It answers before it works like
-everything scheduled, but it is dispatched beside `postScheduled` rather than
-through it, so it had an apology written for it and no path that sent one: a
-read that failed before its model call left a console line and nothing else, on
-the one message with no retry behind it. Both callers now hand a failure to
-`jobFailed`, which writes the `<job> job` row and then apologises, in that order.
+**The trade event reaches the same catch.** It is dispatched beside
+`postScheduled` rather than through it; both hand a failure to `jobFailed`, which
+writes the `<job> job` row and then apologises, in that order.
 
 ### What a turn cost
 
-`ask()` logs one line per turn — the caller, the rounds it took, the effort, the
-tokens in and out, how many were served from cache, and how many web searches
-were billed. `postBriefing` adds the briefing's length in characters, and
-the `<brief> briefing delivered` row carries it, which is where a manual run
-reads it now: `?force=1` answers before it works, like everything else a cron
-secret reaches, so its body says `accepted` rather than `chars`. Its `detail`
-splits what came after the critic. The writing worker leaves a `<brief>
-briefing written` row (`stored in 1s, handed to the speaking worker`, with its
-own total in `ms`), and the speaking worker writes the delivered row once he has
-it (`spoken in 19s`, or `sent as text` where the voice did not land). That split
-exists because both model calls have rows of their own and that stretch had
-none: the Sunday that took 315s spent 155 of them there, where Monday spent 20,
-and nothing could say whether the embedding or the voice was the slow half.
+`ask()` records one row per model call in `eugenia_runs` — caller, model,
+rounds, effort, tokens in and out, cache reads and both cache writes, web
+searches and fetches, milliseconds — and a **failed turn is a row too**, since a
+briefing that dies costs the same searches as one that lands. A successful turn's
+`detail` is its client-tool tally. Nothing else can see any of it: the spend cap
+is a ceiling rather than a meter, search bills separately, and the briefing's
+length target lives on the far side of a model call.
 
-None of this changes what she does. It exists because nothing else can see any
-of it: the spend cap on the Anthropic key is a ceiling rather than a meter, web
-search bills separately from tokens, and the briefing's nine-hundred-to-fourteen-
-hundred-character target lives in the prompt, on the far side of a model call,
-where no test can hold it. Unmeasured, the briefing grew by a sixth and the way
-it surfaced was somebody counting the characters by hand.
+Each briefing adds rows of its own, apart from the model calls so *the critic
+costs more than it is worth* and *the briefing is drifting long* stay separate
+questions: `<brief> briefing written` (`stored in 1s, handed to the speaking
+worker`, with its total `ms`) and `<brief> briefing delivered`, carrying the
+length he received and how it went out (`spoken in 19s`, or `sent as text`). A
+manual `?force=1` answers `accepted`, so the delivered row is where its length is
+read.
 
-**And all of it went somewhere it did not survive.** This repository's own
-account of `pg_net` says plainly that nobody reads Edge logs — it is the whole
-reason a failed briefing messages Telegram instead. Every cost and quality meter
-was still writing there and nowhere else, so *"is the briefing drifting long
-again"*, *"what did last month cost"* and *"how often does `fallbacks` actually
-fire"* were questions whose answers were collected and then discarded within
-hours.
+**Two nightly meters write rows, both outcomes.** The embedding sweep writes
+`caller: 'embeddings'`, because a dead vendor takes the semantic arm out while
+the lexical one keeps answering; the channel census writes `caller: 'channels'`,
+because a ladder that stopped moving looks like one with no reason to, and a rung
+is read by comparing nights. `caller` is free text, so neither needed a
+migration. **`postConsolidation` has exactly one `return`**, and a test counts
+it: a quiet day is a branch, and an early return is how both meters once skipped
+every night nobody spoke. The census stays after the pass, the only thing that
+can move a rung.
 
-`eugenia_runs` is those same figures somewhere they last. One row per model call
-on the way out, plus a third row per briefing carrying what he actually received
-and how long the whole thing took — kept apart on purpose, so *the critic costs
-more than it is worth* and *the briefing is drifting long* stay two answerable
-questions rather than one blurred figure. **A failed turn is a row too**, which
-is the row that never existed: a briefing that dies costs the same searches as
-one that lands, and the only trace was an apology, which is a message rather than
-data.
+**A job that dies before its first model call leaves a row too.**
+`postScheduled`'s catch writes `caller: '<job> job'` **before** the apology,
+because the apology carries `.catch(() => {})` and a refusing Telegram would
+otherwise take the only notice with it.
 
-**Two more figures were written after that argument was settled and did not get
-it applied to them**, and both fail in the shape this table was built for — no
-error, nothing reaching him, and the system looking healthy throughout. The
-nightly embedding sweep writes `caller: 'embeddings'`, because a vendor that has
-stopped answering takes the semantic arm of `eugenia_search` out while the
-lexical one keeps returning results. The channel census writes
-`caller: 'channels'`, because a ladder that has quietly stopped moving looks
-exactly like one that had no reason to move — and a rung is read by comparing
-nights, which a line discarded within hours can never be. `caller` is free text
-precisely so neither of these needed a migration.
-
-**Both of these shipped behind an early return**, which is the failure they
-exist to end arriving inside the fix for it. `postConsolidation` returns at once
-on a day nobody spoke, and the two meters sat after that return — so on exactly
-the nights when nothing else happens, neither ran. Quiet nights are ordinary:
-two of the four before this was found were `nothing said`, and a dead embedding
-vendor could have survived all of them with the meter reporting nothing at all.
-The quiet day is a branch now and the meters sit past it. What the test asserts
-is that `postConsolidation` has exactly **one** `return` — the branch shape will
-change, and a second return is what puts the hole back. The census may not be
-hoisted to the top instead: it is taken after the pass because the pass is the
-only thing that can move a rung.
-
-**And a job that dies before its first model call now leaves a row too.** `ask()`
-records a failed turn, so the table could answer *how often does a model call
-die* — and could say nothing whatever about a job that never reached one. Two
-consolidations threw in `turnsSince`, one line into `postConsolidation`,
-apologised on two consecutive nights, and left no row on either: read afterwards
-the table showed a system that had simply had nothing to do. `postScheduled`'s
-catch writes `caller: '<job> job'` — the apology's own vocabulary, suffixed so it
-can never be confused with an `ask()` label — **before** it sends the apology,
-because the apology is sent with `.catch(() => {})` and a Telegram that is
-refusing would otherwise take the only notice with it.
-
-It never throws and never blocks the answer. A briefing that was written, paid
-for and delivered must not be lost because an instrumentation insert failed — or
-because `005` has not been applied yet.
+`recordRun` never throws and never blocks the answer: a briefing written, paid
+for and delivered is not lost to an instrumentation insert, or to `005` not
+being applied yet.
 
 ### Adding the channel map to an existing database
 
