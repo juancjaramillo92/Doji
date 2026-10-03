@@ -2506,10 +2506,10 @@ back. Every function reads into a variable as `x := (select …)`, and
 does**: a paste cut partway fails as `unterminated dollar-quoted string`, which
 reads like a fault in the file.
 
-**Applied by hand, the files are a claim, and `supabase/verify.sql` tests it.** It
-writes nothing; run it after any manual change. CI cannot stand in for it — the
-files need `pg_net`, `vault` and `pg_cron`, which a plain Postgres container
-lacks.
+**Applied by hand, `schema.sql` is a claim, and `supabase/verify.sql` tests it.**
+It writes nothing; run it after any manual change. CI cannot stand in for it —
+the schema needs `pg_net`, `vault` and `pg_cron`, which a plain Postgres
+container lacks.
 
 **`schema.sql` is the whole database, and it is applied by running all of it
 again.** Every statement is `if not exists`, `or replace`, `on conflict do
