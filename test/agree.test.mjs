@@ -2629,7 +2629,7 @@ test('every table the backup reads is ordered by a column it has', async () => {
 
 const VERIFY = source('supabase/verify.sql');
 
-test('verify.sql asks about every table, policy and index the files declare', () => {
+test('verify.sql asks about every table, policy, index and function the files declare', () => {
   const tables = [...SCHEMA_SQL.matchAll(/create table (?:if not exists )?public\.(\w+)/g)].map(m => m[1]);
   const policies = [...SCHEMA_SQL.matchAll(/create policy (\w+) on/g)].map(m => m[1]);
   // `unique` too: a reader matching `create index` alone was blind to the one
@@ -2660,6 +2660,16 @@ test('verify.sql asks about every table, policy and index the files declare', ()
   assert.ok(stated, "verify.sql has no 'every declared index exists' row");
   assert.equal(stated.replace(/' \|\|\s*'/g, '').replace(/\s+/g, ''), expected,
     'the index row and the create index statements name different sets');
+
+  // Functions the same way: a watcher's missing helper raises only when called.
+  const functions = [...SCHEMA_SQL.matchAll(/create or replace function public\.(\w+)/g)]
+    .map(m => m[1]);
+  assert.ok(functions.length >= 8, `read ${functions.length} functions — the reader has gone blind`);
+  const named = (VERIFY.match(/\('every declared function exists',[\s\S]*?\n   '([\s\S]*?)'\)/) || [])[1];
+  assert.ok(named, "verify.sql has no 'every declared function exists' row");
+  assert.equal(named.replace(/' \|\|\s*'/g, '').replace(/\s+/g, ''),
+    [...new Set(functions)].sort().join(','),
+    'the function row and the create function statements name different sets');
 });
 
 /* ─── A summary row may come back false; it may never throw ──────────────────

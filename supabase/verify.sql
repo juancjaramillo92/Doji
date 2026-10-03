@@ -1,9 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- DOJI — does the live database still match these files?
 -- ───────────────────────────────────────────────────────────────────────────
--- The schema is applied by hand on purpose, which makes the numbered files a
--- claim about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 86 checks.
+-- The schema is applied by hand on purpose, which makes schema.sql a claim
+-- about the database. This tests the claim. It writes nothing: run the
+-- whole file after any manual change and read the `ok` column — all 85 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -462,16 +462,6 @@ from (values
      where to_regclass('vault.decrypted_secrets') is not null),
    '1'),
 
-  -- A cron job calling a missing function fails only in cron's own pruned log.
-  ('dispatch_watch exists for its cron job',
-   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.proname = 'dispatch_watch'),
-   '1'),
-  ('pace_watch exists for its cron job',
-   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.proname = 'pace_watch'),
-   '1'),
-
   ('RLS on eugenia_feedback',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_feedback')),
    'true'),
@@ -539,5 +529,19 @@ from (values
    'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
    'eugenia_notes_trgm,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
    'eugenia_turns_embedding,eugenia_turns_id_desc,eugenia_turns_search,' ||
-   'eugenia_turns_trgm,trades_user_open_day')
+   'eugenia_turns_trgm,trades_user_open_day'),
+
+  -- A function is resolved when it is called, not when its caller is created:
+  -- a watcher missing a helper fails only in cron's own pruned log, which is
+  -- the failure the watchers exist to report.
+  ('every declared function exists',
+   (select coalesce(string_agg(distinct p.proname, ',' order by p.proname), 'none')
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname in (
+       'dispatch_bad','dispatch_failures','dispatch_repeats','dispatch_watch',
+       'eugenia_calendar_touch','eugenia_search','pace_line','pace_watch',
+       'tell_him','trades_eugenia_on_event','trades_telegram','trades_touch')),
+   'dispatch_bad,dispatch_failures,dispatch_repeats,dispatch_watch,' ||
+   'eugenia_calendar_touch,eugenia_search,pace_line,pace_watch,' ||
+   'tell_him,trades_eugenia_on_event,trades_telegram,trades_touch')
 ) as t(check_name, actual, expected);

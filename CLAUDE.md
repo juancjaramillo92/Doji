@@ -464,8 +464,8 @@ is tested, and a refused read throws rather than backing up a blank.
   by oid out of `pg_proc` or with `to_regprocedure`, never a written-out signature
   or a `regprocedure` cast; read a public table only through `query_to_xml` behind
   `to_regclass`. Prefer a row that names (`string_agg`) to one that counts.
-  `agree.test.mjs` holds what it asks about against every table, policy, index
-  and trigger `schema.sql` declares, and the count in its header.
+  `agree.test.mjs` holds what it asks about against every table, policy, index,
+  trigger and function `schema.sql` declares, and the count in its header.
 - **`revoke ... from public` is not the whole revoke**: `anon` and `authenticated`
   hold `execute` by name. `verify.sql` asks every callable function.
 - **Every `security definer` function sets `search_path = ''`**; `agree.test.mjs`
