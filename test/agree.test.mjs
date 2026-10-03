@@ -1056,7 +1056,7 @@ test('every read of her tables goes through readRows', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  assert.match(src, /async function readRows<T>\(what: string, url: string\)/,
+  assert.match(src, /async function readRows<T>\(what: string, path: string\)/,
     'readRows is gone — every read is hand-written again');
 
   /* NAMED, NOT COUNTED: a count stays three while one exemption goes and a bypass

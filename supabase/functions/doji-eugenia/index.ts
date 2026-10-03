@@ -265,7 +265,7 @@ const STRATEGY_TOOL = {
     "The reasoning behind his trading rules. You already hold the summary and the " +
     "rules table; this is the rest of the document — why a rule exists, how a " +
     "journal column is meant to be read, what a term means precisely. Sections: " +
-    Object.keys(SECTIONS).map(k => `${k}`).join(", ") + ". " +
+    Object.keys(SECTIONS).join(", ") + ". " +
     "Read the section a rule cites before explaining that rule, rather than " +
     "reconstructing it from the one-line summary.",
   input_schema: {
@@ -445,8 +445,8 @@ const NOTES = 20;
    because PostgREST answers a missing table with a 404 whose JSON body parses
    fine, and a copy that skips the status check hands back an object for rows.
    fillEmbeddings stays out: it needs the response's content-range. */
-async function readRows<T>(what: string, url: string): Promise<T[]> {
-  const res = await fetch(url, { headers: sbHeaders() });
+async function readRows<T>(what: string, path: string): Promise<T[]> {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`${what} read failed (HTTP ${res.status})`);
   return await res.json();
 }
@@ -455,7 +455,7 @@ async function readRows<T>(what: string, url: string): Promise<T[]> {
 // correction beside what it corrected. The id comes back so she can retire one.
 async function readNotes(kind: string): Promise<Note[]> {
   return readRows<Note>('Notes',
-    `${SB_URL}/rest/v1/eugenia_notes?select=id,note&kind=eq.${kind}` +
+    `eugenia_notes?select=id,note&kind=eq.${kind}` +
     `&superseded_by=is.null&order=id.desc&limit=${NOTES}`);
 }
 
@@ -601,9 +601,7 @@ function windowStart(days: unknown, now: number, back: number): string {
   const n = windowDays(days);
 
   const [y, m, d] = nyDate(new Date(now)).split('-').map(Number);
-  const from = new Date(Date.UTC(y, m - 1, d));
-  from.setUTCDate(from.getUTCDate() - n - back);
-  return from.toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1, d - n - back)).toISOString().slice(0, 10);
 }
 
 /* R-14's reads over check_rules' window: TradingView's high-rated releases —
@@ -645,7 +643,7 @@ export function weeksQuery(days: unknown, now = Date.now()): string {
    Friday", a false statement about his own week. */
 async function readTrades(days: unknown): Promise<string> {
   try {
-    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
+    const rows = await readRows<TradeRow>('Trades', tradesQuery(days));
     return rows.length ? JSON.stringify(rows) + reachLine(rows, days) : "No trades in that window.";
   } catch (err) {
     console.error("doji-eugenia: trades read failed —", why(err));
@@ -686,10 +684,10 @@ const CHECK_TOOL = {
 async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
     Promise<{ results: RuleResult[] | null; reach: string }> {
   const [rows, releases, weeks, moves] = await Promise.all([
-    readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`),
-    readRows<{ at: string }>('Releases', `${SB_URL}/rest/v1/${releasesQuery(days)}`),
-    readRows<{ week: string }>('Weeks', `${SB_URL}/rest/v1/${weeksQuery(days)}`),
-    readRows<Stop & { id: string }>('Stops', `${SB_URL}/rest/v1/${stopsQuery(days)}`),
+    readRows<TradeRow>('Trades', tradesQuery(days)),
+    readRows<{ at: string }>('Releases', releasesQuery(days)),
+    readRows<{ week: string }>('Weeks', weeksQuery(days)),
+    readRows<Stop & { id: string }>('Stops', stopsQuery(days)),
   ]);
   const kept = rows.filter(keep);
   const reach = reachLine(rows, days);
@@ -747,7 +745,7 @@ const STATS_TOOL = {
    trader who has not traded. */
 async function readStats(days: unknown): Promise<string> {
   try {
-    const rows = await readRows<TradeRow>('Trades', `${SB_URL}/rest/v1/${tradesQuery(days)}`);
+    const rows = await readRows<TradeRow>('Trades', tradesQuery(days));
     return statsList(journalStats(rows), windowDays(days)) + reachLine(rows, days);
   } catch (err) {
     console.error("doji-eugenia: stats read failed —", why(err));
@@ -953,7 +951,7 @@ async function recordActual(at: unknown, name: unknown, actual: unknown, note: u
 
     // Bounded: the 08:30 slot holds most of a report.
     const standing = await readRows<Release>('Release',
-      `${SB_URL}/rest/v1/eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
+      `eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
     return standing.length
       ? `Nothing at that time is called "${called}". On file: ` +
         `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
@@ -1603,7 +1601,7 @@ export function openOnUser(turns: Turn[]): Turn[] {
 
 async function recent(): Promise<Turn[]> {
   const rows = await readRows<Turn & { created_at: string }>('History',
-    `${SB_URL}/rest/v1/eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`);
+    `eugenia_turns?select=role,content,created_at&order=id.desc&limit=${HISTORY}`);
   return openOnUser(dateTurns(rows.reverse()));
 }
 
@@ -2079,7 +2077,7 @@ export function breachesList(results: RuleResult[] | null): string {
 export async function breachesBlock(): Promise<string> {
   try {
     const [last] = await readRows<{ created_at: string }>('Briefing marker',
-      `${SB_URL}/rest/v1/${briefedQuery()}`);
+      briefedQuery());
     const at = last?.created_at ?? new Date(Date.now() - 86_400_000).toISOString();
     const { results, reach } = await readRules(BREACH_DAYS, t => sinceBriefing(t, at));
     return breachesList(results) + reach;
@@ -2097,7 +2095,7 @@ type Thesis = { thesis: string; moved_on: string | null };
 
 async function readThesis(): Promise<Thesis | null> {
   const [row] = await readRows<Thesis>('Thesis',
-    `${SB_URL}/rest/v1/eugenia_thesis?select=thesis,moved_on&id=eq.current&limit=1`);
+    `eugenia_thesis?select=thesis,moved_on&id=eq.current&limit=1`);
   return row ?? null;
 }
 
@@ -2192,7 +2190,7 @@ const LOOPS = 10;
 
 async function readLoops(): Promise<Loop[]> {
   return readRows<Loop>('Loops',
-    `${SB_URL}/rest/v1/eugenia_loops?select=id,kind,body,opened_on` +
+    `eugenia_loops?select=id,kind,body,opened_on` +
     `&closed_on=is.null&order=id.desc&limit=${LOOPS}`);
 }
 
@@ -2232,7 +2230,7 @@ async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();
   const to   = new Date(now + CAL_AHEAD * 3600_000).toISOString();
   return readRows<Release>('Calendar',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
     `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
@@ -2299,7 +2297,7 @@ export function weekQuery(now: number): string {
 
 export async function weekBlock(now = Date.now()): Promise<string> {
   try {
-    const rows = await readRows<Release>('Week', `${SB_URL}/rest/v1/${weekQuery(now)}`);
+    const rows = await readRows<Release>('Week', weekQuery(now));
     return calendarList(rows, now, "The week ahead, every release TradingView rates high");
   } catch (err) {
     console.error("doji-eugenia: week unavailable —", why(err));
@@ -2522,7 +2520,7 @@ export async function positioningBlock(): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 async function readDesk(day: string): Promise<TradeRow[]> {
   return readRows<TradeRow>('Desk',
-    `${SB_URL}/rest/v1/eugenia_trades?select=*` +
+    `eugenia_trades?select=*` +
     `&or=(open_day.gte.${day},and(exit_price.is.null,fill_time.is.null))` +
     `&order=entry_time.desc&limit=50`);
 }
@@ -2708,7 +2706,7 @@ export function briefedQuery(): string {
 async function briefedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ created_at: string }>('Briefing marker',
-      `${SB_URL}/rest/v1/${briefedQuery()}`);
+      briefedQuery());
     return !!latest && nyDate(new Date(latest.created_at)) === nyDate(new Date());
   } catch (err) {
     console.error("doji-eugenia: could not check for today's briefing —",
@@ -2880,14 +2878,14 @@ export async function postSpeak(due: string): Promise<Response> {
   if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
   const opened = Date.now();
   const [marker] = await readRows<{ created_at: string }>('Briefing marker',
-    `${SB_URL}/rest/v1/eugenia_turns?select=created_at&role=eq.user` +
+    `eugenia_turns?select=created_at&role=eq.user` +
     `&content=eq.${encodeURIComponent(briefingMarker(due))}&order=id.desc&limit=1`);
   const today = nyDate(new Date());
   if (!marker || nyDate(new Date(marker.created_at)) !== today) {
     throw new Error(`no ${due} briefing is stored for ${today}`);
   }
   const [turn] = await readRows<{ content: string }>('Briefing',
-    `${SB_URL}/rest/v1/eugenia_turns?select=content&role=eq.assistant` +
+    `eugenia_turns?select=content&role=eq.assistant` +
     `&created_at=eq.${encodeURIComponent(marker.created_at)}&order=id.desc&limit=1`);
   if (!turn) throw new Error(`the ${due} briefing's marker is stored and its text is not`);
 
@@ -2928,7 +2926,7 @@ export function dayQuery(hours: number, now = Date.now()): string {
 
 async function turnsSince(hours: number): Promise<Turn[]> {
   const rows = await readRows<Turn & { created_at: string }>('Day',
-    `${SB_URL}/rest/v1/${dayQuery(hours)}`);
+    dayQuery(hours));
   return dateTurns(rows.reverse());
 }
 
@@ -2937,7 +2935,7 @@ async function turnsSince(hours: number): Promise<Turn[]> {
 async function consolidatedToday(): Promise<boolean> {
   try {
     const [latest] = await readRows<{ at: string }>('Consolidation marker',
-      `${SB_URL}/rest/v1/eugenia_runs?select=at&caller=eq.consolidation&ok=is.true` +
+      `eugenia_runs?select=at&caller=eq.consolidation&ok=is.true` +
       `&order=id.desc&limit=1`);
     return !!latest && nyDate(new Date(latest.at)) === nyDate(new Date());
   } catch (err) {
@@ -2953,7 +2951,7 @@ export async function feedbackBlock(): Promise<string> {
   try {
     const from = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
     const rows = await readRows<{ on_day: string; verdict: string }>('Feedback',
-      `${SB_URL}/rest/v1/eugenia_feedback?select=on_day,verdict&on_day=gte.${from}` +
+      `eugenia_feedback?select=on_day,verdict&on_day=gte.${from}` +
       `&order=on_day.desc&limit=5`);
     if (!rows.length) return "";
     const said = rows.map(r => `· ${civilDay(r.on_day)}: he marked it ${r.verdict === 'good' ? 'useful' : 'off'}`);
@@ -3089,7 +3087,7 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
   // looked_at is read, not filtered on: a filter would hide the mark that makes
   // the rest of the group skippable.
   const rows = await readRows<Release>('Release',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
+    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
     `&importance=eq.high` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
     `&order=at.asc&limit=${RELEASE_ROWS}`);
@@ -3146,7 +3144,7 @@ async function recordBlock(due: Release[]): Promise<string> {
   const series = [...new Map(due.filter(r => r.ticker).map(r => [r.ticker!, r])).values()];
   const parts = await Promise.all(series.map(async r => {
     try {
-      const rows = await readRows<Release>('Record', `${SB_URL}/rest/v1/${recordQuery(r.ticker!, r.at)}`);
+      const rows = await readRows<Release>('Record', recordQuery(r.ticker!, r.at));
       return recordList(r.name, [...rows].reverse()) + revisionLine(r, rows);
     } catch (err) {
       console.error("doji-eugenia: track record unavailable —", why(err));
@@ -3221,7 +3219,7 @@ const PENDING_AHEAD_H = 8;
 async function aheadToday(now = Date.now()): Promise<Release[]> {
   const to = new Date(now + PENDING_AHEAD_H * 3600_000).toISOString();
   return readRows<Release>('Calendar',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
     `&importance=eq.high&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
     `&order=at.asc&limit=5`);
 }
@@ -3230,7 +3228,7 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
    model call, and one that stopped returning looks like one never needed. */
 export async function postTradeEvent(id: string, event: string): Promise<Response> {
   const [row] = await readRows<TradeRow>('Trade',
-    `${SB_URL}/rest/v1/eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
+    `eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
   // Soft-deleted: nothing to say.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
@@ -3263,7 +3261,7 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
     const day = row.open_day;
     if (!day) return json({ ok: true, skipped: "no filing day" });
     const standing = dayStanding(await readRows<TradeRow>('Day',
-      `${SB_URL}/rest/v1/eugenia_trades?open_day=eq.${day}&limit=50`), day);
+      `eugenia_trades?open_day=eq.${day}&limit=50`), day);
     if (!standing || !standing.breached) {
       return json({ ok: true, trade: id, said: "day is inside its limit" });
     }
@@ -3351,7 +3349,7 @@ export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
 
 async function readMark(): Promise<Mark | null> {
   const [row] = await readRows<Mark>('Mark',
-    `${SB_URL}/rest/v1/eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`);
+    `eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`);
   return row ?? null;
 }
 
@@ -3373,7 +3371,7 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
   const [row] = await readRows<Release>('Calendar',
-    `${SB_URL}/rest/v1/eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
     `&importance=eq.high&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
     `&order=at.desc&limit=1`);
   return row ?? null;
@@ -3665,9 +3663,9 @@ async function handleMessage(update: any): Promise<void> {
     const replied = msg.reply_to_message?.from?.is_bot ? msg.reply_to_message : null;
     const quoting: Promise<string | null> = !replied ? Promise.resolve(null)
       : typeof replied.text === 'string' ? Promise.resolve(replied.text)
-      : readRows<{ content: string }>('Replied-to', `${SB_URL}/rest/v1/${repliedQuery(replied.date)}`)
+      : readRows<{ content: string }>('Replied-to', repliedQuery(replied.date))
           .then(async ([turn]) => turn?.content ?? spokenBriefing(await readRows<Turn & { created_at: string }>(
-            'Replied-to briefing', `${SB_URL}/rest/v1/${spokenQuery(replied.date)}`)) ?? "")
+            'Replied-to briefing', spokenQuery(replied.date))) ?? "")
           .catch(() => "");
 
     let answer: string;
