@@ -1680,11 +1680,10 @@ the taps are never delivered — `allowed_updates` must name `callback_query` to
 
 ### What she remembers
 
-Seven tables, and what separates them is how long a thing is true for. A turn
-rolls over inside a morning; a note about him outlives twenty of those; what he
-UNDERSTANDS outlives both; a thesis is only ever current, which is why it is one
-row rewritten rather than a log; a loop stays until it closes; and the calendar
-is the only dataset here that compounds.
+Seven tables, separated by how long a thing is true for. A turn rolls over inside
+a morning; a note about him outlives twenty of those; what he UNDERSTANDS
+outlives both; a thesis is only ever current, so it is one row rewritten; a loop
+stays until it closes; and the calendar is the one dataset here that compounds.
 
 | | Holds | Window | Written by |
 |---|---|---|---|
@@ -1696,263 +1695,147 @@ is the only dataset here that compounds.
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar`, and an actual TradingView has not published by `record_actual` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 
-Turns roll over in a morning, so without notes she could never know in September
-that he has been working on holding his stop since August. Notes are one
-sentence each about *him* rather than about the market — a note about today's
-price is stale tomorrow and the prompt forbids it. They are handed back at the
-start of every turn, briefing and reply alike.
+**Notes are how he corrects her, and the only way he can.** There is no settings
+page, the button under a briefing carries a verdict and not a reason, and the
+conversation window rolls over in a morning — so *"stop mentioning the
+ten-year"*, *"too long"*, *"lead with what is odd"* are recorded as standing
+instructions: in his words, obeyed from the next message on, outranking the
+shape the prompt otherwise asks for. She acknowledges one in four words or fewer
+so he knows it stuck; a fact about him she records silently. Notes are about
+*him*, never the market — a note about today's price is stale tomorrow.
 
-**And they are how he corrects her, which is the only way he can.** There is no
-settings page, the button under a briefing carries a verdict and not a reason,
-and the conversation window rolls over in a morning — so *"stop mentioning the ten-year"*, *"too long"*, *"lead with what
-is odd"* would all be forgotten by tomorrow if they stayed in the conversation.
-Recorded as notes they are standing instructions: written the moment he gives
-one, in his words, obeyed from the next message on, and overriding the shape the
-prompt otherwise asks for. She acknowledges an instruction in four words or
-fewer — a fact about him she records silently — because otherwise he cannot tell
-it stuck and will say it again.
+**What he commits to is the third kind, read the other way round.** *"This week I
+stop after two losses"* is something he does, so she holds his trades against it
+rather than obeying it — never one he did not make. A closed trade that breaks one
+gets the fact, then her verdict; the briefing gives it one sentence the morning
+after. The nightly pass retires a commitment whose period is over by superseding
+it with how it went — kept, or broken on which trade — since how he does against
+his own word outlives the commitment. Its own kind because the two are read in
+opposite directions. `/notes` lists them between what he told her and what she
+noticed.
 
-**What he commits to is the third kind, and it is read the other way round.**
-*"This week I stop after two losses"* is not something she does — it is something
-he does, so she holds his trades against it rather than obeying it. Written in
-his words with its period, acknowledged like an instruction, and never one he did
-not make. When a closed trade breaks one she says so, fact first and verdict
-after, the way she says a broken rule; the briefing gives it one sentence the
-morning after. The nightly pass reads each day's trades against them, and a
-commitment whose period is over is retired by superseding it with a fact saying
-how it went — kept, or broken and on which trade — because how he does against
-his own word outlives the commitment by months. Its own kind rather than an
-instruction because the two are read in opposite directions, and one window over
-both would have her telling them apart from the wording alone. `/notes` lists
-them between what he told her and what she noticed.
+**A reply to one of her messages tells her which one.** Swipe a message and
+answer, typed or spoken, and she is handed the message he answered — its text, or
+the stored turn sent at that moment, since a voice note carries no words. Without
+it, *"too dense"* under the pulse and under the release look arrive identically.
+What is stored is his words behind a marker carrying her message's opening.
+**The briefing is found looking back**, because it is the one message stored
+before it is sent: when the forward look is empty, the newest two rows inside the
+speaking worker's budget are taken only if they are a briefing and its marker
+sharing one instant — otherwise no quote rather than a wrong one.
 
-**A reply to one of her messages tells her which one.** Swipe a message in
-Telegram and answer it, typed or spoken, and she is handed the message he
-answered — the text when it has any, otherwise the stored turn sent at that
-moment, since a voice note carries no words and her history dates a turn by the
-day alone. Without it, *"too dense"* under the 10:00 pulse and under the release
-look an hour later arrive identically. What is stored is his words behind a
-marker carrying her message's opening, so the nightly pass can tell what a
-correction was about.
-
-**The briefing is found looking back, because it is the one message stored
-before it is sent.** Its marker goes down first and the speaking worker sends it
-seconds to minutes later, so looking forward from the voice note — right for
-every other message — found nothing under the briefing, every time. When the
-forward look is empty, the newest two rows across the speaking worker's budget
-are taken only if they are a briefing and its marker, sharing one instant;
-anything else there gets no quote rather than a wrong one.
-
-`notesBlock()` is therefore load-bearing on **all seven paths**, and its absence
-would be silent: drop it from one and she carries on ignoring an instruction he
-believes she took. A test asserts that the briefing, the pulse, a reply, the
-nightly pass, the release look, the move look and the trade look each read
-them — the last of those was deaf for its whole life, so an instruction he had
-given was obeyed everywhere except the two messages that arrive while he is in
-a position, which are the ones he is least able to ignore. `channelsBlock()`
-goes to the six that are asked to build a term — the release look having joined
-when its prompt was asked to teach, and the move look one release later, for the
-same reason and after the same failure. The two are the same shape: an
-unscheduled message about something the morning did not cover. What moves gold
-runs through a channel as surely as what a print changes does, so a message
-saying the dollar came off teaches nothing to someone for whom the dollar is
-`unseen` — and that is the likeliest message this path sends.
-
-**And the conversation window goes to everything that speaks**, which is the
-same list minus the nightly pass — that one reads a fixed twenty-four hours of
-its own, and the twelve-turn window would be a shorter second copy of the same
-day. This too was missing from the trade look, and it is the quieter failure:
-its R-14/R-19 message fires on a print pending against an open position, which
-is exactly what the morning briefing is likeliest to have named already. With no
-window she cannot know she said it two hours ago, and the sharpest thing she
-sends arrives as a repetition. Both reads sit *after* the two early returns, so
-an ordinary fill — no print pending, no breach — still costs nothing at all.
-Telling her to build a mechanism he has never had built, without handing her the
-map that says which those are, is an instruction outrunning its inputs — and it
-fails by teaching the wrong thing well rather than by failing at all.
+**Who gets what.** `notesBlock()` reaches **all seven paths** — the briefing, the
+pulse, a reply, the nightly pass, the release look, the move look and the trade
+look — and its absence would be silent: she carries on ignoring an instruction he
+believes she took. `channelsBlock()` goes to the six asked to build a term; the
+release and move looks are among them, since what moves gold runs through a
+channel and a message saying the dollar came off teaches nothing to someone for
+whom the dollar is `unseen`. The conversation window goes to everything that
+speaks — not the nightly pass, which reads its own twenty-four hours. It matters
+most on the trade look, whose R-14/R-19 line fires on the print the briefing is
+likeliest to have named. Its reads sit *after* its early returns, so an ordinary
+fill costs nothing. A test reads every one of these.
 
 ### What he has on right now
 
-Every other thing she is handed is about the market, or about what he
-understands. **None of them said whether he was exposed.** So a briefing could
-open on an observation about a level while he sat in a position through the very
-print it was describing, and nothing about that message read as wrong from
-anywhere — every prohibition was kept, and the only thing missing was the fact
-that would have stopped her writing it.
+**Everything else she is handed is about the market or about what he
+understands; `positionsBlock()` says whether he is exposed.** Without it a
+briefing could dwell on a level while he sat in a position through the print it
+described, every prohibition kept. One read with two filters, since an overnight
+hold is not in today's rows and today's closed trades are not open.
 
-`positionsBlock()` is that fact. One read with two filters, because each half
-misses the other: an overnight hold is not in today's rows and today's closed
-trades are not open.
+**Open is both witnesses null** — `exit_price is null and fill_time is null`.
+`exit_price` is the poller's, off the broker's deals; `fill_time` the email's, or
+the poller's for a close it saw. Either alone can miss a close — a hand close
+sends no email, a fold without its entry deal leaves `exit_price` null — and
+reading one column once told him he was in trades he had closed days earlier,
+citing R-19 and R-15 at him: the worst failure available, in the one block where
+she speaks with his rules behind her. **Broker rows only**: pre-sync rows carry
+client ids and neither column. `isOpen` is exported and driven from both sides,
+since `positionsList` renders whatever it is handed. The same missing close makes
+R-10 and R-15 `unknown` rather than running a span to *now* or dropping the row.
 
-**A position is closed on either witness, and reading one column told him he was
-in a trade he had closed days earlier.** `fill_time` had exactly one writer and
-it was `doji-email-sync` — the poller never set it, on any row. **It writes it
-now**, off the `closedAt` it already computes, under `where fill_time is null`:
-the third use of the balance filter, so the email still owns the column wherever
-it lands and the poller fills the gaps. Both reads below stay as they are — two
-witnesses is the right test whichever of them got there first, and a row the
-fold window never reaches is still stamped by neither. What the poller
-records when a position closes is `exit_price`, folded from the broker's own
-deals every two minutes. So a close with no alert email behind it — a manual
-close, R-15's Friday close-out, a parse that failed, an email that never came —
-left `fill_time` null for ever, and this block reported an open position for
-ever. It did it while citing R-19 and R-15 at him about a trade that no longer
-existed, which is the worst failure available here: this is the one block where
-she speaks with his own rules behind her.
+It renders each open position — age, side, size, entry, the stop and target as
+first seen — the quarter-hourly mark **with its age**, and where the day stands
+against R-11's 4%. **A position opened on an earlier day names the day**: his
+holds run multi-session, and a bare `open since 09:15 ET` under *right now* reads
+as this morning. Flat and not traded today, it is nothing at all. It goes to six
+paths — the briefing, the pulse, a reply, the release look, the nightly pass and
+the move look, the likeliest to land mid-position. The trade look is reached
+*from* the position and already holds its row.
 
-Open now means **neither** witness has closed it — `exit_price is null and
-fill_time is null` — the same two-claimant shape `balance` and `direction`
-already use, since a row the poller folded without its entry deal carries a null
-`exit_price` on a closed trade and the email catches that one. **And broker rows
-only:** pre-sync rows carry client ids and no `exit_price`, so every one of them
-read as permanently open. `isOpen` is exported and driven from both sides,
-because `positionsList` is pure, was always driven from both sides, and renders
-exactly what it is handed — the mistake was upstream of it, in deciding what to
-hand it.
-
-**The same column runs through two of the thirteen rules.** R-10 ended an unclosed
-span at *now*, so one missing email made every trade after it overlap a phantom —
-a cascade of failures each naming a real row and each wrong. A close with no time
-is now `unknown`, which is what an end nothing recorded actually is. R-15 used to
-`continue` past those, dropping them from its population silently, which is §8's
-opening sentence happening inside the file that exists to prevent it. It renders the open positions — age, side, size, entry, and
-the stop and target as first seen — the quarter-hourly mark **with its age**, and
-where the day stands against the 4% R-11 sets. **A position opened on an earlier
-day names that day**; it used to render a bare `open since 09:15 ET` under a
-heading that says *right now*, and there is one way to read that and it is the
-wrong one. The summary calls his positions *intraday to multi-session* and R-15
-bounds a hold at the Friday close rather than at midnight, so this is a shape he
-trades. Today stays bare, or the date would be noise on every intraday fill. When he is flat and has not traded
-today, which is most mornings, it is nothing at all.
-
-It is handed to six paths rather than five: the briefing, the pulse, a reply, the
-release look, the nightly pass, and the move look, which joins because a sharp
-move is the likeliest of all of them to arrive while he is in something. The
-trade-event look is deliberately outside it — that one is reached *from* the
-position and already holds the row that fired it.
-
-**What she may do with it is a narrower thing than what she can see, and that
-asymmetry is the design.** Unprompted it does two jobs: it stops her writing
-anything setup-flavoured while a position is open, and it lets her name a
-collision his own rules already name — a high-impact print against an open
+**What she may do with it is narrower than what she can see, by design.**
+Unprompted it stops anything setup-flavoured while a position is open, and lets
+her name a collision his own rules name — a high-impact print against an open
 position (R-14, R-19), or a day past R-11. When *he* raises the position she
-discusses it properly, using his entry and his plan, and refuses exactly one
-thing: any statement about what to do with it.
+discusses it properly and refuses one thing: what to do with it. **His levels
+never appear in a message she starts** — a briefing framed around the number he
+is long from reads as relevance and is the opposite. That guard is a prompt
+paragraph with no structural half, so a test reads for it.
 
-**His levels never appear in a message she starts.** A briefing that mentions the
-number he is long from has begun framing the day around his position rather than
-around what is happening — and it reads as relevance while being the opposite.
-That guard is a paragraph in the prompt and has no structural half, because the
-whole point of handing her the numbers is that she can use them when asked; a
-test reads the prompt for it, since deleting it breaks nothing else.
+**No unrealised P&L is computed.** The mark is up to fifteen minutes old, so the
+figure would be the most anchoring number in the block and the one staleness
+gets most wrong. Entry and mark are given, labelled; she subtracts if asked.
 
-**No unrealised P&L is computed.** The nearest price she holds is up to fifteen
-minutes old, and that figure would be both the most anchoring number in the block
-and the one staleness gets most wrong. Entry and mark are given as what they are,
-labelled, and she can subtract them if he asks.
-
-A run of losses is named — *"that is three this week"* is a fact he should hear
-— and then either explained by what the trades have **in common** or admitted as
-not yet explained, which is information too. A breach of one of his own rules
-inside the run leads, because that is his document deciding.
+A run of losses is named — *"that is three this week"* — then explained by what
+the trades have **in common**, or admitted as not yet explained. A breach of his
+own rule inside the run leads.
 
 ### Search that survives a rephrasing
 
-`eugenia_search` was `websearch_to_tsquery` ranked by `ts_rank`: it found rows
-containing the words asked for and nothing else. Ask *"what did we conclude about
-the December cut"* and a turn saying *the market has mostly given up on easing
-this year* is invisible — same subject, no shared stem.
+`search_memory` reaches past the windows into everything she ever stored, through
+`eugenia_search`. A lexical match alone misses a rephrasing — *"what did we
+conclude about the December cut"* shares no stem with *the market has mostly
+given up on easing this year* — and an empty result becomes a confident *"I have
+no record of that."* So the lexical arm is full text **and** trigram (`pg_trgm`),
+which catches a rephrasing, a typo or a half-remembered quote with no vendor and
+no backfill. `websearch_to_tsquery`, because the query is model-written and the
+strict parser throws on an unbalanced quote.
 
-The failure is silent, and the prompt makes it worse by telling her an empty
-result is trustworthy: *if the search comes back empty, that is an answer worth
-trusting*. A lexical miss becomes a confident *"I have no record of that."*
-
-`pg_trgm` is the half that needs no new vendor — no embedding provider, no per-write
-cost, nothing to backfill — and it is what catches a rephrasing, a typo or a
-half-remembered quote. It is not what catches a different *idea*, and for a while
-this said so and stopped there. The semantic arm below is that half, and the
-trigram one did not move to make room for it.
-
-`word_similarity`, never `similarity`, and the difference is total here.
-`similarity()` normalises over the union of both trigram sets, so a six-word
-question against a fourteen-hundred-character briefing scores near zero however
-well it matches, and every long turn would be unreachable. `word_similarity`
-scores the query against the best matching *extent* inside the target, which is
-exactly this shape: a short query, a long document.
-
-Ranked in two keys rather than one fused score. `ts_rank` lands around 0.0–0.1
-and `word_similarity` spans 0–1, so adding or maxing them needs a scale factor
-invented to make the arithmetic come out — a fudge that decides rankings while
-looking like a formula. Instead an exact word match outranks a near one, and
-within each group the stronger score wins. That is still the order *inside* the
-lexical arm, and it is what the fusion below sees.
+`word_similarity`, never `similarity`: `similarity()` normalises over both
+trigram sets, so a six-word question against a long briefing scores near zero
+however well it matches; `word_similarity` scores against the best matching
+*extent*. The arm ranks in two keys rather than one fused score — an exact word
+match before a near one, then the stronger score — because `ts_rank` and
+`word_similarity` are on different scales and a combining factor would be a
+fudge.
 
 ### Search that survives a different idea
 
-The example above is the one trigram cannot reach. *"What did we conclude about
-the December cut"* and *"the market has mostly given up on easing this year"*
-share no substrings at all, so full text finds nothing, trigram finds nothing,
-and the answer she gives is that you never discussed it.
+`007_semantic.sql` adds an `embedding` to notes and turns and a second arm to the
+same function. **It is reach, not a sixth memory**: the windows do not move,
+since every token in a window is paid on every request.
 
-`007_semantic.sql` adds an `embedding` column to both tables and a second arm to
-the same function. **It is not a sixth memory.** Her memories are lifetimes;
-this is the *reach* into two of them, and the windows do not move — twelve turns
-and twenty notes, because every token in a window is paid on every request.
-Everything a vector finds was already in the table.
+**The lexical arm stays, as the floor.** A vector is worse at exact strings — a
+date, a ticker, `R-08`, a note id — and a row with a null embedding does not
+appear in a nearest-neighbour query at all: half an archive quietly
+unsearchable. **Reciprocal rank fusion, not a weighted sum**: the arms' scores
+are on unrelated scales, RRF compares positions, and a row found by both
+outranks one first in either. A search returns a retired note MARKED rather than
+hidden, and says who said each turn — `note`, `you`, `him` — because a turn
+rendered as hers when it was his is a quote she would misattribute.
 
-**The lexical arm stays, and that is the load-bearing decision.** Two reasons,
-both of which bite. A vector is worse than trigram at exact terms — a date, a
-ticker, `R-08`, a note id — where the thing being asked for *is* the string. And
-a row whose embedding is null does not appear in a nearest-neighbour query at
-all: no error, no log, half an archive quietly unsearchable. The lexical arm is
-full coverage over both tables and cannot have that failure, so it is the floor
-under the semantic one rather than a fallback beside it.
+**Unset is a first-class state.** With no `EMBED_KEY` rows store no vector, the
+query vector is null, the semantic arms return nothing, and the fusion over one
+arm reproduces the lexical order exactly. Turning it on is a secret and a
+backfill. **The embedding model is pinned in the file**, unlike `STT_MODEL`:
+vectors from two models are not comparable, the column catches a change of width
+but not one at the same width, and the ranking would degrade into noise. A change
+means re-embedding both tables.
 
-**Reciprocal rank fusion, not a weighted sum**, and for the reason the two keys
-above exist: `ts_rank` and cosine distance are on unrelated scales, so any
-weighting of them is a constant somebody guessed. RRF compares only *positions*,
-needs no calibration, and makes a row found by both arms outrank one that is
-merely first in either.
-
-**Unset is a first-class state, so this shipped before the key existed.** With no
-`EMBED_KEY` every write stores its row without a vector, the query vector is
-null, both semantic arms return nothing, and the fusion over one arm reproduces
-exactly the ordering above. Turning it on is a secret and a backfill, not a
-deploy.
-
-**The embedding model is pinned in the file, not read from the environment**, and
-that is the whole difference between it and `STT_MODEL`. A transcription model
-chosen in a dashboard changes one answer. An embedding model chosen there changes
-what is *comparable to what* — vectors from two models are not comparable, the
-column type catches a change of width and cannot catch a change at the same
-width, and the ranking degrades into noise with nothing anywhere reporting it.
-Changing it is a code change, and it means re-embedding both tables.
-
-**The function is dropped and recreated, which this repository otherwise avoids.**
-The query vector is a new argument and `create or replace function` cannot change
-an argument list — creating the three-argument form beside the two-argument one
-makes an *overload*, so a two-argument call matches both and Postgres refuses it
-as ambiguous. A drop takes the grants with it, so the `revoke` and `grant` are
-part of the statement rather than a follow-up.
-
-**And `revoke … from public` is not the whole revoke**, which the live database
-had to be asked to find out. `public` there is the PUBLIC *pseudo-role*, which
-every new function carries `EXECUTE` for. `anon` and `authenticated` hold it
-*separately and by name*, from the default privileges Supabase sets on the
-`public` **schema** — two different things spelled the same way, so revoking one
-leaves the other in place and reports nothing. `eugenia_search` had been
-executable by the publishable key since 003 created it; nothing was exposed,
-because the function is not `security definer` and an `anon` caller meets RLS on
-two tables that have no policy for it, but the guarantee stated here was false.
-
-`verify.sql` now asks it of **every callable function in the schema** rather than
-of this one, through `has_function_privilege`, which answers for the role however
+**The function is dropped and recreated.** The query vector is a new argument,
+`create or replace` cannot change an argument list, and the old form beside the
+new is an overload a two-argument call cannot resolve. A drop takes the grants,
+so the `revoke` and `grant` are part of the statement. **And `revoke … from
+public` is not the whole revoke**: `public` is the PUBLIC pseudo-role, while
+`anon` and `authenticated` hold `EXECUTE` separately, from the default
+privileges Supabase sets on the `public` **schema**. `verify.sql` asks it of
+every callable function through `has_function_privilege`, which answers however
 the privilege arrived.
 
-**What cannot be checked from here is the part that matters most.** Nothing in
-the repository reaches a database or the vendor, so the ordering, the coverage
-floor, the widths and the grants are all held by tests and the *retrieval
-quality* is not. That shows up in use and nowhere else.
+Retrieval *quality* cannot be checked from here — nothing in the repository
+reaches the database or the vendor. The ordering, the coverage floor, the widths
+and the grants are held by tests; the rest shows up in use.
 
 ### Where he stands on each channel
 
