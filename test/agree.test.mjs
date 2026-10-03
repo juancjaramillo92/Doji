@@ -1,31 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — the copies that have to agree
    ───────────────────────────────────────────────────────────────────────────
-   Four runtimes, no build step, and facts that consequently live in more than
-   one file: the setups vocabulary, the four journal column names, Eugenia's
-   note limit and note kinds, and the names of the functions themselves.
+   Four runtimes and no build step, so some facts live in more than one file.
+   Copies are not the problem; copies NOTHING CAN COMPARE are. A test asserting
+   each copy against a literal typed beside it lets an editor change a list and
+   its own test in one pass, green. So every copy here is read out of its file
+   and held against the others. A few checks read one file against itself —
+   a boot guard against its secrets, a function body against the calls it must
+   make — and share the rest's failure shape, which is silence.
 
-   TWO CHECKS HERE ARE NOT ABOUT COPIES, and they are here because there is
-   nowhere better: each function's boot guard against the secrets it reads, and
-   `notesBlock()` against the three paths that must call it. Both are one file
-   read against itself rather than two files read against each other — what they
-   share with the rest is the shape of the failure, which is silence.
-
-   Copies are not the problem. Copies NOTHING CAN COMPARE are, and that is what
-   this closes. Every one of these values was already tested — and every one of
-   those tests asserted against a literal typed into the test file beside it, so
-   an editor changing a list and its own test in one pass left the other copy
-   untouched and the suite green.
-
-   Nothing here needs a build step or a running database. The app is read off
-   disk by the same harness the render tests use, the function exports import
-   directly, and the constraint is a line of text in a file.
-
-   WHAT THIS CANNOT SEE: the live database. trades_setup_check is asserted as
-   001_trades.sql declares it, not as Postgres holds it, so a constraint edited
-   by hand in the SQL editor would pass here. supabase/verify.sql is where that
-   is caught, and it is a query a person runs rather than something a suite can
-   reach.
+   WHAT THIS CANNOT SEE: the live database. Constraints are asserted as the SQL
+   declares them; a hand edit in the SQL editor passes here and is
+   supabase/verify.sql's to catch.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,9 +38,7 @@ const EUGENIA_TS = readFileSync(
 const EUGENIA_PROMPT = readFileSync(
   new URL('../supabase/functions/doji-eugenia/prompt.ts', import.meta.url), 'utf8');
 
-// The functions as the DIRECTORY holds them, not as a list typed here: the two
-// tests below both need it, and a fifth function added to one copy and not the
-// other is the same defect this file exists to catch.
+// The functions as the DIRECTORY holds them, not a list typed here.
 const DEPLOYED = readdirSync(new URL('../supabase/functions', import.meta.url),
   { withFileTypes: true })
   .filter(e => e.isDirectory() && !e.name.startsWith('_')).map(e => e.name).sort();
@@ -62,11 +46,8 @@ const DEPLOYED = readdirSync(new URL('../supabase/functions', import.meta.url),
 const FUNCTIONS = DEPLOYED.map(name => ({ name, text: readFileSync(
   new URL(`../supabase/functions/${name}/index.ts`, import.meta.url), 'utf8') }));
 
-/* The vocabulary as Postgres will enforce it, read out of the constraint rather
-   than out of a comment near it. Deliberately anchored on the constraint NAME:
-   a check written against some other column would not be this rule, and a
-   pattern that just hunted for quoted strings in the file would find the
-   direction vocabulary as happily as this one. */
+/* Read out of the constraint, anchored on its NAME: a pattern hunting quoted
+   strings would find the direction vocabulary as happily as this one. */
 function setupsInSchema() {
   const line = SCHEMA.match(/constraint\s+trades_setup_check\s+check\s*\(([^)]*)\)/i);
   assert.ok(line, 'trades_setup_check is not in 001_trades.sql at all');
@@ -79,17 +60,11 @@ const declaresColumn = (name) =>
   new RegExp(`^\\s*${name}\\s+(text|boolean)\\b`, 'mi').test(SCHEMA);
 
 /* ─── Eugenia's view, and the README's copy of it ────────────────────────────
-   The README quotes the whole `create or replace view` statement, because 003
-   starts with a CREATE TABLE and stops there on a database that already has the
-   tables — so re-applying the view means running that statement on its own, and
-   the README is where a person reads it from.
-
-   That makes the select list a fact in two files with nothing between them. A
-   column added to 003 and not to the README leaves the documented statement
-   building a view WITHOUT it, and running the documented one is the whole point
-   of quoting it: the reader would be handed a view missing the column they came
-   to add. Compared as a list rather than as text, so reformatting is free and
-   only the columns matter.
+   The README quotes the whole `create or replace view`, because 003 stops at
+   its first CREATE TABLE on a database that has the tables — so a person
+   re-applies the view from there. A column in 003 and not the README hands
+   them a view missing the column they came to add. Compared as a list, so
+   reformatting is free.
    ───────────────────────────────────────────────────────────────────────── */
 const viewColumns = (text, where) => {
   const stmts = [...text.matchAll(
@@ -103,21 +78,12 @@ const viewColumns = (text, where) => {
   });
 };
 
-/* EVERY COPY IN THE README, NOT THE FIRST ONE. It states this view twice — as
-   the statement an existing database runs on its own, and again inside the
-   migration that drops the view and rebuilds it — and a plain `match` reads
-   only the one at the top. The second is the copy that runs immediately after a
-   `drop view`, so a stale column list there rebuilds the wrong view on a
-   database that has just lost the right one, which is the worst moment for it. */
-/* THE LAST DEFINITION APPLIED IS THE ONE THE DATABASE HOLDS, and there is more
-   than one now. 003 creates the view; 006 replaces it to append the plan. A
-   reader — or a test — anchored on 003 would be describing a view that has not
-   existed since 006 ran, which is the same class of wrongness this whole file
-   exists to catch.
-
-   So the numbered files are read in order and the LAST statement wins, exactly
-   as Postgres resolves it. Nothing needs editing here when a future file
-   appends another column; the file simply joins the list. */
+/* EVERY COPY IN THE README. The second runs straight after a `drop view`, so a
+   stale column list there rebuilds the wrong view on a database that has just
+   lost the right one. */
+/* THE LAST DEFINITION APPLIED IS THE ONE THE DATABASE HOLDS: the numbered files
+   are read in order and the last statement wins, as Postgres resolves it, so a
+   later file appending a column simply joins. */
 // Read from the directory rather than from TRACKED, which is defined further
 // down this file — nothing may reference anything below it at load time.
 const NUMBERED = readdirSync(new URL('../supabase', import.meta.url))
@@ -126,11 +92,8 @@ const NUMBERED = readdirSync(new URL('../supabase', import.meta.url))
   .map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8'))
   .join('\n');
 
-/* Every column `trades` has, read out of 001's table and every later file's
-   `add column`, with whether Postgres generates it. Two readers need the list
-   and one of them needs the flag, so it is read once. Every numbered file, not
-   the one that happened to add the last column: 012 appended best_price and a
-   reader anchored on 006 did not see it arrive. */
+/* Every column `trades` has, from 001 and every later `add column`, with
+   whether Postgres generates it — every file, not the one that added the last. */
 const tradesColumns = () => {
   const schema = SCHEMA.slice(SCHEMA.indexOf('create table public.trades'));
   const declared = schema.slice(0, schema.indexOf('\n);'))
@@ -157,16 +120,10 @@ test('every eugenia_trades view the README states is the one the SQL ends with',
 });
 
 /* ─── The row as TWO files describe it ───────────────────────────────────────
-   `TradeRow` says in its own comment that it is the row eugenia_trades serves,
-   and it is the type every rule in adherence.ts is written against — so a
-   column the view gained and the interface did not is a column no rule can
-   name, invisibly. That is exactly what happened: 006 appended the plan to the
-   view and TradeRow went on describing the row without it for two releases.
-
-   IT MATTERS MORE NOW THAT A READ ASKS FOR `select=*`. readDesk takes whatever
-   the view serves precisely so the column list is not copied a fourth time —
-   which makes this interface the only description of what comes back, and a
-   wrong one indistinguishable from a right one at runtime.
+   `TradeRow` is the row eugenia_trades serves and the type every rule in
+   adherence.ts is written against, so a column the view gains and the
+   interface lacks is one no rule can name. readDesk asks for `select=*`, which
+   makes this interface the only description of what comes back.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('TradeRow names exactly the columns the view serves', () => {
@@ -186,16 +143,9 @@ test('TradeRow names exactly the columns the view serves', () => {
 });
 
 /* ─── What §8 says she holds, against what the view hands her ────────────────
-   §8 is the section she is told to read before producing any number, and its
-   first paragraph is the inventory of a row. For five versions it named four
-   columns the view does not serve — she followed its monthly instruction against
-   `net_pnl` and summed a column that was not there.
-
-   THE INVENTORY IS THEREFORE A COPY OF THE VIEW, in prose, in a file no SQL
-   change has any reason to touch. `id` is in the view and not in §8's list
-   because nothing in the document computes from it beyond the `PID` filter,
-   which §8 states separately — so it is added here rather than left as a
-   difference that would have to be explained every time this is read.
+   §8 is read before any number, and its first paragraph is the inventory of a
+   row — a copy of the view in prose, in a file no SQL change touches. `id` is
+   added here because §8 states the `PID` filter separately.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('§8 inventories exactly the columns the view serves', () => {
@@ -220,16 +170,13 @@ test('§8 inventories exactly the columns the view serves', () => {
     'row than the view hands her — either she reasons about a column that is ' +
     'not there, or one she has is invisible to her');
 
-  /* AND THE WITHHELD ONES STAY WITHHELD. §8 now explains why each is absent,
-     and every explanation is a rule she would otherwise have to be told: that
-     costs are already in the P&L, that balance is the wrong denominator, that
-     the unsettled figure is not reachable by name. Serving one silently turns
-     its paragraph into a wrong fact about her own document. */
+  /* AND THE WITHHELD ONES STAY WITHHELD. Each absence in §8 carries a rule —
+     costs are already in the P&L, balance is the wrong denominator, the
+     unsettled figure is not reachable by name — and serving one silently makes
+     its paragraph a wrong fact about her own document. */
   const cols = servedView();
-  // Scoped to the block that explains them. `balance` and `computed_pnl` are
-  // named all over §8 for other reasons, so searching the section rather than
-  // the block is a check that cannot fail — it passed with the whole paragraph
-  // for `balance` deleted.
+  // Scoped to the block that explains them: both names appear all over §8, so a
+  // section-wide search could not fail.
   const withheld = between('### On the row and deliberately withheld', '### Position size');
   for (const held of ['commission', 'balance', 'computed_pnl', 'user_id']) {
     assert.ok(!cols.includes(held),
@@ -246,14 +193,10 @@ test('the view exposes what the strategy computes from, and still hides the rest
   // and per-trade risk stay underivable however the prompt is written.
   assert.ok(cols.includes('size_oz'), 'Eugenia cannot see position size');
 
-  /* AND net_pnl, BECAUSE §8 SUMS IT AND `pnl` CANNOT BE SUMMED HONESTLY.
-     `pnl` is `coalesce(net_pnl, computed_pnl)`, so on a position whose broker
-     email has not landed it is the folded figure and carries no swap — and this
-     account holds through the 17:00 rollover. Served `pnl` alone she followed
-     §8's monthly instruction against a column that does not exist and produced
-     a total short by an unknown amount, on rows she could not identify. The
-     failure was silent for five versions of the document, which is why it is
-     asserted here rather than left to the prose in either file. */
+  /* AND net_pnl, BECAUSE §8 SUMS IT AND `pnl` CANNOT BE SUMMED HONESTLY. `pnl`
+     falls back to the folded figure, which carries no swap, and this account
+     holds through the 17:00 rollover — so a total over `pnl` alone is short by
+     an unknown amount on rows she cannot identify. */
   assert.ok(cols.includes('net_pnl'),
     'Eugenia cannot see net_pnl, so every multi-day total she gives silently ' +
     'falls back to computed_pnl and omits swap');
@@ -284,9 +227,8 @@ test('the setups vocabulary is the same list in all three places', async () => {
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {
   const { app, close } = await boot();
   try {
-    // The direction the failure has to hold in: the constraint is the last
-    // word, so every value reachable from a client must satisfy it, and nothing
-    // else may.
+    // The constraint is the last word: every value a client can reach must satisfy
+    // it, and nothing else may.
     const allowed = setupsInSchema();
     for (const s of app.CONFIG.SETUPS) assert.ok(allowed.includes(s), `${s} would be refused by Postgres`);
     for (const s of SETUPS)            assert.ok(allowed.includes(s), `${s} would be refused by Postgres`);
@@ -319,16 +261,9 @@ test('every journal column both writers name exists in the schema', async () => 
 });
 
 /* ─── And the two copies inside the redraw trigger ───────────────────────────
-   002_gladys.sql names the four journal columns twice more, and both copies are
-   typed SQL in a file no compiler reads. The WHEN clause decides that an answer
-   moved; the `before` object carries the answers as they stood, which is the
-   whole input to whether the redraw settles the form.
-
-   Each fails silently and differently. A column missing from the WHEN clause is
-   an answer that never reaches the Telegram message — the exact defect the
-   trigger was added to fix, back for one question out of four. A column missing
-   from `before` reads as unanswered, so a correction to a settled trade reopens
-   the form instead of leaving it settled.
+   002_gladys.sql names the four columns twice more. Missing from the WHEN
+   clause, an answer never reaches the Telegram message; missing from `before`,
+   it reads as unanswered and a correction to a settled trade reopens the form.
    ───────────────────────────────────────────────────────────────────────── */
 
 test('the redraw trigger watches, and carries, exactly the journal columns', async () => {
@@ -355,12 +290,10 @@ test('the redraw trigger watches, and carries, exactly the journal columns', asy
   } finally { close(); }
 });
 
-/* And the third read of that same before-state, which is a file against itself
-   rather than two files against each other — same shape as notesBlock() below,
-   and the same failure: silence. postAnswer() is the half of the redraw no test
-   can drive, because it talks to Telegram and PostgREST and nothing else calls
-   it. A constant in place of answered(before) there disagrees with the tap that
-   fired the trigger, and the second redraw is the one that lands. */
+/* And the third read of that before-state. postAnswer() talks only to Telegram
+   and PostgREST, so no test can drive it; a constant in place of
+   answered(before) there disagrees with the tap, and the trigger's redraw is
+   the one that lands. */
 
 test('the redraw decides from the before-state, not from a constant', () => {
   const src = readFileSync(
@@ -382,17 +315,14 @@ test('the redraw decides from the before-state, not from a constant', () => {
 test('no broker column is reachable through either writer', async () => {
   const { app, close } = await boot();
   try {
-    // The list that must never intersect: everything the poller, the email
-    // writer or the database itself owns. If one of these ever appears in
-    // Data.OWNED or in COLUMNS, the design's central guarantee is gone and
-    // there is suddenly something to arbitrate.
+    // Everything the poller, the email writer or the database owns. One of these in
+    // Data.OWNED or COLUMNS and there is suddenly something to arbitrate.
     const broker = [
       'id', 'user_id', 'direction', 'entry_time', 'fill_time', 'entry_price',
       'exit_price', 'commission', 'balance', 'open_day', 'net_pnl',
       'computed_pnl', 'pnl', 'deleted', 'created_at', 'updated_at',
-      // Gladys's own bookkeeping rather than a broker's, and it belongs on this
-      // list for the same reason: a tap or a save that could name it would be
-      // able to point her at somebody else's message, or lose the trade its own.
+      // Gladys's own bookkeeping: a tap or save that could name it could point her at
+      // another message, or lose the trade its own.
       'tg_message_id',
     ];
     const reachable = new Set([...app.Data.OWNED, ...Object.values(COLUMNS)]);
@@ -403,23 +333,13 @@ test('no broker column is reachable through either writer', async () => {
 });
 
 /* ─── The grant list is a fourth copy of what the app may write ──────────────
-   009 says the boundary to the database, and saying it added three more places
-   that state the same five column names: the `grant update (…)` itself and the
-   two arrays in verify.sql that check it. They have to agree with the app or the
-   file is wrong in one of two directions, and both are quiet.
+   The `grant update (…)` and the two arrays in verify.sql that check it must
+   agree with the app. Too NARROW and every save is a 403 that reads as the app
+   broken; too WIDE and `net_pnl` is writable from the browser console.
 
-   Too NARROW and the journal cannot be filled in — a revoke lands, the grant
-   misses a column, and every save fails with a 403 that reads as the app being
-   broken rather than as this being mis-stated. Too WIDE and the file has done
-   nothing: one broker column in that list and `net_pnl` is writable from the
-   browser console again, with every test here still green.
-
-   FIVE, NOT FOUR, AND THE FIFTH IS THE INTERESTING ONE. `Data.OWNED` holds the
-   four journal answers. `deleted` is not one of them and is deliberately on the
-   never-reachable list two tests above — no tap and no save may ever name it —
-   but the app does write it, through `remove()` and `undo()`, which call
-   `update()` directly. So a grant list derived from `Data.OWNED` alone reads as
-   obviously right and takes delete and undo out the moment it is applied.
+   FIVE, NOT FOUR. `deleted` is on the never-reachable list for taps and saves,
+   but `remove()` and `undo()` write it through `update()` — so a grant derived
+   from `Data.OWNED` alone looks right and breaks delete and undo.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the columns 009 grants are exactly the columns the app writes', async () => {
@@ -446,10 +366,9 @@ test('the columns 009 grants are exactly the columns the app writes', async () =
     assert.match(src, /update\(\{ deleted: false \}\)/, 'undo no longer clears deleted');
   } finally { close(); }
 
-  /* verify.sql states the same five twice — once as the columns that must NOT be
-     writable (by exclusion) and once as the ones that must. Both are read here
-     rather than one, because the exclusion list is the half that silently stops
-     protecting anything: add a broker column to it and the check still says 0. */
+  /* verify.sql states the five twice — as what must NOT be writable, by exclusion,
+     and as what must. The exclusion list is the half that silently stops
+     protecting: add a broker column to it and the check still says 0. */
   for (const [what, re] of [
     ['the exclusion list', /column_name not in\s*\n?\s*\(([^)]*)\)/],
     ['the positive list',  /from unnest\(array\s*\n?\s*\[([^\]]*)\]\) col/],
@@ -469,16 +388,10 @@ test('the columns 009 grants are exactly the columns the app writes', async () =
 });
 
 /* ─── Eugenia's note length ──────────────────────────────────────────────────
-   The ceiling used to live in three places — the truncation, the constraint,
-   and the sentence the tool description gives the model. Two of those are now
-   one: NOTE_MAX is the constant, and the description interpolates it, so the
-   model can no longer be promised a budget the code does not keep.
-
-   The constraint is the copy that remains, and it is the one that cannot be
-   fixed from this side. Truncate above it and every remember() is refused by
-   Postgres — writeNote catches that and answers "That did not save", which is
-   deliberate for a transient blip and exactly wrong for a permanent mismatch:
-   her memory stops working and the only sign is her not mentioning it.
+   NOTE_MAX is the constant and the tool description interpolates it. The
+   constraint is the copy that remains: truncate above it and every remember()
+   is refused, answered "That did not save" — right for a blip, and for a
+   permanent mismatch her memory simply stops.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const noteLimit = {
@@ -488,9 +401,8 @@ const noteLimit = {
 };
 
 test('the note length is one number on both sides of the wire', () => {
-  // Each read back out of its own file, so a pattern that stops matching yields
-  // NaN — and NaN against NaN would report a drift that is really this test
-  // having gone blind. Both are checked before they are compared.
+  // Each read from its own file; a pattern that stops matching yields NaN, so
+  // both are checked before they are compared.
   const truncated  = noteLimit.truncatedAt();
   const constraint = noteLimit.constrainedTo();
   assert.ok(Number.isInteger(truncated), 'NOTE_MAX is no longer a literal in doji-eugenia');
@@ -505,33 +417,19 @@ test('the note length is one number on both sides of the wire', () => {
     'the tool description states the budget as a literal again instead of interpolating NOTE_MAX');
 });
 
-/* ─── And the two kinds of note ──────────────────────────────────────────────
-   'fact' and 'instruction' are a vocabulary the model chooses from and Postgres
-   enforces, which is the same shape as the setups list and fails the same way:
-   a kind the tool offers and the constraint refuses makes every remember() of
-   that kind vanish, reported to nobody. A kind the constraint allows and the
-   tool never offers is dead weight that reads as coverage.
+/* ─── And the kinds of note ──────────────────────────────────────────────────
+   A vocabulary the model chooses from and Postgres enforces. A kind offered and
+   refused makes every remember() of it vanish; a kind allowed and never offered
+   is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ─── The five channels, in four places and two vocabularies ────────────────
-   prompt.ts declares them once and the prose interpolates the names, so her
-   vocabulary cannot drift from the list. The other three copies can: the tool's
-   enum is what she is allowed to name, the check constraint is what the database
-   will accept, and §2 of the strategy is the mechanism behind each one. An id
-   the tool offers and the constraint refuses is a set_channel that 400s —
-   reported to her as a database fault, and to nobody else at all. An id the
-   constraint allows that the tool never offers is a rung nothing can ever move:
-   it reads as a channel he has not reached, forever.
-
-   §2 IS THE COPY THAT IS NOT AN ID, which is why it is checked separately and
-   against the other half of the pair. She never utters "central_bank_buying"
-   across a desk, so §2 heads each channel with the SPOKEN name — and a name can
-   therefore drift with every id in the repository still agreeing.
-
-   EITHER WAY IT IS THE QUIET FAILURE. She would teach the channel, at length and
-   correctly, against a map with no rung for it — so the census that exists to
-   show what he has never met would report nothing at all about the thing she
-   spent the morning on.
+   prompt.ts declares them and the prose interpolates the names. The tool's enum
+   is what she may name, the constraint what the database accepts, and §2 the
+   mechanism behind each. Offered and refused is a set_channel that 400s;
+   allowed and never offered is a rung nothing can move. §2 heads each channel
+   with the SPOKEN name, so it is held against the names rather than the ids.
+   Either way she teaches a channel the census cannot see.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the five channels are the same five in the prompt, the tool, the constraint and §2', () => {
@@ -567,10 +465,8 @@ test('the five channels are the same five in the prompt, the tool, the constrain
 });
 
 test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
-  /* The read renders what it is given. A channel with no row would simply drop
-     out of her map — and the whole point of the map is that a channel he has
-     never touched is VISIBLE, so a missing row hides exactly what it exists to
-     show. */
+  /* A channel with no row drops out of her map, which hides exactly what the map
+     exists to show. */
   const seeded = [...(EUGENIA_SQL.match(/insert into public\.eugenia_channels[\s\S]*?on conflict/)?.[0] ?? '')
     .matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
   const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
@@ -580,17 +476,10 @@ test('the five rows are seeded, or a channel is invisible rather than unseen', (
 });
 
 /* ─── The rung that comes back down, and the one that cannot ────────────────
-   The ladder climbed only, for a reason: failing to reach for a mechanism once
-   is not the same as having lost it. What that reasoning missed is that HE can
-   say he has lost it — and promoting too early is her natural error, so without
-   a way down she keeps using a term bare that he told her he no longer follows,
-   with nothing anywhere reporting it.
-
-   THE BOTTOM RUNG IS STILL UNREACHABLE, and that is the half worth testing.
-   `unseen` says a channel has never once come up. It is the only absence this
-   system can see, and a demotion able to write it would report a channel she
-   taught last week as one he has never met — which is the census reporting the
-   opposite of the truth in the one column it exists for.
+   HE can say he has lost a channel, and promoting too early is her natural
+   error, so the ladder has a way down. THE BOTTOM RUNG IS STILL UNREACHABLE:
+   `unseen` says a channel never came up, and writing it back would report one
+   she taught last week as one he has never met.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a demotion can reach every rung but the bottom one', () => {
@@ -609,36 +498,18 @@ test('a demotion can reach every rung but the bottom one', () => {
 });
 
 /* ─── verify.sql is fatal on error, which makes a stale name expensive ───────
-   Nothing in this suite sees the live database, so verify.sql is the only check
-   on it — and it is one query returning one row per fact, which means an ERROR
-   is not a failed row. It aborts the statement, and every check below the line
-   that threw silently stops running.
-
-   THAT IS EXACTLY WHAT HAPPENED. A row asked has_function_privilege about
-   `public.eugenia_search(text, int)`, the signature 003 created and 007
-   deliberately dropped for the three-argument one. A text signature that does
-   not resolve raises 42883 rather than returning false, so from the day 007 was
-   applied the file died at that line, eleven checks below it never ran, and the
-   whole run reported itself as a fault in the database.
-
-   SO THE RULE IS ABOUT THE FORM, NOT ABOUT THAT NAME. Postgres has a
-   non-throwing way to ask about a function — an oid from pg_proc, or
-   to_regprocedure, which answers NULL — and the throwing forms are a text
-   signature and a regprocedure cast. Neither belongs in a file whose errors
-   take the rest of it with them.
+   It is one query returning one row per fact, so an ERROR is not a failed row:
+   it aborts the statement and every check below stops. A text signature that
+   does not resolve raises 42883 rather than returning false. Postgres has
+   non-throwing ways to ask — an oid from pg_proc, or to_regprocedure, which
+   answers NULL — and the throwing forms (a text signature, a regprocedure
+   cast) do not belong in a file whose errors take the rest with them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql expects exactly the triggers the numbered SQL creates on trades', () => {
-  /* THE SECOND THING THE STALE SIGNATURE HID. This row expected three triggers
-     — 001's touch and 002's two — and 005 added the event spine's two without
-     anyone changing it. Because it sits below the line that was aborting the
-     file, it had never once run, so the drift lived from 005 to now and then
-     announced itself as a correct database being wrong.
-
-     Both halves are read out of files. The expected list is whatever verify.sql
-     names today, and the truth is every `create trigger` in the numbered SQL
-     whose target is public.trades — so adding a trigger and forgetting the
-     check fails here, which is the round trip nothing was making. */
+  /* THE TRIGGERS ROW NAMES THEM. Both halves are read out of files — what
+     verify.sql expects, and every `create trigger` on public.trades in the
+     numbered SQL — so adding a trigger without the check fails here. */
   const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
 
   const expected = sql.match(
@@ -647,9 +518,8 @@ test('verify.sql expects exactly the triggers the numbered SQL creates on trades
   const named = expected[1].match(/'([^']*)'/g).join('').replace(/'/g, '')
     .split(',').map(t => t.trim()).filter(Boolean).sort();
 
-  /* `create trigger` and `create or replace trigger` both, and the target table
-     is on a later line — 002 uses the replace form because a plain create is
-     not atomic against an existing one. */
+  /* Both create forms; 002 uses `or replace` because a plain create is not atomic
+     against an existing trigger. The target is on a later line. */
   const created = [...NUMBERED.matchAll(
     /create\s+(?:or\s+replace\s+)?trigger\s+(\w+)\s+[\s\S]{0,120}?\bon\s+public\.trades\b/gi)]
     .map(m => m[1]).sort();
@@ -667,10 +537,9 @@ test('verify.sql names no function in a form that throws when it is gone', () =>
   const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
   assert.ok(sql.length > 1000, 'verify.sql could not be read — the reader has gone blind');
 
-  /* A quoted `public.name(args)` is the shape has_function_privilege and
-     to_regprocedure both take, and the first of those throws on a miss. The
-     safe forms name no arguments at all, so a signature literal anywhere in
-     this file is the defect regardless of what consumes it. */
+  /* A quoted `public.name(args)` is what has_function_privilege takes and throws
+     on a miss. The safe forms name no arguments, so a signature literal anywhere
+     here is the defect. */
   const signatures = [...sql.matchAll(/'public\.\w+\s*\([^']*\)'/g)].map(m => m[0]);
   assert.deepEqual(signatures, [],
     `verify.sql writes a function signature by hand: ${signatures.join(', ')} — it ` +
@@ -686,52 +555,31 @@ test('verify.sql names no function in a form that throws when it is gone', () =>
 });
 
 /* ─── The guard on his levels is a paragraph, and nothing else holds it ──────
-   She is handed his entry, his stop and his target on six paths now, and the
-   only thing between that and her quoting them back at him every morning is a
-   rule in the prompt. There is no structural half here — unlike the broker
-   token she does not hold, or the write path to `trades` that does not exist —
-   because the whole point of giving her the numbers is that she can use them
-   when he ASKS.
-
-   So the failure is a briefing that opens on the level he is long from. It
-   reads as her being relevant, keeps every prohibition she has, and quietly
-   makes the morning about his position rather than about the day. Deleting the
-   paragraph breaks nothing anywhere else.
+   She is handed his entry, stop and target so she can use them when he ASKS.
+   Nothing structural keeps them out of a message she starts; the failure is a
+   briefing opening on the level he is long from, which reads as relevance.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the prompt keeps his levels out of a message she starts', () => {
-  /* Read with the wrapping collapsed. The prompt is hard-wrapped at 84 columns
-     and a sentence that fits on one line today sits across two the moment a
-     word is added ahead of it — so a literal match here would go red on an edit
-     that changed nothing about the rule. */
+  /* Wrapping collapsed: the prompt is hard-wrapped, and a sentence moves across
+     lines when a word is added ahead of it. */
   const said = SYSTEM.replace(/\s+/g, ' ');
 
   assert.match(said, /HIS LEVELS DO NOT APPEAR IN A MESSAGE YOU START/,
     'the prompt no longer keeps his entry and his stop out of a message she ' +
     'opens — she has them on every path and nothing now says not to lead with them');
 
-  /* AND THE ONE REFUSAL. Everything else about an open position she may discuss
-     when he raises it; this is the sentence that keeps the discussion short of
-     advice, and it is the whole of the prohibition on the path where he is most
-     likely to want one. */
+  /* AND THE ONE REFUSAL, on the path where he is most likely to want advice. */
   assert.match(said, /any statement about what to DO with the position/,
     'the prompt no longer refuses trade management on the open position, which ' +
     'is the one thing the block was not built to enable');
 });
 
 test('she is told which two discipline columns lean, and where they lean', () => {
-  /* THE BIAS IS A PROPERTY OF THE COLUMN, NOT OF THE READING. followed_sl and
-     followed_tp are answered seconds after the fill, so they say what he meant
-     to do; they measure respect only where he goes back and corrects one, and a
-     correction he never made reads as compliance. Nothing on the row separates
-     the two.
-
-     It was stated at the trigger that asks the question and in the README's
-     account of it, and in neither place a reader of the FIGURE would look — so
-     she could report a stop-discipline rate off the view with no idea it leans,
-     which is the same failure as presenting a judgment rule's silence as a pass.
-     Read here because there is no structural half: delete the paragraph and
-     nothing breaks, and the number she gives still reads as a measurement. */
+  /* THE BIAS IS A PROPERTY OF THE COLUMN. followed_sl and followed_tp are answered
+     seconds after the fill, so they say what he meant; a correction he never
+     made reads as compliance. Told where she reads the FIGURE, or she reports a
+     stop-discipline rate with no idea it leans. */
   const said = SYSTEM.replace(/\s+/g, ' ');
 
   assert.match(said, /answered at OPEN/,
@@ -743,9 +591,8 @@ test('she is told which two discipline columns lean, and where they lean', () =>
 });
 
 test('the nightly pass is told a demotion is his to declare', () => {
-  /* The tool permits it and the prompt is what asks for it. Silence here is the
-     shape this defect had for its whole life: a mechanism that exists, is
-     documented, and is never once invoked because nothing tells her to. */
+  /* The tool permits it; the prompt is what asks for it. Without the asking, a
+     mechanism exists, is documented and is never once invoked. */
   assert.match(CONSOLIDATE, /comes back down when he says so/i,
     'the nightly pass is no longer told that he can declare a demotion, so the ' +
     'rung only ever climbs however the tool is written');
@@ -760,39 +607,26 @@ test('the rungs are the same words in the tool, the constraint and §0', () => {
   const enforced = [...(EUGENIA_SQL.match(/check \(state in \(([^)]*)\)/i)?.[1] ?? '')
     .matchAll(/'([a-z]+)'/g)].map(m => m[1]);
 
-  // ORDER MATTERS HERE, unlike the channels: this is a ladder, and the first
-  // element is the bottom rung — channelsList falls back to it for a row that
-  // is missing, and a reordered list would render an unseeded channel as owned.
+  // ORDER MATTERS: the first element is the bottom rung, and channelsList falls
+  // back to it for a missing row.
   assert.deepEqual(declared, ['unseen', 'explained', 'used', 'owns'],
     'the ladder has changed — say so here, and check what channelsList falls back to');
   assert.deepEqual(enforced.sort(), [...declared].sort(),
     'the check constraint and prompt.ts no longer hold the same rungs');
 
-  /* AND §0 SAYS WHAT TO DO AT EACH ONE, a row per rung, which is what turned
-     the ladder from a census into an instruction. A rung renamed anywhere else
-     leaves that table answering for a state nothing produces and silent on the
-     state she is actually handed — and the silence is the half that shows,
-     because she falls back to explaining everything or to explaining nothing. */
+  /* AND §0 SAYS WHAT TO DO AT EACH ONE. A rung renamed elsewhere leaves that table
+     answering for a state nothing produces and silent on the one she is handed. */
   const pitched = [...PITCH.matchAll(/^\| `([a-z]+)` \| /gm)].map(m => m[1]);
   assert.deepEqual(pitched, declared,
     'the strategy pitches at a different set of rungs than the map carries');
 });
 
 /* ─── The table she is handed, not the one she could fetch ───────────────────
-   THE TABLE WAS ALWAYS WELL-FORMED AND WAS NEVER READ, which is the exact shape
-   this repository keeps re-learning: the test above proved a row per rung and
-   proved nothing about whether the rows reach her.
-
-   §0 below its summary is `get_strategy`-only, and no prompt on any path tells
-   her to fetch it — so the one rule deciding how every explanation is pitched
-   sat in a section nothing opened. What she actually held was a pair of ends
-   quoted in two prompts, and the bottom of those is a rung `setChannel` refuses
-   to write back. She stopped building the week each channel was first mentioned
-   and could never start again, and every message after that was her following
-   the instruction she had.
-
-   So this asserts the table is IN the cached prefix, and that §0 serves the same
-   characters rather than a second copy of them.
+   A row per rung proves nothing about whether the rows reach her. §0 below its
+   summary is `get_strategy`-only and nothing tells her to fetch it, and
+   `unseen` is a one-way door — so a pair of ends quoted in the prompts left
+   every real rung without an instruction. This asserts the table is IN the
+   cached prefix, and that §0 serves the same characters.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the rule that decides how a term is pitched is in her context, not fetchable', () => {
   assert.ok(SYSTEM.includes(PITCH),
@@ -804,10 +638,8 @@ test('the rule that decides how a term is pitched is in her context, not fetchab
     '§0 no longer serves the same table she is handed — a second copy of the one ' +
     'rule that decides how she teaches, with nothing comparing them');
 
-  /* AND THE MIDDLE RUNGS CARRY AN INSTRUCTION, which is the half that was
-     missing rather than wrong. `unseen` stops being true permanently the first
-     time a subject comes up and `owns` is the far end; everything real sits
-     between them, and a table silent there leaves the binary rule standing. */
+  /* AND THE MIDDLE RUNGS CARRY AN INSTRUCTION: everything real sits between the
+     ends, and a table silent there leaves a binary rule standing. */
   for (const rung of ['explained', 'used']) {
     const row = PITCH.split('\n').find(l => l.startsWith(`| \`${rung}\``));
     assert.ok(row && row.replace(/\|/g, '').trim().length > rung.length + 30,
@@ -819,10 +651,8 @@ test('the rule that decides how a term is pitched is in her context, not fetchab
 test('the note kinds are the same three words in the tool and the constraint', () => {
   const offered = [...EUGENIA_TS.matchAll(/NOTE_KINDS = \[([^\]]*)\]/g)]
     .flatMap(m => [...m[1].matchAll(/'([a-z]+)'/g)].map(k => k[1])).sort();
-  /* THE LAST DECLARATION, read across every numbered file in order, because
-     that is the one Postgres holds: 003 created the constraint with two words
-     and 015 recreates it with three. Read from 003 alone, this compared the
-     tool against a constraint the database no longer has. */
+  /* THE LAST DECLARATION across the numbered files, because that is the one
+     Postgres holds. */
   const declared = [...NUMBERED.matchAll(/eugenia_notes_kind_check\s+check \(kind in \(([^)]*)\)/gi)];
   assert.ok(declared.length >= 2,
     `found ${declared.length} declarations of eugenia_notes_kind_check — the reader has gone blind`);
@@ -838,13 +668,11 @@ test('the note kinds are the same three words in the tool and the constraint', (
 
 
 /* ─── A commitment is only worth having if something checks it ──────────────
-   Three halves, and each is silent without the others. `/notes` hands him the
-   audit — its argument DEFAULTS, so a call site that stops reading commitments
-   still answers, correctly formatted, minus the one list he would look for.
-   SYSTEM tells her to record one and to say so when a trade breaks it.
-   CONSOLIDATE is the only place a commitment whose week is over gets retired
-   with how it went; without it they pile up in her window for ever, each one
-   still being "held against" trades it was never about.
+   Three halves, each silent without the others. `/notes` hands him the audit,
+   and its argument DEFAULTS, so a call site that stops reading commitments
+   still answers — minus the list. SYSTEM tells her to record one and to say
+   when a trade breaks it. CONSOLIDATE retires one whose week is over, or they
+   pile up in her window held against trades they were never about.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a commitment is recorded, audited, held against his trades and retired', () => {
@@ -870,16 +698,10 @@ test('a commitment is recorded, audited, held against his trades and retired', (
 });
 
 /* ─── Who the database and Gmail think they are calling ─────────────────────
-   A function's name is in its directory, in the Deno.serve URL Supabase derives
-   from that directory, and in every caller's URL — and the callers are a SQL
-   file and an Apps Script, which no compiler, deploy or type check ever reads.
-   Renaming doji-telegram to doji-gladys meant editing a trigger body and a cron
-   job by hand, and a missed one is a 404 into a void: pg_net discards the
-   response, so the trade simply goes unannounced.
-
-   So this asserts the other direction from verify.sql. verify.sql reads the
-   live database and checks the trigger names doji-gladys; this reads every
-   caller in the repository and checks each one names a function that exists.
+   A function's name is its directory and every caller's URL, and the callers
+   are SQL and an Apps Script that nothing compiles. A missed rename is a 404
+   pg_net discards. verify.sql checks the live trigger; this checks every
+   caller in the repository names a function that exists.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const read = (path) =>
@@ -915,33 +737,21 @@ test('every function a caller names is a function that exists', () => {
 });
 
 /* ─── Every CSS rule is reachable, and the scan that says so was proved first ─
-   The audit scanned CONFIG keys, declarations and `id` attributes; it never
-   scanned CSS RULES, so a selector whose class stopped being emitted has been
-   invisible for the life of the file. It fails in the quietest way available —
-   the rule stays, costs nothing, matches nothing, and reads as styling for
-   something that exists.
+   A selector whose class stopped being emitted costs nothing, matches nothing
+   and reads as styling for something that exists. Two ways a scan goes blind:
 
-   THE FIRST VERSION OF THIS REPORTED A CLEAN FILE AND WAS BROKEN, which is the
-   fourth time that has happened here and the reason the proof is written down.
-   Two ways it went blind:
+     · Substring matching — `.win` is "found" inside `window`. Names match as
+       whole tokens.
+     · Treating any prefix before a quote as runtime construction — every class
+       sits before a quote somewhere. A name assembled at runtime is a literal
+       prefix ending where the variable begins (`'sess-wr-' + key`,
+       `` `sess-wr-${key}` ``), so the prefix must be quote-terminated or
+       followed by `${`, and end at a dash.
 
-     · Substring matching. `.win` is "found" inside `window`, and the audit's own
-       scan had `"poll"` matching a paragraph about the poller. Names are matched
-       as whole tokens now, bounded by anything that is not a name character.
-
-     · A prefix sitting before a quote counted as dynamic construction. Every
-       class in the file sits before a quote somewhere, so `.watch-movedx` —
-       planted by renaming a live rule — "matched" `class="watch-moved">` and was
-       waved through as built at runtime. A name assembled at runtime appears as
-       a literal prefix that ENDS where the variable begins: `'sess-wr-' + key`
-       or `` `sess-wr-${key}` ``. So the prefix must be quote-terminated or
-       followed by `${`, and must end at a dash.
-
-   Proved against three planted defects — an invented rule, a live rule renamed
-   in the stylesheet only, and a rule mentioned nowhere but a comment — and
-   against a fourth that must NOT be flagged, an invented `.sess-wr-*` that a
-   real prefix reaches. Comments are stripped from the searched text for the
-   same reason the third case exists.
+   Proved against planted defects — an invented rule, a live rule renamed in
+   the stylesheet only, a rule named only in a comment, a substring of a live
+   name — and an invented `.sess-wr-*` a real prefix reaches, which must NOT be
+   flagged. Comments are stripped from the searched text.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // Exported shape rather than inline, so the proof above can be re-run against a
@@ -995,9 +805,7 @@ test('every CSS rule in the client is reachable from the markup or the script', 
   const src = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const got = deadRules(src);
 
-  // WITHOUT THESE THE ASSERTION BELOW PASSES ON A PARSER THAT FOUND NOTHING,
-  // which is how a scan reports a clean file three times running and is wrong
-  // every time.
+  // WITHOUT THESE THE ASSERTION BELOW PASSES ON A PARSER THAT FOUND NOTHING.
   assert.ok(got.selectors > 250,
     `only ${got.selectors} selectors parsed — the brace walk has stopped working`);
   assert.ok(got.classes > 150,
@@ -1019,7 +827,7 @@ test('the dead-rule scan can actually find a dead rule', () => {
     'the scan cannot see a selector that is styled and never emitted');
 
   // A LIVE rule renamed in the stylesheet only — the shape a rename actually
-  // leaves, and the one the first version of this scan waved through.
+  // leaves, and one a quote-adjacent prefix would wave through.
   const i = src.indexOf('<style>'), j = src.indexOf('</style>');
   const renamed = src.slice(0, i) + src.slice(i, j).replace(/\.watch-moved/g, '.watch-movedx') + src.slice(j);
   assert.deepEqual(deadRules(renamed).dead, ['.watch-movedx'],
@@ -1032,12 +840,9 @@ test('the dead-rule scan can actually find a dead rule', () => {
     ['.doji-ghost-rule'],
     'a comment mentioning a class is being read as the class being used');
 
-  /* A NAME THAT IS A SUBSTRING OF A LIVE ONE, which is the case the other three
-     cannot separate. `.hm` appears inside `hm-profit` on the page and never once
-     as a class of its own, so a scan matching substrings calls it reachable and
-     a scan matching tokens calls it dead. Without this the whole proof passes on
-     `rest.includes(name)` — the loosest possible reader — and the audit's `poll`
-     failure would be reproduced here with nothing saying so. */
+  /* A NAME THAT IS A SUBSTRING OF A LIVE ONE: `.hm` appears inside `hm-profit`
+     and never as a class of its own. Without this the proof passes on
+     `rest.includes(name)`, the loosest possible reader. */
   assert.deepEqual(deadRules(plant('.hm{color:red}')).dead, ['.hm'],
     'a class that only ever appears as part of a longer name is being read as ' +
     'used — the scan is matching substrings rather than whole tokens');
@@ -1050,22 +855,14 @@ test('the dead-rule scan can actually find a dead rule', () => {
 });
 
 /* ─── Every top-level declaration is reached from somewhere in the file ──────
-   The companion to the rule scan above, and it catches the likelier shape by
-   far: not a function somebody wrote and never called, but a live one whose
-   last CALLER was deleted. `render()` is a list of eight steps, and removing a
-   line from that list leaves the renderer it named intact, exported to the
-   harness, still passing its own tests, and reached by nothing on the page.
+   The likely shape is not a function never called but a live one whose last
+   CALLER was deleted: drop a line from render()'s step list and the renderer
+   is intact, exported, passing its tests, and reached by nothing. index.html
+   ALONE, because a function only the harness names is dead in the app.
 
-   IT READS index.html ALONE, DELIBERATELY. A function the test harness still
-   names in `EXPOSED` but the app no longer calls is dead in the app, and a scan
-   that counted the harness would call it live and be wrong in the direction
-   that matters.
-
-   Known limitation, stated rather than worked around: string contents are not
-   stripped, so a declaration mentioned only inside a string literal reads as
-   referenced. Stripping them properly needs a JS parser — a template literal
-   holds real code inside `${}` — and no function in this file is named in a
-   string. Comments ARE stripped, which is the case that actually occurs.
+   Strings are not stripped — that needs a JS parser, since `${}` holds code —
+   so a name inside a string literal reads as referenced; none is. Comments
+   ARE stripped.
    ─────────────────────────────────────────────────────────────────────────── */
 
 export function unreferenced(src) {
@@ -1113,35 +910,17 @@ test('the unreferenced-declaration scan can actually find one', () => {
     'function dojiGhostFn() { return 1; }\n// dojiGhostFn is named only here\n\n')).dead
     .includes('dojiGhostFn'), 'a comment naming a function reads as calling it');
 
-  /* THE ONE THAT ACTUALLY HAPPENS: a live renderer whose only caller is dropped
-     out of render()'s step list. Nothing else in the suite notices — the
-     function still exists, still passes its own tests, and is still exported to
-     the harness; it is simply never reached from the page. */
+  /* THE ONE THAT HAPPENS: a live renderer dropped out of render()'s step list. */
   assert.ok(unreferenced(src.replace('    () => renderSetups(rows),\n', '')).dead
     .includes('renderSetups'),
     'dropping a step from render() leaves its renderer unreferenced and unseen');
 });
 
 /* ─── verify.sql's header counts its own checks ──────────────────────────────
-   It was a FOOTER, and the footer was a paragraph for someone already lost:
-   they ran the whole file, the editor showed them the last of ten statements,
-   and the checks they came for scrolled past unseen. It told them how many were
-   thrown away — and it said fifty-seven while the summary held sixty, which is
-   a file describing itself wrongly in the one place read under confusion.
-
-   The file is one statement now and the listings are `diagnose.sql`, so nobody
-   arrives at the bottom lost and the count belongs where it is read BEFORE
-   running instead. The number still has to be right, and for the same reason.
-
-   The number is a digit rather than a word so it can be compared. This
-   repository has been bitten by a stale count twice already; CLAUDE.md's
-   preference for a name or a `string_agg` over a count does not help here,
-   because the thing being stated IS a quantity. So it is counted instead.
-
-   The rows are matched on their shape in the VALUES list — `('check name',` at
-   two spaces of indent — and the count is bounded below as well as compared, so
-   a pattern that stopped matching reports a broken reader rather than agreeing
-   with a footer that says zero.
+   The count is read BEFORE running, so it has to be right. It is a quantity,
+   so it is a digit and counted. Rows are matched on their shape in the VALUES
+   list — `('check name',` at two spaces — and the count is bounded below, so a
+   pattern that stopped matching reports a broken reader.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql says how many checks it runs, and runs that many', () => {
@@ -1163,14 +942,9 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
     `the header says ${stated[1]} checks and the summary holds ${rows} — the file ` +
     `is wrong about itself in the paragraph read before it is run`);
 
-  /* AND ONCE. A second copy of the count is a second thing to update, held
-     together by nothing — the first stayed right while the sentence explaining
-     WHY it is a digit carried the previous release's number, in the same
-     paragraph, four lines below it.
-
-     The numbered files are named in this paragraph (001, 002, 003, 004) and are
-     not counts, so they come out first — by their three-digit shape rather than
-     by a list, which would need extending the day a 011 is written. */
+  /* AND ONCE: a second copy of the count is held together by nothing. The
+     numbered files named in the header are not counts, so they come out first,
+     by their three-digit shape. */
   const others = (header.replace(/\b0\d{2}\b/g, '').match(/\b\d{2,}\b/g) || [])
     .filter(n => n !== stated[1]);
   assert.deepEqual(others, [],
@@ -1179,20 +953,10 @@ test('verify.sql says how many checks it runs, and runs that many', () => {
 });
 
 /* ─── No colour is written in the script, only read from a token ─────────────
-   The palette is tokenised in CSS, and the rule that nothing in the script
-   writes a colour is what keeps light and dark honest: a hex typed into a chart
-   config is invisible to the stylesheet, so it survives a theme change, a
-   palette revision and every review that reads the CSS to see what a colour is.
-
-   Chart.js cannot read a CSS variable, which is exactly why `cssToken()` exists
-   and why the temptation is real — the fix for "the chart needs a colour" looks
-   like typing one. Every value it needs is resolved through `cssToken()` into a
-   module constant instead.
-
-   The rule was stated in CLAUDE.md and enforced by nothing. Comments are
-   stripped first: a comment naming a token's value is documentation, not a
-   colour being written, and failing on one would push the next author to delete
-   the explanation rather than the literal.
+   A hex typed into a chart config is invisible to the stylesheet and survives
+   every theme change and palette revision. Chart.js cannot read a CSS
+   variable, so `cssToken()` resolves each into a module constant. Comments are
+   stripped first: a comment naming a token's value is documentation.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the client writes no colour of its own, and reads them all through cssToken', () => {
@@ -1216,22 +980,11 @@ test('the client writes no colour of its own, and reads them all through cssToke
 });
 
 /* ─── Every maintenance door is named in the README ──────────────────────────
-   The doors are `?force=1`, `?raw=1`, `?consolidate=1` and the rest: query
-   parameters that exist so a person can exercise a path by hand when something
-   has gone wrong. A door nobody can find is a door that does not exist — it is
-   reached at exactly the moment nobody is going to read the source to discover
-   it.
-
-   `?pulse=1` was that door. The pulse itself has a section of its own; the way
-   to fire one by hand appeared nowhere, while every sibling door was written
-   down. Worse, the table stating WHAT A HOLDER OF THE CRON SECRET CAN CAUSE
-   named two of the six on `doji-eugenia` and omitted `?consolidate=1`, which
-   runs the nightly pass and WRITES her memory. That table exists because "the
-   worst case is nothing" was once the sentence that stopped anyone checking the
-   worst case.
-
-   Matched on the door name rather than on prose about the feature: the pulse
-   was discussed at length in a section that never says how to fire one.
+   The doors are query parameters for exercising a path by hand when something
+   has gone wrong — reached exactly when nobody will read the source to find
+   them. They also bound what a holder of the cron secret can cause, and
+   `?consolidate=1` WRITES her memory. Matched on the door name, not on prose
+   about the feature.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every door a function opens is written down in the README', () => {
@@ -1258,21 +1011,10 @@ test('every door a function opens is written down in the README', () => {
 });
 
 /* ─── No paragraph is said to her twice ──────────────────────────────────────
-   `prompt.ts` and `strategy.ts` are the two files where prose IS the program,
-   and a duplicated passage there is worse than a duplicated function. It is
-   sent on every request; it is in the CACHED prefix, so it is paid for and
-   carried whether or not it is read; and the day someone sharpens one copy the
-   model is handed the sharpened instruction and the blunt one together, with
-   nothing anywhere reporting a contradiction.
-
-   Fourteen identical lines were sitting in `prompt.ts` — the whole passage
-   about every quote figure being measured from the 17:00 New York roll, stated
-   twice in a row. Nothing could have caught it: there is no compiler for prose,
-   the tests that read this file look for phrases rather than for repetition, and
-   a prompt reads perfectly well with a paragraph in it twice.
-
-   Six lines, because that is long enough that no two paragraphs arrive at it by
-   coincidence and short enough to catch a passage repeated in part.
+   In `prompt.ts` and `strategy.ts` prose IS the program. A duplicate is paid
+   for on every request in the cached prefix, and the day one copy is
+   sharpened she is handed both with nothing reporting the contradiction. Six
+   lines: too long to arise by coincidence, short enough to catch a part.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no passage of the prompt or the strategy is stated twice', () => {
@@ -1305,20 +1047,10 @@ test('no passage of the prompt or the strategy is stated twice', () => {
 });
 
 /* ─── No read of her tables goes round the one that checks the status ────────
-   `readRows` is ask, refuse on a bad status, parse. What makes it worth having
-   is the middle step, and what makes it worth ENFORCING is how quietly that step
-   fails when it is missing: PostgREST answers a missing table with a 404
-   carrying a JSON body, so `await res.json()` succeeds and the caller is handed
-   an object where it expected an array. An unapplied migration then reads as a
-   block with nothing to say — no error, no log, no empty state, just silence
-   where a paragraph was.
-
-   Fourteen hand-written copies is fourteen chances to leave the check out. One
-   is one, and this is what stops a fifteenth being written beside it.
-
-   `fillEmbeddings` is the single exemption and is named rather than pattern-
-   matched: it reads `content-range` off the response to report how much backlog
-   is left, which a helper returning rows cannot give it.
+   `readRows` is ask, refuse on a bad status, parse. PostgREST answers a missing
+   table with a 404 carrying JSON, so a bare `res.json()` hands the caller an
+   object for an array, and an unapplied migration reads as a block with
+   nothing to say. One helper, and this stops a second copy being written.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every read of her tables goes through readRows', () => {
@@ -1328,10 +1060,8 @@ test('every read of her tables goes through readRows', () => {
   assert.match(src, /async function readRows<T>\(what: string, url: string\)/,
     'readRows is gone — every read is hand-written again');
 
-  /* NAMED, NOT COUNTED. A count says three and stays three while one exemption
-     is removed and a bypass is added, which is the drift this repository has
-     been bitten by before. Each raw GET is attributed to the function it sits
-     in, and the SET has to match. */
+  /* NAMED, NOT COUNTED: a count stays three while one exemption goes and a bypass
+     arrives. Each raw GET is attributed to its function, and the set must match. */
   const fns = [...src.matchAll(/^(?:export )?(?:async )?function (\w+)/gm)]
     .map(m => [m.index, m[1]]);
   const enclosing = (at) => {
@@ -1347,13 +1077,12 @@ test('every read of her tables goes through readRows', () => {
 
   const where = [...new Set(raw.map(m => enclosing(m.index)))].sort();
 
-  /* Three functions may call fetch directly, and each for a reason that a
-     rows-returning helper cannot serve:
-
+  /* Each needs what a rows-returning helper cannot give:
+  
        readRows        it IS the helper
-       fillEmbeddings  reads `content-range` off the response to report backlog
-       healthBlock     a 404 is a SUPPORTED state — 008 not applied yet — so it
-                       returns "" rather than throwing, and readRows throws */
+       fillEmbeddings  reads `content-range` to report backlog
+       healthBlock     a 404 is a SUPPORTED state — 008 not applied — so it
+                       returns "" where readRows throws */
   assert.deepEqual(where, ['fillEmbeddings', 'healthBlock', 'readRows'],
     `these functions read her tables without readRows: ${where.join(', ')}. A missing ` +
     `status check does not throw — PostgREST answers a missing table with a 404 ` +
@@ -1361,18 +1090,11 @@ test('every read of her tables goes through readRows', () => {
     `block it feeds simply falls silent.`);
 });
 
-/* ─── The Node floor has one home, and CI has to read it from there ──────────
-   `engines.node` states the floor and package.json is the only file allowed to.
-   It is jsdom's requirement, above the 22.6 that `--experimental-strip-types`
-   needs, and jsdom is a dependency that moves — so the floor moves with it.
-
-   A workflow pinning `node-version: 22` is a second copy of that decision that
-   nothing compares. It resolves to the newest 22.x, which is why it has always
-   been above the floor and why the disagreement is invisible: the day the floor
-   goes past the newest 22.x, three workflows install a Node the suite is not
-   claimed to run on and go green doing it. setup-node resolves the range in
-   engines.node itself, so the copy is avoidable rather than unavoidable — which
-   is why this asserts one home instead of holding two together.
+/* ─── The Node floor has one home, and CI reads it from there ────────────────
+   `engines.node` states the floor, which moves with jsdom. A workflow pinning
+   `node-version: 22` is a second copy nothing compares: it resolves to the
+   newest 22.x, so the day the floor passes that, CI installs a Node the suite
+   is not claimed to run on and goes green. setup-node reads engines.node.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const WORKFLOWS = ['.github/workflows/test.yml',
@@ -1385,11 +1107,9 @@ test('every workflow takes its Node version from the one file that states it', (
     'package.json no longer states a Node floor, so node-version-file resolves ' +
     'to nothing and every workflow below is reading an empty decision');
 
-  // engines on its own is a note npm prints past — proved by raising the floor
-  // to >=99 and watching `npm ci` install happily. engine-strict is what turns
-  // it into a gate, on a runner and on a laptop alike, which is also what makes
-  // a green CI run evidence that the Node installed is above the floor rather
-  // than evidence that the workflow parsed.
+  // engines alone is a note npm prints past (proved: a floor of >=99 installed
+  // happily). engine-strict makes it a gate, so a green CI run means the Node
+  // installed is above the floor.
   const npmrc = readFileSync(new URL('../.npmrc', import.meta.url), 'utf8');
   assert.match(npmrc, /^engine-strict\s*=\s*true$/m,
     '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
@@ -1407,24 +1127,12 @@ test('every workflow takes its Node version from the one file that states it', (
 });
 
 /* ─── A tag is a name its owner can move; a commit is the code you read ──────
-   Every `uses:` here is a 40-character commit, and the rule is worth a test
-   because the mutable form is the one a person types from memory. `@v7` is
-   shorter, it is what every README shows, and it re-fetches whatever that tag
-   points at on every run — so the audit of an action and the run of it are two
-   different trees, silently.
-
-   supabase/setup-cli@v1 was the case that made this real: not a tag but a
-   BRANCH, which is a ref expected to move in the ordinary course of somebody
-   else's work, in the job that holds SUPABASE_ACCESS_TOKEN. Nothing here reads
-   a secret it is not handed — both credentials are scoped to their own step —
-   so what an earlier action reaches is the toolchain rather than the
-   environment: setup-node provides the `node` that reads SB_SECRET_KEY one step
-   later, setup-cli the `supabase` the deploy hands its token to.
-
-   The trailing `# v7.0.1` is what keeps the line legible and is deliberately
-   NOT asserted: Dependabot writes it beside the SHA it bumps, and a test on a
-   comment would fail on the formatting of a machine-written line rather than on
-   anything true. The SHA is the half that carries the guarantee.
+   Every `uses:` is a 40-character commit. `@v7` is what a person types from
+   memory and re-fetches whatever the tag points at, so the audit of an action
+   and the run of it are two trees. Credentials are step-scoped, so what an
+   earlier action reaches is the toolchain: setup-node provides the `node` that
+   reads SB_SECRET_KEY a step later. The trailing `# v7.0.1` is Dependabot's and
+   NOT asserted; the SHA carries the guarantee.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every action a workflow runs is named by commit, not by a movable tag', () => {
@@ -1442,15 +1150,9 @@ test('every action a workflow runs is named by commit, not by a movable tag', ()
     `current.`);
 });
 
-/* The project ref is not a secret, and it is not a URL everywhere it appears:
-   config.toml carries it as project_id and the deploy workflow as
-   --project-ref. So all three shapes are matched, and each is anchored to the
-   text around it — hunting for a bare twenty-letter word would find one in
-   index.html sooner or later and fail for a reason that is not this.
-
-   A copy in every language here and nothing else checking any of them. A
-   restore into a new project means editing every one, and the one that is
-   missed keeps talking to the old project for as long as it exists. */
+/* The project ref in all three of its shapes — a URL, config.toml's project_id,
+   the workflow's --project-ref — each anchored to its context. A restore into
+   a new project edits every one, and a missed one keeps talking to the old. */
 const REF = /https:\/\/([a-z]+)\.supabase\.co|project_id\s*=\s*"([a-z]+)"|--project-ref\s+([a-z]+)/g;
 
 const refs = (text) => [...text.matchAll(REF)].map(m => m[1] ?? m[2] ?? m[3]);
@@ -1469,23 +1171,14 @@ test('every file that names the Supabase project names the same one', () => {
 
 
 /* ─── Every secret a function needs is one it refuses to run without ────────
-   Each function opens by answering 503 if a required secret is unset, because
-   the alternative is a function that starts, authorises nobody and reports
-   nothing — the shape SB_SECRET_KEY's misspelling had for months.
-
-   That guard is a hand-written list, and the failure is adding a secret and not
-   adding it to the list. Nothing else could catch it: an unset secret makes the
-   function behave differently, not crash, and no test here can set one. So this
-   reads both lists out of the file and requires them to be the same list.
-
-   The guard must also be a chain of ORs. `!A || !B && !C` parses as
-   `!A || (!B && !C)`, which reads exactly like the correct thing and lets two
-   of the three go missing unnoticed — one `&&` in a line of five clauses.
+   Each function answers 503 if a required secret is unset, rather than starting
+   and authorising nobody. The guard is a hand-written list, so this reads the
+   file's own env reads and requires the guard to match. It must be a chain of
+   ORs: `!A || !B && !C` parses as `!A || (!B && !C)` and lets two go missing.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // The consts a function binds from its own environment. SB_KEY and SB_URL come
-// from _shared and are named in the guards without being bound here, which is
-// why the comparison runs from the file's own reads to the guard.
+// from _shared, so the comparison runs from the file's reads to the guard.
 const bound = (text) =>
   [...text.matchAll(/^const\s+([A-Z_]+)\s*=\s*env\((.*)$/gm)]
     .map(m => ({ name: m[1], line: m[2] }));
@@ -1499,28 +1192,14 @@ const guardClause = (text) => {
   return lines[at - 1].match(/^\s*if \((.+)\) \{\s*$/)?.[1] ?? null;
 };
 
-/* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, named here rather than waved
-   through. The boot guard exists because a missing secret used to surface as a
-   downstream failure hours later — so an exemption from it has to be a decision
-   somebody wrote down, not the absence of one.
+/* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, each a decision written down.
+   All are external vendors for one capability: speech-to-text (the Messages
+   API takes no audio), embeddings (unset, search is full text and trigram),
+   and speech (unset, the text goes). Unlike a missing bot token, one
+   capability is absent and every other path is untouched.
 
-   Three, and all three are external vendors this system otherwise has no use
-   for. Speech-to-text: the Messages API takes text and images and not audio,
-   and Telegram does not transcribe for bots, so hearing a voice note needs one.
-   Embeddings: Anthropic serves none, and semantic search is a widening of a
-   reach that already works without it — unset, the search is full text and
-   trigram, which is what it was. Speech: unset, she answers a voice note in
-   text, which is what every other message gets.
-
-   ALL THREE ARE A DIFFERENT KIND OF THING FROM EUGENIA_BOT_TOKEN being unset,
-   where nothing works at all and the right answer is to refuse every request.
-   Here one capability is absent and every other path is untouched.
-
-   THE EXEMPTION IS NOT FREE. Each one has to be guarded where it is USED, so
-   "optional" means a branch that handles its absence rather than a value that
-   reaches a fetch as an empty string. That check is below, and it is the half
-   that stops this list becoming somewhere to hide a secret that is actually
-   required. */
+   NOT FREE: each must be guarded where it is USED — a branch that handles its
+   absence rather than an empty string reaching a fetch. That check is below. */
 const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY']);
 
 test('an optional secret is guarded where it is used', () => {
@@ -1551,14 +1230,11 @@ test('a function refuses to run without every secret it reads', () => {
     const required = bound(text)
       .filter(b => !b.line.includes('||') && !OPTIONAL.has(b.name))
       .map(b => b.name);
-    // SB_KEY is not bound here — it comes from _shared — so it has to be added
-    // by hand, and it is the secret whose silent absence this whole guard is
-    // named after.
+    // SB_KEY comes from _shared, so it is added by hand.
     if (/\bSB_KEY\b/.test(text)) required.push('SB_KEY');
 
-    // WITHOUT THIS THE LOOP BELOW IS VACUOUS. bound() reads `const X = env(` and
-    // a file that stopped binding its secrets that way would satisfy every
-    // guard, including `if (false)`.
+    // WITHOUT THIS THE LOOP BELOW IS VACUOUS: a file that stopped binding its
+    // secrets as `const X = env(` would satisfy every guard.
     assert.ok(required.length >= 2,
       `${name}: only ${required.length} required secrets found — the reader has gone blind`);
 
@@ -1572,16 +1248,11 @@ test('a function refuses to run without every secret it reads', () => {
 
 
 /* ─── The one door, and the property no assertion about its answer can see ───
-   secretMatches is why _shared/edge.ts exists at all: four functions authorise
-   their callers with it, and a copy quietly rewritten to `presented === expected`
-   returns the identical answer to every behavioural test anyone would think to
-   write, while comparing byte by byte and stopping at the first difference —
-   which hands an attacker the expected secret's length, then its leading bytes,
-   one timed request at a time.
-
-   So the guarantee is structural or it is nothing. Both halves are read: the
-   loop that visits every byte of the longer input, and the absence of a direct
-   comparison of the two secrets, which is the shape the rewrite would take.
+   secretMatches rewritten to `presented === expected` gives the same answer to
+   every behavioural test while stopping at the first differing byte — leaking
+   the secret's length and leading bytes one timed request at a time. So both
+   halves are read: the loop over every byte of the longer input, and the
+   absence of a direct comparison.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the secret comparison cannot stop early, whatever its answer', () => {
@@ -1605,23 +1276,15 @@ test('the secret comparison cannot stop early, whatever its answer', () => {
 });
 
 /* ─── Every function says the same thing about its own gateway ──────────────
-   verify_jwt = false is stated twice on purpose — once per function in
-   config.toml, once as --no-verify-jwt on the deploy command — because each
-   function authorises its own caller in code and a gateway that quietly
-   started checking a JWT would take down both Telegram webhooks and the cron
-   poller at once.
-
-   Two statements is the cheap mistake; ONE MISSING statement is not. A function
-   added without a stanza here deploys correctly only for as long as the
-   workflow's flag is what deploys it — a hand-run `supabase functions deploy
-   <name>` would put it behind the gateway, and every caller would get a 401
-   with nothing in the function's own logs to say why.
+   verify_jwt = false is stated per function in config.toml and as
+   --no-verify-jwt on deploy. A function with no stanza deploys right only via
+   the workflow; a hand-run deploy puts it behind the gateway, and every caller
+   gets a 401 with nothing in its logs.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('config.toml turns the gateway off for every function that exists', () => {
-  // Comments stripped first. The file is half explanation, and a `verify_jwt`
-  // named in prose — or a live `= true` above a note about `= false` — would
-  // otherwise satisfy every assertion below while the gateway was on.
+  // Comments stripped: a `verify_jwt` in prose would satisfy every assertion
+  // below while the gateway was on.
   const toml = readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8')
     .split('\n').map(l => l.replace(/#.*$/, '')).join('\n');
 
@@ -1642,83 +1305,48 @@ test('config.toml turns the gateway off for every function that exists', () => {
 
 
 /* ─── The documents may only name things that exist ─────────────────────────
-   README.md is the contract and CLAUDE.md is how to work on the repo, and both
-   are dense with `identifiers` in backticks. Nothing checked them. A rename
-   leaves every mention behind, and a document naming a function that is gone
-   reads exactly like a document that is right — which is how `005_cron.sql`,
-   `doji-telegram` and a `nyClock` correction that no longer existed all
-   survived in prose after the code moved on.
-
-   This catches the mechanical half: a name that is nowhere in the repository.
-   It cannot catch a name that still exists but no longer does what the sentence
-   says. That half is caught by reading, or not at all.
+   A rename leaves every mention behind, and a document naming something gone
+   reads exactly like one that is right. This catches the mechanical half — a
+   name nowhere in the repository. A name that exists but no longer does what
+   the sentence says is caught by reading, or not at all.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const TRACKED = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filter(Boolean);
 
-/* Everything the repository is, as one string, so a symbol counts as real if it
-   exists ANYWHERE — a test file, a SQL constraint, a CSS token — rather than
-   only where a reader might expect it.
-
-   THIS FILE IS EXCLUDED, and that is not tidiness. The exception list below
-   holds the names the documents mention BECAUSE they are absent, and with this
-   file in the corpus every one of them would validate against its own
-   exception — the list would pass by existing rather than by being right. */
+/* Everything the repository is, as one string. THIS FILE IS EXCLUDED: with it
+   in the corpus, every entry below would validate against its own exception. */
 const CODE = TRACKED
   .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f) && f !== 'test/agree.test.mjs')
   .map(f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
 
-/* Prose in backticks is mostly prose. What is wanted is the subset that looks
-   like something a compiler or a filesystem would recognise, so this keeps
-   names that are camelCase, snake_case, hyphenated, dotted or SCREAMING — and
-   drops short lower-case words like `null`, `both` and `no`, which are English
-   wearing a code font.
-
-   THE HYPHEN AND THE LEADING DIGIT MATTER: `doji-telegram` and `005_cron.sql`
-   are two of the three renames that actually survived in prose here, and a
-   pattern anchored on an identifier start would miss both. */
+/* Backticked names that look like code — camelCase, snake_case, hyphenated,
+   dotted or SCREAMING — not short English in a code font. The hyphen and the
+   leading digit matter: `doji-telegram`, `005_cron.sql`. */
 const SYMBOLS = /`([A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_]+)*)`/g;
 
 const looksLikeCode = (name) =>
   /[A-Z_.\-]/.test(name) && name.length >= 4 && /[A-Za-z]/.test(name);
 
-/* Named in prose PRECISELY BECAUSE they are not in the code, so each entry needs
-   its reason beside it or this becomes the place failures are sent to be
-   forgotten:
+/* Named in prose BECAUSE they are not in the code, each with its reason:
 
      TODO                        a prohibition — CLAUDE.md forbids the marker
      background_color            }  manifest fields tried against the iOS
      apple-touch-startup-image   }  launch frame, none of which reached it
 
-   AND THE BROKER'S OWN TOOL NAMES, which are named to say what its endpoint
-   OFFERS and what this repository therefore chooses not to call. They are the
-   one category this test cannot judge: they are real, they are just real
-   somewhere else. `create_order` and the other four destructive names are
-   deliberately NOT here — they are in DESTRUCTIVE_TOOLS in the poller, so they
-   validate against the code, which is what makes the read-only claim checkable
-   rather than merely written down.
+   AND THE BROKER'S OWN TOOL NAMES, real somewhere else. The five destructive
+   ones are NOT here — they are DESTRUCTIVE_TOOLS in the poller, which is what
+   makes the read-only claim checkable.
 
      get_symbols · get_assets · get_pending_orders · get_order_history ·
      get_version   read-only tools cTrader serves and the poller does not call
-     MN_1          a get_trendbars period, one of nine the broker accepts
-     insufficient_quota  the embedding vendor's own code for an unfunded
-                   account, quoted exactly because the README's account of what
-                   the ?embed=1 door reports is worth nothing if it paraphrases
-                   the string somebody will actually read
-     to_regprocedure  Postgres's non-throwing way to name a function, which
-                   both documents prescribe for verify.sql and neither file
-                   uses — because the row that needed it was deleted rather
-                   than rewritten. Naming the safe form is the point; calling
-                   it would mean keeping the copy that went stale
-     BlobPart      a type in Node's own lib, and the example both documents
-                   give for why types.test.mjs is not a whole typecheck: under
-                   that lib a Uint8Array is not one, which is true here and
-                   false on Deno. The claim is only checkable if it names the
-                   type, and the type is real somewhere this repository is not
-     tool_choice   the request field R-15 is about, and the one this file must
-                   not send — REFACTOR.md names it because an entry refusing a
-                   move cannot describe the move without naming it, and the
-                   test beside CRITIC_TOOLS asserts the code has none */
+     MN_1          a get_trendbars period
+     insufficient_quota  the embedding vendor's own code, quoted exactly
+     to_regprocedure  a non-throwing form the documents prescribe; verify.sql
+                   asks by oid instead and never calls it
+     BlobPart      a Node lib type: the documents' example of why
+                   types.test.mjs is not a whole typecheck
+     tool_choice   the request field R-15 refuses, which the test beside
+                   CRITIC_TOOLS asserts the code never sends */
 const DELIBERATELY_ABSENT = new Set([
   'TODO', 'background_color', 'apple-touch-startup-image',
   'get_symbols', 'get_assets', 'get_pending_orders', 'get_order_history',
@@ -1729,10 +1357,7 @@ const DELIBERATELY_ABSENT = new Set([
 test('the documents name only symbols the repository has', () => {
   const missing = [];
 
-  /* REFACTOR.md is read too. It is the working record of a long pass over this
-     code, and its whole value is that a cold session can trust it — a document
-     naming a helper that was renamed or a file that was deleted is worse than
-     no document, because it is read as current. */
+  /* REFACTOR.md too: its value is that a cold session can trust it. */
   for (const doc of ['README.md', 'CLAUDE.md', 'REFACTOR.md']) {
     const text = readFileSync(new URL(`../${doc}`, import.meta.url), 'utf8');
     const named = new Set();
@@ -1749,9 +1374,7 @@ test('the documents name only symbols the repository has', () => {
       `${doc}: only ${named.size} symbols found — the reader has gone blind`);
 
     for (const name of named) {
-      // A name with a file extension is a FILE and is checked as one, against
-      // what git tracks. `verify.sql` and `005_cron.sql` are not symbols, and
-      // reading them as one made their last segment the only thing checked.
+      // A name with a file extension is a FILE, checked against what git tracks.
       if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md)$/.test(name)) {
         if (!TRACKED.some(f => f === name || f.endsWith('/' + name))) {
           missing.push(`${doc}: ${name} (no such file)`);
@@ -1770,21 +1393,11 @@ test('the documents name only symbols the repository has', () => {
 });
 
 
-/* ─── The Data model is a copy of the schema, and nothing compared it ────────
-   The README's Data model section is where a reader goes to learn what a trade
-   row holds, and it is the contract: four writers share this table and the
-   whole design rests on which of them owns which column. It was a hand-kept
-   list. Twenty of the twenty-four columns sat in its two tables, three more
-   in the Bookkeeping prose below them, and `created_at` was in none of the
-   three — documented nowhere on `trades`, while the word appears twice in the
-   README about HER tables, which is the way a gap hides in a long document.
-
-   BOTH DIRECTIONS. A column the schema has and the section never names is one
-   a reader building against this cannot know exists — and it is exactly the
-   new column, the one whose ownership has not been argued yet. A name the
-   section carries that the schema dropped sends them looking for something
-   gone. Read out of the SQL rather than listed here, so the column added next
-   year is covered on the day it is added.
+/* ─── The Data model is a copy of the schema ─────────────────────────────────
+   The README's Data model is the contract on which writer owns which column.
+   BOTH DIRECTIONS: a column the schema has and the section never names is
+   usually the new one whose ownership is unargued; a name the schema dropped
+   sends a reader after something gone. Read out of the SQL.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the Data model names every column the trades table has, and no other', () => {
@@ -1804,9 +1417,8 @@ test('the Data model names every column the trades table has, and no other', () 
     'building against this section cannot know they exist, and a new column ' +
     'is exactly the one whose ownership has not been argued yet');
 
-  /* AND NOTHING NAMED THERE IS GONE. Only the two tables are read for this
-     half: the prose around them names columns of HER tables and of the view,
-     which are not this schema's to answer for. */
+  /* AND NOTHING NAMED THERE IS GONE. Only the two tables: the prose around them
+     names columns of HER tables and the view. */
   const rows = [...section.matchAll(/^\| `(\w+)`(?:, `(\w+)`)? \|/gm)]
     .flatMap(m => m.slice(1)).filter(Boolean);
   assert.ok(rows.length >= 15, `only ${rows.length} column rows parsed — the tables have moved`);
@@ -1816,16 +1428,11 @@ test('the Data model names every column the trades table has, and no other', () 
 
 
 /* ─── The restore names every column, and never the generated one ───────────
-   The procedure read `insert into trades select * from
-   jsonb_populate_recordset(null::trades, ...)`. Postgres refuses any value for
-   a generated column, a null included, so it stopped at `pnl` before a row
-   landed — and nothing ever ran it, because a restore is only run on the day
-   one is needed. Its update list had also stopped at the columns of its year,
-   so a restored row kept whatever the damaged one held for `size_oz`, the plan
-   and `best_price`. Run against Postgres 16 to find it and to confirm the fix.
-
-   Read against the schema rather than a list typed here, so the column added
-   next year is one the restore misses until this goes red. */
+   Postgres refuses any value for a generated column, a null included, so a
+   `select *` restore stops at `pnl` — and a restore is only run on the day it
+   is needed. Its update list must name every column, or a restored row keeps
+   what the damaged one held. Read against the schema.
+   ─────────────────────────────────────────────────────────────────────────── */
 test('the restore procedure writes every column the table lets it write', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const sql = readme.match(/```sql\n-- 1\. paste the file's `trades` array[\s\S]*?```/)?.[0];
@@ -1852,25 +1459,15 @@ test('the restore procedure writes every column the table lets it write', () => 
   assert.deepEqual([...updated].sort(), writable.filter(c => !kept.includes(c)),
     'a row that exists is restored without some of its columns');
 });
-/* ─── The Layout block is a copy of the tree, and nothing compared it ───────
-   README.md opens with a listing of every file and what it is for. It is the
-   first thing a cold session reads and the only place the repository is
-   described as a whole, and it had drifted the way an unchecked copy always
-   does: 008, 009, the backup script, all three documents and both dotfiles
-   were tracked and unlisted. The block still read as complete, because a map
-   cannot show what it left out.
-
-   BOTH DIRECTIONS, because they fail differently. A file missing from the
-   block is invisible to a reader who trusts it — which is what the block is
-   for. An entry naming a file that is gone sends them looking for something
-   deleted. Neither is reachable by the symbol test above: these entries are
-   not in backticks, and the one that is a bare `test/` is not a symbol.
+/* ─── The Layout block is a copy of the tree ─────────────────────────────────
+   The first thing a cold session reads, and a map cannot show what it left
+   out. BOTH DIRECTIONS: a file missing is invisible to a reader who trusts
+   it; an entry for a deleted file sends them looking. These entries are not in
+   backticks, so the symbol test cannot see them.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* An entry is a path, then whitespace, then prose. An INDENTED one is a detail
-   under the directory line above it — `doji-eugenia/adherence.ts` beneath
-   `supabase/functions/doji-eugenia/` — so it is a partial path already covered
-   by its parent, and is checked for existence rather than used as coverage. */
+/* A path, whitespace, prose. An INDENTED entry is a detail under the directory
+   above it, checked for existence rather than counted as coverage. */
 const layoutBlock = () => {
   const found = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
     .match(/\n## Layout\n+```\n([\s\S]*?)\n```\n/);
@@ -1890,9 +1487,7 @@ const covers = (entry, file) =>
 test('the Layout block names every file the repository tracks', () => {
   const { top, nested } = layoutBlock();
 
-  // WITHOUT THIS THE COMPARISONS BELOW PROVE NOTHING. A block that stopped
-  // parsing reports every file missing, which is loud — but the fence moving
-  // to a heading this pattern does not match reports nothing at all.
+  // A fence moved to a heading this pattern misses would report nothing at all.
   assert.ok(top.length > 20, `only ${top.length} Layout entries parsed`);
 
   assert.deepEqual(TRACKED.filter(f => !top.some(e => covers(e, f))), [],
@@ -1906,27 +1501,15 @@ test('the Layout block names every file the repository tracks', () => {
 });
 
 /* ─── One hour cycle, across four runtimes ──────────────────────────────────
-   Nine formatters in this repository ask for an hour, and every one of them
-   has to say WHICH cycle it wants. `hour12: false` does not: it leaves the
-   choice to the locale, which is free to resolve to h24 and render midnight as
-   hour 24 rather than hour 0.
-
-   Where the hour is only tested against a market's opening range that is
-   harmless — 24 fails `h < close` exactly as 0 fails `h >= open` — and both
-   `hourIn` ports say so. It is the clocks that compare the hour against a
-   BOUNDARY that break: `Dates.nyParts` feeds `weekStart` and `lastClose`,
-   where `hour < 17` decides which week a Sunday belongs to, and `nyWall` in
-   adherence.ts feeds `Date.UTC(..., w.hour, w.min)`, where an hour of 24 rolls
-   the instant into the next day and moves the measured offset with it.
-
-   So the cycle is read off every formatter that asks for an hour, rather than
-   off the two that would visibly break. The alternative is nine copies of one
-   decision with nothing comparing them, which is what this file exists for.
+   `hour12: false` leaves the cycle to the locale, which may resolve to h24 and
+   render midnight as 24. Harmless against a market's opening range, fatal
+   against a BOUNDARY: `Dates.nyParts` feeds `hour < 17` in `weekStart`, and
+   `nyWall` in adherence.ts feeds `Date.UTC(..., w.hour, w.min)`, where 24 rolls
+   into the next day. So every formatter that asks for an hour is read.
    ─────────────────────────────────────────────────────────────────────────── */
 
-// The argument list of each `new Intl.DateTimeFormat(...)`, taken by balancing
-// the parentheses rather than by a pattern: the options are an object literal
-// and several of them run over more than one line.
+// Each `new Intl.DateTimeFormat(...)`'s arguments, by balancing parentheses:
+// the options run over several lines.
 const formatters = (text) => {
   const out = [];
   for (const m of text.matchAll(/Intl\.DateTimeFormat\(/g)) {
@@ -1968,42 +1551,31 @@ test('every clock in the repository states the same hour cycle', () => {
 
 
 /* ─── Every way she speaks to him reads what he has told her ────────────────
-   His notes are the only channel he has for correcting her — there is no
-   settings page, the button under a briefing carries a verdict and not a
-   reason, and nothing else survives the twelve turns of conversation window. "Stop mentioning the ten-year" becomes a note,
-   and every later message is supposed to obey it.
-
-   That makes notesBlock() load-bearing in a way it was not before, and its
-   absence is silent: drop it from one path and she simply carries on ignoring
-   an instruction he thinks she took. He would have no way to tell whether she
-   disagreed, forgot, or never read it.
+   His notes are the only channel he has for correcting her. Drop notesBlock()
+   from one path and she carries on ignoring an instruction he thinks she took,
+   and he cannot tell whether she disagreed, forgot, or never read it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ─── The strategy, and the two ways it goes quiet ───────────────────────────
-   She cannot write this document, so nothing she does can report that it never
-   arrived. Both failures are silent and neither changes a single test elsewhere:
-   the always-loaded half dropped from the system prompt, and a rule citing a
-   section get_strategy cannot serve.
+   She cannot write it, so nothing she does reports it missing: the
+   always-loaded half dropped from the system prompt, or a citation
+   get_strategy cannot serve.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the strategy rides on the cached system prompt, not on a message', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  // In the system block AND cached. Moved to a message it is paid on every turn
-  // and breaks the prefix each time the document is edited; dropped entirely she
-  // reasons about his trading from nothing and says so about nothing.
+  // In the system block AND cached. In a message it is paid every turn and
+  // breaks the prefix on each edit.
   assert.match(src, /system:\s*\[\{[^}]*text:\s*SYSTEM \+ ALWAYS[^}]*cache_control/,
     'the strategy is no longer part of the cached system prompt — either she has ' +
     'stopped being given it at all, or it is being paid for on every message');
 
-  /* AND THE WINDOW IS DERIVED FROM THE TOOL ARRAY, which is where the cache key
-     starts. A week of `wrote_1h` settled which array earns the hour: the release
-     look made fourteen turns and wrote five prefixes, its quarter-hourly job
-     clustering several looks into one morning, and every other caller wrote its
-     own on every single turn. A literal here is the shape that goes stale —
-     it reads as a decision and is a default, and the wrong one costs 2× the
-     input rate for a lifetime nothing reads. README.md carries the rows. */
+  /* THE WINDOW IS DERIVED FROM THE TOOL ARRAY, where the cache key starts. A week
+     of `wrote_1h` showed only the release look reuses its prefix inside the
+     hour; a literal here reads as a decision and costs 2× for a lifetime nothing
+     reads. README.md carries the rows. */
   assert.match(src, /ttl:\s*tools === RELEASE_TOOLS \? "1h" : "5m"/,
     'the cached prefix states one window for every caller again — the hour is ' +
     'only earned by RELEASE_TOOLS, see the measurement in README.md');
@@ -2012,11 +1584,8 @@ test('the strategy rides on the cached system prompt, not on a message', () => {
 test('what is summarised into every turn can also be read in full', () => {
   // Each rule cites the section holding its reasoning, and that citation is the
   // only route from a one-line rule to why it exists.
-  /* THE SUBSECTION IS PART OF THE CITATION, and reading only the integer is how
-     this test passed over the defect it was written for. R-05 cites §4.1 and
-     R-06 cites §4.2 — the only two citations in the half she carries on every
-     turn — and `/§(\d+)/` captured `4` out of both, so the reader reported two
-     sections that resolve while she was being told they did not exist. */
+  /* THE SUBSECTION IS PART OF THE CITATION: R-05 and R-06 cite §4.1 and §4.2,
+     and `/§(\d+)/` would capture `4` from both. */
   const cited = [...ALWAYS.matchAll(/§(\d+(?:\.\d+)?)/g)].map(m => m[1]);
   assert.ok(cited.length >= 3,
     `only ${cited.length} section references read out of the rules table — the reader has gone blind`);
@@ -2024,15 +1593,10 @@ test('what is summarised into every turn can also be read in full', () => {
     'no subsection citation read out of the rules table — the reader has gone blind ' +
     'to exactly the shape that broke');
 
-  /* Every one of them, through the same resolution the tool uses. A citation
-     she cannot follow is answered "there is no section 4.1", which is not a
-     blank she fills in herself but a wrong fact about her own document.
-
-     AND A SUBSECTION HAS TO BE IN WHAT CAME BACK. readStrategy falls back to
-     the parent section, deliberately — §4.1 is prose inside §4 — which means a
-     citation to a §4.7 that was never written resolves to §4 and reads exactly
-     like a citation that worked. The heading is the only thing that separates
-     them, so it is the thing asserted. */
+  /* Every one, through the tool's own resolution. AND A SUBSECTION MUST BE IN
+     WHAT CAME BACK: readStrategy falls back to the parent, so a §4.7 that was
+     never written resolves to §4 and looks like one that worked. The heading
+     separates them. */
   for (const k of cited) {
     const body = readStrategy(k);
     assert.ok(body.startsWith('## '),
@@ -2044,16 +1608,9 @@ test('what is summarised into every turn can also be read in full', () => {
     }
   }
 
-  /* §0 and §7 are the two the document's retrieval contract names as always
-     loaded, and both are summarised to get there — the header down to its
-     summary paragraph, the rules down to their table. Losing either from
-     SECTIONS means she holds an abbreviation of something she can no longer
-     read whole, which is the shape of a confident wrong answer.
-
-     Sections 1 and 11 do not exist and nothing cites them: a numbering that
-     skips reads as a decision where six holes read as an unfinished document,
-     and readStrategy answering for a number she invents is asserted below
-     rather than pretended away here. */
+  /* §0 and §7 are always loaded as summaries; losing either from SECTIONS leaves
+     her an abbreviation of something she cannot read whole. §1 and §11 do not
+     exist and nothing cites them; an invented number is asserted below. */
   for (const k of ['0', '7']) {
     assert.ok(k in SECTIONS,
       `§${k} is summarised into every turn and can no longer be read in full`);
@@ -2067,9 +1624,8 @@ test('an unknown section is answered, never silently empty', () => {
   assert.ok(at > -1, 'doji-eugenia no longer has readStrategy()');
   const body = src.slice(at, src.indexOf('\n}', at));
 
-  // The section number arrives from the model, so an invented one is what this
-  // has to survive. An empty tool result is a blank she fills in herself, which
-  // is the one outcome worse than saying it is missing.
+  // The number arrives from the model. An empty result is a blank she fills in
+  // herself, the one outcome worse than saying it is missing.
   assert.match(body, /has no section/,
     'readStrategy returns nothing for a section that does not exist — she would ' +
     'invent the reasoning rather than report it missing');
@@ -2084,26 +1640,16 @@ test('the version the document states is the version she is handed', () => {
 });
 
 /* ─── A schedule nothing dispatches ──────────────────────────────────────────
-   dueNow can answer 'consolidate' correctly every night for a year and the pass
-   never runs, because the branch that would call it is not there. The week-walk
-   in fold.test.mjs proves the ANSWER; nothing there proves anyone acts on it,
-   and the failure is a nightly no-op that returns 200 and looks healthy in
-   net._http_response.
+   dueNow can answer 'consolidate' correctly for a year with no branch to act
+   on it — a nightly 200 that looks healthy. fold.test.mjs proves the answer;
+   this proves something acts on it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ─── The force door asks the day, and asking it is the half a test can miss ──
-   `briefKind` is pure and driven from both sides in fold.test.mjs — and every
-   one of those assertions passed while `?force=1` still read the constant it
-   replaced, because a test that calls a function directly cannot discover that
-   nothing else calls it. That is this repository's oldest defect wearing a new
-   hat, and it was found by putting the constant back and watching the suite
-   stay green.
-
-   The door exists for the hour a briefing did NOT arrive. Reading
-   `briefDue(now) ?? 'weekday'` it could not produce a Sunday briefing outside
-   the single hour one was already due — so on the one evening a week it is
-   needed most it sent Buenos dias and a weekday shape into a market that had
-   just opened.
+   `briefKind` is driven from both sides in fold.test.mjs, and none of that can
+   discover a caller still reading a constant. The door exists for the hour a
+   briefing did NOT arrive, so it must be able to produce a Sunday briefing on
+   Sunday evening.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a forced briefing asks what the day takes, not a literal', () => {
@@ -2120,18 +1666,10 @@ test('a forced briefing asks what the day takes, not a literal', () => {
 });
 
 /* ─── A job that dies before its first model call leaves a row ───────────────
-   `ask()` records a failed turn, so eugenia_runs could answer "how often does a
-   model call die" — and could say nothing whatever about a job that died BEFORE
-   reaching one. Two consolidations threw in `turnsSince`, one line into
-   postConsolidation, apologised to him on two consecutive nights, and left the
-   table with no row on either: read afterwards it showed a system that had
-   simply had nothing to do.
-
-   AND THE ROW HAS TO GO DOWN BEFORE THE MESSAGE. The apology is sent with
-   `.catch(() => {})` — deliberately, since a throw there would replace one
-   silent failure with two — so a Telegram that is refusing takes the only
-   notice with it and leaves nothing anywhere. Ordered this way the row survives
-   that case, which is the one where he has no other way of finding out.
+   `ask()` records a failed turn; a job dying BEFORE one would leave a table
+   showing a system with nothing to do. AND THE ROW GOES DOWN BEFORE THE
+   MESSAGE: the apology carries `.catch(() => {})`, so a refusing Telegram
+   would otherwise take the only notice with it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a scheduled job that dies records it, and records it before it apologises', () => {
@@ -2145,9 +1683,8 @@ test('a scheduled job that dies records it, and records it before it apologises'
       .map(l => l.replace(/\/\/.*$/, '')).join('\n');
   };
 
-  /* BOTH CALLERS THAT ANSWER BEFORE THEY WORK REACH ONE CATCH. The trade event
-     had an apology written for it and no path that sent one: a failure before
-     its model call reached the console and nothing else. */
+  /* BOTH CALLERS THAT ANSWER BEFORE THEY WORK REACH ONE CATCH, the trade event
+     included. */
   assert.match(bodyOf('postScheduled'), /catch \(err\) \{\s*return await jobFailed\(job, err\);/,
     'postScheduled no longer hands its failures to jobFailed');
   const entry = src.slice(src.indexOf('secretMatches(fromCron, CRON_SECRET)'));
@@ -2190,12 +1727,9 @@ test('every answer dueNow can give is dispatched by postScheduled', () => {
 });
 
 /* ─── The critic is given no tool, and not for the obvious reason ────────────
-   An empty array is the cheaper write as well as the stricter one, which is not
-   what it looks like: sharing the briefing's array to ride its cache was tried
-   and measured, and the critic wrote its own prefix anyway because the two also
-   differ in effort. Dropping this back to `CHAT_TOOLS` would be a quiet 23,309
-   tokens a morning at the 1h write rate, buying a read that does not happen.
-   REFACTOR.md R-15 carries the figures.
+   An empty array is the cheaper write as well as the stricter one: the critic
+   differs from the briefing in effort too, so sharing its array still writes a
+   prefix of its own. REFACTOR.md R-15 carries the figures.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the critic is offered no tool at all', () => {
@@ -2203,20 +1737,17 @@ test('the critic is offered no tool at all', () => {
     'CRITIC_TOOLS is no longer empty — either the critic can now go and check ' +
     'something mid-revision, or it is writing a prefix it will not read');
 
-  // AND NOTHING SENDS tool_choice, which is the half a constant cannot show.
-  // The parameter was removed with the caller; a new one would mean the move
-  // R-15 refused has been made again under another name.
+  // AND NOTHING SENDS tool_choice: a new one would be the move R-15 refused,
+  // under another name.
   const code = EUGENIA_TS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.doesNotMatch(code, /tool_choice/,
     'something sends tool_choice again — see REFACTOR.md R-15 before keeping it');
 });
 
-/* ─── A fetched page has two bounds and only one was written ──────────────────
-   `max_uses` caps how many pages she may open and says nothing about how large
-   one may be, so a single long thread could put more into the turn than the rest
-   of the briefing and — before the loop's own breakpoint — be re-sent on every
-   round after it. Dropping this bound breaks nothing and is invisible: the
-   briefing still arrives, reads well, and costs several times what it did.
+/* ─── A fetched page has two bounds ──────────────────────────────────────────
+   `max_uses` caps how many pages, not how large one is, so a single long
+   thread could outweigh the briefing. Dropping this bound is invisible: the
+   briefing arrives, reads well, and costs several times as much.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('web fetch is bounded by size as well as by count', () => {
@@ -2229,15 +1760,9 @@ test('web fetch is bounded by size as well as by count', () => {
 });
 
 /* ─── Every tool sent is a tool served ───────────────────────────────────────
-   The tools array in call() and the branches in ask() are two lists of the same
-   names, and they fail in opposite directions. A tool sent but not served makes
-   the loop throw `tool_use with no tool this function serves` — loud, but only
-   once the model happens to call it, which for a search tool may be days. A tool
-   served but not sent is dead code the model can never reach.
-
-   web_search is the deliberate exception and is excluded by shape rather than by
-   name: it carries a `type` and runs on Anthropic's side, so it never arrives in
-   the loop at all.
+   Sent but not served throws once the model happens to call it — days later
+   for a search tool. Served but not sent is unreachable code. web_search is
+   excluded by shape: it carries a `type` and never arrives in the loop.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the tools she is offered are exactly the tools the loop can run', () => {
@@ -2250,25 +1775,16 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   assert.ok(defined.length >= 3,
     `only ${defined.length} tools read out of the file — the reader has gone blind`);
 
-  // A switch rather than a chain of ifs since there are ten of them, so the
-  // shape the dispatch is read out of moved with it. What is being asserted is
-  // unchanged: every tool defined is executable, and every tool executable is
-  // defined.
+  // Every tool defined is executable, and every tool executable is defined.
   const served = [...src.matchAll(/case ([A-Z_]+_TOOL)\.name:/g)].map(m => m[1]).sort();
   assert.deepEqual(served, defined,
     'a tool is defined that the loop cannot execute, or the reverse — the first ' +
     'throws only once she happens to call it, the second is unreachable');
 
-  /* AND EVERY TOOL SET IS DRAWN FROM THAT SAME LIST. A name appearing in a set
-     but nowhere as a definition is a tool the model is offered and the loop has
-     never heard of. */
-  /* DERIVED, BECAUSE "EVERY TOOL SET" CANNOT BE FOUR NAMES TYPED HERE. The list
-     held four while the file defined five, so a set added later would be
-     offered to a model with nothing checking that the loop can serve what is
-     in it — which is the one thing this test is for.
-
-     CRITIC_TOOLS is the empty one, deliberately, and a test beside it says so:
-     it is the only set exempt from having to offer anything. */
+  /* AND EVERY TOOL SET IS DRAWN FROM THAT LIST: a name in a set with no
+     definition is offered to the model and unknown to the loop. */
+  /* DERIVED: a list of sets typed here goes stale when one is added. CRITIC_TOOLS
+     is the empty one, deliberately, and exempt from offering anything. */
   const sets = [...src.matchAll(/const ([A-Z_]+_TOOLS)(?:: unknown\[\])? = \[([\s\S]*?)\];/g)];
   assert.ok(sets.length >= 5,
     `read ${sets.length} tool sets out of the file — the reader has gone blind`);
@@ -2285,12 +1801,9 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
 });
 
 /* ─── What the nightly pass is given to judge with ───────────────────────────
-   Two instructions in CONSOLIDATE ask for something the pass could not see. It
-   is told to notice what he has started doing differently — a claim about his
-   trading, judged from a transcript that on most days never mentions a trade —
-   and it is told to prefer superseding to adding while holding twenty notes out
-   of an archive it had no way to look at. Both failed upward: the pass ran, the
-   notes looked fine, and the evidence was simply absent.
+   It is told to notice what he has started doing differently — so it needs his
+   trades — and to prefer superseding over adding — so it needs to search the
+   archive. Without either the notes still look fine, which is failing upward.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the nightly pass sees his week and can reach past its own window', () => {
@@ -2319,12 +1832,9 @@ test('the nightly pass sees his week and can reach past its own window', () => {
 });
 
 /* ─── The one thing nothing could measure ────────────────────────────────────
-   Everything else unobservable in this function is counted where it happens and
-   for that exact reason — ask() logs tokens because the spend cap is a ceiling
-   and not a meter, postBriefing logs characters because the length target lives
-   past a model call. What she is FOR is that his understanding grows, the map is
-   the instrument for it, and nothing ever read that instrument back. A ladder
-   that has stopped moving looks exactly like one that never had to.
+   What she is FOR is that his understanding grows; the map is the instrument,
+   and a ladder that stopped moving looks exactly like one that never had to.
+   So the pass records where the five stand.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the nightly pass reports the map it may just have moved', () => {
@@ -2347,24 +1857,13 @@ test('the nightly pass reports the map it may just have moved', () => {
     'recordChannels can throw, and it runs after the work it reports on is done');
 });
 
-/* ─── The two meters that were still going to a console ─────────────────────
-   `eugenia_runs` exists because nobody reads Edge logs — that is the whole
-   argument, made in the file, in the README and in 005. Two figures were
-   written after that argument was settled and did not get it applied to them:
-   what the nightly embedding sweep filled, and where the five channels stand.
-
-   Both fail in the same shape and it is the shape this table was built for. A
-   dead embedding vendor takes the semantic arm of `eugenia_search` out and
-   leaves the lexical one answering, so the search still works and nothing
-   anywhere says half of it stopped; a ladder that has quietly stopped moving
-   looks exactly like one that had no reason to move. Neither is an error, so
-   neither reaches him, and both went to a line discarded within hours.
-
-   READ STRUCTURALLY, because nothing in this suite drives an Edge handler and
-   because `sweepLine` is pure — it is handed two counts and cannot see whether
-   anybody wrote them down. BOTH OUTCOMES, for the reason the heartbeat test
-   gives above: a meter that records only its successes reports a vendor that
-   has been refusing every night for a fortnight as a table with nothing in it.
+/* ─── The nightly meters write rows ──────────────────────────────────────────
+   A dead embedding vendor leaves the lexical arm answering, so search still
+   works with half of it gone; a ladder that stopped moving looks like one with
+   no reason to. Neither is an error, so each goes to `eugenia_runs`. Read
+   structurally — `sweepLine` is pure and cannot see whether anyone wrote it
+   down — and BOTH OUTCOMES, or a vendor refusing for a fortnight reads as a
+   table with nothing in it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the sweep and the census both reach the table, however they end', () => {
@@ -2399,17 +1898,9 @@ test('the sweep and the census both reach the table, however they end', () => {
 });
 
 /* ─── Both meters run on the nights nothing else does ────────────────────────
-   They were added behind postConsolidation's early return, so on a day nobody
-   spoke — two of the last four — neither happened at all. A dead embedding
-   vendor could survive every quiet night with the meter that exists to catch
-   it reporting nothing, and the channel census, which CLAUDE.md calls the only
-   meter on the one claim this design rests on, had the same hole.
-
-   ASSERTED AS ONE EXIT RATHER THAN AS A BRANCH SHAPE. What actually went wrong
-   is that a `return` sat between the read and the meters, and any second
-   `return` in this function puts it back — whatever the surrounding code looks
-   like by then. The census cannot be hoisted to the top instead: it is taken
-   after the pass because the pass is the only thing that can move a rung.
+   ONE EXIT, not a branch shape: any `return` between the read and the meters
+   skips them on a night nobody spoke. The census cannot be hoisted to the top
+   instead — it is taken after the pass, the only thing that moves a rung.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the nightly meters sit past every branch, not behind an early return', () => {
@@ -2436,10 +1927,8 @@ test('the nightly meters sit past every branch, not behind an early return', () 
   assert.ok(census < exit && sweep < exit,
     'a meter sits after the only return, so it never runs at all');
 
-  /* AND THE CENSUS STAYS AFTER THE PASS. Hoisting it above the model call would
-     also make it run on a quiet night, and would record the rungs as they stood
-     BEFORE the only thing in this system that can move one. The rung would then
-     always be one night stale, which is invisible in the column it exists for. */
+  /* AND THE CENSUS STAYS AFTER THE PASS, or every rung is recorded a night
+     stale. */
   assert.ok(body.indexOf('await ask(') < census,
     'the census is taken before the pass, so it reports the ladder as it was ' +
     'about to stop being');
@@ -2449,9 +1938,8 @@ test('the search tool names the function the database actually defines', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  // The RPC path is a string in one file and a function name in another, and a
-  // rename in either is a 404 that searchMemory catches and reports as "could
-  // not be searched" — indistinguishable from the database being down.
+  // The RPC path is a string in one file and a function in another; a rename is a
+  // 404 that reads as the database being down.
   const rpc = src.match(/rest\/v1\/rpc\/(\w+)/);
   assert.ok(rpc, 'doji-eugenia no longer calls an RPC at all');
   assert.match(EUGENIA_SQL,
@@ -2467,15 +1955,9 @@ test('the search tool names the function the database actually defines', () => {
 });
 
 /* ─── Who said it, on both sides of the wire ─────────────────────────────────
-   `source` is a vocabulary now, not a constant: the SQL decides which of three
-   words a hit carries and searchList decides how each is rendered. A word on
-   one side and not the other is a hit attributed to the wrong person — the
-   exact defect that shipped, where the SQL emitted one value for every turn and
-   half of every result set came back as her own words.
-
-   Both lists are read out of the files rather than typed here, for the reason
-   the rest of this suite gives: a test asserting against a literal beside it is
-   a test that changes in the same pass as the thing it guards.
+   The SQL decides which of three words a hit carries and searchList how each
+   renders. A word on one side only is a hit attributed to the wrong person.
+   Both lists are read out of their files.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every source the search can return is a source the renderer knows', () => {
@@ -2483,17 +1965,15 @@ test('every source the search can return is a source the renderer knows', () => 
     /create or replace function public\.eugenia_search[\s\S]*?\$\$;/);
   assert.ok(fn, '003_eugenia.sql no longer defines eugenia_search');
 
-  /* The literals in the two select lists — 'note' from the notes arm, and both
-     arms of the CASE that carries the turn's role. A turn arm that has gone
-     back to a bare 'turn' fails here rather than at the far end of a search. */
+  /* The literals in the two select lists: 'note', and both arms of the CASE on the
+     turn's role. */
   const emitted = [...new Set([...fn[0].matchAll(/'(note|turn|you|him)'/g)].map(m => m[1]))];
   assert.ok(emitted.includes('note'), 'the notes arm no longer labels its hits');
   assert.ok(!emitted.includes('turn'),
     'the turn arm labels every turn the same way again — his words come back as hers');
 
-  // Every source that is not a note has to be a word the renderer holds. The
-  // map is imported rather than read as text, the same way SETUPS and COLUMNS
-  // are: a vocabulary compared against the file that shares it.
+  // Every non-note source must be a word the renderer holds — the map imported,
+  // like SETUPS and COLUMNS.
   for (const word of emitted.filter(w => w !== 'note')) {
     assert.ok(word in SAID,
       `eugenia_search can return source '${word}' and searchList has no word for it — ` +
@@ -2524,16 +2004,9 @@ test('the search function is not reachable by a public key', () => {
 });
 
 /* ─── The pre-trade sequence ─────────────────────────────────────────────────
-   R-08 is a rule about a list, and for six versions the list was not in the
-   document — the rule cited §6, §6 said the steps existed somewhere else, and
-   nothing anywhere could state them. A rule pointing at nothing reads exactly
-   like a rule pointing at something.
-
-   FOUR SINCE v1.9. Psychological levels were a fifth and were folded into the
-   levels step, because they gated nothing — a step that can never be the step
-   you stopped at is not a step, and R-08's only claim is that one of them ends
-   the sequence. The count is asserted because the fold is the kind of edit that
-   lands in the prose and not in the list.
+   R-08 is a rule about a list, so the list must be in the section the rule
+   cites. FOUR STEPS: a step that can never be the one you stopped at is not a
+   step, and R-08's only claim is that one of them ends the sequence.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('R-08 cites a section that actually holds its steps', () => {
@@ -2545,30 +2018,19 @@ test('R-08 cites a section that actually holds its steps', () => {
   const body = SECTIONS[cited[1]];
   assert.ok(body, `R-08 cites §${cited[1]}, which get_strategy cannot serve`);
 
-  // Four, numbered, in the section the rule points at. The ORDER is the rule —
-  // a failed step ends the sequence rather than being traded off against a
-  // later one — so a list that has stopped being ordered is a different rule.
+  // Four, numbered. The ORDER is the rule: a failed step ends the sequence.
   const steps = [...body.matchAll(/^\d\. \*\*/gm)];
   assert.equal(steps.length, 4,
     `§${cited[1]} lists ${steps.length} numbered steps, not the four R-08 requires`);
 });
 
 /* ─── Every section she is told to read is one she can be handed ─────────────
-   The strategy is the one document she may not edit, and `get_strategy` is what
-   stops her inventing what it says. A citation that does not resolve turns that
-   tool into the opposite: `readStrategy` answers a missing section with a
-   sentence naming what the document DOES hold, so she reports her own strategy
-   as silent on something it covers.
-
-   The dotted case is worse and is why the resolution is checked rather than
-   the key. §4.1 and §4.2 are prose inside §4, so `readStrategy` falls back one
-   level to the parent — which means a mistyped §4.9 comes back as §4, a real
-   body, indistinguishable from a citation that worked. So a dotted citation has
-   to name a heading actually present in what came back.
-
-   One citation was checked before this — R-08's, from the rules table. Every
-   other one, including the ones in the prompt she carries on every turn, was
-   not. ─────────────────────────────────────────────────────────────────────── */
+   `readStrategy` answers a missing section with what the document DOES hold,
+   so an unresolved citation has her reporting her strategy silent on something
+   it covers. And §4.1 is prose inside §4, so a mistyped §4.9 falls back to §4
+   and looks like a citation that worked — a dotted citation must name a
+   heading present in what came back.
+   ─────────────────────────────────────────────────────────────────────────── */
 
 test('every section the prompts cite is one get_strategy can serve', () => {
   const sources = { SYSTEM, CONSOLIDATE, ALWAYS };
@@ -2598,12 +2060,9 @@ test('every section the prompts cite is one get_strategy can serve', () => {
 });
 
 test('the two reward-to-risk numbers are kept apart', () => {
-  /* 1:1.5 is a condition at ENTRY — step 4 refuses the trade below it. A
-     realised 1:1.25 is what a $30 target shortened on an open trade leaves
-     behind, and it is ALSO what $25 set at entry over a $20 stop leaves behind,
-     which is a breach. The document stated one floor for six versions and the
-     two silently contradicted each other; v1.9 keeps them apart by saying the
-     row cannot tell which produced it. */
+  /* 1:1.5 is a condition at ENTRY — step 4 refuses the trade below it. A realised
+     1:1.25 is both a $30 target shortened on an open trade and a breach set at
+     $25 over a $20 stop; only a row carrying the plan as first seen can tell. */
   assert.match(ALWAYS, /at least 1:1\.5\s+to\s+enter/,
     'the entry condition has stopped being stated in the always-loaded half');
   assert.match(SECTIONS['12'], /At entry it is a condition: at least 1:1\.5/,
@@ -2615,13 +2074,9 @@ test('the two reward-to-risk numbers are kept apart', () => {
 });
 
 /* ─── The strategy is markdown inside a template literal ─────────────────────
-   Every backtick in that document is escaped, and the file is written by editing
-   text that ALREADY contains escaped ones — so an editor that escapes a second
-   time produces `\\\`` , which parses fine, passes every other test, and reaches
-   her as a literal backslash in front of every column name.
-
-   It has happened three times. Nothing failed any of them, because a stray
-   backslash is valid TypeScript and valid prose.
+   Every backtick is escaped, and editing text that already contains escaped
+   ones invites a second escape: `\\\``, valid TypeScript and valid prose,
+   reaching her as a backslash before every column name.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no section reaches her carrying escape characters', () => {
@@ -2637,36 +2092,18 @@ test('no section reaches her carrying escape characters', () => {
 });
 
 /* ─── The prompt is the product, and it is read as prose ─────────────────────
-   `strategy.ts` is scanned above for double-escaped backticks because that
-   defect is invisible in a diff and reaches her as literal noise. This is the
-   same class in the other file she is actually made of: a sentence inserted
-   into a wrapped paragraph without re-wrapping it, which leaves a line at
-   double the width and, where the insert landed on a dash, `— —` shipped into
-   the system prompt of every single request. Nothing anywhere reads this file
-   as text.
-
-   IT CATCHES THE MECHANICAL HALF ONLY, and saying so is the point of saying
-   anything: an over-long line and a doubled dash are artifacts nothing else
-   produces, so they can be asserted. The other half of the same edit — the
-   SHORT line left behind where the sentence was pulled out — is indistinguishable
-   from a deliberate break before a heading or a list, and a check for it would
-   fire on most of this prompt. That half is caught by reading and by nothing here.
+   A sentence inserted into a wrapped paragraph without rewrapping leaves a line
+   at double width, and where it lands on a dash, `— —` ships into every
+   request. Those two artifacts are asserted. The SHORT line left where a
+   sentence was pulled out looks like a deliberate break, and is caught by
+   reading only.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no paragraph of the prompt shows where it was edited', () => {
-  /* The template literals as the FILE holds them, not the interpolated
-     constants: ${CHANNEL_NAMES} expands one short source line to 168
-     characters, and it is the source wrapping that is the artifact. */
-  /* DERIVED, BECAUSE THE NAMED LIST WENT STALE THE WAY A NAMED LIST DOES. It
-     held five while the file exported nine, so every prompt written after it —
-     MOVE and TRIM among them — was exempt without anyone deciding that. MOVE
-     had a 112-character line sitting between neighbours of 75 and 78: the
-     artifact this test exists for, in a prompt it could not see. The test
-     below it derives its bodies and was always right; these two sat next to
-     each other.
-
-     PITCH IS THE ONE EXEMPTION AND IT IS STRUCTURAL: it is a markdown table,
-     and a `|` row cannot be wrapped without breaking the table it draws. */
+  /* The literals as the FILE holds them: an interpolation expands one short line,
+     and it is the source wrapping that is the artifact. */
+  /* DERIVED, so every exported prompt is checked without anyone deciding to add
+     it. PITCH IS THE ONE EXEMPTION: a markdown table row cannot be wrapped. */
   const WRAPPED = /export const (\w+) = `([\s\S]*?)`;/g;
   const TABLE = new Set(['PITCH']);
   const bodies = [...EUGENIA_PROMPT.matchAll(WRAPPED)].filter(([, n]) => !TABLE.has(n));
@@ -2685,26 +2122,13 @@ test('no paragraph of the prompt shows where it was edited', () => {
 });
 
 /* ─── A preference of his is not the prompt's to state ───────────────────────
-   The prompt held *"he gets frustrated by walls of text"* and *"he has told you
-   so"*, and neither was ever said. They read as grounding and are the opposite:
-   a claim about a conversation this repository cannot see, sitting in the file
-   that decides how she talks to the person it is about — so the failure is her
-   handing him back a taste he never had, in the voice of someone quoting him.
-
-   THE RULE IS NOT "SOURCE IT PROPERLY", IT IS THAT THE PROMPT DOES NOT CARRY
-   HIS PREFERENCES AT ALL. There is already a channel for them and it is the one
-   he can correct: an instruction note, which `notesBlock()` puts in front of her
-   on every path and which the prompt itself says outranks the shape. A rule
-   worth keeping stands on why it is right; one that needs him behind it belongs
-   in a note.
-
-   So the words below are searched for as tastes rather than as attributions —
-   an invented preference and a real one are indistinguishable in this file, and
-   both are in the wrong place. The second pattern is the other half of the same
-   move: a rule stated on its own terms and then propped up with *and he has told
-   you so*, which is the form the RELEASE prompt shipped in. Bare `he told you`
-   and `he said` are left alone, since that is how the tool descriptions name the
-   notes mechanism — the thing this test is pointing at.
+   A claim about a conversation this repository cannot see, in the file that
+   decides how she talks to him, reaches him as her quoting a taste he never
+   had. THE PROMPT CARRIES NO PREFERENCE OF HIS AT ALL: an instruction note is
+   the channel for them, the one he can correct, and the prompt says notes
+   outrank the shape. So tastes are searched for as tastes, and a rule propped
+   up with *and he has told you so* is the other half. Bare `he told you` and
+   `he said` stay: that is how the tool descriptions name the notes mechanism.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the prompt states no preference of his', () => {
@@ -2730,51 +2154,28 @@ test('the prompt states no preference of his', () => {
 });
 
 /* ─── Every read is bounded ──────────────────────────────────────────────────
-   Four reads in this function pull rows she is then charged for reasoning over,
-   and three of them were capped from the day they were written. The fourth —
-   the nightly pass — was not, and nothing failed: a normal day is a handful of
-   turns, so an unbounded window looks identical to a bounded one until the day
-   it does not.
+   A normal day is a handful of turns, so an unbounded read looks identical to
+   a bounded one until the day it does not.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every row-returning read of her own tables carries a limit', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  /* TWO NORMALISATIONS, AND BOTH WERE LEARNED BY THIS TEST FAILING ON CORRECT
-     CODE. Every URL here is built from template literals joined by `+`, so the
-     limit routinely sits in a different literal from the select and a pattern
-     that stops at the first backtick cannot see it. And a path is a READ only if
-     it names `select=` — a PATCH against one primary key is a REST path against
-     a growing table too, and needs no limit at all.
-
-     THE TABLE IS WHATEVER STANDS BEFORE THE `?`, rather than a list of the
-     names this file happens to use today. An earlier version named them, and
-     `fillEmbeddings` — which reads `rest/v1/${table}` because it sweeps two
-     tables through one function — was invisible to it: the one read this
-     guard could not see was the sweep whose backlog was once drained from the
-     wrong end. A reader that names its subjects goes blind the moment one of
-     them is spelled differently, and says nothing when it does. */
+  /* URLs are template literals joined by `+`, so they are joined first. A PATCH
+     on one key is not a read and needs no limit. THE TABLE IS WHATEVER STANDS
+     BEFORE THE `?`, not a list of names: `fillEmbeddings` reads
+     `rest/v1/${table}`, and a reader that names its subjects is blind to it. */
   const joined = src.replace(/`\s*\+\s*`/g, '');
   const reads = [...joined.matchAll(/rest\/v1\/([^?`]+)\?(select=[^`]*)/g)]
     .map(m => [m[1], m[2]]);
 
-  /* AND `select=` IS NOT WHAT MAKES A PATH A READ — the read HELPER is, and
-     naming the query string was a third way of naming subjects. Two rows come
-     back from `eugenia_trades?open_day=eq.${day}&limit=50`, which asks for
-     every column and therefore writes no `select=` at all: a read of a growing
-     table, invisible to the clause above for its whole life. It carries a
-     limit, so nothing was wrong — but the reader could not have said so, which
-     is the half this census is for. Every call to readRows is a read by
-     construction, and a new one cannot be spelled out of view. */
-  /* THE PATH-BUILDERS ARE RESOLVED RATHER THAN EXEMPTED. Three call sites
-     hand readRows `${SB_URL}/rest/v1/${tradesQuery(days)}`, and two more name
-     briefedQuery and dayQuery — the limit is inside the builder because that
-     is where the model's `days` is clamped. Exempting them would be the census
-     naming a subject again, which is the fault the comment above it describes.
-     Any `…Query()` in the argument is substituted for its body, so the same
-     question is asked of every read and a limit deleted from a builder fails
-     here rather than quietly widening five call sites at once. */
+  /* AND `select=` IS NOT WHAT MAKES A PATH A READ — the helper is. A read asking
+     for every column writes no `select=`, so every call to readRows is a read by
+     construction and a new one cannot be spelled out of view. */
+  /* THE PATH-BUILDERS ARE RESOLVED RATHER THAN EXEMPTED. Any `…Query()` in the
+     argument is replaced by its body, so a limit deleted from a builder fails
+     here rather than widening every call site at once. */
   const bodyOf = (fn) => {
     const at = joined.indexOf(`function ${fn}(`);
     assert.ok(at > -1, `the read helper names ${fn}(), which no longer exists`);
@@ -2800,16 +2201,11 @@ test('every row-returning read of her own tables carries a limit', () => {
       `the read of ${table} has no limit — an unusual day puts the whole window ` +
       `into a model call with nothing to stop it`);
 
-    /* AND A LIMIT TAKES AN END, WHICH IS THE HALF THAT HAS ALREADY BITTEN
-       TWICE. `id` is the only monotonic key any of these tables has, so a read
-       ordered by it is asking for the newest rows or the oldest, and the two
-       are indistinguishable from outside: the same rows come back either way
-       on a quiet day, and the wrong end only shows on the day there is more
-       than a window's worth. The pass once kept the FIRST two hundred turns of
-       a day and dropped the evening, where a late instruction lives, and
-       `fillEmbeddings` drained its backlog from the wrong end. Ordering by a
-       clock is a different question and is left alone — the event spine reads
-       `at.asc` on purpose, because the next release is the earliest one. */
+    /* AND A LIMIT TAKES AN END. `id` is the only monotonic key, so ordering by it
+       asks for the newest rows or the oldest, and the two are indistinguishable
+       until there is more than a window's worth. Ordering by a clock is a
+       different question — the spine reads `at.asc` because the next release is
+       the earliest. */
     assert.doesNotMatch(query, /order=id\.asc/,
       `the read of ${table} orders id.asc under a limit, so it keeps the OLDEST ` +
       `rows in the window and silently drops everything since — which is what ` +
@@ -2818,15 +2214,10 @@ test('every row-returning read of her own tables carries a limit', () => {
 });
 
 /* ─── Retirement, and the filter that is the whole of it ─────────────────────
-   A superseded note is still in the table by design — the trail is the point.
-   What keeps it out of her context is one clause in one query, and losing that
-   clause fails in the worst available way: she is handed the correction AND the
-   thing it corrected, every turn, with nothing marking which is current. No
-   error, no log, and the note count merely looks healthy.
-
-   Three copies have to agree for the feature to exist at all: the column in the
-   schema, the filter in the read, and the parameter in the tool she calls. Any
-   one of them missing leaves the other two doing nothing.
+   A superseded note stays in the table; one clause keeps it out of her
+   context. Lose it and she is handed the correction AND the thing it corrected
+   every turn, with nothing marking which is current. The column, the filter
+   and the tool parameter must all agree.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the notes read asks for live notes only, and for the id that names one', () => {
@@ -2859,15 +2250,10 @@ test('the column, the filter and the tool parameter all exist together', () => {
     'the notes index no longer matches the read it exists for');
 });
 
-/* ─── The same filter again, on the write, where it answers a different question
-   The read's `superseded_by=is.null` decides what she is HANDED. This one
-   decides what a retirement may TOUCH, and only the read has ever been held to
-   it. Without it the PATCH matches an already-retired note and re-points it at
-   the new row: the trail stops being a chain and becomes a star, the note that
-   originally corrected it is orphaned, and every row involved still reads as
-   healthy. It is also the branch that decides whether she tells him the
-   retirement missed — an unfiltered PATCH always matches, so the honest
-   "note N is not there to retire" could never once be said. */
+/* ─── The same filter on the write, where it answers a different question ────
+   This decides what a retirement may TOUCH. Without it the PATCH re-points an
+   already-retired note: the trail becomes a star rather than a chain, and the
+   honest "note N is not there to retire" can never be said. */
 
 test('the supersede write may only retire a note that is still live', () => {
   const src = readFileSync(
@@ -2892,29 +2278,15 @@ test('the supersede write may only retire a note that is still live', () => {
 });
 
 /* ─── A block reaches the message, however it was awaited ────────────────────
-   These calls used to be `await notesBlock()` spliced straight into the string
-   being built, and a regex for that exact shape was the whole check. They are
-   now gathered into a Promise.all — six independent reads that were six round
-   trips before a briefing asked for its first token — so the text the old regex
-   looked for is gone while the thing it was protecting is not.
-
-   So this follows the VALUE rather than the syntax: the call is made, and
-   whatever it was bound to is used again afterwards. A dropped call fails the
-   first half. A call whose result is read and then never concatenated into the
-   message fails the second — which is the new way this can break, is invisible
-   at runtime, and is precisely what the old regex could not have seen.
+   The calls are gathered into a Promise.all, so this follows the VALUE rather
+   than the syntax: the call is made, and what it was bound to is used again.
+   A dropped call fails the first half; a result read and never concatenated
+   into the message fails the second.
    ─────────────────────────────────────────────────────────────────────────── */
 const reaches = (code, fn) => {
   if (new RegExp(`await\\s+${fn}\\(\\)`).test(code)) return true;
-  // EVERY Promise.all IN THE BODY, not the first one. handleMessage has two —
-  // the /notes audit reads its own rows before the reply path gathers its
-  // context — and stopping at the first meant the check answered "no" for a
-  // call sitting in the second, which is a green test reporting the opposite of
-  // the truth.
-  // Whitespace-tolerant around the `=`: a destructuring long enough to wrap is
-  // still the same call, and a reader that only matches one line answers "this
-  // path does not read his notes" about a path that does — a green suite
-  // reporting the opposite of the truth, in the other direction.
+  // EVERY Promise.all in the body — handleMessage has two. Whitespace-tolerant
+  // around the `=`, since a destructuring long enough to wrap is the same call.
   for (const all of code.matchAll(
     /const \[([^\]]+)\]\s*=\s*await\s+Promise\.all\(\[([\s\S]*?)\]\)/g)) {
     const names = all[1].split(',').map(s => s.trim()).filter(Boolean);
@@ -2940,35 +2312,14 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     return src.slice(at, end);
   };
 
-  /* postConsolidation is the worst one to lose. The others going without notes
-     costs continuity in one message; consolidation going without them means she
-     cannot see what she already holds, so she never supersedes and writes the
-     same fact again every night.
-
-     postRelease JOINED THE LIST WHEN THE PRINT LOOK WAS ASKED TO TEACH. Its
-     prompt now tells her to build a mechanism he has never had built before
-     saying what a number changed — and which those are is exactly what the map
-     holds. Asking it to teach from a ladder it is not handed is the same shape
-     the nightly pass was already fixed for: an instruction that outruns its
-     inputs, and one that fails by teaching the wrong thing well rather than by
-     failing at all.
-
-     AND postMove JOINED IT FOR THE SAME REASON, ONE RELEASE LATER. The two
-     looks are the same shape — an unscheduled message about something the
-     morning did not cover — and the move look was the one of the pair that
-     could only report. What is behind a move runs through a channel as surely
-     as what is behind a print does, so a message saying the dollar came off
-     teaches nothing to a man for whom the dollar is `unseen`, and that is the
-     likeliest message this path sends. It reached him as a number and a name,
-     which is the failure the map exists to prevent. */
-  /* FOUR LISTS, BECAUSE THEY ANSWER FOUR DIFFERENT QUESTIONS, and collapsing
-     them into one would either assert something a path has no business holding
-     or quietly stop asserting it of a path that needs it.
-
-     `TEACHES` is the six whose prompts build a term, so those get the map.
-     `SENDS` is the six that put a message in front of him right now — the
-     nightly pass is not one, it writes memory and sends nothing. His notes go
-     to all seven, because an instruction he gave is not optional anywhere. */
+  /* postConsolidation is the worst to lose: without its notes she cannot see what
+     she holds, never supersedes, and writes the same fact nightly. postRelease
+     and postMove teach — what is behind a print or a move runs through a
+     channel — so a look not handed the ladder teaches the wrong thing well. */
+  /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the six whose prompts build a
+     term, so they get the map. `SENDS` is the six that put a message in front of
+     him now — the nightly pass writes memory and sends nothing. His notes go to
+     all seven. */
   const TEACHES = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
                    'postRelease', 'postMove'];
   const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
@@ -2978,79 +2329,48 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
 
   for (const fn of TEACHES) {
-    // Comments stripped, because the identifier appearing in prose about the
-    // call is not the call. And `await` required: notesBlock is async, so an
-    // un-awaited one interpolates "[object Promise]" into the prompt — which
-    // reaches the model as text rather than as an error.
+    // Comments stripped, and `await` required: an un-awaited notesBlock
+    // interpolates "[object Promise]" into the prompt as text.
     const code = body(fn).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
     assert.ok(reaches(code, 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
       `he gave would be ignored, with nothing anywhere reporting it`);
-    /* AND THE MAP, on the same four paths and for a sharper version of the same
-       reason. Losing the notes costs continuity in one message; losing the map
-       costs the only thing that says which channels are THIN, and it fails
-       upward — she carries on teaching well, on whatever the day happens to be
-       about, and the channel he has never once used stays never used with
-       nothing anywhere reporting it. Worst on the nightly pass, which is also
-       the only thing that can move a rung: without the map in front of it, it
-       cannot see what it is moving from. */
+    /* AND THE MAP: the only thing that says which channels are THIN, and its loss
+       fails upward — she teaches well on whatever the day is about. Worst on the
+       nightly pass, the only thing that can move a rung. */
     assert.ok(reaches(code, 'channelsBlock'),
       `${fn} never gets channelsBlock() into the message it sends — she would teach without knowing ` +
       `which channels are thin, and nothing would report it`);
   }
 
-  /* NOTES REACH SEVEN PATHS, NOT FIVE. The move look and the trade look send
-     him messages like any other, and the trade look was deaf to his notes for
-     its whole life — so an instruction he had given her was obeyed everywhere
-     except the two messages that arrive while he is in a position, which are
-     the ones he is least able to ignore. */
+  /* NOTES REACH SEVEN PATHS — the two looks that arrive while he is in a position
+     included. */
   for (const fn of [...new Set([...TEACHES, ...SENDS])]) {
     assert.ok(reaches(reads(fn), 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
       `he gave would be ignored, with nothing anywhere reporting it`);
   }
 
-  /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS. Its absence is the
-     quietest failure on this list: she simply says a thing she already said,
-     and a repetition reads as emphasis rather than as a defect. It bites
-     hardest on the trade look, whose R-14/R-19 message fires on a print pending
-     against an open position — which is exactly what the morning briefing is
-     most likely to have named already.
-
-     postConsolidation is deliberately absent: it reads a fixed twenty-four
-     hours of its own and the twelve-turn window would be a second, shorter copy
-     of the same day. */
+  /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
+     again what she said, and a repetition reads as emphasis. Hardest on the
+     trade look, whose R-14/R-19 line fires on the print the briefing most likely
+     named. postConsolidation reads its own fixed twenty-four hours. */
   for (const fn of SENDS) {
     assert.ok(reaches(reads(fn), 'recent'),
       `${fn} sends him a message with no conversation window — she cannot know ` +
       `she said the same thing an hour ago, and a repetition reads as emphasis`);
   }
 
-  /* AND THE ABSENCE IS ASSERTED, NOT LEFT TO A LIST. `postConsolidation` was
-     said to be deliberately without the window — in a comment, and by not
-     appearing in the array above, which is not a check. Adding `recent()` to
-     the pass passed the whole suite. Half a census is the fault this file
-     keeps finding: presence held on the paths that need it and absence held
-     nowhere, so the one path the rule is ABOUT is the one nothing reads. */
+  /* AND THE ABSENCE IS ASSERTED: presence checked on the paths that need it and
+     absence nowhere would leave the one path the rule is about unread. */
   assert.ok(!reaches(reads('postConsolidation'), 'recent'),
     'the nightly pass now takes the twelve-turn window as well as its own ' +
     'fixed twenty-four hours — a second, shorter copy of the same day, paid ' +
     'for on every request of the one caller that reads a whole day at once');
 
-  /* AND WHAT HE HAS ON, WHICH IS SIX PATHS RATHER THAN FIVE. The move look
-     joins because the message that talks past a live position is whichever one
-     happens to be next, and a sharp move is the likeliest of all of them to
-     arrive while he is in one.
-
-     Losing it is silent in the way that matters: she carries on writing well,
-     about a level or a shape, into a chat where he is sitting in a trade — and
-     the message reads as correct because every rule about what she may SAY is
-     still being kept. The only thing missing is the fact that would have
-     stopped her.
-
-     postTradeEvent is deliberately not here. It is reached FROM the position
-     and already carries the row that fired it, so the block would hand it what
-     it opened with. */
+  /* AND WHAT HE HAS ON, on six paths: the move look joins, being the likeliest
+     message to land while he is in a trade. postTradeEvent is reached FROM the
+     position and already carries its row. */
   for (const fn of [...TEACHES, 'postMove']) {
     const code = reads(fn);
     assert.ok(reaches(code, 'positionsBlock'),
@@ -3060,23 +2380,12 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
 });
 
 /* ─── The pass that runs last reads what the writer was told ────────────────
-   The critic is the only thing that touches the briefing after it is written,
-   and two of its five checks are about him rather than about the prose: whether
-   the briefing obeys his standing instructions, and whether a term is being
-   built at a rung that no longer needs it. Both were asked of a message that
-   carried the rules and the draft and nothing else.
-
-   Neither fails loudly, and the second fails UPWARD, which is why it survived.
-   Asked whether a term had already been explained, a reader holding one message
-   answers from the only evidence in the room — the mechanism sitting in the
-   paragraph being judged — so the build-up the map had just required was cut as
-   a redefinition, last, every morning. The briefing that arrives is shorter,
-   fluent and correct, and every rule about what she may SAY still passes. The
-   only thing missing is the teaching, which is the one thing it is for.
-
-   So the assertion is the call site rather than the prompt: the prose can say
-   the notes are above it, and a call that stops passing them changes nothing
-   anyone can see.
+   Two of the critic's checks are about him: whether the briefing obeys his
+   standing instructions, and whether a term is built at a rung that no longer
+   needs it. From one message alone, the mechanism in the paragraph reads as a
+   redefinition and the build-up the map required is cut — last, every
+   morning, fluently. So the call site is asserted: the prose can say the notes
+   are above it while the call stops passing them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the critic is handed his notes, the map and the desk it is asked to enforce', () => {
@@ -3088,10 +2397,8 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
   const body = src.slice(at, src.indexOf('\n}', at))
     .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
 
-  /* In the message, not merely in the signature: a parameter the message string
-     never interpolates is a critic reading the rules with none of the inputs.
-     Read as the template literal critique() builds, wherever that is handed —
-     it goes to the shared gate() now rather than straight into an ask(). */
+  /* In the message, not merely the signature, read from the template literal
+     critique() hands to gate(). */
   const content = body.match(/`([\s\S]*?)`/);
   assert.ok(content, 'critique() no longer builds its message from a template literal');
   for (const block of ['notes', 'channels', 'desk', 'story']) {
@@ -3101,9 +2408,8 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
       `position while holding none of them, and it answers anyway`);
   }
 
-  /* AND THE DRAFT STAYS LAST. The prompt names it at the end of the message and
-     the blocks are prose that reads exactly like a briefing; put the draft first
-     and "return the briefing itself and nothing else" points at his notes. */
+  /* AND THE DRAFT STAYS LAST, or "return the briefing itself and nothing else"
+     points at his notes. */
   assert.ok(content[1].indexOf('${draft}') > content[1].indexOf('${story}'),
     'the draft is no longer the last thing in the critic message — the prompt says ' +
     'it is at the end, and the blocks above it read like prose it could return');
@@ -3117,14 +2423,8 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
 });
 
 /* ─── The senses, and the copies they add ────────────────────────────────────
-   005 brings five tables, a trigger and a hybrid search, and with them a fresh
-   crop of vocabularies stated in two places: a `kind` the tool offers and the
-   constraint refuses is a write that vanishes reported to nobody, which is the
-   exact failure eugenia_channels' ids were already held together against.
-
-   Every check below reads BOTH copies out of their files rather than either
-   against a literal typed here. A literal is a third copy and would go stale
-   with the other two.
+   Vocabularies stated in a constraint and in code: a kind offered and refused
+   is a write that vanishes. Both copies are read out of their files.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // The values inside a `check (col in ('a', 'b'))`, whichever constraint it is.
@@ -3132,10 +2432,8 @@ const checkValues = (sql, constraint) => {
   const at = sql.indexOf(constraint);
   if (at < 0) return null;
   const clause = sql.slice(at, sql.indexOf('))', at));
-  // Case-insensitive: every vocabulary here was lower-case until `direction`,
-  // whose values are the broker's own BUY and SELL. A lower-case class returned
-  // an empty list for it rather than failing, which is the shape of blindness
-  // this file exists to avoid — so the callers below assert on what came back.
+  // Case-insensitive, for `direction`'s BUY and SELL; callers assert on what came
+  // back, so an empty list fails rather than passing.
   return [...clause.matchAll(/'([A-Za-z_]+)'/g)].map(m => m[1]).sort();
 };
 
@@ -3147,31 +2445,18 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
     'is a 400 she reports to nobody, the second is a value nothing can write');
 });
 
-/* ─── The two vocabularies the writers depend on and nothing compared ────────
-   Both are enumerated in a check constraint, and both have copies in code that
-   the constraint would silently invalidate. They fail in the direction that is
-   hardest to see: NARROWING the constraint does not break a test or a build, it
-   makes every write carrying the dropped value fail at PostgREST — and the two
-   writers that would hit it report to a console this repository says twice that
-   nobody reads.
-
-   `direction` drops half the journal: every SELL rejected, the poller logging
-   and carrying on, the app showing only longs. `role` drops half of every
-   conversation: her own turns refused, so the history window fills with his
-   messages alone and she reads as though she had never answered.
+/* ─── The two vocabularies the writers depend on ─────────────────────────────
+   NARROWING a constraint breaks no build; it makes every write carrying the
+   dropped value fail at PostgREST, reported to a console. `direction` would
+   drop every SELL; `role` would drop her own turns, leaving a history of his
+   messages alone.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ─── What Telegram is told to deliver ───────────────────────────────────────
-   `allowed_updates` is set once, by hand, outside this repository, and getting
-   it wrong fails in the way this system's registration mistakes always fail:
-   the update is simply never delivered. Eugenia needs both kinds — a message to
-   answer and a callback_query for the feedback keyboard under every briefing —
-   and her own dispatch says so in a comment beside the branch that handles them.
-
-   The setup runbook said `["message"]` alone, so a restore built from this file
-   would have come up with a briefing nobody could rate, the button spinning and
-   nothing reporting it. Two copies of one value, in a document and in a comment,
-   with the failure invisible from both.
+   `allowed_updates` is set by hand, outside this repository, and a wrong one
+   means the update is never delivered. Eugenia needs a message and a
+   callback_query for the feedback keyboard; the README's registration and the
+   code's dispatch are held together.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README registers each bot for the updates its code actually handles', () => {
@@ -3182,10 +2467,8 @@ test('the README registers each bot for the updates its code actually handles', 
   };
 
   for (const [fn, kinds] of Object.entries(wanted)) {
-    /* The registration block is the one that names the function's endpoint AND
-       the updates together — the endpoint alone appears in half a dozen other
-       sentences, and taking the first of those reads a paragraph about
-       something else and reports the registration missing. */
+    /* The block naming the endpoint AND the updates together — the endpoint alone
+       appears in other sentences. */
     const line = [...readme.matchAll(new RegExp(`/functions/v1/${fn}`, 'g'))]
       .map(m => readme.slice(m.index, m.index + 400)
         .match(/allowed_updates\s*=\s*\[[^\]]*\]/))
@@ -3200,10 +2483,8 @@ test('the README registers each bot for the updates its code actually handles', 
         `the README registers ${fn} without "${kind}" — that update is then ` +
         `never delivered, and nothing anywhere reports it`);
     }
-    /* And the code has to actually read every kind the README asks for — as a
-       PROPERTY of the update, not merely as a word somewhere in the file. A
-       bare word match passed for "poll", which appears in prose about the
-       poller; asking for `.poll` asks the question that was meant. */
+    /* Read as a PROPERTY of the update: a bare word matches "poll" in prose about
+       the poller. */
     const src = readFileSync(
       new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url), 'utf8');
     for (const kind of [...line[0].matchAll(/"(\w+)"/g)].map(m => m[1])) {
@@ -3214,14 +2495,12 @@ test('the README registers each bot for the updates its code actually handles', 
   }
 });
 
-/* THE THREE POLLER RETURNS THAT LEGITIMATELY MARK NOTHING, and no two of them
-   for the same reason — which is why they are written down rather than
-   inferred from their status code. The first two are not runs: a 503 at boot
-   has no credentials to mark WITH, and a 401 is somebody knocking. The third
-   is a run and still must not mark, which is the one worth reading twice: the
-   quote door is reached every quarter hour by the price job, so a mark there
-   would keep `last_ok` fresh while the two-minute poll sat dead — the monitor
-   reporting health it read off a different job. */
+/* THE THREE POLLER RETURNS THAT LEGITIMATELY MARK NOTHING, each for its own
+   reason, so written down rather than inferred from a status. A 503 at boot
+   has no credentials to mark WITH; a 401 is somebody knocking; and the quote
+   door is a run that still must not mark — the price job reaches it every
+   quarter hour, and a mark there would keep `last_ok` fresh while the
+   two-minute poll sat dead. */
 const UNMARKED = {
   'not configured':
     'the boot guard: no broker credentials loaded, so there is nothing to poll ' +
@@ -3234,17 +2513,11 @@ const UNMARKED = {
 };
 
 /* ─── Both silent writers leave a mark, on both paths ────────────────────────
-   The poller and the email function are the two writers with no voice: their
-   failures reach console.error and a response pg_net discards. `sync_health` is
-   the only evidence either is alive, and it is worth exactly as much as its
-   call sites — a heartbeat missing from the success path makes a healthy writer
-   read as dead, and one missing from the failure path is the original problem
-   with a table beside it.
-
-   Read structurally because nothing in this suite can drive an Edge handler,
-   and because both calls sit at the very end of long functions where a later
-   edit walks past them. Neither shows up as a failure if it goes: the poll
-   still folds its deals, and the row simply stops moving.
+   `sync_health` is worth exactly as much as its call sites: missing from the
+   success path a healthy writer reads as dead, missing from the failure path
+   it is the original silence with a table beside it. Read structurally — no
+   Edge handler can be driven here, and the calls sit at the end of long
+   functions where a later edit walks past them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the two writers with no voice record both outcomes', () => {
@@ -3266,21 +2539,13 @@ test('the two writers with no voice record both outcomes', () => {
       `${fn} never records a failure, so the only account of a run that failed ` +
       `at 03:00 is still a console nobody reads`);
 
-    /* AND IN THE EMAIL FUNCTION, EVERY 400 IS A FILL DISCARDED FOR EVER. That
-       status tells the Apps Script the row will never be accepted, so it
-       labels the thread, the thread leaves the Gmail query, and the settled
-       P&L is gone. Two of those paths refused a body and marked nothing, so
-       the one failure mode that loses data left `sync_health` showing whatever
-       the last good fill said. Derived rather than named, so a third refusal
-       added later cannot arrive unmarked. */
+    /* AND IN THE EMAIL FUNCTION EVERY 400 IS A FILL DISCARDED FOR EVER: the Apps
+       Script labels the thread and the settled P&L is gone. Each refusal path must
+       mark, and they are derived, so one added later cannot arrive unmarked. */
     if (who === 'email') {
-      /* EACH WINDOW ENDS AT THE PREVIOUS `return`, because every return ends a
-         path and a path may only be credited with its OWN mark. Two weaker
-         versions of this check passed while a heartbeat was deleted: a flat
-         400-character look-back borrowed the mark above it, and bounding at
-         the previous REFUSAL still spanned the 500 path's mark in between.
-         Written down because the check failing to fail is the thing this
-         repository keeps finding, and it found it here twice in a row. */
+      /* EACH WINDOW ENDS AT THE PREVIOUS `return`, so a path is credited only with
+         its OWN mark. A flat look-back borrows the mark above it; bounding at the
+         previous refusal spans the 500 path's mark in between. */
       const returns = [...code.matchAll(/return json\([^;]*\);/g)];
       // `answer` is answerFor(res.status), 400 for a row PostgREST will never
       // accept — the same discard, reached by a computed status.
@@ -3299,13 +2564,10 @@ test('the two writers with no voice record both outcomes', () => {
         from = r.index + r[0].length;
       }
 
-      /* AND THE ONE MARK THAT IS CONDITIONAL STAYS NARROW. `testSecret()` in
-         doji_gmail_sync.gs posts `{}` deliberately — a body this function
-         cannot accept, so a 400 proves the secret was taken — and marking that
-         would report a healthy sync as broken every time a person ran the
-         diagnostic. The carve-out is a body with no `id`, which `parseAlert_`
-         cannot produce; widened to anything else it swallows the finding the
-         mark exists for. */
+      /* THE ONE CONDITIONAL MARK STAYS NARROW. `testSecret()` in doji_gmail_sync.gs
+         posts `{}` on purpose, and marking that refusal would report a healthy sync
+         broken whenever a person ran the diagnostic. The carve-out is a body with no
+         `id`, which `parseAlert_` cannot produce; wider, it swallows real findings. */
       assert.match(code, /const probe = !body \|\| typeof body !== "object" \|\| !\("id" in body\);/,
         `${fn}'s probe test is no longer exactly "the body carries no id" — a ` +
         `wider one stops marking fills that really were discarded`);
@@ -3314,23 +2576,11 @@ test('the two writers with no voice record both outcomes', () => {
         `reports a working sync as a failing one`);
     }
 
-    /* AND EVERY PATH THAT COMPLETES MUST MARK, NOT ONLY THE LAST ONE. The
-       poller returns early when the market is closed, which is a completed run
-       by every measure the mark exists for — cron fired, the function is
-       deployed, its secrets loaded, it decided correctly. Unmarked, gold's
-       Friday-to-Sunday close freezes it for forty-eight hours against a
-       six-hour window and she reports the sync dead every Sunday evening.
-
-       A monitor that is wrong on an ordinary day gets ignored, and an ignored
-       monitor is worse than none. `healthLine` is pure and cannot see this —
-       it is handed rows — so the call sites are read here instead.
-
-       THE PATHS ARE DERIVED AND THE SILENT ONES ARE DECLARED, which is the
-       half this check was missing: it read ONE early return by name, so the
-       second one to arrive unmarked would have been invisible in exactly the
-       way the first was. Three paths legitimately mark nothing and no two of
-       them for the same reason, so the reasons are written down rather than
-       inferred — an exemption is a row with a reason in it, never an absence. */
+    /* AND EVERY PATH THAT COMPLETES MUST MARK. The market-closed return is a
+       completed run; unmarked, gold's weekend close freezes the mark for
+       forty-eight hours against a six-hour window and the sync reads dead every
+       Sunday evening. `healthLine` is pure and cannot see this. THE PATHS ARE
+       DERIVED AND THE SILENT ONES DECLARED, each with its reason. */
     if (fn === 'doji-mcp-sync') {
       const returns = [...code.matchAll(/return json\([^;]*\);/g)];
       assert.ok(returns.length >= 5,
@@ -3361,12 +2611,8 @@ test('the two writers with no voice record both outcomes', () => {
       }
     }
 
-    /* And it must be a name the table both ACCEPTS and SEEDS. Asked of the
-       constraint rather than of the file, because the seed alone answers yes
-       for a name the check would refuse — and both halves matter separately:
-       an unaccepted name is a 400 the writer swallows, an unseeded one is a
-       PATCH by primary key landing on nothing, which is a 200 with an empty
-       body. Either way the row never moves and the writer reads as dead. */
+    /* A name the table both ACCEPTS and SEEDS: unaccepted is a 400 the writer
+       swallows, unseeded is a PATCH landing on nothing — a 200 with an empty body. */
     assert.ok(accepted.includes(who),
       `sync_health_id_check refuses '${who}', so every heartbeat ${fn} sends is ` +
       `a 400 it swallows — indistinguishable from one that never fired`);
@@ -3377,15 +2623,9 @@ test('the two writers with no voice record both outcomes', () => {
 });
 
 /* ─── The number in the instructions is a number, and numbers go stale ───────
-   CLAUDE.md tells a new reader what `npm test` should print. It said 402 for
-   long enough to be wrong by thirty-two, which is the same failure this file
-   exists for in its smallest form: a copy nothing compares, in the one document
-   somebody reads before touching anything.
-
-   It is derivable, so it is derived. The runner reports one line per top-level
-   `test(` call, and that is what is counted here — a suite added in a fifth file
-   is picked up without touching this test, and a count typed into the document
-   and not updated fails on the next run rather than in six months.
+   CLAUDE.md tells a new reader what `npm test` should print. It is derivable,
+   so it is derived: one line per top-level `test(` call, across every suite in
+   test/.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the test count the instructions state is the count the suite runs', () => {
@@ -3411,18 +2651,11 @@ test('the test count the instructions state is the count the suite runs', () => 
     `sitting in a subfolder where it silently does not run at all`);
 });
 
-/* ─── The backup reads each table by a column that table actually has ────────
-   Paging by Range needs a stable order, so every read carries one — and the
-   order column has to exist. `eugenia_channels` is keyed by `channel` rather
-   than `id`, because the five rungs ARE the rows; ordering it by `id` is a 400
-   from PostgREST and the whole backup is refused.
-
-   NOTHING IN THIS SUITE COULD SEE THAT, and the reason is worth keeping. The
-   paging tests drive `readAll` against a stubbed fetch, and a stub answers
-   whatever it is asked — so the loop was proved and the QUERY was never
-   checked against a real schema. It failed on its first live run. This is the
-   half a stub cannot cover: the column names, read out of the SQL that creates
-   the table.
+/* ─── The backup reads each table by a column that table has ─────────────────
+   Paging needs a stable order, and `eugenia_channels` is keyed by `channel`:
+   ordering it by `id` is a 400 and the whole backup refused. A stubbed fetch
+   answers whatever it is asked, so the paging tests prove the loop and never
+   the QUERY. This reads the column names out of the SQL.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every table the backup reads is ordered by a column it has', async () => {
@@ -3449,16 +2682,10 @@ test('every table the backup reads is ordered by a column it has', async () => {
 });
 
 /* ─── verify.sql has to ask about everything the files declare ───────────────
-   The numbered files are a CLAIM about the database and verify.sql is the only
-   thing that tests it, so an object declared and never asked about is drift in
-   the part nobody checks. It was 25 of 39: eleven indexes and the three policies
-   the dashboard card reads were declared and never asked about, and RLS was
-   asserted for four of ten tables.
-
-   Every one of those fails silently by construction. A missing `*_app_read`
-   policy is not an error — RLS does exactly its job and the card shows nothing,
-   which looks like a quiet week. A missing index is not an error either: the
-   query returns the same rows off a sequential scan and gets slower every week.
+   An object declared and never asked about is drift in the part nobody checks,
+   and each fails silently by construction: a missing `*_app_read` policy is
+   RLS doing its job and the card showing nothing; a missing index returns the
+   same rows off a sequential scan, slower every week.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // NUMBERED is already the numbered files as one string, read at the top of this
@@ -3490,9 +2717,7 @@ test('verify.sql asks about every table, policy and index the files declare', ()
       `it is the same rows off a sequential scan, slower every week`);
   }
 
-  /* AND THE EXPECTED STRING IS THE LIST ITSELF. The row names every index, so
-     the row is a second copy of what the SQL declares — held here rather than
-     left to be noticed when someone runs the file. */
+  /* THE EXPECTED STRING IS THE LIST ITSELF, held against what the SQL declares. */
   const expected = [...new Set(indexes)].sort().join(',');
   const stated = (VERIFY.match(/\('every declared index exists',[\s\S]*?\n   '([\s\S]*?)'\)/) || [])[1];
   assert.ok(stated, "verify.sql has no 'every declared index exists' row");
@@ -3501,16 +2726,11 @@ test('verify.sql asks about every table, policy and index the files declare', ()
 });
 
 /* ─── A summary row may come back false; it may never throw ──────────────────
-   An error in verify.sql is not a failed row, it is a file that STOPPED —
-   taking every check below it and reporting a correct database as a broken one.
-   That has happened once already, to a written-out function signature.
-
-   The shape that does it is a summary row reading a public table DIRECTLY:
-   Postgres parses the whole statement up front, so a table that is not there
-   raises 42P01 rather than answering. Three seed checks did exactly that. They
-   have to read the table — that is what a seed check is — so they read it
-   through `query_to_xml`, which takes its query as a string and is guarded by
-   `to_regclass`, and answer NULL when the table is absent.
+   An error in verify.sql is a file that STOPPED, taking every check below it.
+   Postgres parses the whole statement first, so a summary row reading a public
+   table directly raises 42P01 when the table is absent. Seed checks read
+   through `query_to_xml`, which takes its query as a string, guarded by
+   `to_regclass`, and answer NULL.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no summary row reads a table in a way that would throw', () => {
@@ -3519,21 +2739,14 @@ test('no summary row reads a table in a way that would throw', () => {
   assert.ok(from > -1 && to > from, 'verify.sql no longer has one summary block');
   const summary = VERIFY.slice(from, to);
 
-  /* Comments first, then string literals — in that order. A `--` comment in
-     this file routinely carries an apostrophe ("the poller's answer"), in a
-     dash comment and in a block comment alike, and a single unpaired quote
-     desynchronises literal matching for everything after it — which had this
-     reading `to_regclass('public.eugenia_channels')` as a live table read. */
+  /* Comments first, then strings: an apostrophe in a comment desynchronises
+     quote matching for everything after it. */
   const unquoted = summary
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/--[^\n]*/g, '')
     .replace(/'(?:[^']|'')*'/g, "''");
-  /* Any schema, not only `public`. `cron.job` is the same hazard wearing an
-     extension's name: on a database without pg_cron a direct read raises, and
-     "that never happens on Supabase" is how a row ends up runnable in exactly
-     one place. The catalogs — pg_class, pg_proc, pg_policy, pg_indexes,
-     information_schema — are always there and are what the rest of the file
-     asks. */
+  /* Any schema, not only `public`: on a database without pg_cron a direct read of
+     `cron.job` raises too. The catalogs are always there. */
   const direct = [...unquoted.matchAll(/from\s+(public|cron|net|vault)\.(\w+)/g)]
     .map(m => `${m[1]}.${m[2]}`);
   assert.deepEqual(direct, [],
@@ -3544,16 +2757,11 @@ test('no summary row reads a table in a way that would throw', () => {
   assert.match(summary, /to_regclass/, 'the summary no longer asks by oid at all');
 });
 
-/* ─── Every table stands behind RLS, and nothing was checking that ───────────
-   The publishable key is in `index.html` and is meant to be. RLS is the only
-   thing between it and every table in the schema — either a policy that scopes
-   the rows, or, for the tables 003 keeps from the app entirely, RLS on with no
-   policy at all, which denies that key outright.
-
-   A table created without `enable row level security` is readable by anyone who
-   opens the page. Nothing failed, nothing logged, and the table simply answers.
-   Read out of the SQL rather than listed here, so table eleven is covered on the
-   day it is written rather than on the day someone remembers this test.
+/* ─── Every table stands behind RLS ──────────────────────────────────────────
+   The publishable key is in `index.html` by design, and RLS is all that stands
+   between it and every table — a policy scoping the rows, or RLS with no
+   policy, which denies it outright. A table without `enable row level
+   security` simply answers anyone. Read out of the SQL.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every table the numbered files create has row level security on', () => {
@@ -3628,9 +2836,8 @@ test('the importance a release may carry is the one the table accepts', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  /* TRADINGVIEW'S THREE LEVELS MAP ONTO THE SAME THREE, and that map is what
-     writes them now. One the table refuses is a 400 on every quarter-hourly
-     filing it touches, recorded as a failed `calendar` run and nothing else. */
+  /* TRADINGVIEW'S THREE LEVELS MAP ONTO THE SAME THREE; one the table refuses is
+     a 400 on every filing it touches. */
   const tv = readFileSync(
     new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
   const mapped = tv.match(/const IMPORTANCE[^=]*= \{([^}]+)\}/);
@@ -3638,29 +2845,22 @@ test('the importance a release may carry is the one the table accepts', () => {
   assert.deepEqual([...mapped[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
     "TradingView's importance maps to one the table refuses, or one is unreachable");
 
-  /* AND THE ONE THAT WAKES HER IS ONE OF THEM. The event spine selects on
-     importance='high', so a rename on either side leaves a spine that matches
-     nothing — every release filed, none of them ever looked at, and no error
-     anywhere. */
+  /* AND THE ONE THAT WAKES HER IS ONE OF THEM: a rename leaves a spine that
+     matches nothing, with no error anywhere. */
   assert.ok(declared.includes('high'), 'nothing is filed as high, so the spine can never fire');
 
-  /* READ OUT OF pendingRelease ITSELF, not out of the file. aheadToday filters
-     on the same value, so a whole-file match stayed green while the spine's own
-     filter was deleted — the query that decides whether she is ever woken by a
-     print, answering for a query that decides what to mention in a message. */
+  /* READ OUT OF pendingRelease ITSELF: aheadToday filters on the same value, so
+     a whole-file match stays green with the spine's own filter deleted. */
   const at = src.indexOf('async function pendingRelease(');
   assert.ok(at > -1, 'doji-eugenia no longer has pendingRelease()');
   const spine = src.slice(at, src.indexOf('\n}', at));
   assert.match(spine, /importance=eq\.high/,
     'the release spine no longer filters on importance, so every medium and low ' +
     'entry filed all week would wake her');
-  /* AND THE MARK IS SELECTED RATHER THAN FILTERED ON, which is the one place
-     this reads as a deletion and is not. The query cannot filter it away: the
-     question is whether ANYTHING at that release time has been looked at, and a
-     `looked_at=is.null` filter hides exactly the mark that answers it — which
-     is how one print became five looks. The guarantee moved into dueRelease and
-     is driven from both sides in fold.test.mjs; what has to be true here is
-     that the column still comes back at all. */
+  /* THE MARK IS SELECTED RATHER THAN FILTERED ON. The question is whether
+     ANYTHING at that release time has been looked at, and `looked_at=is.null`
+     would hide exactly the mark that answers it. dueRelease is driven in
+     fold.test.mjs; here the column must still come back. */
   assert.match(spine, /select=[^&`]*looked_at/,
     'pendingRelease no longer reads looked_at, so dueRelease cannot see the mark ' +
     'and every print is looked at every quarter of an hour until it ages out');
@@ -3670,12 +2870,9 @@ test('the importance a release may carry is the one the table accepts', () => {
 });
 
 /* ─── The pure half settles nothing about the call ───────────────────────────
-   `dueRelease` is driven from both sides in fold.test.mjs and every one of those
-   assertions stays green while postRelease marks only the row its message
-   happens to name — which leaves the other four standing unlooked, and the next
-   quarter-hour hands back the same print. That is the loop this was built to
-   close, surviving inside the fix for it, and it is the third time this shape
-   has been found here.
+   `dueRelease` stays green while postRelease marks only the row its message
+   names, leaving the rest of the group unlooked — and the next quarter-hour
+   hands back the same print. So markLooked must take every id in the group.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every row at the release time is marked, not the one the message names', () => {
@@ -3687,19 +2884,15 @@ test('every row at the release time is marked, not the one the message names', (
     'postRelease marks something other than the whole group, so the duplicates ' +
     'it just decided to skip come back unlooked at the next quarter hour');
 
-  // AND THE MARK GOES DOWN BEFORE THE LOOK, which is what makes it once-only at
-  // all: a look that generates and then fails to write would otherwise repeat
-  // every fifteen minutes, each one billed.
+  // THE MARK GOES DOWN BEFORE THE LOOK: one that generates and fails to write
+  // would repeat every fifteen minutes, each billed.
   assert.ok(body.indexOf('markLooked') < body.indexOf('await ask('),
     'the mark now lands after the model call, so a look that dies repeats');
 });
 
-/* ─── A command nothing routes is a command that does not exist ──────────────
-   `parseChannel` is pure and driven from both sides in fold.test.mjs, and every
-   one of those assertions stays green with the branch deleted from
-   handleMessage — the command then falls through to the catch-all that ignores
-   anything starting with a slash, and he gets no reply at all. Same shape as
-   briefKind's: the pure half proves the parse, never the call.
+/* ─── A command nothing routes does not exist ────────────────────────────────
+   `parseChannel` stays green with the branch deleted from handleMessage, and
+   the command falls through to the catch-all for slashes — no reply at all.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the rung he sets himself is routed, and routed before the slash catch-all', () => {
@@ -3718,23 +2911,17 @@ test('the rung he sets himself is routed, and routed before the slash catch-all'
     '/channel is read after the catch-all that ignores every slash command, so it ' +
     'can never run');
 
-  /* AND IT GOES THROUGH setChannel RATHER THAN WRITING ITS OWN PATCH, which is
-     what keeps the one-way door on the bottom rung and the unseeded-table check
-     in one place. A second writer here is a second copy of both. */
+  /* THROUGH setChannel, which holds the one-way door on the bottom rung and the
+     unseeded-table check in one place. */
   assert.match(body.slice(routed, routed + 400), /await setChannel\(/,
     '/channel writes the ladder itself, so the guard on the bottom rung and the ' +
     'check for an unseeded table are now stated in one place and enforced in another');
 });
 
 /* ─── A rule the critic also holds has to move in both places ────────────────
-   The critic runs LAST and returns the version that goes. A rule loosened in
-   the briefing prompt and left standing in `CRITIC` is a rule the critic puts
-   back, every morning, on the pass nothing downstream can see — which is how
-   the build-up `PITCH` required was being cut after `PITCH` had been obeyed.
-
-   One chain per briefing is the newest such pair. It exists because nine
-   subjects each carrying a mechanism is the shape he asked twice to be rid of,
-   in notes that were stored, read, and outranked by a rule with no carve-out.
+   The critic runs LAST and returns the version that goes, so a rule loosened in
+   the prompt and standing in `CRITIC` is put back every morning. One chain per
+   briefing is such a pair: nine subjects each walking a mechanism is a survey.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('one chain per briefing is stated to the writer and to the critic', () => {
@@ -3745,28 +2932,18 @@ test('one chain per briefing is stated to the writer and to the critic', () => {
     'the critic no longer checks it — so the writer may obey the rule and the ' +
     'pass that runs last has no reason to keep that version');
 
-  /* AND THE SLOT THAT CARRIED THE SECOND CHAIN SAYS SO ITSELF. "Name it and
-     move on" was already there and was not enough: it describes the length of
-     the paragraph and not what may be inside it. */
+  /* AND THE ROUND-UP SLOT SAYS SO ITSELF: a length says nothing about what may be
+     inside the paragraph. */
   assert.match(EUGENIA_PROMPT, /NAMED AND NOTHING MORE/,
     'the round-up slot no longer forbids mechanism, which is where the second ' +
     'chain actually lived');
 });
 
 /* ─── A thread that cannot close fills the list that holds the ones that can ──
-   `readLoops` takes the newest ten and the window was already full: six watches
-   and four questions. The eleventh loop she opens pushes the oldest out of what
-   she is HANDED while leaving it open in the table, so it can never be closed
-   by anyone who cannot see it — the same limit-at-the-right-end shape as the
-   nightly pass's, arriving where the assumption underneath it was that threads
-   close at all.
-
-   Two kinds could not. A move filed as unexplained when nothing had moved, now
-   fixed at the gate; and a question he does not answer, which closes only on an
-   answer. The pass was told to write a NOTE about the second and not to close
-   it — so it wrote one, correctly, and nothing acted on it. Both halves below
-   fail in silence: drop either and she keeps asking, the list keeps filling,
-   and no error is raised anywhere.
+   `readLoops` hands her the newest ten, so a loop that never closes pushes the
+   oldest out of view while leaving it open in the table — closable by nobody.
+   A question unanswered for a week IS answered and closes, with a note; a
+   WATCH is untouched, since age proves nothing about an odd reaction.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a question he has not answered in a week is closed, not kept', () => {
@@ -3774,24 +2951,16 @@ test('a question he has not answered in a week is closed, not kept', () => {
     'the nightly pass no longer closes a question he has not answered, so every ' +
     'one of them stays open for the life of the deployment');
 
-  // AND THE WATCH IS NOT SWEPT UP WITH IT. Age proves nothing about an odd
-  // reaction — it may still explain itself — so the exception has to stay an
-  // exception rather than becoming "close anything old".
+  // AND THE WATCH STAYS AN EXCEPTION, not "close anything old".
   assert.match(EUGENIA_PROMPT, /A thread that is merely old stays open/,
     'the pass may now close a watch for being old, which is the follow-through ' +
     'this whole mechanism exists for, quietly stopping');
 });
 
 /* ─── The briefing asks him nothing, and a reply still may ──────────────────
-   THE SLOT WAS MEASURING NOTHING. It existed to learn what he actually holds,
-   and over eleven days it produced four questions and four open threads and no
-   answers — he reads on a phone and answers by instruction, which is a channel
-   that works, rather than by reply.
-
-   THE SCOPE IS THE HALF THAT MATTERS HERE. Cutting questions everywhere would
-   take the trade conversation with it, where asking one thing and waiting is
-   the whole method and where he IS answering. So this is read as a pair: the
-   briefing is silent, and the reply path keeps its questions.
+   A slot whose only output is an open thread measures nothing. THE SCOPE IS
+   THE HALF THAT MATTERS: in the trade conversation one question and then
+   silence is the method, and he answers there. So this is read as a pair.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the briefing closes without a question to him', () => {
@@ -3799,14 +2968,12 @@ test('the briefing closes without a question to him', () => {
     'the briefing may end with a question again — four went unanswered in eleven ' +
     'days and each one is an open thread that can only close by being given up on');
 
-  // AND THE RULES THAT ONLY MADE SENSE WHILE IT ASKED ARE GONE WITH IT. A rule
-  // about re-asking, in a file where nothing asks, is the dead branch this
-  // repository refuses — and the one a later reader restores the slot from.
+  // AND THE RULES THAT ONLY MADE SENSE WHILE IT ASKED ARE GONE: a rule about
+  // re-asking where nothing asks is a dead branch a later reader restores the
+  // slot from.
   assert.doesNotMatch(EUGENIA_PROMPT, /you may ask it once more, differently/,
     'the re-asking rule survived the slot it belonged to');
-  /* BOTH FILES, because the sentence lived in the tool's description in
-     index.ts while this read only prompt.ts — a check that could not fail on
-     the file the defect was in, and the defect stood under it. */
+  /* BOTH FILES: the tool's description in index.ts can carry the sentence too. */
   for (const [file, text] of [['prompt.ts', EUGENIA_PROMPT], ['index.ts', EUGENIA_TS]]) {
     assert.doesNotMatch(text, /at most\s*"?\s*\+?\s*"?one of each in a\s+briefing/,
       `${file}: open_loop still promises a question loop the briefing can no longer open`);
@@ -3814,10 +2981,8 @@ test('the briefing closes without a question to him', () => {
 });
 
 test('and a reply may still ask, because that is a conversation he is in', () => {
-  /* THE CAPABILITY THIS WAS NOT ALLOWED TO COST. He answers when he is the one
-     who started talking — most of all about a trade, where the method is one
-     question and then silence. A change that took that too would be quieter and
-     worse. */
+  /* THE CAPABILITY THIS MAY NOT COST: one question and then silence, when he
+     started talking. */
   assert.match(EUGENIA_PROMPT, /When he mentions how he felt, slow down\. One question at a time/,
     'the trade conversation lost its questions, which is where he does answer');
   assert.match(EUGENIA_PROMPT, /Never infer what he planned\. Ask\./,
@@ -3882,24 +3047,16 @@ test('every column the cost meter writes is a column the table has', () => {
   const calls = [...src.matchAll(/recordRun\(\{([\s\S]*?)\}\)/g)];
   assert.ok(calls.length >= 3, `only ${calls.length} recordRun call sites — the reader has gone blind`);
 
-  /* ONE READER FOR BOTH DIRECTIONS. It was two, and the day one of them learned
-     to skip string literals the other did not — a census whose halves read the
-     same source two ways is the drift it exists to catch, inside itself.
-
-     Shorthand and long form both, since `cached` and `caller: label` sit in the
-     same literal. Comments stripped: a name in prose is not a key. Strings come
-     out next — a comma inside `failed, the draft went` is prose, and a split
-     that cannot tell reads "the" as a column. Then every bracketed group,
-     innermost first: `.slice(0, 500)` and `[message, toolLine()]` both carry
-     commas that separate items rather than keys, and splitting naively reads
-     "500" or "toolLine" as a column name. */
+  /* ONE READER FOR BOTH DIRECTIONS, or its halves read the same source two ways.
+     Shorthand and long form both. Comments stripped; strings out next (a comma
+     in prose is not a key separator); then every bracketed group, innermost
+     first, since `.slice(0, 500)` carries commas that separate arguments. */
   const group = /\([^()[\]{}]*\)|\[[^()[\]{}]*\]|\{[^()[\]{}]*\}/g;
   const keysOf = (body) => {
     let flat = body.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
       .replace(/`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''");
-    // Until nothing changes, rather than `group.test(flat)`: a regex carrying
-    // the g flag keeps its position between calls, and a test() that starts
-    // where the last one stopped reports no match that is there.
+    // Until nothing changes, not `group.test(flat)`: a g-flag regex keeps its
+    // position between calls.
     for (let i = 0; i < 8; i++) {
       const next = flat.replace(group, '');
       if (next === flat) break;
@@ -3916,15 +3073,9 @@ test('every column the cost meter writes is a column the table has', () => {
     }
   }
 
-  /* AND THE OTHER DIRECTION, WHICH IS THE ONE THAT SHIPPED BROKEN. A column
-     nothing writes reads null on every row for ever: the insert succeeds, the
-     table keeps growing, the meter looks healthy, and the one figure somebody
-     added the column FOR is the figure that is not there. `model` went in that
-     way and needed a second guard written by hand. This is that guard for every
-     column at once, so the next one costs nothing.
-
-     `id` and `at` are the only exemptions and they are structural — a bigserial
-     and a default the writer must not set. */
+  /* AND THE OTHER DIRECTION: a column nothing writes reads null for ever while
+     the insert succeeds and the meter looks healthy. `id` and `at` are the only
+     exemptions — a bigserial and a default the writer must not set. */
   const written = new Set(calls.flatMap(([, body]) => keysOf(body)));
   for (const col of columns) {
     if (col === 'id' || col === 'at') continue;
@@ -3934,10 +3085,8 @@ test('every column the cost meter writes is a column the table has', () => {
       `reads null for ever`);
   }
 
-  /* AND THE CHECK THAT WOULD CATCH THAT ON A LIVE DATABASE NAMES THEM A THIRD
-     TIME. A verify.sql row asking after a column 005 does not declare comes back
-     false on a correct database, which is the failure mode that gets a checker
-     stopped being run. */
+  /* AND verify.sql NAMES THEM A THIRD TIME: a row asking after an undeclared
+     column comes back false on a correct database. */
   const verify = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
   const asked = verify.match(
     /table_name = 'eugenia_runs'\s*\n\s*and column_name in \(([^)]*)\)/);
@@ -3950,21 +3099,11 @@ test('every column the cost meter writes is a column the table has', () => {
 });
 
 /* ─── The line on price is the product ───────────────────────────────────────
-   No signal, and no view on where price goes except one fenced three ways. It
-   is the line between a market analyst and a signal service, it is stated in
-   the file rather than enforced by anything, and for a long time nothing
-   asserted it was there at all — deleting it from SYSTEM broke no test, and
-   what came back would have read like a better briefing.
-
-   THE TWO GATES NEED IT AS MUCH AS THE WRITER DOES, and for a reason that is
-   theirs alone: they do not merely approve, they REWRITE. A gate that has not
-   been told the rule can take a compliant message and hand back one that
-   breaks it, and the gate runs LAST, so nothing after it disagrees. That is
-   the same argument that already keeps the writing rules in all three copies.
-
-   SYSTEM is the system prompt on every call, so RELEASE and CONSOLIDATE
-   inherit it and do not restate it — which is why this names the prompts that
-   must carry it rather than requiring it everywhere.
+   No signal, and no view on where price goes except one fenced three ways — the
+   line between a market analyst and a signal service, enforced by nothing but
+   the sentence. THE TWO GATES NEED IT AS MUCH AS THE WRITER: they REWRITE, and
+   run last, so a gate not told the rule can hand back a message breaking it.
+   RELEASE and CONSOLIDATE inherit SYSTEM.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no prompt that writes or rewrites may lose the line on price', () => {
@@ -3991,30 +3130,18 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
 });
 
 /* ─── Her read is allowed because it is fenced, and the fence is three copies ─
-   She may say which way today's news leans for gold. What keeps that from
-   being a tip is the fence around it: labelled as HER read, carrying what would
-   prove it wrong, naming no level — and never given while he is in a position,
-   where a view on price is advice about the trade however it is worded.
-
-   The fence is sentences and nothing else, so a copy that drops one half is
-   silent: the writer loses it and a read with a level in it goes out, or a gate
-   loses it and CUTS every compliant read, which is the gate overruling the
-   writer on a rule it no longer holds. Each half is read in the writer and in
-   both gates for that reason.
-
-   THE OPEN-POSITION HALF NEEDS AN INPUT AS WELL AS A SENTENCE. A gate asked
-   whether he is in a position must be handed the block that says so, or it
-   answers from nothing — which is the critic's old failure with his notes,
-   arriving on a new rule.
+   Labelled as HER read, carrying what would prove it wrong, naming no level —
+   and none while he is in a position. A writer losing a half sends a read with
+   a level in it; a gate losing one CUTS every compliant read. THE
+   OPEN-POSITION HALF NEEDS AN INPUT TOO: a gate must be handed the block that
+   says whether he is in a position.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('both gates check the message against the story, and the story states a direction', () => {
-  /* "OCTOBER RATE CUT ODDS", TWICE, IN A WEEK THE FED HAD JUST HIKED — inside
-     messages whose own reasoning was about a hike. A slip rather than a gap in
-     what she knew, and neither gate could catch it: both judge how she writes
-     and were handed nothing saying which way things are going. One rule, held
-     by both, the way WRITING is; and it is only as good as the story, so the
-     nightly pass is told to write the direction into it. */
+  /* "Rate cut odds" in a week the Fed had hiked, inside reasoning about a hike: a
+     slip neither gate could catch, being handed nothing that says which way
+     things are going. One rule held by both, the way WRITING is, and only as good
+     as the story — so the nightly pass writes the direction into it. */
   const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1];
   assert.match(body('AGAINST_THE_STORY'), /says "cut" where the story says "hike"/,
     'AGAINST_THE_STORY no longer names the slip it exists for');
@@ -4030,35 +3157,26 @@ test('both gates check the message against the story, and the story states a dir
 });
 
 test('the writing rules ban a figure of speech, with his own example of one beside it', () => {
-  /* EVERY WORD SHORT AND THE SENTENCE STILL A PUZZLE. "The relief in gold has
-     been contained rather than clean" obeys every countable rule in WRITING and
-     reached him as something to decode — the pulse of 30 September. NO
-     PUNCHLINES covered a clever line at the END of a paragraph and said nothing
-     about one in the middle. The example is the case he pointed at, because a
-     worked example is what moved her register when a description did not; and
-     it lives in WRITING, so the writer and both gates read it at once. */
+  /* EVERY WORD SHORT AND THE SENTENCE STILL A PUZZLE: "The relief in gold has been
+     contained rather than clean" obeys every countable rule. A worked example
+     moves her register where a description does not, and in WRITING the writer
+     and both gates read it at once. */
   const writing = EUGENIA_PROMPT.match(/export const WRITING = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(writing, /NO FIGURES OF SPEECH/, 'WRITING no longer bans figures of speech');
   assert.match(writing, /contained rather than clean" makes him work out that it means "that mix is why gold has only risen a little"/,
     'the figure-of-speech rule has lost its worked example — the description alone is what failed');
 
-  /* AND THE MESSAGE CAME AT ALL BECAUSE THE LOOK BEFORE IT REPORTED ONE NUMBER.
-     Core PCE's monthly figure went at 08:37; the yearly rate falling 3.3 to 3.0
-     and spending up 0.9% in the same report went at 10:00, from the pulse,
-     under "things the 8:30 note missed". */
+  /* AND A LOOK REPORTS THE WHOLE RELEASE, not one number from it, or the rest
+     arrives later from the pulse as things the look missed. */
   const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(release, /A RELEASE IS A REPORT, NOT ONE NUMBER\. Read everything that came out at that time/,
     'RELEASE no longer asks for the whole report — the pulse is left to finish it');
 });
 
 test('the critic counts paragraphs and dashes last, after everything that can add them', () => {
-  /* THE TWO COUNTABLE RULES THAT DID NOT LAND. Three briefings in a row went
-     through the critic with six-sentence paragraphs, two with an em-dash aside,
-     and the verdict row read `revised` every time. Both rules were in the
-     `WRITING` it is handed, among a dozen judgement calls. A count is a
-     different act from a reading, so it is asked for as one, and LAST — every
-     check above it can add a clause, and a count taken before the chain is
-     completed is a count of a paragraph that no longer exists. */
+  /* THE COUNTABLE RULES ARE ASKED FOR AS A COUNT. Among a dozen judgement calls
+     they did not land; counting is a different act from reading, so it is its
+     own step, and LAST — every check above can add a clause. */
   const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
   const count = critic.indexOf('LAST, COUNT.');
   assert.ok(count > -1, 'CRITIC no longer asks for the count as a step of its own');
@@ -4074,10 +3192,7 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
 });
 
 test('TRIM counts too, last, because the short messages broke the rule the critic fixed', () => {
-  /* The critic's count took the briefing to no paragraph over four. TRIM was
-     never given it, and the reply and the move look the same week carried
-     paragraphs of five to seven. Last for the critic's reason: the mechanism
-     check above it can add a clause. */
+  /* TRIM counts too, last, for the critic's reason. */
   const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)[1];
   const count = trim.indexOf('LAST, COUNT.');
   assert.ok(count > -1, 'TRIM no longer counts, so a reply goes out with paragraphs of seven');
@@ -4093,20 +3208,13 @@ test('TRIM counts too, last, because the short messages broke the rule the criti
 });
 
 /* ─── Two things a coach does, inside the line ───────────────────────────────
-   His decision, after the signal rule was put to him: keep it, and let her do
-   two things it had been read as forbidding. A level price has already printed
-   is a FACT and may be named, but never in the paragraph that holds her read,
-   because a level beside a direction is an entry with the verb left out. And a
-   plan he has not taken may be checked against HIS rules when he asks, with
-   the levels staying his.
-
-   Each is sentences in three places, like the fence above, and each fails
-   silently when a copy drops its half: a gate missing the observed-level
-   clause cuts "today's high was 4,193" as a forward call, and a gate missing
-   the limit lets the level-beside-a-read through, and it runs last. The plan
-   check cites rules by number, and a number naming a judgment rule would have
-   her pronounce on the one thing §7 says no row can see, so each cited rule
-   is read against the strategy's own table.
+   A level price has already printed is a FACT and may be named — never in the
+   paragraph holding her read, where a level beside a direction is an entry
+   with the verb left out. And a plan he has not taken may be checked against
+   HIS rules when he asks, the levels staying his. Each lives in three places
+   and fails silently when a copy drops its half. The plan check cites rules by
+   number, so each cited rule is read against §7's table: a judgment rule
+   there would have her pronounce on what no row can see.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a printed level may be named, never beside her read, in the writer and both gates', () => {
@@ -4195,10 +3303,8 @@ test('her read on price is fenced in the writer and in both gates', () => {
 });
 
 /* ─── A verdict judges the decision, and waits for the close ─────────────────
-   She may call a trade bad. What makes that coaching rather than a scoreboard
-   is the measure: his rules and the plan he entered with, never the P&L —
-   judged on the result she praises luck and punishes discipline. And it waits
-   for the close, because a verdict on a live trade is advice about it. The
+   Measured against his rules and the plan he entered with, never the P&L, and
+   only after the close — a verdict on a live trade is advice about it. The
    critic restates the second half, since it runs last and rewrites.
    ─────────────────────────────────────────────────────────────────────────── */
 
@@ -4219,13 +3325,9 @@ test('a verdict judges the decision rather than the result, and never an open tr
   assert.match(bodies.TRADE_EVENT, /say whether the trade is good/,
     'TRADE_EVENT no longer forbids judging the trade he is in');
 
-  /* THE FACT ALONE IS WHERE SHE STOPPED. The first two briefings under the
-     coaching rules named the breach — 52 minutes, R-12 allows fifteen, marked
-     compliant — and went back to the market with no verdict and no lesson,
-     with a note beside them already recording it as a repeat. The writer is
-     told the verdict is not optional and the briefing slot makes room for three
-     sentences; the critic, which runs last, adds a missing verdict and may not
-     cut one for length. Any one of those gone and the fact-only line returns. */
+  /* THE FACT ALONE IS WHERE SHE STOPS without these: the writer told the verdict
+     is not optional, the briefing slot with room for it, and the critic adding
+     a missing one and never cutting it for length. */
   assert.match(bodies.SYSTEM, /THE VERDICT IS NOT OPTIONAL/,
     'SYSTEM no longer says a breach needs a verdict after it, and she goes back to ' +
     'stating the fact and stopping');
@@ -4238,13 +3340,8 @@ test('a verdict judges the decision rather than the result, and never an open tr
 });
 
 /* ─── diagnose.sql counts itself too ─────────────────────────────────────────
-   Its header says how many listings it holds, and that number went stale the
-   way a number in prose does: it said ten while the file held eleven, 007
-   having added the embedding backlog with nothing comparing the sentence
-   beside it. The count matters here for the same reason it does next door —
-   run the file top to bottom and a SQL editor shows only the LAST listing, so
-   a reader trusting the header to know what is in front of them is trusting
-   the one thing nothing checked.
+   Run top to bottom, an editor shows only the LAST listing, so the header is
+   how a reader knows what is in front of them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('diagnose.sql says how many listings it holds, and holds that many', () => {
@@ -4268,15 +3365,10 @@ test('diagnose.sql says how many listings it holds, and holds that many', () => 
 });
 
 /* ─── Every definer runs with an empty search_path ───────────────────────────
-   `security definer` is what makes vault.decrypted_secrets readable to a
-   trigger firing under service_role, and it is also what makes an unqualified
-   name dangerous: the function runs as the owner, so anything it resolves
-   through a schema someone else can create in resolves with the owner's
-   rights. 002 empties the path and says so; 005's trigger on the SAME table
-   with the SAME privileges set it to `public` instead. Nothing was reachable
-   through it — every name in that function is qualified — but the hardening
-   was applied to one of two, which is how the second one comes to be written
-   without it.
+   `security definer` makes vault.decrypted_secrets readable to a trigger under
+   service_role, and makes an unqualified name dangerous: the function runs as
+   its owner, so a name resolved through a schema someone else can create in
+   resolves with the owner's rights. Every definer is derived from the SQL.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every security definer function empties its search_path', () => {
@@ -4305,13 +3397,9 @@ test('every security definer function empties its search_path', () => {
 });
 
 /* ─── The search 007 built, not merely one by that name ──────────────────────
-   003 creates a two-argument eugenia_search and 007 DROPS it, because
-   `create or replace function` cannot change an argument list and the two
-   side by side are an overload a two-argument call cannot resolve. On a fresh
-   database the order handles it. On one where 007 was never applied, 003's
-   version is still there — and a check that COUNTS functions by that name
-   answers 1 for both, so a search that errors inside her tool loop on every
-   call was reported as correct.
+   007 drops 003's two-argument eugenia_search, since side by side they are an
+   overload a two-argument call cannot resolve. A check COUNTING functions by
+   name answers 1 on a database where 007 never ran, so the row names arities.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql asks eugenia_search which arguments it takes', () => {
@@ -4339,12 +3427,9 @@ test('verify.sql asks eugenia_search which arguments it takes', () => {
 });
 
 /* ─── The detail column is bounded at both ends ──────────────────────────────
-   008 constrains `last_error` to `between 1 and 500`, and heartbeat() guarded
-   only the upper bound. An empty message — `new Error()` carries one — violated
-   the lower one, PostgREST refused the row, and `last_error_at` went with it
-   because they are a single PATCH. So the one failure a writer most needs
-   recorded is the one that leaves no mark, which is the state the truncation
-   comment calls a writer that reads as dead.
+   008 constrains `last_error` to `between 1 and 500`. An empty message —
+   `new Error()` carries one — is refused, and `last_error_at` with it, being
+   one PATCH: the failure most needing a record leaves none.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('heartbeat cannot write a detail the column refuses', () => {
@@ -4372,16 +3457,9 @@ test('heartbeat cannot write a detail the column refuses', () => {
 });
 
 /* ─── When a briefing has stopped being possible ─────────────────────────────
-   010 reports an ABSENCE, and the hour it may first do so is the one thing that
-   decides whether it is a monitor or a nuisance: asked while a retry is still
-   running it names a briefing that is being written as one that never came,
-   which is the ordinary-day false alarm that gets a monitor ignored.
-
-   The bound is the last RETRY hour plus one, and that relationship lived in a
-   comment on one side and a literal on the other, in two languages with no
-   build step between them. Widening retryDue by an hour — which is a change
-   anyone might make for a good reason — would have made 010 wrong every single
-   day, with nothing here comparing the two.
+   010 reports an ABSENCE, and asked while a retry is still running it names a
+   briefing being written as one that never came. Its first hour is the last
+   RETRY hour plus one, so it is derived from `retryDue` and held against 010.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('010 waits until the last retry hour has passed, in both languages', () => {
@@ -4409,17 +3487,10 @@ test('010 waits until the last retry hour has passed, in both languages', () => 
 
 /* ─── One definition of a failed dispatch ────────────────────────────────────
    `dispatch_watch` gates a REPEATING job behind three failures in an hour, and
-   the gate used to restate what a failure is rather than ask the function that
-   decides it. The restatement was narrower — `no response row` or `a non-2xx
-   status` — so a request that TIMED OUT, which has a row, a null status_code
-   and `timed_out` set, counted as ZERO. The repeating three are the poller, the
-   spine and the price mark, and a timing-out worker on the poller is the exact
-   failure this table was built for: selected by dispatch_failures and gated to
-   silence by a count that could not see it.
-
-   It also counted requests made seconds ago, where the outer query judges
-   nothing under fifteen minutes old, so an in-flight poll pushed a healthy job
-   toward the threshold from the other side.
+   must ask what a failure is of `dispatch_bad` rather than restate it: a
+   timed-out request has a row, a null status and `timed_out` set, and a
+   narrower restatement counts it as zero. The gate also skips requests too
+   young to judge.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('both readers of "a failed dispatch" ask the same function', () => {
@@ -4441,10 +3512,9 @@ test('both readers of "a failed dispatch" ask the same function', () => {
   const gate = body.match(/or \(select count\(\*\)([\s\S]*?)>= 3;/);
   assert.ok(gate, 'the repeat gate is gone, so a repeating job reports on one failure');
 
-  // The PREDICATE is shared; the population is not. The gate counts rows
-  // rather than unsettled ones, because the step below settles a suppressed
-  // failure on purpose — counting out of dispatch_failures would inherit its
-  // `not settled` filter and the tally could never reach three.
+  // The PREDICATE is shared; the population is not. The sweep settles a
+  // suppressed failure on purpose, so counting out of dispatch_failures would
+  // inherit `not settled` and never reach three.
   for (const [what, src] of [['the repeat gate', gate[1]],
                              ['dispatch_failures', fn('dispatch_failures')]]) {
     assert.match(src, /public\.dispatch_bad\(/,
@@ -4466,13 +3536,10 @@ test('both readers of "a failed dispatch" ask the same function', () => {
 });
 
 /* ─── A door in the schedule and a door in the code ──────────────────────────
-   The two data-driven senses are reached by a query flag and nothing else, and
-   the flag is written twice: in the cron job's URL and in the branch that reads
-   it. They are the only two things in this system where a rename fails in
-   COMPLETE silence — pg_net discards the response, so a `?move=1` nothing reads
-   falls past every branch to "nothing due this hour", answers 200, and the sense
-   simply stops existing. No apology, because nothing threw; no missing message,
-   because the message was never due.
+   The data-driven senses are reached by a query flag written twice — the cron
+   URL and the branch that reads it. A rename falls past every branch to
+   "nothing due this hour", answers 200, and pg_net discards it: the sense
+   stops existing in complete silence.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every flag a cron job calls with is a flag the function reads', () => {
@@ -4502,18 +3569,10 @@ test('every flag a cron job calls with is a flag the function reads', () => {
 });
 
 /* ─── And the same census from the other side ────────────────────────────────
-   The check above reads 004 and asks whether the function answers. Nothing
-   asked the reverse, which is the half that fails silently: a door written
-   into postScheduled with no job behind it is answered correctly by nobody.
-   `dueNow` has this guard already — every answer it can give has a branch —
-   and the FLAGS, which are the other way in, did not.
-
-   Two kinds of door are legitimate and they are declared rather than derived,
-   because nothing in the source tells them apart: a scheduled sense, which
-   needs a job in 004, and a door a PERSON opens, which must not have one. An
-   exemption is a row with a reason in it, never an absence — so a new flag
-   fails this suite until someone says which kind it is, and the day a sense
-   ships without its job is the day that sentence cannot be written.
+   A door in postScheduled with no job behind it is answered correctly by
+   nobody. A scheduled sense needs a job in 004; a door a PERSON opens must not
+   have one. Nothing in the source tells them apart, so they are declared, and
+   a new flag fails this suite until someone says which it is.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const BY_HAND = {
@@ -4571,25 +3630,14 @@ test('every door the function reads is opened by a cron job or by a person', () 
 });
 
 /* ─── The watcher's own report can be lost, and it plans for that ───────────
-   THE FIRST MESSAGE IT EVER SENT DID NOT ARRIVE. pg_net reported `timed_out`
-   with the whole twenty-second budget spent in the TCP/SSL handshake and zero
-   milliseconds in the request — the connection to Telegram never opened. The
-   function had already settled the rows, because pg_net is ASYNCHRONOUS and it
-   could not learn otherwise inside the same call.
-
-   So a real outage would have been reported exactly once, into a dropped
-   connection, and never mentioned again: the silence this table exists to end,
-   reproduced inside the thing built to end it. Third time that shape has been
-   found here.
-
-   `reported_by` is the repair. A failure is marked with the request id of the
-   message that named it and is NOT settled; the next sweep looks that id up and
-   settles on a 2xx, or clears the mark and says it again on anything else.
-
-   Held structurally because nothing in this suite runs Postgres. The behaviour
-   itself was driven on a real server — reported, lost, said again, lost again,
-   said again, and retired past three hours — and each guard here was proved by
-   removing it and watching that sequence change.
+   pg_net is ASYNCHRONOUS, so the sweep cannot learn inside the same call that
+   its message never arrived — and a report that times out in the handshake,
+   with the rows already settled, is an outage said once into a dropped
+   connection and never again. So a failure is marked with the request id of
+   the message that named it and NOT settled; the next sweep settles on a 2xx,
+   or clears the mark and says it again. Driven on a real server — reported,
+   lost, said again, retired past three hours — with each guard here proved by
+   removing it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a failure is settled when its report lands, not when it is sent', () => {
@@ -4602,9 +3650,8 @@ test('a failure is settled when its report lands, not when it is sent', () => {
 
   // Confirm and release, and both must exist: only one of them and a report
   // either finishes rows it never delivered or never finishes them at all.
-  /* Anchored on the closing paren, not just the substring: `between 200 and 299
-     and false` contains the condition and never fires, and a loose match said
-     that was fine. */
+  /* Anchored on the closing paren: `between 200 and 299 and false` contains the
+     condition and never fires. */
   assert.match(sql, /set settled = true[\s\S]{0,300}?r\.id = d\.reported_by[\s\S]{0,120}?status_code between 200 and 299\);/,
     'nothing settles a row on a DELIVERED report, so the mark is set and never cleared');
   assert.match(sql, /set reported_by = null[\s\S]{0,300}?r\.timed_out/,
@@ -4616,12 +3663,9 @@ test('a failure is settled when its report lands, not when it is sent', () => {
     'dispatch_failures does not exclude rows already reported, so the same ' +
     'outage arrives every ten minutes until it resolves');
 
-  /* AND THE SETTLE MUST SKIP WHAT WAS JUST SAID. Without this a sweep that
-     could NOT send — a Vault name misspelled, which is the failure this
-     repository has had twice — settles the outage anyway, and repairing the
-     name delivers nothing because there is nothing left to say. Driven both
-     ways on a real server: unsettled while the name is wrong, delivered on the
-     sweep after it is fixed. */
+  /* AND THE SETTLE MUST SKIP WHAT WAS JUST SAID, or a sweep that could NOT send
+     — a Vault name misspelled — settles the outage anyway, and fixing the name
+     delivers nothing. Driven both ways on a real server. */
   assert.match(sql, /where not settled and reported_by is null[\s\S]{0,200}?id not in \(select id from _said\)/,
     'the settle does not exclude the rows just named, so a report that could ' +
     'not be sent finishes them silently');
@@ -4634,24 +3678,14 @@ test('a failure is settled when its report lands, not when it is sent', () => {
 });
 
 /* ─── Every pg_net dispatch is recorded, and none can break its own caller ───
-   A 546 comes back BEFORE the worker exists, so the function writes no row,
-   sends no apology and appears in no log of its own. `net._http_response` is
-   the only witness, it carries no url, and pg_net prunes it within hours — so
-   what a failed request was FOR is unrecoverable unless the request id is
-   captured at the moment it is made. 009's ledger is that capture, and a
-   dispatch site added without it is a job that can vanish silently, which is
-   the whole thing this was built to stop.
+   A 546 comes back BEFORE the worker exists, so the only witness is a row in
+   `net._http_response` — no url, pruned within hours. What a failed request
+   was FOR is recoverable only if its id is captured as it is made, which is
+   009's ledger. Job names are held against the check constraint.
 
-   THE JOB NAMES ARE HELD AGAINST THE CHECK CONSTRAINT rather than a literal
-   here, so the six exist in one place and a seventh has to be declared before
-   it can be used.
-
-   AND THE TWO TRIGGER SITES MUST NOT BE ABLE TO BREAK THEIR OWN WRITE. They
-   fire inside the UPDATE that set the column, so anything raised in them takes
-   that write with it — a tap answering a journal question would fail because a
-   monitor could not record that a message had been sent. The post happens
-   first, into a variable; the ledger insert is best-effort behind an exception
-   block. Same trade 008 makes, same words.
+   AND THE TRIGGER SITES MUST NOT BREAK THEIR OWN WRITE: they fire inside the
+   UPDATE that set the column, so the post goes into a variable first and the
+   ledger insert is best-effort behind an exception block.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every pg_net dispatch records a job the ledger declares', () => {
@@ -4670,21 +3704,14 @@ test('every pg_net dispatch records a job the ledger declares', () => {
   for (const f of files) {
     const sql = readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8')
       .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
-    /* A POST ADDRESSED TO TELEGRAM IS A REPORT, NOT A DISPATCH, and it is the
-       one call that must NOT reach the ledger it is reporting on: a watcher
-       that recorded its own message would be judged by the next sweep and end
-       up reporting itself. Parted by where the call GOES rather than by which
-       file it is in — the exemption was `f.startsWith('009')`, which is a
-       statement about a filename, and 010's watcher would have had to be named
-       here to stay honest. The url is the first argument, so it is inside the
-       call rather than merely near it. */
+    /* A POST ADDRESSED TO TELEGRAM IS A REPORT, NOT A DISPATCH, and must not reach
+       the ledger it reports on, or the next sweep would judge it. Parted by where
+       the call GOES, not by filename; the url is the first argument. */
     for (const tail of sql.split('net.http_post(').slice(1)) {
       if (!/api\.telegram\.org/.test(tail.slice(0, 300))) posts += 1;
     }
-    /* The job is the LAST argument of either shape — `), 'poller';` closing the
-       select, or `values (req, 'gladys')` in a trigger. Matched that way rather
-       than as the first quoted word after the insert, which is 'x-doji-key' in
-       the headers and was what the first draft of this test read. */
+    /* The job is the LAST argument of either shape — `), 'poller';` closing a
+       select, or `values (req, 'gladys')` in a trigger. */
     for (const m of sql.matchAll(
         /insert into public\.dispatch[\s\S]{0,900}?(?:\),|values \(req,)\s*'([a-z-]+)'\s*[;)]/g)) {
       used.push([f, m[1]]);
@@ -4715,20 +3742,13 @@ test('a trigger that cannot record its dispatch still makes it', () => {
   }
 });
 
-/* ─── The clock the workers run on, and the three copies that watch it ───────
-   010 is the only monitor here that can speak BEFORE the failure, and it has to
-   be, because after the failure there is nothing left to speak with: a briefing
-   killed at the wall clock hands pg_net its 200 before it dies, so 009's ledger
-   records a healthy dispatch, `ask()` never reaches its catch, no apology is
-   sent, and all three retries redo the same too-long work. Three monitors, all
-   green, and nothing reaches him.
-
-   Everything below is a copy that nothing else compares. The caller it looks
-   for is written in TypeScript and read in SQL; the number of cron jobs is
-   declared in 004 and asserted in verify.sql; the ceiling is quoted back to him
-   in the message it decides. Each fails silently on its own — a watcher looking
-   for a caller nobody writes reports a briefing missing every single day, which
-   is the false alarm that gets a monitor muted in a week.
+/* ─── The clock the workers run on, and the copies that watch it ─────────────
+   010 speaks BEFORE the failure because afterwards nothing can: a briefing
+   killed at the wall clock has already handed pg_net its 200, so the ledger
+   records health, `ask()` never reaches its catch and no apology is sent. The
+   caller it looks for is written in TypeScript and read in SQL, the job count
+   is declared in 004 and asserted in verify.sql, and the ceiling is quoted in
+   the message it decides — each a copy that fails silently on its own.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const PACE_SQL = readFileSync(new URL('../supabase/010_pace.sql', import.meta.url), 'utf8');
@@ -4754,9 +3774,8 @@ test('the row 010 looks for is the row postBriefing writes', () => {
     'suffix — the two halves of this name are in two languages with no build ' +
     'step between them');
 
-  /* THE KINDS 010 CAN PUT IN FRONT OF THAT SUFFIX, held against the type. A
-     third Brief that 010 never assigns to `owed` is a briefing whose absence
-     is unwatched, and it looks exactly like one that never fails. */
+  /* THE KINDS 010 CAN NAME, held against the type: a Brief it never assigns to
+     `owed` is a briefing whose absence nobody watches. */
   const owed = [...PACE_SQL.match(/owed := case([\s\S]*?)end;/)[1]
     .matchAll(/then '(\w+)'/g)].map(m => m[1]).sort();
   assert.deepEqual(owed, kinds,
@@ -4768,10 +3787,8 @@ test('010 states its ceiling once and quotes that one', () => {
   const ms = Number(PACE_SQL.match(/ceiling_ms constant int := (\d+);/)[1]);
   assert.ok(ms > 0, '010 no longer declares ceiling_ms — the reader has gone blind');
 
-  /* THE MESSAGE MAY NOT SPELL THE NUMBER OUT AGAIN. It is quoted back to him in
-     the sentence the threshold decides, and written twice the threshold moves
-     while the sentence keeps naming the old one — a warning that is arithmetic
-     about one ceiling and prose about another. */
+  /* THE MESSAGE MAY NOT SPELL THE NUMBER OUT AGAIN, or the threshold moves while
+     the sentence names the old one. */
   const body = PACE_SQL.slice(PACE_SQL.indexOf('lines := lines || format(\n      \'Longest'));
   assert.ok(!new RegExp(`\\b${ms / 1000}s\\b`).test(body.slice(0, 600)),
     `010's message writes ${ms / 1000}s as a literal beside a ceiling it already ` +
@@ -4784,9 +3801,8 @@ test('010 states its ceiling once and quotes that one', () => {
     '010 no longer derives its threshold from the ceiling — the two would drift, ' +
     'and a threshold above the ceiling is a watcher that can never speak');
 
-  /* AND THE PROSE HOLDS THE SAME NUMBER. It is a fact about the platform rather
-     than about this repository, stated in the file that explains why the cron
-     half answers before it works — so a plan change moves both or neither. */
+  /* AND THE PROSE HOLDS THE SAME NUMBER, a platform fact, so a plan change moves
+     both or neither. */
   const claude = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');
   assert.ok(claude.includes(`${ms / 1000}s paid`),
     `CLAUDE.md does not name ${ms / 1000}s as the paid wall clock that 010 watches ` +
@@ -4794,13 +3810,8 @@ test('010 states its ceiling once and quotes that one', () => {
 });
 
 /* ─── And the README lists them, which is a third copy ───────────────────────
-   The count next door is the check that already existed; this is the table a
-   person reads to know what is supposed to be running, and a schedule written
-   into prose is a copy of 004 that nothing compared. It went in because the
-   three job NAMES appeared nowhere in the README at all — the watchers and the
-   history purge were documented as behaviour with no way to look them up — and
-   a table that names them is worth having only while it is true. Both
-   directions, since a row that quietly vanishes is as bad as one that lies.
+   The table a person reads to know what should be running. Both directions,
+   since a row that quietly vanishes is as bad as one that lies.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README names every cron job 004 schedules, on its stated schedule', () => {
@@ -4812,9 +3823,7 @@ test('the README names every cron job 004 schedules, on its stated schedule', ()
   assert.ok(scheduled.size >= 5,
     `only ${scheduled.size} cron jobs read out of 004 — the reader has gone blind`);
 
-  /* SLICED TO THE TABLE RATHER THAN MATCHED ACROSS THE FILE: the row shape is
-     three backticked cells, which the CSS palette table has too, and a reader
-     that swept the whole README pulled ten colour tokens in as cron jobs. */
+  /* SLICED TO THE TABLE: the palette table has three backticked cells too. */
   const table = readme.slice(readme.indexOf('| Job | Schedule | What it drives |'));
   assert.ok(table && table.length < readme.length,
     'the README no longer has a job table with that header');
@@ -4845,11 +3854,7 @@ test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
   const stated = Number(verify.match(
     /\('\w+ cron jobs, all active',[\s\S]*?'(\d+)'\),/)[1]);
 
-  /* THIS ROW HAS BEEN WRONG BEFORE and its own comment says so: it read three
-     while 004 defined four, so the check that exists to catch a missing job was
-     itself what looked broken on a correct database. It was fixed by hand and
-     left to be counted by hand again, which is the same defect with a longer
-     fuse. */
+  /* A count typed by hand goes stale the day a job is added; this compares it. */
   assert.equal(stated, scheduled,
     `verify.sql expects ${stated} cron jobs and 004 schedules ${scheduled} — run ` +
     `against a correct database this row reports a fault, and a job dropped from ` +
@@ -4870,13 +3875,10 @@ test('the cron jobs verify.sql counts are the ones 004 schedules', () => {
 test('010 marks the day said only where the message was actually sent', () => {
   const body = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_watch('));
 
-  /* THE ROW IS THE GUARD, which is what makes this ordering load-bearing rather
-     than tidy. `pace_watch` speaks at most once a New York day and decides that
-     by looking for its own row — so a row written after a send that could not
-     be made marks the day as said and swallows the warning for good. Repairing
-     a misspelled Vault name would then deliver silence, which is 009's lesson
-     arriving here: found by running it with the name wrong, since nothing else
-     exercises that half. */
+  /* THE ROW IS THE GUARD. `pace_watch` speaks at most once a New York day and
+     decides that by finding its own row, so a row written after a send that
+     could not be made swallows the warning for good. Written only where the post
+     was made. */
   const post = body.indexOf('net.http_post(');
   const mark = body.indexOf("values ('pace', false");
   const warn = body.indexOf('raise warning');
@@ -4891,15 +3893,10 @@ test('010 marks the day said only where the message was actually sent', () => {
 });
 
 test('no numbered SQL file reads into a variable with SELECT … INTO', () => {
-  /* THE DASHBOARD READS THE WORDS AND NOT THE LANGUAGE. The Supabase SQL editor
-     looks for new tables without RLS before it runs, and it takes
-     `select … into worst` inside plpgsql for `create table worst`. Its
-     *run with RLS* button then appends `alter table worst enable row level
-     security` to the end of the paste — a table that does not exist, so the
-     paste, one transaction, rolls back whole. Nothing here can see the editor,
-     so the shape it misreads is kept out of every file a person pastes into
-     it: `x := (select …)` says the same thing and cannot be mistaken for a
-     table. */
+  /* THE DASHBOARD READS THE WORDS AND NOT THE LANGUAGE. The SQL editor takes
+     `select … into worst` inside plpgsql for `create table worst`, and its *run
+     with RLS* button appends an `alter table` for a table that does not exist —
+     rolling the whole paste back. `x := (select …)` cannot be mistaken. */
   const dir = new URL('../supabase/', import.meta.url);
   const files = readdirSync(dir).filter(f => /^\d{3}_.*\.sql$/.test(f));
   assert.ok(files.length >= 13, `only ${files.length} numbered SQL files read — the reader has gone blind`);
@@ -4913,13 +3910,10 @@ test('no numbered SQL file reads into a variable with SELECT … INTO', () => {
 });
 
 test('the briefing is written in one worker and spoken in another, and never lost between them', () => {
-  /* TWO WORKERS NOW, because they shared one four-hundred-second clock and a
-     voice that stalled on 2 October took the whole briefing with it. What the
-     split must not do is open a third way to lose it — so the order is read:
-     stored BEFORE the hand-off, or the second worker finds nothing to speak;
-     and a hand-off that did not start falls back to speaking HERE, or a refused
-     boot is a briefing he never receives. Nothing in this suite can drive a
-     worker calling itself, so the source is what is read. */
+  /* TWO WORKERS, so a stalled voice cannot take the briefing with it. The split
+     must not open a third way to lose it: stored BEFORE the hand-off, or the
+     second worker finds nothing; and a hand-off that did not start falls back to
+     speaking HERE. No worker calling itself can be driven, so the source is read. */
   const at = (body, s) => body.indexOf(s);
   const brief = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function postBriefing('),
                                  EUGENIA_TS.indexOf('async function postSpeak('));
@@ -4950,13 +3944,10 @@ test('the briefing is written in one worker and spoken in another, and never los
 });
 
 test('010 says a slow run once, and the week stays visible to diagnose', () => {
-  /* THE DAY WAS THE ONLY GUARD, AND A RUN OUTLIVES A DAY. It stays in a
-     seven-day window for seven days, so the first Sunday over the share was
-     announced at 17:37 and again at 00:37, on its way to eight identical
-     messages. Replayed against a real Postgres before this went in: eight sends
-     before, one after, and a second slow run later in the week said once in its
-     own right. Nothing here runs SQL, so this reads for the three pieces that
-     replay depended on. */
+  /* A RUN IS SAID ONCE. It stays in a seven-day window for seven days, so a day
+     guard alone announces it nightly. Replayed against a real Postgres: eight
+     sends before, one after. This reads for the three pieces that replay
+     depended on. */
   const line = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_line('),
                               PACE_SQL.indexOf('create or replace function public.pace_watch('));
   const watch = PACE_SQL.slice(PACE_SQL.indexOf('create or replace function public.pace_watch('));
@@ -4967,11 +3958,9 @@ test('010 says a slow run once, and the week stays visible to diagnose', () => {
     "pace_watch no longer hands pace_line the time it last spoke, off its own " +
     "'pace' rows — the filter above then has nothing to filter with");
 
-  /* AND THE SECOND ARGUMENT IS A SECOND FUNCTION. Without the drop the old
-     one-argument version survives on every database that ran 010 before, and
-     `pace_line()` in diagnose.sql matches both and is refused as ambiguous. The
-     revoke has to name the signature that exists, or it raises and the file
-     stops half-applied. */
+  /* THE SECOND ARGUMENT IS A SECOND FUNCTION. Without the drop the old version
+     survives and `pace_line()` in diagnose.sql is refused as ambiguous; the
+     revoke must name the signature that exists, or it raises mid-file. */
   const drop = PACE_SQL.indexOf('drop function if exists public.pace_line(timestamptz);');
   assert.ok(drop > -1 && drop < PACE_SQL.indexOf('create or replace function public.pace_line('),
     '010 no longer drops the one-argument pace_line before creating the two-argument one');
@@ -4982,22 +3971,12 @@ test('010 says a slow run once, and the week stays visible to diagnose', () => {
 });
 
 /* ─── Everything a cron job dispatches answers before it works ───────────────
-   TWO LIMITS, AND PAYING MOVES ONLY ONE. The worker's wall clock is 150s free
-   and 400s paid; that is what killed the Sunday briefing at 145.4s of drafting,
-   four and a half seconds short of finishing. The REQUEST idle timeout is 150s
-   on every plan — send the caller nothing for that long and the request is
-   closed under you — so the same briefing, now completing and delivering
-   perfectly, still hands pg_net a 504.
-
-   That 504 is the thing this test exists for. In `net._http_response`, the only
-   place a dispatch is recorded, it is indistinguishable from a call that never
-   ran at all. A watcher built on that table would report every good briefing as
-   a failure, which is the ordinary-day false alarm that gets a monitor ignored.
-   Answering first is what makes a non-2xx there mean what it says.
-
-   `?embed=1` is the single exception and it is the one flag NO cron job calls —
-   which is how this is asserted, against 004 rather than against a literal.
-   Its answer IS its interface: it is called until it reports `left: 0`.
+   TWO LIMITS, AND PAYING MOVES ONLY ONE. The wall clock is 150s free and 400s
+   paid; the REQUEST idle timeout is 150s on every plan, so a briefing that
+   completes perfectly while sending nothing still hands pg_net a 504 — in
+   `net._http_response`, indistinguishable from a call that never ran.
+   Answering first makes a non-2xx there mean what it says. `?embed=1` is the
+   one exception: its answer IS its interface, and no cron job calls it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a cron-dispatched call answers first, and only the backfill door waits', () => {
@@ -5027,10 +4006,8 @@ test('a cron-dispatched call answers first, and only the backfill door waits', (
     `postScheduled is awaited at ${sync} call sites — one is the backfill door ` +
     `and any other is a scheduled job that can still collect a 504`);
 
-  /* THE EXCEPTION IS DERIVED, NOT TYPED. Any flag a cron job dispatches must go
-     the answer-first way; `embed` is the only one no job calls, which is what
-     entitles it to wait. Add a cron job for it and this fails, which is the
-     point — the door would then be able to 504 like the rest. */
+  /* THE EXCEPTION IS DERIVED, NOT TYPED: a cron job for `embed` fails this,
+     since the door could then 504 like the rest. */
   const dispatched = new Set(
     [...CRON_SQL.matchAll(/functions\/v1\/[\w-]+\?(\w+)=\w+/g)].map(m => m[1]));
   const waits = [...branch.matchAll(/get\("(\w+)"\) === "1"\) return await/g)].map(m => m[1]);
@@ -5046,26 +4023,16 @@ test('a cron-dispatched call answers first, and only the backfill door waits', (
 });
 
 test('a vendor that refuses costs the vector, never the note or the turn', () => {
-  /* embed() THROWS ON PURPOSE, so that `?embed=1` — a door run by hand and read
-     for its answer — reports WHY nothing was filled rather than `ok: true,
-     filled: 0`. No credit on the account, a key without the permission and a
-     mistyped secret otherwise look identical, and the one place the reason was
-     written is the Edge log this repository already says nobody reads.
-
-     WHICH MAKES THE TWO WRITE PATHS THE ONES THAT MUST SWALLOW IT. A helper
-     reached from a caught call site and a bare one is the exact shape that
-     killed a briefing here once. This asserts the asymmetry is the intended one
-     — the writers catch, the door does not — because getting it backwards means
-     a vendor outage stops her remembering anything at all, silently, while the
-     door that exists to report it stays cheerfully quiet. */
+  /* embed() THROWS ON PURPOSE, so `?embed=1` reports WHY nothing filled — no
+     credit, a key without permission and a mistyped secret are three repairs.
+     WHICH MAKES THE WRITE PATHS THE ONES THAT MUST SWALLOW IT. Backwards, a
+     vendor outage stops her remembering anything, silently, while the door
+     stays quiet. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  /* READ BY LINE RATHER THAN BY A REGEX OVER THE CALL. `embed(turns.map(t =>
-     String(t.content)))` closes three parens, and a pattern that walks to the
-     first one stops inside the argument — reporting the one call site that most
-     needs the catch as though it had none. Each call is one statement on one
-     line, so the line is the honest unit. */
+  /* BY LINE, not a regex over the call: `embed(turns.map(t => String(t.content)))`
+     closes three parens. */
   const calls = src.split('\n').filter(l => l.includes('await embed('));
   assert.equal(calls.length, 4,
     `${calls.length} embed() call sites read — the reader has gone blind, or one ` +
@@ -5094,15 +4061,9 @@ test('a vendor that refuses costs the vector, never the note or the turn', () =>
 });
 
 test('the quote she reads is the quote the poller serves', () => {
-  /* TWO FILES, ONE OBJECT, AND NO BUILD STEP BETWEEN THEM. The poller folds a
-     cTrader price into `Spot` and serves it; doji-eugenia declares `Quote` and
-     reads the fields back out by name. Nothing resolves one against the other at
-     runtime, so a field renamed on the poller's side reaches her as undefined —
-     and the price sense would put "against a previous close of undefined" in
-     front of him rather than failing.
-
-     Both are read out of their own files. A list typed here would be a third
-     copy, and would go stale with whichever of the two it stopped matching. */
+  /* TWO FILES, ONE OBJECT, NO BUILD STEP. The poller serves `Spot`; doji-eugenia
+     reads `Quote` by name. A renamed field reaches her as undefined — "against a
+     previous close of undefined" — rather than failing. */
   const poller = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
   const eugenia = readFileSync(
@@ -5128,23 +4089,11 @@ test('the quote she reads is the quote the poller serves', () => {
 });
 
 test('every number off the quote reaches her with the window it was measured over', () => {
-  /* THE FAILURE THIS EXISTS TO PREVENT HAS ALREADY HAPPENED ONCE, and it left
-     no trace anywhere except in the message he read. `readMarket` served the
-     folded quote as raw JSON, so `change` arrived as a bare number with no
-     window attached — and every window in that object is the BROKER'S session,
-     which for gold restarts at the 17:00 New York roll. Before the roll that
-     makes `change` the overnight move, which is what the briefing's opening
-     line wants and why nobody noticed. After it, the same field is a few hours
-     of evening trade, and at 20:57 it reached him as "up $12 on the day" about
-     a day that was up more than $40.
-
-     NOTHING ELSE BREAKS IF THE LABEL GOES. The quote is still served, the
-     numbers are still right, the message still reads as a working price — the
-     only thing missing is the sentence saying what the numbers are of, which is
-     exactly the shape of the positionsBlock guard and of the prompt's own
-     sourcing rule. So it is read here, on both of the paths that carry it: the
-     tool every briefing calls, and the one message that is sent in the hours
-     when the two windows disagree. */
+  /* THE WINDOW TRAVELS WITH THE NUMBER. Every figure in the quote is measured
+     from the broker's session, which restarts at the 17:00 New York roll: before
+     it `change` is the overnight move, after it a few hours of evening, and a
+     bare number reads as "on the day" either way. Nothing else breaks if the
+     label goes, so it is read on both paths that carry it. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -5155,40 +4104,30 @@ test('every number off the quote reaches her with the window it was measured ove
     return src.slice(at, end).split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
   };
 
-  /* THE WINDOW IS INSIDE THE RENDERING RATHER THAN BESIDE IT, which is what
-     makes this one assertion rather than one per caller. A quote said three
-     ways is three chances to print `change` without saying what it changed
-     from, so there is one `quoteLine` and it carries the label itself. */
+  /* THE WINDOW IS INSIDE THE RENDERING: one `quoteLine` carries the label, so a
+     quote cannot be said without it. */
   assert.match(body('quoteLine', 'export function'), /quoteWindow\(/,
     'quoteLine no longer says which session its figures cover, so every caller ' +
     'of it now hands her a `change` with no window on it — which after the 17:00 ' +
     'roll reads as the move on the day and is not');
 
-  /* AND EVERY PATH THAT PUTS A PRICE IN FRONT OF HER GOES THROUGH IT. The tool
-     any turn may call, the block the briefing is handed, and the price sense —
-     three callers, and a fourth that rendered its own would be the way this
-     comes back. */
+  /* AND EVERY PATH THAT PUTS A PRICE IN FRONT OF HER GOES THROUGH IT; a fourth
+     rendering its own is the way this comes back. */
   for (const fn of ['readMarket', 'marketBlock', 'postMove']) {
     assert.match(body(fn), /quoteLine\(/,
       `${fn} renders the quote its own way instead of through quoteLine — a ` +
       `second rendering is a second chance to state a figure without its window`);
   }
 
-  /* THE BRIEFING IS HANDED THE PRICE RATHER THAN ASKED TO FETCH IT. Every other
-     thing it always needs is read before the call; the price was a tool she had
-     to remember to reach for, which is an instruction standing where an input
-     belongs. It fails silently — a level off a search page is four digits and
-     looks like gold. */
+  /* THE BRIEFING IS HANDED THE PRICE rather than asked to fetch it: a level off a
+     search page is four digits and looks like gold. */
   assert.match(body('postBriefing'), /marketBlock\(/,
     'the briefing no longer reads the price before it writes, so its opening ' +
     'line depends on her choosing to call a tool — and a stale level quoted ' +
     'from a search is indistinguishable from a live one');
 
-  /* AND THE BOUNDARY IS THE ONE THE REST OF THE SYSTEM ALREADY KEEPS. 17:00 New
-     York is the Friday close, the Sunday open and the poller's whole definition
-     of market hours; a second literal here would be a fourth copy of one value
-     with nothing comparing them. It reads nyClock for the same reason every
-     other schedule does — a fixed UTC hour is right for half the year. */
+  /* THE BOUNDARY THE REST OF THE SYSTEM KEEPS — the Friday close, the Sunday
+     open, the poller's market hours. Read through nyClock. */
   assert.match(src, /export const ROLL_HOUR = 17;/,
     'the roll hour is no longer named, so the window label is deciding from a literal');
   assert.match(src, /nyClock\(now\)\.hour >= ROLL_HOUR/,
@@ -5197,16 +4136,9 @@ test('every number off the quote reaches her with the window it was measured ove
 });
 
 test('the two unscheduled looks both build a term before they use one', () => {
-  /* THE PRINT LOOK AND THE MOVE LOOK ARE THE SAME SHAPE — something happened
-     that this morning did not cover — and for a release the move look was the
-     half that could only report. Both are handed the channel map (asserted with
-     the rest of the blocks above); this is the other half, which is that the
-     prompt actually asks for the thing the map is for.
-
-     Handing a path the ladder and not telling it to build from it fails exactly
-     the way handing it the instruction without the ladder does: she teaches
-     well, about whatever the message happens to be about, and the channel he
-     has never once used stays never used. Neither half is visible at runtime. */
+  /* THE PRINT LOOK AND THE MOVE LOOK ARE TOLD TO BUILD FROM THE MAP they are
+     handed. A ladder without the instruction fails exactly as the instruction
+     without the ladder: she teaches well about whatever the message is about. */
   const prompts = readFileSync(
     new URL('../supabase/functions/doji-eugenia/prompt.ts', import.meta.url), 'utf8');
 
@@ -5216,17 +4148,9 @@ test('the two unscheduled looks both build a term before they use one', () => {
     return m[1];
   };
 
-  /* THE RUNG THEY NAME IS `explained`, AND NAMING `unseen` INSTEAD IS THE BUG
-     THIS REPLACED. Both prompts used to read "build it at unseen, do not at
-     owns" — a pair of ends over a four-rung ladder, and the bottom one is a
-     ONE-WAY DOOR: `setChannel` refuses to write it back, because it means the
-     subject has never once come up. So the only build instruction either path
-     had stopped being reachable the first time a channel was mentioned, and the
-     two rungs every channel actually sits at had no instruction at all.
-
-     A binary rule over four states reads as "the other case". She used the term
-     bare, correctly, for weeks — and no prompt tweak could fix it, because the
-     rule being followed was the one written down. */
+  /* THE RUNG THEY NAME IS `explained`. `unseen` is a ONE-WAY DOOR, so a build
+     instruction gated on it stops being reachable the first time a channel is
+     mentioned, and a binary rule over four rungs reads as "the other case". */
   for (const name of ['RELEASE', 'MOVE']) {
     const text = section(name);
     assert.match(text, /where he stands on each channel/i,
@@ -5241,26 +4165,18 @@ test('the two unscheduled looks both build a term before they use one', () => {
       `is the one failure worse than saying nothing`);
   }
 
-  /* AND THE MOVE LOOK IS TOLD WHAT ITS OWN FIGURES ARE OF. It is the only path
-     that fires in the evening, which is the only time the broker's session and
-     the calendar day disagree — so the prompt carrying the roll is not a
-     restatement of the block above it but the rule for reading it. */
+  /* AND THE MOVE LOOK IS TOLD WHAT ITS FIGURES ARE OF: it is the path that fires
+     in the evening, when the session and the calendar day disagree. */
   assert.match(section('MOVE'), /17:00 New York/,
     'the move look is no longer told where its session starts, and the evening ' +
     'is the only time it runs where that matters');
 });
 
 /* ─── The app's arithmetic, in a second runtime ──────────────────────────────
-   `journal.ts` is index.html's stats layer ported so she can reach it, and
-   there is no build step between them — so this is a copy, and a copy nothing
-   compares is the defect rather than the copy. Three constants and the shape of
-   the definitions are read out of BOTH files.
-
-   The break-even band is the one that matters most. It is ±$3 of the entry
-   PRICE, and the alternative that looks identical everywhere except on a large
-   position is ±$3 of the P&L. If these two files ever disagree about it, the
-   win rate she quotes and the win rate on his screen differ, and neither says
-   which is which.
+   `journal.ts` is index.html's stats layer ported, with no build step between
+   them. The break-even band matters most: ±$3 of the entry PRICE, where ±$3
+   of P&L looks identical except on a large position — and then her win rate
+   and his screen's differ, with nothing saying which is which.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the journal stats agree with the app they were ported from', () => {
   const app = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -5277,9 +4193,7 @@ test('the journal stats agree with the app they were ported from', () => {
     'the session vocabulary differs — she would report a breakdown under names ' +
     'that are not the ones he sees, or drop a session entirely');
 
-  /* AND THE HOURS BEHIND THEM, since the names agreeing is not the same as the
-     boundaries agreeing: a London close an hour out relabels every trade in the
-     overlap and nothing about the output looks wrong. */
+  /* AND THE HOURS: a London close an hour out relabels every overlap trade. */
   for (const [name, m] of Object.entries(MARKETS)) {
     const row = app.match(new RegExp(`${name}:\\s*\\{[^}]*tz:\\s*'([^']+)'[^}]*open:\\s*(\\d+)[^}]*close:\\s*(\\d+)`));
     assert.ok(row, `index.html no longer defines the ${name} session hours`);
@@ -5287,12 +4201,9 @@ test('the journal stats agree with the app they were ported from', () => {
       `the ${name} hours differ between the app and journal.ts`);
   }
 
-  /* THE THREE SUBTLE DEFINITIONS, read as SHAPE rather than as text, because
-     the prose differs between a browser file and an Edge module while the rule
-     must not. Each is the half of a pair that looks identical in every ordinary
-     case and parts on one: a scratch measured in price rather than dollars, a
-     money split on the sign rather than the label, and averages on the label
-     rather than the sign. */
+  /* THE SUBTLE DEFINITIONS, read as SHAPE: each is half of a pair that parts on
+     one case — a scratch in price rather than dollars, money on the sign rather
+     than the label, averages on the label rather than the sign. */
   const mod = readFileSync(
     new URL('../supabase/functions/doji-eugenia/journal.ts', import.meta.url), 'utf8');
 
@@ -5300,12 +4211,8 @@ test('the journal stats agree with the app they were ported from', () => {
     ['the scratch band against the entry PRICE', /Math\.abs\(t\.exit_price - t\.entry_price\) <= BE/],
     ['the money split on the SIGN of the P&L',    /if \(t\.pnl >= 0\) gross \+= t\.pnl; else loss -= t\.pnl;/],
     ['the averages split on the RESULT LABEL',    /r === 'win'[\s\S]{0,60}r === 'loss'/],
-    /* THE FOURTH, and the one a band cannot state. A trade can move sixty
-       dollars of price and come back to exactly nothing once commission is in,
-       so the price band cannot reach it — and it is a break-even at any lot
-       size, which is the property the band is measured in price to protect.
-       Both files must say so or the same trade is a break-even in the app and a
-       loss to her, on the same row. */
+    /* THE FOURTH, which a band cannot state: a trade can move sixty dollars and
+       come back to exactly nothing, and that is a break-even at any size. */
     ['exactly nothing made as a BREAK-EVEN', /scratch \|\| t\.pnl === 0 \? 'be'/],
   ]) {
     assert.match(mod, re, `journal.ts no longer computes ${what}`);
@@ -5326,10 +4233,8 @@ test('the stats tool is offered wherever the journal is reasoned about', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  /* A CONVERSATION AND THE NIGHTLY PASS, and the pass is the one that would be
-     missed. It is told to notice what he has started doing differently, which
-     is a claim about a stretch of trading — and it was given the week's rows to
-     make it from. The rows are the evidence; this is the arithmetic over them. */
+  /* A CONVERSATION AND THE NIGHTLY PASS, which judges a stretch of trading and
+     needs the arithmetic over the rows it is given. */
   for (const set of ['CHAT_TOOLS', 'CONSOLIDATE_TOOLS']) {
     const list = src.match(new RegExp(`const ${set} = \\[([\\s\\S]*?)\\];`));
     assert.ok(list, `doji-eugenia no longer declares ${set}`);
@@ -5353,11 +4258,9 @@ test('every column the price mark writes is a column the table has', () => {
   assert.deepEqual([...columns].sort(), ['at', 'bid', 'id', 'looked_at'],
     'eugenia_price has changed shape and the sense reading it has not');
 
-  /* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT, which is the whole
-     of the cooldown: written unconditionally it would stamp on every quarter
-     hour, the quiet gate would be permanently shut, and the sense would fire
-     exactly once ever. Read out of markPrice rather than the file, since
-     eugenia_calendar's own looked_at is written a few hundred lines above. */
+  /* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT: written
+     unconditionally the quiet gate never reopens and the sense fires once ever.
+     Read out of markPrice, since the calendar has its own looked_at. */
   const at = src.indexOf('async function markPrice(');
   assert.ok(at > -1, 'doji-eugenia no longer has markPrice()');
   const body = src.slice(at, src.indexOf('\n}', at));
@@ -5371,12 +4274,9 @@ test('every column the price mark writes is a column the table has', () => {
 });
 
 test('the trades trigger fires on the transition, not on every poll', () => {
-  /* `is distinct from`, NEVER `<>`, and this is the same three-state trap
-     trades_telegram_on_answer already documents. fill_time is null on every open
-     position, so `old.fill_time <> new.fill_time` is NULL rather than true on
-     exactly the transition this trigger exists for — a WHEN clause that is not
-     true does not fire, and the close event would be the one that never
-     happened. */
+  /* `is distinct from`, NEVER `<>`: fill_time is null on an open position, so
+     `<>` is NULL on exactly the transition this trigger exists for, and a WHEN
+     that is not true does not fire. */
   const closed = SENSES_SQL.match(/create trigger trades_eugenia_closed[\s\S]*?execute function/);
   assert.ok(closed, '005 no longer creates trades_eugenia_closed');
   assert.match(closed[0], /old\.fill_time is null/);
@@ -5385,9 +4285,8 @@ test('the trades trigger fires on the transition, not on every poll', () => {
     'the close trigger compares fill_time with <>, which is NULL against an open ' +
     'position and therefore never fires');
 
-  /* AND THE POLLER MUST NOT RE-FIRE IT. Every position in the window is
-     re-upserted every two minutes, so an update trigger without a transition
-     guard is a model call every two minutes for the life of the position. */
+  /* AND THE POLLER MUST NOT RE-FIRE IT: the two-minute re-upsert without a
+     transition guard is a model call every two minutes. */
   const opened = SENSES_SQL.match(/create trigger trades_eugenia_opened[\s\S]*?execute function/);
   assert.ok(opened, '005 no longer creates trades_eugenia_opened');
   assert.match(opened[0], /after insert/);
@@ -5398,9 +4297,8 @@ test('the trades trigger fires on the transition, not on every poll', () => {
 });
 
 test('the trigger reads the cron secret under the spelling Vault holds', () => {
-  // One value, two stores, two spellings, and Postgres compares the Vault name
-  // case-sensitively. Gladys's trigger shipped reading the upper-case one and
-  // went quiet without failing anything.
+  // One value, two stores, two spellings; Postgres compares the Vault name
+  // case-sensitively.
   assert.match(SENSES_SQL, /where name = 'doji_cron_secret'/,
     '005 reads the cron secret under a name Vault does not hold, so the trigger ' +
     'presents null and doji-eugenia answers 401 — silently, to nobody');
@@ -5421,10 +4319,8 @@ test('the app reads only the three tables it was given a policy for', () => {
       `index.html reads ${t} and 005 never grants select on it`);
   }
 
-  /* AND HER NOTES STAY OUT OF IT. eugenia_notes and eugenia_turns are working
-     memory; his window into them is /notes in her own thread, where an answer
-     can be asked a question back. A policy on either would make the app a
-     second reader of something 003 deliberately denies the publishable key. */
+  /* AND HER NOTES STAY OUT OF IT: his window into them is /notes, where an answer
+     can be questioned. A policy here would make the app a second reader. */
   for (const shut of ['eugenia_notes', 'eugenia_turns']) {
     assert.ok(!read.has(shut), `index.html now reads ${shut}, which is her memory`);
     assert.ok(!new RegExp(`create policy .*on public\\.${shut}`).test(SENSES_SQL),
@@ -5433,15 +4329,9 @@ test('the app reads only the three tables it was given a policy for', () => {
 });
 
 test('the hybrid search still answers in the shape the function reads', () => {
-  /* THE FUNCTION IS 007's, AND ONLY 007's. It was 005's until the query vector
-     needed a third argument — `create or replace function` cannot change an
-     argument list, so 007 drops and recreates. A definition left behind in 005
-     would not replace 007's, it would sit beside it as an overload, and 005 is
-     the file meant to be applied again.
-
-     The return type is still load-bearing for the same reason it always was:
-     widening it needs another drop, and the columns searchList reads have to
-     survive that. */
+  /* THE FUNCTION IS 007's ALONE: a definition left in 005, which is re-applied,
+     would sit beside it as an overload. The return type stays load-bearing,
+     since widening it needs another drop. */
   const fn = SEMANTIC_SQL.match(/create function public\.eugenia_search[\s\S]*?\$\$;/);
   assert.ok(fn, '007 no longer defines eugenia_search');
   assert.doesNotMatch(SENSES_SQL, /function public\.eugenia_search/,
@@ -5465,15 +4355,9 @@ test('the hybrid search still answers in the shape the function reads', () => {
 });
 
 /* ─── The number IS the apply order ──────────────────────────────────────────
-   Nothing applies these files but a person reading the README and pasting them
-   one at a time, so the three digits are the whole of what says which goes
-   first. Two files carried 009 for three releases: the README ran the grants
-   before the dispatch ledger, and every derivation in this file sorts
-   lexically, which runs them the other way round. Harmless there, because
-   neither creates anything the other reads — and invisible for exactly that
-   reason, which is the part worth catching. The test above decides "earlier"
-   by comparing file names, so a shared prefix makes its answer arbitrary on
-   the day two files at the same number DO touch the same object.
+   A person pastes these one at a time in the order the digits give. Two files
+   sharing a number make "earlier" arbitrary, invisibly, until the day they
+   touch the same object.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no two numbered SQL files claim the same position', () => {
@@ -5492,22 +4376,11 @@ test('no two numbered SQL files claim the same position', () => {
 });
 
 /* ─── A re-runnable file may not undo a later one ────────────────────────────
-   The numbered files are applied in order by hand, and two of them are meant to
-   be applied AGAIN as they grow. That only works while nothing in an earlier
-   file recreates something a later file has since dropped — and 005 did exactly
-   that for a release: it carried the two-argument `eugenia_search` that 007
-   drops to make room for the query vector.
-
-   Re-applying 005 on a database that has had 007 would have put the old
-   signature back beside the new one. Two things then go wrong at once, and 007's
-   own comment names both: a two-argument call matches both functions and
-   Postgres refuses it as ambiguous, and a bare `create` takes `execute` from the
-   schema's default privileges — which Supabase grants to `anon` and
-   `authenticated` BY NAME, so the `revoke ... from public` beside it does not
-   touch them. Her whole memory, reachable with the key that ships in the page.
-
-   Nothing failed. The file applies cleanly, the revoke it carries looks like the
-   guard, and the damage is a privilege nobody asked about.
+   Some files are applied AGAIN as they grow, which works only while nothing in
+   an earlier file recreates what a later one dropped. Re-creating 007's
+   dropped signature from 005 would leave an ambiguous overload and a function
+   executable by `anon` — granted BY NAME through the schema's defaults, which a
+   `revoke ... from public` does not touch. The file would apply cleanly.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no numbered file recreates an object a later one drops', () => {
@@ -5525,11 +4398,8 @@ test('no numbered file recreates an object a later one drops', () => {
   }
   assert.ok(dropped.length >= 1, 'no drops read at all — the reader has gone blind');
 
-  /* ONLY THE FILES THAT CAN ACTUALLY BE APPLIED AGAIN. A file carrying a bare
-     `create table` refuses on its second run and stops there — 001 and 003 are
-     run-once by construction, which is why they may still hold the definitions
-     they had. Derived from the file rather than listed here, so a file that
-     becomes re-runnable comes under this rule the moment it does. */
+  /* ONLY FILES THAT CAN BE APPLIED AGAIN: a bare `create table` refuses on the
+     second run. Derived, so a file that becomes re-runnable is covered at once. */
   const rerunnable = (f) => !/^create table (?!if not exists)/m.test(text(f));
 
   for (const d of dropped) {
@@ -5557,11 +4427,8 @@ test('005 is safe to re-run, because it is the file that will grow', () => {
 });
 
 /* ─── Semantic search, and the three ways it fails without saying so ─────────
-   Nothing in this repository can reach a database or an embedding vendor, so
-   what a vector actually RETRIEVES is not knowable from here — that shows up in
-   use and nowhere else. What is knowable is the shape around it, and every one
-   of these failures is silent by construction: the search keeps answering, and
-   answers worse.
+   What a vector RETRIEVES is not knowable from here. The shape around it is,
+   and each failure is silent: the search keeps answering, worse.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the width the vendor is asked for is the width the column accepts', () => {
@@ -5582,45 +4449,34 @@ test('the width the vendor is asked for is the width the column accepts', () => 
 });
 
 test('the lexical arm survives, because a null embedding vanishes silently', () => {
-  /* THE FLOOR UNDER THE SEMANTIC ARM. Every row written before 007 has a null
-     embedding, and so does any row whose vendor call failed — none of them
-     appears in a nearest-neighbour query, with no error and no log. Replacing
-     the lexical arm with the vector one rather than fusing them would make half
-     an archive unsearchable and look like a search that simply found nothing. */
+  /* THE FLOOR UNDER THE SEMANTIC ARM. A null embedding is absent from a
+     nearest-neighbour query, so the lexical arm is fused, never replaced. */
   const fn = SEMANTIC_SQL.slice(SEMANTIC_SQL.indexOf('create function public.eugenia_search'));
   assert.match(fn, /websearch_to_tsquery/, 'the full-text arm is gone from the search');
   assert.match(fn, /word_similarity\(q,/, 'the trigram arm is gone from the search');
   assert.match(fn, /<%/, 'the trigram operator is gone, so its index is unused');
 
-  // BOTH null guards, and each stops a different thing. Without the first a row
-  // with no vector is ordered by a distance it does not have; without the
-  // second every distance is null on an unset key, `order by null` returns
-  // whatever the scan reaches first, and arbitrary rows enter the fusion.
+  // BOTH null guards: without the first a row is ordered by a distance it does
+  // not have; without the second an unset key makes every distance null and
+  // arbitrary rows enter the fusion.
   const arms = [...fn.matchAll(/where \w\.embedding is not null and \(select vec from ask\) is not null/g)];
   assert.equal(arms.length, 2,
     'a semantic arm no longer guards on both nulls — with no key it would feed ' +
     'arbitrary rows into the ranking rather than none');
 
-  // And each arm is ranked where the distance is still in scope. A CTE's own
-  // order is not carried out of it, so numbering the rows anywhere else is the
-  // ranking replaced by whatever order the scan produced.
+  // Ranked where the distance is in scope: a CTE's order is not carried out.
   assert.equal([...fn.matchAll(/row_number\(\) over \(order by dist\)/g)].length, 2,
     'a semantic arm is numbered by something other than its distance');
 });
 
 test('the search that is dropped is granted again in the same file', () => {
-  /* 005 REPLACES THIS FUNCTION IN PLACE PRECISELY SO ITS GRANTS SURVIVE, and
-     007 cannot: the query vector is a new argument, and `create or replace`
-     cannot change an argument list. So the drop is deliberate — and a drop
-     takes the grants with it, while a bare `create function` carries EXECUTE to
-     PUBLIC, which `anon` inherits. Forgetting these two lines is a public
-     entry point to her memory with only RLS behind it. */
+  /* THE DROP TAKES THE GRANTS, and a bare `create function` carries EXECUTE to
+     PUBLIC, which `anon` inherits. These two lines keep her memory off the
+     publishable key. */
   const at = SEMANTIC_SQL.indexOf('create function public.eugenia_search');
   assert.ok(at > -1, '007 no longer creates eugenia_search');
-  /* THE `> -1` IS THE HALF THAT MAKES THIS A CHECK. Written as a bare position
-     comparison it passed with the drop deleted outright — indexOf answers -1,
-     which is duly less than everything, and the assertion that exists to catch
-     a missing statement was satisfied by its absence. */
+  /* `> -1` MAKES THIS A CHECK: indexOf answers -1 for a deleted drop, which is
+     less than everything. */
   const dropped = SEMANTIC_SQL.indexOf('drop function if exists public.eugenia_search(text, int)');
   assert.ok(dropped > -1 && dropped < at,
     'the old two-argument search is not dropped before the new one is created — ' +
@@ -5631,12 +4487,9 @@ test('the search that is dropped is granted again in the same file', () => {
   assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from public/,
     '007 creates the search and leaves EXECUTE granted to PUBLIC');
 
-  /* AND FROM anon AND authenticated BY NAME, which is a SECOND revoke and not
-     the same one written twice. `public` above is the PUBLIC pseudo-role; these
-     two are granted EXECUTE separately by the default privileges Supabase sets
-     on the public SCHEMA. Two different things spelled the same way — the live
-     database answered 2 to "executable by anyone else" with the PUBLIC revoke
-     in place, and had done since 003 created this function. */
+  /* AND FROM anon AND authenticated BY NAME — a SECOND revoke. `public` is the
+     pseudo-role; these two hold EXECUTE separately from the schema's default
+     privileges. */
   assert.match(after, /revoke all on function public\.eugenia_search\(text, int, text\) from anon, authenticated/,
     "007 revokes the search from PUBLIC and leaves it granted to anon and " +
     "authenticated, which is what Supabase's default privileges give every new " +
@@ -5658,10 +4511,8 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
     '007 creates the three-argument search without dropping it first, so a ' +
     'second run refuses');
 
-  /* AND THE BACKFILL'S TABLE AND COLUMN ARE A PAIR THAT HAS TO BE REAL. It
-     builds its URL from arguments, so the reader that checks every
-     `rest/v1/eugenia_*` cannot see these two — a mistyped column here is a 400
-     on a maintenance door nobody runs twice. */
+  /* THE BACKFILL BUILDS ITS URL FROM ARGUMENTS, so the reader of
+     `rest/v1/eugenia_*` cannot see the table and column; each is checked here. */
   const calls = [...EUGENIA_TS.matchAll(/fillEmbeddings\('(\w+)', '(\w+)'\)/g)]
     .map(m => `${m[1]}.${m[2]}`);
   assert.ok(calls.length >= 4, `only ${calls.length} sweep call sites — the door and the nightly pass both call it`);
@@ -5675,15 +4526,9 @@ test('007 is safe to re-run, and the sweep names columns that exist', () => {
 });
 
 test('the text is sent only when the audio did not land', () => {
-  /* THE VOICE NOTE IS THE MESSAGE NOW, and the ordering this used to assert is
-     reversed with it: `say` first meant two bubbles and two notifications for
-     one thing she said, which he asked to stop.
-
-     THE OBJECTION TO AUDIO-ONLY WAS REAL AND THIS IS THE ANSWER TO IT. A vendor
-     that refuses, an unset key, a format Telegram will not render — audio alone
-     turns each into a MISSING message. So `say` is still reachable and is the
-     fallback, and the property below is that it is reachable at all: deleted,
-     every one of those failures is silence with nothing reporting it. */
+  /* THE VOICE NOTE IS THE MESSAGE, and `say` is the fallback. An unset key, a
+     refusing vendor or an unrenderable format would make audio alone a MISSING
+     message, so the property is that `say` is still reachable. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const at = src.indexOf('export async function sayAloud(');
@@ -5708,12 +4553,9 @@ test('the text is sent only when the audio did not land', () => {
 });
 
 test('the briefing goes out as she wrote it, hello included, and the hello is hers', () => {
-  /* A SCRIPTED HELLO WAS PREPENDED IN CODE, and it was the line he heard worst:
-     the same words every morning, said with a tempo nothing in the text could
-     fix. The hello is hers now. Two things would quietly undo that — a
-     greeting put back on the front of the briefing, and a critic that, running
-     last, treats her hello as an opening that is true on any morning and cuts
-     it or strands it on a line of its own, where it is read as a paragraph. */
+  /* THE HELLO IS HERS. A greeting prepended in code was the same words every
+     morning; undone by putting one back, or by a critic that cuts her hello as
+     an opening true on any morning. */
   const at = EUGENIA_TS.indexOf('async function postBriefing(');
   assert.ok(at > -1, 'doji-eugenia no longer has postBriefing()');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
@@ -5730,16 +4572,11 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 });
 
 test('every message she writes goes out through sayAloud', () => {
-  /* THE HALF THE FUNCTION CANNOT GUARANTEE. A path that calls `say` directly
-     still works and still reaches him — it is simply silent, which is the
-     feature not happening on one message rather than failing anywhere. Seven:
-     both briefings share two — the speaking worker, and postBriefing's own
-     fallback for the morning that worker will not start — then the pulse, the
-     release look, the trade event, the move look and the reply.
-
-     `/notes`, the apologies and the short operational lines keep `say`
-     deliberately: a rendered table read aloud is unlistenable and a failure
-     notice is not a message she wrote. */
+  /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
+     and is silent. Seven sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the pulse, the release look, the trade event,
+     the move look and the reply. `/notes`, the apologies and the short
+     operational lines keep `say` deliberately. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
@@ -5749,16 +4586,10 @@ test('every message she writes goes out through sayAloud', () => {
 });
 
 test('the three gated paths remember what the gate returned, not the draft', () => {
-  /* THE STALE COPY ARRIVING THROUGH THE DOOR THE GATE OPENED. `trim` may
-     rewrite, so the draft and the message he read are two different texts —
-     and for as long as these three had a gate they sent one and stored the
-     other. The cost is not the audit: it is that her own history then holds
-     words he never saw, resent as hers for the next six exchanges, which is
-     exactly what `remember` refuses for the notes and the week's trades.
-
-     `postBriefing` is not here because it never had the fault — it stores what
-     `critique` returned. Nothing in this suite can drive a path that sends, so
-     the binding is read out of the source. */
+  /* WHAT IS STORED IS WHAT HE READ. `trim` may rewrite, and storing the draft
+     would put words he never saw in her history, resent as hers for six
+     exchanges. `postBriefing` stores what `critique` returned. Read from the
+     source, since nothing here drives a path that sends. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -5781,12 +4612,8 @@ test('the three gated paths remember what the gate returned, not the draft', () 
 });
 
 test('the audio is asked for in the one format Telegram renders as a voice note', () => {
-  /* THE ONLY THING ON THIS PATH THAT WOULD FAIL QUIETLY. The vendor's default
-     is mp3, and mp3 WORKS: the request succeeds, Telegram accepts the file, and
-     it arrives as an attachment — no waveform, no speed control, no playing it
-     with the phone at your ear. Nothing errors and nothing logs; the feature
-     simply stops being the thing it was built for, which is the one failure
-     shape a person would not think to report as a bug. */
+  /* THE ONE THING HERE THAT FAILS QUIETLY: the vendor's default mp3 WORKS, and
+     arrives as an attachment rather than a voice note — nothing errors. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const at = src.indexOf('async function speak(');
@@ -5801,20 +4628,16 @@ test('the audio is asked for in the one format Telegram renders as a voice note'
     'to go on');
   assert.match(body, /"reply\.ogg"/,
     'the upload no longer carries an .ogg filename');
-  /* BOTH REQUESTS CARRY THE BUDGET. fold.test.mjs drives a hanging vendor at
-     the speech request; an upload to Telegram that hangs is the same worker
-     shut down at four hundred seconds with nothing falling back, and no test
-     there can reach it without a second stub of the same thing. */
+  /* BOTH REQUESTS CARRY THE BUDGET: an upload to Telegram that hangs kills the
+     worker as surely as a hanging vendor. */
   assert.equal((body.match(/\bsignal\b/g) || []).length, 3,
     'speak() takes the budget and does not hand it to both of its requests — a ' +
     'request without it waits for as long as the vendor takes');
 });
 
 test('the length she is told to write to is the length that is spoken', () => {
-  /* TWO COPIES OF ONE NUMBER, and the failure of a disagreement is silent in
-     the worse direction: a prompt allowed to run longer than the cap produces
-     answers that are simply never spoken, and nothing tells him the audio was
-     dropped rather than never attempted. */
+  /* THERE IS NO CAP, SO THE PROMPT STATES NO LENGTH: a number there would ask her
+     to write shorter for a limit that does not exist. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /Keep it under \$\{[A-Z_]*MAX[A-Z_]*\} characters/,
@@ -5823,10 +4646,8 @@ test('the length she is told to write to is the length that is spoken', () => {
 });
 
 test('every reason a voice note fails is one the handler can actually reach', () => {
-  /* A SENTENCE NOTHING SELECTS IS A SENTENCE NOBODY READS, and the reverse is
-     worse — a key looked up in the map and not defined there renders as
-     `undefined` to him. Both halves, because either alone goes green while the
-     feature is broken in the other direction. */
+  /* A sentence nothing selects is never read, and a key looked up and not defined
+     renders `undefined` to him. Both halves. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -5850,11 +4671,9 @@ test('every reason a voice note fails is one the handler can actually reach', ()
       `VOICE_TROUBLE defines "${key}" and no path can ever produce it`);
   }
 
-  /* AND THE FORMAT IS DECLARED BOTH WAYS. Telegram hands over `audio/ogg` and
-     the file's own extension; the services that speak this API shape differ in
-     which of the two they read the format off, so sending only one is a bet on
-     which provider is behind STT_URL. Both is the portable answer, and the
-     content type is the half that looks redundant and would be tidied away. */
+  /* THE FORMAT IS DECLARED BOTH WAYS — `audio/ogg` and the extension — since
+     providers differ in which they read. The content type is the half that
+     looks redundant. */
   const fn = src.match(/async function transcribe\([\s\S]*?\n\}/);
   assert.ok(fn, 'doji-eugenia no longer has transcribe()');
   assert.match(fn[0], /new Blob\(\[bytes\], \{ type: mime \}\)/,
@@ -5866,21 +4685,13 @@ test('every reason a voice note fails is one the handler can actually reach', ()
 });
 
 test('every query flag the poller reads is one the market gate considers', () => {
-  /* A READ-ONLY FLAG LEFT OUT OF THE GATE ANSWERS "market closed" AT THE
-     WEEKEND, which is precisely when it is reached for: a suspicious row gets
-     looked at on a Saturday, and the debug surface that exists to answer the
-     question replies that there is nothing to poll. The failure is silent, it
-     looks like the flag working, and it is invisible five days a week.
-
-     So the list is held against itself rather than against a literal here:
-     every flag the entry point reads must appear in the gate, whether it is
-     read-only or not. Adding one and forgetting it is the whole failure. */
+  /* A READ-ONLY FLAG LEFT OUT OF THE GATE ANSWERS "market closed" AT THE WEEKEND,
+     exactly when a suspicious row gets looked at. Every flag the entry point
+     reads must appear in the gate. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  // Any compared value, not only "1": ?market=raw is a second flag on the same
-  // parameter, and a pattern anchored on "1" would have skipped it — leaving
-  // the one that answers "market closed" all weekend unchecked.
+  // Any compared value, not only "1": ?market=raw shares its parameter.
   const flags = [...src.matchAll(/const (\w+)\s*=\s*url\.searchParams\.get\("(\w+)"\) === "[^"]+"/g)]
     .map(m => m[1]);
   assert.ok(flags.length >= 3, `only ${flags.length} flags read out of the poller — the reader has gone blind`);
@@ -5896,9 +4707,8 @@ test('every query flag the poller reads is one the market gate considers', () =>
 });
 
 test('the poller answers its debug flags before it writes anything', () => {
-  // Both read-only flags return a Response, and both must do it before the
-  // fold and the upsert are reached — a debug surface that writes on the way
-  // to answering is not a debug surface.
+  // Both read-only flags return before the fold and the upsert: a debug surface
+  // that writes on the way to answering is not one.
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
@@ -5912,10 +4722,9 @@ test('the poller answers its debug flags before it writes anything', () => {
       `?${flag}=1 is answered after the poll has already folded its deals`);
   }
 
-  /* AND tools/list GOES PAST THE ALLOW-LIST RATHER THAN THROUGH IT, which is
-     correct and worth stating: ALLOWED_TOOLS guards a tool NAME becoming a
-     request, and `tools/list` names none. What must stay true is that it
-     discovers tools without calling one. */
+  /* tools/list GOES PAST THE ALLOW-LIST, correctly: ALLOWED_TOOLS guards a tool
+     NAME becoming a request, and `tools/list` names none. It must discover
+     without calling. */
   const block = src.slice(src.indexOf('if (tools) {'), write);
   assert.match(block, /method: "tools\/list"/);
   assert.ok(!/tools\/call/.test(block),
@@ -5924,14 +4733,9 @@ test('the poller answers its debug flags before it writes anything', () => {
 });
 
 /* ─── Nothing this function can call may place a trade ───────────────────────
-   `?tools=1` established what the broker's endpoint actually offers, and the
-   answer has two halves. It serves prices, which is why ALLOWED_TOOLS grew. It
-   also serves create_order, close_position, amend_position, amend_order and
-   cancel_order — on the same credential, reachable by the same token.
-
-   So the read-only guarantee this repository states about the poller is not a
-   property of the key. It is a property of one array in one file, and the
-   failure mode of editing it carelessly is not a bug report.
+   The broker's endpoint serves create_order, close_position, amend_position,
+   amend_order and cancel_order on the same credential as the prices. The
+   read-only guarantee is a property of one array in one file, not of the key.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the poller can call nothing that would place, move or close a trade', () => {
@@ -5955,9 +4759,8 @@ test('the poller can call nothing that would place, move or close a trade', () =
       `poller is no longer read-only and nothing else in this system says so`);
   }
 
-  /* AND EVERY READ STILL GOES THROUGH THE CHECK. The list is inert if the one
-     place a tool name becomes a request stops consulting it — which is a
-     likelier regression than someone typing create_order into the array. */
+  /* AND EVERY READ STILL GOES THROUGH THE CHECK — likelier to regress than someone
+     typing create_order into the array. */
   assert.match(src, /if \(!ALLOWED_TOOLS\.includes\(tool\)\) throw/,
     'mcpPost no longer enforces the allow-list, so the array is decoration');
 
@@ -5970,14 +4773,11 @@ test('the poller can call nothing that would place, move or close a trade', () =
 });
 
 /* ─── TradingView reads, and the list of what it may read is TradingView's ────
-   The poller's destructive five are typed into the poller because cTrader's
-   listing was never kept. TradingView's is: `?tools=1`'s answer is a fixture,
-   whole, so the eleven tools that change his account are DERIVED from its
-   `readOnlyHint` rather than copied — a twelfth arriving in a fresh capture is
-   banned without anyone remembering to add it. Three halves, each one the
-   poller's: every permitted tool is read-only on TradingView's own listing,
-   the one place a name becomes a request still consults the list, and no tool
-   that writes is named anywhere in the file, whatever the list says.
+   `?tools=1`'s answer is a fixture, so the tools that change his account are
+   DERIVED from its `readOnlyHint` rather than copied, and a new one in a fresh
+   capture is banned unasked. The poller's three halves: every permitted tool
+   is read-only on the listing, the one place a name becomes a request
+   consults the list, and no writing tool is named anywhere in the file.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('doji-tradingview may call only what TradingView itself marks read-only', () => {
@@ -6027,9 +4827,8 @@ test('every tool doji-tradingview may call is one a probe or a reader calls', ()
 });
 
 test('every tool the poller may call is one it actually calls or probes', () => {
-  // A name in the array that nothing reaches is a widening with no feature
-  // behind it — which is the shape a destructive tool would arrive in if one
-  // ever did, since it would be added "for later" rather than used.
+  // A name in the array nothing reaches is a widening with no feature — the shape
+  // a destructive tool would arrive in, added "for later".
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
   const allowed = [...src.match(/const ALLOWED_TOOLS = \[([\s\S]*?)\] as const;/)[1]
@@ -6041,33 +4840,20 @@ test('every tool the poller may call is one it actually calls or probes', () => 
   }
 });
 
-/* ─── The two columns with two claimants are settled inside the UPDATE ───────
-   `balance` and the plan are the only columns here two writers both reach for,
-   and both are arbitrated the same way: a filter in the URL, evaluated by
-   Postgres inside the UPDATE, so there is no read to lose a race with.
-
-   Losing either filter is silent in the way that matters. The poller re-reads
-   every open position for the life of the position, and R-04 moves the stop to
-   break-even partway through — so an unfiltered write files the break-even stop
-   as the plan, and the plan is then the thing it exists to be compared against.
-   The number is present, plausible and wrong. `balance` fails the same way
-   against the figure the broker printed on the fill.
-
-   Read out of each function body rather than out of the file: both filters are
-   one clause in one template literal, and a whole-file match for `is.null` is
-   answered by the other function's copy. */
+/* ─── The columns with two claimants are settled inside the UPDATE ───────────
+   A filter in the URL, evaluated by Postgres inside the UPDATE, so there is no
+   read to lose a race with. Unfiltered, the poller's re-read files R-04's
+   break-even stop as the plan — present, plausible and wrong — and `balance`
+   overwrites the figure the broker printed on the fill. Read out of each
+   function body: a whole-file match is answered by another function's copy. */
 
 test('the three columns with two claimants are filtered inside the UPDATE', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  /* `fill_time` JOINED THEM, AND ARRIVED HERE THE HARD WAY. It had ONE writer
-     and it was the email — the poller saw every close within two minutes,
-     already knew the instant, and never wrote it. So a close with no alert
-     behind it left the column null for ever: Eugenia reported eight positions
-     he had closed, cited R-19 and R-15 at him about them, and her close sense
-     never fired once. The filter is what keeps the email owning it wherever it
-     lands, with this filling the gaps rather than racing it. */
+  /* `fill_time` IS THE THIRD. The email owns it; the poller stamps a close it has
+     already seen under the same filter, so the email still wins wherever it
+     lands and the poller fills only the gaps. */
   for (const [fn, col] of [['writeBalance', 'balance'], ['writePlan', '\\$\\{col\\}'],
                            ['writeFill', 'fill_time']]) {
     const at = src.indexOf(`function ${fn}(`);
@@ -6084,21 +4870,11 @@ test('the three columns with two claimants are filtered inside the UPDATE', () =
 });
 
 test('the trade look speaks only about the day it is happening on', () => {
-  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY and neither had anything
-     checking that the trade is. `aheadToday` reads the releases still to come
-     THIS day; R-11 says the day ends here, which is a sentence whose whole
-     content is that he should stop trading now.
-
-     The trigger fires on a transition, not on a clock, so the row it carries is
-     only today's by habit — and anything that stamps an old close fires it for
-     an old day. It took the poller's first backfill to show it: two messages
-     arrived saying "today's realised P&L is −61.78" and "the day sits at
-     −318.88", about the 11th and the 19th of August, in the present tense,
-     three weeks after those days ended.
-
-     Read as a guard BEFORE either branch, because it is a property of the event
-     rather than of what she would have said about it — and placed after the
-     branches it would be two guards, with the second one to be forgotten. */
+  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY. The trigger fires on a
+     transition, not a clock, so anything stamping an old close fires it for an
+     old day — a backfill would report August's losses in the present tense.
+     Guarded BEFORE either branch, being a property of the event; after them it
+     would be two guards, with the second to be forgotten. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -6119,14 +4895,10 @@ test('the trade look speaks only about the day it is happening on', () => {
 });
 
 test('the close instant is written only where the deals say it closed', () => {
-  /* THE SAME SET THE BALANCE WRITE TAKES, and it has to be: a fully closed
-     position cannot end on an opening deal, so wherever there is an exit price
-     the latest deal IS the closing one. On a partial close there is no exit
-     price and there is no close to stamp — writing one would file a position
-     still running as finished, which is the reported bug in reverse and worse.
-
-     Read out of the handler rather than the helper, because the helper cannot
-     see which rows it is called for. */
+  /* THE SAME SET THE BALANCE WRITE TAKES: a fully closed position ends on its
+     closing deal. A partial close has no exit price and no close to stamp —
+     writing one would file a running position as finished. Read out of the
+     handler, since the helper cannot see which rows it is called for. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
@@ -6141,17 +4913,15 @@ test('the close instant is written only where the deals say it closed', () => {
     'the close instant is written before the row exists, so every first sighting ' +
     'of a close is silently skipped');
 
-  /* AND IT NEVER TAKES THE POLL DOWN. The deals are why this function exists
-     and are written by the time this runs; a close instant that fails to record
-     leaves one row in the state every unstamped row is already in. */
+  /* AND IT NEVER TAKES THE POLL DOWN: a stamp that fails leaves one row in the
+     state every unstamped row is already in. */
   const at = src.indexOf('let stamped = 0;');
   assert.ok(at > -1, 'the poller no longer counts the close instants it wrote');
   assert.match(src.slice(at, at + 400), /try \{[\s\S]*?\} catch/,
     'the close-instant write is unguarded, so one failed PATCH loses the whole poll');
 
-  // Counted on the ANSWER rather than the attempt, for `planned`'s reason: a
-  // PATCH filtered to nothing is a 200, so a count of calls reads the same on a
-  // working filter and a broken one.
+  // Counted on the ANSWER rather than the attempt: a PATCH filtered to nothing is
+  // a 200.
   assert.match(src.slice(at, at + 400), /if \(await writeFill\([^)]*\)\) stamped\+\+;/,
     'stamped counts calls made rather than rows written — the number would read ' +
     'the same whether the filter works or has stopped filtering');
@@ -6160,40 +4930,27 @@ test('the close instant is written only where the deals say it closed', () => {
     'arbitration is not in the answer anybody reads');
 });
 
-/* ─── And the meter beside the filter has to be able to report it failing ────
-   `planned` in the poller's answer counted CALLS. With a position open it read
-   1 every two minutes — which is what a working filter, a filter that had
-   stopped filtering, and a row the upsert had not yet inserted all look like.
-   Three states, one number, and the number nobody could learn anything from sat
-   directly beside the arbitration above: the meter could not see the failure it
-   was adjacent to.
-
-   It counts rows now, and `return=representation` is what makes that possible —
-   a PATCH filtered to nothing is a 200 with an empty body, so `res.ok` alone
-   can never answer the question. DROPPING THE PREFER HEADER IS THE SILENT HALF:
-   the body comes back empty, every write reads as no write, and the meter
-   settles on 0, which is exactly the healthy steady state. Nothing else in the
-   suite would notice.
+/* ─── The meter beside the filter has to be able to report it failing ───────
+   `planned` counts ROWS, not calls — a working filter, a broken one and a row
+   not yet inserted would otherwise read the same. `return=representation` is
+   what makes that answerable: a PATCH filtered to nothing is a 200 with an
+   empty body. DROPPING THE PREFER HEADER IS THE SILENT HALF — every write
+   reads as none, and the meter settles on 0, the healthy steady state.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the poller counts the plans it wrote, not the plans it tried', () => {
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
 
-  /* BOTH FILTERED WRITERS, because the silent half is a property of the shape
-     rather than of one function: a PATCH under a `is.null` filter always
-     answers 200, so without the representation there is nothing to count and
-     the meter settles on the healthy steady state. writeFill was added with
-     this uncovered and a falsification found it — dropping its header turned
-     nothing red. */
+  /* BOTH FILTERED WRITERS: the silent half is a property of the shape, not of
+     one function. */
   for (const fn of ['writePlan', 'writeFill']) {
     const at = src.indexOf(`function ${fn}(`);
     assert.ok(at > -1, `doji-mcp-sync no longer has ${fn}()`);
     const body = src.slice(at, src.indexOf('\n}', at));
 
-    // A count or a yes/no — what matters is that the answer is DERIVED from the
-    // representation rather than from the call having been made. writeFill
-    // stamps one column and says whether it did; writePlan may stamp two.
+    // A count or a yes/no, DERIVED from the representation. writeFill stamps one
+    // column; writePlan may stamp two.
     assert.match(body, /Promise<(boolean|number)>/,
       `${fn} no longer answers whether it wrote, so the count beside it is ` +
       `back to counting calls`);
@@ -6216,11 +4973,9 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
 });
 
 test('the poller fills best_price once, newest first, and counts what it wrote', () => {
-  /* THE PURE HALF IS DRIVEN IN fold.test.mjs AND PROVES NOTHING ABOUT THE CALL.
-     bestPrice can be right on every bar while the poll never reaches it, reads
-     the backlog oldest first so a fresh close waits behind a year of history,
-     or overwrites a figure every two minutes — and none of those is a wrong
-     number any test of the function could see. So the call site is read. */
+  /* bestPrice can be right on every bar while the poll never reaches it, reads the
+     backlog oldest first, or overwrites every two minutes — none a wrong number
+     a test of the function could see. So the call site is read. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-mcp-sync/index.ts', import.meta.url), 'utf8');
   const at = src.indexOf('async function fillExcursions(');
@@ -6244,11 +4999,9 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
 });
 
 test("the nightly pass files the week, meters both outcomes, and check_rules reads it", () => {
-  /* fileWeek and r14 are driven in fold.test.mjs, and neither can see whether
-     anything calls them. A pass that stopped filing the week leaves every week
-     unmarked, R-14 unknown on every trade, and nothing anywhere erroring — so
-     the call sites are read, along with both meters and the calendar handed
-     to the rules. */
+  /* fileWeek and r14 are driven in fold.test.mjs; a pass that stopped filing
+     leaves R-14 unknown on every trade with nothing erroring. The call sites,
+     both meters and the calendar handed to the rules are read. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const at = src.indexOf('async function postConsolidation(');
@@ -6279,22 +5032,15 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
 });
 
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {
-  /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. So the market
-     read is deliberately not hers to make: doji-mcp-sync holds
-     CTRADER_MCP_TOKEN and will only ever answer with a quote, and she presents
-     the cron secret she already has. Giving her that token to save a hop would
-     put a market order one prompt injection away from the bot whose entire
-     product is that she gives no signals.
-
-     Structural, not instructed — the same shape as her having exactly one
-     database read of the journal and no write path to it. */
+  /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. doji-mcp-sync
+     holds the token and only ever answers with a quote; she presents the cron
+     secret she has. The token in her hands would put a market order one prompt
+     injection away. Structural, not instructed. */
   const eugenia = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
-  /* THE READ, NOT THE MENTION. The comment above readMarket explains at length
-     why she does not hold this token, and a bare name match fired on the
-     explanation — a test that forbids saying the word rather than doing the
-     thing, which would push the reasoning out of the file to stay green. */
+  /* THE READ, NOT THE MENTION: the comment explaining why she does not hold the
+     token names it. */
   assert.ok(!/env\(\s*["']CTRADER_/.test(eugenia),
     'doji-eugenia reads a cTrader credential — the market read must go through ' +
     'the poller, which is the only function that may hold one');
@@ -6313,17 +5059,10 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
 });
 
 /* ─── Only the TradingView filing makes a calendar row ───────────────────────
-   An upsert keyed on a name the model writes once filed a print under
-   `retail sales` beside the row it had been handed as
-   `US retail sales (August, advance)` — an INSERT, the actual on a row with no
-   consensus and the consensus on a row with no actual, and nothing failed. The
-   prompt had said *the same time and name* since the tool was written, which is
-   the evidence that an instruction cannot carry this.
-
-   So the guarantee is structural and read here: one write in the file can
-   create a row, it is keyed on TradingView's id, and what she is handed can
-   only PATCH. Each is silent when it breaks — a second writer still answers and
-   leaves a row behind that nobody is looking at.
+   An upsert keyed on a model-written name files a print on a new row, silently,
+   and an instruction cannot carry this. So it is structural: one write in the
+   file creates a row, keyed on TradingView's id, and what she is handed can
+   only PATCH. A second writer still answers and leaves a row nobody watches.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('one write makes a calendar row, keyed on the id, and she holds none', () => {
@@ -6354,9 +5093,8 @@ test('one write makes a calendar row, keyed on the id, and she holds none', () =
 });
 
 test('the move look has a tool set of its own, with no print to file', () => {
-  /* It borrowed RELEASE_TOOLS, so it carried `record_actual` into a look the
-     calendar has already said no print explains, and it bought the hour the
-     cache window grants that array alone — written on every turn, read on none. */
+  /* Not RELEASE_TOOLS: that carries `record_actual` into a look no print
+     explains, and buys the hour of cache that array alone is granted. */
   const array = EUGENIA_TS.match(/const MOVE_TOOLS = \[([^\]]*)\]/)?.[1];
   assert.ok(array, 'the move look no longer has a tool set of its own');
   assert.doesNotMatch(array, /ACTUAL_TOOL/, 'the move look can file a release figure again');
@@ -6384,9 +5122,8 @@ test('the release prompt asks for the tool the release look actually has', () =>
 });
 
 test('the market around gold reaches both paths that explain gold against it, and only from one list', () => {
-  /* aroundList is pure and driven in fold.test.mjs, and cannot see whether
-     anything calls it. A briefing that stopped reading the market still reads
-     well — and walks its chain through real yields off a search page again. */
+  /* aroundList is driven in fold.test.mjs and cannot see its callers. A briefing
+     that stopped reading the market still reads well, off a search page. */
   const body = (name) => {
     const at = EUGENIA_TS.indexOf(`async function ${name}(`);
     assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
@@ -6425,8 +5162,7 @@ test('the move look reads the wires before it searches, and claims no more than 
 
 /* ─── What broke since the last briefing ─────────────────────────────────────
    `breachesBlock` is driven in fold.test.mjs; whether the briefing reads it is
-   not, and a briefing without it still arrives and still mentions his trades —
-   judged by eye, over "yesterday", which is the arrangement it replaced. */
+   read here. */
 test('the briefing is handed the rules his trades broke, and told to take them from there', () => {
   const at = EUGENIA_TS.indexOf('async function postBriefing(');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at))
@@ -6466,10 +5202,9 @@ test('the release look is handed the release\'s own record, and told to read aga
 });
 
 /* ─── The briefing that opens the week ───────────────────────────────────────
-   weekBlock is driven in fold.test.mjs. Whether a Sunday reads it, whether she
-   is told what to do with it, and whether the critic counts a week's list
-   against the words are not — and a critic that does would cut the prose to
-   make room for the week every Sunday, running last. */
+   Whether a Sunday reads weekBlock, is told what to do with it, and is spared
+   the critic counting the week's list against the words — or the prose is cut
+   to make room every Sunday. */
 test('the Sunday briefing reads the week, is told it is about the week, and the critic does not count it', () => {
   const at = EUGENIA_TS.indexOf('async function postBriefing(');
   const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
@@ -6491,10 +5226,8 @@ test('the Sunday briefing reads the week, is told it is about the week, and the 
 });
 
 /* ─── The market around gold, in a conversation ──────────────────────────────
-   serve() is driven for get_around in fold.test.mjs. Whether the conversation
-   can call it is the tool array, and whether she knows to is the prompt: a
-   tool in neither place is a reply that searches for the dollar, against the
-   rule that it never be quoted from a search. */
+   The tool array and the prompt: a tool in neither is a reply that searches
+   for the dollar, against the rule that it never be quoted from a search. */
 test('a reply can read the market around gold, and is told to before searching for it', () => {
   const chat = EUGENIA_TS.match(/const CHAT_TOOLS = \[([\s\S]*?)\];/);
   assert.ok(chat, 'doji-eugenia no longer defines CHAT_TOOLS');
@@ -6510,12 +5243,9 @@ test('a reply can read the market around gold, and is told to before searching f
 });
 
 /* ─── Where the speculators stand ────────────────────────────────────────────
-   positioningList is pure and driven in fold.test.mjs; who is handed it is
-   three call sites no test can drive. The Sunday briefing and get_around carry
-   it. A weekday briefing would carry the same weekly count five mornings
-   running, and the move look would be handed a plausible cause for a
-   quarter-hour move that it cannot be — the one thing that path is told not to
-   invent. Both of those are an ordinary edit away, and both read as her being
+   The Sunday briefing and get_around carry the weekly count. A weekday briefing
+   would repeat it five mornings running, and the move look would be handed a
+   plausible cause it cannot be — both an ordinary edit away, both reading as
    better informed. */
 test('the speculators\' weekly count reaches the Sunday briefing and a conversation, and nothing else', () => {
   const body = (name) => {
@@ -6540,10 +5270,9 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
     'the count lost the line that keeps it from reading as a signal');
 });
 
-/* THE RATE ODDS GO TO THE BRIEFING AND A CONVERSATION. ratesList is pure and
-   driven in fold.test.mjs; whether anything reads it is two call sites, and
-   the prompt paragraph is what tells her a later meeting is never a chance —
-   the half that keeps her figure matching his FedWatch screen. */
+/* THE RATE ODDS GO TO THE BRIEFING AND A CONVERSATION, and the prompt says a
+   later meeting is never a chance — the half that keeps her figure matching
+   his FedWatch screen. */
 test('the rate odds reach the briefing and a conversation, said the way FedWatch shows them', () => {
   const at = EUGENIA_TS.indexOf('async function postBriefing(');
   const brief = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
@@ -6560,11 +5289,9 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
     'she may quote a later meeting as its own odds, which FedWatch does not show');
 });
 
-/* THE REVISION RIDES ON THE RECORD READ, AND THE ORDER OF THAT READ IS THE
-   WHOLE OF IT. revisionLine is pure and driven in fold.test.mjs against rows
-   newest first; recordList wants them oldest first. `rows.reverse()` reverses in
-   place, so handing it the same array before revisionLine reads it gives the
-   revision the OLDEST print on file and every month a false one. */
+/* THE ORDER OF THE RECORD READ IS THE WHOLE OF IT. revisionLine wants rows
+   newest first and recordList oldest first; `rows.reverse()` reverses in
+   place, so reversing first hands revisionLine the OLDEST print. */
 test('the release look is handed the revision, off the record read newest first', () => {
   const at = EUGENIA_TS.indexOf('async function recordBlock(');
   assert.ok(at > -1, 'doji-eugenia no longer has recordBlock()');
@@ -6578,20 +5305,17 @@ test('the release look is handed the revision, off the record read newest first'
 });
 
 test('the calendar is filed before the briefing reads it and before the look decides', () => {
-  /* calendarRows and awaitingActual are pure and driven in fold.test.mjs, and
-     neither can see whether anything calls them. A briefing that reads before
-     it files hands her yesterday's calendar; a look that decides before it
-     files never sees the actual the filing would have landed, and waits out
-     the half hour on every print. */
+  /* A briefing that reads before it files hands her yesterday's calendar; a look
+     that decides before it files never sees the actual, and waits out the half
+     hour on every print. */
   const body = (name) => {
     const at = EUGENIA_TS.indexOf(`async function ${name}(`);
     assert.ok(at > -1, `doji-eugenia no longer has ${name}()`);
     return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
   };
   const brief = body('postBriefing');
-  /* AND ON A SUNDAY THE WEEK, which the nightly pass files five hours after
-     the one briefing about it — so a Sunday that filed only the rolling window
-     would read a week that is not there yet, and say nothing past Monday. */
+  /* AND ON A SUNDAY THE WEEK, which the nightly pass files five hours after the
+     one briefing about it. */
   const files = brief.search(/await \(due === 'sunday' \? filedWeek\(weekOf\(new Date\(\)\)\) : filed\(\)\)/);
   assert.ok(files > -1, 'the briefing no longer files the week on a Sunday and the day otherwise');
   for (const read of ['calendarBlock()', 'weekBlock()']) {
@@ -6611,10 +5335,7 @@ test('the calendar is filed before the briefing reads it and before the look dec
 
 test('the release look is handed the stamp its tool takes', () => {
   /* THE HEADING IS IN ET AND THE TOOL TAKES UTC. Asked to convert, she converts
-     from a New York clock she was given as words — a conversion standing where
-     an input belongs, which is the shape the price line was moved for. Dropping
-     it breaks nothing: the look still runs, still says the right thing, and
-     writes against an instant an hour out for half the year. */
+     from words — an instant an hour out for half the year, silently. */
   const at = EUGENIA_TS.indexOf('async function postRelease(');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
   assert.match(body, /toISOString\(\)[\s\S]{0,80}record_actual/,
@@ -6622,24 +5343,16 @@ test('the release look is handed the stamp its tool takes', () => {
 });
 
 test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () => {
-  /* `updated_at` exists to say which of two contradictory rows carries the later
-     CONTENT. markLooked writes looked_at and nothing else, so an unconditional
-     touch makes it say when a row was last HANDLED — and on 16 September the row
-     with the stale prior was marked at 12:35:00 while the row with the actual
-     was written at 12:36:15. Seventy-five seconds is the whole reason it ordered
-     correctly. Reverse them and the column answers the opposite of the truth. */
+  /* `updated_at` says which of two contradictory rows carries the later CONTENT.
+     markLooked writes looked_at alone, so an unconditional touch would make it
+     say when a row was last HANDLED instead. */
   const fn = SENSES_SQL.slice(SENSES_SQL.indexOf('function public.eugenia_calendar_touch()'));
   const body = fn.slice(0, fn.indexOf('$$;') + 3);
   assert.match(body, /is distinct from/,
     'eugenia_calendar_touch moves updated_at on every update again, so a look ' +
     'marking a stale row makes it read as the later one');
-  /* AND THE WRITER IS THE OTHER HALF OF THAT GUARANTEE, which was checked on
-     the trigger side alone. The exclusion above only helps while the MARK
-     sends `looked_at` and nothing else — a PATCH that names `updated_at`
-     itself moves the column whatever the trigger compares, and the guarantee
-     is gone with both halves still reading as present. Proved by adding
-     `updated_at` to the body and watching this go red; before it existed, that
-     mutation passed the whole suite. */
+  /* AND THE WRITER IS THE OTHER HALF: a mark PATCH naming `updated_at` moves it
+     whatever the trigger compares. Proved by adding it and watching this go red. */
   const mark = EUGENIA_TS.slice(EUGENIA_TS.indexOf('async function markLooked'));
   const sent = mark.slice(0, mark.indexOf('\n}')).match(/JSON\.stringify\(\{([^}]*)\}/);
   assert.ok(sent, 'markLooked no longer PATCHes a literal body this can read');
@@ -6656,30 +5369,16 @@ test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () 
 });
 
 /* ─── The shape rules, and the critic's second copy of each ──────────────────
-   `CRITIC` runs LAST. A rule tightened for the writer and left out of the
-   critic is a rule the critic removes again every morning, which is how the
-   build-up `PITCH` had just required came to be cut from every briefing before
-   it was sent. These hold the pairs together.
-
-   Each one is silent when it breaks: the briefing still arrives, still reads
-   well, and is simply back to the thing he said was too hard to read.
+   `CRITIC` runs LAST, so a rule tightened for the writer and left out of the
+   critic is removed again every morning. Each pair breaks silently.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the writing rules are stated once and read by all three', () => {
-  /* ONE IDEA PER SENTENCE IS THE RULE THE REST OF IT RESTS ON, and this is what
-     holds it: everything here bounded word CHOICE and nothing bounded a
-     SENTENCE, so a message built entirely of plain words still read as hard and
-     no rule was being broken.
-
-     THEY WERE TWO COPIES HELD APART BY A TEST, which worked while there were
-     two readers. The night a move look sent three paragraphs there was a third
-     reader needed — and a third copy is where two agreeing and one drifting
-     starts. `WRITING` is the source; SYSTEM writes to it, CRITIC checks the
-     briefing against it, TRIM checks the short messages against it.
-
-     A reader that stops interpolating it is silent: it still has a prompt, the
-     message still arrives, and one of the three is simply working from an older
-     idea of how she writes. */
+  /* ONE IDEA PER SENTENCE IS THE RULE THE REST RESTS ON: word CHOICE bounded and
+     the SENTENCE not, a message of plain words still reads as hard. `WRITING`
+     is the one source — SYSTEM writes to it, CRITIC and TRIM check against it —
+     and a reader that stops interpolating it still has a prompt and still
+     sends, from an older idea of how she writes. */
   assert.match(EUGENIA_PROMPT, /export const WRITING = `/,
     'the writing rules are no longer stated in one place');
   for (const reader of ['SYSTEM', 'CRITIC', 'TRIM']) {
@@ -6701,11 +5400,9 @@ test('the number budget is stated to the writer and to the critic', () => {
 });
 
 test('the word count never outranks the teaching block, in either copy', () => {
-  /* A CEILING ON ITS OWN WAS TRIED HERE AND IT CUT THE TEACHING, every morning,
-     because the teaching block is the longest thing on the page. The count is
-     only safe while what to cut INSTEAD is stated beside it — so these two
-     belong to one decision and a copy holding the count alone reproduces the
-     failure the count was removed for. */
+  /* A CEILING ON ITS OWN CUTS THE TEACHING, the longest thing on the page. The
+     count is safe only beside what to cut INSTEAD, so a copy holding the count
+     alone reproduces that. */
   const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
   const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
   for (const [who, half] of [['writer', writer], ['critic', critic]]) {
@@ -6717,14 +5414,11 @@ test('the word count never outranks the teaching block, in either copy', () => {
 });
 
 test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
-  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, and it has to be said in both: the
-     critic is the half that decides a mechanism it can see inside one briefing
-     is a repetition. At `owns` the map says use it bare, and for this chain
-     that is wrong — it is under nearly every briefing, and a reader who has
-     lost it has lost all of them. */
-  // WHITESPACE-COLLAPSED, because this file is hard-wrapped at eighty columns by
-  // its own prose guard — a phrase is routinely split across two lines, and a
-  // reader that cannot see one would report a rule missing that is sitting there.
+  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, in both: the critic decides whether
+     a mechanism inside one briefing is a repetition, and this chain is under
+     nearly every briefing. */
+  // WHITESPACE-COLLAPSED: the prompt is hard-wrapped and a phrase splits across
+  // lines.
   const flat = at => EUGENIA_PROMPT.slice(...at).replace(/\s+/g, ' ');
   const cut = EUGENIA_PROMPT.indexOf('export const CRITIC');
   for (const [who, half] of [['writer', flat([0, cut])], ['critic', flat([cut])]]) {
@@ -6737,17 +5431,9 @@ test('the gold-against-real-yields chain is exempt from the rung, in both copies
 });
 
 test('no term is used bare, and the test is whether the name explains itself', () => {
-  /* THE RULE BANNED THE THING HE LIKED. It was "no coined shorthand — do not
-     invent a name and reuse it as though it were a term", and his own approved
-     draft leans on "the genuine part" three times. Read literally the prompt
-     forbade the register it was written to produce, which is the shape that
-     makes a rule get ignored rather than followed.
-
-     Self-describing is the distinction that was actually meant. "The leftover"
-     tells a reader nothing; "the genuine part" tells them everything. And the
-     case it really fails on is not an invented name at all — it is a MARKET
-     term used bare. "Oil has handed back most of the war premium" is four plain
-     words and one that does the whole damage. */
+  /* SELF-DESCRIBING, NOT UNCOINED. "No coined shorthand" forbade "the genuine
+     part", which is the register wanted; "the leftover" tells a reader nothing.
+     The real failure is a MARKET term used bare: "the war premium". */
   const flat = EUGENIA_PROMPT.replace(/\s+/g, ' ');
   assert.match(flat, /NO TERM USED BARE/,
     'a term may be used with no gloss again, which is what "war premium" was');
@@ -6763,16 +5449,9 @@ test('no term is used bare, and the test is whether the name explains itself', (
 });
 
 test('the rules carry a worked example, because no description of them worked', () => {
-  /* "USE THE PLAINEST AVAILABLE WORD" HAD BEEN IN THESE RULES FOR DAYS and the
-     briefing it produced said "dearer fuel lifts measured inflation twice
-     over". Meanwhile the countable rule beside it — twenty words, one idea —
-     landed at a hundred per cent on its first morning: zero sentences over the
-     cap, longest eighteen words, no asides.
-
-     That split is the whole reason this is here. A gate can count words. It
-     cannot adjudicate "is this the plainest word" against an adjective, and a
-     model matches an example where it ignores a description. It lives in
-     WRITING so the writer and both gates read the same one. */
+  /* A GATE CAN COUNT WORDS; IT CANNOT ADJUDICATE "THE PLAINEST WORD" against an
+     adjective, and a model matches an example where it ignores a description.
+     In WRITING, so the writer and both gates read the same one. */
   const at = EUGENIA_PROMPT.indexOf('export const WRITING = `');
   const body = EUGENIA_PROMPT.slice(at, EUGENIA_PROMPT.indexOf('`;', at));
   assert.match(body, /THIS IS THE STANDARD/,
@@ -6787,29 +5466,18 @@ test('the rules carry a worked example, because no description of them worked', 
 });
 
 /* ─── verify.sql is one statement, and diagnose.sql is where the rest went ────
-   A SQL editor shows the result of the LAST statement only. Ten listings under
-   the summary meant that running the file top to bottom displayed the last ten
-   HTTP responses and threw all 71 checks away — which is not hypothetical: it
-   happened, to the person who wrote the note at the bottom explaining it, and
-   then again to the person that note was written for.
-
-   Moving the summary to the END instead would have been worse. Three of those
-   listings can RAISE on a database missing what they read — `cron.job` without
-   pg_cron, `net._http_response` without pg_net, a public table never created —
-   and anything that raises takes every statement after it, so the summary would
-   vanish on exactly the databases it exists for. Two files is what lets both be
-   last in their own.
-
-   The regression is one appended `select`, and it is silent: the file still
-   runs, every check still passes, and the grid shows something else.
+   An editor shows the LAST statement's result only, so listings below the
+   summary throw every check away. The summary cannot go last instead: three
+   listings can RAISE (`cron.job`, `net._http_response`, a public table), and
+   a raise takes every statement after it. Two files, each last in its own.
+   The regression is one appended `select`, and it is silent.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('verify.sql runs exactly one statement, so the editor shows the checks', () => {
   const sql = readFileSync(new URL('../supabase/verify.sql', import.meta.url), 'utf8');
 
-  /* Comments first, then string literals — the order this file already learned
-     the hard way, since a `--` comment here routinely carries an apostrophe and
-     one unpaired quote desynchronises literal matching for everything after. */
+  /* Comments first, then strings: an apostrophe in a comment desynchronises
+     quote matching. */
   const bare = sql
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/--[^\n]*/g, '')
@@ -6834,17 +5502,9 @@ test('the listings still exist, in the file that can afford to raise', () => {
 });
 
 /* ─── One model per caller, and the map is keyed on a free-text label ────────
-   A week of `eugenia_runs` decided this: fourteen release looks cost more than
-   five briefings, and the move look is the most expensive single message she
-   sends. What moves to Sonnet is bounded work handed everything it needs; what
-   stays on Opus decides something open — the briefing, the nightly pass that
-   writes memory, the critic that is the last gate, the trade look that reaches
-   him mid-position, and the conversation.
-
-   THE MAP IS KEYED ON A STRING NOTHING CHECKS. A key no caller uses is a row
-   that silently never applies, and the caller then runs on the default, which
-   is the expensive one — correct output, quietly, at the price the change was
-   made to stop paying.
+   Measured cost decided it. THE MAP IS KEYED ON A STRING NOTHING CHECKS: a key
+   no caller uses silently never applies, and that caller runs on the default
+   — correct, at the price the change was made to stop paying.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every model the map names belongs to a caller that exists', () => {
@@ -6853,10 +5513,7 @@ test('every model the map names belongs to a caller that exists', () => {
         .map(m => m[1]),
     // The briefings are the one label built rather than written: `${due} briefing`.
     ...[...EUGENIA_TS.matchAll(/\$\{due\} briefing/g)].map(() => 'weekday briefing'),
-    // AND THE TWO THAT REACH ask() THROUGH gate(). The critic and the trim share
-    // one body, so their labels are arguments to it rather than literals beside
-    // an effort — invisible to the reader above, and a model row keyed on one of
-    // them would have read as naming nothing.
+    // AND THE TWO THAT REACH ask() THROUGH gate(), whose labels are arguments.
     ...[...EUGENIA_TS.matchAll(/gate\([\s\S]{0,200}?,\s*'([^']+)'(?:,\s*\w+)?\)/g)].map(m => m[1]),
   ]);
   assert.ok(labels.size >= 5,
@@ -6875,31 +5532,20 @@ test('every model the map names belongs to a caller that exists', () => {
 });
 
 test('no caller that runs a tool loop is on the cheaper model', () => {
-  /* THE RELEASE LOOK DIED AT MAX_ROUNDS ON ITS FIRST TWO FIRINGS AFTER MOVING.
-     Twice inside half an hour, and what reached him was the apology. Fourteen
-     turns on Opus in the measured week had never come near the cap.
-
-     The cap is higher now and that is NOT why they came back. What the two
-     failures establish is that the round budget on a tool-heavy caller is a
-     property of the MODEL rather than of the task — which nothing here had
-     measured and the change assumed. A cheaper caller that does not answer is
-     not cheaper.
-
-     `trim` is the exception and the distinction is the whole of why: it is
-     handed `CRITIC_TOOLS`, which is empty, so it makes one request with no loop
-     to run out of. That is the shape a cheaper model is safe on here.
-
-     A caller added to this map with a non-empty tool array would look exactly
-     like the last one did: correct in every test, cheaper on paper, and dead on
-     the morning a print lands. */
+  /* A TOOL-LOOPING CALLER STAYS ON THE DEFAULT. The release look on Sonnet died
+     at MAX_ROUNDS twice in half an hour; whether the model or the new
+     `record_actual` tool spent the rounds is confounded, and the policy needs
+     neither answer: a cheaper caller that does not answer is not cheaper.
+     `trim` is handed `CRITIC_TOOLS`, which is empty, so it has no loop to run
+     out of — the shape a cheaper model is safe on. A caller added with a
+     non-empty array looks correct in every test until the morning a print
+     lands. */
   const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
   const keyed = [...map.slice(0, map.indexOf('};')).matchAll(/'([^']+)':\s*SONNET/g)]
     .map(m => m[1]);
 
-  /* RESOLVED rather than looked for nearby, because a label reaches ask() two
-     ways: named beside its array, or handed to gate(), which supplies one for
-     it. A reader that only knew the first shape would have passed `trim` for
-     the wrong reason and would pass a tool-heavy caller wired the same way. */
+  /* RESOLVED, because a label reaches ask() two ways: beside its array, or
+     through gate(). */
   const arrayFor = (label) => {
     const direct = EUGENIA_TS.match(
       new RegExp(`ask\\([\\s\\S]{0,400}?'(?:high|medium|low)',\\s*'${label}',\\s*(\\w+)`));
@@ -6930,10 +5576,8 @@ test('the round cap is a backstop rather than a working limit', () => {
 });
 
 test('the critic is not among them, and that is the decision', () => {
-  /* IT IS THE ONE I EXPECTED TO MOVE. Sonnet saves about $3.50 a month on it —
-     and it runs LAST, it can rewrite, and it is the final gate on the exact
-     thing he spent two weeks saying read badly. A saving that small against
-     that risk is optimising because it is possible. */
+  /* THE CRITIC STAYS: about $3.50 a month saved, against the gate that runs
+     LAST, can rewrite, and judges the thing he said read badly. */
   const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
   const body = map.slice(0, map.indexOf('};'));
   for (const judging of ['critic', 'consolidation', 'reply', 'trade look', 'briefing']) {
@@ -6944,12 +5588,9 @@ test('the critic is not among them, and that is the decision', () => {
 });
 
 test('the refusal fallback rides only with the model it is proven on', () => {
-  /* NOT A RULE, CAUTION. `fallbacks` has carried the briefings since the
-     morning a decline cost one, on Opus. Whether the parameter is accepted on
-     Sonnet is not something anything here has established, and the failure if
-     it is not is a 400 on every call — three callers dark at once, all of them
-     scheduled. Both halves must be gated together: the header without the field
-     and the field without the header are each a 400 in their own right. */
+  /* CAUTION, NOT A RULE. Whether Sonnet accepts `fallbacks` is unestablished,
+     and a refusal would be a 400 on every call of three scheduled callers. The
+     header and the field are gated together, each a 400 alone. */
   const at = EUGENIA_TS.indexOf('async function call(');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n  if (!res.ok)', at));
   assert.match(body, /\.\.\.\(model === OPUS\s*\n?\s*\?\s*\{ "anthropic-beta": "server-side-fallback/,
@@ -6961,19 +5602,10 @@ test('the refusal fallback rides only with the model it is proven on', () => {
 });
 
 /* ─── A move with no cause under it is a price callout ───────────────────────
-   The move look sent him three paragraphs about gold being up 35.8 since the
-   roll, ending "I can't find what did this" and "I've filed it to check
-   tomorrow". It was obeying `MOVE` exactly: the prompt said an unexplained move
-   was worth telling him as that, and that open_loop was the right home for it.
-
-   Both halves were wrong and the file already knew why. Without a cause all
-   that is left is the price, which is on his screen in more detail than she can
-   give it — and the whole justification for this path is TEACHING what moved
-   gold, so no cause means nothing to teach. The loop is worse: nothing arrives
-   tomorrow to close a thread about a move that had no event under it, so it
-   rides into every briefing after it. That is the $13 and $17 case from the
-   thin hours, recurring at $35 because the gate was fixed and the prompt was
-   not.
+   Without a cause all that is left is the price, which is on his screen in
+   more detail, and this path exists to TEACH what moved gold. An open loop is
+   worse: nothing arrives to close a thread about a move with no event under
+   it, so it rides into every briefing after.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('an unexplained move is silence, and opens no thread', () => {
@@ -6988,50 +5620,30 @@ test('an unexplained move is silence, and opens no thread', () => {
     'the move look may open a thread about a move with no event under it — ' +
     'nothing will ever close it, so it rides into every briefing after it');
 
-  // AND THE LENGTH PERMISSION IS GONE. "Take the extra sentence or two that
-  // needs" was the only length signal on this path and it pointed the wrong
-  // way, at the end of the prompt, which is the last thing she reads.
+  // AND THE LENGTH PERMISSION IS GONE: it pointed the wrong way, last thing she
+  // read.
   assert.doesNotMatch(flat, /extra sentence or two/,
     'MOVE ends by inviting a longer message again, which is the one length ' +
     'instruction on a path the critic did not reach');
 });
 
-/* ─── The gate reaches the messages the critic never did ─────────────────────
-   `CRITIC` ran on the briefing ALONE. The pulse, the release look and the move
-   look went out unreviewed for their whole lives — which is most of what he
-   receives in a week, and it is where he was reading her and finding her hard.
-   The writing rules were live and global on those paths; nothing had to answer
-   for them.
+/* ─── The gate reaches every message she composes ────────────────────────────
+   The pulse, the release look and the move look are most of what he receives,
+   and the writing rules had to answer for them too.
 
-   THE TRADE EVENT STAYS OUT, AND THE REASON ON RECORD FOR IT WAS WRONG. It
-   said there was no composed prose to trim, which is false: both branches
-   decide WHETHER TO SPEAK from data before any model call, and then the one
-   that speaks calls `ask` with history, notes and two tools and writes two
-   sentences. The half that is true is about the decision, not about the prose.
-
-   What actually exempts it is that TRIM REWRITES, and this is the one message
-   where a rewrite can do harm and has almost nothing to improve. It reaches a
-   man who is in a position or has just breached his day, and the one thing
-   that must never happen there is a sentence that reads as an instruction — a
-   gate paraphrasing a citation of his rule is how one becomes an order. That
-   is the shape already learned once, when a gate that had not been told the
-   no-direction rule could hand back a message breaking it. TRADE_EVENT is also
-   the most constrained prompt in the file, so almost nothing TRIM checks is
-   reachable inside two sentences.
+   THE TRADE EVENT STAYS OUT, because TRIM REWRITES. It reaches a man in a
+   position or past his day, where a gate paraphrasing a citation of his rule
+   is how a sentence becomes an order. Both branches decide whether to speak
+   before any model call, and TRADE_EVENT is the most constrained prompt in the
+   file — almost nothing TRIM checks is reachable in two sentences.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* THE CENSUS, AND IT EXISTS BECAUSE EVERY OTHER CHECK HERE IS VERTICAL. They
-   ask whether a name exists, whether two copies agree, whether an output
-   drifted — one fact each, verified deeply. The fault they cannot see is
-   HORIZONTAL: six paths that should do comparable things, one of them missing a
-   step. That is invisible to every check in this file taken one at a time, and
-   it stayed invisible twice — the gate reached three paths and not the reply,
-   and the three that gained a gate kept storing the draft.
-
-   So the table is derived from the source and compared with a declaration.
-   A new path that sends him something makes the derived set grow, and the test
-   fails until someone writes down what gate it runs and what it carries. An
-   exemption is a row with a reason in it, never an absence. */
+/* THE CENSUS, BECAUSE EVERY OTHER CHECK HERE IS VERTICAL — one fact each,
+   deeply. The HORIZONTAL fault is six paths that should do comparable things,
+   one missing a step. So the table is derived from the source and compared
+   with a declaration: a new path that sends fails until someone writes down
+   its gate and what it carries. An exemption is a row with a reason in it,
+   never an absence. */
 const SENDS = {
   postBriefing:   { gate: 'critique', carries: 'brief' },
   postSpeak:      { gate: null,       carries: 'turn.content',
@@ -7100,18 +5712,15 @@ test('every censused path gates, speaks and stores the same one text', () => {
 });
 
 test('the two gates share the half that makes a gate safe', () => {
-  /* A revision that fails `keepDraft` is overruled, and a gate that THROWS
-     costs nothing. Both are the same for either gate and both were about to be
-     copied — and a copy of the catch is where one gate loses the message it was
-     checking, on the day a vendor is slow. */
+  /* ONE GATE: a revision failing `keepDraft` is overruled, and a gate that THROWS
+     costs nothing. A copied catch is where one gate loses its message on the day
+     a vendor is slow. */
   const at = EUGENIA_TS.indexOf('async function gate(');
   assert.ok(at > -1, 'the shared gate body is gone, so each gate holds its own copy');
   const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at));
 
-  /* THE FIRST RETURN IN EACH BRANCH, NOT THE RETURN WITHIN SOME CHARACTERS. A
-     window of two hundred passed while each branch was a line long and failed
-     the day the verdict row went in front of the return — the branch still
-     returned the draft, and the check had been measuring its length. */
+  /* THE FIRST RETURN IN EACH BRANCH, not a character window, which measures the
+     branch's length. */
   const firstReturn = (from) => {
     const i = body.indexOf(from);
     return i < 0 ? null : (body.slice(i).match(/return [^;]+;/) ?? [])[0];
@@ -7125,14 +5734,10 @@ test('the two gates share the half that makes a gate safe', () => {
 });
 
 /* ─── And what the gate decided is a row ─────────────────────────────────────
-   The first three days with a gate on every path showed the paragraph rule
-   broken in nearly every message that passed through one, and nothing could
-   say why: `ask` records that the gate RAN, and whether it then sent its
-   revision, sent the draft back untouched, or was overruled went to a console
-   line. Those are three different repairs. One verdict per gated message on
-   every outcome, so the rows count the messages — bounded at the previous
-   `return`, the heartbeat test's reason: a path may only be credited with its
-   own mark, never with the one above it. */
+   Revised, unchanged and overruled are three different repairs, and `ask`
+   records only that the gate RAN. One verdict per gated message on every
+   outcome, each bounded at the previous `return`: a path is credited only with
+   its own mark. */
 
 test('every message a gate decides leaves one verdict row, on all three outcomes', () => {
   const at = EUGENIA_TS.indexOf('async function gate(');
@@ -7158,33 +5763,24 @@ test('every message a gate decides leaves one verdict row, on all three outcomes
 });
 
 test('keepDraft is relative, because it now reads three-sentence messages', () => {
-  /* IT WAS A FLAT FOUR HUNDRED CHARACTERS, which is a briefing's floor: shorter
-     than that and the thing that came back was an apology. A release look is two
-     or three sentences and often under four hundred to begin with, so that floor
-     overrules every revision there is — and a gate overruled every time looks
-     exactly like a gate that agreed with the draft. */
+  /* NO FLAT FLOOR: a release look is often under four hundred characters, and a
+     gate overruled every time looks exactly like one that agreed. */
   assert.doesNotMatch(EUGENIA_TS, /CRITIC_FLOOR/,
     'the absolute floor is back, so the gate on the short paths is paid for and ' +
     'overruled on every message it ever checks');
   assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
     'keepDraft no longer scales with the draft it is judging');
-  /* AND TRIM'S CEILING IS ITS OWN. Held at the call, because keepDraft is pure
-     and driven in fold.test.mjs, and a trim that stops passing it falls back to
-     twice the draft — the ceiling its own notes once got through under. */
+  /* AND TRIM'S CEILING IS ITS OWN, held at the call: without it the fallback is
+     twice the draft. */
   const at = EUGENIA_TS.indexOf('async function trim(');
   assert.match(EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}', at)), /'trim', TRIM_MOST\)/,
     'TRIM is judged by the critic\'s ceiling again, so its notes on a message can reach him with it');
 });
 
-/* ─── Which model ran, which the log line said and the row did not ───────────
-   `rounds` has been written since this table existed and `fell_back` records
-   only a decline, so "how many rounds does THIS model need on THIS caller" had
-   no answer here. The day a tool-heavy caller changed model it ran out of
-   rounds twice in half an hour, and nothing could compare the two.
-
-   The column existing is the half a schema check can see. The half it cannot is
-   NOTHING WRITING IT: every row still lands, the meter still looks healthy, and
-   the column reads null for ever — answerable-looking and unanswerable.
+/* ─── Which model ran ────────────────────────────────────────────────────────
+   "How many rounds does THIS model need on THIS caller" needs the model on the
+   row. A schema check sees the column; the half it cannot see is NOTHING
+   WRITING IT — every row lands and the column reads null for ever.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every run row records the model that answered it', () => {
@@ -7205,12 +5801,10 @@ test('every run row records the model that answered it', () => {
 });
 
 /* ─── A swipe-reply, looked up the way each message was stored ───────────────
-   Every message but the briefing is stored after it is sent, so its turn is the
-   first one after the voice note; the briefing is stored before, so its turn is
-   behind it. Both lookups are pure and driven in fold.test.mjs — and the pure
-   half passing proves nothing about the call, which is what this reads: the
-   backward look reached only when the forward one finds nothing, since asked
-   first it names the briefing under a reply to the answer that followed it.
+   Every message but the briefing is stored after it is sent, so its turn is
+   the first after the voice note; the briefing is stored before. The backward
+   look runs only when the forward one finds nothing — asked first, it names
+   the briefing under a reply to the answer that followed it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('a swipe-reply looks forward first and back for the briefing only after', () => {
@@ -7226,12 +5820,9 @@ test('a swipe-reply looks forward first and back for the briefing only after', (
 });
 
 /* ─── The short-message gate reads replies too ───────────────────────────────
-   TRIM was written for the messages she starts and told every message it reads
-   that it is two or three sentences. Then the reply joined its callers, and the
-   reply path tells her its length is whatever the answer needs — a plan checked
-   against his rules can run to nine findings. `keepDraft` only refuses a
-   revision under a third of the draft, so a gate cutting a reply to its last
-   three sentences was accepted. The rule names whose length it is. */
+   A reply's length is whatever the answer needs, and `keepDraft` only refuses
+   a revision under a third of the draft — so TRIM is told whose length the
+   three-sentence rule is, or it cuts a nine-finding plan check to three. */
 
 test('the short-message gate does not hold a reply to two or three sentences', () => {
   const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
@@ -7243,9 +5834,7 @@ test('the short-message gate does not hold a reply to two or three sentences', (
 });
 
 /* ─── The trade look is told what happened, not a state that may be false ────
-   It fires on an open and on a close, and it told her on both that he was in a
-   position while reading it. On a close that took his day past R-11 he may hold
-   nothing at all, and she is told so beside the situation she is describing. */
+   On a close that took his day past R-11 he may hold nothing at all. */
 
 test('the trade look does not tell her he is in a position on a close', () => {
   const body = EUGENIA_PROMPT.match(/export const TRADE_EVENT = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');

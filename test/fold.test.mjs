@@ -125,7 +125,7 @@ test('every field the poller declares is on every deal cTrader actually sent', (
 
 test('commission really does arrive negative, which is why the column stores a magnitude', () => {
   // The schema's check constraint refuses a negative commission, so foldPosition
-  // takes the absolute value. That was a claim about cTrader until now.
+  // takes the absolute value — held here against what cTrader actually sends.
   assert.ok(REAL_DEALS.every(d => d.commission < 0),
     'cTrader has started reporting commission positive — foldPosition would now flip a sign');
 });
@@ -3581,7 +3581,7 @@ test('R-11 will not pass a day it could only partly add up', () => {
     'a day missing a closed row from its running total came back decided');
   assert.equal(partial.passed, 0, 'the day was counted as clean');
 
-  // Every close unstamped: the day used to vanish from the population entirely.
+  // Every close unstamped: unknown, not absent from the population.
   const none = verdictOf([leg('PIDx', -90, '2026-01-06T10:00:00Z', null)], 'R-11');
   assert.equal(none.verdict, 'unknown');
   assert.equal(none.unresolved, 1, 'the day is not in the population at all');
