@@ -564,8 +564,7 @@ async function setChannel(channel: unknown, state: unknown, evidence: unknown): 
     }
     return `${id} is now ${to}.`;
   } catch (err) {
-    console.error("doji-eugenia: channel not moved —",
-      why(err));
+    console.error("doji-eugenia: channel not moved —", why(err));
     return "That did not save. Carry on and do not mention it.";
   }
 }
@@ -2218,6 +2217,8 @@ type Release = {
   looked_at?: string | null; ticker?: string | null;
 };
 
+// The columns every calendar read asks for; the spine adds the two optional ones.
+const RELEASE_COLUMNS = "id,at,name,importance,consensus,prior,actual,note";
 
 /* Read earliest first, so a day too heavy for the bound loses the
    furthest-ahead rows, which tomorrow's briefing reads anyway. A full read
@@ -2228,7 +2229,7 @@ async function readCalendar(now = Date.now()): Promise<Release[]> {
   const from = new Date(now - CAL_BACK * 3600_000).toISOString();
   const to   = new Date(now + CAL_AHEAD * 3600_000).toISOString();
   return readRows<Release>('Calendar',
-    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
     `&at=gte.${from}&at=lte.${to}&order=at.asc&limit=${CAL_ROWS}`);
 }
 
@@ -2288,7 +2289,7 @@ export async function calendarBlock(): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 export function weekQuery(now: number): string {
   const to = new Date(now + 7 * 86_400_000).toISOString();
-  return `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+  return `eugenia_calendar?select=${RELEASE_COLUMNS}` +
          `&importance=eq.${HIGH}&at=gte.${new Date(now).toISOString()}&at=lte.${to}` +
          `&order=at.asc&limit=40`;
 }
@@ -2697,8 +2698,7 @@ async function briefedToday(): Promise<boolean> {
       briefedQuery());
     return !!latest && nyDate(new Date(latest.created_at)) === nyDate(new Date());
   } catch (err) {
-    console.error("doji-eugenia: could not check for today's briefing —",
-      why(err));
+    console.error("doji-eugenia: could not check for today's briefing —", why(err));
     return true;
   }
 }
@@ -2927,8 +2927,7 @@ async function consolidatedToday(): Promise<boolean> {
       `&order=id.desc&limit=1`);
     return !!latest && nyDate(new Date(latest.at)) === nyDate(new Date());
   } catch (err) {
-    console.error("doji-eugenia: could not check for tonight's pass —",
-      why(err));
+    console.error("doji-eugenia: could not check for tonight's pass —", why(err));
     return true;
   }
 }
@@ -3075,7 +3074,7 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
   // looked_at is read, not filtered on: a filter would hide the mark that makes
   // the rest of the group skippable.
   const rows = await readRows<Release>('Release',
-    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note,looked_at,ticker` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS},looked_at,ticker` +
     `&importance=eq.high` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
     `&order=at.asc&limit=${RELEASE_ROWS}`);
@@ -3207,7 +3206,7 @@ const PENDING_AHEAD_H = 8;
 async function aheadToday(now = Date.now()): Promise<Release[]> {
   const to = new Date(now + PENDING_AHEAD_H * 3600_000).toISOString();
   return readRows<Release>('Calendar',
-    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
     `&importance=eq.high&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
     `&order=at.asc&limit=5`);
 }
@@ -3359,7 +3358,7 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
   const [row] = await readRows<Release>('Calendar',
-    `eugenia_calendar?select=id,at,name,importance,consensus,prior,actual,note` +
+    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
     `&importance=eq.high&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
     `&order=at.desc&limit=1`);
   return row ?? null;
@@ -3618,8 +3617,7 @@ async function handleMessage(update: any): Promise<void> {
         ]);
         await say(notesList(told, noticed, channels, loops, story, promised));
       } catch (err) {
-        console.error("doji-eugenia: notes unavailable —",
-          why(err));
+        console.error("doji-eugenia: notes unavailable —", why(err));
         await say("I cannot read my notes just now, jefe.");
       }
       return;
