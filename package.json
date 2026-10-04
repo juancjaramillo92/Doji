@@ -8,7 +8,7 @@
     "test:db": "node --test test/db/*.test.mjs"
   },
   "devDependencies": {
-    "jsdom": "^30.0.1",
+    "jsdom": "^30.1.1",
     "typescript": "^7.0.2"
   }
 }
