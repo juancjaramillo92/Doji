@@ -367,7 +367,7 @@ single-sourced at run time:
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `schema.sql` |
 | each **sense's query flag** | the cron job's URL in `schema.sql` and the branch in `postScheduled` — held in both directions, so a rename and a sense with no job both fail |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
-| the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case |
+| the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **columns of `eugenia_price`** | the table and what `markPrice` PATCHes |
@@ -397,10 +397,11 @@ update and delete and grants back update on exactly five columns —
 `Data.OWNED`'s four and `deleted`. The threat it stops is a client already
 holding the session token, a narrow one; it is done because the test above made
 it cheap. `updated_at` needs no grant: column privileges are checked against the
-SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`. Run on a
-throwaway Postgres 16 with this table and the grants verbatim: a journal save as
-`authenticated` succeeds and moves `updated_at`; a write to `net_pnl`, an insert
-and a hard delete are refused; soft delete and undo pass.
+SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`.
+`test/db/schema.test.mjs` runs it: a journal save as `authenticated` succeeds
+and moves `updated_at`; a write to `net_pnl`, an insert and a hard delete are
+refused; soft delete and undo pass; another owner's row is neither read nor
+written.
 
 ---
 
@@ -2507,16 +2508,17 @@ does**: a paste cut partway fails as `unterminated dollar-quoted string`, which
 reads like a fault in the file.
 
 **Applied by hand, `schema.sql` is a claim, and `supabase/verify.sql` tests it.**
-It writes nothing; run it after any manual change. CI cannot stand in for it —
-the schema needs `pg_net`, `vault` and `pg_cron`, which a plain Postgres
-container lacks.
+It writes nothing; run it after any manual change. CI runs it too, against a
+fresh build behind stand-ins, which proves the two files agree — only a run in
+the SQL editor proves the live database does.
 
 **`schema.sql` is the whole database, and it is applied by running all of it
 again.** Every statement is `if not exists`, `or replace`, `on conflict do
 nothing` or guarded by a check, so a fresh project and the live one both end up
 matching the file, and a change is an edit to the file followed by a re-run.
-`agree.test.mjs` holds that shape; a run against a throwaway Postgres holding
-`pg_net`, `vault` and `pg_cron` stubs is what proves an edit to it. Two
+`agree.test.mjs` holds that shape, and `npm run test:db` proves it: a second
+run changes nothing, and run over main's copy the file leaves what a fresh apply
+leaves. Two
 constraints come from Postgres itself: `create or replace view` may only append
 a column, so the view's list is in the order columns were added, and `create or
 replace function` cannot change an argument list or a return type — either needs
@@ -2592,6 +2594,7 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
 ```sh
 npm ci               # once — jsdom and typescript, and nothing else
 npm test
+npm run test:db      # schema.sql on a real Postgres — see below
 ```
 
 Node 22.22.2 or newer — jsdom's floor — stated in `package.json`'s `engines` and
@@ -2606,7 +2609,17 @@ Edge Functions and of the app's inline script.
 green is the tree everyone gets — and the same suite gates the function deploy.
 The suites run on every push through `.github/workflows/test.yml`. The script
 globs `test/*.test.mjs` one level deep, so a test in a subfolder would silently
-not run.
+not run — `test/db` is the one subfolder, on purpose, with its own command and
+its own CI job, and `agree.test.mjs` holds that both still name it.
+
+**`npm run test:db` needs a Postgres 16 server with pgvector**, named by the
+standard `PG*` variables and reached as a superuser, so `npm test` keeps needing
+Node alone. It builds a throwaway database from `test/db/supabase.sql` — stand-ins
+for `auth`, `vault`, `pg_net`, `pg_cron` and the API roles, which record rather
+than send — and `schema.sql`. Text cannot see what it sees: Postgres resolves a
+PL/pgSQL body only on its first call, inside the write that fired it, so a
+one-letter typo in a trigger passes every other suite and fails every insert.
+In CI, the job starts the runner's own Postgres and installs pgvector.
 
 **Every `uses:` in the workflows names a commit, never a tag.** A tag can be
 repointed between runs, so the action audited is not the action that runs;
@@ -2629,6 +2642,8 @@ home-screen shortcut and every bookmark open `/`.
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
+| `test/db/schema.test.mjs` | `schema.sql` applied to a real Postgres: a re-run changes nothing, and run over main's copy it leaves what a fresh apply leaves; `verify.sql` passes against what it builds; the trades triggers fire on what they should and nothing else, and a missing secret costs the message, never the write; the app's grants and RLS; the calendar's clock; both watchers driven from planted rows; her search by words, spelling and vector; every scheduled job's command run once; and a census that every PL/pgSQL function was driven |
+| `test/db/supabase.sql` | the stand-ins: what Supabase provides, as far as `schema.sql` reaches it |
 | `supabase/verify.sql` | not a suite: run by hand against the live database, one statement, one row per fact. Nothing in it may raise on a wrong database — functions are asked by oid, tables through `query_to_xml` |
 
 **What is not covered.** Pixels — correct HTML under broken CSS passes. Realtime
@@ -2636,9 +2651,8 @@ and the auth server, since Supabase is a stand-in. What SheetJS writes from the
 rows it is handed. Anything whose first line is the network — the MCP transport,
 the upserts, the Telegram sends, the model call — is tested for what it decides,
 not what it sends; where the decision lives in such a function, `agree.test.mjs`
-reads its source. Gmail itself, behind the Apps Script stubs. The triggers'
-`WHEN` clauses, argued against the column types rather than executed, since
-nothing here runs Postgres. `IO.backup` is plain JSON and is not tested.
+reads its source. Gmail itself, behind the Apps Script stubs. What Supabase's own
+`pg_net`, `pg_cron` and Vault do, behind `test/db`'s stand-ins. `IO.backup` is plain JSON and is not tested.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and

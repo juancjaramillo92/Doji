@@ -4,7 +4,8 @@
   "type": "module",
   "engines": { "node": ">=22.22.2" },
   "scripts": {
-    "test": "node --experimental-strip-types --test test/*.test.mjs"
+    "test": "node --experimental-strip-types --test test/*.test.mjs",
+    "test:db": "node --test test/db/*.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^30.0.1",

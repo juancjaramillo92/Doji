@@ -102,7 +102,8 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 692 tests, six suites
+npm test      # 694 tests, six suites
+npm run test:db   # schema.sql on a real Postgres 16 with pgvector, as a superuser
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced
@@ -310,7 +311,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   an assistant turn; nothing may depend on `HISTORY` being even.
 - **`TradeRow` is a copy of the view's column list**, held by a test. A summary
   inherits the detailed read's guarantees: `journalStats` counts `settled` and
-  `fellBack`. `journal.ts` is a copy of `index.html`'s arithmetic, held by shape.
+  `fellBack`. `journal.ts` is a copy of `index.html`'s arithmetic, held by shape and by
+  running both over the same rows.
 - **`tradesQuery` and `writeNote` are boundaries**: clamp and truncate, never
   throw mid-turn.
 
@@ -453,9 +455,9 @@ is tested, and a refused read throws rather than backing up a blank.
   `drop` into it**: a re-run repeats it on the live database; a drop that is
   needed is run by hand, once. `create or replace view` may only append a
   column, and `create or replace function` may not change a return type or an
-  argument list. Prove an edit by replay against a local Postgres 16 with
-  pgvector and stubs for `auth`, `vault`, `net` and `cron`: the old file and the
-  new must dump identically, fresh and re-run over each other.
+  argument list. `npm run test:db` proves an edit: fresh, re-run, and run over
+  main's copy must dump identically. A new PL/pgSQL function needs a test that
+  calls it, or the suite's census goes red.
 - **The file is a claim; `verify.sql` tests it.** It is ONE statement, because a
   SQL editor shows only the last statement's result; `agree.test.mjs` counts its
   semicolons. The listings are `diagnose.sql`, whose header count is also held.
@@ -482,9 +484,8 @@ is tested, and a refused read throws rather than backing up a blank.
   settling its rows.
 - **`pace_line` speaks before the failure.** Its first hour is derived from
   `retryDue`; it is said once per run; the row is written only where the post
-  was made. The ceiling is the 400s paid wall clock, stated once. Replay it
-  against a local Postgres (`/usr/lib/postgresql/16/bin`, stubs for `vault` and
-  `net`) after any change — `agree.test.mjs` reads its shape and cannot run it.
+  was made. The ceiling is the 400s paid wall clock, stated once.
+  `test/db` drives it from planted rows; `agree.test.mjs` reads its shape.
 - **No SQL file reads into a variable with `select … into`**; use
   `x := (select …)`. When the editor refuses a file, read what it actually received
   first — a truncated paste reads as a broken file.

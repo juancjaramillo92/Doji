@@ -95,10 +95,9 @@ breakpoint, so "what else differs between these two calls" is the question, not
 "what did I change".
 
 ### R-9 — a database test in `npm test`
-**Why refused:** `npm ci` installs jsdom and nothing else. The one assertion that
-wanted a database — whether a BEFORE trigger's write needs a column grant — was
-answered on a throwaway Postgres and written down instead.
-**Revisit if:** a second and third such question appear.
+**Why refused:** `npm test` needs Node alone, and `npm ci` installs jsdom and
+typescript and nothing else. The database has its own suite, `npm run test:db`,
+and its own CI job; folding it in would make every run need a server.
 
 ### R-11 — folding the New York clock into one definition
 **Why refused:** the nine copies are FIVE questions, not nine answers to one.
@@ -161,10 +160,8 @@ every one of which would have to learn to read a directory. That is days of
 careful work on the checks themselves, which is the worst thing to be editing
 for a reason that is not about what they check.
 
-**Revisit if:** the file gains a second subject — something that is not Eugenia
-answering, remembering or being scheduled — or a second function needs one of
-its blocks. Not on length alone. And if it ever happens, the entry point stays
-where it is, guarded, for the reason `CLAUDE.md` gives.
+**Not revisited:** the owner settled it in October 2026, on length or any
+other ground.
 
 ### R-17 — bounding the lexical arm of `eugenia_search`
 **Why refused:** it was proposed on a reading of the query and the reading was
@@ -254,23 +251,27 @@ step these would take *Raptor 3*; the repository stands at 2.5: audited, slimmed
 its SQL one file, both watchers sending through `tell_him`. Let 2.5 run live
 before starting any of them.
 
-- **The CSS.** About 1,500 lines of `index.html`, the largest block nothing has
-  simplified, and the one lever left that need not change behaviour. No test
-  sees a pixel (§1): the golden snapshot holds the markup, not how it looks, so
-  each step is a device pass by a person, screen by screen.
 - **One rules module for the app and Eugenia.** `journal.ts` copies the app's
-  break-even band, sessions and three P&L rules — about 60 lines, held by one
-  test. Sharing a file saves roughly 110 lines net, but the app's script cannot
-  import a module before it runs, so it changes how the app boots, and with it
-  `boot.mjs`, the type check and the golden snapshot. Worth it only if the copies
-  start to drift. Her win rate differs on purpose — null when nothing is
-  decided, and rounded — and a shared module keeps that difference.
+  break-even band, sessions and three P&L rules — about 60 lines, held by two
+  tests: one reads the copies, the other runs both over the same rows. Sharing
+  a file saves roughly 110 lines net, but the app's script is a classic one and
+  cannot import, so it changes how the app boots, and with it `boot.mjs`, the
+  type check and the golden snapshot. And it trades a drift CI catches before a
+  deploy for one it cannot: two deployed files, a fresh page beside a cached
+  module, disagreeing on his phone. Worth it only if the copies start to drift.
+  Her win rate differs on purpose — null when nothing is decided, and rounded —
+  and a shared module keeps that difference.
 - **The moves in §2.** Each changes behaviour or breaks a rule `CLAUDE.md`
   states. Reopen one at a time, with an answer to its reasoning and the owner's
   sign-off.
 
 Looked at in the same pass and NOT on this list:
 
+- **The CSS.** About 1,500 lines of `index.html`, worked over while the journal
+  was built: every colour is a token on `:root`, and no class is declared that
+  the markup and script do not name. What repeats is a one-line rule beside
+  each component, which grouping would move away from it. No test sees a pixel
+  (§1), so any pass is a device check by a person for a saving nobody needs.
 - **One cron job for both watchers.** pg_cron runs a job's statements in one
   transaction, so a raise in one watcher would roll back the other's report.
 - **Cutting a part of Eugenia.** Every optional secret is set, so nothing of hers
