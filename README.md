@@ -439,9 +439,19 @@ control over any of them could only lie. The trade log is where they are read.
 is set at once; undo clears it. The window forgives the reflex, it does not hold
 the delete back.
 
-**Everything that exists nowhere else is backed up daily, from outside the
-browser.** `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`,
-reads nine tables into one JSON artifact: `trades`, whose journal columns only
+**Two backups, for two different losses.** Neither is in the app.
+
+**Supabase snapshots the whole database daily**, and the Pro plan keeps the last
+seven, under Database → Backups in the dashboard. A snapshot is every table,
+Vault included, and Doji keeps nothing in Storage, so it is everything there is.
+It is the repair for a database that is gone or broken: a restore returns the
+whole project to that day, and everything written since — trades, answers, her
+memory — goes with it. Point-in-time recovery between snapshots is a paid
+add-on.
+
+**A copy of what exists nowhere else is taken daily, outside Supabase.**
+`scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
+nine tables into one JSON artifact: `trades`, whose journal columns only
 you can supply, and the eight of hers with no other source — the channel map,
 notes, turns, thesis, open loops, calendar, feedback, and every stop and target a
 position carried. `trades` goes whole, the soft-deleted rows included: a restore
@@ -455,8 +465,11 @@ running. **The paging is the load-bearing part.** PostgREST caps a response at
 its own `max-rows`, so one read of `eugenia_turns` returns a page that looks
 exactly like a complete archive. The walk stops on a short page, not a count it
 was told, and the job refuses to upload a document whose `trades` is empty.
-Artifacts expire after ninety days, so download one occasionally, or run it by
-hand:
+It is the repair the snapshots cannot make: ninety days rather than seven, so a
+mistake found in the second week can still be undone; one table at a time,
+so the journal comes back without rolling back her memory; and in another
+company's keeping, if the Supabase account itself is lost. Artifacts expire
+after ninety days, so download one occasionally, or run it by hand:
 
 ```sh
 SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup.mjs > backup.json
@@ -2692,8 +2705,9 @@ home-screen shortcut and every bookmark open `/`.
 and the auth server, since Supabase is a stand-in. Anything whose first line is the network — the MCP transport,
 the upserts, the Telegram sends, the model call — is tested for what it decides,
 and through the doors `serve.test.mjs` drives, for what it sends; where a
-decision lives deeper than a test can reach, `agree.test.mjs` reads its source. Gmail itself, behind the Apps Script stubs. What Supabase's own
-`pg_net`, `pg_cron` and Vault do, behind `test/db`'s stand-ins.
+decision lives deeper than a test can reach, `agree.test.mjs` reads its source.
+Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
+`pg_cron` and Vault do, behind `test/db`'s stand-ins.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and

@@ -431,8 +431,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 
 ## The journal and her memory are backed up from outside the browser
 
-`scripts/backup.mjs`, run daily by `.github/workflows/backup.yml`; the app has no
-backup of its own.
+`scripts/backup.mjs`, run daily by `.github/workflows/backup.yml`, beside
+Supabase's own daily snapshots, which roll back the whole project; the README
+says which repair each makes. The app has no backup of its own.
 The paging is the part to be careful with: PostgREST caps a response at its own
 `max-rows`, so one read returns a page that looks like a complete archive. The
 walk stops on a short page, `readAll` takes its `fetch` as an argument so the loop
