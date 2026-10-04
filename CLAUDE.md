@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 694 tests, six suites
+npm test      # 697 tests, six suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -129,7 +129,11 @@ what each suite covers.
   Regenerate with `GOLDEN=write npm test` only in the commit that changes
   behaviour, with the reason in the message. Its fixtures earn their place by
   mutation; the pair entered and closed in opposite orders is the one to keep in
-  mind. It sweeps `Dates.session` around all four DST changeovers.
+  mind. It sweeps `Dates.session` around all four DST changeovers. The same
+  rules hold `golden-fold.json`: what the poller, the email path, the calendar
+  fold and Eugenia's rules and stats make of the real captures, with the poller's
+  two windows applied as it applies them — fold every position in a capture and
+  the closing half of an earlier trade reads as an open one.
 - **Two branches of `session()` decide nothing, and a test says so.** London, New
   York and an Asian centre are never open together, and Sydney is never open with
   London without Tokyo, so `MARKETS.sydney` cannot change what `session()`

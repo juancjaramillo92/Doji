@@ -4,7 +4,7 @@
 REGISTER: every move considered and turned down, with the reasoning that decided
 it, so a tempting one is not re-proposed and eventually waved through on a tired
 afternoon. A refusal has no code to attach itself to, which is why it needs a
-document. Read §2 before proposing a simplification; §4 is the next step, and
+document. Read §2 before proposing a simplification; §3 is the next step, and
 says what is pending.
 
 Where it disagrees with the README, the README wins and you say so.
@@ -233,24 +233,7 @@ whether an index can serve it, and that is a measurement rather than a reading.
 
 ---
 
-## 3 · WHAT IS STILL OPEN
-
-None of which blocks anything:
-
-- **Pure-logic goldens.** `Dates.session` has one. `foldPosition`, the email
-  parser and `adherence.ts` are covered by `fold.test.mjs` and by nothing that
-  would notice an unnamed output changing shape.
-- **Doc coverage, code to doc.** The maintenance doors are held by a test and
-  the doc-to-code direction has been run; whether every feature has a paragraph
-  has not.
-- **Section placement.** Never swept. The comment register was swept once, in
-  the pass that cut every comment to its *why* and proved each file
-  token-identical afterwards; placement is the judgment half that pass left.
-
-
----
-
-## 4 · THE NEXT STEP — DECIDED
+## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,
 after 2.5 had run live, and nothing in it is deferred. Each item below is
@@ -277,6 +260,10 @@ the answer is this section: nothing, until one of those conditions is met.
 
 Looked at in the same pass and NOT on this list:
 
+- **Section placement** — whether each function sits under the right banner in
+  `index.html` and `doji-eugenia/index.ts`. No test can judge it, and a sweep is
+  churn in two four-thousand-line files, with load order at stake in the first,
+  for readability alone. A block is placed when it is next touched.
 - **The CSS.** About 1,500 lines of `index.html`, worked over while the journal
   was built: every colour is a token on `:root`, and no class is declared that
   the markup and script do not name. What repeats is a one-line rule beside
