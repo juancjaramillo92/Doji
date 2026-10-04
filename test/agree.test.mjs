@@ -2507,9 +2507,9 @@ const UNMARKED = {
 /* ─── Both silent writers leave a mark, on both paths ────────────────────────
    `sync_health` is worth exactly as much as its call sites: missing from the
    success path a healthy writer reads as dead, missing from the failure path
-   it is the original silence with a table beside it. Read structurally — no
-   Edge handler can be driven here, and the calls sit at the end of long
-   functions where a later edit walks past them.
+   it is the original silence with a table beside it. Read structurally, since
+   serve.test.mjs drives only the paths a stub can reach, and the calls sit at
+   the end of long functions where a later edit walks past them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the two writers with no voice record both outcomes', () => {

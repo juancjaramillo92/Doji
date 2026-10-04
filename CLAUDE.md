@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 700 tests, six suites
+npm test      # 710 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -221,7 +221,9 @@ what could not be verified.
   lists, and both lists in `trades_telegram_on_answer`, against each other.
 - **`callback_data` stays under 64 bytes**: it is the entire state a tap needs.
 - **`Deno.serve` is guarded so a test can import the module without serving**,
-  which is also why shared primitives live in `_shared/edge.ts`.
+  which is also why shared primitives live in `_shared/edge.ts`. `serve.test.mjs`
+  hands the guard a stub that keeps the handler, in its own process because
+  `edge.ts` reads its environment once, at first import.
 - **Do not extract the entry point.** All five functions authorise their callers
   in the same four lines, and that stays readable in the file being edited.
 
