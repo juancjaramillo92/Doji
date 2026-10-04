@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 692 tests, six suites
+npm test      # 693 tests, six suites
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced
@@ -310,7 +310,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   an assistant turn; nothing may depend on `HISTORY` being even.
 - **`TradeRow` is a copy of the view's column list**, held by a test. A summary
   inherits the detailed read's guarantees: `journalStats` counts `settled` and
-  `fellBack`. `journal.ts` is a copy of `index.html`'s arithmetic, held by shape.
+  `fellBack`. `journal.ts` is a copy of `index.html`'s arithmetic, held by shape and by
+  running both over the same rows.
 - **`tradesQuery` and `writeNote` are boundaries**: clamp and truncate, never
   throw mid-turn.
 

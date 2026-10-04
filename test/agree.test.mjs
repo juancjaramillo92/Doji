@@ -24,7 +24,8 @@ import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/st
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
-import { BE, SESSIONS, MARKETS } from '../supabase/functions/doji-eugenia/journal.ts';
+import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
+  from '../supabase/functions/doji-eugenia/journal.ts';
 
 // A repository file, read once however many tests ask for it.
 const READ = new Map();
@@ -4107,6 +4108,58 @@ test('the journal stats agree with the app they were ported from', () => {
   assert.match(app, /scratch \|\| t\.pnl === 0 \? 'be'/,
     'index.html no longer calls a P&L of exactly zero a break-even, so her port ' +
     'and the screen disagree about the same trade');
+});
+
+/* The test above reads the copies; this one RUNS them. A shape match cannot see
+   a definition the regexes do not name — the session order, the entry-then-fill
+   fallback, what counts as journalled — so both are handed the same rows and
+   must return the same answers. The win rate is compared where something is
+   decided: hers is rounded and null on nothing, on purpose. */
+test('the journal stats compute what the app computes, row for row', async () => {
+  const { app, close } = await boot();
+  try {
+    const row = (o) => ({
+      id: 'PID1', direction: 'buy', entry_time: '2026-03-10T14:00:00Z', fill_time: '2026-03-10T15:00:00Z',
+      entry_price: 2400, exit_price: 2410, pnl: 10, open_day: '2026-03-10',
+      setup: null, followed_rules: null, followed_sl: null, followed_tp: null,
+      size_oz: 1, net_pnl: null, planned_sl: null, planned_tp: null, best_price: null, ...o,
+    });
+    const rows = [
+      row({}),                                                     // $10 at a small size: a win, not a scratch
+      row({ exit_price: 2402, pnl: 200 }),                         // a scratch in price at a large size
+      row({ exit_price: 2403, pnl: 300 }),                         // the band's edge, inside
+      row({ exit_price: 2403.01, pnl: 301 }),                      // and just past it
+      row({ exit_price: 2460, pnl: 0 }),                           // sixty dollars out and back to nothing
+      row({ exit_price: 2390, pnl: -10 }),
+      row({ entry_price: null, exit_price: null, pnl: 2.5 }),      // no prices: the P&L band
+      row({ entry_price: null, exit_price: null, pnl: -50 }),
+      row({ exit_price: null, fill_time: null, pnl: null }),       // open: undecided
+      row({ entry_time: '2026-03-10T06:00:00Z' }),                 // held from Asian into London+NY: the entry decides
+      row({ entry_time: null, fill_time: '2026-07-01T13:30:00Z' }),// the session seam
+      row({ entry_time: null, fill_time: null }),                  // no instant at all
+      row({ setup: 'Break & Retest', followed_rules: false, followed_sl: false, followed_tp: false }),
+      row({ setup: 'Break & Retest', followed_rules: true, followed_sl: true, followed_tp: null }),
+    ];
+
+    rows.forEach((t, i) => {
+      assert.equal(resultOf(t), app.resultOf(t), `row ${i}: the result differs`);
+      assert.equal(sessionOf(t), app.sessionOf(t), `row ${i}: the session differs`);
+      assert.equal(isJournalled(t), app.isComplete(t), `row ${i}: journalled differs`);
+    });
+
+    const theirs = app.counts(rows), hers = counts(rows);
+    for (const k of ['win', 'loss', 'be', 'decided']) assert.equal(hers[k], theirs[k], `the ${k} count differs`);
+    assert.equal(hers.wr, Math.round(theirs.wr * 100) / 100, 'the win rate differs');
+    assert.deepEqual(money(rows), { ...app.money(rows) }, 'the money split differs');
+    assert.deepEqual(averages(rows), { ...app.averages(rows) }, 'the averages differ');
+
+    /* Every half hour of a year, so both daylight-saving seasons of all four
+       centres are crossed; the boundaries are whole hours. */
+    for (let at = Date.UTC(2026, 0, 1); at < Date.UTC(2027, 0, 1); at += 30 * 60_000) {
+      assert.equal(sessionAt(new Date(at)), app.Dates.session(new Date(at)),
+        `the session at ${new Date(at).toISOString()} differs`);
+    }
+  } finally { close(); }
 });
 
 test('the stats tool is offered wherever the journal is reasoned about', () => {
