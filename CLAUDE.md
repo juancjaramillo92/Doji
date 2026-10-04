@@ -103,7 +103,7 @@ can drive, `agree.test.mjs` reads the call.
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
 npm test      # 694 tests, six suites
-npm run test:db   # schema.sql on a real Postgres 16 with pgvector, as a superuser
+npm run test:db   # schema.sql on a real Postgres 17 with pgvector, as a superuser
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced
