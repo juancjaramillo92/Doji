@@ -30,7 +30,7 @@ any change that touches it.
 
 ## 2 · THE REJECTED REGISTER
 
-Nine are refused by a rule `CLAUDE.md` states, and are named here rather than
+Ten are refused by a rule `CLAUDE.md` states, and are named here rather than
 argued, so the reason lives once, in the document every session reads.
 
 | Move | Refused by, in `CLAUDE.md` |
@@ -44,6 +44,7 @@ argued, so the reason lives once, in the document every session reads.
 | R-7 — deciding a Telegram redraw from the keyboard | never decide whether a message settles off its keyboard |
 | R-8 — writing a `drop` into `schema.sql` | never write a `drop` into it: a re-run repeats it on the live database |
 | R-10 — regenerating `golden.json` or `golden-fold.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
+| R-18 — a per-caller cache window in place of the tool array | the cache window is derived from the tool array; do not move a window on an argument |
 
 The rest are refused by something no other document holds, so they carry their
 reasoning here.
@@ -229,6 +230,55 @@ produced a confident wrong answer about which line was expensive.
 **And the shape to carry away:** an unbounded row count is a claim about
 memory, not about time. The question is which operator runs per row and
 whether an index can serve it, and that is a measurement rather than a reading.
+
+### R-19 — a pattern filter on what she sends, behind *no signal*
+**Why refused:** an outside review in October 2026 proposed it as the one wall
+that is not a sentence. The prohibition is about meaning, and a pattern cannot
+read meaning: a printed level is a fact she may state, and a plan he has not
+taken is checked against his own numbers. A filter strict enough to catch a
+paraphrased signal holds real messages, and the path the review would start
+with, the trade event, is where a held message costs most. The trade event's
+exemption from `TRIM` is deliberate, for the reason `CLAUDE.md` gives. What the
+review actually found is §1's last row: there is no red-team set, so nothing
+says whether the prompts still behave.
+**Revisit if:** that set exists, and shows a violation with a shape a pattern
+catches and no real message shares.
+
+### R-20 — a "started" marker against a second briefing across the hour
+**Why refused:** the race needs one run to outlive the hour. The job fires at
+minute zero, the worker dies at 400s, and each turn is bounded at `TURN_MS`.
+**Revisit if:** the hourly job leaves minute zero, or the wall clock passes an
+hour.
+
+### R-21 — de-duplicating Telegram's update id in the reply path
+**Why refused:** the reply path answers 200 before it works, so a redelivery
+needs Telegram to give up on a response that is sent at once. Nothing has shown
+a double reply.
+**Revisit if:** `eugenia_turns` ever holds one message of his twice.
+
+### R-22 — a secret per caller in place of `DOJI_CRON_SECRET`
+**Why refused:** the system has one user, and the secret lives only in Vault,
+in Edge secrets and in the cron jobs. Every new name is another pair spelled in
+two places that fails quietly when one is wrong — the failure `CLAUDE.md` lists
+under *Two names that are one value*. What a leak would spend is bounded by the
+cap on the Anthropic key.
+**Revisit if:** anyone but him ever holds a credential here.
+
+### R-23 — holding the function deploy until `test:db` passes
+**Why refused:** the deploy ships functions, and `schema.sql` is applied by
+hand, on purpose. A red database suite cannot reach the database through the
+deploy, so gating it would hold back functions for a change they do not carry.
+**Revisit if:** applying `schema.sql` is ever automated.
+
+### R-24 — keeping the live TradingView sign-in until a new one completes
+**Deferred, not refused.** `?connect=1` clears the tokens before anyone signs
+in, so a stray call (his, or anyone holding the cron secret) ends a working
+connection. The repair is to hold the new client beside the old one and swap
+on a completed callback. It needs new columns, and a function deploys itself
+on merge while the SQL waits for a person: shipped in that order, the sign-in
+breaks.
+**Revisit if:** a sign-in is lost to a stray `?connect=1`, or `tradingview_auth`
+changes for another reason. Then it goes in the same pass, SQL applied first.
 
 ---
 
