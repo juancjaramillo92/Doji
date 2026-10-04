@@ -1131,6 +1131,20 @@ test('every workflow takes its Node version from the one file that states it', (
   }
 });
 
+/* ─── The database suite runs, though npm test cannot reach it ───────────────
+   test/db sits below the glob `npm test` reads, on purpose: it needs a server.
+   So nothing else would notice it stop running — the script renamed, the
+   step dropped from CI.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('CI runs the database suite that npm test leaves out', () => {
+  const { scripts } = JSON.parse(source('package.json'));
+  assert.match(scripts['test:db'] ?? '', /test\/db\/\*\.test\.mjs/, 'package.json no longer names the database suite');
+  assert.ok(readdirSync(new URL('./db/', import.meta.url)).some(f => f.endsWith('.test.mjs')),
+    'test/db holds no suite for test:db to run');
+  assert.match(source('.github/workflows/test.yml'), /^\s*- run: npm run test:db$/m,
+    'test.yml no longer runs the database suite, and nothing else does');
+});
+
 /* ─── A tag is a name its owner can move; a commit is the code you read ──────
    Every `uses:` is a 40-character commit. `@v7` is what a person types from
    memory and re-fetches whatever the tag points at, so the audit of an action

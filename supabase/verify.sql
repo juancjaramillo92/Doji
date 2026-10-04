@@ -7,7 +7,8 @@
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
--- A CI job cannot stand in: schema.sql needs pg_net, vault and pg_cron.
+-- CI runs it against a fresh build behind stand-ins (test/db), which proves
+-- this file and schema.sql agree; only a run here proves the live database does.
 --
 -- A row may come back false; it must never raise, or every row stops with it.
 -- So functions are asked by name or oid, never by written signature, and a

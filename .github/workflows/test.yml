@@ -16,3 +16,27 @@ jobs:
       # else gets, or "the suite passes" is a claim about one machine.
       - run: npm ci
       - run: npm test
+
+  # schema.sql on a real Postgres. Its own job, because it needs a server and
+  # `npm test` needs Node alone.
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The suite re-runs schema.sql over main's copy, so it needs main.
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      # The runner carries Postgres 16 stopped; pgvector is the one extension
+      # schema.sql needs that it lacks. Peer authentication, so the runner's own
+      # user becomes the superuser the suite connects as.
+      - run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-16-pgvector
+          sudo systemctl start postgresql
+          sudo -u postgres createuser --superuser "$USER"
+      - run: npm run test:db
+        env:
+          PGHOST: /var/run/postgresql

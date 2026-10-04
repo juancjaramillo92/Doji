@@ -95,10 +95,9 @@ breakpoint, so "what else differs between these two calls" is the question, not
 "what did I change".
 
 ### R-9 — a database test in `npm test`
-**Why refused:** `npm ci` installs jsdom and nothing else. The one assertion that
-wanted a database — whether a BEFORE trigger's write needs a column grant — was
-answered on a throwaway Postgres and written down instead.
-**Revisit if:** a second and third such question appear.
+**Why refused:** `npm test` needs Node alone, and `npm ci` installs jsdom and
+typescript and nothing else. The database has its own suite, `npm run test:db`,
+and its own CI job; folding it in would make every run need a server.
 
 ### R-11 — folding the New York clock into one definition
 **Why refused:** the nine copies are FIVE questions, not nine answers to one.
