@@ -1024,7 +1024,8 @@ test('the README names every setting, table, function, tool and command the code
 
   const lists = {
     settings: [...all(fns, /\b(?:env|envHours)\(\s*["'`]([A-Z_]+)/g),
-               ...all(source('scripts/backup.mjs'), /process\.env\.([A-Z_]+)/g),
+               ...readdirSync(new URL('../scripts', import.meta.url))
+                 .flatMap(f => all(source(`scripts/${f}`), /process\.env\.([A-Z_]+)/g)),
                ...all(source('doji_gmail_sync.gs'), /getProperty\('([A-Z_]+)'\)/g)],
     tables: all(SCHEMA_SQL, /create (?:table if not exists|or replace view) public\.(\w+)/g),
     functions: all(SCHEMA_SQL, /create or replace function public\.(\w+)/g),
@@ -1139,9 +1140,9 @@ test('every read of her tables goes through readRows', () => {
    is not claimed to run on and goes green. setup-node reads engines.node.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const WORKFLOWS = ['.github/workflows/test.yml',
-                   '.github/workflows/deploy-functions.yml',
-                   '.github/workflows/backup.yml'].map(read);
+// Derived, so a workflow added later is held to both rules below unasked.
+const WORKFLOWS = readdirSync(new URL('../.github/workflows', import.meta.url))
+  .filter(f => f.endsWith('.yml')).map(f => read(`.github/workflows/${f}`));
 
 test('every workflow takes its Node version from the one file that states it', () => {
   const pkg = JSON.parse(source('package.json'));

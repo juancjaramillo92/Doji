@@ -2134,12 +2134,14 @@ export async function thesisBlock(): Promise<string> {
 
 /* ─── Whether the journal is still being written ────────────────────────────
    The poller and the email function have no voice, and either dying looks like
-   a week he did not trade. sync_health is their heartbeat and this its one
-   reader. Six hours against the two-minute poll: shorter and a quiet Sunday
-   reads as a fault, longer and a Monday outage reaches him Tuesday. A fact
-   about his instruments, so she leads with it.
+   a week he did not trade. sync_health is their heartbeat and this its
+   reader; scripts/health.mjs asks the same staleness from outside, for when
+   pg_cron itself has stopped and no briefing comes. Six hours against the
+   two-minute poll: shorter and a quiet Sunday reads as a fault, longer and a
+   Monday outage reaches him Tuesday. A fact about his instruments, so she
+   leads with it.
    ─────────────────────────────────────────────────────────────────────────── */
-const STALE_HOURS = 6;
+export const STALE_HOURS = 6;
 
 const WRITERS: Record<string, string> = {
   poller: "the broker sync",

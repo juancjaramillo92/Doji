@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 710 tests, seven suites
+npm test      # 712 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -438,6 +438,8 @@ The paging is the part to be careful with: PostgREST caps a response at its own
 `max-rows`, so one read returns a page that looks like a complete archive. The
 walk stops on a short page, `readAll` takes its `fetch` as an argument so the loop
 is tested, and a refused read throws rather than backing up a blank.
+`scripts/health.mjs` beside it asks hourly whether the poller is still running,
+for when pg_cron is not; it imports `STALE_HOURS` rather than copying it.
 
 ---
 

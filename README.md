@@ -61,10 +61,12 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 scripts/backup.mjs                      the paged read behind the daily copy
+scripts/health.mjs                      whether anything is running, asked from outside
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
+.github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -557,6 +559,16 @@ after the latest success means failing now, and a success after it clears. **A
 market-closed skip is a completed run and marks itself**, or gold's weekend close
 reads as a dead sync every Sunday evening. The table is inert until it exists:
 both writers swallow their own heartbeat failure.
+
+**Something outside the database asks too.** Every watcher here is a pg_cron
+job, and so is the briefing that reports them, so pg_cron stopping or the
+project pausing silences all of them at once. `scripts/health.mjs`, run hourly by
+`.github/workflows/health.yml` with the backup's two secrets, reads the poller's
+`last_ok` and fails the job when it is older than `STALE_HOURS` — imported from
+her file, so the two readers cannot disagree — and GitHub's email about a failed
+run is the alarm. Staleness only: a failed poll is hers to report, and one that
+keeps failing goes stale. A refused read fails the job too, since a revoked key
+or a paused project is the outage it exists to name.
 
 **`dispatch_watch` sees the call that never ran.** Supabase can refuse a
 worker with `546 WORKER_RESOURCE_LIMIT` *before* the function exists — nothing

@@ -58,6 +58,7 @@ import {
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
+import { lastRun, stale } from '../scripts/health.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -2014,6 +2015,31 @@ test('the backup names every table that has no other source', async () => {
   // than about him, and it is by far the largest table.
   assert.ok(!TABLES.some(([t]) => t === 'eugenia_runs'), 'the cost meter is in the backup');
   assert.match(out.taken_at, /^\d{4}-\d\d-\d\dT/, 'the document does not say when it was taken');
+});
+
+/* ─── The outside check: is anything running at all ─────────────────────── */
+
+test('the outside check fails a poller past the briefing\'s threshold, and only then', () => {
+  const now = Date.parse('2026-08-03T12:00:00Z');
+  const ago = (h) => new Date(now - h * 3600_000).toISOString();
+  // The same six hours healthLine reads, imported: at the edge it is running.
+  assert.equal(stale(ago(6), now), null);
+  assert.match(stale(ago(6.1), now), /^the poller last completed a run 6\.1h ago/);
+  assert.equal(stale(ago(0.05), now), null);
+  assert.equal(stale(null, now), 'the poller has never completed a run');
+});
+
+test('the outside check counts a refused read as the outage, never as a pass', async () => {
+  const refused = async () => ({ ok: false, status: 401, text: async () => 'bad key' });
+  await assert.rejects(() => lastRun('https://x', 'k', refused), /HTTP 401/,
+    'a revoked key or a paused project answered the check as healthy');
+  const empty = async () => ({ ok: true, json: async () => [] });
+  await assert.rejects(() => lastRun('https://x', 'k', empty), /no poller row/);
+
+  const asked = [];
+  const row = async (u) => { asked.push(u); return { ok: true, json: async () => [{ last_ok: 'T' }] }; };
+  assert.equal(await lastRun('https://x', 'k', row), 'T');
+  assert.deepEqual(asked, ['https://x/rest/v1/sync_health?select=last_ok&id=eq.poller']);
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
