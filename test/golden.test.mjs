@@ -40,6 +40,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { boot, trade } from './boot.mjs';
+import { boot as bootScript } from './gs.mjs';
+import { parseSse } from '../supabase/functions/_shared/edge.ts';
+import { foldPosition, foldHours, balanceTarget } from '../supabase/functions/doji-mcp-sync/index.ts';
+import { emailRow } from '../supabase/functions/doji-email-sync/index.ts';
+import { foldCalendar, unwrap } from '../supabase/functions/doji-tradingview/index.ts';
+import { checkRules, adherenceList, dayStanding } from '../supabase/functions/doji-eugenia/adherence.ts';
+import { journalStats, statsList } from '../supabase/functions/doji-eugenia/journal.ts';
 
 const GOLDEN = new URL('./golden.json', import.meta.url);
 const WRITE  = process.env.GOLDEN === 'write';
@@ -509,4 +516,102 @@ test('the two branches of session() that decide nothing still decide nothing', a
       `so MARKETS.sydney has stopped being dead and session() means something ` +
       `new — check that this is what was intended`);
   } finally { h.close(); }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FOLDS — what the functions make of what the broker and the email sent
+   ───────────────────────────────────────────────────────────────────────────
+   The same instrument, pointed at the pure half of the system. fold.test.mjs
+   asserts on what it names; this records everything else the folds return,
+   off the real captures rather than built rows — the columns the poller and
+   the email write, which the app cannot correct, and what Eugenia is told about
+   the week those columns describe. golden-fold.json obeys golden.json's rules:
+   CURRENT behaviour, regenerated only in the commit that changes it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const FOLD_GOLDEN = new URL('./golden-fold.json', import.meta.url);
+const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+const USER = '00000000-0000-0000-0000-000000000001';
+
+function folds() {
+  const deals = JSON.parse(parseSse(fixture('ctrader-get-deals.txt')).result.content[0].text).deals;
+  const byPosition = new Map();
+  for (const d of deals) byPosition.set(d.positionId, [...(byPosition.get(d.positionId) ?? []), d]);
+
+  /* As the poller runs: the capture is its fold window, and it writes only the
+     positions with a deal inside the write window, which ends MAX_POSITION_HOURS
+     — foldHours(0) — after the fold window opens. Folding every position
+     instead would write the closing half of a trade opened before the capture
+     as an open one, which the poller never does. */
+  const opened = Math.min(...deals.map(d => d.executionTimestamp));
+  const last   = Math.max(...deals.map(d => d.executionTimestamp));
+  const from   = opened + foldHours(0) * 3_600_000;
+  const written = [...byPosition.values()]
+    .filter(ds => ds.some(d => d.executionTimestamp >= from))
+    .map(ds => ({ row: foldPosition(ds, USER), closedAt: Math.max(...ds.map(d => d.executionTimestamp)) }))
+    .sort((a, b) => a.row.id.localeCompare(b.row.id));
+
+  // The email about one of those trades, parsed and bounded as the two halves
+  // of the email path do it.
+  const parsed = bootScript().parseAlert_('[cTrader live account] Stop loss filled for XAUUSD',
+                                          fixture('ctrader-stop-loss-filled.html'));
+  const email = emailRow(JSON.parse(JSON.stringify(parsed)), USER);
+
+  /* The week as the trades table then holds it, read through eugenia_trades:
+     the poller's columns, its close stamp, and the email's two owned columns
+     where the email landed. Nobody has journalled it. */
+  const rows = written.map(({ row, closedAt }) => {
+    const t = { ...row, fill_time: row.exit_price === null ? null : new Date(closedAt).toISOString(),
+                net_pnl: null, setup: null, followed_rules: null, followed_sl: null, followed_tp: null,
+                planned_sl: null, planned_tp: null, best_price: null };
+    if (t.id === email.row.id) Object.assign(t, { fill_time: email.row.fill_time, net_pnl: email.row.net_pnl });
+    return { ...t, pnl: t.net_pnl ?? t.computed_pnl };
+  });
+  const rules = checkRules(rows, last + 86_400_000);
+  const stats = journalStats(rows);
+
+  return {
+    poller: {
+      written: written.map(w => w.row),
+      stamped: written.filter(w => w.row.exit_price !== null)
+                      .map(w => [w.row.id, new Date(w.closedAt).toISOString()]),
+      balanceFor: balanceTarget(written.filter(w => w.row.exit_price !== null)
+                                       .map(w => ({ id: w.row.id, at: w.closedAt })), last + 60_000),
+    },
+    email: { parsed, row: email },
+    calendar: foldCalendar(unwrap(JSON.parse(fixture('tradingview-calendar.json')), 'mcp-tv-get-economic-calendar')),
+    eugenia: {
+      rules, told: adherenceList(rules),
+      standing: [...new Set(rows.map(t => t.open_day))].sort().map(day => dayStanding(rows, day)),
+      stats, statsTold: statsList(stats, 7),
+    },
+  };
+}
+
+// Through JSON, as each half leaves the function: an undefined key is an absent
+// column, and the parsed alert crosses from the script's own realm.
+const foldShot = () => JSON.parse(JSON.stringify(folds()));
+
+test('the folds make of the real captures exactly what is written down', () => {
+  const shot = foldShot();
+
+  if (WRITE) {
+    writeFileSync(FOLD_GOLDEN, JSON.stringify(shot, null, 2) + '\n');
+    console.log('golden-fold.json rewritten — this run asserted nothing');
+    return;
+  }
+
+  const want = JSON.parse(readFileSync(FOLD_GOLDEN, 'utf8'));
+  for (const [section, parts] of Object.entries(want)) {
+    for (const part of Object.keys(parts)) {
+      assert.deepEqual(shot[section]?.[part], parts[part],
+        `${section}.${part} is not what golden-fold.json records — if this was a ` +
+        `refactor, it changed behaviour and is not a refactor`);
+    }
+  }
+  assert.deepEqual(shot, want, 'the folds return a part golden-fold.json does not record');
+});
+
+test('the folds capture the same thing twice', () => {
+  assert.deepEqual(foldShot(), foldShot(),
+    'the same captures folded twice differ — something reads a clock or an iteration order');
 });

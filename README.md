@@ -407,6 +407,21 @@ written.
 
 ## Operating
 
+**The dashboard, top to bottom** — one `render()` step each, every figure off
+the shared definitions in **What is derived, not stored**:
+
+| Panel | What it shows |
+|---|---|
+| Broker banner | how many trades are not yet journalled — a setup and all three answers — and opens the oldest |
+| P&L card | the latest synced balance; all-time net, gross profit and gross loss; this week and this month each beside the one before, in money rather than a percentage |
+| Curve | cumulative P&L over every trade carrying a figure, by filing day, coloured by where it ended |
+| Periods | This Month, This Week and All Time: the win, loss and break-even wheel with its win rate over decided trades, gross, loss and net, the realised reward-to-risk bar and the discipline bars |
+| Calendar | a month of day tiles in their result colour with weekly totals, the month's profit, loss, net and trade count, and the year as a strip of months; a day opens its trades |
+| Setups | one wheel per setup, with its split by session beneath |
+| Roll-forward | this month beside last: opening, profit, loss, closing, change, best and worst trade, average win and loss, and the synced balances at each end |
+| Trade log | ten a page, newest first: filing day and New York time, direction, session, setup and P&L; a row opens its entry |
+| Watch card | Eugenia's thesis, open loops and calendar — **What she is watching, on the dashboard** |
+
 **Trades appear on their own.** Enter a position and it shows within about two
 minutes — correct day, correct session, purple and pending, P&L blank until it
 closes. Open it and fill in the setup and the three discipline answers.
@@ -554,9 +569,10 @@ marks, nothing throws, nothing logs — and the only witness is a row in
 `net._http_response`, pruned within hours and carrying **no url**. So every
 `net.http_post` records its request id in a ledger with the job named, and
 `agree.test.mjs` counts calls against ledger rows. `dispatch_watch` runs every
-ten minutes **in Postgres** and posts to Telegram directly, reading
-`eugenia_bot_token` and `telegram_chat_id` from Vault, so it shares no failure
-mode with the function it watches.
+ten minutes **in Postgres** and posts to Telegram directly through `tell_him`,
+which reads `eugenia_bot_token` and `telegram_chat_id` from Vault, so it shares
+no failure mode with the function it watches. A failed call is defined once, in
+`dispatch_bad`: no `2xx` answer, a timeout, or no answer at all.
 
 - **A single lost poll is not reported.** A job that comes round on its own is
   evidence only in quantity — `dispatch_repeats`, three failures in an hour; a
@@ -606,7 +622,7 @@ next.
 **The write window is six hours.** Every upsert fires the `updated_at` trigger
 and a realtime UPDATE that makes every open tab re-render, so a month-wide window
 rewrote some 28,800 rows a day for nothing. Six hours tolerates 180 missed runs;
-backfills pass `?force=1&hours=168`.
+backfills pass `?force=1&hours=168`. `LOOKBACK_HOURS` overrides the six.
 
 **The read window is wider, and has to be.** Deals are fetched over `write window
 + MAX_POSITION_HOURS` (72h by default) and folded from that; a position is
@@ -725,7 +741,10 @@ Only rows the fold window reaches are stamped, so the historical gap needs
 `?force=1&hours=N`.
 
 It needs `DOJI_USER_ID` in secrets: `trades.user_id` defaults to `auth.uid()`,
-which is null under the service role.
+which is null under the service role. Two optional secrets override defaults:
+`CTRADER_MCP_URL`, the MCP endpoint (cTrader's own), and `SYMBOL_IDS`, the
+instruments folded — `41`, XAUUSD — of which the first is the one priced and
+read for bars.
 
 ### The email parser
 
@@ -1322,7 +1341,7 @@ the tool matches the instant. **A speech is recorded by its line alone**: either
 half may come without the other, and an absent key is left as it was.
 
 **The row records when its content was last written.** `updated_at` moves through
-a trigger, but **not on a mark**: `markLooked` writes `looked_at` alone, so the
+a trigger, `eugenia_calendar_touch`, but **not on a mark**: `markLooked` writes `looked_at` alone, so the
 column says which of two rows carries the later content rather than when one was
 last handled. The trigger compares the row as `jsonb` less those two columns, so a
 column added later is compared without anyone remembering it.
@@ -2154,7 +2173,7 @@ a walk stopped by two refusals, is a second run from the week its last row names
 
 ### Programmatic tool calls need their container
 
-`web_search_20260209` does dynamic filtering by running code on Anthropic's side,
+`web_search` (type `web_search_20260209`) does dynamic filtering by running code on Anthropic's side,
 and from inside that container the model can call `get_trades` programmatically.
 A continuation answering those calls must carry the container id from the paused
 response, or it is rejected:
@@ -2639,7 +2658,7 @@ home-screen shortcut and every bookmark open `/`.
 |---|---|
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, week and backup boundaries, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the export's figures, the snapshot, the offline boot, and the watch card |
-| `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
+| `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |

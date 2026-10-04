@@ -1007,6 +1007,43 @@ test('every door a function opens is written down in the README', () => {
     `anyone reads the source to find out it is there.`);
 });
 
+/* ─── The README names everything the code keeps a list of ───────────────────
+   The symbol test reads doc to code; this reads code to doc, for the lists a
+   reader needs whole: every setting a function, the backup or the Apps Script
+   reads from its environment, every table, view and function schema.sql
+   declares, every tool Eugenia is handed and every command she answers. Each
+   list is derived from the code, so a sibling added tomorrow fails here until
+   the README says what it is.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the README names every setting, table, function, tool and command the code defines', () => {
+  const readme = source('README.md');
+  const fns = readdirSync(new URL('../supabase/functions', import.meta.url), { recursive: true })
+    .filter(f => f.endsWith('.ts')).map(f => source(`supabase/functions/${f}`)).join('\n');
+  const all = (text, re) => [...new Set([...text.matchAll(re)].map(m => m[1]))];
+
+  const lists = {
+    settings: [...all(fns, /\b(?:env|envHours)\(\s*["'`]([A-Z_]+)/g),
+               ...all(source('scripts/backup-memory.mjs'), /process\.env\.([A-Z_]+)/g),
+               ...all(source('doji_gmail_sync.gs'), /getProperty\('([A-Z_]+)'\)/g)],
+    tables: all(SCHEMA_SQL, /create (?:table if not exists|or replace view) public\.(\w+)/g),
+    functions: all(SCHEMA_SQL, /create or replace function public\.(\w+)/g),
+    tools: all(EUGENIA_TS, /\bname:\s*"([a-z_]+)"/g),
+    commands: all(EUGENIA_TS, /'(\/[a-z]+)'/g),
+  };
+  // A pattern that stopped matching would report every list covered.
+  for (const [what, floor] of [['settings', 20], ['tables', 10], ['functions', 10], ['tools', 10], ['commands', 2]]) {
+    assert.ok(lists[what].length >= floor,
+      `only ${lists[what].length} ${what} read out of the code — the reader has gone blind`);
+  }
+
+  const missing = Object.entries(lists).flatMap(([what, names]) =>
+    names.filter(n => !new RegExp(`(^|[^\\w/])${n.replace(/\//g, '\\/')}\\b`).test(readme))
+         .map(n => `${what}: ${n}`));
+  assert.deepEqual(missing, [],
+    'the code defines these and the README never says what they are');
+});
+
 /* ─── No paragraph is said to her twice ──────────────────────────────────────
    In `prompt.ts` and `strategy.ts` prose IS the program. A duplicate is paid
    for on every request in the cached prefix, and the day one copy is
