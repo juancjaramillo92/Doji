@@ -8,9 +8,10 @@
    the file to a throwaway database behind supabase.sql's stand-ins and drives
    every function it declares.
 
-   Its own command, `npm run test:db`, because it needs a Postgres 16 server
-   with pgvector, named by the standard PG* variables and reached as a
-   superuser; `npm test` needs Node alone. CI runs both.
+   Its own command, `npm run test:db`, because it needs a Postgres server of
+   the major version Supabase runs, with pgvector, named by the standard PG*
+   variables and reached as a superuser; `npm test` needs Node alone. CI runs
+   both.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,6 +69,18 @@ before(() => {
   fresh = dump(DB);
   sql(`alter database ${DB} set track_functions = 'all';`);
   sql(`insert into auth.users values ('${U}'), ('${V}');`);
+});
+
+/* ─── The server is the one the live database runs ──────────────────────── */
+
+/* A file that applies cleanly on one major version can refuse on another, so
+   a pass here says something about the live database only on its version.
+   test.yml's PGCLUSTER is where that version is stated. */
+test('the server is the major version Supabase runs', () => {
+  const live = file('.github/workflows/test.yml').match(/PGCLUSTER: (\d+)\//)?.[1];
+  assert.ok(live, 'test.yml no longer names the cluster the suite runs on');
+  assert.equal(String(Math.floor(Number(sql('show server_version_num', 'postgres')) / 10000)), live,
+    `this server is not Postgres ${live}, the version Supabase runs`);
 });
 
 /* ─── Re-runnable, as CLAUDE.md requires of every statement ─────────────── */

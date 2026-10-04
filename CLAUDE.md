@@ -98,18 +98,22 @@ can drive, `agree.test.mjs` reads the call.
 
 ---
 
-## Tests — one command, and run it
+## Tests — two commands, and run them
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
 npm test      # 694 tests, six suites
-npm run test:db   # schema.sql on a real Postgres 16 with pgvector, as a superuser
+npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
 Node 22.22.2+ (jsdom's floor), stated in `package.json`'s `engines` and enforced
 by `engine-strict=true` in `.npmrc`. The script globs `test/*.test.mjs` one level
-deep, so a test in a subfolder silently would not run. `boot.mjs` and `gs.mjs` are
-harnesses, not suites; the README's Tests section says what each suite covers.
+deep, so a test in a subfolder silently would not run — except `test/db`, on
+purpose, which needs a server and has its own command and CI job. A cloud session
+whose network refuses `apt.postgresql.org` cannot install that version; CI is then
+the run, and run on any other version the suite's first test is the one that fails.
+`boot.mjs` and `gs.mjs` are harnesses, not suites; the README's Tests section says
+what each suite covers.
 
 - **`types.test.mjs`** asks a compiler two scope questions — a name used and
   declared nowhere, a name declared and used nowhere — of the Edge Functions and,

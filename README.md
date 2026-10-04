@@ -2612,14 +2612,17 @@ globs `test/*.test.mjs` one level deep, so a test in a subfolder would silently
 not run — `test/db` is the one subfolder, on purpose, with its own command and
 its own CI job, and `agree.test.mjs` holds that both still name it.
 
-**`npm run test:db` needs a Postgres 16 server with pgvector**, named by the
-standard `PG*` variables and reached as a superuser, so `npm test` keeps needing
+**`npm run test:db` needs a Postgres server with pgvector, of the major version
+Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
+suite, so a Supabase upgrade is that one value changed — reached through the
+standard `PG*` variables as a superuser, so `npm test` keeps needing
 Node alone. It builds a throwaway database from `test/db/supabase.sql` — stand-ins
 for `auth`, `vault`, `pg_net`, `pg_cron` and the API roles, which record rather
 than send — and `schema.sql`. Text cannot see what it sees: Postgres resolves a
 PL/pgSQL body only on its first call, inside the write that fired it, so a
 one-letter typo in a trigger passes every other suite and fails every insert.
-In CI, the job starts the runner's own Postgres and installs pgvector.
+In CI, the job installs that version and pgvector from PostgreSQL's own
+repository, since the runner carries an older one.
 
 **Every `uses:` in the workflows names a commit, never a tag.** A tag can be
 repointed between runs, so the action audited is not the action that runs;
