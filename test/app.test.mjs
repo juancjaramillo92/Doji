@@ -4,9 +4,8 @@
    index.html booted in jsdom; test/boot.mjs says how a single-file app with no
    exports is got at.
 
-   NOT COVERED: pixels, so correct HTML under broken CSS passes; realtime and
-   the auth server, since Supabase is a recording stand-in; and the bytes
-   SheetJS writes, since the export runs against a recording stub.
+   NOT COVERED: pixels, so correct HTML under broken CSS passes; and realtime
+   and the auth server, since Supabase is a recording stand-in.
 
    trade() defaults to entry 3400 and exit 3410, a $10 move — decisively not a
    scratch under the price rule, so a test that wants one says so in prices.
@@ -15,10 +14,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, trade, journalled } from './boot.mjs';
 
-let app, seed, $, win, close, db, charts, sheets;
+let app, seed, $, win, close, db, charts;
 
 before(async () => {
-  ({ app, seed, $, win, close, db, charts, sheets } = await boot());
+  ({ app, seed, $, win, close, db, charts } = await boot());
 });
 after(() => close());
 
@@ -46,8 +45,8 @@ test('any unanswered field leaves the trade pending', () => {
 });
 
 /* THE SAME THREE-STATE, EVERYWHERE IT IS READ: what the bars count, what the
-   log draws, what the form pre-selects, what a save writes and what the export
-   says. A null read as `no` in any one is the journal reporting a rule broken
+   log draws, what the form pre-selects and what a save writes. A null read as
+   `no` in any one is the journal reporting a rule broken
    that was never answered — worst in the bar, where a violation is exactly what
    he looks for. */
 
@@ -858,56 +857,6 @@ test('the discipline answers are read from the modal body, not the document', ()
   }
 });
 
-
-/* ─── What the export carries ────────────────────────────────────────────────
-   The harness puts a recording stand-in on window.XLSX, the one condition
-   loadXLSX() checks, so every line the app owns runs and its rows are read
-   back. SheetJS itself is a stub: a sheet name or column width is not held.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-test('the export carries the figures the screen carries', async () => {
-  seed([
-    journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 57.1, setup: 'Break & Retest',
-                 entry_time: '2026-07-30T14:00:00Z' }),
-    journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -22, setup: 'Support & Resistance',
-                 entry_time: '2026-07-29T09:00:00Z', followed_sl: false })
-  ]);
-  const before = sheets.length;
-  await app.IO.journal();
-  assert.equal(sheets.length, before + 1, 'the export built no sheet');
-
-  const rows = sheets[sheets.length - 1].rows;
-  assert.equal(rows.length, 2);
-
-  // Read from the app rather than typed here, so this cannot drift into its own
-  // opinion of what a trade is.
-  for (const row of rows) {
-    const t = app.Data.byId.get(row.Date.includes('30') ? 'PID1' : 'PID2');
-    assert.equal(row['P&L ($)'], t.pnl);
-    assert.equal(row.Session, app.sessionOf(t));
-    assert.equal(row.Setup, t.setup);
-    assert.equal(row.Result,
-      { win: 'Win', loss: 'Loss', be: 'Break Even' }[app.resultOf(t)]);
-  }
-});
-
-test('the export says nothing where a question was never answered', () => {
-  // The reader that leaves the app: a null written as "No" is a breach in a file
-  // he may hand to someone, with no way back to the fact he never answered.
-  const cell = sheets[sheets.length - 1].rows.find(r => r.Setup === 'Break & Retest');
-  assert.equal(cell['Followed Rules'], 'Yes');
-
-  return (async () => {
-    seed([journalled({ id: 'PID3', open_day: '2026-07-30', pnl: 12,
-                       followed_rules: null, followed_sl: false })]);
-    await app.IO.journal();
-    const row = sheets[sheets.length - 1].rows[0];
-    assert.equal(row['Followed Rules'], '',
-      'an unanswered question left the app as an answer');
-    assert.equal(row['Followed Stop Loss'], 'No', 'a real NO must still say No');
-    assert.equal(row['Followed Take Profit'], 'Yes');
-  })();
-});
 
 /* ─── The snapshot, a full copy of the journal on the device ─────────────────
    It is in plaintext in localStorage. Two properties: it is only written from

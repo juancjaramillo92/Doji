@@ -15,10 +15,9 @@ the broker supplies, and the discipline record, which only you can.
 Open `index.html`. That is the whole application — no build step, no bundler, no
 dependencies to install.
 
-Three libraries load from jsDelivr, each pinned to an exact version. Chart.js and
-the Supabase client are blocking scripts; SheetJS, the largest, is fetched on the
-first export. Chart.js and SheetJS carry an SRI hash; the Supabase client does
-not, for the reason given beside its tag. Two typefaces come from Google Fonts —
+Two libraries load from jsDelivr, each pinned to an exact version, as blocking
+scripts: Chart.js and the Supabase client. Chart.js carries an SRI hash; the
+Supabase client does not, for the reason given beside its tag. Two typefaces come from Google Fonts —
 Hanken Grotesk for the interface, JetBrains Mono for every figure — and `--ui`
 and `--mono` both carry a system fallback, so a network that blocks the fonts
 costs the typeface and nothing else.
@@ -439,10 +438,6 @@ control over any of them could only lie. The trade log is where they are read.
 **Deletes** stage with a 7-second undo. The row leaves the screen and `deleted`
 is set at once; undo clears it. The window forgives the reflex, it does not hold
 the delete back.
-
-**Export** gives the journal as `.xlsx`, one row per trade, as a Blob URL that
-is revoked when the link offering it is replaced. It is a desk task, so the
-button is hidden on a phone.
 
 **Everything that exists nowhere else is backed up daily, from outside the
 browser.** `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`,
@@ -2415,7 +2410,6 @@ references anything defined below it at load time.
 | `Charts` | Chart.js wrappers and the shared visual primitives |
 | `Render` | one function per component |
 | `Journal` | the entry modal |
-| `IO` | export |
 | `Login` | session gate |
 | `Carousel` | mobile swipe position and dots |
 
@@ -2682,7 +2676,7 @@ home-screen shortcut and every bookmark open `/`.
 | File | Covers |
 |---|---|
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
-| `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the export's figures, the snapshot, the offline boot, and the watch card |
+| `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; and Eugenia answering a message, a trade event and the hour before the work, with the work kept |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
@@ -2695,8 +2689,7 @@ home-screen shortcut and every bookmark open `/`.
 | `supabase/verify.sql` | not a suite: run by hand against the live database, one statement, one row per fact. Nothing in it may raise on a wrong database — functions are asked by oid, tables through `query_to_xml` |
 
 **What is not covered.** Pixels — correct HTML under broken CSS passes. Realtime
-and the auth server, since Supabase is a stand-in. What SheetJS writes from the
-rows it is handed. Anything whose first line is the network — the MCP transport,
+and the auth server, since Supabase is a stand-in. Anything whose first line is the network — the MCP transport,
 the upserts, the Telegram sends, the model call — is tested for what it decides,
 and through the doors `serve.test.mjs` drives, for what it sends; where a
 decision lives deeper than a test can reach, `agree.test.mjs` reads its source. Gmail itself, behind the Apps Script stubs. What Supabase's own
@@ -2727,7 +2720,7 @@ saved message, so they are built in its shape, and one test holds the builder
 against the real body. The email path and the poller are the two pieces that
 could lose data quietly, and the daily backup is the floor under both.
 
-**The Supabase client carries no SRI hash**, unlike Chart.js and SheetJS. It is
+**The Supabase client carries no SRI hash**, unlike Chart.js. It is
 pinned to an exact version, which closes the drift; the hash would have to be
 recomputed on every bump and a forgotten one fails closed with no message. To add
 one, compute it from the npm tarball the CDN mirrors:

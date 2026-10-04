@@ -21,7 +21,6 @@ any change that touches it.
 | pixels, CSS values | a device pass by a person |
 | realtime, auth | a live two-tab and sign-in test |
 | the live database | `verify.sql`, run by hand |
-| the xlsx export's own output | one manual export |
 | retrieval quality | a golden set that does not exist |
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |

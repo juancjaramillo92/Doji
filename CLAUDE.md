@@ -66,7 +66,7 @@ Every change is:
   differ from the committed one with nothing to reveal it. The SQL stays manual
   on purpose.
 - **Dependency-free.** No new libraries in the app: Chart.js and the Supabase
-  client are blocking tags; SheetJS is fetched on first export by `loadXLSX()`.
+  client are its two, both blocking tags.
   `jsdom` and `typescript` are dev dependencies and neither ships.
 - **A workflow names a commit, never a tag.** `.github/dependabot.yml` keeps the
   SHAs maintained, and `agree.test.mjs` holds them.
@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 712 tests, seven suites
+npm test      # 710 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -121,8 +121,8 @@ what each suite covers.
   `boot.mjs` runs, exported so both read one program). Only those two, because
   they cannot go red for a reason that is not a defect; a whole typecheck under
   Node's lib reports facts about the invocation. One planted defect per question
-  rides in every program. `Chart` and `XLSX` are the browser shim, each held
-  against the page still loading its script.
+  rides in every program. `Chart` is the browser shim, held against the page
+  still loading its script.
 - **`golden.test.mjs`** asserts on what the others do not name — every derived
   value and every panel's markup — booted on a frozen clock (`boot({ now })`,
   frozen before the script runs, since `View.heatmap` reads the clock at load).
@@ -142,9 +142,8 @@ what each suite covers.
 - The golden snapshot captures `innerHTML`, the DOM re-serialised, so it cannot
   see two of `esc`'s five replacements; a direct test holds those.
 
-Nothing here sees pixels, realtime, auth, what SheetJS writes, or the live
-database — `verify.sql` is that check and a person runs it. Say so on any visual
-change. State on handback what was verified by running, what by reading, and
+Nothing here sees pixels, realtime, auth, or the live database — `verify.sql`
+is that check and a person runs it. Say so on any visual change. State on handback what was verified by running, what by reading, and
 what could not be verified.
 
 ---
