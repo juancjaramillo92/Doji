@@ -3765,6 +3765,25 @@ test('pace_line states its ceiling once and quotes that one', () => {
     `— one of the two has been changed without the other`);
 });
 
+/* A turn's budget is the share pace_line warns at, so the seconds above it are
+   left to file the row and send the apology. Raised past the ceiling, a stalled
+   turn is killed at the wall clock again, silently, which is what it exists to
+   prevent; moved apart from the watcher, one of the two is reading the wrong
+   share. */
+test('a model turn may spend what pace_line calls safe, and no more', () => {
+  const ceiling = Number(PACE_SQL.match(/ceiling_ms constant int := (\d+);/)[1]);
+  const [num, den] = PACE_SQL.match(/speak_at\s+constant int := ceiling_ms \* (\d+) \/ (\d+);/)
+    .slice(1).map(Number);
+  const turn = Number(EUGENIA_TS.match(/const TURN_MS = ([\d_]+);/)?.[1].replaceAll('_', ''));
+  assert.ok(turn > 0, 'doji-eugenia no longer declares TURN_MS — the reader has gone blind');
+  assert.equal(turn, ceiling * num / den,
+    `TURN_MS is ${turn}ms where pace_line warns at ${ceiling * num / den}ms`);
+  assert.match(EUGENIA_TS, /const deadline = AbortSignal\.timeout\(budget\);/,
+    'ask() no longer starts its turn on the budget');
+  assert.match(EUGENIA_TS, /call\(convo, effort, tools, model, deadline, container\)/,
+    'the turn\'s signal no longer reaches the request');
+});
+
 /* ─── And the README lists them, which is a third copy ───────────────────────
    The table a person reads to know what should be running. Both directions,
    since a row that quietly vanishes is as bad as one that lies.

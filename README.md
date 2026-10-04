@@ -379,7 +379,7 @@ single-sourced at run time:
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
-| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first |
+| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia` |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow and the Apps Script |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -2236,6 +2236,17 @@ billing for ever; the one it can cause is a message that never arrives.
 `detail` says what the rounds were spent on — `record_actual×4, get_market×1` —
 since a name that cannot match, a tool called one per round and a model that
 will not batch are different repairs.
+
+**`TURN_MS` is its twin for time: 300s, the share `pace_line` warns at.** Every
+request in a turn carries one `AbortSignal`, so a model that never answers throws
+inside the worker — the failed row is filed and the apology goes, as for any
+other failure — instead of holding the turn until the platform kills the worker
+at 400s, where nothing runs. One budget for the whole turn, because ten rounds
+each under a per-request bound could still outlive the worker together. It is
+measured on the clock `eugenia_runs.ms` records, so the longest successful row
+per caller says how much room there is. The briefing writes in two turns, the
+draft and the critic: the bound catches a stall in either, and two slow turns
+together are `pace_line`'s to see.
 
 **What she costs, measured.** The week of 2026-09-10 came to **$16.68, about $72 a
 month**:

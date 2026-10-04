@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 696 tests, six suites
+npm test      # 698 tests, six suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -396,7 +396,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 - **The container is mandatory once web search is in play**; neither tool sets
   `strict: true`.
 - **Effort is per caller**; nothing runs `low`.
-- **`MAX_ROUNDS` is a backstop** at ten. `rounds` and `model` are columns; a
+- **`MAX_ROUNDS` is a backstop** at ten, and `TURN_MS` its twin for time — one
+  signal per turn, at `pace_line`'s share. `rounds` and `model` are columns; a
   successful turn's `detail` is its client-tool tally. Read `rounds` before
   changing a caller's model.
 - **`MODELS` is keyed on the caller's label**, absent means Opus, and only `trim`

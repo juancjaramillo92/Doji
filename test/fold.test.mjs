@@ -2229,6 +2229,42 @@ test('a turn served by another model names it in the cost line', async () => {
   assert.match(line, /FELL BACK TO some-other-model/);
 });
 
+/* A request that never answers. Only the signal ask() hands it can end it, so
+   a turn that settles proves the signal reached the request. Raced against a
+   deadline of its own, as the speech test is: AbortSignal.timeout's timer is
+   unref'd, so this timer stands in for the open socket a real request holds,
+   and a regression fails here rather than hanging the suite. */
+test('a model request that never answers fails the turn in words, and files its row', async () => {
+  const rows = [];
+  let err, timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(
+      'ask() waited past its budget for a model that never answers')), 3_000);
+  });
+  await stubbed(async () => {
+    globalThis.fetch = (url, init) => {
+      if (url.includes('/rest/v1/eugenia_runs')) {
+        rows.push(...JSON.parse(init.body));
+        return Promise.resolve({ ok: true });
+      }
+      return new Promise((_, reject) =>
+        init.signal?.addEventListener('abort', () => reject(init.signal.reason)));
+    };
+    try {
+      err = await Promise.race([
+        ask([{ role: 'user', content: 'anything' }], 'medium', 'test', undefined, 50)
+          .then(() => null, e => e),
+        deadline]);
+    } finally { clearTimeout(timer); }
+  });
+  assert.ok(err, 'a request that never answered let the turn return');
+  assert.equal(err.message, "Claude did not finish within the turn's 0.05s",
+    'the apology would quote the runtime\'s abort rather than say what happened');
+  assert.equal(rows.length, 1, 'the stalled turn left no row');
+  assert.equal(rows[0].ok, false);
+  assert.match(rows[0].detail, /did not finish/);
+});
+
 test('a fallback on one round survives a later round that did not fall back', async () => {
   // Round one declines and is rescued; round two runs on what was asked for.
   // Clearing on the second would report the turn as ordinary.
