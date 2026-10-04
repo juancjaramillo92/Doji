@@ -536,7 +536,7 @@ direction cannot be fixed in the app, which does not own the column.
 |---|---|---|---|---|
 | direction, entry time or price, exit price, size, commission, `computed_pnl`, filing day | the poller, alone | `?raw=1&hours=N` — what cTrader actually sent | `?force=1&hours=N` if the fold is wrong for a response that is right; a code change if the response itself is shaped differently | rewrites all ten of those columns for **every** position in the window, so any hand-correction inside it goes back |
 | `net_pnl` — the settled money figure | the email path, alone | the thread is unlabelled, so the next Apps Script run retries it | re-send the alert, or accept `computed_pnl` through `pnl` | nothing; the poller never writes this column |
-| a closed trade with `exit_price is null` | the poller, folded without its entry deal | that combination *is* the signature | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
+| a closed trade with `exit_price is null` | the poller, whose fold lost its entry deal and was held back | that combination *is* the signature, and `sync_health` names the ids while the close is in the window | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
 | `balance`, `planned_sl`, `planned_tp`, `fill_time`, `best_price` | settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
 | setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
 | a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
@@ -625,8 +625,15 @@ upserted only if one of its deals falls inside the narrow window. Read at six
 hours, a long position's closing deal arrives without its entry, and the fold
 reads direction, entry time, entry price and filing day off the exit — silently.
 Anything held longer than `MAX_POSITION_HOURS` still slices, so the constant is a
-bound on position lifetime. The signature of a slice is **`exit_price is null`
-on a closed trade**.
+bound on position lifetime. **A slice is never written**: its fold reads open,
+and `sliced` holds back any fold the deals call open that `get_positions` no
+longer lists — read after the deals, so a position closing between the two reads
+is skipped for one poll rather than written sliced once. Written, it would
+overwrite the direction and entry the poll filed while the position was live,
+and the email's direction with them. The row keeps its entry and gets no exit,
+so the signature of a slice is still **`exit_price is null` on a closed trade**,
+and the poll marks `sync_health` with the ids after its own mark, so her briefing
+names it while the close is in the write window.
 
 Four things about the data are easy to get wrong and invisible afterwards:
 

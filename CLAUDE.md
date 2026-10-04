@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 698 tests, six suites
+npm test      # 700 tests, six suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -199,8 +199,9 @@ what could not be verified.
   `DESTRUCTIVE_TOOLS` names the five the broker serves on the same credential, and
   a test asserts none is reachable, and that no permitted name goes uncalled.
   `doji-tradingview` derives its banned set from the captured listing.
-- **The poller's two windows are different questions** (README). The signature of
-  a row folded without its entry deal is `exit_price is null` on a closed trade.
+- **The poller's two windows are different questions** (README). A fold without
+  its entry deal is held back by `sliced`, judged against `get_positions` read
+  after the deals; the row it leaves is `exit_price is null` on a closed trade.
   Repairs are `?force=1&hours=N`, which overwrite hand corrections in the window.
 
 ---

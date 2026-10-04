@@ -20,7 +20,7 @@ import { secretMatches, nyClock, nyDate, marketOpen, parseSse } from '../supabas
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget,
-  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges,
+  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges, sliced,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -308,6 +308,28 @@ test('a sliced deal set inverts direction and leaves exit_price null', () => {
   assert.equal(closeOnly.exit_price, null);        // `exit_price is null` on a closed trade
   assert.equal(closeOnly.computed_pnl, null);
   assert.equal(closeOnly.entry_price, 3371.38);    // the exit's price, filed as the entry
+});
+
+/* What the poll holds back, judged against the broker's own live list as
+   get_positions serves it. Folds are real ones, so a change to what an
+   entry-less fold looks like reaches this test too. */
+test('a fold the deals call open that the broker no longer lists is held back', () => {
+  const closeOnly = foldPosition([deal({ side: 'BUY', price: 3371.38, min: 29, positionId: 7 })], USER);
+  const live = foldPosition([deal({ side: 'SELL', price: 3400, positionId: 8 })], USER);
+  const closed = foldPosition([
+    deal({ side: 'SELL', price: 3400, positionId: 9 }),
+    deal({ side: 'BUY', price: 3390, min: 10, dealId: 2, positionId: 9 })], USER);
+  const listed = openPlans([{ positionId: 8, stopLoss: 3410 }]);
+
+  assert.deepEqual(sliced([closeOnly, live, closed], listed), ['PID7'],
+    'the entry-less fold was written, so its inverted direction overwrites the right one');
+  // A partial close is open by its deals and still listed: written.
+  const partial = foldPosition([
+    deal({ side: 'SELL', price: 3400, vol: 200, positionId: 8 }),
+    deal({ side: 'BUY', price: 3390, vol: 100, min: 10, dealId: 2, positionId: 8 })], USER);
+  assert.deepEqual(sliced([partial], listed), [], 'a live partial close was held back');
+  // A list that could not be read holds nothing back: the poll writes as it did.
+  assert.deepEqual(sliced([closeOnly], null), []);
 });
 
 test('a same-side deal is a scale-in, not a close', () => {

@@ -379,6 +379,25 @@ export function openPlans(positions: any[]): OpenPlan[] {
   });
 }
 
+/* ─── A fold missing its entry ─────────────────────────────────────────────
+   A position that outlived the fold window closes without its entry deal in
+   view: the close is taken as the entry, the direction inverts, and the fold
+   reads open. Upserted, that overwrites the right direction and entry the poll
+   wrote while the position was live, and the email's direction after it.
+
+   The broker's own list of live positions says what the deals cannot: a fold
+   the deals call open that the broker no longer lists has lost its entry. Read
+   after the deals, so a position that closes between the two reads is skipped
+   for one poll and written whole on the next, never written sliced. Pure, so
+   the decision is driven; `live` null is a list that could not be read, and
+   then nothing is held back. */
+export function sliced(rows: { id: string; exit_price: number | null }[],
+                       live: OpenPlan[] | null): string[] {
+  if (!live) return [];
+  const open = new Set(live.map(p => p.id));
+  return rows.filter(r => r.exit_price === null && !open.has(r.id)).map(r => r.id);
+}
+
 // One write per column, each on its own filter: a filter cannot arbitrate a
 // column it does not name.
 async function writePlan(plan: OpenPlan): Promise<number> {
@@ -668,12 +687,23 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     // Each position folds from its complete deal set; only those that moved in
     // the write window are sent. The last deal rides along: wherever there is
     // an exit price, it is the closing one.
-    const folded = [...byPosition.values()]
+    const moved = [...byPosition.values()]
       .filter(ds => ds.some(d => d.executionTimestamp >= from))
       .map(ds => ({
         row: foldPosition(ds, USER_ID),
         closedAt: Math.max(...ds.map(d => d.executionTimestamp)),
       }));
+
+    // The live positions: what `sliced` judges against, and the plan below.
+    // Never fatal — a list that cannot be read holds nothing back.
+    let plans: OpenPlan[] | null = null;
+    try {
+      plans = openPlans((await mcpCall(session, "get_positions", {})).positions ?? []);
+    } catch (err) {
+      console.error("doji-mcp-sync: positions not read —", why(err));
+    }
+    const slices = sliced(moved.map(f => f.row), plans);
+    const folded = moved.filter(f => !slices.includes(f.row.id));
     const n = await upsert(folded.map(f => f.row));
 
     /* The close instant, which the email owns: this stamps every close it saw
@@ -713,12 +743,12 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     // instant's reasons.
     let planned = 0, stops = 0;
     try {
-      const open = await mcpCall(session, "get_positions", {});
-      const plans = openPlans(open.positions ?? []);
-      // Sequential: a handful of single-row PATCHes. Counted on the answer:
-      // steady state is 0, and a filter that stopped filtering reads 1 forever.
-      for (const plan of plans) planned += await writePlan(plan);
-      stops = await recordStops(plans);
+      if (plans) {
+        // Sequential: a handful of single-row PATCHes. Counted on the answer:
+        // steady state is 0, and a filter that stopped filtering reads 1 forever.
+        for (const plan of plans) planned += await writePlan(plan);
+        stops = await recordStops(plans);
+      }
     } catch (err) {
       console.error("doji-mcp-sync: plan not recorded —",
         why(err));
@@ -735,10 +765,19 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
 
     // Marked after every step, so it means the deals landed.
     await heartbeat("poller");
+    /* And a slice after it, so the last outcome reads as a failure in her
+       briefing while the close is in the write window: the row keeps its entry
+       but has no exit until a wide backfill reaches the entry. */
+    if (slices.length) {
+      await heartbeat("poller", new Error(
+        `${slices.join(", ")} closed with the entry outside the ${foldHours(hours)}h ` +
+        `fold window, so the close was not written — repair with ?force=1&hours=N ` +
+        `wide enough to reach the entry`));
+    }
 
     return json({
       ok: true, window_hours: hours, fold_hours: foldHours(hours),
-      deals: deals.length, positions: n, balance_for: target, planned, stamped, stops, excursions,
+      deals: deals.length, positions: n, sliced: slices, balance_for: target, planned, stamped, stops, excursions,
       // Reported, not acted on: true of almost every run.
       has_more: data.hasMore ?? null,
     });

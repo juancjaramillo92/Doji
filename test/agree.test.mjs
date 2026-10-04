@@ -4894,6 +4894,33 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
     'lands as whatever R-04 has since moved it to');
 });
 
+/* `sliced` is driven in fold.test.mjs; this reads that the poll asks it, in
+   the one order that cannot write a slice: the deals, then the broker's live
+   list, then the judgment, then the upsert of what survived it. The list read
+   first, a position closing between the two reads is written sliced once. */
+test('the poll judges its folds against the live list before it writes them', () => {
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
+  const at = (needle) => {
+    const i = src.indexOf(needle);
+    assert.ok(i > -1, `the poll no longer contains ${needle}`);
+    return i;
+  };
+  const deals    = at('await mcpCall(session, "get_deals", dealArgs)');
+  const positions = at('await mcpCall(session, "get_positions", {})');
+  const judged   = at('const slices = sliced(moved.map(f => f.row), plans);');
+  const kept     = at('const folded = moved.filter(f => !slices.includes(f.row.id));');
+  const written  = at('await upsert(folded.map(f => f.row))');
+  assert.ok(deals < positions && positions < judged && judged < kept && kept < written,
+    'the poll no longer reads the deals, then the live list, then judges, then writes ' +
+    'what survived — an entry-less fold can reach the upsert');
+  assert.equal(src.split('mcpCall(session, "get_positions"').length - 1, 1,
+    'get_positions is read twice in the poll — the plan and the slice judgment must ' +
+    'stand on the same list');
+  assert.match(src, /await heartbeat\("poller"\);\n[\s\S]{0,400}if \(slices\.length\) \{\n\s*await heartbeat\("poller", new Error\(/,
+    'a slice is no longer marked after the run\'s own mark, so the last outcome reads ' +
+    'as healthy and her briefing never names it');
+});
+
 test('the poller fills best_price once, newest first, and counts what it wrote', () => {
   /* bestPrice can be right on every bar while the poll never reaches it, reads the
      backlog oldest first, or overwrites every two minutes — none a wrong number
