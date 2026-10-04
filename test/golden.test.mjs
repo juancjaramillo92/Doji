@@ -207,8 +207,8 @@ const DESK = {
 
 /* ─── What gets written down ─────────────────────────────────────────────────
    Derived values AND markup, because each alone has a blind spot: the values
-   miss a template that stopped emitting a class, the markup misses a figure
-   right on screen and wrong in the object the export reads.
+   miss a template that stopped emitting a class, the markup misses a derived
+   value that is wrong where the screen does not show it.
    ─────────────────────────────────────────────────────────────────────────── */
 
 // Every panel, by the id it renders into. innerHTML rather than textContent:
@@ -295,7 +295,7 @@ function capture({ app, $, win, charts }) {
 
   const clock = {
     today: A.Dates.today(), nyMonth: A.Dates.nyMonth(),
-    weekStart: wk, monthStart: mo, lastClose: A.Dates.lastClose(),
+    weekStart: wk, monthStart: mo,
   };
 
   // Both indexes, whole: every render reads them.

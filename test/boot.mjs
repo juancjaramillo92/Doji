@@ -18,7 +18,7 @@ const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 // Explicit rather than scraped, so a rename in the app fails here loudly
 // instead of a test asserting on `undefined`.
 const EXPOSED = [
-  'CONFIG', 'Data', 'Dates', 'IO', 'Journal', 'Login',
+  'CONFIG', 'Data', 'Dates', 'Journal', 'Login',
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'averages', 'pctSplit', 'byKey', 'round2', 'prevWeek', 'shiftMonth',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
@@ -139,8 +139,8 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
     })
   };
 
-  // jsdom has none of these and the app touches all three: matchMedia at load,
-  // getContext on every wheel, createObjectURL from the weekly backup's timer.
+  // jsdom has neither and the app touches both: matchMedia at load, getContext
+  // on every wheel.
   win.matchMedia = q => ({
     matches: false, media: q, addEventListener() {}, removeEventListener() {},
     addListener() {}, removeListener() {}
@@ -153,21 +153,6 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
     return new Proxy({}, {
       get: (t, k) => k === 'canvas' ? canvas : (t[k] ??= () => {})
     });
-  };
-  win.URL.createObjectURL = () => 'blob:doji-test';
-  win.URL.revokeObjectURL = () => {};
-
-  /* SheetJS, recorded rather than fetched: with window.XLSX present, loadXLSX()
-     returns at once, the export builds its own rows, and json_to_sheet catches
-     them. Only the four entry points the export calls. */
-  const sheets = [];
-  win.XLSX = {
-    utils: {
-      json_to_sheet: (rows) => { const ws = { rows }; sheets.push(ws); return ws; },
-      book_new: () => ({ SheetNames: [], Sheets: {} }),
-      book_append_sheet: (wb, ws, name) => { wb.SheetNames.push(name); wb.Sheets[name] = ws; }
-    },
-    write: () => new Uint8Array([0])
   };
 
   if (snapshot) win.localStorage.setItem('doji_snapshot_v1', JSON.stringify(snapshot));
@@ -196,7 +181,7 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   // the process alive. Closing the window is not optional housekeeping.
   const close = () => win.close();
 
-  return { dom, win, app, seed, charts, sheets, close, db: win.__db, $: id => win.document.getElementById(id) };
+  return { dom, win, app, seed, charts, close, db: win.__db, $: id => win.document.getElementById(id) };
 }
 
 // A trade as the app receives one: broker columns filled, journal columns

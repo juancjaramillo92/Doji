@@ -1342,9 +1342,9 @@ const MODELS: Record<string, string> = {
 export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
 
 async function call(messages: any[], effort: Effort, tools: unknown[],
-                    model: string, container?: string) {
+                    model: string, signal: AbortSignal, container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
+    method: "POST", signal,
     headers: {
       "x-api-key": ANTHROPIC_KEY,
       "anthropic-version": "2023-06-01",
@@ -1393,6 +1393,15 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
    guards against. eugenia_runs.rounds says how close each caller runs. */
 const MAX_ROUNDS = 10;
 
+/* Its twin for time. A request that never answers otherwise holds the turn
+   until the worker is killed at its wall clock — no catch, no row, no apology,
+   and each retry dies the same way. Bounded, it throws inside the worker, and
+   the row and the apology go out like any other failure. The share pace_line
+   warns at, so the hundred seconds above it are left to report in; one budget
+   for the whole turn, since ten rounds each under a per-request bound could
+   still outlive the worker together. eugenia_runs.ms is the clock it reads. */
+const TURN_MS = 300_000;
+
 // What a name with nothing behind it is told, by serve and by the loop alike.
 const unserved = (name: string) =>
   `There is no tool called "${name}" here. Answer without it and do not mention this.`;
@@ -1428,9 +1437,10 @@ export async function serve(name: string, input: any): Promise<string> {
 /* `label` names the caller: eugenia_runs files the row under it and modelFor
    picks the model from it, so one string decides what ran and what it is filed
    as. Effort alone cannot tell the callers apart. Exported so a test can drive
-   the loop against a stubbed fetch. */
+   the loop against a stubbed fetch, with the budget a parameter so a stall
+   needs no waiting out. */
 export async function ask(messages: Turn[], effort: Effort, label: string,
-                          tools: unknown[] = CHAT_TOOLS): Promise<string> {
+                          tools: unknown[] = CHAT_TOOLS, budget = TURN_MS): Promise<string> {
   // Derived, so a caller cannot run one model and be recorded under another.
   const model = modelFor(label);
   const offered = new Set(tools.map((t: any) => t.name));
@@ -1449,6 +1459,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   let fellBack = "";
   // For the row; `rounds` outlives the loop so a turn that died says where.
   const started = Date.now();
+  const deadline = AbortSignal.timeout(budget);
   let rounds = 0;
   // What the rounds were spent on — the client-tool half of the tally, beside
   // the server tools. A count of rounds could not say.
@@ -1469,7 +1480,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   try {
   while (rounds < MAX_ROUNDS) {
     rounds++;
-    const body = await call(convo, effort, tools, model, container);
+    const body = await call(convo, effort, tools, model, deadline, container);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
@@ -1550,7 +1561,10 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
     return text;
   }
   throw new Error(`tool loop did not settle in ${MAX_ROUNDS} rounds`);
-  } catch (err) {
+  } catch (caught) {
+    // The abort's own message is the runtime's, and says nothing he can use.
+    const err = deadline.aborted
+      ? new Error(`Claude did not finish within the turn's ${budget / 1000}s`) : caught;
     // A failed turn is a row too — the one that never existed. Rethrown.
     await run(false, [why(err), toolLine()].filter(Boolean).join(' · tools: ').slice(0, 500));
     throw err;
@@ -2120,12 +2134,14 @@ export async function thesisBlock(): Promise<string> {
 
 /* ─── Whether the journal is still being written ────────────────────────────
    The poller and the email function have no voice, and either dying looks like
-   a week he did not trade. sync_health is their heartbeat and this its one
-   reader. Six hours against the two-minute poll: shorter and a quiet Sunday
-   reads as a fault, longer and a Monday outage reaches him Tuesday. A fact
-   about his instruments, so she leads with it.
+   a week he did not trade. sync_health is their heartbeat and this its
+   reader; scripts/health.mjs asks the same staleness from outside, for when
+   pg_cron itself has stopped and no briefing comes. Six hours against the
+   two-minute poll: shorter and a quiet Sunday reads as a fault, longer and a
+   Monday outage reaches him Tuesday. A fact about his instruments, so she
+   leads with it.
    ─────────────────────────────────────────────────────────────────────────── */
-const STALE_HOURS = 6;
+export const STALE_HOURS = 6;
 
 const WRITERS: Record<string, string> = {
   poller: "the broker sync",

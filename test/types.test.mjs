@@ -121,14 +121,13 @@ test('no Edge Function uses a name nothing declares, or declares one nothing use
 });
 
 /* ─── The app ────────────────────────────────────────────────────────────────
-   THE SHIM IS A BOUNDARY AND IS DECLARED, NOT DERIVED. `Chart` and `XLSX` are
-   globals off CDN scripts this repository does not own. Each is held against a
-   script the page still loads, or the entry becomes a free variable wearing a
+   THE SHIM IS A BOUNDARY AND IS DECLARED, NOT DERIVED. `Chart` is a global
+   off a CDN script this repository does not own. It is held against a script
+   the page still loads, or the entry becomes a free variable wearing a
    declaration. `supabase` needs no row: the app reads `window.supabase`, a
    property question rather than a scope one. */
 const CDN = {
   Chart: 'chart.js@',
-  XLSX:  'xlsx@',
 };
 
 const GLOBALS = 'globals.d.ts';

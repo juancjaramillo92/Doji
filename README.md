@@ -15,10 +15,9 @@ the broker supplies, and the discipline record, which only you can.
 Open `index.html`. That is the whole application — no build step, no bundler, no
 dependencies to install.
 
-Three libraries load from jsDelivr, each pinned to an exact version. Chart.js and
-the Supabase client are blocking scripts; SheetJS, the largest, is fetched on the
-first export. Chart.js and SheetJS carry an SRI hash; the Supabase client does
-not, for the reason given beside its tag. Two typefaces come from Google Fonts —
+Two libraries load from jsDelivr, each pinned to an exact version, as blocking
+scripts: Chart.js and the Supabase client. Chart.js carries an SRI hash; the
+Supabase client does not, for the reason given beside its tag. Two typefaces come from Google Fonts —
 Hanken Grotesk for the interface, JetBrains Mono for every figure — and `--ui`
 and `--mono` both carry a system fallback, so a network that blocks the fonts
 costs the typeface and nothing else.
@@ -60,11 +59,13 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/adherence.ts             the thirteen rules a journal row can answer
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
-scripts/backup-memory.mjs               the paged read behind the weekly copy
+scripts/backup.mjs                      the paged read behind the daily copy
+scripts/health.mjs                      whether anything is running, asked from outside
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-.github/workflows/backup-memory.yml     the weekly copy of the eight tables nothing else holds
+.github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
+.github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -379,7 +380,7 @@ single-sourced at run time:
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
-| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first |
+| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia` |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow and the Apps Script |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -438,15 +439,47 @@ control over any of them could only lie. The trade log is where they are read.
 is set at once; undo clears it. The window forgives the reflex, it does not hold
 the delete back.
 
-**Export** gives the journal as `.xlsx` and a full `.json` backup, both as Blob
-URLs, as the weekly auto-backup does. The backup carries **every** row, the
-soft-deleted ones included — restoring without them lets the poller rebuild
-every trade you removed — and omits the generated `pnl`. It is a genuine restore
-point, and deliberately has no restore *button*: replacing the database from a
-file is a job for the SQL editor, done knowingly.
+**Two backups, for two different losses.** Neither is in the app.
+
+**Supabase snapshots the whole database daily**, and the Pro plan keeps the last
+seven, under Database → Backups in the dashboard. A snapshot is every table,
+Vault included, and Doji keeps nothing in Storage, so it is everything there is.
+It is the repair for a database that is gone or broken: a restore returns the
+whole project to that day, and everything written since — trades, answers, her
+memory — goes with it. Point-in-time recovery between snapshots is a paid
+add-on.
+
+**A copy of what exists nowhere else is taken daily, outside Supabase.**
+`scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
+nine tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the eight of hers with no other source — the channel map,
+notes, turns, thesis, open loops, calendar, feedback, and every stop and target a
+position carried. `trades` goes whole, the soft-deleted rows included: a restore
+without them lets the poller rebuild every trade you removed. `eugenia_runs` is
+left out: the largest table, and facts about model calls rather than about you.
+
+It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
+step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
+so this is blast radius — leaked, it is revoked alone while the functions keep
+running. **The paging is the load-bearing part.** PostgREST caps a response at
+its own `max-rows`, so one read of `eugenia_turns` returns a page that looks
+exactly like a complete archive. The walk stops on a short page, not a count it
+was told, and the job refuses to upload a document whose `trades` is empty.
+It is the repair the snapshots cannot make: ninety days rather than seven, so a
+mistake found in the second week can still be undone; one table at a time,
+so the journal comes back without rolling back her memory; and in another
+company's keeping, if the Supabase account itself is lost. Artifacts expire
+after ninety days, so download one occasionally, or run it by hand:
+
+```sh
+SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup.mjs > backup.json
+```
+
+**Restoring the journal** is a job for the SQL editor, done knowingly — there is
+no restore button:
 
 ```sql
--- 1. paste the file's `trades` array as the argument
+-- 1. paste the file's `tables.trades` array as the argument
 -- 2. run it; every column is written except the generated pnl
 insert into trades (id, user_id, direction, entry_time, fill_time, entry_price,
   exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl,
@@ -471,39 +504,11 @@ on conflict (id) do update set
 ```
 
 The columns are named because Postgres refuses any value for a generated
-column, a null included, so `select *` would stop at `pnl` before a row landed.
-`agree.test.mjs` reads all three lists against the schema, so a column added
-later fails the suite until the restore names it.
-
-**The weekly auto-backup** fires after the Friday 17:00 New York close, keyed on
-the last completed week so it runs once. Desktop only, with a per-device marker,
-so a phone does not consume the laptop's turn. A gesture-less download can be
-blocked silently, so the toast asks you to verify rather than claiming success.
-
-**Her memory is backed up from outside the browser.** The app's backup is
-`trades`, whose broker columns a wide `?force=1` can rebuild and whose journal
-columns only that file holds. Her tables are the other way round — no source
-anywhere else — and RLS denies the publishable key most of them on
-purpose, so no in-app backup can or should reach them.
-`scripts/backup-memory.mjs`, run every Sunday evening by
-`.github/workflows/backup-memory.yml`, reads the eight tables with no other
-source — the channel map, notes, turns, thesis, open loops, calendar, feedback,
-and every stop and target a position carried — into one JSON artifact.
-`eugenia_runs` is left out: the largest table, and facts about model calls
-rather than about him.
-
-It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
-step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
-so this is blast radius — leaked, it is revoked alone while the functions keep
-running. **The paging is the load-bearing part.** PostgREST caps a response at
-its own `max-rows`, so one read of `eugenia_turns` returns a page that looks
-exactly like a complete archive. The walk stops on a short page, not a count it
-was told, and the job refuses to upload a document with zero rows. Artifacts
-expire after ninety days, so download one occasionally, or run it by hand:
-
-```sh
-SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
-```
+column, a null included, so `select *` would stop at `pnl` before a row landed;
+the backup carries `pnl` and the statement ignores it. `agree.test.mjs` reads
+all three lists against the schema, so a column added later fails the suite
+until the restore names it, and `test/db` runs the statement over a backup's
+rows.
 
 **Signing out** is a double-click on the sync dot, and it deletes the snapshot:
 a full plaintext copy of the journal in `localStorage`, which left behind puts
@@ -541,7 +546,7 @@ direction cannot be fixed in the app, which does not own the column.
 |---|---|---|---|---|
 | direction, entry time or price, exit price, size, commission, `computed_pnl`, filing day | the poller, alone | `?raw=1&hours=N` — what cTrader actually sent | `?force=1&hours=N` if the fold is wrong for a response that is right; a code change if the response itself is shaped differently | rewrites all ten of those columns for **every** position in the window, so any hand-correction inside it goes back |
 | `net_pnl` — the settled money figure | the email path, alone | the thread is unlabelled, so the next Apps Script run retries it | re-send the alert, or accept `computed_pnl` through `pnl` | nothing; the poller never writes this column |
-| a closed trade with `exit_price is null` | the poller, folded without its entry deal | that combination *is* the signature | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
+| a closed trade with `exit_price is null` | the poller, whose fold lost its entry deal and was held back | that combination *is* the signature, and `sync_health` names the ids while the close is in the window | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
 | `balance`, `planned_sl`, `planned_tp`, `fill_time`, `best_price` | settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
 | setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
 | a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
@@ -562,6 +567,16 @@ after the latest success means failing now, and a success after it clears. **A
 market-closed skip is a completed run and marks itself**, or gold's weekend close
 reads as a dead sync every Sunday evening. The table is inert until it exists:
 both writers swallow their own heartbeat failure.
+
+**Something outside the database asks too.** Every watcher here is a pg_cron
+job, and so is the briefing that reports them, so pg_cron stopping or the
+project pausing silences all of them at once. `scripts/health.mjs`, run hourly by
+`.github/workflows/health.yml` with the backup's two secrets, reads the poller's
+`last_ok` and fails the job when it is older than `STALE_HOURS` — imported from
+her file, so the two readers cannot disagree — and GitHub's email about a failed
+run is the alarm. Staleness only: a failed poll is hers to report, and one that
+keeps failing goes stale. A refused read fails the job too, since a revoked key
+or a paused project is the outage it exists to name.
 
 **`dispatch_watch` sees the call that never ran.** Supabase can refuse a
 worker with `546 WORKER_RESOURCE_LIMIT` *before* the function exists — nothing
@@ -630,8 +645,15 @@ upserted only if one of its deals falls inside the narrow window. Read at six
 hours, a long position's closing deal arrives without its entry, and the fold
 reads direction, entry time, entry price and filing day off the exit — silently.
 Anything held longer than `MAX_POSITION_HOURS` still slices, so the constant is a
-bound on position lifetime. The signature of a slice is **`exit_price is null`
-on a closed trade**.
+bound on position lifetime. **A slice is never written**: its fold reads open,
+and `sliced` holds back any fold the deals call open that `get_positions` no
+longer lists — read after the deals, so a position closing between the two reads
+is skipped for one poll rather than written sliced once. Written, it would
+overwrite the direction and entry the poll filed while the position was live,
+and the email's direction with them. The row keeps its entry and gets no exit,
+so the signature of a slice is still **`exit_price is null` on a closed trade**,
+and the poll marks `sync_health` with the ids after its own mark, so her briefing
+names it while the close is in the write window.
 
 Four things about the data are easy to get wrong and invisible afterwards:
 
@@ -967,7 +989,7 @@ every use and a function cannot rewrite its own Edge secrets. One row in
 `tradingview_auth`: RLS on, no policy, revoked from both public roles, and
 `verify.sql` asks all three. A refresh that brings no new refresh token keeps the
 old one — storing the absence would end the connection at the next expiry. The
-table is not in the memory backup and must not be: a live refresh token in an
+table is not in the backup and must not be: a live refresh token in an
 artifact is the account.
 
 **One renewal at a time, by a lease.** A rotating server may treat a refresh
@@ -2242,6 +2264,17 @@ billing for ever; the one it can cause is a message that never arrives.
 since a name that cannot match, a tool called one per round and a model that
 will not batch are different repairs.
 
+**`TURN_MS` is its twin for time: 300s, the share `pace_line` warns at.** Every
+request in a turn carries one `AbortSignal`, so a model that never answers throws
+inside the worker — the failed row is filed and the apology goes, as for any
+other failure — instead of holding the turn until the platform kills the worker
+at 400s, where nothing runs. One budget for the whole turn, because ten rounds
+each under a per-request bound could still outlive the worker together. It is
+measured on the clock `eugenia_runs.ms` records, so the longest successful row
+per caller says how much room there is. The briefing writes in two turns, the
+draft and the critic: the bound catches a stall in either, and two slow turns
+together are `pace_line`'s to see.
+
 **What she costs, measured.** The week of 2026-09-10 came to **$16.68, about $72 a
 month**:
 
@@ -2390,7 +2423,6 @@ references anything defined below it at load time.
 | `Charts` | Chart.js wrappers and the shared visual primitives |
 | `Render` | one function per component |
 | `Journal` | the entry modal |
-| `IO` | export and backup |
 | `Login` | session gate |
 | `Carousel` | mobile swipe position and dots |
 
@@ -2657,24 +2689,25 @@ home-screen shortcut and every bookmark open `/`.
 | File | Covers |
 |---|---|
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
-| `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, week and backup boundaries, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the export's figures, the snapshot, the offline boot, and the watch card |
+| `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; and Eugenia answering a message, a trade event and the hour before the work, with the work kept |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
-| `test/db/schema.test.mjs` | `schema.sql` applied to a real Postgres: a re-run changes nothing, and run over main's copy it leaves what a fresh apply leaves; `verify.sql` passes against what it builds; the trades triggers fire on what they should and nothing else, and a missing secret costs the message, never the write; the app's grants and RLS; the calendar's clock; both watchers driven from planted rows; her search by words, spelling and vector; every scheduled job's command run once; and a census that every PL/pgSQL function was driven |
+| `test/db/schema.test.mjs` | `schema.sql` applied to a real Postgres: a re-run changes nothing, and run over main's copy it leaves what a fresh apply leaves; `verify.sql` passes against what it builds; the trades triggers fire on what they should and nothing else, and a missing secret costs the message, never the write; the app's grants and RLS; the README's restore run over a backup's rows; the calendar's clock; both watchers driven from planted rows; her search by words, spelling and vector; every scheduled job's command run once; and a census that every PL/pgSQL function was driven |
 | `test/db/supabase.sql` | the stand-ins: what Supabase provides, as far as `schema.sql` reaches it |
 | `supabase/verify.sql` | not a suite: run by hand against the live database, one statement, one row per fact. Nothing in it may raise on a wrong database — functions are asked by oid, tables through `query_to_xml` |
 
 **What is not covered.** Pixels — correct HTML under broken CSS passes. Realtime
-and the auth server, since Supabase is a stand-in. What SheetJS writes from the
-rows it is handed. Anything whose first line is the network — the MCP transport,
+and the auth server, since Supabase is a stand-in. Anything whose first line is the network — the MCP transport,
 the upserts, the Telegram sends, the model call — is tested for what it decides,
-not what it sends; where the decision lives in such a function, `agree.test.mjs`
-reads its source. Gmail itself, behind the Apps Script stubs. What Supabase's own
-`pg_net`, `pg_cron` and Vault do, behind `test/db`'s stand-ins. `IO.backup` is plain JSON and is not tested.
+and through the doors `serve.test.mjs` drives, for what it sends; where a
+decision lives deeper than a test can reach, `agree.test.mjs` reads its source.
+Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
+`pg_cron` and Vault do, behind `test/db`'s stand-ins.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and
@@ -2699,9 +2732,9 @@ add.
 a buy, a thousands separator, a missing figure and an unreadable time exist in no
 saved message, so they are built in its shape, and one test holds the builder
 against the real body. The email path and the poller are the two pieces that
-could lose data quietly, and the weekly backup is the floor under both.
+could lose data quietly, and the daily backup is the floor under both.
 
-**The Supabase client carries no SRI hash**, unlike Chart.js and SheetJS. It is
+**The Supabase client carries no SRI hash**, unlike Chart.js. It is
 pinned to an exact version, which closes the drift; the hash would have to be
 recomputed on every bump and a forgotten one fails closed with no message. To add
 one, compute it from the npm tarball the CDN mirrors:

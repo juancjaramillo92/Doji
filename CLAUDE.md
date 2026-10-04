@@ -66,7 +66,7 @@ Every change is:
   differ from the committed one with nothing to reveal it. The SQL stays manual
   on purpose.
 - **Dependency-free.** No new libraries in the app: Chart.js and the Supabase
-  client are blocking tags; SheetJS is fetched on first export by `loadXLSX()`.
+  client are its two, both blocking tags.
   `jsdom` and `typescript` are dev dependencies and neither ships.
 - **A workflow names a commit, never a tag.** `.github/dependabot.yml` keeps the
   SHAs maintained, and `agree.test.mjs` holds them.
@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 697 tests, six suites
+npm test      # 710 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -121,8 +121,8 @@ what each suite covers.
   `boot.mjs` runs, exported so both read one program). Only those two, because
   they cannot go red for a reason that is not a defect; a whole typecheck under
   Node's lib reports facts about the invocation. One planted defect per question
-  rides in every program. `Chart` and `XLSX` are the browser shim, each held
-  against the page still loading its script.
+  rides in every program. `Chart` is the browser shim, held against the page
+  still loading its script.
 - **`golden.test.mjs`** asserts on what the others do not name — every derived
   value and every panel's markup — booted on a frozen clock (`boot({ now })`,
   frozen before the script runs, since `View.heatmap` reads the clock at load).
@@ -142,9 +142,8 @@ what each suite covers.
 - The golden snapshot captures `innerHTML`, the DOM re-serialised, so it cannot
   see two of `esc`'s five replacements; a direct test holds those.
 
-Nothing here sees pixels, realtime, auth, what SheetJS writes, or the live
-database — `verify.sql` is that check and a person runs it. Say so on any visual
-change. State on handback what was verified by running, what by reading, and
+Nothing here sees pixels, realtime, auth, or the live database — `verify.sql`
+is that check and a person runs it. Say so on any visual change. State on handback what was verified by running, what by reading, and
 what could not be verified.
 
 ---
@@ -199,8 +198,9 @@ what could not be verified.
   `DESTRUCTIVE_TOOLS` names the five the broker serves on the same credential, and
   a test asserts none is reachable, and that no permitted name goes uncalled.
   `doji-tradingview` derives its banned set from the captured listing.
-- **The poller's two windows are different questions** (README). The signature of
-  a row folded without its entry deal is `exit_price is null` on a closed trade.
+- **The poller's two windows are different questions** (README). A fold without
+  its entry deal is held back by `sliced`, judged against `get_positions` read
+  after the deals; the row it leaves is `exit_price is null` on a closed trade.
   Repairs are `?force=1&hours=N`, which overwrite hand corrections in the window.
 
 ---
@@ -220,7 +220,9 @@ what could not be verified.
   lists, and both lists in `trades_telegram_on_answer`, against each other.
 - **`callback_data` stays under 64 bytes**: it is the entire state a tap needs.
 - **`Deno.serve` is guarded so a test can import the module without serving**,
-  which is also why shared primitives live in `_shared/edge.ts`.
+  which is also why shared primitives live in `_shared/edge.ts`. `serve.test.mjs`
+  hands the guard a stub that keeps the handler, in its own process because
+  `edge.ts` reads its environment once, at first import.
 - **Do not extract the entry point.** All five functions authorise their callers
   in the same four lines, and that stays readable in the file being edited.
 
@@ -396,7 +398,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 - **The container is mandatory once web search is in play**; neither tool sets
   `strict: true`.
 - **Effort is per caller**; nothing runs `low`.
-- **`MAX_ROUNDS` is a backstop** at ten. `rounds` and `model` are columns; a
+- **`MAX_ROUNDS` is a backstop** at ten, and `TURN_MS` its twin for time — one
+  signal per turn, at `pace_line`'s share. `rounds` and `model` are columns; a
   successful turn's `detail` is its client-tool tally. Read `rounds` before
   changing a caller's model.
 - **`MODELS` is keyed on the caller's label**, absent means Opus, and only `trim`
@@ -426,13 +429,17 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 
 ---
 
-## Her memory is backed up from outside the browser
+## The journal and her memory are backed up from outside the browser
 
-`scripts/backup-memory.mjs`, run weekly by `.github/workflows/backup-memory.yml`.
+`scripts/backup.mjs`, run daily by `.github/workflows/backup.yml`, beside
+Supabase's own daily snapshots, which roll back the whole project; the README
+says which repair each makes. The app has no backup of its own.
 The paging is the part to be careful with: PostgREST caps a response at its own
 `max-rows`, so one read returns a page that looks like a complete archive. The
 walk stops on a short page, `readAll` takes its `fetch` as an argument so the loop
 is tested, and a refused read throws rather than backing up a blank.
+`scripts/health.mjs` beside it asks hourly whether the poller is still running,
+for when pg_cron is not; it imports `STALE_HOURS` rather than copying it.
 
 ---
 

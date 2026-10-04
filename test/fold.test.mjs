@@ -20,7 +20,7 @@ import { secretMatches, nyClock, nyDate, marketOpen, parseSse } from '../supabas
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget,
-  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges,
+  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges, sliced,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -57,7 +57,8 @@ import {
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { backup, readAll, TABLES } from '../scripts/backup-memory.mjs';
+import { backup, readAll, TABLES } from '../scripts/backup.mjs';
+import { lastRun, stale } from '../scripts/health.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -308,6 +309,28 @@ test('a sliced deal set inverts direction and leaves exit_price null', () => {
   assert.equal(closeOnly.exit_price, null);        // `exit_price is null` on a closed trade
   assert.equal(closeOnly.computed_pnl, null);
   assert.equal(closeOnly.entry_price, 3371.38);    // the exit's price, filed as the entry
+});
+
+/* What the poll holds back, judged against the broker's own live list as
+   get_positions serves it. Folds are real ones, so a change to what an
+   entry-less fold looks like reaches this test too. */
+test('a fold the deals call open that the broker no longer lists is held back', () => {
+  const closeOnly = foldPosition([deal({ side: 'BUY', price: 3371.38, min: 29, positionId: 7 })], USER);
+  const live = foldPosition([deal({ side: 'SELL', price: 3400, positionId: 8 })], USER);
+  const closed = foldPosition([
+    deal({ side: 'SELL', price: 3400, positionId: 9 }),
+    deal({ side: 'BUY', price: 3390, min: 10, dealId: 2, positionId: 9 })], USER);
+  const listed = openPlans([{ positionId: 8, stopLoss: 3410 }]);
+
+  assert.deepEqual(sliced([closeOnly, live, closed], listed), ['PID7'],
+    'the entry-less fold was written, so its inverted direction overwrites the right one');
+  // A partial close is open by its deals and still listed: written.
+  const partial = foldPosition([
+    deal({ side: 'SELL', price: 3400, vol: 200, positionId: 8 }),
+    deal({ side: 'BUY', price: 3390, vol: 100, min: 10, dealId: 2, positionId: 8 })], USER);
+  assert.deepEqual(sliced([partial], listed), [], 'a live partial close was held back');
+  // A list that could not be read holds nothing back: the poll writes as it did.
+  assert.deepEqual(sliced([closeOnly], null), []);
 });
 
 test('a same-side deal is a scale-in, not a close', () => {
@@ -1983,7 +2006,7 @@ test('the backup names every table that has no other source', async () => {
     'trade_stops is not paged by its whole key');
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
-  for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
+  for (const t of ['trades', 'eugenia_notes', 'eugenia_turns', 'eugenia_channels',
                    'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
                    'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
@@ -1992,6 +2015,31 @@ test('the backup names every table that has no other source', async () => {
   // than about him, and it is by far the largest table.
   assert.ok(!TABLES.some(([t]) => t === 'eugenia_runs'), 'the cost meter is in the backup');
   assert.match(out.taken_at, /^\d{4}-\d\d-\d\dT/, 'the document does not say when it was taken');
+});
+
+/* ─── The outside check: is anything running at all ─────────────────────── */
+
+test('the outside check fails a poller past the briefing\'s threshold, and only then', () => {
+  const now = Date.parse('2026-08-03T12:00:00Z');
+  const ago = (h) => new Date(now - h * 3600_000).toISOString();
+  // The same six hours healthLine reads, imported: at the edge it is running.
+  assert.equal(stale(ago(6), now), null);
+  assert.match(stale(ago(6.1), now), /^the poller last completed a run 6\.1h ago/);
+  assert.equal(stale(ago(0.05), now), null);
+  assert.equal(stale(null, now), 'the poller has never completed a run');
+});
+
+test('the outside check counts a refused read as the outage, never as a pass', async () => {
+  const refused = async () => ({ ok: false, status: 401, text: async () => 'bad key' });
+  await assert.rejects(() => lastRun('https://x', 'k', refused), /HTTP 401/,
+    'a revoked key or a paused project answered the check as healthy');
+  const empty = async () => ({ ok: true, json: async () => [] });
+  await assert.rejects(() => lastRun('https://x', 'k', empty), /no poller row/);
+
+  const asked = [];
+  const row = async (u) => { asked.push(u); return { ok: true, json: async () => [{ last_ok: 'T' }] }; };
+  assert.equal(await lastRun('https://x', 'k', row), 'T');
+  assert.deepEqual(asked, ['https://x/rest/v1/sync_health?select=last_ok&id=eq.poller']);
 });
 
 /* ─── Eugenia: Telegram's 4096-character limit ───────────────────────────── */
@@ -2227,6 +2275,42 @@ test('a caller on a cheaper model does not read as having fallen back', async ()
 test('a turn served by another model names it in the cost line', async () => {
   const [line] = await costLines([answers('some-other-model')]);
   assert.match(line, /FELL BACK TO some-other-model/);
+});
+
+/* A request that never answers. Only the signal ask() hands it can end it, so
+   a turn that settles proves the signal reached the request. Raced against a
+   deadline of its own, as the speech test is: AbortSignal.timeout's timer is
+   unref'd, so this timer stands in for the open socket a real request holds,
+   and a regression fails here rather than hanging the suite. */
+test('a model request that never answers fails the turn in words, and files its row', async () => {
+  const rows = [];
+  let err, timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(
+      'ask() waited past its budget for a model that never answers')), 3_000);
+  });
+  await stubbed(async () => {
+    globalThis.fetch = (url, init) => {
+      if (url.includes('/rest/v1/eugenia_runs')) {
+        rows.push(...JSON.parse(init.body));
+        return Promise.resolve({ ok: true });
+      }
+      return new Promise((_, reject) =>
+        init.signal?.addEventListener('abort', () => reject(init.signal.reason)));
+    };
+    try {
+      err = await Promise.race([
+        ask([{ role: 'user', content: 'anything' }], 'medium', 'test', undefined, 50)
+          .then(() => null, e => e),
+        deadline]);
+    } finally { clearTimeout(timer); }
+  });
+  assert.ok(err, 'a request that never answered let the turn return');
+  assert.equal(err.message, "Claude did not finish within the turn's 0.05s",
+    'the apology would quote the runtime\'s abort rather than say what happened');
+  assert.equal(rows.length, 1, 'the stalled turn left no row');
+  assert.equal(rows[0].ok, false);
+  assert.match(rows[0].detail, /did not finish/);
 });
 
 test('a fallback on one round survives a later round that did not fall back', async () => {

@@ -95,7 +95,7 @@
   --be-tx:#9aa4c0;
   /* Every neutral surface, hover and hairline comes from one of these five, so
      an alpha is changed in one place. */
-  --fill-0:rgba(255,255,255,.02);   /* inset panels (io section, day row)      */
+  --fill-0:rgba(255,255,255,.02);   /* inset panels (day cell, day row)        */
   --fill-1:rgba(255,255,255,.04);   /* pills, inputs                           */
   --fill-2:rgba(255,255,255,.07);   /* hover on a --fill-1 surface             */
   --fill-3:rgba(255,255,255,.08);   /* hover on a --fill-2 surface             */
@@ -111,8 +111,6 @@
   --warn:#d9a441;
   /* A shade below --glass, so a resultless day recedes behind those with one. */
   --cell-bg:rgba(8,8,10,.55);
-  /* --win at two alphas, for the export-ready confirmation strip. */
-  --win-gl:rgba(59,165,133,.08); --win-bd:rgba(59,165,133,.25);
   /* Held as the whole gradient rather than just its colour: all four users want
      identical geometry. */
   --aura:radial-gradient(760px 520px at 6% -8%, rgba(92,64,176,.12), transparent 62%);
@@ -185,16 +183,14 @@ tbody tr:focus-visible, .day-trade-row:focus-visible, .heatmap-cell:focus-visibl
 .heatmap-cell-count, .heatmap-cell-pnl, .tlog-time, .tlog-pag-info,
 .tlog-pag-btn, .roll-range, thead th, td, .dir-pill, .sess-wr-pct,
 .journal-q-label, .jf-pill-lbl,
-.jm-btn-save, .jm-btn-cancel, .io-modal-title, .io-section-label,
-.export-ready-link span, .export-ready-link a, .day-trade-sub, .day-trade-pnl,
+.jm-btn-save, .jm-btn-cancel, .day-modal-title, .day-trade-sub, .day-trade-pnl,
 .notif, .notif-undo, .login-sub, .login-input, .login-err, .broker-banner b,
 .broker-banner-cta, .boot-msg {
   font-family:var(--mono);
 }
 
 /* Tier 1 — where a label opens a block rather than annotating a figure. */
-.btn, .cbox-l, .journal-q-label, .jm-btn-save, .jm-btn-cancel,
-.io-section-label, .login-sub {
+.btn, .cbox-l, .journal-q-label, .jm-btn-save, .jm-btn-cancel, .login-sub {
   font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
 }
 
@@ -255,7 +251,6 @@ nav {
 .btn:hover { border-color:var(--p); color:var(--p); }
 .btn.primary { background:var(--p); color:var(--tx-max); border-color:var(--p); font-weight:600; }
 .btn.primary:hover { background:var(--p); color:var(--tx-max); box-shadow:0 0 22px -4px var(--p-gl3); }
-.btn.r4 { border-radius:var(--r-sm); }
 
 .icon-btn {
   background:none; border:none; color:var(--mt2); cursor:pointer;
@@ -1085,66 +1080,32 @@ td.c   { text-align:center; }
 .jm-btn-cancel:hover { background:var(--fill-3); border-color:var(--bd2); color:var(--tx); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   I/O MODAL
+   DAY PICKER POPUP  (calendar day with 2+ trades)
    ═══════════════════════════════════════════════════════════════════════════ */
-.io-modal {
+.day-modal {
   display:none; position:fixed; inset:0;
   background:var(--scrim);
   z-index:500; align-items:center; justify-content:center; padding:20px;
 }
-.io-modal.open { display:flex; }
-.io-modal-card {
+.day-modal.open { display:flex; }
+.day-modal-card {
   background:var(--bg);
   border:1px solid var(--glass-bd);
-  width:100%; max-width:500px;
+  width:100%; max-width:420px;
   border-radius:var(--r-lg); box-shadow:var(--sh-3); overflow:hidden;
 }
-.io-modal-hdr {
+.day-modal-hdr {
   display:flex; align-items:center; justify-content:space-between;
   padding:14px 20px; border-bottom:1px solid var(--bd);
 }
-.io-modal-title {
+.day-modal-title {
   font-size:9px; letter-spacing:2px; text-transform:uppercase;
   color:var(--mt2);
 }
-.io-modal-body {
+.day-modal-body {
   padding:20px; display:flex; flex-direction:column; gap:14px;
   max-height:80vh; overflow-y:auto;
 }
-.io-section {
-  border:1px solid var(--bd); padding:16px; border-radius:var(--r-md);
-  background:var(--fill-0);
-}
-.io-section-label {
-  color:var(--mt2); margin-bottom:6px;
-}
-.io-section-desc {
-  font-size:11px; color:var(--mt2); line-height:1.7; margin-bottom:12px;
-}
-.io-section-desc b { color:var(--tx); }
-.io-section-actions {
-  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
-}
-
-.export-ready-link {
-  margin-top:10px; padding:10px 12px;
-  background:var(--win-gl); border:1px solid var(--win-bd);
-  display:flex; align-items:center; justify-content:space-between;
-  border-radius:var(--r-sm);
-}
-.export-ready-link span {
-  font-size:8px; color:var(--win);
-}
-.export-ready-link a {
-  font-size:8px; letter-spacing:1px; text-transform:uppercase;
-  background:var(--win); color:var(--bg);
-  padding:6px 15px; text-decoration:none; font-weight:700; border-radius:var(--r-full);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   DAY PICKER POPUP  (calendar day with 2+ trades — reuses .io-modal shell)
-   ═══════════════════════════════════════════════════════════════════════════ */
-.day-modal-card { max-width:420px; }
 /* Matched on the ID: the element carries no class, so a class selector here
    silently colours nothing. */
 #day-modal-title .win  { color:var(--win); }
@@ -1375,11 +1336,8 @@ tr.broker-pending td:first-child {
   .log-split { grid-template-columns:1fr; }
 
   /* Fullscreen does nothing on a phone and the API is unreliable on iOS.
-     Import/export is a desk task: it writes a file that wants somewhere to be
-     filed. Hidden rather than removed so desktop keeps both. This does leave
-     the phone unable to export — deliberate, backups belong on the machine that
-     keeps them. */
-  #nav-fs-btn, #nav-io-btn { display:none; }
+     Hidden rather than removed so desktop keeps it. */
+  #nav-fs-btn { display:none; }
 
   /* Two rows of six: quarters land in whole rows, cells stay tappable. */
   .heatmap-year { grid-template-columns:repeat(6,1fr); }
@@ -1476,8 +1434,8 @@ tr.broker-pending td:first-child {
   td, thead th { padding-left:6px; padding-right:6px; }
 
   /* Pop-ups: tighter shells so every card sits fully inside the viewport. */
-  .io-modal { padding:14px 10px; }
-  .io-modal-body { padding:16px 14px; }
+  .day-modal { padding:14px 10px; }
+  .day-modal-body { padding:16px 14px; }
 
   /* Journal modal: full-bleed card. */
   .journal-modal { padding:12px 8px; overflow-x:hidden; }
@@ -1546,7 +1504,6 @@ tr.broker-pending td:first-child {
            relative move between subpaths turns one inside out. -->
       <svg class="fs-ico-exit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
     </button>
-    <button id="nav-io-btn" class="nav-icon-btn" title="Export" aria-label="Export data">&#x21C5;</button>
   </div>
 </nav>
 
@@ -1640,40 +1597,6 @@ tr.broker-pending td:first-child {
 
 </main>
 
-<!-- ═══ I/O MODAL ═══ -->
-<div id="io-modal" class="io-modal" role="dialog" aria-modal="true" aria-labelledby="io-modal-title" aria-hidden="true">
-  <div class="io-modal-card">
-    <div class="io-modal-hdr">
-      <span id="io-modal-title" class="io-modal-title">Export</span>
-      <button id="io-close-btn" class="icon-btn" aria-label="Close">✕</button>
-    </div>
-    <div class="io-modal-body">
-
-      <div id="io-section-journal" class="io-section">
-        <div class="io-section-label">Export Journal to Excel</div>
-        <div class="io-section-desc">
-          Exports every journal entry as a <b>.xlsx</b> file — one row per trade, every field included: date, direction, session, setup, P&amp;L, result, and discipline (rules / SL / TP).
-        </div>
-        <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
-      </div>
-
-      <div id="io-section-json" class="io-section">
-        <div class="io-section-label">Full Backup (JSON)</div>
-        <div class="io-section-desc">
-          Exports <b>everything</b> — every trade, every journal field — as a single
-          <b>.json</b> file, the soft-deleted trades included, so it is a real
-          restore point. Restoring is done in the SQL editor, knowingly, with the
-          statement in the README, rather than one click from an export.
-        </div>
-        <div class="io-section-actions">
-          <button id="io-export-json-btn" class="btn r4">↓ Export Backup</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
 <!-- ═══ JOURNAL MODAL ═══ -->
 <div id="journal-modal" class="journal-modal" role="dialog" aria-modal="true" aria-label="Trade journal entry" aria-hidden="true">
   <div class="journal-modal-card">
@@ -1682,13 +1605,13 @@ tr.broker-pending td:first-child {
 </div>
 
 <!-- ═══ DAY PICKER POPUP (calendar day with 2+ trades) ═══ -->
-<div id="day-modal" class="io-modal" role="dialog" aria-modal="true" aria-labelledby="day-modal-title" aria-hidden="true">
-  <div class="io-modal-card day-modal-card">
-    <div class="io-modal-hdr">
-      <span id="day-modal-title" class="io-modal-title"></span>
+<div id="day-modal" class="day-modal" role="dialog" aria-modal="true" aria-labelledby="day-modal-title" aria-hidden="true">
+  <div class="day-modal-card">
+    <div class="day-modal-hdr">
+      <span id="day-modal-title" class="day-modal-title"></span>
       <button id="day-close-btn" class="icon-btn" aria-label="Close">✕</button>
     </div>
-    <div class="io-modal-body">
+    <div class="day-modal-body">
       <div id="day-trade-list" class="day-trade-list"></div>
     </div>
   </div>
@@ -1713,11 +1636,7 @@ tr.broker-pending td:first-child {
 
 <!-- jsDelivr mirrors the npm artifacts byte-for-byte, so the SRI hash below can
      be recomputed straight from the official tarball. chart.umd.js in 4.4.0 IS
-     the minified build — npm ships no separate .min for it.
-
-     SheetJS is not here: it is the largest of the three and only needed on
-     export, so a blocking tag would cost every open for a weekly feature.
-     loadXLSX() injects it on first use with the same pin and hash. -->
+     the minified build — npm ships no separate .min for it. -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"
   integrity="sha512-6HrPqAvK+lZElIZ4mZ64fyxIBTsaX5zAFZg2V/2WT+iKPrFzTzvx6QAsLW2OaLwobhMYBog/+bvmIEEGXi0p1w=="
   crossorigin="anonymous"></script>
@@ -1728,8 +1647,8 @@ tr.broker-pending td:first-child {
      point at. Pinning closes that for one character.
 
      A hash would also prove the bytes untampered, but it needs recomputing on
-     every bump and a forgotten one fails closed with no message. Chart.js and
-     SheetJS carry hashes because they are effectively frozen; this one moves.
+     every bump and a forgotten one fails closed with no message. Chart.js
+     carries one because it is effectively frozen; this one moves.
      Add one here if this ever leaves a single-user setting. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/dist/umd/supabase.js"
   crossorigin="anonymous"></script>
@@ -1748,7 +1667,6 @@ tr.broker-pending td:first-child {
      Charts     Chart.js wrappers and the four shared visual primitives
      Render     one function per component, orchestrated by render()
      Journal    the entry modal
-     IO         export and backup
      Login      session gate
      Mobile     carousel, zoom lock, keyboard inset
      boot       wiring and start
@@ -1972,15 +1890,6 @@ const Dates = {
   monthStart(date = new Date()) {
     const p = Dates.nyParts(date);
     return `${p.y}-${String(p.m).padStart(2,'0')}-01`;
-  },
-
-  // The Friday whose 17:00 New York close last passed — a stable per-week key,
-  // so the weekly backup fires once and never twice.
-  lastClose(date = new Date()) {
-    const p = Dates.nyParts(date);
-    let back = (p.weekday - 5 + 7) % 7;               // Fri=0, Sat=1 … Thu=6
-    if (p.weekday === 5 && p.hour < 17) back = 7;     // Friday pre-close
-    return new Date(Date.UTC(p.y, p.m - 1, p.d - back)).toISOString().slice(0, 10);
   }
 };
 
@@ -2162,7 +2071,7 @@ function latestBefore(list, field, day = null) {
    ─────────────────────────────────────────────────────────────────────────── */
 const Data = {
   sb: null,
-  all: [],          // every row, deleted included — the backup needs them
+  all: [],          // the table as loaded, deleted rows included
   rows: [],         // what renders: the live ones, derived from `all` by index()
   byId: new Map(),
   byDay: new Map(),
@@ -2196,8 +2105,6 @@ const Data = {
 
   async load() {
     try {
-      // Nothing renders them, but a restore without them lets the poller
-      // rebuild every trade ever removed.
       const { data, error } = await this.sb
         .from('trades').select('*');
       if (error) throw error;
@@ -2299,11 +2206,8 @@ const Data = {
     return true;
   },
 
-  /* Into `all`, which the backup exports, and not only what renders. Written
-     only by load(), `all` would hold the pre-edit value after a save or delete —
-     realtime usually reloads within a second and hides it, but with the socket
-     down a backup taken straight after an edit exports the old row. That is the
-     one thing a restore point cannot get wrong. */
+  /* Into `all`, which index() derives `rows` from: written anywhere else, the
+     next index() would bring the pre-edit row back on screen. */
   replace(row) {
     const i = this.all.findIndex(t => t.id === row.id);
     if (i === -1) this.all.push(row); else this.all[i] = row;
@@ -2358,7 +2262,7 @@ const Data = {
 const EMPTY_DAY = Object.freeze({ list: [], pnl: 0, pnlN: 0, be: 0, pending: false });
 
 const modalOpen = () =>
-  ['journal-modal','io-modal','day-modal'].some(id => $(id)?.classList.contains('open'));
+  ['journal-modal','day-modal'].some(id => $(id)?.classList.contains('open'));
 
 // One writer for the status dot, so the indicator cannot disagree with what the
 // data layer did. Named setSyncStatus, not status: a top-level `function
@@ -3637,124 +3541,6 @@ const PendingDelete = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   IO — export and backup
-
-   Export only. A spreadsheet row carries no position id, so the sync could never
-   match it and every imported trade would be a permanent duplicate waiting to
-   happen. Historical backfill belongs in the database, run once, not behind a
-   button that can be pressed twice.
-   ═══════════════════════════════════════════════════════════════════════════ */
-// SheetJS, fetched the first time the trader exports, with the same pin and SRI
-// hash a blocking tag would carry. The promise is cached so a second export
-// reuses the library, and cleared on failure so a retry is not stuck on a
-// rejected one.
-let xlsxLoading = null;
-function loadXLSX() {
-  if (window.XLSX) return Promise.resolve();
-  if (xlsxLoading) return xlsxLoading;
-
-  xlsxLoading = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-    s.integrity = 'sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==';
-    s.crossOrigin = 'anonymous';
-    s.onload  = () => resolve();
-    s.onerror = () => { xlsxLoading = null; reject(new Error('SheetJS failed to load')); };
-    document.head.appendChild(s);
-  });
-  return xlsxLoading;
-}
-
-const IO = {
-  open() { openModal('io-modal'); },
-
-  // `pnl` is generated and cannot be written back, so it is dropped here rather
-  // than failing one row at a time during a restore.
-  payload() {
-    return {
-      exported_at: new Date().toISOString(),
-      trades: Data.all.map(({ pnl, ...row }) => row)
-    };
-  },
-
-  /* Blob URLs, not data: URIs — one mechanism for both export buttons and the
-     weekly auto-backup. A percent-encoded JSON backup holds the whole file
-     twice in memory as a string and runs into a URL-length ceiling; a Blob has
-     neither problem. */
-  blobUrl(data, type) {
-    return URL.createObjectURL(new Blob([data], { type }));
-  },
-
-  showLink(url, filename, sectionId) {
-    const host = $(sectionId);
-    if (!host) return;
-    // Revoked here rather than on a timer, so a URL stays valid exactly as long
-    // as the anchor offering it is on screen.
-    const prev = host.querySelector('.export-ready-link a');
-    if (prev) URL.revokeObjectURL(prev.href);
-    host.querySelector('.export-ready-link')?.remove();
-    const div = document.createElement('div');
-    div.className = 'export-ready-link';
-    div.innerHTML = `<span>Ready</span><a href="${url}" download="${filename}">↓ Download</a>`;
-    host.appendChild(div);
-  },
-
-  async journal() {
-    if (!Data.rows.length) { notify('No entries to export', true); return; }
-    // First export of the session only — loadXLSX resolves immediately after.
-    if (!window.XLSX) notify('Preparing export…');
-    try { await loadXLSX(); }
-    catch (e) { notify('Could not load the spreadsheet library', true); return; }
-
-    const yn  = v => v === true ? 'Yes' : v === false ? 'No' : '';
-    const res = t => ({ win:'Win', loss:'Loss', be:'Break Even' })[resultOf(t)] || '';
-
-    const rows = [...Data.rows]
-      .sort(byKey)
-      .map(t => ({
-        'Date':           Dates.fmt(dayOf(t), { day:'2-digit', month:'short', year:'numeric' }),
-        'Direction':      t.direction || '',
-        'Session':        sessionOf(t) || '',
-        'Setup':          t.setup || '',
-        'P&L ($)':        t.pnl ?? '',
-        'Result':         res(t),
-        'Followed Rules': yn(t.followed_rules),
-        'Followed Stop Loss': yn(t.followed_sl),
-        'Followed Take Profit': yn(t.followed_tp)
-      }));
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:22},{wch:10},{wch:10},{wch:16},{wch:20},{wch:22}];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Journal');
-    const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    IO.showLink(
-      IO.blobUrl(out, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
-      'doji-journal-' + Dates.today() + '.xlsx', 'io-section-journal');
-    notify(`Journal ready — ${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`);
-  },
-
-  // A restore point he owns, independent of the account. No restore button by
-  // design: replacing the database from a file is a job for the SQL editor and
-  // the README's statement, not a click away from an export.
-  backup() {
-    const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
-    IO.showLink(url, 'doji-backup-' + Dates.today() + '.json', 'io-section-json');
-    notify('Backup ready');
-  },
-
-  // A gesture-less download can be blocked silently with no API to detect it,
-  // so the toast asks the trader to verify rather than asserting success.
-  download(filename) {
-    const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════════════
    LOGIN — the session gate
    ═══════════════════════════════════════════════════════════════════════════ */
 const Login = {
@@ -3860,10 +3646,10 @@ const Carousel = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WATCHERS
+   WATCHER
 
-   Both track a key that only changes on a real boundary, so a throttled timer or
-   a sleeping machine can delay them but never make them miss or double-fire.
+   It tracks a key that only changes on a real boundary, so a throttled timer or
+   a sleeping machine can delay it but never make it miss or double-fire.
    ═══════════════════════════════════════════════════════════════════════════ */
 const DayWatcher = {
   day: null,
@@ -3879,31 +3665,12 @@ const DayWatcher = {
   }
 };
 
-const BackupWatcher = {
-  KEY: 'doji_backup_last_close',
-  last: null,
-  check() {
-    // Phones never auto-download: a phone's Downloads folder is not where a
-    // backup belongs, and a gesture-less download there is as likely to be
-    // blocked as saved. The marker is per-device, so skipping does not consume
-    // the laptop's turn.
-    if (Phone.matches) return;
-    const key = Dates.lastClose();
-    if (key === BackupWatcher.last || !Data.rows.length) return;
-    IO.download('doji-backup-' + key + '.json');
-    BackupWatcher.last = key;
-    try { localStorage.setItem(BackupWatcher.KEY, key); } catch (e) {}
-    notify('Weekly backup triggered → doji-backup-' + key + '.json — verify it landed in downloads');
-  }
-};
-
 /* ═══════════════════════════════════════════════════════════════════════════
    WIRING — split by surface, so adding a control means editing one function.
    All of it runs once, at boot.
    ═══════════════════════════════════════════════════════════════════════════ */
 function wire() {
   // Chrome
-  on('nav-io-btn', 'click', IO.open);
   // Both halves guarded: `(a || b).call(x)` throws where neither exists, giving
   // a TypeError on a chrome button rather than a no-op.
   const root = document.documentElement;
@@ -3954,8 +3721,6 @@ function wire() {
   on('journal-modal', 'click', e => { if (e.target.id === 'journal-modal') Journal.close(); });
 
   // Other modals
-  on('io-close-btn',  'click', () => closeModal('io-modal'));
-  on('io-modal',      'click', e => { if (e.target.id === 'io-modal') closeModal('io-modal'); });
   on('day-close-btn', 'click', () => closeModal('day-modal'));
   on('day-modal',     'click', e => { if (e.target.id === 'day-modal') closeModal('day-modal'); });
   onActivate('day-trade-list', e => {
@@ -3964,8 +3729,6 @@ function wire() {
     closeModal('day-modal');
     Journal.open(row.dataset.trade);
   });
-  on('io-export-journal-btn', 'click', IO.journal);
-  on('io-export-json-btn',    'click', IO.backup);
 
   // Toast undo
   on('notif', 'click', e => { if (e.target.closest('.notif-undo')) PendingDelete.undo(); });
@@ -3980,7 +3743,6 @@ function wire() {
     if (e.key !== 'Escape') return;
     if ($('journal-modal').classList.contains('open')) Journal.close();
     else if ($('day-modal').classList.contains('open')) closeModal('day-modal');
-    else if ($('io-modal').classList.contains('open'))  closeModal('io-modal');
   });
 }
 
@@ -4018,9 +3780,7 @@ function openOffline() {
   //
   // Supabase is fatal: it is the data. Chart.js is not — the heatmap, the log
   // and the roll-forward draw without it, and render() isolates each step, so
-  // the app degrades to "no wheels" rather than refusing to start. SheetJS is
-  // not checked here because it is not loaded here; loadXLSX() reports its own
-  // failure.
+  // the app degrades to "no wheels" rather than refusing to start.
   if (!window.supabase) {
     bootState('Could not load the app. Check your connection and reload.', true);
     return;
@@ -4030,14 +3790,9 @@ function openOffline() {
   wire();
 
   DayWatcher.day = Dates.today();
-  try { BackupWatcher.last = localStorage.getItem(BackupWatcher.KEY); } catch (e) {}
-
-  // One timer for both: each check is a cheap key comparison, and one interval
-  // is one thing to reason about rather than two that drift.
-  const tick = () => { DayWatcher.check(); BackupWatcher.check(); };
-  setInterval(tick, 30000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-  window.addEventListener('focus', tick);
+  setInterval(DayWatcher.check, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) DayWatcher.check(); });
+  window.addEventListener('focus', DayWatcher.check);
 
   let data, error;
   try {
@@ -4060,7 +3815,6 @@ function openOffline() {
     await Data.start();
     render();
     bootState(null);
-    BackupWatcher.check();
     // Not awaited, and after the render on purpose: the journal is what this
     // page is for, and her three small reads must never sit in front of it.
     Watch.draw();

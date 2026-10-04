@@ -1024,7 +1024,8 @@ test('the README names every setting, table, function, tool and command the code
 
   const lists = {
     settings: [...all(fns, /\b(?:env|envHours)\(\s*["'`]([A-Z_]+)/g),
-               ...all(source('scripts/backup-memory.mjs'), /process\.env\.([A-Z_]+)/g),
+               ...readdirSync(new URL('../scripts', import.meta.url))
+                 .flatMap(f => all(source(`scripts/${f}`), /process\.env\.([A-Z_]+)/g)),
                ...all(source('doji_gmail_sync.gs'), /getProperty\('([A-Z_]+)'\)/g)],
     tables: all(SCHEMA_SQL, /create (?:table if not exists|or replace view) public\.(\w+)/g),
     functions: all(SCHEMA_SQL, /create or replace function public\.(\w+)/g),
@@ -1139,9 +1140,9 @@ test('every read of her tables goes through readRows', () => {
    is not claimed to run on and goes green. setup-node reads engines.node.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const WORKFLOWS = ['.github/workflows/test.yml',
-                   '.github/workflows/deploy-functions.yml',
-                   '.github/workflows/backup-memory.yml'].map(read);
+// Derived, so a workflow added later is held to both rules below unasked.
+const WORKFLOWS = readdirSync(new URL('../.github/workflows', import.meta.url))
+  .filter(f => f.endsWith('.yml')).map(f => read(`.github/workflows/${f}`));
 
 test('every workflow takes its Node version from the one file that states it', () => {
   const pkg = JSON.parse(source('package.json'));
@@ -1489,7 +1490,7 @@ test('the Data model names every column the trades table has, and no other', () 
    ─────────────────────────────────────────────────────────────────────────── */
 test('the restore procedure writes every column the table lets it write', () => {
   const readme = source('README.md');
-  const sql = readme.match(/```sql\n-- 1\. paste the file's `trades` array[\s\S]*?```/)?.[0];
+  const sql = readme.match(/```sql\n-- 1\. paste the file's `tables.trades` array[\s\S]*?```/)?.[0];
   assert.ok(sql, 'the README no longer carries the restore procedure');
 
   const list = (text) => text.split(',').map(c => c.trim()).filter(Boolean);
@@ -2507,9 +2508,9 @@ const UNMARKED = {
 /* ─── Both silent writers leave a mark, on both paths ────────────────────────
    `sync_health` is worth exactly as much as its call sites: missing from the
    success path a healthy writer reads as dead, missing from the failure path
-   it is the original silence with a table beside it. Read structurally — no
-   Edge handler can be driven here, and the calls sit at the end of long
-   functions where a later edit walks past them.
+   it is the original silence with a table beside it. Read structurally, since
+   serve.test.mjs drives only the paths a stub can reach, and the calls sit at
+   the end of long functions where a later edit walks past them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the two writers with no voice record both outcomes', () => {
@@ -2650,7 +2651,7 @@ test('the test count the instructions state is the count the suite runs', () => 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every table the backup reads is ordered by a column it has', async () => {
-  const { TABLES } = await import('../scripts/backup-memory.mjs');
+  const { TABLES } = await import('../scripts/backup.mjs');
   assert.ok(TABLES.length >= 6, `only ${TABLES.length} tables in the backup`);
 
   for (const [table, orderBy] of TABLES) {
@@ -3765,6 +3766,25 @@ test('pace_line states its ceiling once and quotes that one', () => {
     `— one of the two has been changed without the other`);
 });
 
+/* A turn's budget is the share pace_line warns at, so the seconds above it are
+   left to file the row and send the apology. Raised past the ceiling, a stalled
+   turn is killed at the wall clock again, silently, which is what it exists to
+   prevent; moved apart from the watcher, one of the two is reading the wrong
+   share. */
+test('a model turn may spend what pace_line calls safe, and no more', () => {
+  const ceiling = Number(PACE_SQL.match(/ceiling_ms constant int := (\d+);/)[1]);
+  const [num, den] = PACE_SQL.match(/speak_at\s+constant int := ceiling_ms \* (\d+) \/ (\d+);/)
+    .slice(1).map(Number);
+  const turn = Number(EUGENIA_TS.match(/const TURN_MS = ([\d_]+);/)?.[1].replaceAll('_', ''));
+  assert.ok(turn > 0, 'doji-eugenia no longer declares TURN_MS — the reader has gone blind');
+  assert.equal(turn, ceiling * num / den,
+    `TURN_MS is ${turn}ms where pace_line warns at ${ceiling * num / den}ms`);
+  assert.match(EUGENIA_TS, /const deadline = AbortSignal\.timeout\(budget\);/,
+    'ask() no longer starts its turn on the budget');
+  assert.match(EUGENIA_TS, /call\(convo, effort, tools, model, deadline, container\)/,
+    'the turn\'s signal no longer reaches the request');
+});
+
 /* ─── And the README lists them, which is a third copy ───────────────────────
    The table a person reads to know what should be running. Both directions,
    since a row that quietly vanishes is as bad as one that lies.
@@ -4873,6 +4893,33 @@ test('the poller counts the plans it wrote, not the plans it tried', () => {
     'writePlan is back to one PATCH for both sides — `planned_sl is null` cannot ' +
     'arbitrate `planned_tp`, so a side that appears later either never lands or ' +
     'lands as whatever R-04 has since moved it to');
+});
+
+/* `sliced` is driven in fold.test.mjs; this reads that the poll asks it, in
+   the one order that cannot write a slice: the deals, then the broker's live
+   list, then the judgment, then the upsert of what survived it. The list read
+   first, a position closing between the two reads is written sliced once. */
+test('the poll judges its folds against the live list before it writes them', () => {
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
+  const at = (needle) => {
+    const i = src.indexOf(needle);
+    assert.ok(i > -1, `the poll no longer contains ${needle}`);
+    return i;
+  };
+  const deals    = at('await mcpCall(session, "get_deals", dealArgs)');
+  const positions = at('await mcpCall(session, "get_positions", {})');
+  const judged   = at('const slices = sliced(moved.map(f => f.row), plans);');
+  const kept     = at('const folded = moved.filter(f => !slices.includes(f.row.id));');
+  const written  = at('await upsert(folded.map(f => f.row))');
+  assert.ok(deals < positions && positions < judged && judged < kept && kept < written,
+    'the poll no longer reads the deals, then the live list, then judges, then writes ' +
+    'what survived — an entry-less fold can reach the upsert');
+  assert.equal(src.split('mcpCall(session, "get_positions"').length - 1, 1,
+    'get_positions is read twice in the poll — the plan and the slice judgment must ' +
+    'stand on the same list');
+  assert.match(src, /await heartbeat\("poller"\);\n[\s\S]{0,400}if \(slices\.length\) \{\n\s*await heartbeat\("poller", new Error\(/,
+    'a slice is no longer marked after the run\'s own mark, so the last outcome reads ' +
+    'as healthy and her briefing never names it');
 });
 
 test('the poller fills best_price once, newest first, and counts what it wrote', () => {
