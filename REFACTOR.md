@@ -44,7 +44,7 @@ argued, so the reason lives once, in the document every session reads.
 | R-6 — making the offline snapshot writable | the snapshot is a read cache and can never be anything else |
 | R-7 — deciding a Telegram redraw from the keyboard | never decide whether a message settles off its keyboard |
 | R-8 — writing a `drop` into `schema.sql` | never write a `drop` into it: a re-run repeats it on the live database |
-| R-10 — regenerating `golden.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
+| R-10 — regenerating `golden.json` or `golden-fold.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 
 The rest are refused by something no other document holds, so they carry their
 reasoning here.
