@@ -18,9 +18,11 @@ jobs:
       - run: npm test
 
   # schema.sql on a real Postgres. Its own job, because it needs a server and
-  # `npm test` needs Node alone.
+  # `npm test` needs Node alone. A named release rather than ubuntu-latest:
+  # Postgres comes from PostgreSQL's own repository, which supports a new
+  # Ubuntu only some time after GitHub moves the label onto it.
   database:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
