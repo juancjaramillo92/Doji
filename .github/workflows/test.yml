@@ -32,13 +32,14 @@ jobs:
       # The major version Supabase runs, stated here alone: the suite reads it
       # back and refuses a server that is not it. The runner carries an older
       # Postgres, so 17 and pgvector come from PostgreSQL's own repository, which
-      # its script adds. PGCLUSTER points every client at that cluster, and peer
+      # its script adds. The runner creates no cluster on install, so the job
+      # creates its own. PGCLUSTER points every client at it, and peer
       # authentication makes the runner's own user the superuser it connects as.
       - run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y -q postgresql-17 postgresql-17-pgvector
-          sudo systemctl start postgresql@17-main
-          sudo -u postgres createuser --cluster 17/main --superuser "$USER"
+          sudo pg_createcluster --start 17 doji
+          sudo -u postgres createuser --cluster 17/doji --superuser "$USER"
       - run: npm run test:db
         env:
-          PGCLUSTER: 17/main
+          PGCLUSTER: 17/doji
