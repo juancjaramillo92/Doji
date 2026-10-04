@@ -4302,8 +4302,8 @@ test('the hybrid search still answers in the shape the function reads', () => {
    run leaves alone. A bare `create table` refuses and rolls the paste back; a
    bare `create policy` or a publication `add` raises on the second run; a
    seed without `on conflict` duplicates or refuses; a `drop` re-run on the
-   live database takes whatever it names with it. The replay that proves the
-   file against the database is a person's (README); this is the shape.
+   live database takes whatever it names with it. `test/db` proves it on a
+   real Postgres; this is the shape, which needs no server to read.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('schema.sql is safe to re-run in full', () => {

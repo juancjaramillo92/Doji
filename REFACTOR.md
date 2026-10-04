@@ -4,8 +4,8 @@
 REGISTER: every move considered and turned down, with the reasoning that decided
 it, so a tempting one is not re-proposed and eventually waved through on a tired
 afternoon. A refusal has no code to attach itself to, which is why it needs a
-document. Read §2 before proposing a simplification; §4 holds the moves
-deferred rather than refused.
+document. Read §2 before proposing a simplification; §4 is the next step, and
+says what is pending.
 
 Where it disagrees with the README, the README wins and you say so.
 
@@ -88,6 +88,12 @@ effort as the cause.
 prefix is genuinely shared and the array is worth revisiting in the same pass.
 Not before, and never on the argument alone: the numbers above took one morning
 to collect and the argument took a fortnight to look wrong.
+
+Nor is the effort worth raising for its own sake. A higher effort would only
+earn its time and cost if the critic were letting rule breaks through, and in
+October 2026 it had revised every briefing since its verdicts were first
+recorded — all six, by 1 to 11 per cent. Ask `eugenia_runs` for `critic
+verdict` rows before reopening it on that ground.
 
 **And the shape to carry away:** the request field that broke this was not the
 one the change touched. A cache key spans every field that renders ahead of the
@@ -244,26 +250,30 @@ None of which blocks anything:
 
 ---
 
-## 4 · DEFERRED — THE NEXT STEP
+## 4 · THE NEXT STEP — DECIDED
 
-Considered in October 2026 and left for later, not refused. The owner calls the
-step these would take *Raptor 3*; the repository stands at 2.5: audited, slimmed,
-its SQL one file, both watchers sending through `tell_him`. Let 2.5 run live
-before starting any of them.
+The step the owner calls *Raptor 3* was reviewed with him in October 2026,
+after 2.5 had run live, and nothing in it is deferred. Each item below is
+decided and reopens only on the condition it names. Asked "what is pending",
+the answer is this section: nothing, until one of those conditions is met.
 
-- **One rules module for the app and Eugenia.** `journal.ts` copies the app's
-  break-even band, sessions and three P&L rules — about 60 lines, held by two
+- **One rules module for the app and Eugenia — kept as two copies.**
+  `journal.ts` copies the app's break-even band, sessions and three P&L rules —
+  about 60 lines, held by two
   tests: one reads the copies, the other runs both over the same rows. Sharing
   a file saves roughly 110 lines net, but the app's script is a classic one and
   cannot import, so it changes how the app boots, and with it `boot.mjs`, the
   type check and the golden snapshot. And it trades a drift CI catches before a
   deploy for one it cannot: two deployed files, a fresh page beside a cached
-  module, disagreeing on his phone. Worth it only if the copies start to drift.
-  Her win rate differs on purpose — null when nothing is decided, and rounded —
-  and a shared module keeps that difference.
-- **The moves in §2.** Each changes behaviour or breaks a rule `CLAUDE.md`
-  states. Reopen one at a time, with an answer to its reasoning and the owner's
-  sign-off.
+  module, disagreeing on his phone. Her win rate differs on purpose — null when
+  nothing is decided, and rounded — and a shared module keeps that difference.
+  **Reopen if** the row-for-row test in `agree.test.mjs` ever finds the copies
+  apart for a reason that is not a bug in one of them.
+- **Every move in §2 — each reviewed, each standing.** The nine `CLAUDE.md`
+  refuses stay refused. R-9 is built beside `npm test` as `test/db`. R-15 stays
+  measured and refused; R-16 is settled outright; R-11, R-12, R-13 and R-17
+  stand on their reasoning. Each reopens only on its own **Revisit if**, one at
+  a time, with the owner's sign-off.
 
 Looked at in the same pass and NOT on this list:
 
