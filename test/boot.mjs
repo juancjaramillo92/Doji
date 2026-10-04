@@ -140,7 +140,7 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   };
 
   // jsdom has none of these and the app touches all three: matchMedia at load,
-  // getContext on every wheel, createObjectURL from the weekly backup's timer.
+  // getContext on every wheel, createObjectURL from the export.
   win.matchMedia = q => ({
     matches: false, media: q, addEventListener() {}, removeEventListener() {},
     addListener() {}, removeListener() {}

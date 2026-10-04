@@ -163,7 +163,7 @@ test('load fills both row sets, hides deleted rows, and reports Synced', async (
   ];
   await app.Data.load();
 
-  assert.equal(app.Data.all.length, 2);        // the backup keeps deleted rows
+  assert.equal(app.Data.all.length, 2);        // the table as loaded
   assert.equal(app.Data.rows.length, 1);       // nothing renders them
   assert.equal(app.Data.offline, false);
   assert.ok(app.Data.byId.has('PID1'));        // load indexed on the way out
@@ -250,11 +250,11 @@ test('a save replaces the row it names, in both row sets', async () => {
   assert.equal(app.Data.byId.get('PID2').setup, 'Support & Resistance');
   assert.equal(app.Data.byId.get('PID1').setup, 'Break & Retest', 'the wrong row was overwritten');
 
-  // `all` is what a backup exports and nothing on screen reads it, so a stale
-  // copy there shows up only in a restore.
-  assert.equal(app.Data.all.length, 2, 'the backup copy now holds two of one trade');
+  // `rows` is derived from `all`, so a stale copy there is back on screen at
+  // the next index().
+  assert.equal(app.Data.all.length, 2, '`all` now holds two of one trade');
   assert.equal(app.Data.all.find(t => t.id === 'PID2').setup, 'Support & Resistance',
-    'the backup copy still holds the pre-edit row');
+    '`all` still holds the pre-edit row');
 });
 
 /* ─── The scratch rule ───────────────────────────────────────────────────────
@@ -472,9 +472,9 @@ test('a split always totals 100 percent, and nothing to split is null', () => {
   assert.equal(app.pctSplit([0, 0, 0]), null);   // no trades — not 0%, nothing
 });
 
-/* ─── The week and the backup key ────────────────────────────────────────────
-   What "This Week" means and when the weekly backup fires. Both hinge on 17:00
-   New York and both take their date as an argument.
+/* ─── The week ───────────────────────────────────────────────────────────────
+   What "This Week" means. It hinges on 17:00 New York and takes its date as an
+   argument.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the week opens at the Sunday 17:00 New York gold open', () => {
@@ -500,18 +500,6 @@ test('the week boundary holds its New York hour in winter too', () => {
   // UTC would open the week an hour early for half the year.
   assert.equal(app.Dates.weekStart(new Date('2026-01-11T21:30:00Z')), '2026-01-04');
   assert.equal(app.Dates.weekStart(new Date('2026-01-11T22:00:00Z')), '2026-01-11');
-});
-
-test('the backup key is the Friday whose 17:00 New York close last passed', () => {
-  const key = iso => app.Dates.lastClose(new Date(iso));
-
-  // Fri 21 Aug 2026, EDT. Before 17:00 ET the week has not closed, so the key
-  // is still the previous Friday and the backup does not fire twice.
-  assert.equal(key('2026-08-21T20:00:00Z'), '2026-08-14');
-  assert.equal(key('2026-08-21T21:00:00Z'), '2026-08-21');
-  // It then holds all weekend and into the next week.
-  assert.equal(key('2026-08-23T12:00:00Z'), '2026-08-21');
-  assert.equal(key('2026-08-27T12:00:00Z'), '2026-08-21');
 });
 
 test('the P&L card steps back a whole week and a whole month, across a year end', () => {
@@ -1195,8 +1183,8 @@ test('the card reads her three tables and never her notes', async () => {
    minutes. `deleted` is written but not in `Data.OWNED`: `remove()` and
    `restore()` call `update()` directly rather than going through `save()`.
 
-   `rows` loses the row; `all`, which the backup exports, KEEPS it flagged.
-   Backwards, a deleted trade exports as live or vanishes from the backup.
+   `rows` loses the row; `all` KEEPS it flagged, as the table does. Unflagged
+   there, the next index() puts a deleted trade back on screen.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const staged = async (rows) => {
@@ -1206,7 +1194,7 @@ const staged = async (rows) => {
   db.patches.length = 0;
 };
 
-test('a delete leaves the rendered rows and stays in the backup, flagged', async () => {
+test('a delete leaves the rendered rows and stays in `all`, flagged', async () => {
   await staged([
     journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 }),
     journalled({ id: 'PID2', open_day: '2026-07-29', pnl: -10 })
@@ -1218,9 +1206,9 @@ test('a delete leaves the rendered rows and stays in the backup, flagged', async
     'the delete sent something other than the soft-delete flag');
   assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID2'],
     'the deleted trade still renders');
-  assert.equal(app.Data.all.length, 2, 'the deleted trade left the backup');
+  assert.equal(app.Data.all.length, 2, 'the deleted trade left `all`');
   assert.equal(app.Data.all.find(t => t.id === 'PID1').deleted, true,
-    'the backup copy is not flagged, so a restore point exports it as live');
+    'the copy in `all` is not flagged, so the next index() renders it again');
   // Re-indexed on the way out, or every render still reads it through byId.
   assert.equal(app.Data.byId.has('PID1'), false, 'the index still holds the row');
 });
@@ -1251,7 +1239,7 @@ test('a restore puts the trade back in both row sets', async () => {
   assert.deepEqual(db.patches.map(p => ({ ...p })), [{ deleted: false }]);
   assert.deepEqual([...app.Data.rows].map(t => t.id), ['PID1'], 'the trade did not come back');
   assert.equal(app.Data.all.find(t => t.id === 'PID1').deleted, false,
-    'the backup copy is still flagged deleted after a restore');
+    '`all` still holds the row flagged deleted after a restore');
   assert.ok(app.Data.byId.has('PID1'), 'the restored row was not re-indexed');
 });
 

@@ -57,7 +57,7 @@ import {
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { backup, readAll, TABLES } from '../scripts/backup-memory.mjs';
+import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1983,7 +1983,7 @@ test('the backup names every table that has no other source', async () => {
     'trade_stops is not paged by its whole key');
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
-  for (const t of ['eugenia_notes', 'eugenia_turns', 'eugenia_channels',
+  for (const t of ['trades', 'eugenia_notes', 'eugenia_turns', 'eugenia_channels',
                    'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
                    'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);

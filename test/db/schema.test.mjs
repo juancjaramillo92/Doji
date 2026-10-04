@@ -189,6 +189,45 @@ test('the app writes its four answers and the soft delete, on its own rows, and 
     'another owner\'s row was written');
 });
 
+/* ─── The restore the README gives ──────────────────────────────────────── */
+
+/* Run as written, over the array a backup holds — PostgREST's `select=*`,
+   generated `pnl` included — into a table that lost one row and had another's
+   answers wiped. `updated_at` is set by the touch trigger on the repaired row,
+   so it is the one column left out of the comparison. The row whose answers
+   come back has its Telegram message redrawn to show them; nothing is sent
+   that is not an edit of a message that exists. */
+test('the README\'s restore puts back every row a backup holds, and sends no new message', () => {
+  sql(RESET + `insert into public.trades (id, user_id, direction, entry_time, fill_time, entry_price,
+                 exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl, setup,
+                 followed_rules, followed_sl, followed_tp, deleted, tg_message_id, planned_sl,
+                 planned_tp, best_price) values
+    ('PID20', '${U}', 'SELL', now() - interval '3 days', now() - interval '3 days' + interval '40 minutes',
+     2410.5, 2380.25, 0.5, 0.07, 10123.45, current_date - 3, 15.06, 15.05, 'Break & Retest',
+     true, true, false, false, 501, 2420, 2380, 2379.9),
+    ('PID21', '${U}', 'BUY', now() - interval '2 days', now() - interval '2 days' + interval '9 minutes',
+     2400, 2390, 1, 0.14, 10113.31, current_date - 2, -10.14, -10.14, 'Support & Resistance',
+     false, null, true, true, null, 2390, 2425, null);
+    truncate net.sent;`);
+  const table = () => sql(`select json_agg(to_jsonb(t) - 'updated_at' order by id) from public.trades t`);
+  const backup = sql(`select json_agg(t) from public.trades t`);
+  const before = table();
+
+  sql(`delete from public.trades where id = 'PID21';
+       update public.trades set setup = null, followed_rules = null, deleted = true where id = 'PID20';
+       truncate net.sent;`);
+  assert.notEqual(table(), before, 'the damage did not change the table');
+
+  const restore = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
+    .match(/```sql\n(-- 1\. paste the file's `tables\.trades` array[\s\S]*?)```/)[1];
+  sql(restore.replace(`'<<<PASTE ARRAY HERE>>>'`, `$backup$${backup}$backup$`));
+
+  assert.equal(table(), before, 'the restore did not put the table back as the backup held it');
+  assert.equal(sql(`select string_agg(concat_ws(':', regexp_replace(url, '^.*/functions/v1/', ''),
+                                              body->>'id', body->>'tg_message_id'), ',') from net.sent`),
+    'doji-gladys:PID20:501', 'a restore sent something other than the one redraw a restored answer owes');
+});
+
 /* ─── The calendar's clock ──────────────────────────────────────────────── */
 
 test('a release changing moves updated_at, and marking it looked at does not', () => {

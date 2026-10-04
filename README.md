@@ -60,11 +60,11 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/adherence.ts             the thirteen rules a journal row can answer
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
-scripts/backup-memory.mjs               the paged read behind the weekly copy
+scripts/backup.mjs                      the paged read behind the daily copy
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-.github/workflows/backup-memory.yml     the weekly copy of the eight tables nothing else holds
+.github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -438,15 +438,38 @@ control over any of them could only lie. The trade log is where they are read.
 is set at once; undo clears it. The window forgives the reflex, it does not hold
 the delete back.
 
-**Export** gives the journal as `.xlsx` and a full `.json` backup, both as Blob
-URLs, as the weekly auto-backup does. The backup carries **every** row, the
-soft-deleted ones included — restoring without them lets the poller rebuild
-every trade you removed — and omits the generated `pnl`. It is a genuine restore
-point, and deliberately has no restore *button*: replacing the database from a
-file is a job for the SQL editor, done knowingly.
+**Export** gives the journal as `.xlsx`, one row per trade, as a Blob URL that
+is revoked when the link offering it is replaced. It is a desk task, so the
+button is hidden on a phone.
+
+**Everything that exists nowhere else is backed up daily, from outside the
+browser.** `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`,
+reads nine tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the eight of hers with no other source — the channel map,
+notes, turns, thesis, open loops, calendar, feedback, and every stop and target a
+position carried. `trades` goes whole, the soft-deleted rows included: a restore
+without them lets the poller rebuild every trade you removed. `eugenia_runs` is
+left out: the largest table, and facts about model calls rather than about you.
+
+It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
+step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
+so this is blast radius — leaked, it is revoked alone while the functions keep
+running. **The paging is the load-bearing part.** PostgREST caps a response at
+its own `max-rows`, so one read of `eugenia_turns` returns a page that looks
+exactly like a complete archive. The walk stops on a short page, not a count it
+was told, and the job refuses to upload a document whose `trades` is empty.
+Artifacts expire after ninety days, so download one occasionally, or run it by
+hand:
+
+```sh
+SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup.mjs > backup.json
+```
+
+**Restoring the journal** is a job for the SQL editor, done knowingly — there is
+no restore button:
 
 ```sql
--- 1. paste the file's `trades` array as the argument
+-- 1. paste the file's `tables.trades` array as the argument
 -- 2. run it; every column is written except the generated pnl
 insert into trades (id, user_id, direction, entry_time, fill_time, entry_price,
   exit_price, size_oz, commission, balance, open_day, net_pnl, computed_pnl,
@@ -471,39 +494,11 @@ on conflict (id) do update set
 ```
 
 The columns are named because Postgres refuses any value for a generated
-column, a null included, so `select *` would stop at `pnl` before a row landed.
-`agree.test.mjs` reads all three lists against the schema, so a column added
-later fails the suite until the restore names it.
-
-**The weekly auto-backup** fires after the Friday 17:00 New York close, keyed on
-the last completed week so it runs once. Desktop only, with a per-device marker,
-so a phone does not consume the laptop's turn. A gesture-less download can be
-blocked silently, so the toast asks you to verify rather than claiming success.
-
-**Her memory is backed up from outside the browser.** The app's backup is
-`trades`, whose broker columns a wide `?force=1` can rebuild and whose journal
-columns only that file holds. Her tables are the other way round — no source
-anywhere else — and RLS denies the publishable key most of them on
-purpose, so no in-app backup can or should reach them.
-`scripts/backup-memory.mjs`, run every Sunday evening by
-`.github/workflows/backup-memory.yml`, reads the eight tables with no other
-source — the channel map, notes, turns, thesis, open loops, calendar, feedback,
-and every stop and target a position carried — into one JSON artifact.
-`eugenia_runs` is left out: the largest table, and facts about model calls
-rather than about him.
-
-It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
-step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
-so this is blast radius — leaked, it is revoked alone while the functions keep
-running. **The paging is the load-bearing part.** PostgREST caps a response at
-its own `max-rows`, so one read of `eugenia_turns` returns a page that looks
-exactly like a complete archive. The walk stops on a short page, not a count it
-was told, and the job refuses to upload a document with zero rows. Artifacts
-expire after ninety days, so download one occasionally, or run it by hand:
-
-```sh
-SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
-```
+column, a null included, so `select *` would stop at `pnl` before a row landed;
+the backup carries `pnl` and the statement ignores it. `agree.test.mjs` reads
+all three lists against the schema, so a column added later fails the suite
+until the restore names it, and `test/db` runs the statement over a backup's
+rows.
 
 **Signing out** is a double-click on the sync dot, and it deletes the snapshot:
 a full plaintext copy of the journal in `localStorage`, which left behind puts
@@ -967,7 +962,7 @@ every use and a function cannot rewrite its own Edge secrets. One row in
 `tradingview_auth`: RLS on, no policy, revoked from both public roles, and
 `verify.sql` asks all three. A refresh that brings no new refresh token keeps the
 old one — storing the absence would end the connection at the next expiry. The
-table is not in the memory backup and must not be: a live refresh token in an
+table is not in the backup and must not be: a live refresh token in an
 artifact is the account.
 
 **One renewal at a time, by a lease.** A rotating server may treat a refresh
@@ -2390,7 +2385,7 @@ references anything defined below it at load time.
 | `Charts` | Chart.js wrappers and the shared visual primitives |
 | `Render` | one function per component |
 | `Journal` | the entry modal |
-| `IO` | export and backup |
+| `IO` | export |
 | `Login` | session gate |
 | `Carousel` | mobile swipe position and dots |
 
@@ -2657,7 +2652,7 @@ home-screen shortcut and every bookmark open `/`.
 | File | Covers |
 |---|---|
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
-| `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, week and backup boundaries, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the export's figures, the snapshot, the offline boot, and the watch card |
+| `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the export's figures, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
@@ -2674,7 +2669,7 @@ rows it is handed. Anything whose first line is the network — the MCP transpor
 the upserts, the Telegram sends, the model call — is tested for what it decides,
 not what it sends; where the decision lives in such a function, `agree.test.mjs`
 reads its source. Gmail itself, behind the Apps Script stubs. What Supabase's own
-`pg_net`, `pg_cron` and Vault do, behind `test/db`'s stand-ins. `IO.backup` is plain JSON and is not tested.
+`pg_net`, `pg_cron` and Vault do, behind `test/db`'s stand-ins.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and
@@ -2699,7 +2694,7 @@ add.
 a buy, a thousands separator, a missing figure and an unreadable time exist in no
 saved message, so they are built in its shape, and one test holds the builder
 against the real body. The email path and the poller are the two pieces that
-could lose data quietly, and the weekly backup is the floor under both.
+could lose data quietly, and the daily backup is the floor under both.
 
 **The Supabase client carries no SRI hash**, unlike Chart.js and SheetJS. It is
 pinned to an exact version, which closes the drift; the hash would have to be

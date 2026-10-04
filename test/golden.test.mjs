@@ -295,7 +295,7 @@ function capture({ app, $, win, charts }) {
 
   const clock = {
     today: A.Dates.today(), nyMonth: A.Dates.nyMonth(),
-    weekStart: wk, monthStart: mo, lastClose: A.Dates.lastClose(),
+    weekStart: wk, monthStart: mo,
   };
 
   // Both indexes, whole: every render reads them.

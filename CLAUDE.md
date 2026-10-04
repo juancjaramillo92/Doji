@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 697 tests, six suites
+npm test      # 696 tests, six suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -426,9 +426,10 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 
 ---
 
-## Her memory is backed up from outside the browser
+## The journal and her memory are backed up from outside the browser
 
-`scripts/backup-memory.mjs`, run weekly by `.github/workflows/backup-memory.yml`.
+`scripts/backup.mjs`, run daily by `.github/workflows/backup.yml`; the app has no
+backup of its own.
 The paging is the part to be careful with: PostgREST caps a response at its own
 `max-rows`, so one read returns a page that looks like a complete archive. The
 walk stops on a short page, `readAll` takes its `fetch` as an argument so the loop

@@ -1122,9 +1122,6 @@ td.c   { text-align:center; }
   font-size:11px; color:var(--mt2); line-height:1.7; margin-bottom:12px;
 }
 .io-section-desc b { color:var(--tx); }
-.io-section-actions {
-  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
-}
 
 .export-ready-link {
   margin-top:10px; padding:10px 12px;
@@ -1375,10 +1372,8 @@ tr.broker-pending td:first-child {
   .log-split { grid-template-columns:1fr; }
 
   /* Fullscreen does nothing on a phone and the API is unreliable on iOS.
-     Import/export is a desk task: it writes a file that wants somewhere to be
-     filed. Hidden rather than removed so desktop keeps both. This does leave
-     the phone unable to export — deliberate, backups belong on the machine that
-     keeps them. */
+     Export is a desk task: it writes a spreadsheet that wants somewhere to be
+     filed. Hidden rather than removed so desktop keeps both. */
   #nav-fs-btn, #nav-io-btn { display:none; }
 
   /* Two rows of six: quarters land in whole rows, cells stay tappable. */
@@ -1657,19 +1652,6 @@ tr.broker-pending td:first-child {
         <button id="io-export-journal-btn" class="btn primary r4">↓ Export Journal (.xlsx)</button>
       </div>
 
-      <div id="io-section-json" class="io-section">
-        <div class="io-section-label">Full Backup (JSON)</div>
-        <div class="io-section-desc">
-          Exports <b>everything</b> — every trade, every journal field — as a single
-          <b>.json</b> file, the soft-deleted trades included, so it is a real
-          restore point. Restoring is done in the SQL editor, knowingly, with the
-          statement in the README, rather than one click from an export.
-        </div>
-        <div class="io-section-actions">
-          <button id="io-export-json-btn" class="btn r4">↓ Export Backup</button>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>
@@ -1716,7 +1698,7 @@ tr.broker-pending td:first-child {
      the minified build — npm ships no separate .min for it.
 
      SheetJS is not here: it is the largest of the three and only needed on
-     export, so a blocking tag would cost every open for a weekly feature.
+     export, so a blocking tag would cost every open for an occasional one.
      loadXLSX() injects it on first use with the same pin and hash. -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"
   integrity="sha512-6HrPqAvK+lZElIZ4mZ64fyxIBTsaX5zAFZg2V/2WT+iKPrFzTzvx6QAsLW2OaLwobhMYBog/+bvmIEEGXi0p1w=="
@@ -1748,7 +1730,7 @@ tr.broker-pending td:first-child {
      Charts     Chart.js wrappers and the four shared visual primitives
      Render     one function per component, orchestrated by render()
      Journal    the entry modal
-     IO         export and backup
+     IO         export
      Login      session gate
      Mobile     carousel, zoom lock, keyboard inset
      boot       wiring and start
@@ -1972,15 +1954,6 @@ const Dates = {
   monthStart(date = new Date()) {
     const p = Dates.nyParts(date);
     return `${p.y}-${String(p.m).padStart(2,'0')}-01`;
-  },
-
-  // The Friday whose 17:00 New York close last passed — a stable per-week key,
-  // so the weekly backup fires once and never twice.
-  lastClose(date = new Date()) {
-    const p = Dates.nyParts(date);
-    let back = (p.weekday - 5 + 7) % 7;               // Fri=0, Sat=1 … Thu=6
-    if (p.weekday === 5 && p.hour < 17) back = 7;     // Friday pre-close
-    return new Date(Date.UTC(p.y, p.m - 1, p.d - back)).toISOString().slice(0, 10);
   }
 };
 
@@ -2162,7 +2135,7 @@ function latestBefore(list, field, day = null) {
    ─────────────────────────────────────────────────────────────────────────── */
 const Data = {
   sb: null,
-  all: [],          // every row, deleted included — the backup needs them
+  all: [],          // the table as loaded, deleted rows included
   rows: [],         // what renders: the live ones, derived from `all` by index()
   byId: new Map(),
   byDay: new Map(),
@@ -2196,8 +2169,6 @@ const Data = {
 
   async load() {
     try {
-      // Nothing renders them, but a restore without them lets the poller
-      // rebuild every trade ever removed.
       const { data, error } = await this.sb
         .from('trades').select('*');
       if (error) throw error;
@@ -2299,11 +2270,8 @@ const Data = {
     return true;
   },
 
-  /* Into `all`, which the backup exports, and not only what renders. Written
-     only by load(), `all` would hold the pre-edit value after a save or delete —
-     realtime usually reloads within a second and hides it, but with the socket
-     down a backup taken straight after an edit exports the old row. That is the
-     one thing a restore point cannot get wrong. */
+  /* Into `all`, which index() derives `rows` from: written anywhere else, the
+     next index() would bring the pre-edit row back on screen. */
   replace(row) {
     const i = this.all.findIndex(t => t.id === row.id);
     if (i === -1) this.all.push(row); else this.all[i] = row;
@@ -3637,7 +3605,7 @@ const PendingDelete = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   IO — export and backup
+   IO — export
 
    Export only. A spreadsheet row carries no position id, so the sync could never
    match it and every imported trade would be a permanent duplicate waiting to
@@ -3668,37 +3636,6 @@ function loadXLSX() {
 const IO = {
   open() { openModal('io-modal'); },
 
-  // `pnl` is generated and cannot be written back, so it is dropped here rather
-  // than failing one row at a time during a restore.
-  payload() {
-    return {
-      exported_at: new Date().toISOString(),
-      trades: Data.all.map(({ pnl, ...row }) => row)
-    };
-  },
-
-  /* Blob URLs, not data: URIs — one mechanism for both export buttons and the
-     weekly auto-backup. A percent-encoded JSON backup holds the whole file
-     twice in memory as a string and runs into a URL-length ceiling; a Blob has
-     neither problem. */
-  blobUrl(data, type) {
-    return URL.createObjectURL(new Blob([data], { type }));
-  },
-
-  showLink(url, filename, sectionId) {
-    const host = $(sectionId);
-    if (!host) return;
-    // Revoked here rather than on a timer, so a URL stays valid exactly as long
-    // as the anchor offering it is on screen.
-    const prev = host.querySelector('.export-ready-link a');
-    if (prev) URL.revokeObjectURL(prev.href);
-    host.querySelector('.export-ready-link')?.remove();
-    const div = document.createElement('div');
-    div.className = 'export-ready-link';
-    div.innerHTML = `<span>Ready</span><a href="${url}" download="${filename}">↓ Download</a>`;
-    host.appendChild(div);
-  },
-
   async journal() {
     if (!Data.rows.length) { notify('No entries to export', true); return; }
     // First export of the session only — loadXLSX resolves immediately after.
@@ -3728,29 +3665,20 @@ const IO = {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Journal');
     const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    IO.showLink(
-      IO.blobUrl(out, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
-      'doji-journal-' + Dates.today() + '.xlsx', 'io-section-journal');
+    const url = URL.createObjectURL(new Blob([out],
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+
+    const host = $('io-section-journal');
+    // Revoked here rather than on a timer, so a URL stays valid exactly as long
+    // as the anchor offering it is on screen.
+    const prev = host.querySelector('.export-ready-link a');
+    if (prev) URL.revokeObjectURL(prev.href);
+    host.querySelector('.export-ready-link')?.remove();
+    const div = document.createElement('div');
+    div.className = 'export-ready-link';
+    div.innerHTML = `<span>Ready</span><a href="${url}" download="doji-journal-${Dates.today()}.xlsx">↓ Download</a>`;
+    host.appendChild(div);
     notify(`Journal ready — ${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`);
-  },
-
-  // A restore point he owns, independent of the account. No restore button by
-  // design: replacing the database from a file is a job for the SQL editor and
-  // the README's statement, not a click away from an export.
-  backup() {
-    const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
-    IO.showLink(url, 'doji-backup-' + Dates.today() + '.json', 'io-section-json');
-    notify('Backup ready');
-  },
-
-  // A gesture-less download can be blocked silently with no API to detect it,
-  // so the toast asks the trader to verify rather than asserting success.
-  download(filename) {
-    const url = IO.blobUrl(JSON.stringify(IO.payload(), null, 2), 'application/json');
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 };
 
@@ -3860,10 +3788,10 @@ const Carousel = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WATCHERS
+   WATCHER
 
-   Both track a key that only changes on a real boundary, so a throttled timer or
-   a sleeping machine can delay them but never make them miss or double-fire.
+   It tracks a key that only changes on a real boundary, so a throttled timer or
+   a sleeping machine can delay it but never make it miss or double-fire.
    ═══════════════════════════════════════════════════════════════════════════ */
 const DayWatcher = {
   day: null,
@@ -3876,24 +3804,6 @@ const DayWatcher = {
     // forward.
     if (prevMonth && today.slice(0, 7) !== prevMonth) View.heatmap = Dates.nyMonth();
     render();
-  }
-};
-
-const BackupWatcher = {
-  KEY: 'doji_backup_last_close',
-  last: null,
-  check() {
-    // Phones never auto-download: a phone's Downloads folder is not where a
-    // backup belongs, and a gesture-less download there is as likely to be
-    // blocked as saved. The marker is per-device, so skipping does not consume
-    // the laptop's turn.
-    if (Phone.matches) return;
-    const key = Dates.lastClose();
-    if (key === BackupWatcher.last || !Data.rows.length) return;
-    IO.download('doji-backup-' + key + '.json');
-    BackupWatcher.last = key;
-    try { localStorage.setItem(BackupWatcher.KEY, key); } catch (e) {}
-    notify('Weekly backup triggered → doji-backup-' + key + '.json — verify it landed in downloads');
   }
 };
 
@@ -3965,7 +3875,6 @@ function wire() {
     Journal.open(row.dataset.trade);
   });
   on('io-export-journal-btn', 'click', IO.journal);
-  on('io-export-json-btn',    'click', IO.backup);
 
   // Toast undo
   on('notif', 'click', e => { if (e.target.closest('.notif-undo')) PendingDelete.undo(); });
@@ -4030,14 +3939,9 @@ function openOffline() {
   wire();
 
   DayWatcher.day = Dates.today();
-  try { BackupWatcher.last = localStorage.getItem(BackupWatcher.KEY); } catch (e) {}
-
-  // One timer for both: each check is a cheap key comparison, and one interval
-  // is one thing to reason about rather than two that drift.
-  const tick = () => { DayWatcher.check(); BackupWatcher.check(); };
-  setInterval(tick, 30000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-  window.addEventListener('focus', tick);
+  setInterval(DayWatcher.check, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) DayWatcher.check(); });
+  window.addEventListener('focus', DayWatcher.check);
 
   let data, error;
   try {
@@ -4060,7 +3964,6 @@ function openOffline() {
     await Data.start();
     render();
     bootState(null);
-    BackupWatcher.check();
     // Not awaited, and after the render on purpose: the journal is what this
     // page is for, and her three small reads must never sit in front of it.
     Watch.draw();

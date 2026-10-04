@@ -1024,7 +1024,7 @@ test('the README names every setting, table, function, tool and command the code
 
   const lists = {
     settings: [...all(fns, /\b(?:env|envHours)\(\s*["'`]([A-Z_]+)/g),
-               ...all(source('scripts/backup-memory.mjs'), /process\.env\.([A-Z_]+)/g),
+               ...all(source('scripts/backup.mjs'), /process\.env\.([A-Z_]+)/g),
                ...all(source('doji_gmail_sync.gs'), /getProperty\('([A-Z_]+)'\)/g)],
     tables: all(SCHEMA_SQL, /create (?:table if not exists|or replace view) public\.(\w+)/g),
     functions: all(SCHEMA_SQL, /create or replace function public\.(\w+)/g),
@@ -1141,7 +1141,7 @@ test('every read of her tables goes through readRows', () => {
 
 const WORKFLOWS = ['.github/workflows/test.yml',
                    '.github/workflows/deploy-functions.yml',
-                   '.github/workflows/backup-memory.yml'].map(read);
+                   '.github/workflows/backup.yml'].map(read);
 
 test('every workflow takes its Node version from the one file that states it', () => {
   const pkg = JSON.parse(source('package.json'));
@@ -1489,7 +1489,7 @@ test('the Data model names every column the trades table has, and no other', () 
    ─────────────────────────────────────────────────────────────────────────── */
 test('the restore procedure writes every column the table lets it write', () => {
   const readme = source('README.md');
-  const sql = readme.match(/```sql\n-- 1\. paste the file's `trades` array[\s\S]*?```/)?.[0];
+  const sql = readme.match(/```sql\n-- 1\. paste the file's `tables.trades` array[\s\S]*?```/)?.[0];
   assert.ok(sql, 'the README no longer carries the restore procedure');
 
   const list = (text) => text.split(',').map(c => c.trim()).filter(Boolean);
@@ -2650,7 +2650,7 @@ test('the test count the instructions state is the count the suite runs', () => 
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every table the backup reads is ordered by a column it has', async () => {
-  const { TABLES } = await import('../scripts/backup-memory.mjs');
+  const { TABLES } = await import('../scripts/backup.mjs');
   assert.ok(TABLES.length >= 6, `only ${TABLES.length} tables in the backup`);
 
   for (const [table, orderBy] of TABLES) {

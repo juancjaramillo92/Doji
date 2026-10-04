@@ -1,11 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — a copy of everything about him that exists nowhere else
    ───────────────────────────────────────────────────────────────────────────
-   `trades` can be rebuilt from cTrader with a wide `?force=1`; her memory has
-   no other source, and the app cannot reach it — RLS denies the publishable
-   key her notes and turns, rightly. So the copy is taken with the secret key,
-   from outside the browser: each table read through PostgREST, paged to the
-   end, written as one JSON document.
+   His journal answers and her memory exist nowhere else, so they are copied
+   with the secret key from outside the browser — RLS denies the publishable
+   key her notes and turns, rightly. Each table is read through PostgREST,
+   paged to the end, and written as one JSON document.
+
+   `trades` goes whole, soft-deleted rows included: a wide `?force=1` can
+   rebuild its broker columns but never his answers, and a restore without the
+   deleted rows lets the poller bring back every trade he removed.
 
    It pages because PostgREST caps a response at its own `max-rows`, and one
    read of `eugenia_turns` looks exactly like a complete archive until the day
@@ -14,7 +17,7 @@
    `eugenia_runs` is left out: the cost meter, the largest table, and nothing
    about him.
 
-   Run:  SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup-memory.mjs > memory.json
+   Run:  SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup.mjs > backup.json
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Each table with its primary key, which orders the paging: Range needs a
@@ -24,6 +27,7 @@
    `create table`. Listed in restore order, so a note's supersedes target is
    always there first. */
 export const TABLES = [
+  ['trades',           'id'],
   ['eugenia_channels', 'channel'],
   ['eugenia_notes',    'id'],
   ['eugenia_turns',    'id'],
@@ -79,12 +83,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SB_SECRET_KEY;
   if (!url || !key) {
-    console.error('backup-memory: SUPABASE_URL and SB_SECRET_KEY must both be set');
+    console.error('backup: SUPABASE_URL and SB_SECRET_KEY must both be set');
     process.exit(1);
   }
   const out = await backup(url, key);
   const counts = Object.entries(out.tables).map(([t, r]) => `${t}=${r.length}`).join(' ');
   // To stderr, so stdout is the document and nothing else.
-  console.error(`backup-memory: ${counts}`);
+  console.error(`backup: ${counts}`);
   process.stdout.write(JSON.stringify(out));
 }
