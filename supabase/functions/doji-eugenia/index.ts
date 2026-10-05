@@ -3445,7 +3445,7 @@ async function postMove(): Promise<Response> {
   const asked = MOVE +
     `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
-    `Nothing high-impact on the calendar has printed in the last hour.` +
+    `No high-impact US release has printed in the last hour.` +
     // quoteLine, which names the session window — this path fires in the
     // evening, when the session and the calendar day disagree.
     `\n\n${quoteLine(spot, new Date())}` +

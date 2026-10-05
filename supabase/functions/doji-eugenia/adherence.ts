@@ -639,7 +639,7 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
     if (atEntry) pass.push(t.id);
     else (now === was ? fail : unknown).push(t.id);
   }
-  return result('R-19', 'positions from an earlier session a high-rated release landed on, judged on the stop and target in force at the print',
+  return result('R-19', 'positions from an earlier session a high-rated US release landed on, judged on the stop and target in force at the print',
                 pass, fail, unknown);
 }
 

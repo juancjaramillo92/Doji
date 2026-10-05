@@ -486,10 +486,11 @@ create index if not exists eugenia_runs_caller_at on public.eugenia_runs (caller
 alter table public.eugenia_runs enable row level security;
 
 -- ─── The calendar ──────────────────────────────────────────────────────────
--- What lands and what it printed. It wakes her after a high-impact print, and
--- it compounds: in a year it is how each release ran against expectations,
--- with her line beside each one. Filed from TradingView; she writes only
--- `note`, and an `actual` TradingView has not yet published.
+-- What lands and what it printed: the US releases, and from abroad what she
+-- reads the dollar through. It wakes her after a high-impact US print, and it
+-- compounds: in a year it is how each release ran against expectations, with
+-- her line beside each one. Filed from TradingView; she writes only `note`, and
+-- an `actual` TradingView has not yet published.
 create table if not exists public.eugenia_calendar (
   id         bigserial primary key,
 
@@ -1392,8 +1393,8 @@ select cron.schedule(
 );
 
 -- ─── Her event spine ───────────────────────────────────────────────────────
--- Files the calendar and looks at any high-impact release that has landed and
--- not been looked at. A separate job, not a faster hourly one: every hourly
+-- Files the calendar and looks at any high-impact US release that has landed
+-- and not been looked at. A separate job, not a faster hourly one: every hourly
 -- schedule tests `hour === n`, so */15 there would run four briefings a morning.
 -- Off the hour, clear of the briefing.
 select cron.schedule(

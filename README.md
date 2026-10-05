@@ -1191,12 +1191,14 @@ are none.
 
 **The calendar is the one place the prose rule is relaxed** — a plain day label
 and one line per item, times in ET, one fact each. On a weekday it is that day's
-releases. The list holds times and names, `NAMED AND NOTHING MORE`: no mechanism
-goes in it, because that slot is where a second chain hides.
+releases, and a line from abroad only where the story runs through it. The list
+holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
+because that slot is where a second chain hides.
 
 **On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
 whole week first (`filedWeek`, the nightly pass's own filing) and is handed every
-release TradingView rates high for the seven days ahead, in place of the rolling
+US release TradingView rates high for the seven days ahead, and from abroad the
+central banks' decisions and headline inflation, in place of the rolling
 calendar — high only, since seven days of medium is a page and none of it moves
 gold alone. The first paragraph is where the story stands as the market opens,
 the teaching block walks the release most likely to move it, and the calendar is
@@ -1815,7 +1817,7 @@ the move look, the likeliest to land mid-position. The trade look is reached
 
 **What she may do with it is narrower than what she can see, by design.**
 Unprompted it stops anything setup-flavoured while a position is open, and lets
-her name a collision his own rules name — a high-impact print against an open
+her name a collision his own rules name — a high-impact US print against an open
 position (R-14, R-19), or a day past R-11. When *he* raises the position she
 discusses it properly and refuses one thing: what to do with it. **His levels
 never appear in a message she starts** — a briefing framed around the number he
