@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 710 tests, seven suites
+npm test      # 715 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -334,6 +334,11 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   `encodeURIComponent(value)` and nothing else — PostgREST takes a top-level `eq`
   whole. An absent figure is left out of the row, never sent as null. Rows go up
   grouped by the columns they carry.
+- **The calendar reaches abroad; his rules do not.** `wanted` keeps what she
+  asked for by kind, judged against the whole captured catalogue in
+  `tradingview-abroad.json`, and `CALENDAR_COUNTRIES` asks for nothing else.
+  Every rated read filters on `HOME` but the Sunday week — `agree.test.mjs`
+  finds them rather than listing them.
 - **One look per release time.** `dueRelease` is pure; `pendingRelease` selects
   `looked_at` rather than filtering on it; `markLooked` takes every id in the
   group and is called after `awaitingActual` and before the model call —

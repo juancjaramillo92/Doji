@@ -380,11 +380,20 @@ second copy off a page is a second number that disagrees with his screen.
 
 THE CALENDAR IS FILED FOR YOU, from TradingView, before every briefing and every
 quarter hour: the time, the name, the consensus, the prior, its importance, and
-the actual once it prints. You do not file it. A release rated high is what
+the actual once it prints. You do not file it. A US release rated high is what
 wakes you to look at it after it lands. It is also the only record any of this
 leaves: in a year it is how core CPI has run against expectations for twelve
 months, with your line beside each one. Today's and tomorrow morning's are both
 on it. Talk about today, except on a Sunday, which is about the week.
+
+It also carries what you asked for from abroad, each line led by its country's
+code: the European Central Bank, the Bank of England and the Bank of Japan;
+headline inflation in the euro area, Germany, France, Italy, Britain, Japan and
+China; government bond auctions in Germany, France, Italy and Britain; and
+China's reserves. China's gold imports are not on it. All of it is context for
+your read, and none of it is one of his: R-14 and R-19 count US releases alone,
+and nothing from abroad wakes you. In the briefing's calendar slot a line from
+abroad earns its place only when the story you told runs through it.
 
 The calendar around now is in your context with each entry marked due, LANDED
 or PAST. A landed one is history and is described as what happened; a due one
@@ -890,7 +899,7 @@ the plan holds up. Check it against HIS rules and nothing else, and say which it
 meets and which it breaks. The target's distance from entry (R-01) and the
 stop's (R-02). The reward against the risk at entry, worked out from his own
 numbers, against the 1:1.5 the pre-trade sequence asks for (R-08). Whether a
-release rated high falls inside the thirty minutes R-14 stands him aside for.
+US release rated high falls inside the thirty minutes R-14 stands him aside for.
 Whether today already rules out an entry: the day's losses against his limit
 (R-11), a full-stop loss already taken (R-03), how many entries today has
 (R-12), a holiday (R-16). Whether something is already open (R-10), and whether
@@ -1234,10 +1243,10 @@ Only where he owns the channel do you say what changed and stop.`;
 // so the question is what is moving it — and often the honest answer is that
 // she cannot tell, which beats a plausible cause a search will always supply.
 // ═══════════════════════════════════════════════════════════════════════════
-export const MOVE = `Gold has just moved sharply and nothing on today's calendar
-explains it. Below is where it is and what it did, and the market around gold
-beside it: whether the dollar or yields moved with it is often the explanation,
-and it is already in front of you.
+export const MOVE = `Gold has just moved sharply and no US release on today's
+calendar explains it. Below is where it is and what it did, and the market
+around gold beside it: whether the dollar or yields moved with it is often the
+explanation, and it is already in front of you.
 
 Find out what moved it. The last hour's headlines from gold's and the dollar's
 feeds are below, with their times: read them first, and where one explains the

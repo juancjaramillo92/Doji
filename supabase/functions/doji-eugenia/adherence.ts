@@ -462,8 +462,9 @@ function r13(rows: TradeRow[]): RuleResult {
    No entries before a high-impact release. §7: none in the 30 minutes before a
    US release TradingView rates high; one with a release later that day but
    further off is unknown. Thirty minutes is the floor no reading excuses, and
-   the rest is his judgement — unknown, never pass. HIGH is his decision
-   (v1.20), imported by the query that reads the calendar.
+   the rest is his judgement — unknown, never pass. HIGH and HOME are his
+   decision (v1.20), imported by the query that reads the calendar; the
+   calendar also holds releases from abroad, and none of them is one of his.
 
    A week nobody fetched is not a quiet week: `weeks` is evidence of a
    whole-week fetch, and an entry outside one is unknown. After the print is
@@ -471,6 +472,7 @@ function r13(rows: TradeRow[]): RuleResult {
    ───────────────────────────────────────────────────────────────────────── */
 export const NEWS_MIN = 30;
 export const HIGH = 'high';
+export const HOME = 'US';
 
 export interface Calendar { releases: string[]; weeks: Set<string> }
 

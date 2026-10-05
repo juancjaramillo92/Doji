@@ -26,6 +26,7 @@ import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyb
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
   from '../supabase/functions/doji-eugenia/journal.ts';
+import { HOME } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
 const READ = new Map();
@@ -2860,6 +2861,65 @@ test('the importance a release may carry is the one the table accepts', () => {
   assert.doesNotMatch(spine, /looked_at=is\.null/,
     'the filter is back, so the duplicates are handed over one at a time again — ' +
     'which is the five-looks-per-print this replaced');
+});
+
+/* ─── The calendar reaches abroad; his rules do not ──────────────────────────
+   doji-tradingview asks for a fixed list of economies and calendarRows decides
+   which of theirs are filed, so the two lists are one fact in two files: an
+   economy asked for and never kept is paid for on every filing, and one kept
+   and never asked for is a selection that can never fire. And everything that
+   acts on a release — R-14 and R-19, the look, the trade warning, the move's
+   explanation — counts the US alone, while only the Sunday week and the
+   rolling list carry what is filed from abroad.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the economies the calendar is asked for are the ones calendarRows keeps', () => {
+  const tv = source('supabase/functions/doji-tradingview/index.ts');
+  const asked = tv.match(/const CALENDAR_COUNTRIES = "([A-Z,]+)";/);
+  assert.ok(asked, 'doji-tradingview no longer names the economies it asks the calendar for');
+  assert.match(uncomment(bodyOf(tv, 'Deno.serve(async')), /countries: CALENDAR_COUNTRIES/,
+    'the calendar door asks for something other than the declared economies');
+
+  const lists = EUGENIA_TS.match(/const BANKS = \[[^\]]*\], AUCTIONS = \[[^\]]*\];/);
+  assert.ok(lists, 'doji-eugenia no longer declares the central banks and auctions it keeps');
+  const kept = new Set([...(lists[0] + bodyOf(EUGENIA_TS, 'export function wanted('))
+    .matchAll(/'([A-Z]{2})'/g)].map(m => m[1]));
+  kept.add(HOME);
+  assert.deepEqual([...kept].sort(), asked[1].split(',').sort(),
+    'the calendar is asked for an economy nothing keeps, or keeps one it never asks for');
+});
+
+test('only US releases are counted, looked at or warned of', () => {
+  /* EVERY READ FILTERED ON A RATING, found rather than listed, so a new one
+     arrives already asked the question. The Sunday week is the one declared
+     exception: it is a list for her to read, not a release anything acts on. */
+  const LISTS = ['export function weekQuery('];
+  const reads = [...EUGENIA_TS.matchAll(/importance=eq\./g)].map(m => {
+    const at = Math.max(...['\nexport function ', '\nasync function ', '\nexport async function ']
+      .map(d => EUGENIA_TS.lastIndexOf(d, m.index))) + 1;
+    return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('(', at) + 1);
+  });
+  assert.ok(reads.length >= 5, `only ${reads.length} rated reads found — the reader has gone blind`);
+  for (const decl of reads) {
+    const body = bodyOf(EUGENIA_TS, decl);
+    if (LISTS.includes(decl)) {
+      assert.doesNotMatch(body, /country=eq\./, `${decl} no longer carries what is filed from abroad`);
+      continue;
+    }
+    assert.ok(body.includes('country=eq.${HOME}'),
+      `${decl} reads releases from abroad as his, so a print in Tokyo stands him aside`);
+  }
+  for (const decl of LISTS) assert.ok(reads.includes(decl), `${decl} is declared a list and reads no rating`);
+
+  /* THE COUNTRY HIS RULES COUNT is HOME in adherence.ts, the column's default
+     in schema.sql — every row filed before the column was a US one — and the
+     app's watch card, which can import neither. */
+  assert.equal(HOME, 'US');
+  assert.match(SENSES_SQL, new RegExp(`add column if not exists country text not null default '${HOME}'`),
+    'eugenia_calendar.country defaults to an economy other than the one his rules count');
+  const watch = bodyOf(source('index.html'), 'const Watch = {');
+  assert.match(watch, new RegExp(`from\\('eugenia_calendar'\\)[\\s\\S]*?\\.eq\\('country', '${HOME}'\\)`),
+    "the app's calendar card reads abroad too, and a night of it pushes the morning's prints off twenty rows");
 });
 
 /* ─── The pure half settles nothing about the call ───────────────────────────

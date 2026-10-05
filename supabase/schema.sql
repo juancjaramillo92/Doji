@@ -498,7 +498,7 @@ create table if not exists public.eugenia_calendar (
 
   name       text not null,
 
-  -- Only 'high' wakes her.
+  -- Only 'high' wakes her, and only at home.
   importance text not null default 'high'
     constraint eugenia_calendar_importance_check check (importance in ('high', 'medium', 'low')),
 
@@ -549,6 +549,12 @@ end $$;
 create or replace trigger eugenia_calendar_touch_updated_at
   before update on public.eugenia_calendar
   for each row execute function public.eugenia_calendar_touch();
+
+-- Where a release is from. Every rule that reads one is about the US, and the
+-- rest is filed as context, so the rules filter on this. Added after the
+-- table, so a fresh build and the live one end with the same column order; the
+-- default is the US because every row filed before it was.
+alter table public.eugenia_calendar add column if not exists country text not null default 'US';
 
 create index if not exists eugenia_calendar_at on public.eugenia_calendar (at desc);
 

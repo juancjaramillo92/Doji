@@ -373,6 +373,8 @@ single-sourced at run time:
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **columns of `eugenia_price`** | the table and what `markPrice` PATCHes |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the spine's `importance=eq.high` |
+| the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
+| the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
@@ -889,11 +891,15 @@ another name; fundamentals and filings are about companies.
 
 **`?calendar=1&from=YYYY-MM-DD&to=YYYY-MM-DD` is the calendar reader** — the one
 door where a request value reaches a tool, refused rather than clamped: `from`
-and `to` are whole days only, at most 31, nothing before 2003-09-01, US only (every rule that reads
-a release is about USD). Each event comes back with its permanent `id`, the
-minute it lands, title, importance (`high`, `medium`, `low` from TradingView's 1,
-0, −1), period, consensus, prior and actual as text with their unit (`200K`,
-`0.2%`, `$6.748T`), and `ticker`. No consensus stays null; zero is `0%`.
+and `to` are whole days only, at most 31, nothing before 2003-09-01. The
+economies are fixed in the function (`CALENDAR_COUNTRIES`): the US, which every
+rule that reads a release is about, and the ones Eugenia reads the dollar through
+— the euro area, Germany, France, Italy, Britain, Japan and China. Each event
+comes back with its permanent `id`, the minute it lands, title, country,
+TradingView's own category (`mny`, `prce`, `bnd`, or null where it gives none),
+importance (`high`, `medium`, `low` from TradingView's 1, 0, −1), period,
+consensus, prior and actual as text with their unit (`200K`, `0.2%`, `$6.748T`),
+and `ticker`. No consensus stays null; zero is `0%`.
 `timed` is false for what is on the calendar without being a release — a summit
 filed at midnight under `Calendar` must not be counted as a print. The event
 descriptions are dropped, since she would pay for each on every request.
@@ -958,6 +964,10 @@ result marked `isError: false`, with `success: false` in the payload. `unwrap`
 checks both and reads `structuredContent` rather than the duplicate text block.
 `test/fixtures/tradingview-calendar.json` is eight events from the 1 October
 calendar probe, one per shape the fold must handle.
+`test/fixtures/tradingview-abroad.json` is every kind of event TradingView listed
+for the seven economies abroad from 7 September to 4 November, read on 5 October
+— 459 kinds, 862 events, each with its country, rating, category and title — so
+what is filed from abroad is judged against the whole catalogue.
 
 **`?probe=` is fixed: nothing in the request reaches a tool.** It picks one of
 seven, every argument is written in the function, and each call's failure is its
@@ -1296,9 +1306,26 @@ is least likely to speak. The spine is driven by data rather than an hour.
 she already holds, and upserts every timed US release rated medium or above into
 `eugenia_calendar` under TradingView's own id (`tv_id`):
 the time, the name with its period (*Core PCE Price Index MoM (Aug)*), the
-importance, the consensus, the prior, and the actual once it prints. Low-rated
-items are not filed — each would be in front of her on every request and none
-moves gold alone. The briefing files before it reads, and a **quarter-hourly
+country, the importance, the consensus, the prior, and the actual once it prints.
+Low-rated US items are not filed — each would be in front of her on every request
+and none moves gold alone.
+
+**From abroad, what she asked for and nothing else** (`wanted`): the central
+banks of the euro area, Britain and Japan (`mny` at medium or above — decisions,
+minutes, the president's and the governor's speeches); headline inflation in all
+seven (`prce` rated high); government bond auctions in Germany, France, Italy and
+Britain, less the bills, which TradingView names in months; and China's reserves.
+By kind rather than by rating, since the rating would miss most of it: TradingView
+rates Lagarde medium and every auction and China's reserves low, and rates a dozen
+surveys high. About 12 events a week, out of more than 100 listed. China's gold
+imports are not on TradingView's calendar. A row from abroad carries its country
+at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
+economies publish that title in one hour and `record_actual` matches on the name.
+**None of it is one of his**: R-14 and R-19, the look, the trade event's warning
+and the move's explanation all read `country=eq.US` (`HOME`, beside `HIGH` in
+`adherence.ts`), and a list that carries a line from abroad tells her so once.
+The rolling list and the Sunday week carry it; the week takes only what is rated
+high, so abroad that is the central banks' decisions and headline inflation. The briefing files before it reads, and a **quarter-hourly
 job** files before asking one question: **which release time has landed and not
 yet been looked at?** Every filing is an `eugenia_runs` row under `calendar`,
 failed or not, since a calendar that stopped moving looks like a quiet week.
@@ -1420,7 +1447,7 @@ rules read back at the moment they apply**:
 
 | Event | What she may say |
 |---|---|
-| opened | a high-impact print is pending and he is now in a position — R-14 is about standing aside before one, R-19 about a position inherited into one |
+| opened | a high-impact US print is pending and he is now in a position — R-14 is about standing aside before one, R-19 about a position inherited into one |
 | closed | that fill took the day past −4% of the account his size implies, and R-11 says the day ends there |
 
 Naming the rule is citation; saying what he should do is not hers, and the
@@ -1513,7 +1540,7 @@ holds the two lists together.
 **R-14 and R-19 are judged against TradingView's calendar** — he defined high
 impact, at v1.20, as a US release TradingView rates high, so one calendar serves
 the briefing, the trade event and the rules. Rows with no TradingView id are not
-read. **A week nobody fetched is not a quiet week**: `calendar_weeks`
+read, and neither are rows from abroad. **A week nobody fetched is not a quiet week**: `calendar_weeks`
 records each week a whole-week fetch landed for, and
 an entry outside one is `unknown`. Both markers go through `fileWeek`, which
 writes the rows first and the mark after:
@@ -2359,6 +2386,10 @@ window into them is `/notes`. The three tables the card reads carry no `user_id`
 so `using (true)` for `authenticated` is the honest policy; a test asserts the
 card reads only those three and that `schema.sql` opens nothing on the other two.
 
+**The calendar on it is the US releases alone**: what is filed from abroad is
+context for her, and a night of European and Asian rows would push the morning's
+prints out of the card's twenty.
+
 **One read, after the render.** A failure — her tables not applied, a missing policy,
 no network — hides the card and touches nothing else, and is logged:
 `supabase-js` resolves a failed read as `{ data: null, error }`, so `data || []`
@@ -2391,7 +2422,7 @@ with *buy* left out.
 
 **She checks a plan you have not taken, when you ask, against your rules**: the
 stop and target distances (R-01, R-02), reward against risk at entry against R-08's
-1:1.5, a high-rated release inside R-14's thirty minutes, whether the day already
+1:1.5, a high-rated US release inside R-14's thirty minutes, whether the day already
 rules out an entry (R-03, R-11, R-12, R-16), something already open (R-10), the
 Friday close (R-15). Whether the setup is the right kind of level is judgment and
 stays yours. **The levels stay yours**: she never suggests a different entry, stop

@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 85 checks.
+-- whole file after any manual change and read the `ok` column — all 86 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -440,6 +440,12 @@ from (values
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_calendar'
        and column_name = 'ticker'),
+   '1'),
+  -- Without it every filing is refused, and so is every read of the US releases.
+  ('eugenia_calendar has its country',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_calendar'
+       and column_name = 'country'),
    '1'),
   ('neither public role holds a grant on tradingview_auth',
    (select (has_table_privilege('anon', to_regclass('public.tradingview_auth'), 'select')

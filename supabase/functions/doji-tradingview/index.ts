@@ -349,8 +349,10 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
 
 /* ─── The calendar ─────────────────────────────────────────────────────────
    The releases as data, each with an id TradingView keeps — the key her
-   calendar is filed on — and its figures with unit and scale. US only: every
-   rule that reads a release is about USD.
+   calendar is filed on — and its figures with unit and scale. The US, which
+   every rule that reads a release is about, and the economies she reads the
+   dollar through: the euro area and its three largest, Britain, Japan and
+   China. Which of theirs are filed is hers to decide, in `calendarRows`.
 
    The window is the one request value that reaches a tool, so it is refused
    unless valid: dates only, at most 31 days (as far ahead as TradingView
@@ -358,6 +360,7 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
    ───────────────────────────────────────────────────────────────────────── */
 const CALENDAR_DAYS = 31;
 const CALENDAR_FIRST = "2003-09-01";
+const CALENDAR_COUNTRIES = "US,EU,DE,FR,IT,GB,JP,CN";
 
 export function calendarWindow(from: string | null, to: string | null) {
   const day = /^\d{4}-\d{2}-\d{2}$/;
@@ -381,8 +384,9 @@ const IMPORTANCE: Record<number, string> = { 1: "high", 0: "medium", [-1]: "low"
 
 /* `timed` is false for an entry that is not a release — a summit rated high
    and filed at midnight under `indicator: "Calendar"`. Kept as news, marked so
-   nothing counts minutes to it. `comment` is dropped: a paragraph per release,
-   paid for on every request. */
+   nothing counts minutes to it. `category` is TradingView's own code — `mny`,
+   `prce`, `bnd` — or null where it gives none. `comment` is dropped: a
+   paragraph per release, paid for on every request. */
 export function foldCalendar(answer: any) {
   if (answer.status !== "ok" || !Array.isArray(answer.result)) {
     throw new Error(`TradingView calendar: ${answer.error || `status ${answer.status}`}`);
@@ -392,6 +396,7 @@ export function foldCalendar(answer: any) {
     at: e.date,
     title: e.title,
     country: e.country,
+    category: e.category ?? null,
     importance: IMPORTANCE[e.importance] ?? "low",
     timed: e.indicator !== "Calendar",
     period: e.period || null,
@@ -751,7 +756,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
                       `apart, and not before ${CALENDAR_FIRST}` }, 400);
       }
       const answer = await tvCall(await tvSession(), "mcp-tv-get-economic-calendar",
-        { countries: "US", ...window });
+        { countries: CALENDAR_COUNTRIES, ...window });
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
