@@ -302,12 +302,10 @@ async function callback(url: URL): Promise<Response> {
    same credential serves eleven tools that change his alerts and watchlists,
    and mcp-watchlist-get-active-watchlist creates a watchlist when none is
    active. Left out on purpose: the technical rating, forecasts and screener,
-   which are signals by another name, and everything about companies. The
-   screener's column catalog is in: it names what the quote batch may ask for
-   and runs no screen. */
+   which are signals by another name, and everything about companies. */
 const ALLOWED_TOOLS = [
   "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-symbol-data-batch",
-  "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols", "mcp-tv-get-screener-columns",
+  "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols",
 ] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
 
@@ -685,9 +683,7 @@ async function readVolume() {
      search     the names a real yield and gold's feeds go by
      fedfunds   fed funds futures under continuous and named months, and what
                 a bar carries
-     futures    whether gold futures' open interest is a column the batch can
-                ask for, what a daily bar of the front month carries, and
-                whether open interest or COMEX's vault stocks exist as symbols
+     futures    what a daily bar of gold's front month carries
 
    Every argument is written here; none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -729,14 +725,8 @@ const PROBES: Record<string, () => Call[]> = {
     ...["CBOT:ZQ1!", "CBOT:ZQ2!", "CBOT:ZQ3!", "CBOT:ZQV2026", "CBOT:ZQX2026", "CBOT:ZQZ2026"]
       .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 3 }]),
   ],
-  // The batch asks under a guessed column name; the catalog's answer says
-  // whether the guess was the name.
   futures: () => [
-    ["mcp-tv-get-screener-columns", { search: "interest" }],
-    ["mcp-tv-get-symbol-data-batch", { symbols: ["COMEX:GC1!"], columns: ["close", "open_interest"] }],
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
-    ["mcp-tv-search-symbols", { query: "gold open interest" }],
-    ["mcp-tv-search-symbols", { query: "COMEX gold stocks" }],
   ],
 };
 
