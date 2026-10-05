@@ -413,8 +413,11 @@ export function foldCalendar(answer: any) {
    probe while the OHLCV read answered for every symbol.
 
    The real yield is FRED's daily TIPS series, a day or more behind, and must
-   never read as live: `daily` says so to whoever renders it. The names live
-   here, once, beside the symbols — this list is the whole of what is read. */
+   never read as live: `daily` says so to whoever renders it. Abroad, the
+   ten-year yields she reads the calendar's auctions and central banks against
+   — France and Italy each against Germany is what lenders charge for the doubt
+   — and the euro, more than half the dollar index. The names live here, once,
+   beside the symbols — this list is the whole of what is read. */
 const MARKET = [
   { symbol: "TVC:DXY",     name: "Dollar index",              unit: "" },
   { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
@@ -424,6 +427,12 @@ const MARKET = [
   { symbol: "TVC:USOIL",   name: "US crude oil",              unit: "$" },
   { symbol: "SP:SPX",      name: "S&P 500",                   unit: "" },
   { symbol: "TVC:VIX",     name: "VIX",                       unit: "" },
+  { symbol: "TVC:DE10Y",   name: "German ten-year yield",     unit: "%" },
+  { symbol: "TVC:FR10Y",   name: "French ten-year yield",     unit: "%" },
+  { symbol: "TVC:IT10Y",   name: "Italian ten-year yield",    unit: "%" },
+  { symbol: "TVC:GB10Y",   name: "UK ten-year gilt yield",    unit: "%" },
+  { symbol: "TVC:JP10Y",   name: "Japanese ten-year yield",   unit: "%" },
+  { symbol: "FX:EURUSD",   name: "Euro in dollars",           unit: "" },
 ];
 
 /* A span, not a change: where the first bar opened and the last one stands,
@@ -667,7 +676,8 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(-7), date_to: day(0), min_importance: 1 }],
   ],
   quotes: () => [
-    ["mcp-tv-get-symbol-data-batch", { symbols: AROUND }],
+    // Without the euro: a forex symbol is what drew the scanner's 429.
+    ["mcp-tv-get-symbol-data-batch", { symbols: AROUND.filter(s => !s.startsWith("FX:")) }],
     // The real yield is daily; a 15m bar of it answers nothing.
     ...AROUND.filter(s => s !== "FRED:DFII10")
       .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "15m", count: 2 }]),

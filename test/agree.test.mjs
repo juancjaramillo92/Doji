@@ -4818,6 +4818,19 @@ test('every tool doji-tradingview may call is one a probe or a reader calls', ()
   }
 });
 
+test('the quote batch is probed without the euro, the one forex symbol the market reads', () => {
+  /* The batch was refused whole with the forex scanner's 429; the probe asks
+     whether it answers without one. The market's own read is bar by bar and
+     takes the euro like any other line. */
+  const src = source('supabase/functions/doji-tradingview/index.ts');
+  const market = [...src.match(/const MARKET = \[([\s\S]*?)\n\];/)[1].matchAll(/symbol: "([^"]+)"/g)].map(m => m[1]);
+  const forex = market.filter(s => /^(FX|FX_IDC|OANDA|PEPPERSTONE):/.test(s));
+  assert.ok(forex.length, 'the market reads no forex symbol, so this check has nothing to hold');
+  assert.ok(forex.every(s => s.startsWith('FX:')), `a forex symbol is read under another prefix: ${forex}`);
+  assert.match(src, /"mcp-tv-get-symbol-data-batch", \{ symbols: AROUND\.filter\(s => !s\.startsWith\("FX:"\)\) \}/,
+    'the quote probe sends the euro in the batch it exists to try without one');
+});
+
 test('every tool the poller may call is one it actually calls or probes', () => {
   // A name in the array nothing reaches is a widening with no feature — the shape
   // a destructive tool would arrive in, added "for later".

@@ -906,7 +906,10 @@ descriptions are dropped, since she would pay for each on every request.
 
 **`?market=1` is the market around gold, as bars**: the dollar index, the two-
 and ten-year yields, the ten-year real yield, silver, US crude, the S&P 500 and
-the VIX. The quote batch refused on every probe with the scanners' 429, while the
+the VIX — and abroad the German, French, Italian, UK and Japanese ten-year
+yields and EUR/USD, what the calendar's auctions and central banks are read
+against: France and Italy each against Germany is what lenders charge for the
+doubt, and the euro is more than half the dollar index. The quote batch refused on every probe with the scanners' 429, while the
 OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
 `foldBars` to where the first opened and where the last stands, each with its
 time. The real yield is FRED's daily series and is marked `daily`. Symbols, names
@@ -976,7 +979,7 @@ own answer:
 | `?probe=` | what it asks |
 |---|---|
 | `calendar` | the next three days of US events, and the past week at high importance, to see whether a release that printed carries its actual beside the forecast and the prior |
-| `quotes` | whether the quote batch answers for the dollar, the two- and ten-year yields, the real yield, silver, oil, the S&P and the VIX with no forex symbol in it — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
+| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, silver, oil, the S&P and the VIX with no forex symbol in it (the euro is left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
