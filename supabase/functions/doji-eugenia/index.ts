@@ -1049,8 +1049,9 @@ const AROUND_TOOL = {
     "abroad the German, French, Italian, UK and Japanese ten-year yields and the " +
     "euro, each a level now beside the level at a stated time; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
-    "the next three Fed meetings; and the CFTC's weekly count of " +
-    "where the speculators stand in gold futures. Use it whenever you are about " +
+    "the next three Fed meetings; the CFTC's weekly count of " +
+    "where the speculators stand in gold futures; and what COMEX gold futures traded in " +
+    "the last finished session against the twenty before. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
     "crossed the wires, and quote those from here rather than from a search. " +
     "Every line says what it is measured from; say that window, never 'today'. " +
@@ -1446,7 +1447,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case MARKET_TOOL.name:   return await readMarket();
     case AROUND_TOOL.name:
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(WIRES_CHAT_MIN),
-                                 positioningBlock()])).join("").trim();
+                                 positioningBlock(), volumeBlock()])).join("").trim();
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -2557,6 +2558,50 @@ export async function positioningBlock(): Promise<string> {
   }
 }
 
+/* ─── What COMEX gold futures traded ───────────────────────────────────────
+   The exchange's volume in the front month, the one volume that is the
+   market's: the broker's is its own clients. The last finished session against
+   the twenty before it, since heavy means something only against its own past.
+
+   Every briefing and get_around, not the move look: a day's total cannot be
+   the cause of a quarter-hour move. Never throws.
+   ───────────────────────────────────────────────────────────────────────── */
+type Session = { start: string; volume: number };
+
+// A Globex gold session runs 23 hours, 18:00 to 17:00 ET, and is named for the
+// day it ends; it starts the evening before.
+const SESSION_MS = 23 * 3_600_000;
+
+// One session that will not read refuses all, as the CFTC's rows do.
+export function volumeList(sessions: Session[], now = Date.now()): string {
+  if (!sessions.every(s => Number.isFinite(Date.parse(s.start)) && Number.isFinite(s.volume))) {
+    throw new Error("no readable session");
+  }
+  const done = sessions.filter(s => Date.parse(s.start) + SESSION_MS <= now);
+  if (!done.length) throw new Error("no finished session");
+  const n = (v: number) => v.toLocaleString('en-US');
+  const latest = done[done.length - 1];
+  const before = done.slice(-21, -1);
+  const day = nyDate(new Date(Date.parse(latest.start) + SESSION_MS));
+  const average = Math.round(before.reduce((sum, s) => sum + s.volume, 0) / before.length);
+  return `\n\nWhat COMEX gold futures traded — the exchange's own volume in the front-month ` +
+    `contract, from TradingView's daily bars, finished sessions only:\n` +
+    `· ${weekday(day)} ${civilDay(day)}: ${n(latest.volume)} contracts` +
+    (before.length
+      ? `, against an average of ${n(average)} over ` +
+        `${before.length === 1 ? "the session" : `the ${before.length} sessions`} before.`
+      : `.`);
+}
+
+export async function volumeBlock(): Promise<string> {
+  try {
+    return volumeList((await tvRead("volume")).sessions);
+  } catch (err) {
+    console.error("doji-eugenia: futures volume unavailable —", why(err));
+    return "\n\nWhat COMEX gold futures traded could not be read just now; do not quote it from a search.";
+  }
+}
+
 /* ─── What he has on, and where his day stands ─────────────────────────────
    Whether he is exposed right now, which no other block said — so a briefing
    could talk about a level he was sitting in a position through. Six paths;
@@ -2856,10 +2901,10 @@ async function postBriefing(due: Brief): Promise<Response> {
   // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   // Every read at once: independent and small, so the batch costs its slowest.
-  const [price, around, rates, crowd, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
+  const [price, around, rates, crowd, traded, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
     await Promise.all([
-      marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", notesBlock(),
-      channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(), loopsBlock(),
+      marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", volumeBlock(),
+      notesBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(), loopsBlock(),
       due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(),
     ]);
 
@@ -2868,7 +2913,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped, everything after it may be
     // missing rows.
-    + health + price + around + rates + crowd + notes + channels + trades + breaches + story + loops + calendar + desk;
+    + health + price + around + rates + crowd + traded + notes + channels + trades + breaches + story + loops + calendar + desk;
 
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`);

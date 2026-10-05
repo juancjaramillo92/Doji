@@ -5268,6 +5268,32 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
     'the count lost the line that keeps it from reading as a signal');
 });
 
+/* ─── What COMEX gold futures traded ─────────────────────────────────────────
+   Every briefing and get_around. The move look would be handed a day's total as
+   the cause of a quarter-hour move, and the prompt keeps the broker's volume,
+   which is its own clients, from standing in for the market's. */
+test('futures volume reaches every briefing and a conversation, and never the move look', () => {
+  const body = (name) =>
+    bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
+  const calls = [...EUGENIA_TS.matchAll(/(?<!function )volumeBlock\(\)/g)].length;
+  assert.equal(calls, 2, `volumeBlock() is called ${calls} times — a new reader was given the day's volume`);
+  assert.match(body('postBriefing'), /volumeBlock\(\)/, 'the briefing no longer reads the futures volume');
+  assert.match(body('postBriefing'), /\+ crowd \+ traded \+/, 'the briefing reads the futures volume and never hands it over');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /volumeBlock\(\)/,
+    'a conversation asked whether a move had volume behind it has nothing but a search to answer from');
+  assert.doesNotMatch(body('postMove'), /volumeBlock/,
+    'the move look is handed a day\'s volume as the cause of a quarter-hour move');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  const said = system.slice(system.indexOf('WHAT COMEX GOLD FUTURES TRADED'));
+  assert.ok(said.length < system.length, 'SYSTEM no longer says what the futures volume is for, so it reads as news');
+  const paragraph = said.slice(0, said.indexOf('. ', said.indexOf('never a call on where price goes')) + 1);
+  assert.match(paragraph, /never read volume off the broker's feed/,
+    'the volume lost the line that keeps the broker\'s clients from standing in for the market');
+  assert.match(paragraph, /never a reason to trade, and never a call on where price goes/,
+    'the volume lost the line that keeps it from reading as a signal');
+});
+
 /* THE RATE ODDS GO TO THE BRIEFING AND A CONVERSATION, and the prompt says a
    later meeting is never a chance — the half that keeps her figure matching
    his FedWatch screen. */
