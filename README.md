@@ -881,13 +881,15 @@ and a few seconds later:
 
 **What it may read is TradingView's own answer, not a list typed here.** The
 `?tools=1` capture is kept whole in `test/fixtures/tradingview-tools-list.json`:
-35 tools, 24 marked `readOnlyHint`. `ALLOWED_TOOLS` names six of those 24, and
+35 tools, 24 marked `readOnlyHint`. `ALLOWED_TOOLS` names seven of those 24, and
 `agree.test.mjs` holds each against the capture, derives the eleven that write
 from the same file, and fails if any is named in the function at all. One of
 them reads like a read: `mcp-watchlist-get-active-watchlist` activates or
 creates a watchlist when none is active. The technical rating, analyst forecasts
 and the screener are read-only and stay off anyway, each being a signal by
-another name; fundamentals and filings are about companies.
+another name; fundamentals and filings are about companies. The screener's
+column catalog is on: it names what the quote batch may ask for and runs no
+screen.
 
 **`?calendar=1&from=YYYY-MM-DD&to=YYYY-MM-DD` is the calendar reader** — the one
 door where a request value reaches a tool, refused rather than clamped: `from`
@@ -975,7 +977,7 @@ for the seven economies abroad from 7 September to 4 November, read on 5 October
 what is filed from abroad is judged against the whole catalogue.
 
 **`?probe=` is fixed: nothing in the request reaches a tool.** It picks one of
-seven, every argument is written in the function, and each call's failure is its
+eight, every argument is written in the function, and each call's failure is its
 own answer:
 
 | `?probe=` | what it asks |
@@ -987,6 +989,7 @@ own answer:
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
+| `futures` | whether open interest on gold futures is a column the quote batch can ask for (the column catalog's answer for `interest`, and the batch asked for `COMEX:GC1!` under the guessed name `open_interest`), what a daily bar of the front month carries, and whether open interest or COMEX's vault stocks exist as symbols. The gap between futures and spot is not here: `gold` already reads `COMEX:GC1!` beside spot in one batch |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose
