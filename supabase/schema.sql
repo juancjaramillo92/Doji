@@ -486,10 +486,11 @@ create index if not exists eugenia_runs_caller_at on public.eugenia_runs (caller
 alter table public.eugenia_runs enable row level security;
 
 -- ─── The calendar ──────────────────────────────────────────────────────────
--- What lands and what it printed. It wakes her after a high-impact print, and
--- it compounds: in a year it is how each release ran against expectations,
--- with her line beside each one. Filed from TradingView; she writes only
--- `note`, and an `actual` TradingView has not yet published.
+-- What lands and what it printed: the US releases, and from abroad what she
+-- reads the dollar through. It wakes her after a high-impact US print, and it
+-- compounds: in a year it is how each release ran against expectations, with
+-- her line beside each one. Filed from TradingView; she writes only `note`, and
+-- an `actual` TradingView has not yet published.
 create table if not exists public.eugenia_calendar (
   id         bigserial primary key,
 
@@ -498,7 +499,7 @@ create table if not exists public.eugenia_calendar (
 
   name       text not null,
 
-  -- Only 'high' wakes her.
+  -- Only 'high' wakes her, and only at home.
   importance text not null default 'high'
     constraint eugenia_calendar_importance_check check (importance in ('high', 'medium', 'low')),
 
@@ -549,6 +550,12 @@ end $$;
 create or replace trigger eugenia_calendar_touch_updated_at
   before update on public.eugenia_calendar
   for each row execute function public.eugenia_calendar_touch();
+
+-- Where a release is from. Every rule that reads one is about the US, and the
+-- rest is filed as context, so the rules filter on this. Added after the
+-- table, so a fresh build and the live one end with the same column order; the
+-- default is the US because every row filed before it was.
+alter table public.eugenia_calendar add column if not exists country text not null default 'US';
 
 create index if not exists eugenia_calendar_at on public.eugenia_calendar (at desc);
 
@@ -1386,8 +1393,8 @@ select cron.schedule(
 );
 
 -- ─── Her event spine ───────────────────────────────────────────────────────
--- Files the calendar and looks at any high-impact release that has landed and
--- not been looked at. A separate job, not a faster hourly one: every hourly
+-- Files the calendar and looks at any high-impact US release that has landed
+-- and not been looked at. A separate job, not a faster hourly one: every hourly
 -- schedule tests `hour === n`, so */15 there would run four briefings a morning.
 -- Off the hour, clear of the briefing.
 select cron.schedule(

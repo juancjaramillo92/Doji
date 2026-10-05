@@ -335,6 +335,7 @@
       "at": "2026-10-01T12:30:00.000Z",
       "title": "Initial Jobless Claims",
       "country": "US",
+      "category": "lbr",
       "importance": "medium",
       "timed": true,
       "period": "Sep/26",
@@ -348,6 +349,7 @@
       "at": "2026-10-01T13:05:00.000Z",
       "title": "Fed Schmid Speech",
       "country": "US",
+      "category": "mny",
       "importance": "medium",
       "timed": true,
       "period": null,
@@ -361,6 +363,7 @@
       "at": "2026-10-01T13:45:00.000Z",
       "title": "S&P Global Manufacturing PMI Final",
       "country": "US",
+      "category": null,
       "importance": "low",
       "timed": true,
       "period": "Sep",
@@ -374,6 +377,7 @@
       "at": "2026-10-01T14:00:00.000Z",
       "title": "Construction Spending MoM",
       "country": "US",
+      "category": "hse",
       "importance": "low",
       "timed": true,
       "period": "Aug",
@@ -387,6 +391,7 @@
       "at": "2026-10-01T14:30:00.000Z",
       "title": "EIA Natural Gas Stocks Change",
       "country": "US",
+      "category": "enrg",
       "importance": "low",
       "timed": true,
       "period": "Sep/25",
@@ -400,6 +405,7 @@
       "at": "2026-10-01T20:30:00.000Z",
       "title": "Fed Balance Sheet",
       "country": "US",
+      "category": "mny",
       "importance": "low",
       "timed": true,
       "period": "Sep/30",
@@ -413,6 +419,7 @@
       "at": "2026-10-02T12:30:00.000Z",
       "title": "Non Farm Payrolls",
       "country": "US",
+      "category": "lbr",
       "importance": "high",
       "timed": true,
       "period": "Sep",
@@ -426,6 +433,7 @@
       "at": "2026-09-24T00:00:00.000Z",
       "title": "President Trump and President Xi Summit",
       "country": "US",
+      "category": "gov",
       "importance": "high",
       "timed": false,
       "period": null,
@@ -594,10 +602,10 @@
           "PID576467200",
           "PID576895159"
         ],
-        "why": "positions from an earlier session a high-rated release landed on, judged on the stop and target in force at the print"
+        "why": "positions from an earlier session a high-rated US release landed on, judged on the stop and target in force at the print"
       }
     ],
-    "told": "R-01: FAIL (0 pass, 1 fail, 0 unknown) · wins closing under $25 from entry, break-even exits and Friday close-outs excepted — PID576292865\nR-02: FAIL (13 pass, 1 fail, 0 unknown) · losses further than $20 from entry — the cap only, never whether it was respected — PID577885869\nR-03: PASS (1 pass, 0 fail, 0 unknown) · days with more than one entry after a full-stop loss — a loss $20 or more from entry\nR-04: UNKNOWN (0 pass, 0 fail, 8 unknown) · losses beyond break-even on trades that had already run $20 in his favour — PID575635016, PID575921759, PID577395373, PID577759653, PID577797592, PID577819501\nR-10: FAIL (17 pass, 2 fail, 0 unknown) · positions whose open spans overlap another — PID577885869, PID577916992\nR-11: FAIL (3 pass, 1 fail, 0 unknown) · entries taken after the day was already past −4% of account — 2026-08-19\nR-12: FAIL (0 pass, 3 fail, 1 unknown) · days with a second entry taken while the first was open or more than 15 minutes after it closed, or a third entry at all — 2026-08-17, 2026-08-18, 2026-08-19, 2026-08-16\nR-13: PASS (1 pass, 0 fail, 0 unknown) · calendar months carrying more than one position size\nR-14: UNKNOWN (0 pass, 0 fail, 19 unknown) · entries in the 30 minutes before a US release rated high — PID575635016, PID575659387, PID575921759, PID576292865, PID576467200, PID576895159\nR-15: PASS (19 pass, 0 fail, 0 unknown) · positions still open across a Friday 17:00 New York close\nR-16: PASS (19 pass, 0 fail, 0 unknown) · entries taken on a US market or bank holiday, or in the Christmas stretch\nR-18: FAIL (1 pass, 18 fail, 0 unknown) · closes with no broker alert behind them — closed by hand — the Friday close-out excepted — PID575635016, PID575659387, PID575921759, PID576292865, PID576467200, PID576895159\nR-19: UNKNOWN (0 pass, 0 fail, 19 unknown) · positions from an earlier session a high-rated release landed on, judged on the stop and target in force at the print — PID575635016, PID575659387, PID575921759, PID576292865, PID576467200, PID576895159",
+    "told": "R-01: FAIL (0 pass, 1 fail, 0 unknown) · wins closing under $25 from entry, break-even exits and Friday close-outs excepted — PID576292865\nR-02: FAIL (13 pass, 1 fail, 0 unknown) · losses further than $20 from entry — the cap only, never whether it was respected — PID577885869\nR-03: PASS (1 pass, 0 fail, 0 unknown) · days with more than one entry after a full-stop loss — a loss $20 or more from entry\nR-04: UNKNOWN (0 pass, 0 fail, 8 unknown) · losses beyond break-even on trades that had already run $20 in his favour — PID575635016, PID575921759, PID577395373, PID577759653, PID577797592, PID577819501\nR-10: FAIL (17 pass, 2 fail, 0 unknown) · positions whose open spans overlap another — PID577885869, PID577916992\nR-11: FAIL (3 pass, 1 fail, 0 unknown) · entries taken after the day was already past −4% of account — 2026-08-19\nR-12: FAIL (0 pass, 3 fail, 1 unknown) · days with a second entry taken while the first was open or more than 15 minutes after it closed, or a third entry at all — 2026-08-17, 2026-08-18, 2026-08-19, 2026-08-16\nR-13: PASS (1 pass, 0 fail, 0 unknown) · calendar months carrying more than one position size\nR-14: UNKNOWN (0 pass, 0 fail, 19 unknown) · entries in the 30 minutes before a US release rated high — PID575635016, PID575659387, PID575921759, PID576292865, PID576467200, PID576895159\nR-15: PASS (19 pass, 0 fail, 0 unknown) · positions still open across a Friday 17:00 New York close\nR-16: PASS (19 pass, 0 fail, 0 unknown) · entries taken on a US market or bank holiday, or in the Christmas stretch\nR-18: FAIL (1 pass, 18 fail, 0 unknown) · closes with no broker alert behind them — closed by hand — the Friday close-out excepted — PID575635016, PID575659387, PID575921759, PID576292865, PID576467200, PID576895159\nR-19: UNKNOWN (0 pass, 0 fail, 19 unknown) · positions from an earlier session a high-rated US release landed on, judged on the stop and target in force at the print — PID575635016, PID575659387, PID575921759, PID576292865, PID576467200, PID576895159",
     "standing": [
       {
         "day": "2026-08-16",

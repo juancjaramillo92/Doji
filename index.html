@@ -3202,6 +3202,8 @@ const Watch = {
   // is at its worst exactly where this matters, since Sunday's 17:00 open is
   // about a week that has not started. Twelve hours back and a day forward needs
   // no boundary arithmetic to get wrong. Hers reaches four hours further ahead.
+  // US releases only: what is filed from abroad is context for her, and a
+  // night of it would push this morning's prints out of twenty rows.
   BACK_H: 12, AHEAD_H: 24,
 
   // A time from another day names the day, her own calendar's rule. Twelve
@@ -3224,7 +3226,7 @@ const Watch = {
 
       const [cal, story, loops] = await Promise.all([
         Data.sb.from('eugenia_calendar')
-          .select('at,name,importance,consensus,actual,note')
+          .select('at,name,importance,consensus,actual,note').eq('country', 'US')
           .gte('at', from).lte('at', to).order('at', { ascending: true }).limit(20),
         Data.sb.from('eugenia_thesis').select('thesis,moved_on').eq('id', 'current').maybeSingle(),
         Data.sb.from('eugenia_loops')

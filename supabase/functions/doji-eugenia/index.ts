@@ -32,7 +32,7 @@ import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
-  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, weekOf,
+  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, HOME, weekOf,
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
@@ -608,15 +608,15 @@ function windowStart(days: unknown, now: number, back: number): string {
   return new Date(Date.UTC(y, m - 1, d - n - back)).toISOString().slice(0, 10);
 }
 
-/* R-14's reads over check_rules' window: TradingView's high-rated releases —
-   only rows with its id, since her older typed ones were never a rating he
+/* R-14's reads over check_rules' window: TradingView's high-rated US releases
+   — only rows with its id, since her older typed ones were never a rating he
    chose — a day early, as a UTC bound would drop the evening before; and the
    fetched weeks a further seven back, since the window's first day sits in a
    week that began before it. */
 export const RULE_RELEASES = 500;
 
 export function releasesQuery(days: unknown, now = Date.now()): string {
-  return `eugenia_calendar?select=at&importance=eq.${HIGH}&tv_id=not.is.null` +
+  return `eugenia_calendar?select=at&importance=eq.${HIGH}&country=eq.${HOME}&tv_id=not.is.null` +
          `&at=gte.${windowStart(days, now, 1)}&order=at.desc&limit=${RULE_RELEASES}`;
 }
 
@@ -784,31 +784,53 @@ async function tvRead(door: string, query = ""): Promise<any> {
 
 // What doji-tradingview's `foldCalendar` answers, one release each.
 interface TvEvent {
-  id: string; at: string; title: string; importance: string; timed: boolean;
+  id: string; at: string; title: string; country: string; category: string | null;
+  importance: string; timed: boolean;
   period: string | null; consensus: string | null; prior: string | null; actual: string | null;
   ticker: string | null;
 }
 
-/* Releases only — `timed` false is a marker, not a print — and medium or
-   above: low is mortgage rates and rig counts, paid for on every request and
-   moving nothing.
+/* At home, releases only — `timed` false is a marker, not a print — and medium
+   or above: low is mortgage rates and rig counts, paid for on every request
+   and moving nothing.
 
-   A figure TradingView has not published is left out, never sent as null:
+   Abroad, what she asked for, by kind rather than by rating, which would miss
+   most of it: TradingView rates the ECB's president medium, every bond auction
+   and China's reserves low, and a dozen surveys high. The central banks of the
+   euro area, Britain and Japan; each economy's headline inflation; government
+   bond auctions in Germany, France, Italy and Britain, less the bills, which it
+   names in months; China's reserves. An auction is kept though TradingView
+   files some under `Calendar`, the marker's indicator, at their own minute.
+   None of it counts for R-14 or R-19, which are about US releases. */
+const BANKS = ['EU', 'GB', 'JP'], AUCTIONS = ['DE', 'FR', 'IT', 'GB'];
+
+export function wanted(e: TvEvent): boolean {
+  if (e.country === HOME) return e.timed && e.importance !== 'low';
+  if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low';
+  if (e.category === 'prce') return e.importance === 'high';
+  if (AUCTIONS.includes(e.country)) return /Auction|Tender|Syndication/.test(e.title) && !/Month/.test(e.title);
+  return e.country === 'CN' && e.title === 'Foreign Exchange Reserves';
+}
+
+/* A figure TradingView has not published is left out, never sent as null:
    under merge-duplicates a null erases an actual the release look recorded by
    hand. `note` is hers and never named. The period joins the name, since the
-   title alone does not say which month. */
+   title alone does not say which month, and abroad the country leads it, since
+   France, Italy and Germany each publish an "Inflation Rate YoY Prel" and
+   record_actual matches on the name. */
 export function calendarRows(events: TvEvent[], from: number, to: number) {
   return events
-    .filter(e => e.timed && e.importance !== 'low')
+    .filter(wanted)
     .filter(e => {
       const at = Date.parse(e.at);
       return at >= from && at <= to;
     })
     .map(e => {
+      const title = e.country === HOME ? e.title : `${e.country} ${e.title}`;
       const row: Record<string, string> = {
         tv_id: e.id, at: new Date(e.at).toISOString(),
-        name: e.period ? `${e.title} (${e.period})` : e.title,
-        importance: e.importance, source: 'tradingview',
+        name: e.period ? `${title} (${e.period})` : title,
+        country: e.country, importance: e.importance, source: 'tradingview',
       };
       for (const k of ['consensus', 'prior', 'actual', 'ticker'] as const) if (e[k] !== null) row[k] = e[k]!;
       return row;
@@ -2233,13 +2255,13 @@ export async function loopsBlock(): Promise<string> {
 }
 
 type Release = {
-  id: number; at: string; name: string; importance: string;
+  id: number; at: string; name: string; country: string; importance: string;
   consensus: string | null; prior: string | null; actual: string | null; note: string | null;
   looked_at?: string | null; ticker?: string | null;
 };
 
 // The columns every calendar read asks for; the spine adds the two optional ones.
-const RELEASE_COLUMNS = "id,at,name,importance,consensus,prior,actual,note";
+const RELEASE_COLUMNS = "id,at,name,country,importance,consensus,prior,actual,note";
 
 /* Read earliest first, so a day too heavy for the bound loses the
    furthest-ahead rows, which tomorrow's briefing reads anyway. A full read
@@ -2263,7 +2285,8 @@ const nyTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
    speech, and any print not yet published — and due. Rendering a past row as
    due had her describe a print as still to come. A line from another day names
    the day, or tomorrow's 08:30 and today's read alike, and the weekday is
-   given rather than left to her arithmetic. */
+   given rather than left to her arithmetic. A list holding anything from abroad
+   says once what such a line is not: one of the releases his rules count. */
 const weekday = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC', weekday: 'long',
 }).format(new Date(`${iso}T12:00:00Z`));
@@ -2286,7 +2309,10 @@ export function calendarList(rows: Release[], now = Date.now(),
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");
   });
-  return `\n\n${heading}:\n${lines.join("\n")}`;
+  return `\n\n${heading}:\n${lines.join("\n")}` + (rows.some(r => r.country !== HOME)
+    ? `\n· A line led by a country code is from abroad and filed as context: R-14 and R-19 ` +
+      `count US releases alone, and nothing from abroad wakes you to look at it.`
+    : "");
 }
 
 export async function calendarBlock(): Promise<string> {
@@ -2305,8 +2331,9 @@ export async function calendarBlock(): Promise<string> {
 /* ─── The week ahead, for the briefing that opens it ───────────────────────
    The Sunday briefing's rolling calendar reaches Monday evening, so a Thursday
    CPI reached it only if a search did. It gets the week instead, high only —
-   the releases R-14 stands him aside for — replacing the rolling list rather
-   than sitting beside it, since one print twice reads as two things.
+   the US releases R-14 stands him aside for, and abroad the central banks'
+   decisions and headline inflation — replacing the rolling list rather than
+   sitting beside it, since one print twice reads as two things.
    ───────────────────────────────────────────────────────────────────────── */
 export function weekQuery(now: number): string {
   const to = new Date(now + 7 * 86_400_000).toISOString();
@@ -2318,7 +2345,7 @@ export function weekQuery(now: number): string {
 export async function weekBlock(now = Date.now()): Promise<string> {
   try {
     const rows = await readRows<Release>('Week', weekQuery(now));
-    return calendarList(rows, now, "The week ahead, every release TradingView rates high");
+    return calendarList(rows, now, "The week ahead, the releases TradingView rates high");
   } catch (err) {
     console.error("doji-eugenia: week unavailable —", why(err));
     return "";
@@ -3068,7 +3095,9 @@ async function postPulse(): Promise<Response> {
    the briefing and wait for a pulse whose default is silence. This fires off
    the filed calendar — the quarter-hourly job asks whether anything high has
    landed unlooked, and `looked_at` makes it once-only. Still silent by
-   default: a number landing where everyone expected is not news.
+   default: a number landing where everyone expected is not news. US releases
+   only: what is filed from abroad is context for her reads, and a look at
+   each would wake him at 21:30 for China's inflation.
    ───────────────────────────────────────────────────────────────────────── */
 // Older than this, a print is history for tomorrow's briefing — and a redeploy
 // after an outage cannot send a day of looks at once.
@@ -3096,7 +3125,7 @@ async function pendingRelease(now = Date.now()): Promise<Release[]> {
   // the rest of the group skippable.
   const rows = await readRows<Release>('Release',
     `eugenia_calendar?select=${RELEASE_COLUMNS},looked_at,ticker` +
-    `&importance=eq.high` +
+    `&importance=eq.high&country=eq.${HOME}` +
     `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
     `&order=at.asc&limit=${RELEASE_ROWS}`);
   return dueRelease(rows);
@@ -3214,8 +3243,8 @@ async function postRelease(): Promise<Response> {
 /* ─── The trade she hears about in two minutes ─────────────────────────────
    Still no verdict; she may say only his own rules, at the moment they apply:
 
-     opened — a high-impact print is pending and he is now in a position: R-14
-              and R-19. Citing them is hers; deciding what he does is not.
+     opened — a high-impact US print is pending and he is now in a position:
+              R-14 and R-19. Citing them is hers; deciding what he does is not.
      closed — that fill took the day past −4%: R-11 says the day ends there.
 
    Both branches decide from data before any model call, so an ordinary fill
@@ -3228,7 +3257,7 @@ async function aheadToday(now = Date.now()): Promise<Release[]> {
   const to = new Date(now + PENDING_AHEAD_H * 3600_000).toISOString();
   return readRows<Release>('Calendar',
     `eugenia_calendar?select=${RELEASE_COLUMNS}` +
-    `&importance=eq.high&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
+    `&importance=eq.high&country=eq.${HOME}&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
     `&order=at.asc&limit=5`);
 }
 
@@ -3374,13 +3403,13 @@ async function markPrice(bid: number, looked: boolean): Promise<void> {
   if (!res.ok) throw new Error(`Mark write failed (HTTP ${res.status})`);
 }
 
-// A high print in the last hour, looked at or not: that message is the one he
-// gets about this move.
+// A high US print in the last hour, looked at or not: that message is the one
+// he gets about this move. A print abroad has no look, so it explains nothing.
 async function explained(now = Date.now()): Promise<Release | null> {
   const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
   const [row] = await readRows<Release>('Calendar',
     `eugenia_calendar?select=${RELEASE_COLUMNS}` +
-    `&importance=eq.high&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
+    `&importance=eq.high&country=eq.${HOME}&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
     `&order=at.desc&limit=1`);
   return row ?? null;
 }
@@ -3416,7 +3445,7 @@ async function postMove(): Promise<Response> {
   const asked = MOVE +
     `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
     `${Math.abs(worth.move)} in the last ${since} minutes. ` +
-    `Nothing high-impact on the calendar has printed in the last hour.` +
+    `No high-impact US release has printed in the last hour.` +
     // quoteLine, which names the session window — this path fires in the
     // evening, when the session and the calendar day disagree.
     `\n\n${quoteLine(spot, new Date())}` +

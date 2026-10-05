@@ -42,7 +42,7 @@ import {
   positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
+  releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -53,7 +53,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, lowVolumeDays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, HIGH, weekOf, STOP_GRACE_MIN,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -631,7 +631,7 @@ test('the calendar folds to what her calendar holds, and no more', () => {
 
   assert.deepEqual(by['396934'], {
     id: '396934', at: '2026-10-01T12:30:00.000Z', title: 'Initial Jobless Claims', country: 'US',
-    importance: 'medium', timed: true, period: 'Sep/26',
+    category: 'lbr', importance: 'medium', timed: true, period: 'Sep/26',
     consensus: '200K', prior: '198K', actual: '197K', ticker: 'ECONOMICS:USIJC',
   });
   // No consensus is not a consensus of zero — and a consensus of zero is one.
@@ -643,6 +643,8 @@ test('the calendar folds to what her calendar holds, and no more', () => {
   assert.equal(by['397784'].prior, '$6.748T');
   assert.equal(by['397784'].actual, null);
   assert.equal(by['398554'].ticker, null);
+  // TradingView gives the PMIs no category, and no category is not a code.
+  assert.equal(by['398554'].category, null);
   assert.equal(by['396953'].importance, 'high');
   assert.equal(by['396953'].consensus, '90K');
   // On the calendar, rated high, and not a release: nothing counts minutes to it.
@@ -2739,7 +2741,7 @@ test('a figure TradingView has not published is left out of the row, never sent 
   const by = Object.fromEntries(calendarRows(FOLDED, 0, Infinity).map(r => [r.tv_id, r]));
   assert.deepEqual(by['396934'], {
     tv_id: '396934', at: '2026-10-01T12:30:00.000Z', name: 'Initial Jobless Claims (Sep/26)',
-    importance: 'medium', source: 'tradingview', consensus: '200K', prior: '198K', actual: '197K',
+    country: 'US', importance: 'medium', source: 'tradingview', consensus: '200K', prior: '198K', actual: '197K',
     ticker: 'ECONOMICS:USIJC',
   });
   // Payrolls has not printed: present-and-null would erase an actual the
@@ -2749,6 +2751,75 @@ test('a figure TradingView has not published is left out of the row, never sent 
   // A speech has no figure of any kind, and names none.
   for (const k of ['consensus', 'prior', 'actual']) assert.ok(!(k in by['421425']), `a speech names ${k}`);
   assert.ok(Object.values(by).every(r => !('note' in r)), 'a filing names note, which is hers');
+});
+
+/* ─── Abroad, what she asked for ─────────────────────────────────────────────
+   Judged against every kind of event TradingView listed for the seven
+   economies over two months, so the selection is held against the whole
+   catalogue rather than the examples someone thought of.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const ABROAD = JSON.parse(readFileSync(
+  new URL('./fixtures/tradingview-abroad.json', import.meta.url), 'utf8')).kinds;
+
+test('abroad, the central banks, headline inflation, bond auctions and China\'s reserves are filed, and nothing else', () => {
+  const kept = {};
+  for (const k of ABROAD.filter(k => wanted({ ...k, timed: true }))) (kept[k.country] ??= []).push(k.title);
+  const auctions = (titles) => titles.filter(t => /Auction|Tender|Syndication/.test(t));
+  assert.deepEqual(kept.EU, ['Deposit Facility Rate', 'ECB Interest Rate Decision', 'ECB Press Conference',
+    'Inflation Rate YoY Flash', 'ECB General Council Meeting', 'ECB Monetary Policy Meeting Accounts',
+    'ECB Nagel Speech', 'ECB President Lagarde Speech']);
+  assert.deepEqual(kept.JP, ['BoJ Interest Rate Decision', 'Inflation Rate YoY', 'BoJ Gov Ueda Speech',
+    'BoJ Koeda Speech', 'BoJ Monetary Policy Meeting Minutes', 'BoJ Quarterly Outlook Report',
+    'BoJ Summary of Opinions']);
+  assert.deepEqual(kept.CN, ['Inflation Rate YoY', 'Foreign Exchange Reserves'],
+    'China is filed past the lowest bar she set for it');
+  assert.deepEqual(kept.GB.filter(t => !auctions([t]).length), ['BoE Interest Rate Decision', 'Inflation Rate YoY',
+    'BoE MPC Vote Cut', 'BoE MPC Vote Hike', 'BoE MPC Vote Unchanged', 'MPC Meeting Minutes']);
+  for (const c of ['DE', 'FR', 'IT']) {
+    assert.deepEqual(kept[c].filter(t => !auctions([t]).length), ['Inflation Rate YoY Prel'], `${c} files a survey`);
+  }
+
+  /* EVERY GOVERNMENT BOND AUCTION IN THE FOUR, AND NO BILL. TradingView files
+     them under three categories, some under the marker's `Calendar`, and names
+     every bill in months. */
+  const listed = (c) => auctions(ABROAD.filter(k => k.country === c).map(k => k.title));
+  for (const c of ['DE', 'FR', 'IT', 'GB']) {
+    assert.deepEqual(auctions(kept[c]), listed(c).filter(t => !/Month/.test(t)), `${c} drops a bond auction or files a bill`);
+    assert.ok(auctions(kept[c]).length >= 8, `${c} files ${auctions(kept[c]).length} auctions — the reader has gone blind`);
+  }
+  assert.ok(!kept.JP.some(t => /Auction/.test(t)), "Japan's auctions are filed, and she asked for its bank and its inflation");
+
+  // Her own measure: a hundred events in two months, out of nine hundred.
+  const events = ABROAD.filter(k => wanted({ ...k, timed: true })).reduce((n, k) => n + k.n, 0);
+  assert.equal(events, 103);
+});
+
+test('a release from abroad is filed under its country, and led by it', () => {
+  const at = '2026-09-30T12:00:00.000Z';
+  const event = (country, title, extra = {}) => ({ id: `${country}-${title}`, at, title, country,
+    category: 'prce', importance: 'high', timed: true, period: 'Sep',
+    consensus: null, prior: null, actual: null, ticker: null, ...extra });
+  const rows = calendarRows([event('FR', 'Inflation Rate YoY Prel'), event('IT', 'Inflation Rate YoY Prel'),
+    event('DE', '15/20/30-Year Bund Auction', { category: 'gov', importance: 'low', timed: false, period: null })],
+    0, Infinity);
+  // Three countries publish this title in one hour, and record_actual matches the name.
+  assert.deepEqual(rows.map(r => r.name),
+    ['FR Inflation Rate YoY Prel (Sep)', 'IT Inflation Rate YoY Prel (Sep)', 'DE 15/20/30-Year Bund Auction']);
+  assert.deepEqual(rows.map(r => r.country), ['FR', 'IT', 'DE']);
+  // At home the marker is still not a release, however it is rated.
+  assert.equal(calendarRows([event(HOME, 'Summit', { category: 'gov', timed: false })], 0, Infinity).length, 0);
+});
+
+test('a list holding anything from abroad says once that his rules do not count it', () => {
+  const row = (name, country) => ({ id: 0, at: '2026-10-29T12:15:00Z', name, country, importance: 'high',
+    consensus: null, prior: null, actual: null, note: null });
+  const out = calendarList([row('EU ECB Interest Rate Decision', 'EU'), row('GDP Growth Rate QoQ Adv', 'US')],
+    Date.parse('2026-10-29T11:00:00Z'));
+  assert.match(out, /08:15 ET EU ECB Interest Rate Decision — due/);
+  assert.equal(out.match(/R-14 and R-19 count US releases alone/g)?.length, 1);
+  assert.doesNotMatch(calendarList([row('GDP Growth Rate QoQ Adv', 'US')], Date.parse('2026-10-29T11:00:00Z')),
+    /abroad/);
 });
 
 test('the filing goes up in groups that carry the same columns, keyed on the id', async () => {
@@ -3306,11 +3377,11 @@ test('R-14 fails an entry in the thirty minutes before a release rated high, and
   assert.equal(NEWS_MIN, 30);
 });
 
-test("R-14's reads cover the trades' window, TradingView's high-rated releases only, newest first", () => {
+test("R-14's reads cover the trades' window, TradingView's high-rated US releases only, newest first", () => {
   const now = Date.parse('2026-10-20T15:00:00Z');
   const since = tradesQuery(30, now).match(/open_day=gte\.([\d-]+)/)[1];
   const rel = releasesQuery(30, now), wk = weeksQuery(30, now);
-  assert.match(rel, new RegExp(`^eugenia_calendar\\?select=at&importance=eq\\.${HIGH}&tv_id=not\\.is\\.null`));
+  assert.match(rel, new RegExp(`^eugenia_calendar\\?select=at&importance=eq\\.${HIGH}&country=eq\\.${HOME}&tv_id=not\\.is\\.null`));
   // What she typed in before the TradingView filing carries no id and was
   // never a rating he chose.
   assert.match(wk, /^calendar_weeks\?select=week/);
@@ -3889,13 +3960,14 @@ test('the open threads are split by what closes them', () => {
 test('a landed release is never described as one still to come', () => {
   // The morning of those two prints, so both are today's and carry no date.
   const out = calendarList([
-    { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
+    { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', country: 'US', importance: 'high',
       consensus: '0.3%', prior: '0.2%', actual: '0.4%', note: 'Hotter than expected.' },
-    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', importance: 'high',
+    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', country: 'US', importance: 'high',
       consensus: null, prior: null, actual: null, note: null },
   ], Date.parse('2026-01-09T13:05:00Z'));
   assert.match(out, /08:30 ET core CPI — LANDED at 0\.4%/);
   assert.match(out, /15:00 ET FOMC minutes — due/);
+  assert.doesNotMatch(out, /abroad/, 'a list of US releases is told some of it is from abroad');
   assert.equal(calendarList([]), '');
 });
 
@@ -3903,7 +3975,7 @@ test('a calendar line from another day names the day, and today stays bare', () 
   /* A day forward holds two 08:30s and twelve hours back holds last night's
      20:00, so the day must be named. Driven across yesterday evening, this
      morning and tomorrow morning, from Thursday's 08:00 briefing. */
-  const row = (at, name) => ({ id: 0, at, name, importance: 'high',
+  const row = (at, name) => ({ id: 0, at, name, country: 'US', importance: 'high',
     consensus: null, prior: null, actual: null, note: null });
   const out = calendarList([
     row('2026-09-24T00:00:00Z', 'FOMC minutes'),       // Wed 20:00 New York
@@ -3924,7 +3996,7 @@ test('a past speech carries the line written about it', () => {
   // The line is the only record a speech leaves; a PAST row that dropped it
   // would hand her the time and the name and nothing of what was said.
   const out = calendarList([{ id: 0, at: '2026-10-01T19:30:00Z', name: 'Fed Williams Speaks',
-    importance: 'high', consensus: null, prior: null, actual: null,
+    country: 'US', importance: 'high', consensus: null, prior: null, actual: null,
     note: 'No urgency to hike again after September.' }], Date.parse('2026-10-01T22:00:00Z'));
   assert.match(out, /Fed Williams Speaks — PAST, no figure on file\. No urgency to hike again/);
 });
@@ -5350,9 +5422,9 @@ test('the Sunday briefing is handed the week ahead, high releases only, each wit
   assert.match(q, /order=at\.asc/, 'the week is not in the order it happens');
 
   const rows = [
-    { id: 1, at: '2026-09-30T12:15:00Z', name: 'ADP Nonfarm Employment Change (Sep)', importance: 'high',
+    { id: 1, at: '2026-09-30T12:15:00Z', name: 'ADP Nonfarm Employment Change (Sep)', country: 'US', importance: 'high',
       consensus: '50K', prior: '54K', actual: null, note: null },
-    { id: 2, at: '2026-10-02T12:30:00Z', name: 'Nonfarm Payrolls (Sep)', importance: 'high',
+    { id: 2, at: '2026-10-02T12:30:00Z', name: 'Nonfarm Payrolls (Sep)', country: 'US', importance: 'high',
       consensus: '45K', prior: '22K', actual: null, note: null },
   ];
   let asked = '';
@@ -5429,7 +5501,7 @@ test('the briefing is handed what Friday broke on Sunday, and what the weekend h
 test('a full calendar read says it stopped, and a short one says nothing', async () => {
   const at = (i) => new Date(Date.now() + (i + 1) * 60_000).toISOString();
   const rows = (n) => Array.from({ length: n }, (_, i) =>
-    ({ id: i, at: at(i), name: `release ${i}`, importance: 'medium',
+    ({ id: i, at: at(i), name: `release ${i}`, country: 'US', importance: 'medium',
        consensus: null, prior: null, actual: null, note: null }));
   const block = (n) => stubbed(async () => {
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rows(n) });
