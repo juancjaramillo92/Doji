@@ -2,8 +2,8 @@
 // DOJI — TradingView  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
 // Holds the TradingView sign-in, alone. TradingView adds what the broker cannot
-// serve: the calendar as data, and the dollar and yields gold is priced
-// against. Its own function, because the same credential serves create_alert
+// serve: the calendar as data, the dollar and yields gold is priced against,
+// and the exchange's own volume. Its own function, because the same credential serves create_alert
 // and delete_watchlist — his account, kept out of Eugenia as the cTrader token
 // is — and the sign-in ends in a public callback that has no place in her
 // webhook.

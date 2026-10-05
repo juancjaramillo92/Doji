@@ -827,8 +827,8 @@ token is ever misused.
 
 **`doji-tradingview` holds the TradingView sign-in, and nothing else here does.**
 TradingView adds the half of the market the broker cannot serve: the economic
-calendar as data, and the dollar and yields gold is priced against. Every read of
-it goes through this function, and each reader was written against what
+calendar as data, the dollar and yields gold is priced against, and the
+exchange's own volume. Every read of it goes through this function, and each reader was written against what
 `?tools=1` and `?probe=` actually returned — the tool names it serves
 (`mcp-tv-get-economic-calendar`) are not the ones its documentation gives.
 
