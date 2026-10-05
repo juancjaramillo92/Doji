@@ -957,9 +957,11 @@ at least fifteen minutes old. It reaches the briefing and `get_around`.
 Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
 `088691`), which needs no credential, so she reads it herself. `positioningList`
 gives the managed-money net, its sides, the week's change, the net's range over
-52 weeks (crowded means something only against its own past), and the Tuesday it
-was taken. Only the Sunday briefing and `get_around` get it: a weekday briefing
-would repeat it five times, and a weekly count cannot cause a quarter-hour move.
+52 weeks (crowded means something only against its own past), the open interest
+with its change from the week before (a move with it rising is new money, with
+it falling one side leaving), and the Tuesday it was taken. Only the Sunday
+briefing and `get_around` get it: a weekday briefing would repeat it five times,
+and a weekly count cannot cause a quarter-hour move.
 Background, in one sentence at most, never a reason to trade.
 
 **A refusal can arrive marked as success.** The quote batch's 429 came inside a
