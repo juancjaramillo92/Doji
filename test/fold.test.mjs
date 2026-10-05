@@ -26,7 +26,7 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
-  calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq,
+  calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -45,6 +45,7 @@ import {
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
   aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
+  volumeList, volumeBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -972,6 +973,54 @@ test('positioning that will not read is a sentence, and never takes the briefing
   await stubbed(async () => {
     globalThis.fetch = async () => new Response('[]', { status: 200 });
     assert.match(await positioningBlock(), /could not be read just now; do not quote it from a search/);
+  });
+});
+
+/* ─── What COMEX gold futures traded ─────────────────────────────────────────
+   The front month's daily bars from the 5 October futures probe, verbatim, read
+   at 15:47 UTC: Thursday's session, Friday's, and Monday's still forming. Each
+   starts at 18:00 New York the evening before. */
+const GC_BARS = { bars: [
+  { c: 4202.3, h: 4222.8, l: 4169.4, o: 4190.1, t: 1790805600, v: 128923 },
+  { c: 4162.3, h: 4259, l: 4153.8, o: 4204.6, t: 1790892000, v: 165228 },
+  { c: 4165.5, h: 4198.9, l: 4150.4, o: 4169.4, t: 1791151200, v: 90330 }], success: true };
+const PROBED = Date.parse('2026-10-05T15:47:57Z');
+
+test('futures bars fold to each session\'s start and its contracts', () => {
+  assert.deepEqual(foldSessions(GC_BARS), [
+    { start: '2026-09-30T22:00:00.000Z', volume: 128923 },
+    { start: '2026-10-01T22:00:00.000Z', volume: 165228 },
+    { start: '2026-10-04T22:00:00.000Z', volume: 90330 },
+  ]);
+  assert.throws(() => foldSessions({ bars: [], success: true }), /no bars/);
+});
+
+test('futures volume is the last finished session, named for the day it ended, against the ones before', () => {
+  const sessions = foldSessions(GC_BARS);
+  const out = volumeList(sessions, PROBED);
+  assert.match(out, /Friday 2 Oct: 165,228 contracts, against an average of 128,923 over the session before\./,
+    'the session that ended Friday is not the latest finished one, or is named for the evening it began');
+  assert.doesNotMatch(out, /90,330/, 'a session still forming is read as finished, so every morning reads light');
+  // Monday's session ends at 17:00 New York, 21:00 UTC in October.
+  assert.match(volumeList(sessions, Date.parse('2026-10-05T21:00:00Z')),
+    /Monday 5 Oct: 90,330 contracts, against an average of 147,076 over the 2 sessions before\./);
+  // In winter the session starts at 23:00 UTC and still runs 23 hours.
+  assert.match(volumeList([{ start: '2026-12-03T23:00:00.000Z', volume: 1000 }], Date.parse('2026-12-04T22:00:00Z')),
+    /Friday 4 Dec: 1,000 contracts\.$/, 'with nothing before it, the line claims an average of nothing');
+  const twentyTwo = Array.from({ length: 22 }, (_, i) =>
+    ({ start: new Date(Date.parse('2026-09-01T22:00:00Z') + i * 86_400_000).toISOString(), volume: i === 0 ? 1e9 : 100 }));
+  assert.match(volumeList(twentyTwo, Date.parse('2026-10-01T00:00:00Z')), /average of 100 over the 20 sessions before/,
+    'the average reaches past the twenty sessions before the latest');
+  assert.throws(() => volumeList([{ ...sessions[0], volume: null }, sessions[1]], PROBED), /no readable session/);
+  assert.throws(() => volumeList([sessions[2]], PROBED), /no finished session/);
+});
+
+test('futures volume that will not read is a sentence, and never takes the briefing down', async () => {
+  await stubbed(async () => {
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, sessions: [] }), { status: 200 });
+    assert.match(await volumeBlock(), /could not be read just now; do not quote it from a search/);
+    globalThis.fetch = async () => new Response('{}', { status: 500 });
+    assert.match(await volumeBlock(), /could not be read just now; do not quote it from a search/);
   });
 });
 

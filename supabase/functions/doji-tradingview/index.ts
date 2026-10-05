@@ -649,6 +649,28 @@ async function readRates() {
   return { ok: true, today, ...foldRates(prices, today), contracts, missing, calendar };
 }
 
+/* ─── What COMEX gold futures traded ───────────────────────────────────────
+   The exchange's own volume, which the broker's feed cannot give: its volume
+   is the broker's own clients. The front month's daily bars, each session's
+   start and its contracts. Whether a session has finished is the reader's to
+   say, where the clock is read; the last bar here is usually still forming. */
+const FUTURES = "COMEX:GC1!";
+
+// Twenty finished sessions behind the latest, and one still forming.
+const SESSIONS = 22;
+
+export function foldSessions(answer: any) {
+  const bars = answer.bars;
+  if (!Array.isArray(bars) || !bars.length) throw new Error("no bars");
+  return bars.map((b: any) => ({ start: new Date(b.t * 1000).toISOString(), volume: b.v }));
+}
+
+async function readVolume() {
+  const answer = await tvCall(await tvSession(), "mcp-tv-get-ohlcv",
+    { symbol: FUTURES, interval: "1D", count: SESSIONS });
+  return { ok: true, symbol: FUTURES, sessions: foldSessions(answer) };
+}
+
 /* ─── The probes ───────────────────────────────────────────────────────────
    What each read returns, raw, before anything folds it:
 
@@ -784,10 +806,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
-    // ?market=1, ?news=1 and ?rates=1 read only what is fixed above.
+    // ?market=1, ?news=1, ?rates=1 and ?volume=1 read only what is fixed above.
     if (url.searchParams.get("market") === "1") return json(await readMarket());
     if (url.searchParams.get("news") === "1") return json(await readHeadlines());
     if (url.searchParams.get("rates") === "1") return json(await readRates());
+    if (url.searchParams.get("volume") === "1") return json(await readVolume());
 
     const asked = url.searchParams.get("probe");
     if (asked) {
@@ -797,7 +820,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1, ?rates=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1, ?rates=1, ?volume=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

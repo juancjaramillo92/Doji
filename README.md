@@ -966,6 +966,21 @@ briefing and `get_around` get it: a weekday briefing would repeat it five times,
 and a weekly count cannot cause a quarter-hour move.
 Background, in one sentence at most, never a reason to trade.
 
+**`?volume=1` is what COMEX gold futures traded** — the exchange's own volume in
+the front-month contract (`COMEX:GC1!`), twenty-two daily bars folded by
+`foldSessions` to each session's start and its contracts. It is the market's
+volume; the broker's is its own clients, and the prompt tells her never to read
+volume off it. `volumeList` decides which sessions have finished — a Globex
+session runs 23 hours, 18:00 to 17:00 New York, and is named for the day it
+ends — and states the latest beside its average over the twenty before. Every
+briefing and `get_around` get it; the move look does not, since a day's total
+cannot be the cause of a quarter-hour move. The front month moves to the next
+contract every couple of months, and on that day the count can jump or drop for
+no reason in the market, so she says a sharp change may be the switch rather
+than reading it. TradingView serves neither daily open interest nor COMEX vault
+stocks (the 5 October `futures` probe) and CME's site refuses automated reads,
+so the weekly CFTC count is the open interest she has.
+
 **A refusal can arrive marked as success.** The quote batch's 429 came inside a
 result marked `isError: false`, with `success: false` in the payload. `unwrap`
 checks both and reads `structuredContent` rather than the duplicate text block.
