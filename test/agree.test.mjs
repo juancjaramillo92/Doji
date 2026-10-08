@@ -3866,6 +3866,12 @@ test('the writing worker spends what is left of its own clock, and no step more'
   assert.match(brief, /critique\([^)]*, left\(\)\)/, 'the critic may outlive the worker');
   assert.match(brief, /sayAloud\(brief, [^;]*, Math\.min\(SPEAK_MS, left\(\)\)\)/,
     'the fallback voice may outlive the worker');
+  // The census, so a step added beside these three is held to the same clock.
+  const steps = [...uncomment(brief).matchAll(/\b(ask|critique|gate|sayAloud)\(([^;]*);/g)];
+  assert.ok(steps.length >= 3, `only ${steps.length} timed steps read in postBriefing — the reader has gone blind`);
+  for (const [, fn, call] of steps) {
+    assert.match(call, /left\(\)/, `postBriefing calls ${fn} on a clock other than what is left of its own`);
+  }
   const gate = bodyOf(EUGENIA_TS, 'async function gate(');
   assert.match(gate, /'medium', label, CRITIC_TOOLS, budget\)/,
     'gate no longer hands its budget to the model call — the critic runs on TURN_MS whatever is left');
