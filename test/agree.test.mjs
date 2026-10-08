@@ -5621,7 +5621,7 @@ test('the round cap is a backstop rather than a working limit', () => {
 });
 
 test('the critic is not among them, and that is the decision', () => {
-  /* THE CRITIC STAYS: about $3.50 a month saved, against the gate that runs
+  /* THE CRITIC STAYS: about $2 a month saved, against the gate that runs
      LAST, can rewrite, and judges the thing he said read badly. */
   const map = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const MODELS: Record<string, string> = {'));
   const body = map.slice(0, map.indexOf('};'));
