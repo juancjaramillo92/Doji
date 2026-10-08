@@ -2384,8 +2384,14 @@ a month saved, against the last gate on exactly what he said read badly.
 `MODELS` is keyed on the caller's label, the string `eugenia_runs.caller`
 records, and absent means Opus.
 
-**The cache window is derived from the tool array.** A cache read is a tenth of
-the input rate; a write is 1.25× at five minutes and **2× at an hour**, so the hour
+**Both tiers are on 5.5** (`claude-opus-5-5`, `claude-sonnet-5-5`): the same
+tiers, cheaper. The week to 2026-10-08 came to $17.52 on Opus 5 and Sonnet 5, and
+the same tokens at the 5.5 rates to $13.86 — Opus a fifth cheaper on input,
+output and writes, and a cache read down to a twentieth of the input rate on
+both. Writes were 63% of that week, so they are where the saving lands.
+
+**The cache window is derived from the tool array.** A cache read is a twentieth
+of the input rate; a write is 1.25× at five minutes and **2× at an hour**, so the hour
 pays only when a prefix is read twice more inside it. The tool array is where the
 cache key starts, so each tool set is its own prefix — and a week of `wrote_1h`
 answered *is a second turn likely inside the hour* per array:
