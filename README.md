@@ -382,7 +382,7 @@ single-sourced at run time:
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
-| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia` |
+| the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow and the Apps Script |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
@@ -2121,7 +2121,9 @@ price and the CFTC's count. Unbounded, a feed that stopped answering held the
 caller until the platform closed the request at 150s. The 7 October pulse
 spent that long learning TradingView was down, and in a briefing the wait lands
 on the writing worker's clock. Each caller already says what a failed read
-means, so a dead feed now costs 45 seconds and that sentence.
+means, so a dead feed now costs 45 seconds and that sentence. **A timeout names
+its door** — *TradingView calendar: no answer in 45s* — since the abort's own
+message names nothing, and the meter rows are where an outage is read afterwards.
 
 **A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
 at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the
@@ -2340,9 +2342,17 @@ other failure — instead of holding the turn until the platform kills the worke
 at 400s, where nothing runs. One budget for the whole turn, because ten rounds
 each under a per-request bound could still outlive the worker together. It is
 measured on the clock `eugenia_runs.ms` records, so the longest successful row
-per caller says how much room there is. The briefing writes in two turns, the
-draft and the critic: the bound catches a stall in either, and two slow turns
-together are `pace_line`'s to see.
+per caller says how much room there is.
+
+**The writing worker has one clock, and each step is handed what is left of
+it.** The briefing runs its reads, the draft and the critic in a row, and each
+inside its own bound summed past the wall: on 8 October, 50s of reads against a
+dead feed, a 247s draft that searched seven times because the feed was dead,
+and the critic — 336s. So **`WRITER_MS`**, 370 seconds from the moment the
+worker opens, is the budget: the draft gets the lesser of `TURN_MS` and what is
+left, the critic what remains after it, and the fallback voice the same. A
+critic out of time fails like any other, and `gate` sends the draft. The thirty
+seconds under the wall are storing, the hand-off and the row.
 
 **What she costs, measured.** The week to 2026-10-08 came to **$17.52, about $76 a
 month**, on Opus 5 and Sonnet 5. The same tokens at the 5.5 rates come to $13.86,
