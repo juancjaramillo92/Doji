@@ -1396,14 +1396,16 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       max_tokens: 16000,
       /* Cached: long, fixed, and sent on every turn — which is why the strategy
          rides here. The window is a property of the tool ARRAY, where the key
-         starts: each array is its own prefix. A week of wrote_1h showed every
-         caller's turns equal to its writes except the release look, whose
-         quarter-hourly looks cluster in one morning — so it keeps the hour.
-         Everything else is five minutes, which the rounds within a turn keep
-         alive. `ttl` is a plain field, not a beta. */
+         starts: each array is its own prefix. The release look keeps the hour
+         because its quarter-hourly looks cluster in one morning; the chat array
+         because fourteen of a week's eighteen replies came within an hour of the
+         turn before, six within five minutes. The briefing shares that array,
+         never reuses it, and pays 2× for the write. Everything else is five
+         minutes, which the rounds within a turn keep alive. `ttl` is a plain
+         field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
-                                  ttl: tools === RELEASE_TOOLS ? "1h" : "5m" } }],
+                                  ttl: tools === RELEASE_TOOLS || tools === CHAT_TOOLS ? "1h" : "5m" } }],
       messages,
       // Server tools need no loop here; the rest are executed below.
       tools,

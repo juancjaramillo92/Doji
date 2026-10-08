@@ -285,8 +285,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   dotted one names a heading in what came back. §2 and §3 are not his and use the
   spoken channel names. Step 4 of R-08 is readable only off a row carrying the
   plan; do not read 1:1.5 and a realised 1:1.25 as a pair of floors.
-- **The cache window is derived from the tool array**: `1h` for `RELEASE_TOOLS`,
-  `5m` for the rest. Do not move a window on an argument; `wrote_1h` and
+- **The cache window is derived from the tool array**: `1h` for `RELEASE_TOOLS`
+  and `CHAT_TOOLS`, `5m` for the rest. Do not move a window on an argument; `wrote_1h` and
   `wrote_5m` are what decide it.
 - **`superseded_by=is.null` on `readNotes` is the whole of retirement**, and the
   write is filtered the same way. Column, filter and tool parameter agree.
