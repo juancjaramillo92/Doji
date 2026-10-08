@@ -2392,7 +2392,8 @@ both. Writes were 63% of that week, so they are where the saving lands.
 
 **The cache window is derived from the tool array.** A cache read is a twentieth
 of the input rate; a write is 1.25× at five minutes and **2× at an hour**, so the hour
-pays only when a prefix is read twice more inside it. The tool array is where the
+pays once about two turns in five arrive inside it, sparing the rewrites the five
+minutes would have paid for. The tool array is where the
 cache key starts, so each tool set is its own prefix — and a week of `wrote_1h`
 answered *is a second turn likely inside the hour* per array:
 
@@ -2408,9 +2409,15 @@ answered *is a second turn likely inside the hour* per array:
 | Sunday briefing | 1 | 1 | 0 |
 
 (Consolidation's sixth turn is the row for a turn that failed before the model
-answered.) Only `RELEASE_TOOLS` earns the hour, because its quarter-hourly job
-clusters several looks into one morning; the briefing and the pulse are two hours
-apart. So it is `1h` for `RELEASE_TOOLS` and `5m` for the rest. The move look has
+answered.) That week only `RELEASE_TOOLS` earned the hour, because its
+quarter-hourly job clusters several looks into one morning; the briefing and the
+pulse are two hours apart. One reply could not say how replies arrive. The week
+to 2026-10-08 had eighteen: fourteen within an hour of the reply or pulse before
+them, six within five minutes — so eight a week wrote again a prefix the hour
+would still have held, and `CHAT_TOOLS` takes the hour too. The weekday briefing
+shares that array but not its effort, so it reads nothing the replies wrote and
+pays 2× for its own write; the replies more than cover it. So it is `1h` for
+`RELEASE_TOOLS` and `CHAT_TOOLS`, and `5m` for the rest. The move look has
 its own `MOVE_TOOLS`, without `record_actual`, at five minutes. `cached` counts
 reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
 differ.

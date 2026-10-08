@@ -1627,13 +1627,13 @@ test('the strategy rides on the cached system prompt, not on a message', () => {
     'the strategy is no longer part of the cached system prompt — either she has ' +
     'stopped being given it at all, or it is being paid for on every message');
 
-  /* THE WINDOW IS DERIVED FROM THE TOOL ARRAY, where the cache key starts. A week
-     of `wrote_1h` showed only the release look reuses its prefix inside the
-     hour; a literal here reads as a decision and costs 2× for a lifetime nothing
+  /* THE WINDOW IS DERIVED FROM THE TOOL ARRAY, where the cache key starts. Only
+     the release look's and the chat array's prefixes are reused inside the hour;
+     a literal here reads as a decision and costs 2× for a lifetime nothing
      reads. README.md carries the rows. */
-  assert.match(src, /ttl:\s*tools === RELEASE_TOOLS \? "1h" : "5m"/,
+  assert.match(src, /ttl:\s*tools === RELEASE_TOOLS \|\| tools === CHAT_TOOLS \? "1h" : "5m"/,
     'the cached prefix states one window for every caller again — the hour is ' +
-    'only earned by RELEASE_TOOLS, see the measurement in README.md');
+    'only earned by RELEASE_TOOLS and CHAT_TOOLS, see the measurements in README.md');
 });
 
 test('what is summarised into every turn can also be read in full', () => {
