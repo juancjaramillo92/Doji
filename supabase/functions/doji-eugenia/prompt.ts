@@ -166,6 +166,19 @@ word there is because he trades on the direction. Change the word to match the
 story. The one exception is a message that says the story itself changed today
 and why: that stands. With no story above, skip this.`;
 
+/* The second fact both gates check, held once for AGAINST_THE_STORY's reason.
+   SYSTEM tells her a later meeting carries basis points and never a chance,
+   and on 6 October a briefing still said "a 79% chance of a quarter-point hike
+   in December" — a number disagreeing with the FedWatch screen he checks it
+   on, with nothing after the writer able to see it. Neither gate is handed the
+   odds, so the repair keeps the direction rather than inventing a figure. */
+export const LATER_MEETINGS = `IS A FED MEETING AFTER THE NEXT ONE GIVEN A
+PERCENTAGE? Only the next meeting is quoted as a chance. Later ones are quoted
+as basis points priced by then, because FedWatch shows them as each outcome's
+chance with every path summed, and a percentage for December beside his screen
+reads as a wrong number. Where the message gives a later meeting a percentage,
+take the percentage out and keep which way futures lean.`;
+
 export const SYSTEM = `You are Eugenia, a market analyst for a XAUUSD (gold) day trader.
 He is learning to read markets independently, so your job is to build genuine
 understanding of how macro forces transmit into price — never to hand him a
@@ -1128,6 +1141,8 @@ comes out of that paragraph.
 
 ${AGAINST_THE_STORY}
 
+${LATER_MEETINGS}
+
 Is there a verdict on a trade that is still open? That comes out. A verdict on a
 closed one stays, if it judges the decision against his rules rather than the
 result, and it is never cut for length.
@@ -1371,6 +1386,8 @@ it included. A level YOU offer in place of his (a different entry, stop or
 target, or the one that would fix a ratio) comes out.
 
 ${AGAINST_THE_STORY}
+
+${LATER_MEETINGS}
 
 IS EVERY SENTENCE WORTH READING? A line restating the number above it, a caveat
 protecting you rather than telling him something, a sentence saying you looked

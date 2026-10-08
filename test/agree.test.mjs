@@ -5312,15 +5312,42 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
   assert.match(system, /WHAT THE FUTURES PRICE FOR THE FED COMES IN THE BRIEFING/);
   assert.match(system, /never turn those into a chance/,
     'she may quote a later meeting as its own odds, which FedWatch does not show');
+  /* AND BOTH GATES HOLD IT, because SYSTEM alone did not: the 6 October
+     briefing said "a 79% chance of a quarter-point hike in December". */
+  const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1];
+  assert.match(body('LATER_MEETINGS').replace(/\s+/g, ' '), /take the percentage out and keep which way futures lean/,
+    'LATER_MEETINGS no longer says what to do with a later meeting given a percentage');
+  for (const gate of ['CRITIC', 'TRIM']) {
+    assert.ok(body(gate).includes('${LATER_MEETINGS}'),
+      `${gate} no longer checks for a later meeting given a percentage — it runs last, ` +
+      `and a December chance disagrees with the FedWatch screen he checks it on`);
+  }
 });
 
 /* THE ORDER OF THE RECORD READ IS THE WHOLE OF IT. revisionLine wants rows
    newest first and recordList oldest first; `rows.reverse()` reverses in
    place, so reversing first hands revisionLine the OLDEST print. */
+/* EVERY MARKET READ CARRIES THE BOUND, AND THE SET IS DERIVED. Unbounded, a
+   feed that stopped answering held the 7 October pulse until the platform cut
+   the request at 150s. Nothing in the suite can hang a real request, so the
+   reads are found by what they address — TradingView's doors, the broker's
+   price, the CFTC's count — and a new one arriving without the bound fails. */
+test('every market read gives up at READ_MS rather than at the platform', () => {
+  const reads = [...EUGENIA_TS.matchAll(/await fetch\((`\$\{SB_URL\}\/functions\/v1\/doji-tradingview[^`]*`|MARKET_URL|COT_URL)[\s\S]*?\);/g)];
+  assert.equal(reads.length, 3, `read ${reads.length} market fetches — the reader has gone blind, or one was added`);
+  for (const [call] of reads) {
+    assert.match(call, /signal: AbortSignal\.timeout\(READ_MS\)/,
+      `${call.slice(0, 70)}… carries no bound — a feed that stops answering holds the caller for 150s`);
+  }
+});
+
 test('the release look is handed the revision, off the record read newest first', () => {
   const body = bodyOf(EUGENIA_TS, 'async function recordBlock(', 'doji-eugenia no longer has recordBlock()');
   assert.match(body, /recordList\(r\.name, \[\.\.\.rows\]\.reverse\(\)\) \+ revisionLine\(r, rows\)/,
     'the record is reversed in place before the revision reads it, or the revision is not handed over');
+  // The minutes carry the rate decision's ticker, so their record was the decisions'.
+  assert.match(body, /due\.filter\(r => r\.ticker && \(r\.consensus \|\| r\.prior\)\)/,
+    'a release with no figure coming is handed a record, and the minutes read as rate decisions');
   const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
   assert.match(release, /A REVISION IS PART OF THE PRINT/, 'RELEASE no longer tells her what a revision line is');
   assert.match(release, /never work one\s+out yourself/,
