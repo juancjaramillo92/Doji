@@ -1362,8 +1362,8 @@ const CRITIC_TOOLS: unknown[] = [];
    `trim` stays on Sonnet because its array is empty: one request, no loop, no
    cap to reach. The critic does not move: it runs last, can rewrite, and is
    the final gate on how she reads. */
-const OPUS = "claude-opus-5";
-const SONNET = "claude-sonnet-5";
+const OPUS = "claude-opus-5-5";
+const SONNET = "claude-sonnet-5-5";
 
 /* Keyed on the caller's label — the string eugenia_runs.caller records — and
    agree.test.mjs holds the keys against labels actually passed. Absent means
@@ -1382,9 +1382,10 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       "x-api-key": ANTHROPIC_KEY,
       "anthropic-version": "2023-06-01",
       // A header, not a `betas` body field: that is the SDKs' parameter, and
-      // an unknown body field is a 400 on every call. With Opus alone, by
-      // caution: nothing has shown Sonnet accepts `fallbacks`, and if it does
-      // not, every Sonnet call 400s. The header and the field go together.
+      // an unknown body field is a 400 on every call. With Opus alone: the one
+      // Sonnet caller is `trim`, and a gate that fails sends the draft, so a
+      // decline there costs nothing a fallback would save. The header and the
+      // field go together.
       ...(model === OPUS
           ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
           : {}),

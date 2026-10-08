@@ -2311,8 +2311,8 @@ async function costLines(responses) {
 }
 
 test('the ordinary turn says nothing about the model, because nothing happened', async () => {
-  const [line] = await costLines([answers('claude-opus-5')]);
-  assert.match(line, /test — claude-opus-5, 1 round\(s\), medium effort/);
+  const [line] = await costLines([answers('claude-opus-5-5')]);
+  assert.match(line, /test — claude-opus-5-5, 1 round\(s\), medium effort/);
   assert.doesNotMatch(line, /FELL BACK/);
 });
 
@@ -2322,11 +2322,11 @@ test('a caller on a cheaper model does not read as having fallen back', async ()
      through `ask`, because the comparison is inside the loop. */
   const lines = [];
   await stubbed(async () => {
-    globalThis.fetch = async () => answers('claude-sonnet-5');
+    globalThis.fetch = async () => answers('claude-sonnet-5-5');
     console.log = (line) => lines.push(line);
     await ask([{ role: 'user', content: 'anything' }], 'medium', 'trim');
   });
-  assert.match(lines[0], /trim — claude-sonnet-5/,
+  assert.match(lines[0], /trim — claude-sonnet-5-5/,
     'the trim did not ask for Sonnet, so the model map is not reaching the request');
   assert.doesNotMatch(lines[0], /FELL BACK/,
     'a caller answered by the model it asked for reads as a fallback, so the ' +
@@ -2378,7 +2378,7 @@ test('a fallback on one round survives a later round that did not fall back', as
   // Round one declines and is rescued; round two runs on what was asked for.
   // Clearing on the second would report the turn as ordinary.
   const [line] = await costLines([asksForStrategy('some-other-model'),
-                                  answers('claude-opus-5')]);
+                                  answers('claude-opus-5-5')]);
   assert.match(line, /2 round\(s\)/);
   assert.match(line, /FELL BACK TO some-other-model/);
 });
@@ -2408,7 +2408,7 @@ async function turnWithJournal(status, responses) {
   });
 }
 
-const twoRounds = [asksForTrades('claude-opus-5'), answers('claude-opus-5')];
+const twoRounds = [asksForTrades('claude-opus-5-5'), answers('claude-opus-5-5')];
 
 test('a journal read that 404s is answered to her, and the turn finishes', async () => {
   const { text, answered } = await turnWithJournal(404, twoRounds);
@@ -2437,10 +2437,10 @@ test('an empty window still says it is empty, because that is an answer', async 
 test('a tool the caller was not offered is answered as unknown and never runs', async () => {
   const db = [], sent = [];
   const responses = [
-    served('claude-opus-5', { stop_reason: 'tool_use', content: [
+    served('claude-opus-5-5', { stop_reason: 'tool_use', content: [
       { type: 'tool_use', id: 'tu_1', name: 'set_channel',
         input: { channel: 'dollar', state: 'owns', evidence: 'one exchange' } }] }),
-    answers('claude-opus-5'),
+    answers('claude-opus-5-5'),
   ];
   let n = 0;
   await stubbed(async () => {
@@ -2467,7 +2467,7 @@ const pausedContent = [
 const paused = (model) => served(model, { stop_reason: 'pause_turn', content: pausedContent });
 
 test('a paused turn is resumed, not sent as the answer', async () => {
-  const { sent, lines } = await bodiesOf([paused('claude-opus-5'), answers('claude-opus-5')]);
+  const { sent, lines } = await bodiesOf([paused('claude-opus-5-5'), answers('claude-opus-5-5')]);
   assert.equal(sent.length, 2, 'the paused turn ended the loop, so its preamble was the answer');
   // Resumed by sending it back as it stands, with nothing after it.
   assert.deepEqual(sent[1].messages.at(-1), { role: 'assistant', content: pausedContent });
@@ -2479,7 +2479,7 @@ test('a turn cut off at max_tokens fails rather than sending half an answer', as
   await stubbed(async () => {
     globalThis.fetch = async (url, init) => String(url).startsWith('/rest/')
       ? (rows.push(JSON.parse(init.body)[0]), { ok: true, status: 201 })
-      : served('claude-opus-5', { stop_reason: 'max_tokens',
+      : served('claude-opus-5-5', { stop_reason: 'max_tokens',
           content: [{ type: 'text', text: 'Gold opened the week at' }] });
     await assert.rejects(ask([{ role: 'user', content: 'anything' }], 'medium', 'test'),
       /max_tokens/);
@@ -2518,15 +2518,15 @@ const marks = (body) => body.messages.flatMap(m =>
   (Array.isArray(m.content) ? m.content : []).filter(b => b.cache_control));
 
 test('the first request marks nothing, because there is nothing yet to re-read', async () => {
-  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
-                                   answers('claude-opus-5')]);
+  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5-5'),
+                                   answers('claude-opus-5-5')]);
   assert.equal(marks(sent[0]).length, 0,
     'a breakpoint on the opening message is a write nothing will ever read back');
 });
 
 test('the round after a tool call reads the last one back instead of buying it', async () => {
-  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
-                                   answers('claude-opus-5')]);
+  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5-5'),
+                                   answers('claude-opus-5-5')]);
   const [mark] = marks(sent[1]);
   assert.ok(mark, 'the tool results carry no breakpoint — every round re-sends ' +
                   'the whole conversation at full price, which is what this fixes');
@@ -2542,18 +2542,18 @@ test('the mark moves rather than accumulating, which is what keeps it under four
      behind on each round, the fifth request is a 400 — on exactly the mornings
      with most to read. Two tool rounds tell a mark that moved from one that
      stayed. */
-  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5'),
-                                   asksForStrategy('claude-opus-5'),
-                                   answers('claude-opus-5')]);
+  const { sent } = await bodiesOf([asksForStrategy('claude-opus-5-5'),
+                                   asksForStrategy('claude-opus-5-5'),
+                                   answers('claude-opus-5-5')]);
   assert.equal(marks(sent[2]).length, 1,
     `the third request carries ${marks(sent[2]).length} breakpoints — they are ` +
     `accumulating, and the fifth round will be refused`);
 });
 
 test('a cache write is counted, and the two prices are counted apart', async () => {
-  /* A read is a tenth of the input price; a write is 1.25× or 2× by lifetime, so
+  /* A read is a twentieth of the input price; a write is 1.25× or 2× by lifetime, so
      a single total cannot be turned back into money. */
-  const { lines } = await bodiesOf([served('claude-opus-5', {
+  const { lines } = await bodiesOf([served('claude-opus-5-5', {
     stop_reason: 'end_turn',
     content: [{ type: 'text', text: 'an answer' }],
     usage: {
@@ -2570,7 +2570,7 @@ test('a vendor that stops splitting the total reads as wrong, never as free', as
   /* THE FIVE-MINUTE FIGURE IS THE REMAINDER, not a read: with no
      `cache_creation` breakdown both TTLs would read zero — a cache costing
      nothing, which is what a working one looks like. */
-  const { lines } = await bodiesOf([served('claude-opus-5', {
+  const { lines } = await bodiesOf([served('claude-opus-5-5', {
     stop_reason: 'end_turn',
     content: [{ type: 'text', text: 'an answer' }],
     usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 1300 },

@@ -463,7 +463,7 @@ create table if not exists public.eugenia_runs (
   searches   int,
   fetches    int,
 
-  -- What filling the cache cost. A read (`cached`) is a tenth of the input
+  -- What filling the cache cost. A read (`cached`) is a twentieth of the input
   -- rate; a write is 1.25× at five minutes and 2× at an hour, so the two TTLs
   -- are kept apart — their sum is not money.
   wrote_1h   int,
