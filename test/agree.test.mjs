@@ -2412,7 +2412,7 @@ test('the critic is handed his notes, the map and the desk it is asked to enforc
 
   // And postBriefing hands over the three it has already awaited, rather than
   // the critic opening reads of its own on the far side of a briefing.
-  assert.match(bodyOf(src, 'async function postBriefing('), /critique\(draft,\s*notes,\s*channels,\s*desk,\s*story\)/,
+  assert.match(bodyOf(src, 'async function postBriefing('), /critique\(draft,\s*notes,\s*channels,\s*desk,\s*story,\s*left\(\)\)/,
     'postBriefing no longer passes the notes, the map, the desk and the story it already ' +
     'holds into critique() — the critic is back to judging without them');
 });
@@ -3843,6 +3843,32 @@ test('a model turn may spend what pace_line calls safe, and no more', () => {
     'ask() no longer starts its turn on the budget');
   assert.match(EUGENIA_TS, /call\(convo, effort, tools, model, deadline, container\)/,
     'the turn\'s signal no longer reaches the request');
+});
+
+/* THE WRITING WORKER RUNS SEVERAL BOUNDED TURNS IN A ROW, and each inside
+   TURN_MS still summed to 336s of 400 on 8 October. So the worker has one
+   clock and every step is handed what is left of it: the draft no more than
+   that, the critic what remains after the draft (out of time, gate sends the
+   draft), the fallback voice the same. Nothing in the suite can run a worker
+   against its wall, so the hand-offs are read. */
+test('the writing worker spends what is left of its own clock, and no step more', () => {
+  const ceiling = Number(PACE_SQL.match(/ceiling_ms constant int := (\d+);/)[1]);
+  const writer = Number(EUGENIA_TS.match(/const WRITER_MS = ([\d_]+);/)?.[1].replaceAll('_', ''));
+  assert.ok(writer > 0, 'doji-eugenia no longer declares WRITER_MS — the reader has gone blind');
+  assert.ok(ceiling - writer >= 20_000,
+    `WRITER_MS leaves ${(ceiling - writer) / 1000}s of the ${ceiling / 1000}s wall for storing, the ` +
+    `hand-off and the row`);
+  const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
+  assert.match(brief, /const left = \(\) => Math\.max\(0, opened \+ WRITER_MS - Date\.now\(\)\);/,
+    'postBriefing no longer measures what is left of its clock');
+  assert.match(brief, /'high', `\$\{due\} briefing`, CHAT_TOOLS, Math\.min\(TURN_MS, left\(\)\)\)/,
+    'the draft may outlive the worker');
+  assert.match(brief, /critique\([^)]*, left\(\)\)/, 'the critic may outlive the worker');
+  assert.match(brief, /sayAloud\(brief, [^;]*, Math\.min\(SPEAK_MS, left\(\)\)\)/,
+    'the fallback voice may outlive the worker');
+  const gate = bodyOf(EUGENIA_TS, 'async function gate(');
+  assert.match(gate, /'medium', label, CRITIC_TOOLS, budget\)/,
+    'gate no longer hands its budget to the model call — the critic runs on TURN_MS whatever is left');
 });
 
 /* ─── And the README lists them, which is a third copy ───────────────────────
@@ -5335,8 +5361,12 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
 test('every market read gives up at READ_MS rather than at the platform', () => {
   const reads = [...EUGENIA_TS.matchAll(/await fetch\((`\$\{SB_URL\}\/functions\/v1\/doji-tradingview[^`]*`|MARKET_URL|COT_URL)[\s\S]*?\);/g)];
   assert.equal(reads.length, 3, `read ${reads.length} market fetches — the reader has gone blind, or one was added`);
-  for (const [call] of reads) {
-    assert.match(call, /signal: AbortSignal\.timeout\(READ_MS\)/,
+  for (const { 0: call, index } of reads) {
+    // Bound where it is made, or by a signal the enclosing function bounds —
+    // tvRead holds its own, to name the door when it fires.
+    const enclosing = EUGENIA_TS.slice(EUGENIA_TS.lastIndexOf('\nasync function ', index), index);
+    assert.ok(/signal: AbortSignal\.timeout\(READ_MS\)/.test(call) ||
+              (/\bsignal\b/.test(call) && /const signal = AbortSignal\.timeout\(READ_MS\)/.test(enclosing)),
       `${call.slice(0, 70)}… carries no bound — a feed that stops answering holds the caller for 150s`);
   }
 });

@@ -3006,6 +3006,27 @@ test('a calendar TradingView refused is an error, not an empty day', async () =>
   });
 });
 
+/* A FEED THAT NEVER ANSWERS IS NAMED IN THE ROW. The abort's own message is
+   "Signal timed out.", and on 8 October the calendar's meter filled with it,
+   naming no door. Driven against a fetch that settles only when aborted, with
+   the clock behind READ_MS shortened so the test does not wait it out. */
+test('a TradingView read that never answers says which door, and how long it waited', async () => {
+  const realTimeout = AbortSignal.timeout;
+  await stubbed(async () => {
+    AbortSignal.timeout = () => realTimeout.call(AbortSignal, 20);
+    globalThis.fetch = (url, init) => new Promise((_, reject) =>
+      init.signal.addEventListener('abort', () => reject(init.signal.reason)));
+    // The stub holds no socket open, and the timer behind the signal is unref'd.
+    const open = setTimeout(() => {}, 1_000);
+    try {
+      await assert.rejects(fileCalendar(OCT1_3PM), /^Error: TradingView calendar: no answer in 45s$/);
+    } finally {
+      clearTimeout(open);
+      AbortSignal.timeout = realTimeout;
+    }
+  });
+});
+
 test('the release look waits for a missing figure, but not past half an hour, and never for a speech', () => {
   const at = '2026-10-02T12:30:00.000Z';
   const payrolls = { id: 1, at, name: 'Non Farm Payrolls (Sep)', importance: 'high',

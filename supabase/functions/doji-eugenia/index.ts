@@ -783,11 +783,18 @@ const READ_MS = 45_000;
 /* Every door of doji-tradingview she reads, behind the cron secret: its
    answer, or a throw naming the door and the reason it gave. */
 async function tvRead(door: string, query = ""): Promise<any> {
-  const res = await fetch(`${SB_URL}/functions/v1/doji-tradingview?${door}=1${query}`,
-                          { headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS) });
-  const answer = await res.json().catch(() => ({}));
-  if (!res.ok || !answer.ok) throw new Error(`TradingView ${door}: ${answer.error ?? `HTTP ${res.status}`}`);
-  return answer;
+  const signal = AbortSignal.timeout(READ_MS);
+  try {
+    const res = await fetch(`${SB_URL}/functions/v1/doji-tradingview?${door}=1${query}`,
+                            { headers: { "x-doji-key": CRON_SECRET }, signal });
+    const answer = await res.json().catch(() => ({}));
+    if (!res.ok || !answer.ok) throw new Error(`TradingView ${door}: ${answer.error ?? `HTTP ${res.status}`}`);
+    return answer;
+  } catch (err) {
+    // The abort's own message is "Signal timed out." and names no door, and
+    // the calendar's meter rows are where an outage is read afterwards.
+    throw signal.aborted ? new Error(`TradingView ${door}: no answer in ${READ_MS / 1000}s`) : err;
+  }
 }
 
 // What doji-tradingview's `foldCalendar` answers, one release each.
@@ -2860,8 +2867,9 @@ export function keepDraft(draft: string, revised: string, most = 2): boolean {
 }
 
 async function critique(draft: string, notes: string, channels: string, desk: string,
-                        story: string): Promise<string> {
-  return await gate(draft, `${CRITIC}${notes}${channels}${desk}${story}\n\nTHE BRIEFING:\n\n${draft}`, 'critic');
+                        story: string, budget: number): Promise<string> {
+  return await gate(draft, `${CRITIC}${notes}${channels}${desk}${story}\n\nTHE BRIEFING:\n\n${draft}`,
+                    'critic', undefined, budget);
 }
 
 /* The gate on the messages the critic never reached — most of what he gets in
@@ -2881,10 +2889,11 @@ async function trim(draft: string, desk: string, story: string): Promise<string>
    outcome is a verdict row — revised, unchanged, overruled, or failed — since
    whether a gate changed anything was a console line, and the paragraph rule
    failed through every gate for days with nothing able to say why. */
-async function gate(draft: string, asked: string, label: string, most?: number): Promise<string> {
+async function gate(draft: string, asked: string, label: string, most?: number,
+                    budget = TURN_MS): Promise<string> {
   const caller = `${label} verdict`;
   try {
-    const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS);
+    const revised = await ask([{ role: 'user', content: asked }], 'medium', label, CRITIC_TOOLS, budget);
     if (keepDraft(draft, revised, most)) {
       await recordRun({ caller, ok: true, chars: draft.length,
                         detail: `kept the draft — revision ${revised.trim().length} vs draft ${draft.length}` });
@@ -2903,6 +2912,16 @@ async function gate(draft: string, asked: string, label: string, most?: number):
     return draft;
   }
 }
+
+/* THE WRITING WORKER HAS ONE CLOCK, AND EACH STEP IS HANDED WHAT IS LEFT OF IT.
+   Every model call is bounded at TURN_MS, but the worker runs several in a row
+   — reads, the draft, the critic — and each inside its bound summed past the
+   400s wall on 8 October: 50s of reads against a dead feed, a 247s draft that
+   searched seven times because the feed was dead, and the critic, 336s in all.
+   So the draft gets no more than is left, and the critic gets what remains
+   after it; a critic out of time fails, and gate sends the draft. The thirty
+   seconds below the wall are storing, the hand-off and the row. */
+const WRITER_MS = 370_000;
 
 /* The briefing reads its own history, so a morning continues from the last
    rather than starting from nothing. The stored user turn is a marker, not the
@@ -2927,9 +2946,10 @@ async function postBriefing(due: Brief): Promise<Response> {
     // missing rows.
     + health + price + around + rates + crowd + traded + notes + channels + trades + breaches + story + loops + calendar + desk;
 
+  const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
-                          'high', `${due} briefing`);
-  const brief = await critique(draft, notes, channels, desk, story);
+                          'high', `${due} briefing`, CHAT_TOOLS, Math.min(TURN_MS, left()));
+  const brief = await critique(draft, notes, channels, desk, story, left());
 
   // The length lives in prose past a model call, where nothing else sees it.
   console.log(`doji-eugenia: ${due} briefing — ${brief.length} characters`);
@@ -2959,7 +2979,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     return json({ ok: true, brief: due, chars: brief.length });
   }
 
-  const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())));
+  const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())), Math.min(SPEAK_MS, left()));
 
   // The artifact's row, apart from the two calls': what he received and how
   // long it all took, with the stretch after the critic split out.
