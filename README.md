@@ -1392,7 +1392,10 @@ the look is handed the last twelve prints of each series in the group, oldest
 first, each against what was expected (`recordList`, read by `recordQuery`).
 Listed, never scored — parsing "0.2%" into a sign is a chance to get every unit
 backwards. `RELEASE` asks whether a miss runs the way the series has been
-missing.
+missing. Only a release with a figure coming gets one: the FOMC minutes carry
+the rate decision's ticker, so their record was the decisions', and a release
+with no consensus and no prior has nothing to read against, which is
+`awaitingActual`'s own test.
 
 **And what the last print became.** A release revises the one before, and
 TradingView carries the revised figure as the new row's `prior` while last
@@ -1442,6 +1445,14 @@ hike. A "cut" where the story says "hike" is changed to match, unless the messag
 says the story changed today and why. The nightly pass writes into the story
 which way the central bank last moved and which way the market is betting. The
 rule is written once, `AGAINST_THE_STORY`, and both gates read it.
+
+**And one against the screen he checks: a later Fed meeting given a
+percentage.** `SYSTEM` says only the next meeting is quoted as a chance, and the
+6 October briefing still said *"a 79% chance of a quarter-point hike in
+December"*, which disagrees with FedWatch's cumulative odds for that meeting.
+`LATER_MEETINGS` is the check, written once and read by both gates. Neither is
+handed the odds, so it takes the percentage out and keeps which way futures
+lean rather than inventing a figure.
 
 **The trade event stays out of the gate.** `TRIM` **rewrites**, and this message
 reaches him in a position or just past his day's limit, where a paraphrased
@@ -2103,6 +2114,14 @@ she writes around the gap; an exception there would end the turn with a question
 unanswered. **The sentence matters as much as the catch**: *no trades in that
 window* from a window nothing looked at is a false statement about his own week,
 in her voice. An empty answer is an answer only when something was read.
+
+**A read that does not answer has failed after `READ_MS`, 45 seconds.** Every
+market read is bounded: TradingView's doors through `tvRead`, the broker's
+price and the CFTC's count. Unbounded, a feed that stopped answering held the
+caller until the platform closed the request at 150s. The 7 October pulse
+spent that long learning TradingView was down, and in a briefing the wait lands
+on the writing worker's clock. Each caller already says what a failed read
+means, so a dead feed now costs 45 seconds and that sentence.
 
 **A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
 at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the

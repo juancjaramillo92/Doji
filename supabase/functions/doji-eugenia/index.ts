@@ -772,11 +772,19 @@ async function readStats(days: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
+/* Every market read is bounded, and what is left when it runs out is the
+   caller's own sentence for a failed read. Unbounded, a feed that stopped
+   answering held the caller until the platform closed the request at 150s —
+   the 7 October pulse spent that long learning TradingView was down — and in a
+   briefing the wait lands on the writing worker's clock. TradingView's doors,
+   the broker's price and the CFTC's count all carry it. */
+const READ_MS = 45_000;
+
 /* Every door of doji-tradingview she reads, behind the cron secret: its
    answer, or a throw naming the door and the reason it gave. */
 async function tvRead(door: string, query = ""): Promise<any> {
   const res = await fetch(`${SB_URL}/functions/v1/doji-tradingview?${door}=1${query}`,
-                          { headers: { "x-doji-key": CRON_SECRET } });
+                          { headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS) });
   const answer = await res.json().catch(() => ({}));
   if (!res.ok || !answer.ok) throw new Error(`TradingView ${door}: ${answer.error ?? `HTTP ${res.status}`}`);
   return answer;
@@ -1069,7 +1077,8 @@ export interface Quote {
    caller says what a missing price means to it. */
 async function marketQuote(): Promise<Quote | null> {
   try {
-    const res = await fetch(MARKET_URL, { headers: { "x-doji-key": CRON_SECRET } });
+    const res = await fetch(MARKET_URL, { headers: { "x-doji-key": CRON_SECRET },
+                                          signal: AbortSignal.timeout(READ_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const quote = await res.json();
     if (!quote?.ok || typeof quote.bid !== 'number') throw new Error("no readable quote");
@@ -2549,7 +2558,7 @@ export function positioningList(rows: Cot[]): string {
 
 export async function positioningBlock(): Promise<string> {
   try {
-    const res = await fetch(COT_URL);
+    const res = await fetch(COT_URL, { signal: AbortSignal.timeout(READ_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return positioningList(await res.json());
   } catch (err) {
@@ -3204,6 +3213,10 @@ export function awaitingActual(due: Release[], now: number): boolean {
    consensus, so a surprise is read against its own record. Listed, not scored:
    the figures are text, and a surprise computed here would be a parse with
    every unit a chance to get the sign backwards.
+
+   Only for a release with a figure coming. The minutes carry the rate
+   decision's ticker, so their "record" was the decisions' — a speech or the
+   minutes has nothing to read against, which is awaitingActual's test.
    ───────────────────────────────────────────────────────────────────────── */
 const RECORD = 12;
 
@@ -3235,7 +3248,8 @@ export function recordQuery(ticker: string, before: string): string {
 
 /* One read per series; a failed read costs its block only. */
 async function recordBlock(due: Release[]): Promise<string> {
-  const series = [...new Map(due.filter(r => r.ticker).map(r => [r.ticker!, r])).values()];
+  const series = [...new Map(due.filter(r => r.ticker && (r.consensus || r.prior))
+    .map(r => [r.ticker!, r])).values()];
   const parts = await Promise.all(series.map(async r => {
     try {
       const rows = await readRows<Release>('Record', recordQuery(r.ticker!, r.at));
