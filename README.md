@@ -2344,57 +2344,57 @@ per caller says how much room there is. The briefing writes in two turns, the
 draft and the critic: the bound catches a stall in either, and two slow turns
 together are `pace_line`'s to see.
 
-**What she costs, measured.** The week of 2026-09-10 came to **$16.68, about $72 a
-month**:
+**What she costs, measured.** The week to 2026-10-08 came to **$17.52, about $76 a
+month**, on Opus 5 and Sonnet 5. The same tokens at the 5.5 rates come to $13.86,
+about $60:
 
-| | tokens | rate | |
+| | $/wk | share |
+|---|---|---|
+| cache writes | **$11.06** | 63% |
+| output | $2.79 | 16% |
+| fresh input | $1.92 | 11% |
+| cache reads | $1.37 | 8% |
+| web search | $0.35 | 2% |
+
+**The cache is the bill**: every turn that starts cold writes her whole prompt
+again. Per caller:
+
+| caller | turns | $/wk | at 5.5 rates |
 |---|---|---|---|
-| cache writes, 1h | 620,460 | 2× | **$6.20** |
-| cache reads | 6,267,957 | 0.1× | $3.13 |
-| cache writes, 5m | 435,375 | 1.25× | $2.72 |
-| output | 94,956 | $25/M | $2.37 |
-| web search | 123 searches | $10/1,000 | $1.23 |
-| fresh input | 202,653 | $5/M | $1.01 |
+| reply | 18 | **$3.85** | $2.99 |
+| weekday briefing | 5 | $2.69 | $2.04 |
+| release look | 4 | $2.07 | $1.53 |
+| consolidation | 7 | $1.95 | $1.51 |
+| trim | 24 | $1.69 | $1.68 |
+| pulse | 5 | $1.63 | $1.25 |
+| move look | 4 | $1.57 | $1.21 |
+| critic | 6 | $1.27 | $1.02 |
+| trade look | 2 | $0.50 | $0.39 |
+| Sunday briefing | 1 | $0.30 | $0.24 |
 
-**The cache is the bill**: writes are 58% of token spend, search 7%. Per caller:
+**Both tiers are on 5.5** (`claude-opus-5-5`, `claude-sonnet-5-5`): the same
+tiers, Opus a fifth cheaper on input, output and writes, and a cache read down to
+a twentieth of the input rate on both.
 
-| caller | turns | $/wk | model that week |
-|---|---|---|---|
-| release look | 14 | **$5.30** | Sonnet 5 |
-| weekday briefing | 5 | $4.12 | Opus 5 |
-| pulse | 5 | $1.89 | Sonnet 5 |
-| consolidation | 7 | $1.47 | Opus 5 |
-| critic | 6 | $1.35 | Opus 5 |
-| move look | 2 | $1.27 | Sonnet 5 |
-| Sunday briefing | 1 | $0.98 | Opus 5 |
-| reply | 1 | $0.31 | Opus 5 |
-
-**Fourteen release looks cost more than five briefings.** Three callers were moved
-to Sonnet on that table, and the release look then died at `MAX_ROUNDS` twice in
-its first half hour — but `record_actual` had become its tool eighty minutes
+**A cheaper caller that does not answer is not cheaper.** In September three
+callers were moved to Sonnet, and the release look then died at `MAX_ROUNDS` twice
+in its first half hour — but `record_actual` had become its tool eighty minutes
 earlier, and with the model reverted its rounds stayed at seven to ten where they
 had been two or three. The pair is confounded, so it establishes nothing about
 the model. The cause turned up in the first tally: `record_actual×6` in seven
 rounds, every call refused by a filter that wrapped the name in quotes PostgREST
-compared as part of it. What stands is the policy: a cheaper caller that does
-not answer is not cheaper, and a move is one caller at a time with `rounds` read
-afterwards. **Only `trim` runs on Sonnet**: it is handed `CRITIC_TOOLS`, which is
-empty — one request, no loop to run out of. The critic stays on Opus: about $3.50
-a month saved, against the last gate on exactly what he said read badly.
-`MODELS` is keyed on the caller's label, the string `eugenia_runs.caller`
-records, and absent means Opus.
-
-**Both tiers are on 5.5** (`claude-opus-5-5`, `claude-sonnet-5-5`): the same
-tiers, cheaper. The week to 2026-10-08 came to $17.52 on Opus 5 and Sonnet 5, and
-the same tokens at the 5.5 rates to $13.86 — Opus a fifth cheaper on input,
-output and writes, and a cache read down to a twentieth of the input rate on
-both. Writes were 63% of that week, so they are where the saving lands.
+compared as part of it. What stands is the policy: a move is one caller at a time
+with `rounds` read afterwards. **Only `trim` runs on Sonnet**: it is handed
+`CRITIC_TOOLS`, which is empty — one request, no loop to run out of. The critic
+stays on Opus: about $2 a month saved, against the last gate on exactly what he
+said read badly. `MODELS` is keyed on the caller's label, the string
+`eugenia_runs.caller` records, and absent means Opus.
 
 **The cache window is derived from the tool array.** A cache read is a twentieth
 of the input rate; a write is 1.25× at five minutes and **2× at an hour**, so the hour
 pays once about two turns in five arrive inside it, sparing the rewrites the five
-minutes would have paid for. The tool array is where the
-cache key starts, so each tool set is its own prefix — and a week of `wrote_1h`
+minutes would have paid for. The tool array is where the cache key starts, so
+each tool set is its own prefix — and the week of 2026-09-10's `wrote_1h`
 answered *is a second turn likely inside the hour* per array:
 
 | caller | turns | prefixes written | inherited one |
