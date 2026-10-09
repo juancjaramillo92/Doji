@@ -1674,7 +1674,8 @@ to him, was never spoken. He decided it the other way. Seven call sites speak:
 the briefing twice (its speaking worker, and its own fallback), the pulse, the
 release look, the trade event, the move look and the reply. `say()` keeps the
 `/notes` audit (a table, unlistenable), the apologies (failure notices, not her
-words) and the short operational lines.
+words), the short operational lines and the charm's copy, whose voice is on the
+charm.
 
 **The voice note is the message, and the text is the fallback.** Both together
 were two notifications for one thing she said. But an unset key, a refusing
@@ -1750,6 +1751,61 @@ that no split strands it. A test reads the call site.
 
 The vendor's policy requires the listener to know the voice is synthetic. Here
 the listener built the bot; a forwarded note carries no such context.
+
+### The charm — her voice on his keyring
+
+A round screen with a microphone and a speaker: he holds it, talks, lets go,
+and she answers out of it. **It is a door into the same conversation, not a
+second bot.** The charm posts its recording to `doji-eugenia` with
+`x-charm-key: <EUGENIA_CHARM_SECRET>` and plays the response body; nothing
+about it goes near Telegram's Bot API, which has no way to speak to a bot as
+him. The turn is **`converse`**, the reply's own — the same twelve turns, notes,
+map, thesis, loops, calendar and desk, the same model and the same `TRIM` gate —
+so the charm and Telegram are one memory and either can follow up the other.
+His words are stored marked `[voice note]`, which is what they are.
+
+**One request, answered at once.** The response starts before the turn does
+and is the audio itself: the vendor's raw **`pcm` — 24 kHz, 16-bit
+little-endian, mono**. No decoder on the device, and the parts of a long answer
+join end to end where a file format's header would not; `chunk()` splits it at
+`TTS_LIMIT` as for a voice note. **While she thinks, the wire carries silence**:
+a tenth of a second of zeros at once and every fifteen seconds (`BEAT`,
+`BEAT_MS`), because a turn can run for minutes and a response quiet that long is
+closed by a proxy on the way — the shortest such limit known is a hundred
+seconds. Zeros are silence in this format, so the device plays them like
+anything else and its face tells thinking from speaking by the level alone.
+The work is kept past a charm that hangs up, so the copy and the memory still
+land.
+
+**Telegram gets the text as a copy**, his words first — `«what she heard»`, a
+blank line, her answer — so a mishearing shows where he can scroll back. It is
+`say()`, not `sayAloud()`: the voice went to the charm, and a second voice note
+of a thing he has just heard is noise. The pair is stored whether or not the
+copy lands.
+
+**What the charm hears when it goes wrong.** A recording with no words, or a
+transcriber that fails, is answered with its `VOICE_TROUBLE` line, spoken, and
+nothing else happens. A turn that throws is answered with `APOLOGY.reply`, the
+reply's own. A part the speech vendor will not read ends the audio; the copy
+in Telegram is the whole of it. The voice has `SPEAK_MS`, and shares the
+request's wall clock with the turn — a turn that runs to its five minutes
+leaves the voice what is left of four hundred seconds.
+
+**The door refuses before it works**: a wrong key is a 401 like any other; a
+right key without `STT_URL`, `STT_KEY` and `TTS_KEY` is a 503 naming them, since
+it could neither hear nor speak; an empty recording, or one over `FILE_MAX`, is
+a 400. **`EUGENIA_CHARM_SECRET` is optional** — unset, the door is shut, because
+`secretMatches` refuses an empty secret, and nothing else changes.
+
+A laptop stands in for the charm with `sox` and `curl` — record 16 kHz mono
+WAV, post it, play what streams back:
+
+```sh
+rec -r 16000 -c 1 -b 16 ask.wav      # talk, then Ctrl-C
+curl -sN --data-binary @ask.wav -H "x-charm-key: $EUGENIA_CHARM_SECRET" \
+     "https://<project>.supabase.co/functions/v1/doji-eugenia" |
+  play -t raw -r 24000 -e signed -b 16 -c 1 -
+```
 
 ### Whether it landed
 
@@ -2222,6 +2278,7 @@ Three things outside the SQL, none of which fails loudly:
   supabase secrets set STT_MODEL=whisper-1     # optional, the default
   supabase secrets set TTS_KEY=<key>
   supabase secrets set EMBED_KEY=<key>
+  supabase secrets set EUGENIA_CHARM_SECRET=$(openssl rand -hex 32)   # the charm, which needs STT and TTS
   ```
 
 **Two backfills, each a door called by hand.** Semantic search changes nothing
@@ -2787,7 +2844,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
-| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; and Eugenia answering a message, a trade event and the hour before the work, with the work kept |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — silence first, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |

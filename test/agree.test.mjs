@@ -1251,20 +1251,23 @@ const guardClause = (text) => {
 };
 
 /* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, each a decision written down.
-   All are external vendors for one capability: speech-to-text (the Messages
+   Four are external vendors for one capability: speech-to-text (the Messages
    API takes no audio), embeddings (unset, search is full text and trigram),
-   and speech (unset, the text goes). Unlike a missing bot token, one
-   capability is absent and every other path is untouched.
+   and speech (unset, the text goes). The fifth is the charm's door: unset,
+   there is no charm. Unlike a missing bot token, one capability is absent and
+   every other path is untouched.
 
    NOT FREE: each must be guarded where it is USED — a branch that handles its
-   absence rather than an empty string reaching a fetch. That check is below. */
-const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY']);
+   absence rather than an empty string reaching a fetch. A door's own secret is
+   guarded by the door, since secretMatches refuses an empty one and
+   fold.test.mjs holds that. That check is below. */
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY', 'CHARM_SECRET']);
 
 test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {
     for (const { name: secret } of bound(text)) {
       if (!OPTIONAL.has(secret)) continue;
-      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b`),
+      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b|if \\(secretMatches\\(\\w+, ${secret}\\)\\)`),
         `${name} treats ${secret} as optional but never checks it before use — ` +
         `unset, it would reach a request as an empty string rather than taking ` +
         `the branch that says she cannot do that yet`);
@@ -2293,7 +2296,7 @@ test('the supersede write may only retire a note that is still live', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 const reaches = (code, fn) => {
   if (new RegExp(`await\\s+${fn}\\(\\)`).test(code)) return true;
-  // EVERY Promise.all in the body — handleMessage has two. Whitespace-tolerant
+  // EVERY Promise.all in the body — a body can hold two. Whitespace-tolerant
   // around the `=`, since a destructuring long enough to wrap is the same call.
   for (const all of code.matchAll(
     /const \[([^\]]+)\]\s*=\s*await\s+Promise\.all\(\[([\s\S]*?)\]\)/g)) {
@@ -2320,10 +2323,11 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
   /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the six whose prompts build a
      term, so they get the map. `SENDS` is the six that put a message in front of
      him now — the nightly pass writes memory and sends nothing. His notes go to
-     all seven. */
-  const TEACHES = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
+     all seven. A reply is `converse`, the turn every door into the
+     conversation shares. */
+  const TEACHES = ['postBriefing', 'postPulse', 'converse', 'postConsolidation',
                    'postRelease', 'postMove'];
-  const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
+  const SENDS = ['postBriefing', 'postPulse', 'converse', 'postRelease',
                  'postMove', 'postTradeEvent'];
 
   const reads = (fn) => uncomment(body(fn));
@@ -4613,8 +4617,9 @@ test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
      and is silent. Seven sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the pulse, the release look, the trade event,
-     the move look and the reply. `/notes`, the apologies and the short
-     operational lines keep `say` deliberately. */
+     the move look and the reply. `/notes`, the apologies, the short
+     operational lines and the charm's copy keep `say` deliberately — the
+     charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 7,
@@ -4651,9 +4656,13 @@ test('the audio is asked for in the one format Telegram renders as a voice note'
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const body = bodyOf(src, 'async function speak(', 'doji-eugenia no longer has speak()');
 
-  assert.match(body, /response_format: "opus"/,
+  assert.match(body, /await reading\(answer, "opus", signal\)/,
     'the speech request no longer asks for opus — mp3 succeeds and arrives as a ' +
     'file attachment rather than a voice note, silently');
+  assert.match(bodyOf(src, 'function reading(', 'doji-eugenia no longer has reading()'),
+    /response_format: format/,
+    'the speech request no longer sends the format its caller asked for, so ' +
+    'what the voice note asks for is not what the vendor is sent');
   assert.match(body, /type: "audio\/ogg"/,
     'the upload no longer declares audio/ogg, so Telegram has only the filename ' +
     'to go on');
@@ -5738,7 +5747,12 @@ const SENDS = {
   postPulse:      { gate: 'trim',     carries: 'sent' },
   postRelease:    { gate: 'trim',     carries: 'sent' },
   postMove:       { gate: 'trim',     carries: 'sent' },
-  handleMessage:  { gate: 'trim',     carries: 'answer' },
+  handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
+  hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
+                    copy: 'the charm speaks what this returns, through ' +
+                          'charmAudio — the voice goes to his keyring, so ' +
+                          'Telegram is sent the text as its copy, not a ' +
+                          'second voice note of a thing he has just heard' },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +
                          'in a position or has just breached his day — the ' +
@@ -5751,11 +5765,13 @@ const SENDS = {
 };
 
 test('every path that sends him something is in the census', () => {
+  // A path that speaks, or one that takes a turn of conversation — the charm
+  // speaks without sayAloud, and is still a path that sends.
   const fns = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)/gm)]
     .map(m => [m[1], m.index]);
   const sending = fns.filter(([, at]) => {
     const end = EUGENIA_TS.indexOf('\n}\n', at);
-    return /await sayAloud\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
+    return /await sayAloud\(|= await converse\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
   }).map(([name]) => name).sort();
 
   assert.deepEqual(sending, Object.keys(SENDS).sort(),
@@ -5771,20 +5787,38 @@ test('every censused path gates, speaks and stores the same one text', () => {
     const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
 
     if (spec.gate) {
-      assert.match(body, new RegExp(`${spec.carries} = await ${spec.gate}\\(`),
-        `${fn} no longer binds what ${spec.gate}() returned — an ungated ` +
+      /* THROUGH THE SHARED TURN: the gate runs in `converse`, and the path must
+         send what came back from it rather than a draft of its own. */
+      const gated = spec.through ? bodyOf(EUGENIA_TS, `async function ${spec.through}(`) : body;
+      assert.match(gated, new RegExp(`${spec.carries} = await ${spec.gate}\\(`),
+        `${spec.through ?? fn} no longer binds what ${spec.gate}() returned — an ungated ` +
         'message still arrives and still reads correctly, and is simply back ' +
         'to being unchecked');
+      if (spec.through) {
+        assert.match(gated, new RegExp(`return \\{[^}]*\\b${spec.carries}\\b(?!\\s*:)[^}]*\\};`),
+          `${spec.through}() no longer hands back the text its gate returned`);
+        assert.match(body, new RegExp(`\\b${spec.carries}\\b[^=;]*= await ${spec.through}\\(`),
+          `${fn} no longer sends what ${spec.through}() returned, so the gate ` +
+          'it runs checks a message he never receives');
+      }
     } else {
       assert.ok(spec.why, `${fn} is exempt from the gate with no reason written down`);
       assert.doesNotMatch(body, /await (trim|critique)\(/,
         `${fn} is declared exempt from the gate and now runs one`);
     }
 
-    const spoken = body.match(/await sayAloud\([\s\S]*?\);/);
-    assert.ok(spoken, `${fn} no longer speaks at all`);
-    assert.match(spoken[0], new RegExp(`\\b${spec.carries}\\b`),
-      `${fn} speaks something other than the text the census says it carries`);
+    if (spec.copy) {
+      // Spoken by whoever it returns to, and copied to Telegram as text.
+      assert.match(body, new RegExp(`return ${spec.carries};`),
+        `${fn} no longer hands back the text the census says it carries`);
+      assert.match(body, new RegExp(`\\bsay\\([^;]*\\b${spec.carries}\\b`),
+        `${fn} no longer copies to Telegram the text it sends`);
+    } else {
+      const spoken = body.match(/await sayAloud\([\s\S]*?\);/);
+      assert.ok(spoken, `${fn} no longer speaks at all`);
+      assert.match(spoken[0], new RegExp(`\\b${spec.carries}\\b`),
+        `${fn} speaks something other than the text the census says it carries`);
+    }
     if (spec.stored) continue;
     assert.match(body, new RegExp(`role: 'assistant', content: ${spec.carries}\\b`),
       `${fn} stores a text other than the one it sent — her history then holds ` +

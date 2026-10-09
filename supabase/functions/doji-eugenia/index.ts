@@ -1842,6 +1842,24 @@ const SPEAK_WORKER_MS = 330_000;
    refusal gets its second try. */
 const ATTEMPT_MS = 150_000;
 
+/* One reading of her words. How she sounds is this request, whoever is
+   listening; only the format is the listener's. */
+function reading(words: string, format: string, signal: AbortSignal): Promise<Response> {
+  return fetch(TTS_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      // Markdown stripped at the boundary: no parse mode is sent, yet a model
+      // writes a bold label in a list anyway, and an asterisk read aloud is
+      // a gamble.
+      model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
+      input: words.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
+      instructions: TTS_STYLE, response_format: format,
+    }),
+    signal,
+  });
+}
+
 /* Never throws and never messages him: any failure answers false and the text
    goes instead. Its own fetch, sendVoice being multipart. Ogg/opus, because the
    default mp3 works and arrives as a file attachment rather than a voice note,
@@ -1850,19 +1868,7 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
   if (!TTS_KEY) return false;
 
   try {
-    const spoken = await fetch(TTS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        // Markdown stripped at the boundary: no parse mode is sent, yet a model
-        // writes a bold label in a list anyway, and an asterisk read aloud is
-        // a gamble.
-        model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
-        input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
-        instructions: TTS_STYLE, response_format: "opus",
-      }),
-      signal,
-    });
+    const spoken = await reading(answer, "opus", signal);
     if (!spoken.ok) throw new Error(`speech HTTP ${spoken.status}`);
 
     const form = new FormData();
@@ -2728,6 +2734,7 @@ export const APOLOGY: Record<string, string> = {
   move:         "I lost sight of the price for a moment, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
+  reply:        "Something broke on my side, jefe. Try again in a moment.",
 };
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
@@ -3684,6 +3691,44 @@ async function handleFeedback(query: any): Promise<void> {
   }
 }
 
+/* ─── A turn of conversation ───────────────────────────────────────────────
+   What she is handed when he talks to her, the model and the gate — one turn
+   however he reached her, so every door into the conversation reads the same
+   memory, notes, map and desk. What comes back is his turn as it is stored
+   (marked when he was quoting her) and her answer as the gate left it.
+   ───────────────────────────────────────────────────────────────────────── */
+async function converse(text: string, blocks: any[],
+                        quoting: Promise<string | null>): Promise<{ asked: string; answer: string }> {
+  const [history, notes, channels, story, loops, calendar, desk, quoted] = await Promise.all([
+    recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
+    calendarBlock(), positionsBlock(), quoting,
+  ]);
+  // A marker with the opening words is stored, so the nightly pass knows
+  // which message "too long" was about; the quote itself is not.
+  let asked = text;
+  if (quoted !== null) {
+    const words = quoted.trim().split(/\s+/).filter(Boolean);
+    const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
+    asked = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
+  }
+  const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
+  // Told it will be heard, and no length: there is no cap to write for.
+  const aloud =
+    `\n\nYour answer reaches him as a voice note, so write it ` +
+    `to be heard: plain sentences, no headings, and nothing that only works ` +
+    `on a page. Its length is whatever the answer needs.`;
+  const context = asked + about + aloud + notes + channels + story + loops + calendar + desk;
+  const draft = await ask(
+    [...history, {
+      role: 'user',
+      // An image rides beside the text; the context is in the text either way.
+      content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
+    }],
+    'medium', 'reply');
+  const answer = await trim(draft, desk, story);
+  return { asked, answer };
+}
+
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
 
 /* Not answered inside the response: Telegram waits about a minute, then
@@ -3799,36 +3844,11 @@ async function handleMessage(update: any): Promise<void> {
             'Replied-to briefing', spokenQuery(replied.date))) ?? "")
           .catch(() => "");
 
-    let answer: string;
+    let asked: string, answer: string;
     try {
-      const [history, notes, channels, story, loops, calendar, desk, quoted] = await Promise.all([
-        recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
-        calendarBlock(), positionsBlock(), quoting,
-      ]);
-      // A marker with the opening words is stored, so the nightly pass knows
-      // which message "too long" was about; the quote itself is not.
-      if (quoted !== null) {
-        const words = quoted.trim().split(/\s+/).filter(Boolean);
-        const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
-        text = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
-      }
-      const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
-      // Told it will be heard, and no length: there is no cap to write for.
-      const aloud =
-        `\n\nYour answer reaches him as a voice note, so write it ` +
-        `to be heard: plain sentences, no headings, and nothing that only works ` +
-        `on a page. Its length is whatever the answer needs.`;
-      const context = text + about + aloud + notes + channels + story + loops + calendar + desk;
-      const draft = await ask(
-        [...history, {
-          role: 'user',
-          // An image rides beside the text; the context is in the text either way.
-          content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
-        }],
-        'medium', 'reply');
       // Gated while the indicator still runs, or three silent seconds read as
       // her finishing and saying nothing.
-      answer = await trim(draft, desk, story);
+      ({ asked, answer } = await converse(text, blocks, quoting));
     } finally {
       // Stopped before sending, or a ping lands after the message.
       clearInterval(keepTyping);
@@ -3837,12 +3857,10 @@ async function handleMessage(update: any): Promise<void> {
     // Sent before the write: the message is what he is waiting on.
     await sayAloud(answer);
     // The text, never the blocks or the audio: a megabyte resent as history.
-    await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
+    await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", why(err));
-    await tg("sendMessage",
-      { chat_id: CHAT_ID, text: "Something broke on my side, jefe. Try again in a moment." })
-      .catch(() => {});
+    await tg("sendMessage", { chat_id: CHAT_ID, text: APOLOGY.reply }).catch(() => {});
   }
 }
 
@@ -3861,10 +3879,71 @@ function background(work: Promise<unknown>) {
   waitUntil.call((globalThis as any).EdgeRuntime, guarded);
 }
 
+/* ─── The charm half: he spoke to the charm ────────────────────────────────
+   A round screen on his keyring with a microphone and a speaker. He holds it,
+   talks and lets go; it posts the recording here and plays what comes back,
+   all on one request. The turn is converse, the reply's own, so the charm and
+   Telegram are one conversation with one memory. Telegram gets the text as a
+   copy, his words first, so a mishearing shows where he can scroll back.
+   ───────────────────────────────────────────────────────────────────────── */
+const CHARM_SECRET = env("EUGENIA_CHARM_SECRET");
+
+/* Never throws: whatever happens, the charm has something to say. The copy
+   and the write go after the charm has her words, which are what he is
+   waiting on, and the pair is stored whether or not the copy lands. */
+async function hearCharm(bytes: Uint8Array): Promise<string> {
+  const heard = await transcribe(bytes, "charm.wav", "audio/wav");
+  if ('trouble' in heard) return VOICE_TROUBLE[heard.trouble];
+  try {
+    const { asked, answer } = await converse(`[voice note] ${heard.said}`, [], Promise.resolve(null));
+    background(say(`«${heard.said}»\n\n${answer}`));
+    background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
+    return answer;
+  } catch (err) {
+    console.error("doji-eugenia:", why(err));
+    return APOLOGY.reply;
+  }
+}
+
+/* What the charm plays is the vendor's raw `pcm`: 24 kHz, 16-bit little-endian,
+   mono. It needs no decoder on the device, and the parts of a long answer join
+   end to end, where each part of a file format would carry its own header. */
+const BEAT = new Uint8Array(4_800);
+const BEAT_MS = 15_000;
+
+/* Silence while she thinks: a tenth of a second of zeros every BEAT_MS, from
+   the first instant. A turn can run for minutes, and a response with nothing
+   on the wire that long is closed by a proxy between here and the charm —
+   which one has never been measured, so the beat sits well inside the
+   shortest such limit known, a hundred seconds. Zeros are silence in this
+   format, so the charm plays them like anything else, and its face can tell
+   thinking from speaking by the level alone. A part the vendor will not read
+   ends the audio; the copy in Telegram is the whole of it. */
+async function* charmAudio(words: Promise<string>): AsyncGenerator<Uint8Array> {
+  let said: string | null = null;
+  while (said === null) {
+    yield BEAT;
+    let beat = 0;
+    said = await Promise.race([words, new Promise<null>(r => { beat = setTimeout(r, BEAT_MS, null); })]);
+    clearTimeout(beat);
+  }
+  const signal = AbortSignal.timeout(SPEAK_MS);
+  try {
+    for (const part of chunk(said, TTS_LIMIT)) {
+      const spoken = await reading(part, "pcm", signal);
+      if (!spoken.ok || !spoken.body) throw new Error(`speech HTTP ${spoken.status}`);
+      yield* spoken.body;
+    }
+  } catch (err) {
+    console.error("doji-eugenia: the charm could not speak —", why(err));
+  }
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromCron     = req.headers.get("x-doji-key");
+  const fromCharm    = req.headers.get("x-charm-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !ANTHROPIC_KEY || !SB_KEY) {
     console.error("doji-eugenia: a required secret is not set — refusing all requests");
@@ -3904,6 +3983,23 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }
       background(postScheduled(url));
       return json({ ok: true, accepted: url.search.slice(1) || "hourly" });
+    }
+    if (secretMatches(fromCharm, CHARM_SECRET)) {
+      // Without both vendors it can neither hear nor speak, said at the door
+      // rather than as silence.
+      if (!STT_URL || !STT_KEY || !TTS_KEY) {
+        return json({ ok: false, error: "the charm needs STT_URL, STT_KEY and TTS_KEY" }, 503);
+      }
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      if (!bytes.length || bytes.length > FILE_MAX) {
+        return json({ ok: false, error: `a recording, up to ${FILE_MAX} bytes` }, 400);
+      }
+      // Answered at once, the audio following as it exists. The turn is kept
+      // alive past a charm that hangs up, so the copy and the memory still land.
+      const words = hearCharm(bytes);
+      background(words);
+      return new Response(ReadableStream.from(charmAudio(words)),
+                          { headers: { "Content-Type": "audio/pcm" } });
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {

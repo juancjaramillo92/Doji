@@ -23,6 +23,8 @@ const ENV = {
   GLADYS_BOT_TOKEN: 'gladys', GLADYS_WEBHOOK_SECRET: 'gladys-hook',
   EUGENIA_BOT_TOKEN: 'eugenia', EUGENIA_WEBHOOK_SECRET: 'eugenia-hook',
   ANTHROPIC_API_KEY: 'sk-ant-test', CTRADER_MCP_TOKEN: 'ctrader',
+  EUGENIA_CHARM_SECRET: 'charm', STT_URL: 'https://stt.test/v1/audio/transcriptions',
+  STT_KEY: 'stt', TTS_KEY: 'tts',
 };
 
 let env = ENV;
@@ -261,4 +263,93 @@ test('doji-eugenia: a message, a trade event and the hour each answer first and 
     for (const reject of hung) reject(new Error('test over'));
     await Promise.all(all);
   }
+});
+
+/* ─── The charm: one request, answered at once, her voice after it ─────────
+   Through the real door and the real turn — the transcription, the reads, the
+   model, the gate, the speech, the copy and the write — each answered by URL,
+   and what comes back read to its end. */
+
+const PCM = [1, 2, 3, 4];
+const charmTurn = (said, answer) => (url, init) => {
+  if (url.startsWith('https://stt.test/')) return ok({ text: said });
+  if (url.startsWith('https://api.anthropic.com/')) {
+    return ok({ model: JSON.parse(init.body).model, stop_reason: 'end_turn',
+                usage: { input_tokens: 10, output_tokens: 5 },
+                content: [{ type: 'text', text: answer }] });
+  }
+  if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
+  if (url.startsWith('https://api.telegram.org/')) return ok({ ok: true });
+  if (url.startsWith('https://db.test/rest/v1/')) return ok([]);
+  return Promise.reject(new Error(`the charm asked something unexpected: ${url}`));
+};
+const charm = (body) => request('doji-eugenia', { header: 'x-charm-key', key: 'charm', body });
+const bodies = (part) => calls.filter(c => c.url.includes(part)).map(c => JSON.parse(c.body));
+
+test('doji-eugenia: the charm is answered at once, hears her answer, and Telegram gets the copy', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('how is gold doing', 'Gold is holding 4,410.');
+  const res = await serve(charm(new Uint8Array(64)));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'audio/pcm');
+  assert.equal(kept.length, 1, 'the turn was not handed to EdgeRuntime.waitUntil, so a charm that hangs up kills it');
+
+  const played = [...new Uint8Array(await res.arrayBuffer())];
+  await Promise.all(kept);
+  assert.ok(played.length > PCM.length, 'nothing was on the wire while she thought');
+  assert.ok(played.slice(0, -PCM.length).every(b => b === 0),
+    'what played before her answer was not silence');
+  assert.deepEqual(played.slice(-PCM.length), PCM, 'her answer is not what the charm played');
+
+  assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]),
+    [['Gold is holding 4,410.', 'pcm']],
+    'the charm was read something other than the gated answer, or in a format it cannot play');
+  assert.deepEqual(bodies('/sendMessage').map(b => b.text), ['«how is gold doing»\n\nGold is holding 4,410.'],
+    'Telegram did not get the copy, his words first');
+  assert.deepEqual(calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns')).map(c => JSON.parse(c.body)),
+    [[{ role: 'user', content: '[voice note] how is gold doing' },
+      { role: 'assistant', content: 'Gold is holding 4,410.' }]],
+    'the exchange was not stored as one conversation with Telegram');
+});
+
+test('doji-eugenia: a long answer reaches the charm whole, every part in order', async () => {
+  // Two paragraphs past the vendor's input limit together: two readings, joined.
+  const long = `${'Gold held. '.repeat(250).trim()}\n\n${'Then it gave way. '.repeat(150).trim()}`;
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('tell me everything', long);
+  const played = [...new Uint8Array(await (await serve(charm(new Uint8Array(64)))).arrayBuffer())];
+  await Promise.all(kept);
+  const read = bodies('/audio/speech').map(b => b.input);
+  assert.equal(read.length, 2, `the answer was read in ${read.length} parts`);
+  assert.equal(read.join('\n\n'), long, 'what was read is not the whole answer, in order');
+  assert.deepEqual(played.slice(-2 * PCM.length), [...PCM, ...PCM], 'the charm did not play every part');
+});
+
+test('doji-eugenia: a recording with no words is answered on the charm, and nothing else happens', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('', 'never asked');
+  const res = await serve(charm(new Uint8Array(64)));
+  await res.arrayBuffer();
+  await Promise.all(kept);
+  assert.match(bodies('/audio/speech')[0]?.input ?? '', /could not make out any words/,
+    'the charm was not told it could not be heard');
+  for (const asked of ['api.anthropic.com', 'api.telegram.org', 'eugenia_turns']) {
+    assert.ok(!calls.some(c => c.url.includes(asked)), `a recording with no words reached ${asked}`);
+  }
+});
+
+test('doji-eugenia: the charm is refused at the door without its vendors or a recording', async () => {
+  for (const unset of ['STT_URL', 'STT_KEY', 'TTS_KEY']) {
+    calls.length = 0;
+    const serve = await serving('doji-eugenia', [unset]);
+    const res = await answer(await serve(charm(new Uint8Array(64))));
+    assert.equal(res.status, 503, `the charm was let in with ${unset} unset`);
+    assert.deepEqual(calls, [], `the charm made a request with ${unset} unset`);
+  }
+  const serve = await serving('doji-eugenia');
+  calls.length = 0;
+  assert.equal((await serve(charm(new Uint8Array(0)))).status, 400, 'an empty recording was let in');
+  assert.deepEqual(calls, [], 'an empty recording made a request');
+  assert.equal((await serve(request('doji-eugenia', { header: 'x-charm-key', key: 'wrong', body: 'x' }))).status,
+    401, 'the charm door admitted a wrong key');
 });
