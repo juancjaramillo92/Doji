@@ -1842,6 +1842,24 @@ const SPEAK_WORKER_MS = 330_000;
    refusal gets its second try. */
 const ATTEMPT_MS = 150_000;
 
+/* One reading of her words. How she sounds is this request, whoever is
+   listening; only the format is the listener's. */
+function reading(words: string, format: string, signal: AbortSignal): Promise<Response> {
+  return fetch(TTS_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      // Markdown stripped at the boundary: no parse mode is sent, yet a model
+      // writes a bold label in a list anyway, and an asterisk read aloud is
+      // a gamble.
+      model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
+      input: words.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
+      instructions: TTS_STYLE, response_format: format,
+    }),
+    signal,
+  });
+}
+
 /* Never throws and never messages him: any failure answers false and the text
    goes instead. Its own fetch, sendVoice being multipart. Ogg/opus, because the
    default mp3 works and arrives as a file attachment rather than a voice note,
@@ -1850,19 +1868,7 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
   if (!TTS_KEY) return false;
 
   try {
-    const spoken = await fetch(TTS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${TTS_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        // Markdown stripped at the boundary: no parse mode is sent, yet a model
-        // writes a bold label in a list anyway, and an asterisk read aloud is
-        // a gamble.
-        model: TTS_MODEL, voice: TTS_VOICE, speed: TTS_SPEED,
-        input: answer.replace(/\*\*|__|\*|_/g, '').replace(/^[·•]\s*/gm, ''),
-        instructions: TTS_STYLE, response_format: "opus",
-      }),
-      signal,
-    });
+    const spoken = await reading(answer, "opus", signal);
     if (!spoken.ok) throw new Error(`speech HTTP ${spoken.status}`);
 
     const form = new FormData();
@@ -3684,6 +3690,44 @@ async function handleFeedback(query: any): Promise<void> {
   }
 }
 
+/* ─── A turn of conversation ───────────────────────────────────────────────
+   What she is handed when he talks to her, the model and the gate — one turn
+   however he reached her, so every door into the conversation reads the same
+   memory, notes, map and desk. What comes back is his turn as it is stored
+   (marked when he was quoting her) and her answer as the gate left it.
+   ───────────────────────────────────────────────────────────────────────── */
+async function converse(text: string, blocks: any[],
+                        quoting: Promise<string | null>): Promise<{ asked: string; answer: string }> {
+  const [history, notes, channels, story, loops, calendar, desk, quoted] = await Promise.all([
+    recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
+    calendarBlock(), positionsBlock(), quoting,
+  ]);
+  // A marker with the opening words is stored, so the nightly pass knows
+  // which message "too long" was about; the quote itself is not.
+  let asked = text;
+  if (quoted !== null) {
+    const words = quoted.trim().split(/\s+/).filter(Boolean);
+    const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
+    asked = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
+  }
+  const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
+  // Told it will be heard, and no length: there is no cap to write for.
+  const aloud =
+    `\n\nYour answer reaches him as a voice note, so write it ` +
+    `to be heard: plain sentences, no headings, and nothing that only works ` +
+    `on a page. Its length is whatever the answer needs.`;
+  const context = asked + about + aloud + notes + channels + story + loops + calendar + desk;
+  const draft = await ask(
+    [...history, {
+      role: 'user',
+      // An image rides beside the text; the context is in the text either way.
+      content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
+    }],
+    'medium', 'reply');
+  const answer = await trim(draft, desk, story);
+  return { asked, answer };
+}
+
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
 
 /* Not answered inside the response: Telegram waits about a minute, then
@@ -3799,36 +3843,11 @@ async function handleMessage(update: any): Promise<void> {
             'Replied-to briefing', spokenQuery(replied.date))) ?? "")
           .catch(() => "");
 
-    let answer: string;
+    let asked: string, answer: string;
     try {
-      const [history, notes, channels, story, loops, calendar, desk, quoted] = await Promise.all([
-        recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
-        calendarBlock(), positionsBlock(), quoting,
-      ]);
-      // A marker with the opening words is stored, so the nightly pass knows
-      // which message "too long" was about; the quote itself is not.
-      if (quoted !== null) {
-        const words = quoted.trim().split(/\s+/).filter(Boolean);
-        const opening = words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
-        text = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
-      }
-      const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
-      // Told it will be heard, and no length: there is no cap to write for.
-      const aloud =
-        `\n\nYour answer reaches him as a voice note, so write it ` +
-        `to be heard: plain sentences, no headings, and nothing that only works ` +
-        `on a page. Its length is whatever the answer needs.`;
-      const context = text + about + aloud + notes + channels + story + loops + calendar + desk;
-      const draft = await ask(
-        [...history, {
-          role: 'user',
-          // An image rides beside the text; the context is in the text either way.
-          content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
-        }],
-        'medium', 'reply');
       // Gated while the indicator still runs, or three silent seconds read as
       // her finishing and saying nothing.
-      answer = await trim(draft, desk, story);
+      ({ asked, answer } = await converse(text, blocks, quoting));
     } finally {
       // Stopped before sending, or a ping lands after the message.
       clearInterval(keepTyping);
@@ -3837,7 +3856,7 @@ async function handleMessage(update: any): Promise<void> {
     // Sent before the write: the message is what he is waiting on.
     await sayAloud(answer);
     // The text, never the blocks or the audio: a megabyte resent as history.
-    await remember([{ role: 'user', content: text }, { role: 'assistant', content: answer }]);
+    await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", why(err));
     await tg("sendMessage",

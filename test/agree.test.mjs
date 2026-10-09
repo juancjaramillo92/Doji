@@ -2293,7 +2293,7 @@ test('the supersede write may only retire a note that is still live', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 const reaches = (code, fn) => {
   if (new RegExp(`await\\s+${fn}\\(\\)`).test(code)) return true;
-  // EVERY Promise.all in the body — handleMessage has two. Whitespace-tolerant
+  // EVERY Promise.all in the body — a body can hold two. Whitespace-tolerant
   // around the `=`, since a destructuring long enough to wrap is the same call.
   for (const all of code.matchAll(
     /const \[([^\]]+)\]\s*=\s*await\s+Promise\.all\(\[([\s\S]*?)\]\)/g)) {
@@ -2320,10 +2320,11 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
   /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the six whose prompts build a
      term, so they get the map. `SENDS` is the six that put a message in front of
      him now — the nightly pass writes memory and sends nothing. His notes go to
-     all seven. */
-  const TEACHES = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
+     all seven. A reply is `converse`, the turn every door into the
+     conversation shares. */
+  const TEACHES = ['postBriefing', 'postPulse', 'converse', 'postConsolidation',
                    'postRelease', 'postMove'];
-  const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
+  const SENDS = ['postBriefing', 'postPulse', 'converse', 'postRelease',
                  'postMove', 'postTradeEvent'];
 
   const reads = (fn) => uncomment(body(fn));
@@ -4651,9 +4652,13 @@ test('the audio is asked for in the one format Telegram renders as a voice note'
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const body = bodyOf(src, 'async function speak(', 'doji-eugenia no longer has speak()');
 
-  assert.match(body, /response_format: "opus"/,
+  assert.match(body, /await reading\(answer, "opus", signal\)/,
     'the speech request no longer asks for opus — mp3 succeeds and arrives as a ' +
     'file attachment rather than a voice note, silently');
+  assert.match(bodyOf(src, 'function reading(', 'doji-eugenia no longer has reading()'),
+    /response_format: format/,
+    'the speech request no longer sends the format its caller asked for, so ' +
+    'what the voice note asks for is not what the vendor is sent');
   assert.match(body, /type: "audio\/ogg"/,
     'the upload no longer declares audio/ogg, so Telegram has only the filename ' +
     'to go on');
@@ -5738,7 +5743,7 @@ const SENDS = {
   postPulse:      { gate: 'trim',     carries: 'sent' },
   postRelease:    { gate: 'trim',     carries: 'sent' },
   postMove:       { gate: 'trim',     carries: 'sent' },
-  handleMessage:  { gate: 'trim',     carries: 'answer' },
+  handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +
                          'in a position or has just breached his day — the ' +
@@ -5771,10 +5776,20 @@ test('every censused path gates, speaks and stores the same one text', () => {
     const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
 
     if (spec.gate) {
-      assert.match(body, new RegExp(`${spec.carries} = await ${spec.gate}\\(`),
-        `${fn} no longer binds what ${spec.gate}() returned — an ungated ` +
+      /* THROUGH THE SHARED TURN: the gate runs in `converse`, and the path must
+         send what came back from it rather than a draft of its own. */
+      const gated = spec.through ? bodyOf(EUGENIA_TS, `async function ${spec.through}(`) : body;
+      assert.match(gated, new RegExp(`${spec.carries} = await ${spec.gate}\\(`),
+        `${spec.through ?? fn} no longer binds what ${spec.gate}() returned — an ungated ` +
         'message still arrives and still reads correctly, and is simply back ' +
         'to being unchecked');
+      if (spec.through) {
+        assert.match(gated, new RegExp(`return \\{[^}]*\\b${spec.carries}\\b(?!\\s*:)[^}]*\\};`),
+          `${spec.through}() no longer hands back the text its gate returned`);
+        assert.match(body, new RegExp(`\\b${spec.carries}\\b[^=;]*= await ${spec.through}\\(`),
+          `${fn} no longer sends what ${spec.through}() returned, so the gate ` +
+          'it runs checks a message he never receives');
+      }
     } else {
       assert.ok(spec.why, `${fn} is exempt from the gate with no reason written down`);
       assert.doesNotMatch(body, /await (trim|critique)\(/,
