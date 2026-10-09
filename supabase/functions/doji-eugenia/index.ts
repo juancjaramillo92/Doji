@@ -2734,6 +2734,7 @@ export const APOLOGY: Record<string, string> = {
   move:         "I lost sight of the price for a moment, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
+  reply:        "Something broke on my side, jefe. Try again in a moment.",
 };
 
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
@@ -3859,9 +3860,7 @@ async function handleMessage(update: any): Promise<void> {
     await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]);
   } catch (err) {
     console.error("doji-eugenia:", why(err));
-    await tg("sendMessage",
-      { chat_id: CHAT_ID, text: "Something broke on my side, jefe. Try again in a moment." })
-      .catch(() => {});
+    await tg("sendMessage", { chat_id: CHAT_ID, text: APOLOGY.reply }).catch(() => {});
   }
 }
 
@@ -3880,10 +3879,71 @@ function background(work: Promise<unknown>) {
   waitUntil.call((globalThis as any).EdgeRuntime, guarded);
 }
 
+/* ─── The charm half: he spoke to the charm ────────────────────────────────
+   A round screen on his keyring with a microphone and a speaker. He holds it,
+   talks and lets go; it posts the recording here and plays what comes back,
+   all on one request. The turn is converse, the reply's own, so the charm and
+   Telegram are one conversation with one memory. Telegram gets the text as a
+   copy, his words first, so a mishearing shows where he can scroll back.
+   ───────────────────────────────────────────────────────────────────────── */
+const CHARM_SECRET = env("EUGENIA_CHARM_SECRET");
+
+/* Never throws: whatever happens, the charm has something to say. The copy
+   and the write go after the charm has her words, which are what he is
+   waiting on, and the pair is stored whether or not the copy lands. */
+async function hearCharm(bytes: Uint8Array): Promise<string> {
+  const heard = await transcribe(bytes, "charm.wav", "audio/wav");
+  if ('trouble' in heard) return VOICE_TROUBLE[heard.trouble];
+  try {
+    const { asked, answer } = await converse(`[voice note] ${heard.said}`, [], Promise.resolve(null));
+    background(say(`«${heard.said}»\n\n${answer}`));
+    background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
+    return answer;
+  } catch (err) {
+    console.error("doji-eugenia:", why(err));
+    return APOLOGY.reply;
+  }
+}
+
+/* What the charm plays is the vendor's raw `pcm`: 24 kHz, 16-bit little-endian,
+   mono. It needs no decoder on the device, and the parts of a long answer join
+   end to end, where each part of a file format would carry its own header. */
+const BEAT = new Uint8Array(4_800);
+const BEAT_MS = 15_000;
+
+/* Silence while she thinks: a tenth of a second of zeros every BEAT_MS, from
+   the first instant. A turn can run for minutes, and a response with nothing
+   on the wire that long is closed by a proxy between here and the charm —
+   which one has never been measured, so the beat sits well inside the
+   shortest such limit known, a hundred seconds. Zeros are silence in this
+   format, so the charm plays them like anything else, and its face can tell
+   thinking from speaking by the level alone. A part the vendor will not read
+   ends the audio; the copy in Telegram is the whole of it. */
+async function* charmAudio(words: Promise<string>): AsyncGenerator<Uint8Array> {
+  let said: string | null = null;
+  while (said === null) {
+    yield BEAT;
+    let beat = 0;
+    said = await Promise.race([words, new Promise<null>(r => { beat = setTimeout(r, BEAT_MS, null); })]);
+    clearTimeout(beat);
+  }
+  const signal = AbortSignal.timeout(SPEAK_MS);
+  try {
+    for (const part of chunk(said, TTS_LIMIT)) {
+      const spoken = await reading(part, "pcm", signal);
+      if (!spoken.ok || !spoken.body) throw new Error(`speech HTTP ${spoken.status}`);
+      yield* spoken.body;
+    }
+  } catch (err) {
+    console.error("doji-eugenia: the charm could not speak —", why(err));
+  }
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromCron     = req.headers.get("x-doji-key");
+  const fromCharm    = req.headers.get("x-charm-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !ANTHROPIC_KEY || !SB_KEY) {
     console.error("doji-eugenia: a required secret is not set — refusing all requests");
@@ -3923,6 +3983,23 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }
       background(postScheduled(url));
       return json({ ok: true, accepted: url.search.slice(1) || "hourly" });
+    }
+    if (secretMatches(fromCharm, CHARM_SECRET)) {
+      // Without both vendors it can neither hear nor speak, said at the door
+      // rather than as silence.
+      if (!STT_URL || !STT_KEY || !TTS_KEY) {
+        return json({ ok: false, error: "the charm needs STT_URL, STT_KEY and TTS_KEY" }, 503);
+      }
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      if (!bytes.length || bytes.length > FILE_MAX) {
+        return json({ ok: false, error: `a recording, up to ${FILE_MAX} bytes` }, 400);
+      }
+      // Answered at once, the audio following as it exists. The turn is kept
+      // alive past a charm that hangs up, so the copy and the memory still land.
+      const words = hearCharm(bytes);
+      background(words);
+      return new Response(ReadableStream.from(charmAudio(words)),
+                          { headers: { "Content-Type": "audio/pcm" } });
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {

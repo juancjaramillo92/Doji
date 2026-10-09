@@ -1251,20 +1251,23 @@ const guardClause = (text) => {
 };
 
 /* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, each a decision written down.
-   All are external vendors for one capability: speech-to-text (the Messages
+   Four are external vendors for one capability: speech-to-text (the Messages
    API takes no audio), embeddings (unset, search is full text and trigram),
-   and speech (unset, the text goes). Unlike a missing bot token, one
-   capability is absent and every other path is untouched.
+   and speech (unset, the text goes). The fifth is the charm's door: unset,
+   there is no charm. Unlike a missing bot token, one capability is absent and
+   every other path is untouched.
 
    NOT FREE: each must be guarded where it is USED — a branch that handles its
-   absence rather than an empty string reaching a fetch. That check is below. */
-const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY']);
+   absence rather than an empty string reaching a fetch. A door's own secret is
+   guarded by the door, since secretMatches refuses an empty one and
+   fold.test.mjs holds that. That check is below. */
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY', 'CHARM_SECRET']);
 
 test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {
     for (const { name: secret } of bound(text)) {
       if (!OPTIONAL.has(secret)) continue;
-      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b`),
+      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b|if \\(secretMatches\\(\\w+, ${secret}\\)\\)`),
         `${name} treats ${secret} as optional but never checks it before use — ` +
         `unset, it would reach a request as an empty string rather than taking ` +
         `the branch that says she cannot do that yet`);
@@ -4614,8 +4617,9 @@ test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
      and is silent. Seven sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the pulse, the release look, the trade event,
-     the move look and the reply. `/notes`, the apologies and the short
-     operational lines keep `say` deliberately. */
+     the move look and the reply. `/notes`, the apologies, the short
+     operational lines and the charm's copy keep `say` deliberately — the
+     charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 7,
@@ -5744,6 +5748,11 @@ const SENDS = {
   postRelease:    { gate: 'trim',     carries: 'sent' },
   postMove:       { gate: 'trim',     carries: 'sent' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
+  hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
+                    copy: 'the charm speaks what this returns, through ' +
+                          'charmAudio — the voice goes to his keyring, so ' +
+                          'Telegram is sent the text as its copy, not a ' +
+                          'second voice note of a thing he has just heard' },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +
                          'in a position or has just breached his day — the ' +
@@ -5756,11 +5765,13 @@ const SENDS = {
 };
 
 test('every path that sends him something is in the census', () => {
+  // A path that speaks, or one that takes a turn of conversation — the charm
+  // speaks without sayAloud, and is still a path that sends.
   const fns = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)/gm)]
     .map(m => [m[1], m.index]);
   const sending = fns.filter(([, at]) => {
     const end = EUGENIA_TS.indexOf('\n}\n', at);
-    return /await sayAloud\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
+    return /await sayAloud\(|= await converse\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
   }).map(([name]) => name).sort();
 
   assert.deepEqual(sending, Object.keys(SENDS).sort(),
@@ -5796,10 +5807,18 @@ test('every censused path gates, speaks and stores the same one text', () => {
         `${fn} is declared exempt from the gate and now runs one`);
     }
 
-    const spoken = body.match(/await sayAloud\([\s\S]*?\);/);
-    assert.ok(spoken, `${fn} no longer speaks at all`);
-    assert.match(spoken[0], new RegExp(`\\b${spec.carries}\\b`),
-      `${fn} speaks something other than the text the census says it carries`);
+    if (spec.copy) {
+      // Spoken by whoever it returns to, and copied to Telegram as text.
+      assert.match(body, new RegExp(`return ${spec.carries};`),
+        `${fn} no longer hands back the text the census says it carries`);
+      assert.match(body, new RegExp(`\\bsay\\([^;]*\\b${spec.carries}\\b`),
+        `${fn} no longer copies to Telegram the text it sends`);
+    } else {
+      const spoken = body.match(/await sayAloud\([\s\S]*?\);/);
+      assert.ok(spoken, `${fn} no longer speaks at all`);
+      assert.match(spoken[0], new RegExp(`\\b${spec.carries}\\b`),
+        `${fn} speaks something other than the text the census says it carries`);
+    }
     if (spec.stored) continue;
     assert.match(body, new RegExp(`role: 'assistant', content: ${spec.carries}\\b`),
       `${fn} stores a text other than the one it sent — her history then holds ` +
