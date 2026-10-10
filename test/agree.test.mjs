@@ -2736,7 +2736,7 @@ test('the test count the instructions state is the count the suite runs', () => 
   assert.equal(Number(stated[1]), total,
     `CLAUDE.md says ${stated[1]} tests and the suite runs ${total}`);
 
-  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
   assert.equal(stated[2], WORDS[files.length],
     `CLAUDE.md says ${stated[2]} suites and test/ holds ${files.length} — the ` +
     `script globs one level, so a fifth suite is either running unmentioned or ` +
