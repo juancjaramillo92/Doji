@@ -33,6 +33,7 @@
 #include "lvgl.h"
 #include "lwip/sockets.h"
 #include "net.h"
+#include "palette.h"
 
 static const char *TAG = "setup";
 
@@ -113,11 +114,11 @@ static void build_screen(void) {
     lv_qrcode_set_light_color(qr, lv_color_white());
     lv_qrcode_update(qr, wifi, strlen(wifi));
     lv_obj_center(qr);
-    text(screens[SHOW_CODE], ap_name, 0x9a92b0, 340);
+    text(screens[SHOW_CODE], ap_name, MUTED, 340);
 
     screens[SHOW_JOINED] = group();
-    text(screens[SHOW_JOINED], SAY[0], 0xe8e6f0, 204);
-    text(screens[SHOW_JOINED], SAY[1], 0x9a92b0, 238);
+    text(screens[SHOW_JOINED], SAY[0], INK, 204);
+    text(screens[SHOW_JOINED], SAY[1], MUTED, 238);
 
     screens[SHOW_BUSY] = group();
     lv_obj_t *s = lv_spinner_create(screens[SHOW_BUSY]);
@@ -127,13 +128,13 @@ static void build_screen(void) {
     lv_obj_set_style_arc_width(s, 6, LV_PART_MAIN);
     lv_obj_set_style_arc_color(s, lv_color_hex(0x1a1528), LV_PART_MAIN);
     lv_obj_set_style_arc_width(s, 6, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(s, lv_color_hex(0xb45cd9), LV_PART_INDICATOR);
-    busy = text(screens[SHOW_BUSY], SAY[2], 0xe8e6f0, 270);
+    lv_obj_set_style_arc_color(s, lv_color_hex(GLOW), LV_PART_INDICATOR);
+    busy = text(screens[SHOW_BUSY], SAY[2], INK, 270);
 
     // A tick in two strokes and a cross, each with its box centred on (233, 233).
     static const lv_point_precise_t ticked[] = { { 203, 237 }, { 223, 257 }, { 263, 209 } };
     static const lv_point_precise_t crossed[] = { { 209, 209 }, { 257, 257 }, { 233, 233 }, { 257, 209 }, { 209, 257 } };
-    screens[SHOW_TICK] = mark(ticked, 3, 0xb45cd9);
+    screens[SHOW_TICK] = mark(ticked, 3, GLOW);
     screens[SHOW_CROSS] = mark(crossed, 5, 0xf3a2e4);
     bsp_display_unlock();
 }
@@ -338,12 +339,6 @@ static esp_err_t api_wifi(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// Online on a saved network, if she is not already.
-static bool get_online(void) {
-    for (int i = 0; i < cfg.n_nets && !online; i++) join(cfg.nets[i].ssid, cfg.nets[i].pass);
-    return online;
-}
-
 /* A key is right when its door lets it in. Eugenia's is asked with an empty
    recording, which a right key is refused with a 400 for, and which costs
    nothing; Gladys's is asked what waits. A 503 is a right key at a door short
@@ -354,7 +349,9 @@ static esp_err_t api_key(httpd_req_t *req) {
         return reply(req, "{\"ok\":false,\"why\":\"refused\"}");
     bool eugenia = !strcmp(who, "eugenia");
     show(SHOW_BUSY, SAY[3]);
-    if (!get_online()) {
+    // Online on a saved network, if she is not already.
+    for (int i = 0; i < cfg.n_nets && !online; i++) join(cfg.nets[i].ssid, cfg.nets[i].pass);
+    if (!online) {
         show(SHOW_JOINED, NULL);
         return reply(req, "{\"ok\":false,\"why\":\"offline\"}");
     }

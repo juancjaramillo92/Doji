@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "lvgl.h"
+#include "palette.h"
 
 LV_FONT_DECLARE(hanken_64);
 LV_FONT_DECLARE(hanken_16);
@@ -20,22 +21,15 @@ LV_FONT_DECLARE(hanken_16);
 static const char *const WORDS[4] = { "SETUP", "RULES", "SL", "TP" };
 static const char *const SHORT[2] = { "B&R", "S&R" };
 
-// Doji's palette.
-#define INK      0xe8e6f0
-#define MUTED    0x9a92b0
-#define ACCENT   0x8b35b8
-#define GROUND   0x0a0813
-#define LINE     0x251d39
-
 /* The halves, in Doji's purples rather than a win's green and a loss's red:
    no is the cool blue-violet on the left, yes the warm magenta on the right,
    each a gradient, top to bottom, that brightens when tapped. The setup's two
    halves share one. As the playground ("Your charm") has them. */
 static const uint32_t HALVES[3][2][2] = {
     //            resting               lit
-    /* setup */ { { 0x16123a, 0x221a4e }, { 0x5c40b0, 0xb45cd9 } },
-    /* no    */ { { 0x120f33, 0x1d1a4a }, { 0x3a3aa8, 0x6a4fd0 } },
-    /* yes   */ { { 0x22103a, 0x34184f }, { 0x8b35b8, 0xd26ce6 } },
+    /* setup */ { { 0x16123a, 0x221a4e }, { DEEP,     GLOW     } },
+    /* no    */ { { 0x120f33, 0x1d1a4a }, { 0x3a3aa8, VIOLET   } },
+    /* yes   */ { { 0x22103a, 0x34184f }, { ACCENT,   0xd26ce6 } },
 };
 
 #define ASK_MS   60000  // then she goes back to sleep, the rest left waiting

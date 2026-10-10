@@ -47,22 +47,27 @@ static float loudness_of(const int16_t *s, size_t n, size_t step) {
     return l > 1 ? 1 : l;
 }
 
-void sound_chime(void) {
+/* Two notes one after the other, each its pitch in Hz and its length in
+   seconds, rising in at `attack` and dying away at `decay`, both per second. */
+static void play_notes(const float notes[2][2], float attack, float decay, float loud) {
     open_at(16000);
-    static const float notes[][2] = { { 659.25f, 0.12f }, { 880.0f, 0.24f } };
     for (int n = 0; n < 2; n++) {
         size_t frames = (size_t)(16000 * notes[n][1]);
         for (size_t at = 0; at < frames; at += CHUNK) {
             size_t k = frames - at < CHUNK ? frames - at : CHUNK;
             for (size_t i = 0; i < k; i++) {
                 float t = (float)(at + i) / 16000.0f;
-                float env = fminf(1.0f, t * 200.0f) * expf(-t * 9.0f);
-                int16_t v = (int16_t)(sinf(2 * (float)M_PI * notes[n][0] * t) * env * 9000);
-                wire[2 * i] = wire[2 * i + 1] = v;
+                float env = fminf(1.0f, t * attack) * expf(-t * decay);
+                wire[2 * i] = wire[2 * i + 1] = (int16_t)(sinf(2 * (float)M_PI * notes[n][0] * t) * env * loud);
             }
             esp_codec_dev_write(speaker, wire, (int)(k * 4));
         }
     }
+}
+
+void sound_chime(void) {
+    static const float notes[2][2] = { { 659.25f, 0.12f }, { 880.0f, 0.24f } };
+    play_notes(notes, 200.0f, 9.0f, 9000);
 }
 
 void sound_tick(void) {
@@ -82,20 +87,8 @@ void sound_tick(void) {
 }
 
 void sound_listen(void) {
-    open_at(16000);
-    static const float notes[][2] = { { 660.0f, 0.07f }, { 990.0f, 0.11f } };
-    for (int n = 0; n < 2; n++) {
-        size_t frames = (size_t)(16000 * notes[n][1]);
-        for (size_t at = 0; at < frames; at += CHUNK) {
-            size_t k = frames - at < CHUNK ? frames - at : CHUNK;
-            for (size_t i = 0; i < k; i++) {
-                float t = (float)(at + i) / 16000.0f;
-                float env = fminf(1.0f, t * 400.0f) * expf(-t * 22.0f);
-                wire[2 * i] = wire[2 * i + 1] = (int16_t)(sinf(2 * (float)M_PI * notes[n][0] * t) * env * 6000);
-            }
-            esp_codec_dev_write(speaker, wire, (int)(k * 4));
-        }
-    }
+    static const float notes[2][2] = { { 660.0f, 0.07f }, { 990.0f, 0.11f } };
+    play_notes(notes, 400.0f, 22.0f, 6000);
 }
 
 size_t sound_record(int16_t *out, size_t max, bool (*more)(float)) {

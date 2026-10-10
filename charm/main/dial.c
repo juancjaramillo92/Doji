@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "config.h"
+#include "palette.h"
 #include "sound.h"
 
 LV_FONT_DECLARE(hanken_16);
@@ -53,7 +54,7 @@ static void draw(lv_event_t *e) {
     for (int i = 0; i < steps; i++) {
         a.start_angle = (270 + i * 360 / STEPS) % 360;
         a.end_angle = (271 + (i + 1) * 360 / STEPS) % 360;
-        a.color = lv_color_mix(lv_color_hex(0xb45cd9), lv_color_hex(0x5c40b0),
+        a.color = lv_color_mix(lv_color_hex(GLOW), lv_color_hex(DEEP),
                                (uint8_t)(255 * (i + 1) / steps));
         lv_draw_arc(layer, &a);
     }
@@ -79,7 +80,7 @@ static void draw(lv_event_t *e) {
     t.align = LV_TEXT_ALIGN_CENTER;
     t.opa = k;
     t.font = &hanken_16;
-    t.color = lv_color_hex(0x9a92b0);
+    t.color = lv_color_hex(MUTED);
     t.letter_space = 2;
     t.text = "VOLUME";
     lv_area_t label = { 0, 362, 465, 382 };

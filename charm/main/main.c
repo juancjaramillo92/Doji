@@ -56,7 +56,6 @@ static const char *TAG = "charm";
 #define CHECK_S       300    // how often she asks what waits, around the clock
 #define CHARGING_S    120    // on the cable, how often the charge is redrawn
 #define AWAKE_MS      30000
-#define GOODNIGHT_MS  1200   // her eyes closing
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define SLIDE_MS      500    // a switch, and a moment over
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
@@ -108,7 +107,7 @@ static void sleep_now(void) {
     int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
     if (lit) {
         face_set_mode(FACE_ASLEEP);
-        vTaskDelay(pdMS_TO_TICKS(GOODNIGHT_MS));
+        vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
     }
     if (lit || marks != drawn) {
         light(EUGENIA, FACE_DARK);

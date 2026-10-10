@@ -4,14 +4,11 @@
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
-
-// PWR reaches the chip high while pressed (power.c), on the one wake input
-// that takes a single pin at either level.
-#define PWR GPIO_NUM_3
+#include "power.h"
 
 // The BOOT button and the touch controller's interrupt pull low, as the
 // motion sensor's does once it is armed.
-static const gpio_num_t WAKE[] = { GPIO_NUM_0, BSP_LCD_TOUCH_INT, MOTION_PIN };
+static const gpio_num_t WAKE[] = { BOOT_PIN, BSP_LCD_TOUCH_INT, MOTION_PIN };
 
 /* What would reset or select the panel, or reset the touch controller, if it
    floated. Held through sleep and through an errand that never starts the
@@ -26,7 +23,7 @@ void sleep_release(void) {
 }
 
 void sleep_woke(void) {
-    rtc_gpio_deinit(PWR);
+    rtc_gpio_deinit(PWR_PIN);
     for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
 }
 
@@ -44,9 +41,11 @@ void sleep_until(time_t wake_at, bool motion) {
     // The pulls hold only while the RTC peripherals keep their power.
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
     esp_sleep_enable_ext1_wakeup_io(mask, ESP_EXT1_WAKEUP_ANY_LOW);
-    rtc_gpio_pullup_dis(PWR);
-    rtc_gpio_pulldown_dis(PWR);
-    esp_sleep_enable_ext0_wakeup(PWR, 1);
+    // PWR, high while pressed, on the one wake input that takes a single pin
+    // at either level.
+    rtc_gpio_pullup_dis(PWR_PIN);
+    rtc_gpio_pulldown_dis(PWR_PIN);
+    esp_sleep_enable_ext0_wakeup(PWR_PIN, 1);
 
     time_t now = time(NULL);
     if (wake_at > now) esp_sleep_enable_timer_wakeup((uint64_t)(wake_at - now) * 1000000ULL);

@@ -32,13 +32,10 @@ static const char *TAG = "power";
 #define BATTERY      0xA4  // percent
 #define OFF_10S      (3 << 2)
 
-#define PWR           GPIO_NUM_3
-#define BOOT          GPIO_NUM_0
 #define POLL_MS       50
 #define OFF_HOLD_MS   1500
 #define SETUP_HOLD_MS 5000
 #define LOW_PERCENT   15
-#define GOODNIGHT_MS  1200
 
 static i2c_master_dev_handle_t chip;
 
@@ -58,8 +55,8 @@ static void watch(void *arg) {
     int pwr_held = 0, boot_held = 0;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
-        pwr_held = gpio_get_level(PWR) ? pwr_held + POLL_MS : 0;
-        boot_held = gpio_get_level(BOOT) ? 0 : boot_held + POLL_MS;
+        pwr_held = gpio_get_level(PWR_PIN) ? pwr_held + POLL_MS : 0;
+        boot_held = gpio_get_level(BOOT_PIN) ? 0 : boot_held + POLL_MS;
         if (boot_held >= SETUP_HOLD_MS) {
             config_ask_setup();
             esp_restart();
@@ -67,7 +64,7 @@ static void watch(void *arg) {
         if (pwr_held < OFF_HOLD_MS) continue;
         ESP_LOGI(TAG, "goodnight");
         face_set_mode(FACE_ASLEEP);
-        vTaskDelay(pdMS_TO_TICKS(GOODNIGHT_MS));
+        vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
         face_set_mode(FACE_DARK);
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
         set(COMMON, get(COMMON) | 1);
@@ -83,7 +80,7 @@ void power_start(void) {
     };
     i2c_master_bus_add_device(bsp_i2c_get_handle(), &dev, &chip);
     set(KEY_TIMES, (get(KEY_TIMES) & ~(3 << 2)) | OFF_10S);
-    gpio_config_t buttons = { .pin_bit_mask = 1ULL << PWR | 1ULL << BOOT, .mode = GPIO_MODE_INPUT };
+    gpio_config_t buttons = { .pin_bit_mask = 1ULL << PWR_PIN | 1ULL << BOOT_PIN, .mode = GPIO_MODE_INPUT };
     gpio_config(&buttons);
     xTaskCreate(watch, "power", 3072, NULL, 3, NULL);
 }

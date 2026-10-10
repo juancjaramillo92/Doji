@@ -291,6 +291,28 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
   }
 });
 
+/* The charm draws in Doji's colours: copies of the app's tokens in C, each
+   beside the token it copies, and in the setup page's CSS under the app's own
+   names. Each copy is read against index.html's first declaration. */
+test('the charm and its setup page draw in the app\'s own colours', () => {
+  const app = new Map();
+  for (const [, name, value] of source('index.html').matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)) {
+    if (!app.has(name)) app.set(name, value.toLowerCase());
+  }
+  const palette = [...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})\s+\/\/ (--[\w-]+)$/gim)];
+  assert.ok(palette.length >= 5, `palette.h names only ${palette.length} tokens beside its colours — the reader has gone blind`);
+  for (const [, name, hex, token] of palette) {
+    assert.equal(`#${hex.toLowerCase()}`, app.get(token), `palette.h's ${name} is not index.html's ${token}`);
+  }
+  const page = source('charm/main/setup.html').match(/:root \{([^}]+)\}/);
+  assert.ok(page, 'setup.html no longer declares its colours in :root');
+  const shared = [...page[1].matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].filter(([, name]) => app.has(name));
+  assert.ok(shared.length >= 5, `setup.html shares only ${shared.length} of the app's tokens — the reader has gone blind`);
+  for (const [, name, value] of shared) {
+    assert.equal(value.toLowerCase(), app.get(name), `setup.html's ${name} is not index.html's`);
+  }
+});
+
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {
   const { app, close } = await boot();
   try {

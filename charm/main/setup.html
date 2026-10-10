@@ -10,48 +10,49 @@
 <style>
 :root {
   color-scheme: dark;
-  --ground: #0a0813; --panel: #0e0b19; --line: #251d39;
-  --ink: #e8e6f0; --muted: #9a92b0; --accent: #8b35b8;
-  --ok: #c9a6ff; --warn: #f3a2e4;
+  /* The app's tokens under the app's names, which agree.test.mjs holds them
+     to; the rest are the page's own. */
+  --glass: #0a0813; --bd: #251d39; --tx: #e8e6f0; --mt2: #9a92b0; --p: #8b35b8;
+  --panel: #0e0b19; --ok: #c9a6ff; --bad: #f3a2e4;
   --sheen: linear-gradient(120deg, #5c40b0, #8b35b8 55%, #b45cd9);
   --system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 var(--system); }
+html, body { margin: 0; background: var(--glass); color: var(--tx); font: 15px/1.5 var(--system); }
 main { max-width: 440px; margin: 0 auto; min-height: 100vh; padding: 20px 20px 28px; display: flex; flex-direction: column; gap: 14px; }
 h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
-p { margin: 0; color: var(--muted); font-size: 14px; }
+p { margin: 0; color: var(--mt2); font-size: 14px; }
 .steps { display: flex; gap: 6px; }
-.steps i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
+.steps i { flex: 1; height: 3px; border-radius: 2px; background: var(--bd); }
 .steps i.on { background: var(--sheen); }
-.list { display: grid; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.net { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--panel); border: 0; border-top: 1px solid var(--line); color: var(--ink); font: 500 15px var(--system); text-align: left; width: 100%; }
+.list { display: grid; border: 1px solid var(--bd); border-radius: 14px; overflow: hidden; }
+.net { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--panel); border: 0; border-top: 1px solid var(--bd); color: var(--tx); font: 500 15px var(--system); text-align: left; width: 100%; }
 .net:first-child { border-top: 0; }
 .net span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.net small { color: var(--muted); font-size: 12px; }
+.net small { color: var(--mt2); font-size: 12px; }
 .net.saved small { color: var(--ok); }
-label { font-size: 13px; color: var(--muted); }
-.input { display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-top: 6px; }
-.input:focus-within { border-color: var(--accent); }
-.input input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--ink); font: 16px var(--system); padding: 12px 14px; outline: none; }
-.input button { background: none; border: 0; color: var(--muted); font: 600 13px var(--system); padding: 0 14px; }
+label { font-size: 13px; color: var(--mt2); }
+.input { display: flex; align-items: center; background: var(--panel); border: 1px solid var(--bd); border-radius: 12px; margin-top: 6px; }
+.input:focus-within { border-color: var(--p); }
+.input input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--tx); font: 16px var(--system); padding: 12px 14px; outline: none; }
+.input button { background: none; border: 0; color: var(--mt2); font: 600 13px var(--system); padding: 0 14px; }
 .status { font-size: 13px; display: flex; align-items: center; gap: 6px; min-height: 20px; margin-top: 6px; }
 .status.ok { color: var(--ok); }
 .status.ok::before { content: "✓"; font-weight: 700; }
-.status.bad { color: var(--warn); }
+.status.bad { color: var(--bad); }
 .status.bad::before { content: "!"; font-weight: 800; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; display: inline-grid; place-items: center; font-size: 11px; flex: none; }
-.status.wait { color: var(--muted); }
-.spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--muted); border-radius: 50%; animation: spin .8s linear infinite; }
+.status.wait { color: var(--mt2); }
+.spin { width: 12px; height: 12px; border: 2px solid var(--bd); border-top-color: var(--mt2); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 .summary { display: grid; gap: 8px; }
-.summary div { display: flex; justify-content: space-between; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; font-size: 14px; }
+.summary div { display: flex; justify-content: space-between; gap: 10px; background: var(--panel); border: 1px solid var(--bd); border-radius: 12px; padding: 11px 14px; font-size: 14px; }
 .summary b { font-weight: 600; color: var(--ok); }
 .cta { margin-top: auto; display: grid; gap: 8px; padding-top: 10px; }
 .go { background: var(--sheen); color: #fff; border: 0; border-radius: 14px; font: 600 16px var(--system); padding: 14px; box-shadow: 0 8px 24px rgba(139,53,184,.35); }
 .go:disabled { opacity: .4; }
-.ghost { background: none; color: var(--muted); border: 0; font: 500 14px var(--system); padding: 6px; }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ghost { background: none; color: var(--mt2); border: 0; font: 500 14px var(--system); padding: 6px; }
+button:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; }
 </style>
 </head>
 <body>

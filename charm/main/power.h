@@ -8,6 +8,10 @@
    task. */
 void power_start(void);
 
+// PWR reaches the chip on GPIO3, high while pressed; BOOT pulls GPIO0 low.
+#define PWR_PIN  3
+#define BOOT_PIN 0
+
 // Whether the battery is low and no cable is charging it.
 bool power_low(void);
 

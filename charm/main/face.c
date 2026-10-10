@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include "esp_random.h"
 #include "lvgl.h"
+#include "palette.h"
 
 LV_FONT_DECLARE(hanken_36);
 
@@ -50,11 +51,6 @@ static const face_geometry_t GEOMETRY[2] = {
 #define SLIDE_MS        450
 #define SHIFT_X         8     // how far the sleep screen's marks wander, so none burns in
 #define SHIFT_Y         4
-
-// Doji's purples.
-#define ACCENT  0x8b35b8
-#define GLOW    0xb45cd9
-#define MUTED   0x9a92b0
 
 extern const uint8_t eugenia_rgb565_start[] asm("_binary_eugenia_rgb565_start");
 extern const uint8_t gladys_rgb565_start[]  asm("_binary_gladys_rgb565_start");
@@ -105,6 +101,12 @@ void face_set_marks(bool b, bool t, int c) { briefing_waits = b; trade_waits = t
 
 static float rnd(void) { return (float)esp_random() / 4294967295.0f; }
 
+// The sleep screen's marks, a new place each time it shows.
+static void wander(void) {
+    shift[0] = (int)lroundf((rnd() * 2 - 1) * SHIFT_X);
+    shift[1] = (int)lroundf((rnd() * 2 - 1) * SHIFT_Y);
+}
+
 static float ease(float v, float t, float rate, float dt) {
     return v + (t - v) * (1.0f - expf(-rate * dt));
 }
@@ -151,7 +153,7 @@ static void dot(lv_layer_t *layer, float cx, float cy, float rx, float ry,
 
 /* Doji's purples round the rim: LVGL draws no conic gradient, so a ring is
    short arcs, each the colour of its place. `turn` spins the colours. */
-static const uint32_t RING[] = { 0x5c40b0, ACCENT, GLOW, 0x6a4fd0, 0x5c40b0 };
+static const uint32_t RING[] = { DEEP, ACCENT, GLOW, VIOLET, DEEP };
 #define RING_STEPS 36
 
 static void draw_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa) {
@@ -295,7 +297,7 @@ static void draw_night(lv_event_t *e) {
     int x = 233 + shift[0], y = 404 + shift[1];
     bool both = briefing_waits && trade_waits;
     if (briefing_waits) mark(layer, both ? x - 15 : x, y, both ? 9 : 11, GLOW, ACCENT, 230);
-    if (trade_waits) mark(layer, both ? x + 15 : x, y, both ? 9 : 11, 0xeeecf4, 0xe8e6f0, 190);
+    if (trade_waits) mark(layer, both ? x + 15 : x, y, both ? 9 : 11, 0xeeecf4, INK, 190);
 
     if (tired && charge < 0) {
         int bx = 233 + shift[0], by = 62 + shift[1];
@@ -329,7 +331,7 @@ static void draw_night(lv_event_t *e) {
         lv_draw_label_dsc_init(&t);
         t.align = LV_TEXT_ALIGN_CENTER;
         t.font = &hanken_36;
-        t.color = lv_color_hex(charge == 100 ? 0xe8e6f0 : MUTED);
+        t.color = lv_color_hex(charge == 100 ? INK : MUTED);
         t.text = percent;
         lv_area_t where = { 0, 211, 465, 255 };
         lv_draw_label(layer, &t, &where);
@@ -351,8 +353,7 @@ static void tick(lv_timer_t *t) {
     if ((m == FACE_DARK) != dark) {
         dark = m == FACE_DARK;
         if (dark) {
-            shift[0] = (int)lroundf((rnd() * 2 - 1) * SHIFT_X);
-            shift[1] = (int)lroundf((rnd() * 2 - 1) * SHIFT_Y);
+            wander();
             lv_obj_add_flag(card[who], LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(night, LV_OBJ_FLAG_HIDDEN);
             lv_obj_invalidate(night);
@@ -364,7 +365,7 @@ static void tick(lv_timer_t *t) {
     }
     shown = m;
     if (dark) {
-        // Redrawn only when a mark changes: under the journal it is not seen.
+        // Redrawn only when a mark changes: the panel holds the rest.
         static int drawn = -1;
         int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
         if (marks != drawn) lv_obj_invalidate(night);
@@ -490,8 +491,7 @@ void face_start(character_t c) {
     // Started on the sleep screen, her face never shows.
     who = wanted = c;
     dark = mode == FACE_DARK;
-    shift[0] = (int)lroundf((rnd() * 2 - 1) * SHIFT_X);
-    shift[1] = (int)lroundf((rnd() * 2 - 1) * SHIFT_Y);
+    wander();
     lv_obj_remove_flag(dark ? night : card[who], LV_OBJ_FLAG_HIDDEN);
 
     uint32_t now = lv_tick_get();
