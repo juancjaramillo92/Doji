@@ -81,6 +81,23 @@ void sound_tick(void) {
     }
 }
 
+void sound_listen(void) {
+    open_at(16000);
+    static const float notes[][2] = { { 660.0f, 0.07f }, { 990.0f, 0.11f } };
+    for (int n = 0; n < 2; n++) {
+        size_t frames = (size_t)(16000 * notes[n][1]);
+        for (size_t at = 0; at < frames; at += CHUNK) {
+            size_t k = frames - at < CHUNK ? frames - at : CHUNK;
+            for (size_t i = 0; i < k; i++) {
+                float t = (float)(at + i) / 16000.0f;
+                float env = fminf(1.0f, t * 400.0f) * expf(-t * 22.0f);
+                wire[2 * i] = wire[2 * i + 1] = (int16_t)(sinf(2 * (float)M_PI * notes[n][0] * t) * env * 6000);
+            }
+            esp_codec_dev_write(speaker, wire, (int)(k * 4));
+        }
+    }
+}
+
 size_t sound_record(int16_t *out, size_t max, bool (*more)(float)) {
     open_at(16000);
     size_t got = 0;

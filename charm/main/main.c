@@ -138,7 +138,8 @@ static void sleep_now(void) {
 
 // In the dark: what waits for Gladys, and in its hours whether the briefing has.
 static void errand(void) {
-    if (net_start()) {
+    net_start();
+    if (net_wait(NET_ALL_MS)) {
         int left = gladys_check();
         bool tick = left > 0 && !trade_waits, ask = briefing_due(time(NULL));
         if (tick || ask) {
@@ -172,13 +173,12 @@ static void awake(void) {
     for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
     bsp_display_unlock();
 
+    // Joining runs beside everything else: she listens while it does, and
+    // waits for it only to send.
+    net_start();
     sound_start();
     sound_volume(cfg.volume);
     if (woke == ESP_SLEEP_WAKEUP_UNDEFINED) sound_chime();  // switched on, not woken
-    if (!net_start()) {
-        ESP_LOGW(TAG, "none of her networks answered");
-        face_set_offline(true);
-    }
 
     // A press is for what waits first: Gladys's journal, then Eugenia's briefing.
     if (who == GLADYS) {

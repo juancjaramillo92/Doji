@@ -2605,8 +2605,10 @@ journals it and goes back to sleep, unless a briefing waits too; only then does
 Eugenia slide in and read it (`?briefing=today`). Awake, **a swipe across her
 face switches them.** The panel's reset and select pins and the touch
 controller's reset are held through sleep, so the sleep screen needs no chip
-awake to stay up and a tap can still wake her. Each waking joins her Wi-Fi
-again, a few seconds while her eyes open.
+awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
+in the background**, the network she was last on first, asked directly on its
+own channel and access point so no scan is needed, then each saved one in
+turn; nothing waits for it but the moment something must be sent.
 
 **Asleep, she runs errands in the dark** every five minutes, around the clock,
 and on the cable every two so the charge stays current. She asks Gladys's door
@@ -2618,8 +2620,10 @@ up and asks no more that day. The screen is started only when its marks must
 change, so most errands never touch it. The briefing's hours are a copy of the
 server's (`charm/main/briefing.c`), held by `agree.test.mjs`.
 
-**A tap and he talks to Eugenia.** The ring shows round the rim and follows his
-voice; his turn ends at a pause of over a second after he has spoken, at a
+**A tap and he talks to Eugenia**, straight away: **two quick rising notes**
+say she heard the tap, and she listens even while she is still joining her
+Wi-Fi — the recording waits for it, not him. The ring shows round the rim and
+follows his voice; his turn ends at a pause of over a second after he has spoken, at a
 second tap, or at a minute, and a tap with nothing said in six seconds is
 dropped. The recording goes to her door as 16 kHz WAV and the answer is played
 as it streams in (*The charm — her voice on his keyring*): her face thinks

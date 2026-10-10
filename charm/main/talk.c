@@ -95,6 +95,10 @@ static int knock(const char *url, const uint8_t *wav, size_t len, void (*lit)(vo
         .timeout_ms = READ_MS,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
+    // Her mark under the face says whether the network is why she cannot answer.
+    bool online = net_wait(NET_ALL_MS);
+    face_set_offline(!online);
+    if (!online) return -1;
     esp_http_client_handle_t h = esp_http_client_init(&c);
     esp_http_client_set_header(h, "x-charm-key", cfg.eugenia_key);
     if (wav) esp_http_client_set_header(h, "Content-Type", "audio/wav");
@@ -130,6 +134,7 @@ void talk(void) {
     static uint8_t *wav;
     if (!wav) wav = heap_caps_malloc(WAV_HEADER + MAX_SAMPLES * 2, MALLOC_CAP_SPIRAM);
 
+    sound_listen();
     face_set_mode(FACE_LISTENING);
     spoke = false;
     began = xTaskGetTickCount();
