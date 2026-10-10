@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 691 tests, seven suites
+npm test      # 695 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -243,6 +243,11 @@ what could not be verified.
   read. A plan he has not taken is checked when he asks, against rules §7 marks
   `journal` or R-08's arithmetic — `agree.test.mjs` reads the citations against
   the table. `TRADE_EVENT` keeps the flat ban.
+- **Her record is judged by the test she stated, never by where price went**,
+  and it is hers: never on the trade look, never cited to him as a reason to
+  believe a read. A graded forecast pulls the next read toward one.
+  `agree.test.mjs` reads the sentence in `CONSOLIDATE`, `record_read` and
+  `SYSTEM`, and the trade look's absence.
 - **The verdict is not optional**: stated in `SYSTEM`, given room in the briefing
   slot, added by `CRITIC` when missing and never cut for length.
 - **The prompt states no preference of his.** A real one belongs in an
@@ -275,7 +280,7 @@ what could not be verified.
 
 Six lifetimes — turns, notes (three `kind`s, `commitment` held against his
 trades rather than obeyed), channels, the thesis and the portrait, loops — plus
-the calendar, and `strategy.ts`, which she cannot write.
+the calendar, her record, and `strategy.ts`, which she cannot write.
 
 - **The strategy rides the cached prefix** (summary, index, rules table) and the
   rest is `get_strategy`. It is markdown in a template literal: every backtick is

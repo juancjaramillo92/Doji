@@ -378,6 +378,8 @@ single-sourced at run time:
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
+| the **verdicts a read may carry** | `READ_VERDICTS` in `index.ts` and the check constraint |
+| the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads` |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
@@ -454,10 +456,10 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-ten tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the nine of hers with no other source — the channel map,
-notes, turns, thesis, portrait, open loops, calendar, feedback, and every stop and
-target a position carried. `trades` goes whole, the soft-deleted rows included: a restore
+eleven tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the ten of hers with no other source — the channel map,
+notes, turns, thesis, portrait, her record, open loops, calendar, feedback, and
+every stop and target a position carried. `trades` goes whole, the soft-deleted rows included: a restore
 without them lets the poller rebuild every trade you removed. `eugenia_runs` is
 left out: the largest table, and facts about model calls rather than about you.
 
@@ -1757,13 +1759,40 @@ a thumbs-up average flatters rather than teaches, and what he *told* her always
 outranks what he tapped. Registering the webhook for `["message"]` alone means
 the taps are never delivered — `allowed_updates` must name `callback_query` too.
 
+### Whether her reads held
+
+Every read she gives says what would prove it wrong, and until this nothing
+looked. **The nightly pass files each of the day's reads with a verdict** —
+`record_read`, one row in `eugenia_reads`: *wrong* when the thing she named
+happened, *held* when it had its chance and did not, *untested* for everything
+else. It judges against the market around gold and the Fed pricing as the day
+closed, which the pass is now handed for this alone, and the calendar and the
+day's turns. Filed and judged in one write, because a read is about today's news
+and 22:00 is after the day it was about; a unique index on the day and the words
+makes a retry's refiling a no-op.
+
+- **Never by where price went.** A read graded on gold's move is a forecast with
+  a score, and a score pulls the next read toward one — the thing the
+  prohibitions exist to stop. A test that was only gold's own price files as
+  untested, and `SYSTEM` asks her to name a link in the chain instead — the
+  two-year, the dollar, the next meeting's pricing — which is also the part he
+  learns from.
+- **The record is hers.** A month of counts and the three newest misses go to the
+  briefing and a reply, the two paths that give a read, and to the pass; never
+  the trade look, which carries none and arrives while he is in a position. It
+  sets how firmly she holds a view — a run of misses on one kind of day is a
+  reason to say less on the next — and she never cites it to him as a reason to
+  believe one, never gives a read to improve it, and never holds one back to
+  protect it. `/notes` shows it to him, so he can see what her reads are worth.
+
 ### What she remembers
 
-Eight tables, separated by how long a thing is true for. A turn rolls over inside
+Nine tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
 rewritten; a loop
-stays until it closes; and the calendar is the one dataset here that compounds.
+stays until it closes; and the calendar and her record are the datasets here that
+compound.
 
 | | Holds | Window | Written by |
 |---|---|---|---|
@@ -1772,6 +1801,7 @@ stays until it closes; and the calendar is the one dataset here that compounds.
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_portrait` | how she reads him — what his notes and trades add up to | 1 row, rewritten | her `set_portrait` tool, nightly |
+| `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
@@ -1840,7 +1870,8 @@ sharing one instant — otherwise no quote rather than a wrong one.
 reply, the nightly pass and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`
 goes wherever the notes go, as its own block so a failed read costs the paragraph
-and never his instructions. `channelsBlock()`
+and never his instructions. `recordBlock()` goes to the briefing, a reply and the
+pass, and a test asserts it never reaches the trade look. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that

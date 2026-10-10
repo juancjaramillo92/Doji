@@ -39,7 +39,7 @@ import {
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -1975,7 +1975,8 @@ test('the backup names every table that has no other source', async () => {
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
   for (const t of ['trades', 'eugenia_notes', 'eugenia_turns', 'eugenia_channels',
-                   'eugenia_thesis', 'eugenia_portrait', 'eugenia_loops', 'eugenia_calendar',
+                   'eugenia_thesis', 'eugenia_portrait', 'eugenia_reads', 'eugenia_loops',
+                   'eugenia_calendar',
                    'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
@@ -3778,6 +3779,30 @@ test('how she reads him carries the day it last moved, and an absent one says no
   assert.equal(portraitLine(null), '');
 });
 
+/* ─── Her record ─────────────────────────────────────────────────────────────
+   A count says how often; only the misses say what she keeps getting wrong. */
+const READS = [
+  { given_on: '2026-07-30', reading: 'a hot print is bad for gold', test: 'the two-year falls on it',
+    verdict: 'wrong', evidence: 'the two-year fell eight basis points' },
+  { given_on: '2026-07-29', reading: 'claims do not move the Fed', test: 'December pricing moves',
+    verdict: 'held', evidence: 'December barely moved' },
+  { given_on: '2026-07-28', reading: 'the dollar leads today', test: 'the dollar index falls',
+    verdict: 'untested', evidence: null },
+  ...['07-27', '07-24', '07-23'].map((d, i) => ({ given_on: `2026-${d}`, reading: `miss ${i}`,
+    test: 'a test', verdict: 'wrong', evidence: 'it fired' })),
+];
+
+test('her record counts every verdict and names the newest misses, three at most', () => {
+  const out = recordList(READS);
+  assert.match(out, /judged at night by the test you stated: 1 held, 4 proved wrong, 1 untested\./);
+  assert.match(out, /30 Jul: a hot print is bad for gold \(wrong if the two-year falls on it\) — the two-year fell/);
+  assert.ok(out.includes('miss 0') && out.includes('miss 1') && !out.includes('miss 2'),
+    'more than three misses are listed, or not the newest');
+  assert.ok(!out.includes('claims do not move'), 'a read that held is listed as a miss');
+  // No reads yet is no record, not a record of zeros.
+  assert.equal(recordList([]), '');
+});
+
 test('the open threads are split by what closes them', () => {
   const out = loopsList([
     { id: 4, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-12' },
@@ -3929,9 +3954,12 @@ test('the audit he asks for carries everything she keeps', () => {
     [{ channel: 'dollar', state: 'used', evidence: null, moved_on: '2026-03-12' }],
     [{ id: 7, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-11' }],
     { thesis: 'Still trading the December cut.', moved_on: '2026-03-12' },
-    [], { portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' });
+    [], { portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' },
+    READS);
 
   assert.match(out, /What you have told me/);
+  assert.match(out, /My reads over the last 30 days, each judged by the test I stated and never by where price went: 1 held, 4 proved wrong, 1 untested\./);
+  assert.match(out, /The latest I got wrong:\n· 30 Jul: a hot print/);
   assert.match(out, /How I read you, last moved 12 Mar:\nHe cuts winners/);
   assert.match(out, /What I have noticed/);
   assert.match(out, /What I flagged/);
@@ -4023,6 +4051,33 @@ test('a list past the window shows the window and says the oldest are not shown'
   const over = notesList(live.slice(0, NOTES + 1), [], []);
   assert.match(over, new RegExp(`What you have told me \\(more than ${NOTES}, the oldest not shown\\)`),
     'his audit hides the overflow from him too');
+});
+
+test('a read is filed once, with a verdict the table accepts, and never without its test', async () => {
+  const posts = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      posts.push({ url: String(url), prefer: opts.headers?.Prefer, body: opts.body });
+      return new Response(null, { status: 201 });
+    };
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'right', evidence: 'x' }), /"right" is not a verdict/,
+      'a verdict the check constraint refuses is sent, and fails as a database fault');
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: '  ', verdict: 'held', evidence: 'x' }), /what would prove it wrong/,
+      'a read with no test is filed, so a verdict on nothing enters her record');
+    assert.equal(posts.length, 0, 'a refused read still reached the database');
+
+    assert.equal(await serve('record_read',
+      { reading: 'a hot print is bad for gold', test: 'the two-year falls', verdict: 'wrong',
+        evidence: 'it fell' }), 'Filed.');
+  });
+  // A retry's refiling lands on the unique index and is dropped, not doubled.
+  assert.match(posts[0].url, /eugenia_reads\?on_conflict=given_on,reading$/);
+  assert.match(posts[0].prefer, /resolution=ignore-duplicates/);
+  const [row] = JSON.parse(posts[0].body);
+  assert.equal(row.verdict, 'wrong');
+  assert.match(row.given_on, /^\d{4}-\d\d-\d\d$/, 'the read is not filed under a New York civil day');
 });
 
 test('one note can retire several, and every id it could not retire is named', async () => {
@@ -4981,6 +5036,7 @@ const TOOL_CALLS = [
   ['set_portrait',  { portrait: 'a reading of him' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
+  ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close' }],
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH: a tool added to `serve` and not
@@ -5063,7 +5119,7 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
 
 const BLOCKS = {
   marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock, portraitBlock,
-  healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
+  recordBlock, healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
 };
 
 test('every block degrades to nothing when its read fails, and never throws', async () => {
@@ -5091,6 +5147,8 @@ test('every block says something when its read succeeds', async () => {
     eugenia_channels: [{ channel: 'rates', state: 'explained', moved_on: '2026-07-01' }],
     eugenia_thesis:   [{ thesis: 'gold heavy above 3450', moved_on: '2026-07-30' }],
     eugenia_portrait: [{ portrait: 'he cuts winners before the target', moved_on: '2026-07-30' }],
+    eugenia_reads:    [{ given_on: '2026-07-29', reading: 'a hot print is bad for gold',
+                         test: 'the two-year falls on it', verdict: 'held', evidence: 'it rose' }],
     eugenia_loops:    [{ id: 1, kind: 'question', body: 'does he size up after two losses',
                          opened_on: '2026-07-28' }],
     eugenia_calendar: [{ id: 1, at: '2026-07-30T12:30:00Z', name: 'CPI', importance: 'high' }],
@@ -5107,8 +5165,8 @@ test('every block says something when its read succeeds', async () => {
       return new Response(JSON.stringify(rows[table] ?? []), {
         status: 200, headers: { 'content-type': 'application/json' } });
     };
-    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'portraitBlock', 'loopsBlock',
-                        'calendarBlock']) {
+    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'portraitBlock', 'recordBlock',
+                        'loopsBlock', 'calendarBlock']) {
       const out = await BLOCKS[name]();
       assert.ok(out.trim().length > 0,
         `${name} read its rows and said nothing — a block that returns "" on success ` +
