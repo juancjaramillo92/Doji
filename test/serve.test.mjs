@@ -24,7 +24,7 @@ const ENV = {
   EUGENIA_BOT_TOKEN: 'eugenia', EUGENIA_WEBHOOK_SECRET: 'eugenia-hook',
   ANTHROPIC_API_KEY: 'sk-ant-test', CTRADER_MCP_TOKEN: 'ctrader',
   EUGENIA_CHARM_SECRET: 'charm', STT_URL: 'https://stt.test/v1/audio/transcriptions',
-  STT_KEY: 'stt', TTS_KEY: 'tts',
+  STT_KEY: 'stt', TTS_KEY: 'tts', GLADYS_CHARM_SECRET: 'gladys-charm',
 };
 
 let env = ENV;
@@ -352,4 +352,114 @@ test('doji-eugenia: the charm is refused at the door without its vendors or a re
   assert.deepEqual(calls, [], 'an empty recording made a request');
   assert.equal((await serve(request('doji-eugenia', { header: 'x-charm-key', key: 'wrong', body: 'x' }))).status,
     401, 'the charm door admitted a wrong key');
+});
+
+/* ─── The briefing on the charm ───────────────────────────────────────────
+   The charm wakes after the briefing's hour and asks whether it has landed,
+   then asks for the briefing itself when he presses. Both read today's stored
+   briefing by its marker, as the speaking worker does. */
+
+const briefingStored = (content) => (url) => {
+  if (url.includes('/rest/v1/eugenia_turns?select=created_at')) {
+    return ok(content === null ? [] : [{ created_at: new Date().toISOString() }]);
+  }
+  if (url.includes('/rest/v1/eugenia_turns?select=content')) return ok([{ content }]);
+  if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
+  return Promise.reject(new Error(`the briefing door asked something unexpected: ${url}`));
+};
+const briefingDoor = (which) => new Request(`https://fn.test/functions/v1/doji-eugenia?briefing=${which}`,
+  { method: 'GET', headers: { 'x-charm-key': 'charm' } });
+
+test('doji-eugenia: the charm hears that the briefing landed, then the briefing itself', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored('Gold opened quiet.');
+  for (const [which, said] of [['ready', 'Your briefing is ready, jefe.'], ['today', 'Gold opened quiet.']]) {
+    calls.length = 0;
+    const res = await serve(briefingDoor(which));
+    assert.equal(res.status, 200, `?briefing=${which} did not answer with audio`);
+    assert.equal(res.headers.get('content-type'), 'audio/pcm');
+    assert.deepEqual([...new Uint8Array(await res.arrayBuffer())].slice(-PCM.length), PCM);
+    assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]), [[said, 'pcm']],
+      `?briefing=${which} read the charm something other than ${JSON.stringify(said)}`);
+    // Sunday's briefing on a Sunday in New York, the weekday one otherwise.
+    const sunday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+      .format(new Date()) === 'Sun';
+    const marker = calls.find(c => c.url.includes('select=created_at')).url;
+    assert.ok(marker.includes(encodeURIComponent(`[${sunday ? 'sunday' : 'weekday'} briefing]`)),
+      `the charm looked for the wrong briefing today: ${marker}`);
+  }
+});
+
+test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored(null);
+  for (const which of ['ready', 'today']) {
+    calls.length = 0;
+    const res = await serve(briefingDoor(which));
+    assert.equal(res.status, 204, `?briefing=${which} answered ${res.status} with no briefing stored`);
+    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), 'a briefing that is not there was spoken');
+  }
+  calls.length = 0;
+  assert.equal((await serve(briefingDoor('yesterday'))).status, 400, 'a briefing door it does not open answered');
+  assert.deepEqual(calls, [], 'a briefing door it does not open made a request');
+});
+
+/* ─── Gladys's charm: what waits, and an answer on its screen ─────────────
+   What waits is read oldest first from a newest-first page; an answer is a
+   tap's own grammar, so it can only ever write one of the four columns. */
+
+const trade = (id, hoursAgo, fields = {}) => ({
+  id, direction: 'BUY', entry_price: 4412.5,
+  entry_time: new Date(Date.now() - hoursAgo * 3_600_000).toISOString(),
+  setup: null, followed_rules: null, followed_sl: null, followed_tp: null, ...fields,
+});
+const gladysCharm = (init = {}) => new Request('https://fn.test/functions/v1/doji-gladys',
+  { method: 'GET', ...init, headers: { 'x-charm-key': 'gladys-charm', ...(init.headers ?? {}) } });
+
+test('doji-gladys: the charm is told what waits, oldest first, a week back at most', async () => {
+  const serve = await serving('doji-gladys');
+  respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)]) : pending();
+  const res = await answer(await serve(gladysCharm()));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.waiting, 2);
+  assert.equal(res.body.trade.id, 'PID1', 'the charm was handed the newer trade first');
+  const read = decodeURIComponent(calls[0].url);
+  for (const part of ['deleted=is.false', 'entry_time=gte.', 'order=entry_time.desc', 'limit=20',
+                      'or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)']) {
+    assert.ok(read.includes(part), `what waits is no longer read with ${part}: ${read}`);
+  }
+  const since = new Date(read.match(/entry_time=gte\.([^&]+)/)[1]);
+  const days = (Date.now() - since) / 86_400_000;
+  assert.ok(days > 6.9 && days < 7.1, `what waits reaches back ${days.toFixed(2)} days, not a week`);
+});
+
+test('doji-gladys: an answer from the charm writes its one column, then says what waits', async () => {
+  const serve = await serving('doji-gladys');
+  respond = (url, init) => {
+    if (init.method === 'PATCH') return ok([trade('PID1', 30, JSON.parse(init.body))]);
+    if (url.includes('/rest/v1/trades?')) return ok([]);
+    return pending();
+  };
+  const res = await answer(await serve(gladysCharm({ method: 'POST', body: JSON.stringify({ data: 'PID1|sl|1' }) })));
+  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null } });
+  const writes = calls.filter(c => c.method === 'PATCH');
+  assert.equal(writes.length, 1);
+  assert.ok(writes[0].url.includes('trades?id=eq.PID1'), writes[0].url);
+  assert.deepEqual(JSON.parse(writes[0].body), { followed_sl: true }, 'the charm wrote more than its one answer');
+});
+
+test('doji-gladys: the charm cannot write anything but an answer, and is shut without its key', async () => {
+  const serve = await serving('doji-gladys');
+  for (const body of [JSON.stringify({ data: 'PID1|edit' }), JSON.stringify({ data: 'PID1|exit_price|1' }),
+                      JSON.stringify({ data: 'PID1|setup|Scalp' }), JSON.stringify({ data: 'PID1|rules|yes' }),
+                      'not json']) {
+    calls.length = 0;
+    const res = await answer(await serve(gladysCharm({ method: 'POST', body })));
+    assert.equal(res.status, 400, `the charm's ${body} was accepted`);
+    assert.deepEqual(calls, [], `the charm's ${body} made a request`);
+  }
+  const shut = await serving('doji-gladys', ['GLADYS_CHARM_SECRET']);
+  calls.length = 0;
+  assert.equal((await shut(gladysCharm())).status, 401, 'the charm door opened with its secret unset');
+  assert.deepEqual(calls, [], 'a shut charm door made a request');
 });

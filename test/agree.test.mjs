@@ -3960,7 +3960,10 @@ test('the briefing is written in one worker and spoken in another, and never los
     'the speaking worker speaks on the one-worker budget, which is the clock it was split off to escape');
   assert.ok(at(speak, 'await sayAloud(') < at(speak, "caller: `${due} briefing delivered`"),
     'the delivered row is written before the send — pace_line reads it as the statement that he has it');
-  assert.match(speak, /created_at=eq\.\$\{encodeURIComponent\(marker\.created_at\)\}/,
+  assert.match(speak, /const turn = await storedBriefing\(due, today\);/,
+    'the speaking worker no longer reads today\'s briefing through storedBriefing');
+  assert.match(bodyOf(EUGENIA_TS, 'async function storedBriefing('),
+    /created_at=eq\.\$\{encodeURIComponent\(marker\.created_at\)\}/,
     'the text is no longer paired with its marker by the instant both were written');
   assert.match(EUGENIA_TS, /if \(speak\) \{ job = 'speak'; return await postSpeak\(speak\); \}/,
     'postScheduled no longer opens the speaking worker\'s door');
@@ -5486,6 +5489,13 @@ const SENDS = {
                          'what he hears differ from what she remembers',
                     stored: 'by postBriefing, before the hand-off — this reads ' +
                             'the stored turn rather than writing one' },
+  charmBriefing:  { gate: null,       carries: 'turn.content', aloud: 'charmAudio',
+                    why: 'the briefing read back on the charm, as postSpeak ' +
+                         'reads it: the text critique() returned and ' +
+                         'postBriefing stored, so the charm says exactly what ' +
+                         'Telegram received',
+                    stored: 'by postBriefing — this reads the stored turn ' +
+                            'rather than writing one' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
   hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
                     copy: 'the charm speaks what this returns, through ' +
@@ -5505,12 +5515,12 @@ const SENDS = {
 
 test('every path that sends him something is in the census', () => {
   // A path that speaks, or one that takes a turn of conversation — the charm
-  // speaks without sayAloud, and is still a path that sends.
+  // speaks through charmAudio rather than sayAloud, and is still a path that sends.
   const fns = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)/gm)]
     .map(m => [m[1], m.index]);
   const sending = fns.filter(([, at]) => {
     const end = EUGENIA_TS.indexOf('\n}\n', at);
-    return /await sayAloud\(|= await converse\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
+    return /await sayAloud\(|= await converse\(|charmAudio\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
   }).map(([name]) => name).sort();
 
   assert.deepEqual(sending, Object.keys(SENDS).sort(),
@@ -5546,7 +5556,10 @@ test('every censused path gates, speaks and stores the same one text', () => {
         `${fn} is declared exempt from the gate and now runs one`);
     }
 
-    if (spec.copy) {
+    if (spec.aloud) {
+      assert.match(body, new RegExp(`${spec.aloud}\\([^;]*\\b${spec.carries.replace('.', '\\.')}\\b`),
+        `${fn} no longer speaks through ${spec.aloud} the text the census says it carries`);
+    } else if (spec.copy) {
       // Spoken by whoever it returns to, and copied to Telegram as text.
       assert.match(body, new RegExp(`return ${spec.carries};`),
         `${fn} no longer hands back the text the census says it carries`);
