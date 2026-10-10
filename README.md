@@ -1063,10 +1063,27 @@ function behind them.
 `GLADYS_BOT_TOKEN`, `GLADYS_WEBHOOK_SECRET`. `TELEGRAM_CHAT_ID` is the exception:
 the one value the two bots share, since there is one trader and one chat.
 
-**One function, two callers**, told apart by the secret presented: `x-doji-key`
-is the database (a position opened, or its answers moved) and
-`x-telegram-bot-api-secret-token` is Telegram reporting a tap. They share the
-keyboard, the message and the `callback_data` grammar.
+**One function, three callers**, told apart by the secret presented: `x-doji-key`
+is the database (a position opened, or its answers moved),
+`x-telegram-bot-api-secret-token` is Telegram reporting a tap, and `x-charm-key`
+is her charm. They share the keyboard, the message and the `callback_data`
+grammar.
+
+**Her charm journals a trade on its own screen.** It sleeps, wakes every few
+minutes around the clock to ask what waits, and shows a still near-white dot
+while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
+`{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with any of
+the four answers missing, not deleted, oldest first so they are journalled in
+the order he took them — read newest first under `WAITING_MAX` and reversed. The
+week is the bound: a trade left unjournalled would otherwise keep the dot lit
+for ever. **An answer is a tap in a tap's own grammar** — a `POST` of
+`{ "data": "PID562780708|sl|1" }` — so `parseCallback` is the one boundary for
+both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
+with a 400, being the Telegram form's. It answers with what waits next, so the
+charm moves on without a second request, and the trigger redraws the Telegram
+message as it does for an answer from the app. **`GLADYS_CHARM_SECRET` is
+optional**: unset, the door is shut, since `secretMatches` refuses an empty
+secret.
 
 **One message, edited in place.** It opens `Hola Jefe, new fill below`, with four
 rows of buttons — the two setups, then Rules, Stop Loss and Take Profit —
@@ -2189,7 +2206,8 @@ Three things outside the SQL, none of which fails loudly:
   supabase secrets set STT_MODEL=whisper-1     # optional, the default
   supabase secrets set TTS_KEY=<key>
   supabase secrets set EMBED_KEY=<key>
-  supabase secrets set EUGENIA_CHARM_SECRET=$(openssl rand -hex 32)   # the charm, which needs STT and TTS
+  supabase secrets set EUGENIA_CHARM_SECRET=$(openssl rand -hex 32)   # her charm, which needs STT and TTS
+  supabase secrets set GLADYS_CHARM_SECRET=$(openssl rand -hex 32)    # Gladys's charm
   ```
 
 **Two backfills, each a door called by hand.** Semantic search changes nothing
@@ -2757,7 +2775,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
-| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — silence first, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm`, the right day's briefing asked for, a `204` while none is stored |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — silence first, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm`, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |

@@ -1,12 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // GLADYS — the journal bot  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// One function, two callers, told apart by the secret they present:
+// One function, three callers, told apart by the secret they present:
 //
 //   x-doji-key                        its triggers — a position opened, post
 //                                     the message; its answers moved, redraw it.
 //   x-telegram-bot-api-secret-token   Telegram — a button was tapped, write the
 //                                     column and redraw the message.
+//   x-charm-key                       her charm — what waits for its journal,
+//                                     and an answer given on its screen.
 //
 // One file, because the halves share the keyboard, the message and the
 // callback_data grammar. A tap names its column through COLUMNS, the same four
@@ -35,7 +37,8 @@
 //           allowed_updates = ["callback_query"] — a tap is her whole
 //           vocabulary.
 // Secrets:  GLADYS_BOT_TOKEN, TELEGRAM_CHAT_ID, GLADYS_WEBHOOK_SECRET,
-//           DOJI_CRON_SECRET, SB_SECRET_KEY
+//           DOJI_CRON_SECRET, SB_SECRET_KEY; GLADYS_CHARM_SECRET, optional —
+//           unset, the charm's door is shut
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -49,6 +52,7 @@ const BOT_TOKEN      = env("GLADYS_BOT_TOKEN");
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const WEBHOOK_SECRET = env("GLADYS_WEBHOOK_SECRET");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
+const CHARM_SECRET   = env("GLADYS_CHARM_SECRET");
 
 /* ─── The journal vocabulary ───────────────────────────────────────────────
    One of three copies — CONFIG.SETUPS and trades_setup_check are the others —
@@ -333,12 +337,48 @@ async function handleTap(req: Request): Promise<Response> {
   }
 }
 
+/* ─── The charm half: he journals on her screen ───────────────────────────
+   Her charm sleeps, wakes every few minutes to ask what waits, and shows a dot
+   while anything does. An answer from it is a tap in a tap's own grammar, so
+   parseCallback is the one boundary for both and no other column is reachable.
+   The trigger then redraws the Telegram message, as it does for the app.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* A week back, oldest first, so trades are journalled in the order he took
+   them. The week is the bound: a trade left unjournalled would otherwise keep
+   her dot lit for ever. Newest first under the limit, then reversed. */
+const WAITING_DAYS = 7;
+const WAITING_MAX = 20;
+
+async function waiting(): Promise<Response> {
+  const since = new Date(Date.now() - WAITING_DAYS * 86_400_000).toISOString();
+  const res = await fetch(`${SB_URL}/rest/v1/trades?select=${SELECT}&deleted=is.false` +
+    `&entry_time=gte.${encodeURIComponent(since)}` +
+    `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
+    `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
+  const rows: Row[] = (await res.json()).reverse();
+  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null });
+}
+
+// Answers only: [Edit] and [Done] belong to the Telegram form. Answered with
+// what waits after it, so the charm moves on without a second request.
+async function charmAnswer(req: Request): Promise<Response> {
+  const tap = parseCallback(String((await req.json().catch(() => null))?.data ?? ""));
+  if (!tap || tap.action !== 'answer' || !tap.column) {
+    return json({ ok: false, error: "not an answer" }, 400);
+  }
+  await patchRow(tap.id, { [tap.column]: tap.value });
+  return await waiting();
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 // Guarded so importing this module runs nothing.
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   // Authorisation first, and the header picks the half.
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromDatabase = req.headers.get("x-doji-key");
+  const fromCharm    = req.headers.get("x-charm-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !SB_KEY) {
     console.error("doji-gladys: a required secret is not set — refusing all requests");
@@ -351,6 +391,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     }
     if (secretMatches(fromDatabase, CRON_SECRET)) {
       return await fromTrigger(req);
+    }
+    if (secretMatches(fromCharm, CHARM_SECRET)) {
+      return req.method === "POST" ? await charmAnswer(req) : await waiting();
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
