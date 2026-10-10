@@ -18,3 +18,6 @@ bool net_wait(int ms);
    x-charm-key; the README's "The charms" says what each answers. */
 #define EUGENIA_DOOR "https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia"
 #define GLADYS_DOOR  "https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-gladys"
+
+// The newest app built from main, published by the charm workflow (ota.c).
+#define FIRMWARE_URL "https://gujhyogvkzjgnrodyuse.supabase.co/storage/v1/object/public/charm/charm.bin"

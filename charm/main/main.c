@@ -20,7 +20,8 @@
    does, and in the briefing's hours (briefing.c) Eugenia's whether it has
    landed; when it has, her face lights and she says so. The screen is started
    only when its marks must change: the panel keeps its picture while the chip
-   sleeps, so most errands never touch it.
+   sleeps, so most errands never touch it. Once a night an errand also looks
+   for a new app from main (ota.c).
 
    PWR is the power chip's (power.c): a press switches her on, and held she
    says goodnight and switches off. */
@@ -42,6 +43,7 @@
 #include "gladys.h"
 #include "motion.h"
 #include "net.h"
+#include "ota.h"
 #include "power.h"
 #include "setup.h"
 #include "sleep.h"
@@ -140,6 +142,7 @@ static void sleep_now(void) {
 static void errand(void) {
     net_start();
     if (net_wait(NET_ALL_MS)) {
+        ota_confirm();
         int left = gladys_check();
         bool tick = left > 0 && !trade_waits, ask = briefing_due(time(NULL));
         if (tick || ask) {
@@ -151,6 +154,12 @@ static void errand(void) {
         if (ask && talk_ready(light_eugenia)) {
             briefing_waits = true;
             briefing_announced(time(NULL));
+        }
+        // A new app from main, in the small hours: she wakes into it at once,
+        // quietly, for this errand's place.
+        if (ota_due(time(NULL)) && !power_low() && ota_update()) {
+            errand_at = time(NULL);
+            sleep_until(errand_at + 1, false);
         }
     }
     sleep_now();
@@ -178,7 +187,7 @@ static void awake(void) {
     net_start();
     sound_start();
     sound_volume(cfg.volume);
-    if (woke == ESP_SLEEP_WAKEUP_UNDEFINED) sound_chime();  // switched on, not woken
+    if (esp_reset_reason() == ESP_RST_POWERON) sound_chime();  // switched on, not woken or restarted
 
     // A press is for what waits first: Gladys's journal, then Eugenia's briefing.
     if (who == GLADYS) {

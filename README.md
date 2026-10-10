@@ -77,6 +77,7 @@ charm/                                  firmware for the two charms — see The 
   main/power.c                          the two buttons and the battery
   main/motion.c                         the motion sensor, armed to wake her
   main/lift.c                           whether a lift was him looking
+  main/ota.c                            her updates over Wi-Fi, from main
   main/hanken_64.c                      Doji's typeface for the journal's words
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
@@ -2532,7 +2533,20 @@ The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
 ESP-IDF's name for the app alone; the workflow fails a build whose image is
-smaller than the bootloader's space plus the app. Nothing secret is in it.
+smaller than the first app slot's offset plus the app. Nothing secret is in it.
+
+**After the first flash she updates herself.** Every build is stamped with the
+commit it was made from, and a build of `main` is also published, the app
+alone, to a public Storage bucket, `charm`, which the workflow makes on first
+use with the repository's `SUPABASE_URL` and `SB_SECRET_KEY` secrets. Once a
+night, in the 03:00 hour in New York and off a low battery, an errand reads the
+newest image's description from its first bytes; when its version is not
+hers, the rest is written into her other app slot (`charm/partitions.csv`
+gives her two of 7 MB) and she wakes into it at once, quietly. A new app is
+good only once it has reached her Wi-Fi: one that never does is rolled back by
+the bootloader at the wake after, to the app that was (`charm/main/ota.c`).
+Only a power-on chimes, so neither an update nor the setup's restart wakes
+anyone.
 
 **A face is a render plus a drawing.** Each character's render is a still
 466 × 466 image, embedded as the RGB565 bytes the screen draws
@@ -2584,9 +2598,9 @@ other caller — and only the keys are secret, so a lost charm is cut off by
 changing them in Supabase.
 
 **Switched on**, she comes up as Eugenia, her face alive at 75% brightness,
-and chimes; joins the first of her networks that answers and sets her clock to
-New York, clock changes included, since the briefing is 08:00 there all year.
-The first serial line names the flash size, the PSRAM the chip actually has and
+and chimes, as only a power-on does; joins her Wi-Fi and sets her clock to New
+York, clock changes included, since the briefing is 08:00 there all year. The
+first serial line names the flash size, the PSRAM the chip actually has and
 what woke it.
 
 **She lives in short waking spells, and whoever is needed wakes.** Thirty
@@ -2670,7 +2684,8 @@ while the chip sleeps, that the touch controller wakes it (the BOOT button
 always does), that the power chip's registers are where Waveshare's example and
 the datasheet put them (the switch-off, the cable and the battery), that the
 motion sensor's wake-on-motion is set as its datasheet has it and which way its
-z axis faces the screen, the readings `lift.c` judges a lift by, that a phone stays on her setup network while she joins another —
+z axis faces the screen, the readings `lift.c` judges a lift by, that the
+Storage API takes the secret key the workflow publishes with, that a phone stays on her setup network while she joins another —
 the two share one radio, so her own moves to the other's channel — whether a
 full-screen swipe is smooth enough to replace the journal's taps, and how long
 a battery lasts.
