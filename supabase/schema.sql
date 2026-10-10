@@ -487,10 +487,8 @@ alter table public.eugenia_runs enable row level security;
 
 -- ─── The calendar ──────────────────────────────────────────────────────────
 -- What lands and what it printed: the US releases, and from abroad what she
--- reads the dollar through. It wakes her after a high-impact US print, and it
--- compounds: in a year it is how each release ran against expectations, with
--- her line beside each one. Filed from TradingView; she writes only `note`, and
--- an `actual` TradingView has not yet published.
+-- reads the dollar through. It compounds: in a year it is how each release ran
+-- against expectations. Filed from TradingView; she writes nothing to it.
 create table if not exists public.eugenia_calendar (
   id         bigserial primary key,
 
@@ -499,7 +497,7 @@ create table if not exists public.eugenia_calendar (
 
   name       text not null,
 
-  -- Only 'high' wakes her, and only at home.
+  -- Only 'high' counts for his rules, and only at home.
   importance text not null default 'high'
     constraint eugenia_calendar_importance_check check (importance in ('high', 'medium', 'low')),
 
@@ -508,15 +506,7 @@ create table if not exists public.eugenia_calendar (
   prior      text,
   actual     text,
 
-  note       text
-    constraint eugenia_calendar_note_length
-      check (note is null or char_length(note) between 1 and 200),
-
   source     text,
-
-  -- When the post-release look ran. Stamped before the look, so a look that
-  -- fails cannot repeat every quarter hour.
-  looked_at  timestamptz,
 
   created_at timestamptz not null default now(),
 
@@ -528,20 +518,19 @@ create table if not exists public.eugenia_calendar (
   -- typed rows carry none.
   tv_id      text,
 
-  -- The series a release belongs to, so a print is read against its own record.
+  -- The series a release belongs to, the same across months.
   ticker     text
 );
 
--- A mark is not an edit: stamping looked_at must not move updated_at, or the
--- column would say when a row was last handled rather than last changed.
--- Compared as jsonb less the two bookkeeping columns, so a column added later
+-- The filing re-upserts every row each quarter hour, so updated_at moves only
+-- when the content changed, or it would say when a row was last filed rather
+-- than last changed. Compared as jsonb less updated_at, so a column added later
 -- is compared without anyone remembering to list it.
 create or replace function public.eugenia_calendar_touch()
 returns trigger
 language plpgsql
 as $$ begin
-  if to_jsonb(old) - 'updated_at' - 'looked_at'
-     is distinct from to_jsonb(new) - 'updated_at' - 'looked_at' then
+  if to_jsonb(old) - 'updated_at' is distinct from to_jsonb(new) - 'updated_at' then
     new.updated_at := now();
   end if;
   return new;
@@ -908,7 +897,7 @@ create table if not exists public.dispatch (
   -- by a flag. agree.test.mjs holds this list against the dispatch sites.
   job     text not null,
   constraint dispatch_job_check check (job in (
-    'poller', 'eugenia', 'eugenia-spine', 'trade-event', 'gladys')),
+    'poller', 'eugenia', 'eugenia-calendar', 'trade-event', 'gladys')),
 
   at      timestamptz not null default now(),
 
@@ -987,7 +976,7 @@ returns boolean
 language sql
 immutable
 as $$
-  select job in ('poller', 'eugenia-spine');
+  select job in ('poller', 'eugenia-calendar');
 $$;
 
 -- ─── Telling him ───────────────────────────────────────────────────────────
@@ -1314,8 +1303,8 @@ revoke all on public.calendar_weeks from anon, authenticated;
 
 -- ═══ Everything that runs on a timer ════════════════════════════════════
 
--- Six jobs: the poller, Eugenia's hourly job and her quarter-hourly spine, the
--- two watchers, and a nightly purge. No calling job holds database
+-- Six jobs: the poller, Eugenia's hourly job and her quarter-hourly calendar,
+-- the two watchers, and a nightly purge. No calling job holds database
 -- power: each presents the cron secret, read from Vault at call time. Vault
 -- names it lower case (doji_cron_secret), the Edge Functions upper case
 -- (DOJI_CRON_SECRET), and Postgres compares Vault names case-sensitively — the
@@ -1348,8 +1337,7 @@ select cron.schedule(
 
 -- ─── Eugenia ───────────────────────────────────────────────────────────────
 -- Hourly; dueNow() decides which hour owes what — the briefing, its retries,
--- the pulse, the nightly pass — against New York's own clock, for the poller's
--- reason. Most hours find nothing due and make no model call.
+-- the nightly pass — against New York's own clock, for the poller's reason. Most hours find nothing due and make no model call.
 select cron.schedule(
   'doji-eugenia',
   '0 * * * *',
@@ -1367,24 +1355,24 @@ select cron.schedule(
   $$
 );
 
--- ─── Her event spine ───────────────────────────────────────────────────────
--- Files the calendar and looks at any high-impact US release that has landed
--- and not been looked at. A separate job, not a faster hourly one: every hourly
--- schedule tests `hour === n`, so */15 there would run four briefings a morning.
--- Off the hour, clear of the briefing.
+-- ─── Her calendar ──────────────────────────────────────────────────────────
+-- Files the calendar, so an actual lands within a quarter hour of printing. A
+-- separate job, not a faster hourly one: every hourly schedule tests
+-- `hour === n`, so */15 there would run four briefings a morning. Off the hour,
+-- clear of the briefing.
 select cron.schedule(
-  'doji-eugenia-spine',
+  'doji-eugenia-calendar',
   '5,20,35,50 * * * *',
   $$
     insert into public.dispatch (id, job)
     select net.http_post(
-      url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?release=1',
+      url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?calendar=1',
       headers := jsonb_build_object(
                    'Content-Type', 'application/json',
                    'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
                                     where name = 'doji_cron_secret')),
       timeout_milliseconds := 120000
-    ), 'eugenia-spine';
+    ), 'eugenia-calendar';
   $$
 );
 

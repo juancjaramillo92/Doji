@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 712 tests, seven suites
+npm test      # 681 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -235,15 +235,14 @@ what could not be verified.
 - **The prohibitions in `prompt.ts` are the product.** *No signal* is enforced by
   nothing but the sentence, so `agree.test.mjs` reads for the line on price in
   `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need it as much
-  as the writer: they REWRITE and run last. `RELEASE` and `CONSOLIDATE` inherit
-  `SYSTEM`.
+  as the writer: they REWRITE and run last. `CONSOLIDATE` inherits `SYSTEM`.
 - **Her read is fenced, not banned**: labelled as hers, with what would prove it
   wrong, no level, and none while he is in a position. All four halves live in
   `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed `positionsBlock()` to
   judge the last. A printed level is a fact, never in the paragraph with her
   read. A plan he has not taken is checked when he asks, against rules §7 marks
   `journal` or R-08's arithmetic — `agree.test.mjs` reads the citations against
-  the table. `RELEASE` and `TRADE_EVENT` keep the flat ban.
+  the table. `TRADE_EVENT` keeps the flat ban.
 - **The verdict is not optional**: stated in `SYSTEM`, given room in the briefing
   slot, added by `CRITIC` when missing and never cut for length.
 - **The prompt states no preference of his.** A real one belongs in an
@@ -285,8 +284,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   dotted one names a heading in what came back. §2 and §3 are not his and use the
   spoken channel names. Step 4 of R-08 is readable only off a row carrying the
   plan; do not read 1:1.5 and a realised 1:1.25 as a pair of floors.
-- **The cache window is derived from the tool array**: `1h` for `RELEASE_TOOLS`
-  and `CHAT_TOOLS`, `5m` for the rest. Do not move a window on an argument; `wrote_1h` and
+- **The cache window is derived from the tool array**: `1h` for `CHAT_TOOLS`,
+  `5m` for the rest. Do not move a window on an argument; `wrote_1h` and
   `wrote_5m` are what decide it.
 - **`superseded_by=is.null` on `readNotes` is the whole of retirement**, and the
   write is filtered the same way. Column, filter and tool parameter agree.
@@ -299,8 +298,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 - **Every read of a growing table carries a limit and takes the newest rows.**
   Select newest-first and reverse, as `recent()` does. `agree.test.mjs` refuses
   `order=id.asc` under a limit.
-- **`notesBlock()` reaches all six paths, `channelsBlock()` the five that teach,
-  `recent()` the five that speak** (not the nightly pass), `positionsBlock()` five.
+- **`notesBlock()` reaches all four paths, `channelsBlock()` the three that teach,
+  `recent()` the three that speak** (not the nightly pass), `positionsBlock()`
+  three.
   The trade look's reads sit after its early returns. `agree.test.mjs` reads every
   body, and asserts the absences too.
 - **Loops close.** `readLoops` takes the newest ten, so a loop that cannot close
@@ -329,20 +329,15 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 ### Her senses
 
 - **The calendar is filed from TradingView by `fileCalendar`, keyed on its id.**
-  One write may create a row; `record_actual` is a PATCH with no insert path and
-  cannot write `consensus` or `prior`. A filter value goes out as
-  `encodeURIComponent(value)` and nothing else — PostgREST takes a top-level `eq`
-  whole. An absent figure is left out of the row, never sent as null. Rows go up
-  grouped by the columns they carry.
+  One write may create a row, and nothing she can call writes to it. A filter
+  value goes out as `encodeURIComponent(value)` and nothing else — PostgREST
+  takes a top-level `eq` whole. An absent figure is left out of the row, never
+  sent as null. Rows go up grouped by the columns they carry.
 - **The calendar reaches abroad; his rules do not.** `wanted` keeps what she
   asked for by kind, judged against the whole captured catalogue in
   `tradingview-abroad.json`, and `CALENDAR_COUNTRIES` asks for nothing else.
   Every rated read filters on `HOME` but the Sunday week — `agree.test.mjs`
   finds them rather than listing them.
-- **One look per release time.** `dueRelease` is pure; `pendingRelease` selects
-  `looked_at` rather than filtering on it; `markLooked` takes every id in the
-  group and is called after `awaitingActual` and before the model call —
-  `agree.test.mjs` reads the order. `updated_at` may not move on a mark.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
 - **The trade event** decides from data before any model call, returns first for
@@ -366,12 +361,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   `?force=1` door, and `agree.test.mjs` reads `postScheduled` for the call. **A
   literal that is right by accident of another function's range is the shape to
   look for.**
-- **`PAUSED` is an off switch, not a retirement**: a paused job keeps its code,
-  its schedule and its tests, and returns before its model call;
-  `agree.test.mjs` holds every name to such a gate.
-- **The data-driven senses are not in `dueNow`.** Each flag is written in its
-  cron job's URL and in `postScheduled`; `agree.test.mjs` holds both directions,
-  with the doors a person opens declared.
+- **The calendar's quarter-hourly door is not in `dueNow`.** Its flag is written
+  in its cron job's URL and in `postScheduled`; `agree.test.mjs` holds both
+  directions, with the doors a person opens declared.
 - **Both halves answer before they work** (`background()` +
   `EdgeRuntime.waitUntil`), because of Telegram's redelivery and the 150s request
   idle timeout behind the 400s paid wall clock. `?embed=1` is the derived
@@ -407,9 +399,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   successful turn's `detail` is its client-tool tally. Read `rounds` before
   changing a caller's model.
 - **`MODELS` is keyed on the caller's label**, absent means Opus, and only `trim`
-  is on Sonnet: its tool array is empty, so it cannot reach the cap. The release
-  look's failures on Sonnet are confounded with `record_actual` landing the same
-  night and establish nothing about the model. `fellBack` compares against what
+  is on Sonnet: its tool array is empty, so it cannot reach the cap. The retired
+  release look's failures on Sonnet were confounded with a new tool landing the
+  same night and establish nothing about the model. `fellBack` compares against what
   the caller asked for. `fallbacks` rides with Opus alone, header and field
   together. The critic stays on Opus and is handed `CRITIC_TOOLS` (empty) — see
   `REFACTOR.md` R-15.
@@ -423,7 +415,7 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   boot guard, each guarded where used — `agree.test.mjs` makes that cost
   something.
 - **Everything she writes is spoken, with the text as the fallback**, through
-  `sayAloud`; `agree.test.mjs` reads it and counts the six call sites, and
+  `sayAloud`; `agree.test.mjs` reads it and counts the four call sites, and
   `fold.test.mjs` drives the fallback. There is no length cap and the prompt
   states none; `TTS_LIMIT` is a chunk size. The briefing speaks in a second worker
   (`postSpeak`), stored before the hand-off, falling back to speaking itself.

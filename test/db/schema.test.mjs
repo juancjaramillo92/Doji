@@ -236,11 +236,11 @@ test('the README\'s restore puts back every row a backup holds, and sends no new
 
 /* ─── The calendar's clock ──────────────────────────────────────────────── */
 
-test('a release changing moves updated_at, and marking it looked at does not', () => {
-  sql(RESET + `insert into public.eugenia_calendar (at, name) values (now(), 'CPI');`);
+test('a release changing moves updated_at, and filing it again unchanged does not', () => {
+  sql(RESET + `insert into public.eugenia_calendar (at, name, actual) values (now(), 'CPI', '0.2%');`);
   const moved = (set) => sql(`select updated_at from public.eugenia_calendar;`) !==
     sql(`update public.eugenia_calendar set ${set}; select updated_at from public.eugenia_calendar;`);
-  assert.equal(moved('looked_at = now()'), false, 'a mark moved updated_at');
+  assert.equal(moved(`actual = '0.2%'`), false, 'filing the same figure again moved updated_at');
   assert.equal(moved(`actual = '0.3%'`), true, 'a new actual did not move updated_at');
 });
 

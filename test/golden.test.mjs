@@ -196,9 +196,9 @@ const HOSTILE = `<script>alert("x")</script> & 'quotes' "double" <b>`;
 const DESK = {
   eugenia_calendar: [
     { at: '2026-07-30T12:30:00.000Z', name: 'US Initial Jobless Claims',
-      importance: 'high', consensus: '232k', actual: '229k', note: null },
+      importance: 'high', consensus: '232k', actual: '229k' },
     { at: '2026-07-31T14:00:00.000Z', name: 'Core PCE & "revisions"',
-      importance: 'high', consensus: "0.2%", actual: null, note: null },
+      importance: 'high', consensus: "0.2%", actual: null },
   ],
   eugenia_thesis: [{ thesis: `Dollar bid into month end; gold heavy above 3450. ${HOSTILE}`,
                      moved_on: '2026-07-30' }],

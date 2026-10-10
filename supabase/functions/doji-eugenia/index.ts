@@ -28,7 +28,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
@@ -59,14 +59,6 @@ export function briefDue(now: Date): Brief | null {
   if (wd >= 1 && wd <= 5 && hour === 8) return 'weekday';
   if (wd === 0 && hour === 17) return 'sunday';
   return null;
-}
-
-/* The second look, whose default answer is silence: weekdays at 10:00, past
-   the 08:30 data and into the session. One call a day rather than an hourly
-   watch, whose right answer would usually be "nothing happened". */
-export function pulseDue(now: Date): boolean {
-  const { wd, hour } = nyClock(now);
-  return wd >= 1 && wd <= 5 && hour === 10;
 }
 
 /* The retries, which fire only if the briefing did not land: weekdays 09:00 to
@@ -102,17 +94,15 @@ export function consolidateRetryDue(now: Date): boolean {
 }
 
 /* What this hour owes — one answer, because the schedules overlap and each
-   being right alone settles nothing. At 10:00 a needed retry beats the pulse:
-   a second look at a morning he was never told about is worth nothing. */
+   being right alone settles nothing. */
 export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
-    Brief | 'pulse' | 'consolidate' | null {
+    Brief | 'consolidate' | null {
   const brief = briefDue(now);
   if (brief) return brief;
   const retry = retryDue(now);
   if (retry && !briefed) return retry;
   // The gate makes 23:00 a retry rather than a second pass.
-  if ((consolidateDue(now) || consolidateRetryDue(now)) && !consolidated) return 'consolidate';
-  return pulseDue(now) ? 'pulse' : null;
+  return (consolidateDue(now) || consolidateRetryDue(now)) && !consolidated ? 'consolidate' : null;
 }
 
 
@@ -775,7 +765,7 @@ const CAL_BACK = 12, CAL_AHEAD = 28;
 /* Every market read is bounded, and what is left when it runs out is the
    caller's own sentence for a failed read. Unbounded, a feed that stopped
    answering held the caller until the platform closed the request at 150s —
-   the 7 October pulse spent that long learning TradingView was down — and in a
+   a 7 October look spent that long learning TradingView was down — and in a
    briefing the wait lands on the writing worker's clock. TradingView's doors,
    the broker's price and the CFTC's count all carry it. */
 const READ_MS = 45_000;
@@ -828,11 +818,10 @@ export function wanted(e: TvEvent): boolean {
 }
 
 /* A figure TradingView has not published is left out, never sent as null:
-   under merge-duplicates a null erases an actual the release look recorded by
-   hand. `note` is hers and never named. The period joins the name, since the
-   title alone does not say which month, and abroad the country leads it, since
-   France, Italy and Germany each publish an "Inflation Rate YoY Prel" and
-   record_actual matches on the name. */
+   under merge-duplicates a null erases an actual already filed. The period
+   joins the name, since the title alone does not say which month, and abroad
+   the country leads it, since France, Italy and Germany each publish an
+   "Inflation Rate YoY Prel". */
 export function calendarRows(events: TvEvent[], from: number, to: number) {
   return events
     .filter(wanted)
@@ -959,75 +948,6 @@ async function filed(now = Date.now()): Promise<void> {
     await recordRun({ caller: 'calendar', ok: false, detail: reason.slice(0, 500) });
   }
 }
-
-/* The fallback for a print TradingView has not published. It cannot insert —
-   an upsert on a model-written name once filed a print beside the row it was
-   handed — so it is a PATCH over the two columns a look owns, never consensus
-   or prior. A name matching nothing answers with the names on file, since an
-   empty PATCH is a 200 that reads like a write.
-
-   Either half may come alone: a speech has no figure, and its one line must
-   not be refused for want of a number. An absent key is left as it was. */
-async function recordActual(at: unknown, name: unknown, actual: unknown, note: unknown): Promise<string> {
-  const when = new Date(String(at ?? ""));
-  const called = String(name ?? "").trim();
-  const printed = String(actual ?? "").trim().slice(0, NOTE_MAX);
-  const line = String(note ?? "").trim().slice(0, NOTE_MAX);
-  if (isNaN(+when) || !called || !(printed || line)) {
-    return "That needs the release's time in UTC, its name exactly as the calendar lists it, " +
-           "and what it printed, or for a speech one line on what was said.";
-  }
-
-  const patch: Record<string, string> = {};
-  if (printed) patch.actual = printed;
-  if (line) patch.note = line;
-
-  // The name goes out encoded and nothing else. PostgREST reads an `eq` value
-  // whole — quotes are stripped only inside `in.(…)` — so quoting it once made
-  // every call miss.
-  const at_ = when.toISOString();
-
-  try {
-    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?at=eq.${at_}&name=eq.${encodeURIComponent(called)}`, {
-      method: "PATCH", headers: sbHeaders("return=representation"),
-      body: JSON.stringify(patch),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    if ((await res.json()).length) return `Recorded against ${called}.`;
-
-    // Bounded: the 08:30 slot holds most of a report.
-    const standing = await readRows<Release>('Release',
-      `eugenia_calendar?select=name&at=eq.${at_}&limit=12`);
-    return standing.length
-      ? `Nothing at that time is called "${called}". On file: ` +
-        `${standing.map(r => r.name).join(", ")}. Call it again with one of those, copied exactly.`
-      : "Nothing is on file at that time, so there is no entry to fill in. Leave it.";
-  } catch (err) {
-    console.error("doji-eugenia: actual not written —", why(err));
-    return UNSAVED;
-  }
-}
-
-const ACTUAL_TOOL = {
-  name: "record_actual",
-  description:
-    "Fill in what a release printed, on the entry already filed for it, or for a " +
-    "speech, which prints nothing, one line on what was said. Give the time in " +
-    "UTC and the name exactly as the list you were handed spells it. This updates " +
-    "that entry and can never add a second one, so a name that matches nothing " +
-    "writes nothing and tells you what is on file instead.",
-  input_schema: {
-    type: "object",
-    properties: {
-      at:     { type: "string", description: "When it landed, ISO 8601 in UTC, as the entry was filed." },
-      name:   { type: "string", description: "The entry's name, copied exactly from the list you were given." },
-      actual: { type: "string", description: "What it printed, with its unit. Left out for a speech." },
-      note:   { type: "string", description: `One line on what it meant, or for a speech what was said. At most ${NOTE_MAX} characters.` },
-    },
-    required: ["at", "name"],
-    additionalProperties: false,
-  },
-} as const;
 
 /* ─── The price, read off the instrument ───────────────────────────────────
    Through the poller, never the broker: the endpoint that serves a price also
@@ -1299,7 +1219,7 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
 // the string, so a megabyte of base64 never becomes memory.
 interface Turn { role: 'user' | 'assistant'; content: string | any[] }
 
-/* Effort per caller. The briefing earns `high`; a reply and the pulse do not —
+/* Effort per caller. The briefing earns `high`; a reply does not —
    at high, "how many trades did I take" bought a minute of thought for one
    sentence. Medium rather than low, because a fast wrong reading of his
    journal is worse than a slow right one. */
@@ -1327,8 +1247,8 @@ const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 
    offered: the shared loop answers a name outside its set as unknown. Never a
    schema for something a job has no business doing — it is paid on every
    request and it is an option that should not be taken. The pass has nothing
-   to research but needs search to supersede rather than duplicate; the release
-   look gets no memory; the trade look only his strategy and journal. */
+   to research but needs search to supersede rather than duplicate; the trade
+   look gets only his strategy and journal. */
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
@@ -1343,8 +1263,6 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
-// A look files an actual, through a PATCH that cannot mint a row.
-const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
@@ -1399,8 +1317,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       max_tokens: 16000,
       /* Cached: long, fixed, and sent on every turn — which is why the strategy
          rides here. The window is a property of the tool ARRAY, where the key
-         starts: each array is its own prefix. The release look keeps the hour
-         because its quarter-hourly looks cluster in one morning; the chat array
+         starts: each array is its own prefix. The chat array keeps the hour
          because fourteen of a week's eighteen replies came within an hour of the
          turn before, six within five minutes. The briefing shares that array,
          never reuses it, and pays 2× for the write. Everything else is five
@@ -1408,7 +1325,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
          field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
-                                  ttl: tools === RELEASE_TOOLS || tools === CHAT_TOOLS ? "1h" : "5m" } }],
+                                  ttl: tools === CHAT_TOOLS ? "1h" : "5m" } }],
       messages,
       // Server tools need no loop here; the rest are executed below.
       tools,
@@ -1463,7 +1380,6 @@ export async function serve(name: string, input: any): Promise<string> {
     case AROUND_TOOL.name:
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), volumeBlock()])).join("").trim();
-    case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
@@ -2279,12 +2195,11 @@ export async function loopsBlock(): Promise<string> {
 
 type Release = {
   id: number; at: string; name: string; country: string; importance: string;
-  consensus: string | null; prior: string | null; actual: string | null; note: string | null;
-  looked_at?: string | null; ticker?: string | null;
+  consensus: string | null; prior: string | null; actual: string | null;
 };
 
-// The columns every calendar read asks for; the spine adds the two optional ones.
-const RELEASE_COLUMNS = "id,at,name,country,importance,consensus,prior,actual,note";
+// The columns every calendar read asks for.
+const RELEASE_COLUMNS = "id,at,name,country,importance,consensus,prior,actual";
 
 /* Read earliest first, so a day too heavy for the bound loses the
    furthest-ahead rows, which tomorrow's briefing reads anyway. A full read
@@ -2324,17 +2239,16 @@ export function calendarList(rows: Release[], now = Date.now(),
                  ` ${r.name}`;
     if (r.actual) {
       return `${head} — LANDED at ${r.actual}` +
-             (r.consensus ? ` against ${r.consensus} expected` : "") +
-             (r.note ? `. ${r.note}` : "");
+             (r.consensus ? ` against ${r.consensus} expected` : "");
     }
-    if (Date.parse(r.at) <= now) return `${head} — PAST, no figure on file` + (r.note ? `. ${r.note}` : "");
+    if (Date.parse(r.at) <= now) return `${head} — PAST, no figure on file`;
     return `${head} — due` +
            (r.consensus ? `, ${r.consensus} expected` : "") +
            (r.prior ? ` after ${r.prior}` : "");
   });
   return `\n\n${heading}:\n${lines.join("\n")}` + (rows.some(r => r.country !== HOME)
     ? `\n· A line led by a country code is from abroad and filed as context: R-14 and R-19 ` +
-      `count US releases alone, and nothing from abroad wakes you to look at it.`
+      `count US releases alone.`
     : "");
 }
 
@@ -2697,22 +2611,14 @@ export async function positionsBlock(): Promise<string> {
   }
 }
 
-/* ─── The cron half: the briefing, and the quieter second look ───────────── */
-
-/* Paused to spend less, not because either is wrong (README, *Paused*), and
-   back on by deleting the name. Each still fires on its schedule and returns
-   before its model call — the release look after filing, so the calendar and
-   every actual keep landing while it is off. */
-export const PAUSED = new Set(['pulse', 'release']);
+/* ─── The cron half: the briefing and the nightly pass ───────────────────── */
 
 /* The apology names the job. Every failure once said "No briefing", so a
    nightly pass that died — whose symptom is a memory that stops growing — sent
    him looking for a missing message. A map, so the words can be enumerated. */
 export const APOLOGY: Record<string, string> = {
   briefing:     "No briefing, jefe — something broke on my side.",
-  pulse:        "My second look at the morning broke, jefe. Nothing is wrong with the briefing.",
   consolidate:  "My nightly tidy-up broke, jefe. I may not have kept what today was worth keeping.",
-  release:      "I could not look at the number that just landed, jefe.",
   trade:        "Something broke while I was looking at your position, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
@@ -2722,19 +2628,18 @@ export const APOLOGY: Record<string, string> = {
 export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
 
 /* The scheduled half. The hourly job asks dueNow what this hour owes; the
-   data-driven senses and the repair doors each name theirs with a flag.
-   ?force=1, ?pulse=1 and ?consolidate=1 run now whatever the clock says — a
+   calendar and the repair doors each name theirs with a flag.
+   ?force=1 and ?consolidate=1 run now whatever the clock says — a
    re-run after a failure, and the only way to see the nightly pass, which
    sends nothing. */
 async function postScheduled(url: URL): Promise<Response> {
   // Named before the work so the catch can say which job died.
   let job = 'briefing';
   try {
-    if (url.searchParams.get("pulse") === "1")       { job = 'pulse';       return await postPulse(); }
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
-    // The data-driven senses, each behind its own door: decided by a table,
-    // not by the clock, so not in dueNow.
-    if (url.searchParams.get("release") === "1")     { job = 'release';     return await postRelease(); }
+    // The calendar, on its own quarter-hourly job, so an actual lands within
+    // one; filed() never throws.
+    if (url.searchParams.get("calendar") === "1")    { await filed(); return json({ ok: true, filed: true }); }
 
     // The backfill, called by hand until `left: 0`; the nightly pass sweeps
     // the trickle a failed vendor call leaves.
@@ -2757,7 +2662,6 @@ async function postScheduled(url: URL): Promise<Response> {
     // Which hours these matter in is dueNow's rule, stated there once.
     const [briefed, consolidated] = await Promise.all([briefedToday(), consolidatedToday()]);
     const due = dueNow(now, briefed, consolidated);
-    if (due === 'pulse')       { job = 'pulse';       return await postPulse(); }
     if (due === 'consolidate') { job = 'consolidate'; return await postConsolidation(); }
     if (due) return await postBriefing(due);
 
@@ -3145,183 +3049,6 @@ async function recordChannels() {
     console.error("doji-eugenia: channels unavailable —", reason);
     await recordRun({ caller: 'channels', ok: false, detail: reason.slice(0, 500) });
   }
-}
-
-/* The quiet look. Nothing is stored when she stays quiet: empty pairs would
-   push the briefing out of the twelve turns. */
-async function postPulse(): Promise<Response> {
-  if (PAUSED.has('pulse')) return json({ ok: true, pulse: "paused" });
-  const [notes, channels, story, loops, calendar, desk] = await Promise.all([
-    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
-    positionsBlock(),
-  ]);
-  const asked = "Pulse, please — anything since the briefing?"
-    + notes + channels + story + loops + calendar + desk;
-  const said = await ask([...await recent(), { role: 'user', content: asked }],
-                         'medium', 'pulse');
-
-  if (isSilent(said)) return json({ ok: true, pulse: "quiet" });
-
-  const sent = await trim(said, desk, story);
-  await sayAloud(sent);
-  await remember([{ role: 'user', content: '[pulse]' }, { role: 'assistant', content: sent }]);
-  return json({ ok: true, pulse: "sent" });
-}
-
-/* ─── The look after a number lands ────────────────────────────────────────
-   The first thing here that is not a clock: an 08:30 print used to land after
-   the briefing and wait for a pulse whose default is silence. This fires off
-   the filed calendar — the quarter-hourly job asks whether anything high has
-   landed unlooked, and `looked_at` makes it once-only. Still silent by
-   default: a number landing where everyone expected is not news. US releases
-   only: what is filed from abroad is context for her reads, and a look at
-   each would wake him at 21:30 for China's inflation.
-   ───────────────────────────────────────────────────────────────────────── */
-// Older than this, a print is history for tomorrow's briefing — and a redeploy
-// after an outage cannot send a day of looks at once.
-const RELEASE_STALE_H = 6;
-
-// A bound, not a working limit.
-const RELEASE_ROWS = 40;
-
-/* One look per release TIME, not per row: the 08:30 slot is most of a report,
-   and her typed rows once fired five looks for one CPI. The earliest time
-   nothing has looked at, and every high row at it, in one message. Exported and
-   pure, since which rows get looked at is the decision. */
-export function dueRelease(rows: Release[]): Release[] {
-  const byTime = new Map<string, Release[]>();
-  for (const r of rows) (byTime.get(r.at) ?? byTime.set(r.at, []).get(r.at)!).push(r);
-  for (const [, group] of [...byTime].sort(([a], [b]) => a < b ? -1 : 1)) {
-    if (!group.some(r => r.looked_at)) return group;
-  }
-  return [];
-}
-
-async function pendingRelease(now = Date.now()): Promise<Release[]> {
-  const from = new Date(now - RELEASE_STALE_H * 3600_000).toISOString();
-  // looked_at is read, not filtered on: a filter would hide the mark that makes
-  // the rest of the group skippable.
-  const rows = await readRows<Release>('Release',
-    `eugenia_calendar?select=${RELEASE_COLUMNS},looked_at,ticker` +
-    `&importance=eq.high&country=eq.${HOME}` +
-    `&at=lte.${new Date(now).toISOString()}&at=gte.${from}` +
-    `&order=at.asc&limit=${RELEASE_ROWS}`);
-  return dueRelease(rows);
-}
-
-/* The look waits for the number, up to half an hour: TradingView publishes an
-   actual a minute or two late, and a look run first spends a search finding
-   what the next filing would hand it. Left unmarked meanwhile. A speech — no
-   consensus, no prior — has nothing coming and is looked at on time. */
-const ACTUAL_WAIT_MIN = 30;
-
-export function awaitingActual(due: Release[], now: number): boolean {
-  return due.some(r => !r.actual && (r.consensus || r.prior)) &&
-         now - Date.parse(due[0].at) < ACTUAL_WAIT_MIN * 60_000;
-}
-
-/* ─── How it usually goes ──────────────────────────────────────────────────
-   The last twelve prints of the same series (020's ticker), each with its
-   consensus, so a surprise is read against its own record. Listed, not scored:
-   the figures are text, and a surprise computed here would be a parse with
-   every unit a chance to get the sign backwards.
-
-   Only for a release with a figure coming. The minutes carry the rate
-   decision's ticker, so their "record" was the decisions' — a speech or the
-   minutes has nothing to read against, which is awaitingActual's test.
-   ───────────────────────────────────────────────────────────────────────── */
-const RECORD = 12;
-
-export function recordList(name: string, rows: Pick<Release, 'at' | 'name' | 'consensus' | 'actual'>[]): string {
-  if (!rows.length) return "";
-  return `\n\nHow ${name} has printed against expectations, the last ${rows.length} times:\n` +
-    rows.map(r => `· ${civilDay(r.at.slice(0, 10))}, ${r.name}: ${r.actual}` +
-      (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file")).join("\n");
-}
-
-/* What the last print became. TradingView carries the revised figure as this
-   row's `prior` while last month's row keeps the first report, so a revision is
-   the two disagreeing — half the story on 2 October, payrolls' August cut from
-   162K to 133K. Only against the print immediately before: a gap half as long
-   again as the one before it is a missing print, and says nothing. */
-export function revisionLine(r: Pick<Release, 'at' | 'prior'>,
-                             record: Pick<Release, 'at' | 'name' | 'actual'>[]): string {
-  const [last, before] = record;
-  if (!r.prior || !last?.actual || !before || r.prior === last.actual) return "";
-  if (Date.parse(r.at) - Date.parse(last.at) > 1.5 * (Date.parse(last.at) - Date.parse(before.at))) return "";
-  return `\nRevised: ${last.name} was first reported at ${last.actual} on ` +
-         `${civilDay(last.at.slice(0, 10))}, and this release revises it to ${r.prior}.`;
-}
-
-export function recordQuery(ticker: string, before: string): string {
-  return `eugenia_calendar?select=at,name,consensus,actual&ticker=eq.${encodeURIComponent(ticker)}` +
-         `&at=lt.${before}&actual=not.is.null&order=at.desc&limit=${RECORD}`;
-}
-
-/* One read per series; a failed read costs its block only. */
-async function recordBlock(due: Release[]): Promise<string> {
-  const series = [...new Map(due.filter(r => r.ticker && (r.consensus || r.prior))
-    .map(r => [r.ticker!, r])).values()];
-  const parts = await Promise.all(series.map(async r => {
-    try {
-      const rows = await readRows<Release>('Record', recordQuery(r.ticker!, r.at));
-      return recordList(r.name, [...rows].reverse()) + revisionLine(r, rows);
-    } catch (err) {
-      console.error("doji-eugenia: track record unavailable —", why(err));
-      return "";
-    }
-  }));
-  return parts.join("");
-}
-
-/* Marked before the look, for the briefing marker's reason: a look that fails
-   after generating would otherwise repeat every quarter hour, billed. Every row
-   at that time, or one left unmarked is the next look. */
-async function markLooked(ids: number[]): Promise<void> {
-  const res = await fetch(`${SB_URL}/rest/v1/eugenia_calendar?id=in.(${ids.join(',')})`, {
-    method: "PATCH", headers: sbHeaders("return=minimal"),
-    body: JSON.stringify({ looked_at: new Date().toISOString() }),
-  });
-  if (!res.ok) throw new Error(`Could not mark ${ids.length} release(s) looked at (HTTP ${res.status})`);
-}
-
-async function postRelease(): Promise<Response> {
-  await filed();
-  if (PAUSED.has('release')) return json({ ok: true, skipped: "paused" });
-  const due = await pendingRelease();
-  if (!due.length) return json({ ok: true, skipped: "nothing has landed unlooked" });
-  if (awaitingActual(due, Date.now())) return json({ ok: true, skipped: "waiting for TradingView's actual" });
-
-  await markLooked(due.map(r => r.id));
-
-  // The channel map, since it is asked to build terms by rung.
-  const [notes, channels, story, loops, desk, record] = await Promise.all([
-    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), positionsBlock(), recordBlock(due),
-  ]);
-  const landed = due.map(r =>
-    `· ${r.name}` +
-    (r.actual ? ` — printed ${r.actual}` : " — not yet published") +
-    (r.consensus ? `, ${r.consensus} expected` : "") +
-    (r.prior ? `, after ${r.prior}` : "")).join("\n");
-  // The UTC instant beside the ET heading: record_actual takes it, and a
-  // conversion she would do in her head is an input.
-  const asked = RELEASE +
-    `\n\nWhat landed at ${nyTime(due[0].at)} ET — ${new Date(due[0].at).toISOString()} in UTC, ` +
-    `which is what record_actual takes:\n${landed}` +
-    record + notes + channels + story + loops + desk;
-
-  const said = await ask([...await recent(), { role: 'user', content: asked }],
-                         'medium', 'release look', RELEASE_TOOLS);
-
-  const named = due.map(r => r.name).join(", ");
-  if (isSilent(said)) return json({ ok: true, release: named, said: "quiet" });
-
-  const sent = await trim(said, desk, story);
-  await sayAloud(sent);
-  // Stored, unlike a quiet look: a follow-up needs it.
-  await remember([{ role: 'user', content: `[${named} landed]` },
-                  { role: 'assistant', content: sent }]);
-  return json({ ok: true, release: named, said: "sent" });
 }
 
 /* ─── The trade she hears about in two minutes ─────────────────────────────

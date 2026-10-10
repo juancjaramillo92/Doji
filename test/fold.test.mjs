@@ -29,7 +29,7 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
-  briefDue, pulseDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
+  briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
@@ -38,11 +38,11 @@ import {
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
-  positionsList, isOpen, healthLine, sweepLine, serve, dueRelease, parseChannel, sayAloud, postSpeak,
+  positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
-  releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory, awaitingActual,
-  aroundList, aroundBlock, headlinesList, headlinesBlock, recordList, recordQuery, revisionLine,
+  releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
+  aroundList, aroundBlock, headlinesList, headlinesBlock,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -895,42 +895,6 @@ test('odds refused or unreadable are a sentence, and never take the briefing dow
   });
 });
 
-/* ─── What the last print became ────────────────────────────────────────────
-   The payrolls rows as filed on 2 October, cut to what the line reads. August
-   was first reported at 162K and September's row carries it revised to 133K as
-   its prior; July, under August's, went from −23K to 21K. The record is handed
-   newest first, which is how recordQuery reads it. */
-const NFP_SEP = { at: '2026-10-02T12:30:00.000Z', prior: '133K' };
-const NFP_RECORD = [
-  { at: '2026-09-04T12:30:00.000Z', name: 'Non Farm Payrolls (Aug)', actual: '162K' },
-  { at: '2026-08-07T12:30:00.000Z', name: 'Non Farm Payrolls (Jul)', actual: '-23K' },
-  { at: '2026-07-03T12:30:00.000Z', name: 'Non Farm Payrolls (Jun)', actual: '147K' },
-];
-
-test('a revision is the prior disagreeing with what was first reported, and says both', () => {
-  assert.equal(revisionLine(NFP_SEP, NFP_RECORD),
-    '\nRevised: Non Farm Payrolls (Aug) was first reported at 162K on 4 Sept, ' +
-    'and this release revises it to 133K.');
-  assert.equal(revisionLine({ ...NFP_SEP, prior: '162K' }, NFP_RECORD), '',
-    'a prior that matches what was first reported is called a revision');
-  assert.equal(revisionLine({ ...NFP_SEP, prior: null }, NFP_RECORD), '');
-  assert.equal(revisionLine(NFP_SEP, []), '');
-});
-
-test('a revision is read only against the print immediately before', () => {
-  /* August's row missing: the newest on file is July's, and −23K against a
-     prior of 133K is two months apart rather than a revision. */
-  assert.equal(revisionLine(NFP_SEP, NFP_RECORD.slice(1)), '',
-    'a missing month reads as a revision of the month before it');
-  assert.equal(revisionLine(NFP_SEP, NFP_RECORD.slice(0, 1)), '',
-    'one row on file is no rhythm to tell a missing print from the last one');
-  // A weekly series keeps its own rhythm: claims a week apart are adjacent.
-  assert.match(revisionLine({ at: '2026-10-01T12:30:00.000Z', prior: '219K' }, [
-    { at: '2026-09-24T12:30:00.000Z', name: 'Initial Jobless Claims', actual: '218K' },
-    { at: '2026-09-17T12:30:00.000Z', name: 'Initial Jobless Claims', actual: '231K' },
-  ]), /first reported at 218K on 24 Sept, and this release revises it to 219K/);
-});
-
 /* ─── Where the speculators stand ───────────────────────────────────────────
    The two reports the CFTC served for gold through pg_net, as strings because
    that is how they arrive. Net 135,699 − 8,310 = 127,389; the week's change is
@@ -1019,30 +983,6 @@ test('futures volume that will not read is a sentence, and never takes the brief
     globalThis.fetch = async () => new Response('{}', { status: 500 });
     assert.match(await volumeBlock(), /could not be read just now; do not quote it from a search/);
   });
-});
-
-/* ─── How a release usually goes ─────────────────────────────────────────── */
-
-test("a release's record is listed oldest first, as printed, and never scored", () => {
-  const out = recordList('Core PCE Price Index MoM (Sep)', [
-    { at: '2026-08-29T12:30:00.000Z', name: 'Core PCE Price Index MoM (Jul)', consensus: '0.2%', actual: '0.1%' },
-    { at: '2026-09-30T12:30:00.000Z', name: 'Core PCE Price Index MoM (Aug)', consensus: '0.3%', actual: '0.2%' },
-    { at: '2026-07-31T12:30:00.000Z', name: 'Core PCE Price Index MoM (Jun)', consensus: null, actual: '0.3%' },
-  ].slice(0, 2));
-  assert.match(out, /How Core PCE Price Index MoM \(Sep\) has printed against expectations, the last 2 times:/);
-  assert.ok(out.indexOf('(Jul)') < out.indexOf('(Aug)'), 'the record does not read oldest first');
-  assert.match(out, /· 29 Aug, Core PCE Price Index MoM \(Jul\): 0\.1% against 0\.2% expected/);
-  // A missing consensus is said, not left to read as a figure.
-  assert.match(recordList('x', [{ at: '2026-07-31T12:30:00.000Z', name: 'x (Jun)', consensus: null, actual: '0.3%' }]),
-    /x \(Jun\): 0\.3%, no consensus on file/);
-  assert.doesNotMatch(out, /\b(above|below|beat|miss)\b/, 'the record is scored rather than listed');
-  assert.equal(recordList('x', []), '');
-});
-
-test('the record reads one series, newest first, before the release, printed ones only', () => {
-  const q = recordQuery('ECONOMICS:USCPCEPIMM', '2026-10-30T12:30:00.000Z');
-  assert.match(q, /^eugenia_calendar\?select=at,name,consensus,actual&ticker=eq\.ECONOMICS%3AUSCPCEPIMM&/);
-  assert.match(q, /&at=lt\.2026-10-30T12:30:00\.000Z&actual=not\.is\.null&order=at\.desc&limit=12$/);
 });
 
 test('the calendar window is whole days, at most a month, inside the data', () => {
@@ -1432,35 +1372,6 @@ test('Saturday never gets a briefing, and no other hour does either', () => {
   assert.equal(due.length, 1);
 });
 
-/* ─── Eugenia: the pulse ─────────────────────────────────────────────────────
-   A weekday hour that is NOT a briefing hour, and able to stay quiet.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-test('the pulse is 10:00 New York on weekdays, in both halves of the year', () => {
-  // 14:00 UTC is 10:00 New York in August (EDT, UTC-4).
-  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 19, 14, 0))), true);
-  // 15:00 UTC is 10:00 New York in January (EST, UTC-5) — the same wall hour.
-  assert.equal(pulseDue(new Date(Date.UTC(2026, 0, 14, 15, 0))), true);
-  // An hour either side of it is not the pulse.
-  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 19, 13, 0))), false);
-  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 19, 15, 0))), false);
-});
-
-test('the weekend gets no pulse at all', () => {
-  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 22, 14, 0))), false);   // Saturday
-  assert.equal(pulseDue(new Date(Date.UTC(2026, 7, 23, 14, 0))), false);   // Sunday
-});
-
-test('a briefing hour and a pulse hour never collide', () => {
-  // Every hour of a full week: the two schedules must never both fire, or one
-  // call would owe two answers and only one caller would get its own.
-  for (let h = 0; h < 24 * 7; h++) {
-    const at = new Date(Date.UTC(2026, 7, 16, h));           // Sun 16 Aug onwards
-    assert.equal(briefDue(at) !== null && pulseDue(at), false,
-      `both due at ${at.toISOString()}`);
-  }
-});
-
 /* ─── Eugenia: which schedule this hour owes ─────────────────────────────────
    The predicates overlap, so what an hour owes is their composition. This walks
    168 CONSECUTIVE HOURS: a walk restarting at 00:00 UTC never reaches Sunday
@@ -1485,24 +1396,23 @@ const timetable = (briefed, passFails = false) => {
   return owed;
 };
 
-test('an ordinary week owes one briefing and one pulse a day, and nothing else', () => {
-  // August, so EDT: 08:00 ET is 12:00 UTC, 10:00 is 14:00, Sunday's 17:00 is
-  // 21:00, and 22:00 ET is 02:00 UTC the NEXT day.
+test('an ordinary week owes one briefing and one nightly pass a day, and nothing else', () => {
+  // August, so EDT: 08:00 ET is 12:00 UTC, Sunday's 17:00 is 21:00, and 22:00
+  // ET is 02:00 UTC the NEXT day.
   assert.deepEqual(timetable(true), [
     '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
-    '2026-08-17T02:00 consolidate', '2026-08-17T12:00 weekday', '2026-08-17T14:00 pulse',
-    '2026-08-18T02:00 consolidate', '2026-08-18T12:00 weekday', '2026-08-18T14:00 pulse',
-    '2026-08-19T02:00 consolidate', '2026-08-19T12:00 weekday', '2026-08-19T14:00 pulse',
-    '2026-08-20T02:00 consolidate', '2026-08-20T12:00 weekday', '2026-08-20T14:00 pulse',
-    '2026-08-21T02:00 consolidate', '2026-08-21T12:00 weekday', '2026-08-21T14:00 pulse',
+    '2026-08-17T02:00 consolidate', '2026-08-17T12:00 weekday',
+    '2026-08-18T02:00 consolidate', '2026-08-18T12:00 weekday',
+    '2026-08-19T02:00 consolidate', '2026-08-19T12:00 weekday',
+    '2026-08-20T02:00 consolidate', '2026-08-20T12:00 weekday',
+    '2026-08-21T02:00 consolidate', '2026-08-21T12:00 weekday',
     '2026-08-22T02:00 consolidate',
   ]);
 });
 
-test('a week of failed briefings owes the retry hours, and the pulse gives way', () => {
-  // 09:00–11:00 ET are 13:00–15:00 UTC. 14:00 is the pulse's hour too, and the
-  // retry takes it. Consolidation is not a briefing, so a failed one neither
-  // delays nor replaces it.
+test('a week of failed briefings owes the retry hours', () => {
+  // 09:00–11:00 ET are 13:00–15:00 UTC. Consolidation is not a briefing, so a
+  // failed one neither delays nor replaces it.
   const day = (d) => [`2026-08-${d}T02:00 consolidate`,
                       `2026-08-${d}T12:00 weekday`, `2026-08-${d}T13:00 weekday`,
                       `2026-08-${d}T14:00 weekday`, `2026-08-${d}T15:00 weekday`];
@@ -1529,10 +1439,10 @@ test('the timetable holds its New York hours in winter too', () => {
     if (due === 'consolidate') done.add(nyDate(at));
   }
   // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's pass.
-  assert.deepEqual(owed, ['03:00 consolidate', '13:00 weekday', '15:00 pulse']);
+  assert.deepEqual(owed, ['03:00 consolidate', '13:00 weekday']);
 });
 
-test('the pulse stays silent on the word it was told to use', () => {
+test('silence is the word she was told to use, and nothing else', () => {
   assert.equal(isSilent('NOTHING'), true);
   assert.equal(isSilent('NOTHING.'), true);
   assert.equal(isSilent('  Nothing  '), true);
@@ -2628,154 +2538,6 @@ test('every other message is not this command', () => {
   }
 });
 
-/* ─── One look per release time, because one print is not one row ────────────
-   A time holds several rows — the 08:30 slot is most of a report — so one look
-   covers the time. The fixture is the real morning: five high rows for one CPI
-   at 12:30 on 11 September.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-const CPI_MORNING = [
-  { id: 1, at: '2026-09-11T12:30:00+00', name: 'August CPI',        importance: 'high', looked_at: null },
-  { id: 2, at: '2026-09-11T12:30:00+00', name: 'core CPI',          importance: 'high', looked_at: null },
-  { id: 3, at: '2026-09-11T12:30:00+00', name: 'headline CPI',      importance: 'high', looked_at: null },
-  { id: 4, at: '2026-09-11T12:30:00+00', name: 'US CPI (August)',   importance: 'high', looked_at: null },
-  { id: 5, at: '2026-09-11T12:30:00+00', name: 'US CPI (core CPI)', importance: 'high', looked_at: null },
-  { id: 6, at: '2026-09-11T14:00:00+00', name: 'Michigan sentiment', importance: 'high', looked_at: null },
-];
-
-test('one print under five names is one look, not five', () => {
-  const due = dueRelease(CPI_MORNING);
-  assert.equal(due.length, 5, 'the group is not the whole release time');
-  assert.deepEqual([...new Set(due.map(r => r.at))], ['2026-09-11T12:30:00+00'],
-    'the group spans two release times, so one message would cover two prints');
-});
-
-test('a release time with any mark on it is finished, whatever else stands there', () => {
-  /* A row minted at 08:35 by the look itself is unlooked and shares the release
-     time; asked per row, it would be a second message about the same number. */
-  const minted = [...CPI_MORNING.slice(0, 2).map(r => ({ ...r, looked_at: '2026-09-11T12:35:00+00' })),
-                  ...CPI_MORNING.slice(2)];
-  const due = dueRelease(minted);
-  assert.deepEqual(due.map(r => r.name), ['Michigan sentiment'],
-    'a looked-at release time came back again, so the duplicates still speak');
-});
-
-test('the earliest unlooked release time is the one taken', () => {
-  // Rows arrive `at.asc` but the decision must not depend on that: a group is
-  // chosen by its time, and the query's ordering is not the guarantee.
-  const shuffled = [...CPI_MORNING].reverse();
-  assert.equal(dueRelease(shuffled)[0].at, '2026-09-11T12:30:00+00');
-});
-
-test('nothing standing unlooked is no look at all', () => {
-  assert.deepEqual(dueRelease([]), []);
-  assert.deepEqual(dueRelease(CPI_MORNING.map(r => ({ ...r, looked_at: 'x' }))), []);
-});
-
-/* ─── The actual goes to the row that was looked at ──────────────────────────
-   An upsert keyed on a model-written name files the actual on a new row with no
-   consensus — silently, and the one comparison the table holds is lost. So the
-   tool cannot insert at all. Driven, because "it is a PATCH" is the claim a
-   reading cannot settle.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-/* Every request record_actual made, with the answer it got, against `onFile`.
-   THE STUB FILTERS THE WAY PostgREST DOES: a top-level `eq` value is taken
-   whole (`pSingleVal` is `many anyChar`) and quotes are stripped only inside
-   `in.(…)`. A stub that answered every PATCH with a match would hold the tool
-   to a filter that can never match, green. */
-async function actualWrites(input, onFile) {
-  const sent = [];
-  return await stubbed(async () => {
-    globalThis.fetch = async (url, init) => {
-      sent.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null });
-      const eq = Object.fromEntries(String(url).split('?')[1].split('&')
-        .map(p => p.split('=')).filter(([, v]) => v.startsWith('eq.'))
-        .map(([k, v]) => [k, decodeURIComponent(v.slice(3))]));
-      const hits = onFile.filter(r => +new Date(r.at) === +new Date(eq.at)
-                                   && (!('name' in eq) || r.name === eq.name));
-      return { ok: true, status: 200, json: async () => hits };
-    };
-    return { said: await serve('record_actual', input), sent };
-  });
-}
-
-const RETAIL = { at: '2026-09-16T12:30:00Z', name: 'US retail sales (August, advance)',
-                 actual: '+1.2% m/m; control group +1.4%', note: 'well above consensus' };
-
-test('the actual is patched onto the row and never posted as a new one', async () => {
-  const { said, sent } = await actualWrites(RETAIL, [RETAIL]);
-  assert.equal(sent.length, 1, 'a second request went out after a write that landed');
-  assert.equal(sent[0].method, 'PATCH',
-    'record_actual is not a PATCH, so a name a shade off the one it was handed mints a row again');
-  assert.match(sent[0].url, /at=eq\.2026-09-16T12:30:00\.000Z/, 'the row is not selected by its time');
-  assert.match(said, /Recorded against/);
-});
-
-test('only the two columns a look owns are written', async () => {
-  /* The look cannot write consensus or prior, and the schema is half of that: a
-     model sending them anyway must not reach the database with them. */
-  const { sent } = await actualWrites(
-    { ...RETAIL, consensus: '+0.3% m/m', prior: '-0.5% m/m (Jul, revised)', importance: 'low' },
-    [RETAIL]);
-  assert.deepEqual(Object.keys(sent[0].body).sort(), ['actual', 'note'],
-    'a look can write a column the briefing owns again');
-});
-
-test('a speech is recorded by its line alone, and a line never erases a figure', async () => {
-  /* A speech prints nothing, so either half may come alone, and an absent key is
-     left as it was: a line written after the figure must not send `actual`. */
-  const POWELL = { at: '2026-10-29T18:30:00Z', name: 'Fed Chair Powell Speaks' };
-  const speech = await actualWrites({ ...POWELL, note: 'Said a December hike is not the base case.' }, [POWELL]);
-  assert.match(speech.said, /Recorded against/, 'a speech with no figure is still refused');
-  assert.deepEqual(Object.keys(speech.sent[0].body), ['note'],
-    'a line alone sent an actual with it, which erases a figure written earlier');
-
-  const neither = await actualWrites(POWELL, [POWELL]);
-  assert.equal(neither.sent.length, 0, 'a call with nothing to record still reached the database');
-  assert.match(neither.said, /for a speech one line/, 'she is not told a line alone is enough for a speech');
-});
-
-test('the name she was handed matches the row it names, whatever it is spelled with', async () => {
-  /* THE NAME GOES OUT AS ITSELF — wrapped in quotes, the quotes are compared as
-     part of it. Every punctuation a release name carries, including the ones
-     that mean something in a URL. */
-  for (const name of ['core PCE', 'US retail sales (August, advance)', 'S&P Global PMI',
-                      'Fed "dot plot"', '#1 jobs report: 100%']) {
-    const row = { ...RETAIL, name };
-    const { said, sent } = await actualWrites(row, [row]);
-    assert.match(said, /Recorded against/,
-      `"${name}" is on file and the filter did not match it — she is told it is not ` +
-      `there, reads it back, and the print is recorded nowhere`);
-    assert.equal(sent.length, 1, `"${name}" needed a second request`);
-  }
-});
-
-test('a name that matches nothing answers with the names on file', async () => {
-  /* A PATCH FILTERED TO NOTHING IS A 200 WITH AN EMPTY BODY. Answered with what
-     is actually on file, the next round has what it needs. */
-  const { said, sent } = await actualWrites({ ...RETAIL, name: 'retail sales' },
-    [RETAIL, { ...RETAIL, name: 'jobless claims' }]);
-  assert.equal(sent.length, 2, 'nothing was read back, so she is told nothing and files again');
-  assert.equal(sent[1].method, undefined, 'the fallback is not a read');
-  assert.match(said, /US retail sales \(August, advance\)/);
-  assert.match(said, /jobless claims/);
-});
-
-test('nothing on file at that time is said plainly and nothing is written', async () => {
-  const { said, sent } = await actualWrites(RETAIL, []);
-  assert.equal(sent.filter(r => r.method === 'PATCH').length, 1);
-  assert.match(said, /Nothing is on file/);
-});
-
-test('a release without a readable time, or with nothing to record, writes nothing at all', async () => {
-  for (const bad of [{ ...RETAIL, at: 'whenever' }, { ...RETAIL, name: '  ' },
-                     { ...RETAIL, actual: '', note: '  ' }]) {
-    const { sent } = await actualWrites(bad, [RETAIL]);
-    assert.equal(sent.length, 0, `${JSON.stringify(bad)} reached the database`);
-  }
-});
-
 /* ─── The calendar TradingView files ─────────────────────────────────────────
    Driven off the fixture doji-tradingview's fold is tested against, folded by
    that fold, so the two halves of the read are held together.
@@ -2800,13 +2562,12 @@ test('a figure TradingView has not published is left out of the row, never sent 
     country: 'US', importance: 'medium', source: 'tradingview', consensus: '200K', prior: '198K', actual: '197K',
     ticker: 'ECONOMICS:USIJC',
   });
-  // Payrolls has not printed: present-and-null would erase an actual the
-  // release look recorded by hand fifteen minutes before the next filing.
-  assert.ok(!('actual' in by['396953']), 'an unpublished actual is sent, and would erase one recorded by hand');
+  // Payrolls has not printed: present-and-null would erase an actual already
+  // filed, should TradingView ever hand one back blank.
+  assert.ok(!('actual' in by['396953']), 'an unpublished actual is sent, and would erase one already filed');
   assert.equal(by['396953'].consensus, '90K');
   // A speech has no figure of any kind, and names none.
   for (const k of ['consensus', 'prior', 'actual']) assert.ok(!(k in by['421425']), `a speech names ${k}`);
-  assert.ok(Object.values(by).every(r => !('note' in r)), 'a filing names note, which is hers');
 });
 
 /* ─── Abroad, what she asked for ─────────────────────────────────────────────
@@ -2859,7 +2620,7 @@ test('a release from abroad is filed under its country, and led by it', () => {
   const rows = calendarRows([event('FR', 'Inflation Rate YoY Prel'), event('IT', 'Inflation Rate YoY Prel'),
     event('DE', '15/20/30-Year Bund Auction', { category: 'gov', importance: 'low', timed: false, period: null })],
     0, Infinity);
-  // Three countries publish this title in one hour, and record_actual matches the name.
+  // Three countries publish this title in one hour.
   assert.deepEqual(rows.map(r => r.name),
     ['FR Inflation Rate YoY Prel (Sep)', 'IT Inflation Rate YoY Prel (Sep)', 'DE 15/20/30-Year Bund Auction']);
   assert.deepEqual(rows.map(r => r.country), ['FR', 'IT', 'DE']);
@@ -2869,7 +2630,7 @@ test('a release from abroad is filed under its country, and led by it', () => {
 
 test('a list holding anything from abroad says once that his rules do not count it', () => {
   const row = (name, country) => ({ id: 0, at: '2026-10-29T12:15:00Z', name, country, importance: 'high',
-    consensus: null, prior: null, actual: null, note: null });
+    consensus: null, prior: null, actual: null });
   const out = calendarList([row('EU ECB Interest Rate Decision', 'EU'), row('GDP Growth Rate QoQ Adv', 'US')],
     Date.parse('2026-10-29T11:00:00Z'));
   assert.match(out, /08:15 ET EU ECB Interest Rate Decision — due/);
@@ -3022,20 +2783,6 @@ test('a TradingView read that never answers says which door, and how long it wai
       AbortSignal.timeout = realTimeout;
     }
   });
-});
-
-test('the release look waits for a missing figure, but not past half an hour, and never for a speech', () => {
-  const at = '2026-10-02T12:30:00.000Z';
-  const payrolls = { id: 1, at, name: 'Non Farm Payrolls (Sep)', importance: 'high',
-                     consensus: '90K', prior: '162K', actual: null, note: null };
-  const t = (min) => Date.parse(at) + min * 60_000;
-  assert.equal(awaitingActual([payrolls], t(5)), true);
-  assert.equal(awaitingActual([payrolls], t(31)), false, 'it waited past half an hour');
-  assert.equal(awaitingActual([{ ...payrolls, actual: '120K' }], t(5)), false);
-  assert.equal(awaitingActual([{ ...payrolls, consensus: null, prior: null }], t(5)), false,
-    'it waited for a figure a speech will never have');
-  // One missing figure in the group holds the group: one look covers the time.
-  assert.equal(awaitingActual([{ ...payrolls, actual: '120K' }, payrolls], t(5)), true);
 });
 
 /* ─── The email boundary ─────────────────────────────────────────────────────
@@ -4038,9 +3785,9 @@ test('a landed release is never described as one still to come', () => {
   // The morning of those two prints, so both are today's and carry no date.
   const out = calendarList([
     { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', country: 'US', importance: 'high',
-      consensus: '0.3%', prior: '0.2%', actual: '0.4%', note: 'Hotter than expected.' },
+      consensus: '0.3%', prior: '0.2%', actual: '0.4%' },
     { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', country: 'US', importance: 'high',
-      consensus: null, prior: null, actual: null, note: null },
+      consensus: null, prior: null, actual: null },
   ], Date.parse('2026-01-09T13:05:00Z'));
   assert.match(out, /08:30 ET core CPI — LANDED at 0\.4%/);
   assert.match(out, /15:00 ET FOMC minutes — due/);
@@ -4053,7 +3800,7 @@ test('a calendar line from another day names the day, and today stays bare', () 
      20:00, so the day must be named. Driven across yesterday evening, this
      morning and tomorrow morning, from Thursday's 08:00 briefing. */
   const row = (at, name) => ({ id: 0, at, name, country: 'US', importance: 'high',
-    consensus: null, prior: null, actual: null, note: null });
+    consensus: null, prior: null, actual: null });
   const out = calendarList([
     row('2026-09-24T00:00:00Z', 'FOMC minutes'),       // Wed 20:00 New York
     row('2026-09-24T12:30:00Z', 'jobless claims'),     // Thu 08:30
@@ -4067,15 +3814,6 @@ test('a calendar line from another day names the day, and today stays bare', () 
   assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
   assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes — PAST, no figure on file/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
-});
-
-test('a past speech carries the line written about it', () => {
-  // The line is the only record a speech leaves; a PAST row that dropped it
-  // would hand her the time and the name and nothing of what was said.
-  const out = calendarList([{ id: 0, at: '2026-10-01T19:30:00Z', name: 'Fed Williams Speaks',
-    country: 'US', importance: 'high', consensus: null, prior: null, actual: null,
-    note: 'No urgency to hike again after September.' }], Date.parse('2026-10-01T22:00:00Z'));
-  assert.match(out, /Fed Williams Speaks — PAST, no figure on file\. No urgency to hike again/);
 });
 
 test('the calendar filed at the weekday briefing reaches the next morning\'s prints', () => {
@@ -4165,8 +3903,7 @@ test('the apology names the job that actually died', () => {
      not growing, not as a missing briefing. */
   assert.match(apologyFor('briefing'), /No briefing/);
   assert.match(apologyFor('consolidate'), /nightly/);
-  assert.match(apologyFor('pulse'), /second look/);
-  assert.match(apologyFor('release'), /number/);
+  assert.match(apologyFor('trade'), /position/);
   // Every job says something different, or the map is not doing anything.
   const said = Object.values(APOLOGY);
   assert.equal(new Set(said).size, said.length, 'two jobs share an apology');
@@ -4806,7 +4543,7 @@ test('the speaking worker refuses a briefing that is not today\'s, and a door th
     globalThis.fetch = async () => Response.json([{ created_at: '2026-09-30T12:02:23.4243+00:00' }]);
     await assert.rejects(postSpeak('weekday'), /no weekday briefing is stored for/,
       "yesterday's briefing would arrive as this morning's");
-    await assert.rejects(postSpeak('pulse'), /no such briefing to speak: pulse/);
+    await assert.rejects(postSpeak('consolidate'), /no such briefing to speak: consolidate/);
   });
 });
 
@@ -5166,7 +4903,6 @@ const TOOL_CALLS = [
   ['set_channel',   { channel: 'rates', state: 'explained', evidence: 'said so' }],
   ['get_market',    {}],
   ['get_around',    {}],
-  ['record_actual', { at: '2026-09-07T12:30:00Z', name: 'CPI', actual: '+0.3% m/m' }],
   ['set_thesis',    { thesis: 'a reading' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
@@ -5246,7 +4982,7 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
 /* ─── A block that cannot read degrades; it does not take the message with it ─
    The blocks are what she is HANDED, each built from a read, and a failed read
    costs that block and nothing else. `notesBlock` is the one to watch: an
-   instruction he gave lives only in a note, and it is on all seven paths. If
+   instruction he gave lives only in a note, and it is on all four paths. If
    it throws, every message dies; if it degrades, one thing is forgotten.
    ─────────────────────────────────────────────────────────────────────────── */
 
@@ -5326,9 +5062,9 @@ test('the Sunday briefing is handed the week ahead, high releases only, each wit
 
   const rows = [
     { id: 1, at: '2026-09-30T12:15:00Z', name: 'ADP Nonfarm Employment Change (Sep)', country: 'US', importance: 'high',
-      consensus: '50K', prior: '54K', actual: null, note: null },
+      consensus: '50K', prior: '54K', actual: null },
     { id: 2, at: '2026-10-02T12:30:00Z', name: 'Nonfarm Payrolls (Sep)', country: 'US', importance: 'high',
-      consensus: '45K', prior: '22K', actual: null, note: null },
+      consensus: '45K', prior: '22K', actual: null },
   ];
   let asked = '';
   await stubbed(async () => {
@@ -5405,7 +5141,7 @@ test('a full calendar read says it stopped, and a short one says nothing', async
   const at = (i) => new Date(Date.now() + (i + 1) * 60_000).toISOString();
   const rows = (n) => Array.from({ length: n }, (_, i) =>
     ({ id: i, at: at(i), name: `release ${i}`, country: 'US', importance: 'medium',
-       consensus: null, prior: null, actual: null, note: null }));
+       consensus: null, prior: null, actual: null }));
   const block = (n) => stubbed(async () => {
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rows(n) });
     return await calendarBlock();
@@ -5426,7 +5162,7 @@ test('an opened event for a trade already closed says nothing and reads no calen
     setup: null, followed_rules: null, followed_sl: null, followed_tp: null, size_oz: 4,
     net_pnl: null, planned_sl: null, planned_tp: null, best_price: null, ...o });
   const pending = [{ id: 1, at: new Date(Date.now() + 3600_000).toISOString(), name: 'US CPI',
-    importance: 'high', consensus: '0.3%', prior: null, actual: null, note: null }];
+    importance: 'high', consensus: '0.3%', prior: null, actual: null }];
 
   const run = (trade) => {
     const asked = [];

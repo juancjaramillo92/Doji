@@ -1026,7 +1026,7 @@ test('the card stays hidden when she has nothing to show', async () => {
 test('the card shows what lands today, the story, and what is still open', async () => {
   const el = await watching({
     calendar: [{ at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
-                 consensus: '0.3%', actual: null, note: null }],
+                 consensus: '0.3%', actual: null }],
     thesis:   [{ thesis: 'Still trading the December cut.', moved_on: '2026-01-08' }],
     loops:    [{ kind: 'question', body: 'Which does he think is bigger?' }],
   });
@@ -1049,8 +1049,8 @@ test('a release on another day names the day, and today\'s does not', async () =
     return d.toISOString();
   };
   const el = await watching({
-    calendar: [{ at: at(0), name: 'today print', importance: 'high', consensus: null, actual: null, note: null },
-               { at: at(1), name: 'tomorrow print', importance: 'high', consensus: null, actual: null, note: null }],
+    calendar: [{ at: at(0), name: 'today print', importance: 'high', consensus: null, actual: null },
+               { at: at(1), name: 'tomorrow print', importance: 'high', consensus: null, actual: null }],
   });
   const lines = [...el.querySelectorAll('.watch-line')].map(l => l.textContent);
   const day = new win.Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short' })
@@ -1064,7 +1064,7 @@ test('a release on another day names the day, and today\'s does not', async () =
 test('a landed release is not drawn as one still to come', async () => {
   const el = await watching({
     calendar: [{ at: '2026-01-09T13:30:00Z', name: 'core CPI', importance: 'high',
-                 consensus: '0.3%', actual: '0.4%', note: 'Hotter.' }],
+                 consensus: '0.3%', actual: '0.4%' }],
   });
   assert.match(el.innerHTML, /0\.4%/);
   assert.match(el.innerHTML, /vs 0\.3%/);

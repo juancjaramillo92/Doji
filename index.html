@@ -3226,7 +3226,7 @@ const Watch = {
 
       const [cal, story, loops] = await Promise.all([
         Data.sb.from('eugenia_calendar')
-          .select('at,name,importance,consensus,actual,note').eq('country', 'US')
+          .select('at,name,importance,consensus,actual').eq('country', 'US')
           .gte('at', from).lte('at', to).order('at', { ascending: true }).limit(20),
         Data.sb.from('eugenia_thesis').select('thesis,moved_on').eq('id', 'current').maybeSingle(),
         Data.sb.from('eugenia_loops')
