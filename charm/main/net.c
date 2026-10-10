@@ -39,6 +39,9 @@ bool net_start(void) {
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL);
     esp_wifi_set_mode(WIFI_MODE_STA);
     esp_wifi_start();
+    // The clock itself survives sleep; the zone it is read in does not.
+    setenv("TZ", NEW_YORK, 1);
+    tzset();
 
     for (int i = 0; i < cfg.n_nets; i++) {
         // The driver's fields need no terminator: a name may fill all 32 bytes.
@@ -52,8 +55,6 @@ bool net_start(void) {
                                               pdMS_TO_TICKS(JOIN_MS));
         if (got & JOINED) {
             ESP_LOGI(TAG, "joined %s", cfg.nets[i].ssid);
-            setenv("TZ", NEW_YORK, 1);
-            tzset();
             esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
             esp_netif_sntp_init(&sntp);
             if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(10000)) == ESP_OK) {

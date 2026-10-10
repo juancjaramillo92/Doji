@@ -57,7 +57,7 @@ static lv_image_dsc_t blush_dsc = {
 };
 
 static const face_geometry_t *F;
-static lv_obj_t *layer_obj;
+static lv_obj_t *base_obj, *layer_obj;
 
 static volatile face_mode_t mode = FACE_IDLE;
 static volatile float level;
@@ -68,6 +68,10 @@ static float gaze[2];
 static uint32_t next_glance, next_blink, blink_at;
 static float lid = 1;  // the blink, on top of how open the mode wants the eyes
 static bool blinking, ring_was_on;
+static bool dark;      // her face hidden: FACE_DARK or FACE_DOT
+static face_mode_t shown;
+
+static bool hides(face_mode_t m) { return m == FACE_DARK || m == FACE_DOT; }
 
 void face_set_mode(face_mode_t m) { mode = m; }
 void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
@@ -117,9 +121,30 @@ static void dot(lv_layer_t *layer, float cx, float cy, float rx, float ry,
     lv_draw_rect(layer, &d, &a);
 }
 
+/* The dot that waits for him, the playground's: purple for Eugenia, the light
+   silver of Gladys's fur at its brightest, since grey on black reads as a
+   smudge. Low on the screen, with a glow. Still, so it stays on the panel
+   while the chip sleeps. */
+static void draw_dot(lv_layer_t *layer) {
+    bool gladys = F == &GLADYS;
+    lv_draw_rect_dsc_t d;
+    lv_draw_rect_dsc_init(&d);
+    d.bg_color = lv_color_hex(gladys ? 0xeeecf4 : 0xb45cd9);
+    d.radius = LV_RADIUS_CIRCLE;
+    d.shadow_color = lv_color_hex(gladys ? 0xe8e6f0 : 0x8b35b8);
+    d.shadow_opa = gladys ? 190 : 230;
+    d.shadow_width = 26;
+    lv_area_t a = { 233 - 11, 404 - 11, 233 + 11, 404 + 11 };
+    lv_draw_rect(layer, &d, &a);
+}
+
 static void draw_face(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     const lv_color_t ink = lv_color_hex(0x0d0c0b);
+    if (dark) {
+        if (shown == FACE_DOT) draw_dot(layer);
+        return;
+    }
 
     // Cheeks
     for (int i = 0; i < 2; i++) {
@@ -201,15 +226,29 @@ static void tick(lv_timer_t *t) {
     last = now;
 
     face_mode_t m = mode;
+
+    // Into or out of the dark: the whole screen changes once, and on the way
+    // out her eyes open from shut.
+    if (hides(m) != dark || (dark && m != shown)) {
+        dark = hides(m);
+        if (dark) lv_obj_add_flag(base_obj, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_remove_flag(base_obj, LV_OBJ_FLAG_HIDDEN);
+        V.open = 0;
+        lv_obj_invalidate(layer_obj);
+    }
+    shown = m;
+    if (dark) return;
+
     float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, glance = 1;
     const float *fixed = NULL;
-    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f };
+    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
     if (m == FACE_LISTENING) { t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up; }
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
     if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
     if (m == FACE_CONFUSED)  { t_smile = -0.35f; t_confused = 1; fixed = puzzled; }
+    if (m == FACE_ASLEEP)    { t_open = 0; t_smile = 0.6f; fixed = rest; }
 
     // Glances: a quick jump to a point, held for a moment.
     if (fixed) { gaze[0] = fixed[0]; gaze[1] = fixed[1]; }
@@ -221,7 +260,7 @@ static void tick(lv_timer_t *t) {
 
     // Blinks: shut in 70 ms, open in 90.
     lid = 1;
-    if (!blinking && (int32_t)(now - next_blink) >= 0) { blinking = true; blink_at = now; }
+    if (!blinking && m != FACE_ASLEEP && (int32_t)(now - next_blink) >= 0) { blinking = true; blink_at = now; }
     if (blinking) {
         uint32_t b = now - blink_at;
         lid = b < 70 ? 1 - b / 70.0f : b < 160 ? (b - 70) / 90.0f : 1;
@@ -231,7 +270,7 @@ static void tick(lv_timer_t *t) {
         }
     }
 
-    V.open = ease(V.open, t_open, 16, dt);
+    V.open = ease(V.open, t_open, m == FACE_ASLEEP ? 3 : 16, dt);
     V.gx = ease(V.gx, gaze[0], 22, dt);
     V.gy = ease(V.gy, gaze[1], 22, dt);
     V.mouth = ease(V.mouth, t_mouth, 28, dt);
@@ -263,10 +302,13 @@ void face_start(bool gladys) {
     lv_obj_t *screen = lv_screen_active();
     lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
 
-    lv_obj_t *img = lv_image_create(screen);
-    lv_image_set_src(img, &base_dsc);
-    lv_obj_set_pos(img, 0, 0);
-    lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE);
+    base_obj = lv_image_create(screen);
+    lv_image_set_src(base_obj, &base_dsc);
+    lv_obj_set_pos(base_obj, 0, 0);
+    lv_obj_remove_flag(base_obj, LV_OBJ_FLAG_CLICKABLE);
+    dark = hides(mode);
+    shown = mode;
+    if (dark) lv_obj_add_flag(base_obj, LV_OBJ_FLAG_HIDDEN);
 
     layer_obj = lv_obj_create(screen);
     lv_obj_remove_style_all(layer_obj);

@@ -21,8 +21,8 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
-  from '../supabase/functions/doji-eugenia/index.ts';
+import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS,
+  briefDue, retryDue } from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
   from '../supabase/functions/doji-eugenia/journal.ts';
@@ -1235,6 +1235,34 @@ test('every file that names the Supabase project names the same one', () => {
   });
   assert.equal(new Set(found).size, 1,
     `the project is split across refs: ${[...new Set(found)].join(', ')}`);
+});
+
+/* The charm cannot be told the briefing has landed — it sleeps — so it wakes
+   to ask in the hours the briefing is written, and holds its own copy of them.
+   Read out of briefing.c and walked against briefDue and retryDue, every hour
+   of a week: a copy an hour early asks for nothing, an hour short misses the
+   last retry. */
+test('the charm asks for the briefing in the hours it is written', () => {
+  const c = source('charm/main/briefing.c');
+  const [weekday, sunday, retries] = ['BRIEF_WEEKDAY', 'BRIEF_SUNDAY', 'BRIEF_RETRIES'].map(name => {
+    const m = c.match(new RegExp(`^#define ${name}\\s+(\\d+)`, 'm'));
+    assert.ok(m, `briefing.c no longer defines ${name}`);
+    return Number(m[1]);
+  });
+  // The days, as the walk below takes them: Sunday's hour, weekdays', none on Saturday.
+  assert.match(c, /day\.tm_wday == 0 \? BRIEF_SUNDAY : day\.tm_wday <= 5 \? BRIEF_WEEKDAY : -1;/,
+    'briefing.c no longer gives the days their hours as this test walks them');
+  // Sunday 16 August 2026 to the Saturday after, New York on daylight time.
+  for (let day = 0; day < 7; day++) {
+    const first = day === 0 ? sunday : day <= 5 ? weekday : null;
+    for (let hour = 0; hour < 24; hour++) {
+      const at = new Date(Date.UTC(2026, 7, 16 + day, hour + 4));
+      const charm = first !== null && hour >= first && hour <= first + retries;
+      assert.equal(charm, Boolean(briefDue(at) || retryDue(at)),
+        `day ${day} at ${hour}:00 New York: the charm ${charm ? 'asks' : 'does not ask'} and the briefing ` +
+        `${charm ? 'is not' : 'is'} written`);
+    }
+  }
 });
 
 

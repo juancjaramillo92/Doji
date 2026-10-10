@@ -68,6 +68,8 @@ charm/                                  firmware for the two charms — see The 
   main/setup.c                          the setup page, on her own Wi-Fi network
   main/net.c                            joining her Wi-Fi, and New York time
   main/talk.c                           talking with Eugenia, through her door
+  main/sleep.c                          deep sleep, and what wakes her
+  main/briefing.c                       when Eugenia wakes to ask for the briefing
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
   tools/art.py                          turns a render into those bytes
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -382,6 +384,7 @@ single-sourced at run time:
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
+| the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
@@ -2527,7 +2530,9 @@ at boot. Her eyes, highlight, smile and cheeks are drawn live on top, measured
 from the render: blinks, glances, the mouth following the loudness of what
 plays; thinking, she looks up and away from one side to the other under three
 thought dots; when something goes wrong, her eyes go uneven and her smile turns
-down. Only the face's own patch is redrawn on a frame; the listening ring,
+down; going to sleep, her eyes close slowly. Asleep, the screen is black, or
+black but for her **still dot** — the playground's, low on the screen with a
+glow: purple for Eugenia, the light silver of Gladys's fur for her. Only the face's own patch is redrawn on a frame; the listening ring,
 round the whole rim, is the one thing that redraws the full screen, and only
 while it shows. The design was settled in two playgrounds before any of this —
 the claude.ai artifacts *Eugenia, on the charm* and *Gladys, on the charm* —
@@ -2549,11 +2554,29 @@ The address of her door is the repository's — in `charm/main/net.h`, which
 the same firmware goes on both boards and a lost charm is cut off by changing
 her key in Supabase.
 
-**What a board does today:** she comes up as whoever the setup page made her,
-her face alive at the saved brightness, and chimes; joins the first of her
-networks that answers and sets her clock to New York, clock changes included,
-since the briefing is 08:00 there all year. The first serial line names the
-character, the flash size and the PSRAM the chip actually has.
+**What a board does today:** switched on, she comes up as whoever the setup
+page made her, her face alive at the saved brightness, and chimes; joins the
+first of her networks that answers and sets her clock to New York, clock
+changes included, since the briefing is 08:00 there all year. The first serial
+line names the character, the flash size, the PSRAM the chip actually has and
+what woke it.
+
+**She lives in short waking spells.** Thirty seconds without a tap and her eyes
+close and the chip goes into deep sleep, where it wakes as if switched on
+again: on a tap, the BOOT button, or a time. The screen keeps what it last
+showed — the panel holds its own picture while it has power, and the two pins
+that could reset it are held — so the dot needs no chip awake to stay up. Each
+waking joins her Wi-Fi again, a few seconds while her eyes open.
+
+**Eugenia wakes on her own for the briefing.** At five past its hour — 08:00
+on a weekday, 17:00 on a Sunday, none on a Saturday — and every ten minutes
+through the hour of the last retry (`retryDue`), she wakes in the dark and asks
+`?briefing=ready`. A `204` and she sleeps again, unseen; her line and her face
+light up, she says it, and sleeps with her dot up, asking no more that day.
+The next time he wakes her, that press is for the briefing: she reads it
+(`?briefing=today`) before anything else. A tap while she asks turns the
+errand into a waking spell. The hours are a copy of the server's
+(`charm/main/briefing.c`), held by `agree.test.mjs`.
 
 **A tap and he talks to Eugenia.** The ring shows round the rim and follows his
 voice; his turn ends at a pause of over a second after he has spoken, at a
@@ -2565,10 +2588,12 @@ exact zeros. A tap while she thinks or speaks cuts her off; the copy in
 Telegram is the whole of it. A door that cannot be reached or refuses her key
 shows her confused for four seconds. Gladys's taps do nothing yet.
 
-**Still to build**, in order: sleep and
-the briefing alert with its still purple dot, Gladys's journal on screen with
-her near-white dot, the volume dial round the rim, and the battery and power
-screens.
+**To check on the real board first**: that the panel keeps the dot while the
+chip sleeps, that the touch controller wakes it (the BOOT button always does),
+and how long a battery lasts.
+
+**Still to build**, in order: Gladys's journal on screen with her near-white
+dot, the volume dial round the rim, and the battery and power screens.
 
 ---
 

@@ -1,8 +1,8 @@
-/* Talking with Eugenia, on one request. He talks until he stops — a second of
-   quiet after his voice, a tap, or a minute — and the recording goes to her
-   door as WAV. What comes back is her raw voice, 24 kHz mono, played as it
-   arrives: silence while she thinks, which her face shows as thinking, then
-   her answer with her mouth following it. */
+/* Eugenia's door, each exchange one request. He talks until he stops — a
+   second of quiet after his voice, a tap, or a minute — and the recording goes
+   to her door as WAV; the briefing is a GET. What comes back is her raw voice,
+   24 kHz mono, played as it arrives: silence while she thinks, which her face
+   shows as thinking, then her voice with her mouth following it. */
 #include "talk.h"
 
 #include <string.h>
@@ -84,34 +84,44 @@ static void play_answer(esp_http_client_handle_t h) {
     }
 }
 
-// False when her door could not be reached or turned him away.
-static bool ask(const uint8_t *wav, size_t len) {
+/* Knocks at her door — a POST of `wav` when there is one, else a GET of
+   `url` — and plays the answer when it is 200, lighting her face for it
+   first. Returns the status, or -1 when the door could not be reached. */
+static int knock(const char *url, const uint8_t *wav, size_t len) {
     esp_http_client_config_t c = {
-        .url = EUGENIA_DOOR,
-        .method = HTTP_METHOD_POST,
+        .url = url,
+        .method = wav ? HTTP_METHOD_POST : HTTP_METHOD_GET,
         .timeout_ms = READ_MS,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
     esp_http_client_handle_t h = esp_http_client_init(&c);
     esp_http_client_set_header(h, "x-charm-key", cfg.key);
-    esp_http_client_set_header(h, "Content-Type", "audio/wav");
-    bool ok = esp_http_client_open(h, (int)len) == ESP_OK;
-    for (size_t sent = 0; ok && sent < len;) {
-        int n = esp_http_client_write(h, (const char *)wav + sent, (int)(len - sent));
-        ok = n > 0;
-        if (ok) sent += (size_t)n;
+    if (wav) esp_http_client_set_header(h, "Content-Type", "audio/wav");
+    bool sent = esp_http_client_open(h, (int)len) == ESP_OK;
+    for (size_t at = 0; sent && at < len;) {
+        int n = esp_http_client_write(h, (const char *)wav + at, (int)(len - at));
+        sent = n > 0;
+        if (sent) at += (size_t)n;
     }
-    if (ok) {
+    int status = -1;
+    if (sent) {
         esp_http_client_fetch_headers(h);
-        int status = esp_http_client_get_status_code(h);
-        ok = status == 200;
-        if (!ok) ESP_LOGW(TAG, "her door answered %d", status);
-    } else {
-        ESP_LOGW(TAG, "her door could not be reached");
+        status = esp_http_client_get_status_code(h);
     }
-    if (ok) play_answer(h);
+    if (status == 200) {
+        face_set_mode(FACE_THINKING);
+        play_answer(h);
+    } else {
+        ESP_LOGW(TAG, "her door answered %d", status);
+    }
     esp_http_client_cleanup(h);
-    return ok;
+    face_set_level(0);
+    return status;
+}
+
+static void confused(void) {
+    face_set_mode(FACE_CONFUSED);
+    vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
 }
 
 void talk(void) {
@@ -127,11 +137,17 @@ void talk(void) {
 
     face_set_mode(FACE_THINKING);
     wav_header(wav, got);
-    bool ok = ask(wav, WAV_HEADER + got * 2);
-    face_set_level(0);
-    if (!ok) {
-        face_set_mode(FACE_CONFUSED);
-        vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
-    }
+    if (knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2) != 200) confused();
+    face_set_mode(FACE_IDLE);
+}
+
+bool talk_ready(void) {
+    return knock(EUGENIA_DOOR "?briefing=ready", NULL, 0) == 200;
+}
+
+void talk_briefing(void) {
+    face_set_mode(FACE_THINKING);
+    int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0);
+    if (status != 200 && status != 204) confused();
     face_set_mode(FACE_IDLE);
 }
