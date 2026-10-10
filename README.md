@@ -1201,9 +1201,17 @@ hour of a week through the composition.
 
 ### The briefing is prose, with one list in it
 
-Five slots: what happened, in two or three sentences with the conclusion first;
-**why that matters for gold**, walked link by link, one sentence per step; the
-calendar; one context line; one thing worth noticing. Numbered sections with
+**It is the weeks behind his chart, not the hours on it.** He reads the hours
+off his own screen, so the overnight move, the session's range, an hour's swing
+in yields and a forty-dollar day stay out; a move earns a line only where it
+changed the bigger story. The live quote is still handed in, for knowing where
+gold stands rather than for opening on.
+
+Five slots: **where the big picture stands** — the Fed's path, the dollar's
+trend, inflation, central-bank buying, and which of them moved — in two or three
+sentences with the conclusion first, or one saying none did; **why that matters
+for gold**, walked link by link, one sentence per step; the calendar; one context
+line on the same scale; one thing worth noticing. Numbered sections with
 headings are a report whatever the vocabulary inside them, which is why there
 are none.
 
@@ -1226,8 +1234,8 @@ length, in `SYSTEM` and in `CRITIC`.
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
 with nothing saying what to lose cuts the teaching block, the longest thing on
 the page — and with channels at `unseen`, where §0 says build the term before
-using it, that is the part that matters. So the budget is 250–300 words, 400 at
-the outside, and beside it a fixed order of what comes out: numbers he cannot act
+using it, that is the part that matters. So the budget is 250–300 words, less on
+a day the picture did not move, 400 at the outside, and beside it a fixed order of what comes out: numbers he cannot act
 on, then levels he can read off his own screen, then any market sentence that
 could have been written on any morning. **Never the teaching block and never an
 event.** Still over means the briefing is about too many things. Four thousand
@@ -1255,7 +1263,8 @@ read as hard when one sentence carries three ideas. The rules, in `WRITING`:
   block is a wall. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
   their last step rather than reading for it among the rest.
 - **A number earns its place** by meaning something he can use; the briefing
-  holds four to six.
+  holds two to four, one budget the writer and `CRITIC` both state and a test
+  holds equal.
 
 **The judgement rules carry worked examples.** The countable rules landed at once
 — a first briefing with no sentence over twenty words — while the same message
@@ -1583,10 +1592,10 @@ a sweep re-entry follows a close, and he trades one entry at a time.
 
 The briefing is researched and written in one generation, and its quality target
 lives on the far side of a model call. So `CRITIC` reads it once more before it
-goes, at `medium` effort with no tools: is the first sentence true only today,
-is a term built at a rung that no longer needs it, is a link missing from the
-chain, is there a forward call, is it inside the budget, does it obey his
-standing instructions. It returns the briefing, not notes about it.
+goes, at `medium` effort with no tools: does the first sentence say where the
+big picture stands today, is a term built at a rung that no longer needs it, is
+a link missing from the chain, is there a forward call, is it inside the budget,
+does it obey his standing instructions. It returns the briefing, not notes about it.
 
 **It is handed his notes and the channel map, because two of those checks read
 them.** Without the map, the mechanism sitting in the paragraph reads as a

@@ -4203,8 +4203,8 @@ test('every number off the quote reaches her with the window it was measured ove
   /* THE BRIEFING IS HANDED THE PRICE rather than asked to fetch it: a level off a
      search page is four digits and looks like gold. */
   assert.match(body('postBriefing'), /marketBlock\(/,
-    'the briefing no longer reads the price before it writes, so its opening ' +
-    'line depends on her choosing to call a tool — and a stale level quoted ' +
+    'the briefing no longer reads the price before it writes, so where gold ' +
+    'stands depends on her choosing to call a tool — and a stale level quoted ' +
     'from a search is indistinguishable from a live one');
 
   /* THE BOUNDARY THE REST OF THE SYSTEM KEEPS — the Friday close, the Sunday
@@ -4600,7 +4600,7 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
     'something is put in front of the briefing again — the hello is hers to say');
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
   const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
-  assert.match(system, /SAY HELLO YOUR OWN WAY, THEN THE NUMBER/, 'SYSTEM no longer asks for her own hello');
+  assert.match(system, /SAY HELLO YOUR OWN WAY, THEN THE STORY/, 'SYSTEM no longer asks for her own hello');
   assert.match(system, /never a line of its own/, 'SYSTEM no longer keeps the hello inside the first paragraph');
   assert.match(critic, /hello it opens with is hers and stays as written/,
     'CRITIC can cut her hello as an opening true on any morning, and it runs last');
@@ -5225,7 +5225,7 @@ test('the Sunday briefing reads the week, is told it is about the week, and the 
     'SYSTEM no longer rules out a weekly review, which he decided against');
   assert.match(system, /week's calendar is a list of the week\s+and is not counted/,
     'SYSTEM counts the week\'s list against the words');
-  assert.match(critic, /a week's calendar,\s+which the briefing that opens the week carries, is not counted/,
+  assert.match(critic.replace(/\s+/g, ' '), /a week's calendar, which the briefing that opens the week carries, is not counted/,
     'CRITIC counts the week\'s list against the words, and it runs last');
 });
 
@@ -5437,12 +5437,35 @@ test('the writing rules are stated once and read by all three', () => {
   }
 });
 
-test('the number budget is stated to the writer and to the critic', () => {
+test('the number budget is stated to the writer and to the critic, and is one budget', () => {
   // Nothing bounded these before. Fourteen true figures is a page he skims.
-  assert.match(EUGENIA_PROMPT, /FOUR TO SIX NUMBERS IN THE WHOLE BRIEFING/,
-    'the writer is no longer given a number budget');
-  assert.match(EUGENIA_PROMPT, /HOW MANY NUMBERS ARE IN IT\?/,
-    'the critic no longer counts them, so the budget is advisory');
+  const writer = EUGENIA_PROMPT.match(/(\w+) TO (\w+) NUMBERS IN THE WHOLE BRIEFING/);
+  assert.ok(writer, 'the writer is no longer given a number budget');
+  const critic = EUGENIA_PROMPT.match(/HOW MANY NUMBERS ARE IN IT\? (\w+) to (\w+) for a briefing/);
+  assert.ok(critic, 'the critic no longer counts them, so the budget is advisory');
+  /* ONE BUDGET IN TWO COPIES. The critic runs last and cuts to its own, so a
+     writer told fewer is rewritten back up to the old count. */
+  assert.deepEqual(critic.slice(1).map(w => w.toLowerCase()), writer.slice(1).map(w => w.toLowerCase()),
+    'the writer and the critic hold different number budgets, and the critic runs last');
+});
+
+test('the briefing opens on the weeks, in the writer and in the critic', () => {
+  /* THE SCALE IS STATED TWICE, because the critic runs last and rewrites: a
+     writer told to open on the big picture under a critic that tests the opening
+     for today's move is put back on the overnight move every morning. And the
+     handed quote is said to be for knowing, not for opening on. */
+  const flat = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1]
+    .replace(/\s+/g, ' ');
+  const system = flat('SYSTEM');
+  const critic = flat('CRITIC');
+  assert.match(system, /WHERE THE BIG PICTURE STANDS\. .*?weeks and months/,
+    'the briefing\'s first slot no longer opens on the forces that move gold over weeks');
+  assert.match(system, /not to open on: a night's move is noise against the weeks/,
+    'the handed quote reads as the opening again, which puts the overnight move first');
+  assert.match(critic, /Does the first sentence say where the big picture stands today\? .*?weeks and months/,
+    'the critic no longer checks the opening for the big picture, and it runs last');
+  assert.match(critic, /the overnight move, the session's range or an hour's swing is the wrong scale/,
+    'the critic no longer names the opening it replaces, so it can keep one');
 });
 
 test('the word count never outranks the teaching block, in either copy', () => {
