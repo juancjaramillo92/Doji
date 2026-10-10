@@ -579,6 +579,59 @@ on conflict (id) do nothing;
 
 alter table public.eugenia_thesis enable row level security;
 
+-- ─── How she reads him ─────────────────────────────────────────────────────
+-- The thesis's twin, about him: one row, rewritten nightly, carrying what the
+-- notes add up to once the oldest have rolled out of the twenty she is shown.
+-- No app policy: it is about him, and the card shows the market.
+create table if not exists public.eugenia_portrait (
+  id         text primary key
+    constraint eugenia_portrait_singleton check (id = 'current'),
+
+  -- Longer than the thesis, still a paragraph.
+  portrait   text not null
+    constraint eugenia_portrait_length check (char_length(portrait) between 1 and 800),
+
+  -- A New York civil day written by the function, for eugenia_channels' reason.
+  moved_on   date,
+  updated_at timestamptz not null default now()
+);
+
+-- Seeded, so the PATCH always lands and the read never has to tell "no row"
+-- from "nothing decided".
+insert into public.eugenia_portrait (id, portrait) values
+  ('current', 'No portrait yet — this is written by the nightly pass once there is enough to read.')
+on conflict (id) do nothing;
+
+alter table public.eugenia_portrait enable row level security;
+
+-- ─── Her record ────────────────────────────────────────────────────────────
+-- Every read she gave, filed by the nightly pass with a verdict on the test
+-- she stated — never on where price went. A row per read; she is handed the
+-- last thirty days. Filed and judged in one write, so no row is ever open.
+create table if not exists public.eugenia_reads (
+  id         bigserial primary key,
+
+  -- A New York civil day written by the function, for eugenia_channels' reason.
+  given_on   date not null,
+
+  reading    text not null
+    constraint eugenia_reads_reading_length check (char_length(reading) between 1 and 300),
+  test       text not null
+    constraint eugenia_reads_test_length check (char_length(test) between 1 and 300),
+  verdict    text not null
+    constraint eugenia_reads_verdict_check check (verdict in ('held', 'wrong', 'untested')),
+  evidence   text
+    constraint eugenia_reads_evidence_length check (char_length(evidence) <= 300),
+
+  created_at timestamptz not null default now()
+);
+
+-- What a retry's refiling lands on: the same words on the same day are one
+-- read. A plain unique index, for PostgREST's `on_conflict` to infer.
+create unique index if not exists eugenia_reads_once on public.eugenia_reads (given_on, reading);
+
+alter table public.eugenia_reads enable row level security;
+
 -- ─── Open threads ──────────────────────────────────────────────────────────
 -- An odd thing she flagged (`watch`) or a question she asked him in a
 -- conversation (`question`), handed back until the nightly pass closes it.

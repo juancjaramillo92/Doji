@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 84 checks.
+-- whole file after any manual change and read the `ok` column — all 89 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -31,8 +31,9 @@ from (values
    (select count(*)::text from information_schema.tables
      where table_schema = 'public'
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
-                          'eugenia_loops','eugenia_feedback')),
-   '5'),
+                          'eugenia_loops','eugenia_feedback','eugenia_portrait',
+                          'eugenia_reads')),
+   '7'),
 
   -- The thesis is PATCHed by primary key, so a missing seed row is a 200 that
   -- lands nowhere: every rewrite dropped, silently.
@@ -41,6 +42,12 @@ from (values
              'select count(*) as c from public.eugenia_thesis where id = ''current''',
              false, true, '')))[1]::text
      where to_regclass('public.eugenia_thesis') is not null),
+   '1'),
+  ('the portrait row is seeded',
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from public.eugenia_portrait where id = ''current''',
+             false, true, '')))[1]::text
+     where to_regclass('public.eugenia_portrait') is not null),
    '1'),
 
   -- Without it `<%` does not exist and the search cannot be created.
@@ -380,6 +387,18 @@ from (values
   ('RLS on eugenia_loops',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_loops')),
    'true'),
+  ('RLS on eugenia_portrait',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_portrait')),
+   'true'),
+  ('no policy on eugenia_portrait',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_portrait')),
+   '0'),
+  ('RLS on eugenia_reads',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_reads')),
+   'true'),
+  ('no policy on eugenia_reads',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reads')),
+   '0'),
 
   -- The dispatch ledger. No policy on purpose.
   ('RLS on dispatch',
@@ -518,13 +537,13 @@ from (values
         'dispatch_job_at','dispatch_unsettled',
         'eugenia_calendar_at','eugenia_calendar_ticker','eugenia_calendar_tv_id','eugenia_loops_open',
         'eugenia_notes_embedding','eugenia_notes_kind_id_desc','eugenia_notes_search',
-        'eugenia_notes_trgm','eugenia_runs_at_desc','eugenia_runs_caller_at',
+        'eugenia_notes_trgm','eugenia_reads_once','eugenia_runs_at_desc','eugenia_runs_caller_at',
         'eugenia_turns_embedding','eugenia_turns_id_desc','eugenia_turns_search',
         'eugenia_turns_trgm','trades_user_open_day')),
    'dispatch_job_at,dispatch_unsettled,' ||
    'eugenia_calendar_at,eugenia_calendar_ticker,eugenia_calendar_tv_id,eugenia_loops_open,' ||
    'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
-   'eugenia_notes_trgm,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
+   'eugenia_notes_trgm,eugenia_reads_once,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
    'eugenia_turns_embedding,eugenia_turns_id_desc,eugenia_turns_search,' ||
    'eugenia_turns_trgm,trades_user_open_day'),
 

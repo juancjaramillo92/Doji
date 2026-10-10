@@ -21,7 +21,8 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
+import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
+         parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
@@ -679,8 +680,17 @@ test('a commitment is recorded, audited, held against his trades and retired', (
   const branch = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('return;', at));
   assert.match(branch, /readNotes\('commitment'\)/,
     '/notes no longer reads his commitments — the audit still answers, minus them');
-  assert.match(branch, /notesList\([^)]*promised\)/,
+  assert.match(branch, /notesList\([^)]*\bpromised[,)]/,
     '/notes reads his commitments and does not hand them to notesList');
+  // The portrait's argument defaults the same way, so the same silence.
+  assert.match(branch, /readPortrait\(\)/,
+    '/notes no longer reads how she reads him — the audit still answers, minus it');
+  assert.match(branch, /notesList\([^)]*\bread[,)]/,
+    '/notes reads the portrait and does not hand it to notesList');
+  assert.match(branch, /readRows<Read>\('Reads', recordQuery\(\)\)/,
+    '/notes no longer reads her record — the audit still answers, minus it');
+  assert.match(branch, /notesList\([^)]*\brecord[,)]/,
+    '/notes reads her record and does not hand it to notesList');
 
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
@@ -2276,15 +2286,15 @@ test('the supersede write may only retire a note that is still live', () => {
   assert.ok(retire.length && retire.length < body.length,
     'writeNote no longer has a retirement branch to check');
 
-  assert.match(retire, /eugenia_notes\?id=eq\.\$\{old\}&superseded_by=is\.null/,
+  assert.match(retire, /eugenia_notes\?id=in\.\(\$\{old\.join\(','\)\}\)&superseded_by=is\.null/,
     'the supersede PATCH no longer filters on superseded_by=is.null, so a note ' +
     'that was already retired is re-pointed at the new row and the note that ' +
     'first corrected it is orphaned — with nothing erroring');
   assert.match(retire, /method: "PATCH", headers: sbHeaders\("return=representation"\)/,
     'the supersede PATCH stopped asking for the row back, so a filtered-to-nothing ' +
     'retirement is a 200 with an empty body and reads as done');
-  assert.match(retire, /\.length === 0/,
-    'nothing checks that the retirement matched a row, so she reports a ' +
+  assert.match(retire, /old\.filter\(id => !hit\.includes\(id\)\)/,
+    'nothing checks that the retirement matched every row it named, so she reports a ' +
     'contradiction retired while it is still handed to her every turn');
 });
 
@@ -2349,7 +2359,25 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     assert.ok(reaches(reads(fn), 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
       `he gave would be ignored, with nothing anywhere reporting it`);
+    /* AND HOW SHE READS HIM, wherever the notes go: it is what the notes add
+       up to once the oldest have rolled out of the window, and the nightly pass
+       has to see the paragraph it is asked to move. */
+    assert.ok(reaches(reads(fn), 'portraitBlock'),
+      `${fn} never gets portraitBlock() into the message it sends — a lesson about ` +
+      `him whose note rolled out of the window is gone there, with nothing reporting it`);
   }
+
+  /* AND HER RECORD, to the two paths that give a read and to the pass that
+     files them — and never to the trade look, which carries no read, so a
+     record there could only be read as a reason to lean on one. */
+  for (const fn of ['postBriefing', 'converse', 'postConsolidation']) {
+    assert.ok(reaches(reads(fn), 'recordBlock'),
+      `${fn} never gets recordBlock() into the message it sends — she holds a view ` +
+      `as firmly after a month of misses as after a month of reads that held`);
+  }
+  assert.ok(!reaches(reads('postTradeEvent'), 'recordBlock'),
+    'the trade look is handed her record — it arrives while he is in a position, ' +
+    'where a hit rate beside a message reads as a reason to act on her');
 
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
      again what she said, and a repetition reads as emphasis. Hardest on the
@@ -3034,6 +3062,62 @@ test('the thesis budget is one number on both sides of the wire', () => {
   assert.ok(declared, 'schema.sql no longer bounds the thesis');
   assert.equal(THESIS_MAX, Number(declared[1]),
     'index.ts truncates the thesis at a different length than the table accepts — ' +
+    'the longer side is a 400 on a write she reports as saved');
+});
+
+// The prompts spell the window, and the point five short of it where the pass
+// merges, out as words; NOTES is the number.
+test('the window the nightly pass is told is the window the read takes', () => {
+  const [word, near] = { 20: ['twenty', 'fifteen'] }[NOTES] ?? [];
+  assert.ok(word, `NOTES is ${NOTES}, which CONSOLIDATE does not spell — update both`);
+  const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
+  assert.match(consolidate, new RegExp(`the ${word} newest notes of each kind`),
+    'the nightly pass is told a different window from the one it is handed');
+  assert.match(consolidate, new RegExp(`you are shown ${word} at most`),
+    'the merge rule names a different window from the one the read takes, so ' +
+    'it merges too late or never');
+  assert.match(consolidate, new RegExp(`holds more than ${near}, find`),
+    'the pass merges at a point that is no longer five short of the window');
+});
+
+test('a read is filed with the verdicts and lengths the table accepts', () => {
+  const verdicts = SCHEMA_SQL.match(/eugenia_reads_verdict_check check \(verdict in \(([^)]*)\)\)/);
+  assert.ok(verdicts, 'schema.sql no longer bounds the verdict');
+  assert.deepEqual(verdicts[1].split(',').map(v => v.trim().replace(/'/g, '')), [...READ_VERDICTS],
+    'index.ts sends a verdict the table refuses, or never sends one it accepts');
+  for (const column of ['reading', 'test']) {
+    const declared = SCHEMA_SQL.match(new RegExp(
+      `eugenia_reads_${column}_length check \\(char_length\\(${column}\\) between 1 and (\\d+)\\)`));
+    assert.ok(declared, `schema.sql no longer bounds ${column}`);
+    assert.equal(READ_MAX, Number(declared[1]), `index.ts truncates ${column} past what the table accepts`);
+  }
+  const evidence = SCHEMA_SQL.match(/eugenia_reads_evidence_length check \(char_length\(evidence\) <= (\d+)\)/);
+  assert.equal(READ_MAX, Number(evidence?.[1]), 'index.ts truncates evidence past what the table accepts');
+});
+
+/* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,
+   and a score pulls the next read toward one — the thing the prohibitions
+   exist to stop. Enforced by nothing but the sentence, in the two places the
+   grader reads it. */
+test('a read is judged by the test she stated, never by where price went', () => {
+  const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
+  assert.match(consolidate, /a read is never judged by where price went/,
+    'the nightly pass may grade a read on the price');
+  assert.match(consolidate, /Judge the test you stated; never add one, never soften one/);
+  const tool = source('supabase/functions/doji-eugenia/index.ts').replace(/"\s*\+\s*"/g, '');
+  assert.match(tool, /Judge only the test you stated, never where price went\./,
+    'record_read no longer says a verdict is never on the price');
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  assert.match(system, /Never cite it to him as a reason to believe a read/,
+    'her record may be offered to him as a reason to trade on her read');
+  assert.match(system, /never give a read to improve it, and never hold one back to protect it/);
+});
+
+test('the portrait budget is one number on both sides of the wire', () => {
+  const declared = SCHEMA_SQL.match(/eugenia_portrait_length check \(char_length\(portrait\) between 1 and (\d+)\)/);
+  assert.ok(declared, 'schema.sql no longer bounds the portrait');
+  assert.equal(PORTRAIT_MAX, Number(declared[1]),
+    'index.ts truncates the portrait at a different length than the table accepts — ' +
     'the longer side is a 400 on a write she reports as saved');
 });
 
@@ -5148,8 +5232,13 @@ test('futures volume reaches every briefing and a conversation', () => {
    his FedWatch screen. */
 test('the rate odds reach the briefing and a conversation, said the way FedWatch shows them', () => {
   const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
-  assert.equal([...EUGENIA_TS.matchAll(/(?<!function )ratesBlock\(\)/g)].length, 2,
-    'ratesBlock() is called somewhere other than the briefing and get_around');
+  assert.equal([...EUGENIA_TS.matchAll(/(?<!function )ratesBlock\(\)/g)].length, 3,
+    'ratesBlock() is called somewhere other than the briefing, get_around and the nightly pass');
+  // The pass reads them as the day closed, to judge a read whose test was the
+  // Fed pricing — and hands them over, or every such read files as untested.
+  assert.match(uncomment(bodyOf(EUGENIA_TS, 'async function postConsolidation(')),
+    /\+ record \+ around \+ rates \+/,
+    'the nightly pass no longer hands over what a read is judged against');
   assert.match(brief, /aroundBlock\(\), ratesBlock\(\),/, 'the briefing no longer reads the rate odds');
   assert.match(brief, /\+ around \+ rates \+/, 'the briefing reads the rate odds and never hands them over');
   const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
