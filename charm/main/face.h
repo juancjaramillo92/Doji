@@ -9,6 +9,8 @@ typedef enum {
     FACE_SPEAKING,   // she is talking: the mouth follows her voice
     FACE_THINKING,   // her answer is on its way: up and away, the thought dots
     FACE_CONFUSED,   // something went wrong: a door refused, no network
+    FACE_DONE,       // a journal finished: the ring sweeps in, a warm smile
+    FACE_HAPPY,      // finished with every answer a yes: the same, delighted
     FACE_ASLEEP,     // going to sleep: the eyes close slowly
     FACE_DARK,       // the screen black: she is asking something quietly
     FACE_DOT,        // black but for her still dot: something waits for him

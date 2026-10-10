@@ -70,8 +70,13 @@ charm/                                  firmware for the two charms — see The 
   main/talk.c                           talking with Eugenia, through her door
   main/sleep.c                          deep sleep, and what wakes her
   main/briefing.c                       when Eugenia wakes to ask for the briefing
+  main/gladys.c                         Gladys's door: what waits, and his answers
+  main/journal.c                        the journal's questions, a screen each
+  main/hanken_64.c                      Doji's typeface for the journal's words
+  art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
   tools/art.py                          turns a render into those bytes
+  tools/fonts.sh                        turns the typeface into the two fonts
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 test/                                   node:test suites — see Tests
@@ -369,8 +374,9 @@ single-sourced at run time:
 
 | The fact | Where its copies live |
 |---|---|
-| the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check` |
-| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object |
+| the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, and her charm's `SETUPS` in `charm/main/gladys.c` |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order |
+| the **letters the journal's font holds** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words in `charm/main/journal.c` |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
@@ -2532,7 +2538,8 @@ plays; thinking, she looks up and away from one side to the other under three
 thought dots; when something goes wrong, her eyes go uneven and her smile turns
 down; going to sleep, her eyes close slowly. Asleep, the screen is black, or
 black but for her **still dot** — the playground's, low on the screen with a
-glow: purple for Eugenia, the light silver of Gladys's fur for her. Only the face's own patch is redrawn on a frame; the listening ring,
+glow: purple for Eugenia, the light silver of Gladys's fur for her. Only the
+face's own patch is redrawn on a frame; the ring, Doji's purples turning slowly
 round the whole rim, is the one thing that redraws the full screen, and only
 while it shows. The design was settled in two playgrounds before any of this —
 the claude.ai artifacts *Eugenia, on the charm* and *Gladys, on the charm* —
@@ -2586,14 +2593,34 @@ as it streams in (*The charm — her voice on his keyring*): her face thinks
 through the silence and speaks when her voice starts, since the silence is
 exact zeros. A tap while she thinks or speaks cuts her off; the copy in
 Telegram is the whole of it. A door that cannot be reached or refuses her key
-shows her confused for four seconds. Gladys's taps do nothing yet.
+shows her confused for four seconds.
+
+**A press and Gladys journals what waits.** She asks her door, and while a
+trade waits her eyes open on him and then the questions take the whole screen,
+the playground's: the setup split down the middle, **B&R** on the left and
+**S&R** on the right; then **RULES**, **SL** and **TP**, each one word on a
+screen whose left half is red for no and right half green for yes. Four dots
+at the top say what is answered. A tap on a half lights it and sends that one
+answer at once, in a tap's own grammar (*Her charm journals a trade on its own
+screen*), and her door answers with what waits next, so the next trade follows
+without a pause. Done, the ring sweeps round once in Doji's purples with a warm
+smile — delighted, eyes curved and cheeks pinker, when every answer was a yes.
+A minute without a tap and the rest waits for next time. Taps, not swipes: a
+swipe moves the whole screen, which this chip may not draw smoothly. The words
+are Doji's typeface, Hanken Grotesk, made into the two fonts by
+`charm/tools/fonts.sh` with only the letters they use.
+
+**Gladys wakes on her own every few minutes** — the setup page's *how often*,
+5 by default, around the clock — and asks in the dark. When a trade waits that
+did not before, a soft double tick, and she sleeps with her dot up until
+nothing does.
 
 **To check on the real board first**: that the panel keeps the dot while the
 chip sleeps, that the touch controller wakes it (the BOOT button always does),
 and how long a battery lasts.
 
-**Still to build**, in order: Gladys's journal on screen with her near-white
-dot, the volume dial round the rim, and the battery and power screens.
+**Still to build**, in order: the volume dial round the rim, and the battery
+and power screens.
 
 ---
 

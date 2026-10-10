@@ -66,6 +66,22 @@ void sound_chime(void) {
     }
 }
 
+void sound_tick(void) {
+    open_at(16000);
+    for (int n = 0; n < 2; n++) {
+        // A tick: 8 ms of a high note dying fast, then the quiet between the two.
+        for (size_t at = 0; at < 1760; at += CHUNK) {
+            size_t k = 1760 - at < CHUNK ? 1760 - at : CHUNK;
+            for (size_t i = 0; i < k; i++) {
+                float t = (float)(at + i) / 16000.0f;
+                float env = t < 0.008f ? expf(-t * 600.0f) : 0;
+                wire[2 * i] = wire[2 * i + 1] = (int16_t)(sinf(2 * (float)M_PI * 1800.0f * t) * env * 7000);
+            }
+            esp_codec_dev_write(speaker, wire, (int)(k * 4));
+        }
+    }
+}
+
 size_t sound_record(int16_t *out, size_t max, bool (*more)(float)) {
     open_at(16000);
     size_t got = 0;

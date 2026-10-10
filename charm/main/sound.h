@@ -12,6 +12,9 @@ void sound_volume(int percent);
 // Two soft notes: the board is alive and the speaker works.
 void sound_chime(void);
 
+// Gladys's soft double tick: a trade waits for its journal.
+void sound_tick(void);
+
 /* Both hand `more` how loud each moment is, 0 to 1, and stop when it answers
    false. Recording is mono 16 kHz into `out`, up to `max` samples, and returns
    how many it took. Playing is mono at `rate` and returns false when `more`

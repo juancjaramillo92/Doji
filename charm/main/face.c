@@ -63,11 +63,12 @@ static volatile face_mode_t mode = FACE_IDLE;
 static volatile float level;
 
 // What is on screen, eased toward what the mode asks for.
-static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused; } V = { .open = 0, .smile = 1 };
+static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused, happy; } V = { .open = 0, .smile = 1 };
 static float gaze[2];
 static uint32_t next_glance, next_blink, blink_at;
 static float lid = 1;  // the blink, on top of how open the mode wants the eyes
-static bool blinking, ring_was_on;
+static bool blinking, ring_was_on, was_done;
+static float sweep = 1;  // how much of the ring is drawn, from the top
 static bool dark;      // her face hidden: FACE_DARK or FACE_DOT
 static face_mode_t shown;
 
@@ -138,6 +139,31 @@ static void draw_dot(lv_layer_t *layer) {
     lv_draw_rect(layer, &d, &a);
 }
 
+/* Doji's purples, turning slowly round the rim: LVGL draws no conic gradient,
+   so the ring is short arcs, each the colour of its place on the turn. */
+static const uint32_t RING[] = { 0x5c40b0, 0x8b35b8, 0xb45cd9, 0x6a4fd0, 0x5c40b0 };
+#define RING_STEPS 36
+
+static void draw_ring(lv_layer_t *layer, int32_t width, float opa) {
+    float turn = lv_tick_get() / 1800.0f;
+    int steps = (int)ceilf(RING_STEPS * sweep);
+    for (int i = 0; i < steps; i++) {
+        float at = fmodf((float)i / RING_STEPS + turn, 1.0f) * 4;
+        int k = (int)at;
+        lv_draw_arc_dsc_t d;
+        lv_draw_arc_dsc_init(&d);
+        d.center.x = 233; d.center.y = 233;
+        d.width = width;
+        d.radius = 231 - width / 2;
+        d.start_angle = (270 + i * 360 / RING_STEPS) % 360;
+        d.end_angle = (271 + (i + 1) * 360 / RING_STEPS) % 360;  // a degree over: no seams
+        d.color = lv_color_mix(lv_color_hex(RING[k + 1]), lv_color_hex(RING[k]),
+                               (uint8_t)(255 * (at - k)));
+        d.opa = (lv_opa_t)(255 * opa);
+        lv_draw_arc(layer, &d);
+    }
+}
+
 static void draw_face(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     const lv_color_t ink = lv_color_hex(0x0d0c0b);
@@ -165,6 +191,11 @@ static void draw_face(lv_event_t *e) {
         float cx = c[0] + V.gx, cy = c[1] + V.gy + V.confused * (i ? -1.6f : 1.6f);
         float open = V.open * lid;
         float rx = F->rx * odd, ry = F->ry * odd * open;
+        // Delighted, an eye is an arc, the playground's: a ring segment over it.
+        if (V.happy > 0.5f) {
+            draw_curve(layer, cx, cy, rx * 0.85f, -rx * 0.52f, 3.4f, ink);
+            continue;
+        }
         if (ry < 1.8f) {
             draw_curve(layer, cx, cy, rx * 0.9f, 1.2f, 2.6f, ink);
             continue;
@@ -203,17 +234,11 @@ static void draw_face(lv_event_t *e) {
         }
     }
 
-    // The listening ring, on the rim.
+    // The ring on the rim: listening, it follows his voice; done, it sweeps in.
     if (V.ring > 0.02f) {
-        lv_draw_arc_dsc_t d;
-        lv_draw_arc_dsc_init(&d);
-        d.center.x = 233; d.center.y = 233;
-        d.width = 4 + (int32_t)(7 * V.ring);
-        d.radius = 231 - d.width / 2;
-        d.start_angle = 0; d.end_angle = 360;
-        d.color = lv_color_hex(0x8b35b8);
-        d.opa = (lv_opa_t)(255 * (0.35f + 0.65f * V.ring));
-        lv_draw_arc(layer, &d);
+        bool listening = shown == FACE_LISTENING;
+        int32_t width = listening ? 4 + (int32_t)(7 * V.ring) : 8;
+        draw_ring(layer, width, listening ? 0.35f + 0.65f * V.ring : V.ring);
     }
 }
 
@@ -240,15 +265,25 @@ static void tick(lv_timer_t *t) {
     if (dark) return;
 
     float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, glance = 1;
+    float t_happy = 0, t_blush = BLUSH;
     const float *fixed = NULL;
-    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
+    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 }, ahead[2] = { 0, 0 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
     if (m == FACE_LISTENING) { t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up; }
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
     if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
     if (m == FACE_CONFUSED)  { t_smile = -0.35f; t_confused = 1; fixed = puzzled; }
+    if (m == FACE_DONE)      { t_smile = 1.1f; t_ring = 1; fixed = ahead; }
+    if (m == FACE_HAPPY)     { t_smile = 1.6f; t_ring = 1; t_happy = 1; t_blush = BLUSH + 0.35f; fixed = ahead; }
     if (m == FACE_ASLEEP)    { t_open = 0; t_smile = 0.6f; fixed = rest; }
+
+    // Done, the ring sweeps round once from the top in 700 ms; otherwise it is whole.
+    static uint32_t done_at;
+    bool done = m == FACE_DONE || m == FACE_HAPPY;
+    if (done && !was_done) done_at = now;
+    was_done = done;
+    sweep = done ? fminf(1, (now - done_at) / 700.0f) : 1;
 
     // Glances: a quick jump to a point, held for a moment.
     if (fixed) { gaze[0] = fixed[0]; gaze[1] = fixed[1]; }
@@ -275,7 +310,8 @@ static void tick(lv_timer_t *t) {
     V.gy = ease(V.gy, gaze[1], 22, dt);
     V.mouth = ease(V.mouth, t_mouth, 28, dt);
     V.smile = ease(V.smile, t_smile, 10, dt);
-    V.blush = ease(V.blush, BLUSH, 4, dt);
+    V.blush = ease(V.blush, t_blush, 4, dt);
+    V.happy = ease(V.happy, t_happy, 10, dt);
     V.ring = ease(V.ring, t_ring, 18, dt);
     V.dots = ease(V.dots, t_dots, 5, dt);
     V.confused = ease(V.confused, t_confused, 8, dt);

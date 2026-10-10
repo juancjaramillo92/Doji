@@ -3,12 +3,14 @@
    Without a network or a key, or when asked by holding the screen for ten
    seconds, she shows the setup page instead.
 
-   She lives in short waking spells. Awake, a tap is for her (Eugenia: he talks
-   to her, talk.c), and AWAKE_MS without one puts her to sleep: her eyes close
-   and the chip stops (sleep.c). A tap or the BOOT button wakes her. Eugenia
-   also wakes on her own after the briefing's hour (briefing.c) to ask, in the
-   dark, whether it has landed; when it has she says so and sleeps with her
-   still dot, and the next time he wakes her she reads it to him. */
+   She lives in short waking spells. Awake, a tap is for her — Eugenia: he
+   talks to her (talk.c); Gladys: she journals what waits (gladys.c) — and
+   AWAKE_MS without one puts her to sleep: her eyes close and the chip stops
+   (sleep.c). A tap or the BOOT button wakes her, and that press is for what
+   waits first. She also wakes on her own, in the dark: Eugenia after the
+   briefing's hour (briefing.c) to ask whether it has landed, saying so when it
+   has; Gladys every few minutes to ask what waits, with a soft double tick
+   when something new does. Either then sleeps with her still dot up. */
 #include "bsp/esp-bsp.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
@@ -23,6 +25,7 @@
 #include "briefing.h"
 #include "config.h"
 #include "face.h"
+#include "gladys.h"
 #include "net.h"
 #include "setup.h"
 #include "sleep.h"
@@ -36,7 +39,7 @@ static const char *TAG = "charm";
 #define GOODNIGHT_MS  1200   // her eyes closing
 #define LAST_FRAME_MS 200    // the dark, or the dot, reaching the panel
 
-static RTC_DATA_ATTR bool waiting;  // her dot is up: a briefing waits for him
+static RTC_DATA_ATTR bool waiting;  // her dot is up: a briefing, or a trade, waits for him
 
 static esp_sleep_wakeup_cause_t woke;
 static TaskHandle_t life_task;
@@ -63,7 +66,13 @@ static void sleep_now(bool lit) {
     }
     face_set_mode(waiting ? FACE_DOT : FACE_DARK);
     vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
-    sleep_until(cfg.gladys ? 0 : briefing_next_ask(time(NULL)));
+    sleep_until(cfg.gladys ? time(NULL) + cfg.check_min * 60 : briefing_next_ask(time(NULL)));
+}
+
+// Gladys journals what waits, and her dot follows what is left.
+static void journal(void) {
+    int left = gladys_journal();
+    if (left >= 0) waiting = left > 0;
 }
 
 static void life(void *arg) {
@@ -73,22 +82,30 @@ static void life(void *arg) {
     if (!net_start()) ESP_LOGW(TAG, "none of her networks answered");
 
     if (woke == ESP_SLEEP_WAKEUP_TIMER) {
-        bool lit = !cfg.gladys && talk_ready();
-        if (lit) {
+        bool lit = false;
+        if (cfg.gladys) {
+            int left = gladys_check();
+            if (left > 0 && !waiting) sound_tick();
+            if (left >= 0) waiting = left > 0;
+        } else if ((lit = talk_ready())) {
             waiting = true;
             briefing_announced(time(NULL));
         }
-        // A tap meanwhile turns the errand into a waking spell.
+        // A tap meanwhile turns the errand into a waking spell, and is a press.
         if (!ulTaskNotifyTake(pdTRUE, 0)) sleep_now(lit);
         face_set_mode(FACE_IDLE);
-    } else if (waiting) {
-        // Woken by hand with her dot up: that press was for the briefing.
+    }
+
+    // A press is for what waits first.
+    if (cfg.gladys) journal();
+    else if (waiting) {
         waiting = false;
         talk_briefing();
     }
 
     while (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(AWAKE_MS))) {
-        if (!cfg.gladys) talk();
+        if (cfg.gladys) journal();
+        else talk();
     }
     sleep_now(true);
 }

@@ -230,6 +230,45 @@ test('the setups vocabulary is the same list in all three places', async () => {
   } finally { close(); }
 });
 
+/* Gladys's charm sends a setup by its name and an answer by its key, and reads
+   the trade's answers by their columns: the same three lists in C. */
+const GLADYS_C = source('charm/main/gladys.c');
+
+test('Gladys\'s charm sends the setups and answers her door takes', () => {
+  const setups = GLADYS_C.match(/SETUPS\[2\] = \{ ("[^"]+"), ("[^"]+") \}/);
+  assert.ok(setups, 'gladys.c no longer lists SETUPS as this test reads them');
+  assert.deepEqual(setups.slice(1).map(s => JSON.parse(s)), [...SETUPS],
+    'the charm offers a setup her door would refuse');
+
+  const pairs = [...GLADYS_C.matchAll(/\{ "(\w+)",\s*"(\w+)" \}/g)].map(m => [m[1], m[2]]);
+  assert.deepEqual(pairs, Object.entries(COLUMNS),
+    'the charm answers a key, or reads a column, her door does not have — or in another order ' +
+    'than the screens ask them');
+});
+
+/* The journal's words are drawn in a font holding only the letters
+   tools/fonts.sh gave it; a word with any other letter draws a gap. */
+test('every word on Gladys\'s screens is in the font that draws it', () => {
+  const journal = source('charm/main/journal.c');
+  const list = (name) => {
+    const m = journal.match(new RegExp(`${name}\\[\\d\\] = \\{([^}]+)\\}`));
+    assert.ok(m, `journal.c no longer lists ${name}`);
+    return [...m[1].matchAll(/"([^"]+)"/g)].map(w => w[1]);
+  };
+  const held = (font) => {
+    const m = source(`charm/main/${font}.c`).match(/--symbols (\S+)/);
+    assert.ok(m, `${font}.c no longer says which letters it holds`);
+    return m[1];
+  };
+  const words = list('WORDS'), short = list('SHORT');
+  assert.equal(words.length, 4, 'a word for each of the four answers');
+  for (const word of [...words, ...short]) {
+    for (const letter of word) assert.ok(held('hanken_64').includes(letter), `hanken_64 cannot draw the ${letter} of ${word}`);
+  }
+  // The setup screen's label is the small font's.
+  for (const letter of words[0]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${words[0]}`);
+});
+
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {
   const { app, close } = await boot();
   try {
