@@ -2315,16 +2315,16 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
 
   /* postConsolidation is the worst to lose: without its notes she cannot see what
      she holds, never supersedes, and writes the same fact nightly. postRelease
-     and postMove teach — what is behind a print or a move runs through a
-     channel — so a look not handed the ladder teaches the wrong thing well. */
-  /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the six whose prompts build a
-     term, so they get the map. `SENDS` is the six that put a message in front of
+     teaches — what is behind a print runs through a channel — so a look not
+     handed the ladder teaches the wrong thing well. */
+  /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the five whose prompts build a
+     term, so they get the map. `SENDS` is the five that put a message in front of
      him now — the nightly pass writes memory and sends nothing. His notes go to
-     all seven. */
+     all six. */
   const TEACHES = ['postBriefing', 'postPulse', 'handleMessage', 'postConsolidation',
-                   'postRelease', 'postMove'];
+                   'postRelease'];
   const SENDS = ['postBriefing', 'postPulse', 'handleMessage', 'postRelease',
-                 'postMove', 'postTradeEvent'];
+                 'postTradeEvent'];
 
   const reads = (fn) => uncomment(body(fn));
 
@@ -2343,8 +2343,8 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
       `which channels are thin, and nothing would report it`);
   }
 
-  /* NOTES REACH SEVEN PATHS — the two looks that arrive while he is in a position
-     included. */
+  /* NOTES REACH SIX PATHS — the trade look, which arrives while he is in a
+     position, included. */
   for (const fn of [...new Set([...TEACHES, ...SENDS])]) {
     assert.ok(reaches(reads(fn), 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
@@ -2368,10 +2368,9 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     'fixed twenty-four hours — a second, shorter copy of the same day, paid ' +
     'for on every request of the one caller that reads a whole day at once');
 
-  /* AND WHAT HE HAS ON, on six paths: the move look joins, being the likeliest
-     message to land while he is in a trade. postTradeEvent is reached FROM the
-     position and already carries its row. */
-  for (const fn of [...TEACHES, 'postMove']) {
+  /* AND WHAT HE HAS ON, on the five that teach. postTradeEvent is reached FROM
+     the position and already carries its row. */
+  for (const fn of TEACHES) {
     const code = reads(fn);
     assert.ok(reaches(code, 'positionsBlock'),
       `${fn} never gets positionsBlock() into the message it sends — it can talk ` +
@@ -2492,9 +2491,9 @@ test('the README registers each bot for the updates its code actually handles', 
 /* THE THREE POLLER RETURNS THAT LEGITIMATELY MARK NOTHING, each for its own
    reason, so written down rather than inferred from a status. A 503 at boot
    has no credentials to mark WITH; a 401 is somebody knocking; and the quote
-   door is a run that still must not mark — the price job reaches it every
-   quarter hour, and a mark there would keep `last_ok` fresh while the
-   two-minute poll sat dead. */
+   door is a run that still must not mark — every briefing and conversation
+   reaches it, and a mark there would keep `last_ok` fresh while the two-minute
+   poll sat dead. */
 const UNMARKED = {
   'not configured':
     'the boot guard: no broker credentials loaded, so there is nothing to poll ' +
@@ -2503,7 +2502,7 @@ const UNMARKED = {
     'a caller without the cron secret — a knock at the door rather than a run',
   'symbol: SYMBOL_IDS[0]':
     'the quote door, which is a different job on the same function: marking it ' +
-    'would let the quarter-hourly price read hold last_ok open over a dead poll',
+    'would let her price reads hold last_ok open over a dead poll',
 };
 
 /* ─── Both silent writers leave a mark, on both paths ────────────────────────
@@ -2868,8 +2867,8 @@ test('the importance a release may carry is the one the table accepts', () => {
    which of theirs are filed, so the two lists are one fact in two files: an
    economy asked for and never kept is paid for on every filing, and one kept
    and never asked for is a selection that can never fire. And everything that
-   acts on a release — R-14 and R-19, the look, the trade warning, the move's
-   explanation — counts the US alone, while only the Sunday week and the
+   acts on a release — R-14 and R-19, the look, the trade warning — counts the
+   US alone, while only the Sunday week and the
    rolling list carry what is filed from abroad.
    ─────────────────────────────────────────────────────────────────────────── */
 
@@ -2899,7 +2898,7 @@ test('only US releases are counted, looked at or warned of', () => {
       .map(d => EUGENIA_TS.lastIndexOf(d, m.index))) + 1;
     return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('(', at) + 1);
   });
-  assert.ok(reads.length >= 5, `only ${reads.length} rated reads found — the reader has gone blind`);
+  assert.ok(reads.length >= 4, `only ${reads.length} rated reads found — the reader has gone blind`);
   for (const decl of reads) {
     const body = bodyOf(EUGENIA_TS, decl);
     if (LISTS.includes(decl)) {
@@ -3161,7 +3160,7 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
   // Several phrasings, so rewording it does not fail and deleting it does.
   const SAYS = /where price goes|what price will do|whether a level holds|what the day will look like|what the rest of the session looks like/i;
 
-  for (const who of ['SYSTEM', 'CRITIC', 'TRIM', 'MOVE', 'TRADE_EVENT']) {
+  for (const who of ['SYSTEM', 'CRITIC', 'TRIM', 'TRADE_EVENT']) {
     assert.ok(bodies[who], `prompt.ts no longer exports ${who}`);
     assert.match(bodies[who], SAYS,
       `${who} no longer says anything about a call on where price goes. That ` +
@@ -3335,7 +3334,7 @@ test('her read on price is fenced in the writer and in both gates', () => {
       `is asked whether a view was given while he was in one`);
   }
   const calls = [...EUGENIA_TS.matchAll(/await trim\(([^)]*)\)/g)].map(m => m[1]);
-  assert.ok(calls.length >= 4, `read ${calls.length} calls to trim() — the reader has gone blind`);
+  assert.ok(calls.length >= 3, `read ${calls.length} calls to trim() — the reader has gone blind`);
   for (const args of calls) {
     assert.match(args, /,\s*desk,\s*story$/,
       `trim(${args}) is not handed the desk and the story — that gate cannot tell ` +
@@ -3577,7 +3576,7 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   const eugenia = source('supabase/functions/doji-eugenia/index.ts');
 
   const called = [...CRON_SQL.matchAll(/functions\/v1\/([\w-]+)\?(\w+)=(\w+)/g)];
-  assert.ok(called.length >= 2,
+  assert.ok(called.length >= 1,
     `only ${called.length} flagged cron URLs read — the reader has gone blind`);
 
   const body = bodyOf(eugenia, 'async function postScheduled(', 'doji-eugenia no longer has postScheduled()');
@@ -3593,7 +3592,6 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   // AND EACH DOOR REACHES ITS OWN WORK. A branch that reads the flag and then
   // falls through to the briefing would pass the check above.
   assert.match(body, /get\("release"\) === "1"\)\s*\{[^}]*postRelease\(\)/);
-  assert.match(body, /get\("move"\) === "1"\)\s*\{[^}]*postMove\(\)/);
 });
 
 /* ─── And the same census from the other side ────────────────────────────────
@@ -3631,7 +3629,7 @@ test('every door the function reads is opened by a cron job or by a person', () 
 
   const dispatched = new Set(
     [...CRON_SQL.matchAll(/functions\/v1\/[\w-]+\?(\w+)=\w+/g)].map(m => m[1]));
-  assert.ok(dispatched.size >= 2,
+  assert.ok(dispatched.size >= 1,
     `only ${dispatched.size} flagged cron URLs read — the reader has gone blind`);
 
   for (const flag of read) {
@@ -3740,7 +3738,7 @@ test('every pg_net dispatch records a job the ledger declares', () => {
     `${posts} calls to net.http_post and ${used.length} of them reach the ledger — ` +
     `the difference is a job that can be refused a worker with nothing anywhere ` +
     `to say it ever existed`);
-  assert.ok(posts >= 6, `only ${posts} dispatch sites found — the reader has gone blind`);
+  assert.ok(posts >= 5, `only ${posts} dispatch sites found — the reader has gone blind`);
 
   for (const job of used) {
     assert.ok(declared.has(job),
@@ -4157,9 +4155,9 @@ test('every number off the quote reaches her with the window it was measured ove
     'of it now hands her a `change` with no window on it — which after the 17:00 ' +
     'roll reads as the move on the day and is not');
 
-  /* AND EVERY PATH THAT PUTS A PRICE IN FRONT OF HER GOES THROUGH IT; a fourth
+  /* AND EVERY PATH THAT PUTS A PRICE IN FRONT OF HER GOES THROUGH IT; a third
      rendering its own is the way this comes back. */
-  for (const fn of ['readMarket', 'marketBlock', 'postMove']) {
+  for (const fn of ['readMarket', 'marketBlock']) {
     assert.match(body(fn), /quoteLine\(/,
       `${fn} renders the quote its own way instead of through quoteLine — a ` +
       `second rendering is a second chance to state a figure without its window`);
@@ -4181,40 +4179,26 @@ test('every number off the quote reaches her with the window it was measured ove
     'an hour wrong for every winter evening, which is half the hours this matters in');
 });
 
-test('the two unscheduled looks both build a term before they use one', () => {
-  /* THE PRINT LOOK AND THE MOVE LOOK ARE TOLD TO BUILD FROM THE MAP they are
-     handed. A ladder without the instruction fails exactly as the instruction
-     without the ladder: she teaches well about whatever the message is about. */
-  const prompts = source('supabase/functions/doji-eugenia/prompt.ts');
+test('the release look builds a term before it uses one', () => {
+  /* THE PRINT LOOK IS TOLD TO BUILD FROM THE MAP it is handed. A ladder without
+     the instruction fails exactly as the instruction without the ladder: she
+     teaches well about whatever the message is about. */
+  const text = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)?.[1];
+  assert.ok(text, 'prompt.ts no longer exports RELEASE');
+  assert.match(text, /where he stands on each channel/i,
+    'RELEASE never tells her she has the channel map, so the block reaches her ' +
+    'as context she has no instruction to use');
 
-  const section = (name) => {
-    const m = prompts.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`));
-    assert.ok(m, `prompt.ts no longer exports ${name}`);
-    return m[1];
-  };
-
-  /* THE RUNG THEY NAME IS `explained`. `unseen` is a ONE-WAY DOOR, so a build
+  /* THE RUNG IT NAMES IS `explained`. `unseen` is a ONE-WAY DOOR, so a build
      instruction gated on it stops being reachable the first time a channel is
      mentioned, and a binary rule over four rungs reads as "the other case". */
-  for (const name of ['RELEASE', 'MOVE']) {
-    const text = section(name);
-    assert.match(text, /where he stands on each channel/i,
-      `${name} never tells her she has the channel map, so the block reaches her ` +
-      `as context she has no instruction to use`);
-    assert.match(text, /\bexplained\b/,
-      `${name} no longer names the rung nearly every channel sits at — bound to ` +
-      `the bottom rung instead, it stops building the first time a subject comes ` +
-      `up and never starts again`);
-    assert.match(text, /\bowns\b/,
-      `${name} no longer says when NOT to build, and explaining something he owns ` +
-      `is the one failure worse than saying nothing`);
-  }
-
-  /* AND THE MOVE LOOK IS TOLD WHAT ITS FIGURES ARE OF: it is the path that fires
-     in the evening, when the session and the calendar day disagree. */
-  assert.match(section('MOVE'), /17:00 New York/,
-    'the move look is no longer told where its session starts, and the evening ' +
-    'is the only time it runs where that matters');
+  assert.match(text, /\bexplained\b/,
+    'RELEASE no longer names the rung nearly every channel sits at — bound to ' +
+    'the bottom rung instead, it stops building the first time a subject comes ' +
+    'up and never starts again');
+  assert.match(text, /\bowns\b/,
+    'RELEASE no longer says when NOT to build, and explaining something he owns ' +
+    'is the one failure worse than saying nothing');
 });
 
 /* ─── The app's arithmetic, in a second runtime ──────────────────────────────
@@ -4341,28 +4325,6 @@ test('the stats tool is offered wherever the journal is reasoned about', () => {
   assert.match(src, /case STATS_TOOL\.name:\s*return await readStats\(input\.days\);/,
     'get_stats is offered and not served — every call would come back as the ' +
     'sentence serve() answers an unknown name with');
-});
-
-test('every column the price mark writes is a column the table has', () => {
-  const src = source('supabase/functions/doji-eugenia/index.ts');
-
-  const table = SENSES_SQL.match(/create table if not exists public\.eugenia_price \(([\s\S]*?)\n\);/);
-  assert.ok(table, 'schema.sql no longer creates eugenia_price');
-  const columns = new Set([...table[1].matchAll(/^\s{2}(\w+)\s+\w/gm)].map(m => m[1]));
-  assert.deepEqual([...columns].sort(), ['at', 'bid', 'id', 'looked_at'],
-    'eugenia_price has changed shape and the sense reading it has not');
-
-  /* THE MARK ADVANCES ON EVERY RUN AND `looked_at` DOES NOT: written
-     unconditionally the quiet gate never reopens and the sense fires once ever.
-     Read out of markPrice, since the calendar has its own looked_at. */
-  const body = bodyOf(src, 'async function markPrice(', 'doji-eugenia no longer has markPrice()');
-  assert.match(body, /\.\.\.\(looked \? \{ looked_at:/,
-    'markPrice writes looked_at unconditionally — every run stamps it, the quiet ' +
-    'window never opens again, and she says one thing about a move and then ' +
-    'nothing for the life of the deployment');
-  assert.match(body, /bid, at: new Date\(\)\.toISOString\(\)/,
-    'markPrice no longer advances the mark on every run, so the window a move is ' +
-    'measured over stops being the gap between runs');
 });
 
 test('the trades trigger fires on the transition, not on every poll', () => {
@@ -4611,25 +4573,25 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
-     and is silent. Seven sites — the briefing's two (the speaking worker and
-     postBriefing's fallback), then the pulse, the release look, the trade event,
-     the move look and the reply. `/notes`, the apologies and the short
+     and is silent. Six sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the pulse, the release look, the trade event
+     and the reply. `/notes`, the apologies and the short
      operational lines keep `say` deliberately. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 7,
-    `${spoken} call sites speak where seven should — a message she writes that goes ` +
+  assert.equal(spoken, 6,
+    `${spoken} call sites speak where six should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
 });
 
-test('the three gated paths remember what the gate returned, not the draft', () => {
+test('the two gated paths remember what the gate returned, not the draft', () => {
   /* WHAT IS STORED IS WHAT HE READ. `trim` may rewrite, and storing the draft
      would put words he never saw in her history, resent as hers for six
      exchanges. `postBriefing` stores what `critique` returned. Read from the
      source, since nothing here drives a path that sends. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
-  for (const fn of ['postPulse', 'postRelease', 'postMove']) {
+  for (const fn of ['postPulse', 'postRelease']) {
     const body = bodyOf(src, `async function ${fn}(`, `doji-eugenia no longer has ${fn}()`);
 
     assert.match(body, /const sent = await trim\(said, desk, story\);/,
@@ -5135,18 +5097,6 @@ test('one write makes a calendar row, keyed on the id, and she holds none', () =
     'keeps a consensus for ever and never the number');
 });
 
-test('the move look has a tool set of its own, with no print to file', () => {
-  /* Not RELEASE_TOOLS: that carries `record_actual` into a look no print
-     explains, and buys the hour of cache that array alone is granted. */
-  const array = EUGENIA_TS.match(/const MOVE_TOOLS = \[([^\]]*)\]/)?.[1];
-  assert.ok(array, 'the move look no longer has a tool set of its own');
-  assert.doesNotMatch(array, /ACTUAL_TOOL/, 'the move look can file a release figure again');
-  const at = EUGENIA_TS.indexOf('async function postMove(');
-  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n}\n', at));
-  assert.match(body, /'move look', MOVE_TOOLS\)/,
-    'the move look is handed some other array than its own');
-});
-
 test('record_actual cannot be handed a column the briefing owns', () => {
   const schema = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const ACTUAL_TOOL'));
   const props = schema.slice(0, schema.indexOf('required:'));
@@ -5164,16 +5114,12 @@ test('the release prompt asks for the tool the release look actually has', () =>
     'the release prompt names no tool for the number, so the look reads the print and files nothing');
 });
 
-test('the market around gold reaches both paths that explain gold against it, and only from one list', () => {
+test('the market around gold reaches the briefing, and only from one list', () => {
   /* aroundList is driven in fold.test.mjs and cannot see its callers. A briefing
      that stopped reading the market still reads well, off a search page. */
-  const body = (name) =>
-    bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
-  for (const fn of ['postBriefing', 'postMove']) {
-    const b = body(fn);
-    assert.match(b, /aroundBlock\(\)/, `${fn} no longer reads the market around gold`);
-    assert.match(b, /\baround \+ /, `${fn} reads the market around gold and never hands it to her`);
-  }
+  const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
+  assert.match(brief, /aroundBlock\(\)/, 'the briefing no longer reads the market around gold');
+  assert.match(brief, /\baround \+ /, 'the briefing reads the market around gold and never hands it to her');
   /* THE SYMBOLS LIVE IN doji-tradingview ALONE, beside their names. A renderer
      holding its own list is a list that can name a symbol nothing reads. */
   assert.doesNotMatch(EUGENIA_TS, /"(?:TVC|FRED|SP):[A-Z0-9]+"/,
@@ -5185,18 +5131,6 @@ test('the market around gold reaches both paths that explain gold against it, an
     'SYSTEM no longer asks her to say what a market figure is measured from');
   assert.doesNotMatch(system, /finance\.yahoo\.com/,
     'SYSTEM still sends her to a page for the dollar or the ten-year she is now handed');
-});
-
-test('the move look reads the wires before it searches, and claims no more than a title', () => {
-  // headlinesList is pure and driven in fold.test.mjs; the call site is not.
-  const body = bodyOf(EUGENIA_TS, 'async function postMove(');
-  assert.match(body, /headlinesBlock\(\)/, 'the move look no longer reads the headlines');
-  assert.match(body, /\+ wires \+/, 'the move look reads the headlines and never hands them to her');
-  const move = EUGENIA_PROMPT.match(/export const MOVE = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
-  assert.match(move, /read them first, and where one explains the move, cite it with its time and its source/,
-    'MOVE no longer sends her to the headlines before a search');
-  assert.match(move, /never what the article goes on to say/,
-    'MOVE no longer stops her claiming what a paywalled story says from its title');
 });
 
 /* ─── What broke since the last briefing ─────────────────────────────────────
@@ -5271,14 +5205,13 @@ test('a reply can read the market around gold, and is told to before searching f
   assert.match(system, /IN A CONVERSATION, get_around READS THE SAME LINES/,
     'SYSTEM no longer tells her the conversation can read the market around gold');
   const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
-  assert.match(served.slice(0, served.indexOf('case ', 5)), /headlinesBlock\(WIRES_CHAT_MIN\)/,
-    'the conversation reads the move look\'s last hour of headlines, not the morning');
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /headlinesBlock\(\)/,
+    'the conversation no longer reads the headlines');
 });
 
 /* ─── Where the speculators stand ────────────────────────────────────────────
    The Sunday briefing and get_around carry the weekly count. A weekday briefing
-   would repeat it five mornings running, and the move look would be handed a
-   plausible cause it cannot be — both an ordinary edit away, both reading as
+   would repeat it five mornings running — an ordinary edit away, and reading as
    better informed. */
 test('the speculators\' weekly count reaches the Sunday briefing and a conversation, and nothing else', () => {
   const body = (name) =>
@@ -5291,8 +5224,6 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
   const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
   assert.match(served.slice(0, served.indexOf('case ', 5)), /positioningBlock\(\)/,
     'a conversation asked whether gold is crowded has nothing but a search to answer from');
-  assert.doesNotMatch(body('postMove'), /positioningBlock/,
-    'the move look is handed a weekly count as the cause of a quarter-hour move');
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
   assert.match(system, /WHERE THE SPECULATORS STAND COMES ON SUNDAY AND FROM get_around/,
     'SYSTEM no longer says what the count is for, so it reads as news');
@@ -5303,10 +5234,9 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
 });
 
 /* ─── What COMEX gold futures traded ─────────────────────────────────────────
-   Every briefing and get_around. The move look would be handed a day's total as
-   the cause of a quarter-hour move, and the prompt keeps the broker's volume,
-   which is its own clients, from standing in for the market's. */
-test('futures volume reaches every briefing and a conversation, and never the move look', () => {
+   Every briefing and get_around. The prompt keeps the broker's volume, which is
+   its own clients, from standing in for the market's. */
+test('futures volume reaches every briefing and a conversation', () => {
   const body = (name) =>
     bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
   const calls = [...EUGENIA_TS.matchAll(/(?<!function )volumeBlock\(\)/g)].length;
@@ -5316,8 +5246,6 @@ test('futures volume reaches every briefing and a conversation, and never the mo
   const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
   assert.match(served.slice(0, served.indexOf('case ', 5)), /volumeBlock\(\)/,
     'a conversation asked whether a move had volume behind it has nothing but a search to answer from');
-  assert.doesNotMatch(body('postMove'), /volumeBlock/,
-    'the move look is handed a day\'s volume as the cause of a quarter-hour move');
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   const said = system.slice(system.indexOf('WHAT COMEX GOLD FUTURES TRADED'));
   assert.ok(said.length < system.length, 'SYSTEM no longer says what the futures volume is for, so it reads as news');
@@ -5682,35 +5610,9 @@ test('the refusal fallback rides only with the model it is proven on', () => {
     'the header and the field are a pair and either alone is a 400');
 });
 
-/* ─── A move with no cause under it is a price callout ───────────────────────
-   Without a cause all that is left is the price, which is on his screen in
-   more detail, and this path exists to TEACH what moved gold. An open loop is
-   worse: nothing arrives to close a thread about a move with no event under
-   it, so it rides into every briefing after.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-test('an unexplained move is silence, and opens no thread', () => {
-  const move = EUGENIA_PROMPT.match(/export const MOVE = `([\s\S]*?)`;/)?.[1];
-  assert.ok(move, 'the MOVE prompt is no longer readable from here');
-  const flat = move.replace(/\s+/g, ' ');
-
-  assert.match(flat, /A MOVE YOU CANNOT EXPLAIN IS NOTHING/,
-    'the move look may report a move it could not explain again — which is a ' +
-    'price callout, and the price is already on his screen');
-  assert.match(flat, /OPEN NO LOOP FOR IT/,
-    'the move look may open a thread about a move with no event under it — ' +
-    'nothing will ever close it, so it rides into every briefing after it');
-
-  // AND THE LENGTH PERMISSION IS GONE: it pointed the wrong way, last thing she
-  // read.
-  assert.doesNotMatch(flat, /extra sentence or two/,
-    'MOVE ends by inviting a longer message again, which is the one length ' +
-    'instruction on a path the critic did not reach');
-});
-
 /* ─── The gate reaches every message she composes ────────────────────────────
-   The pulse, the release look and the move look are most of what he receives,
-   and the writing rules had to answer for them too.
+   The pulse and the release look are most of what he receives unasked, and
+   the writing rules had to answer for them too.
 
    THE TRADE EVENT STAYS OUT, because TRIM REWRITES. It reaches a man in a
    position or past his day, where a gate paraphrasing a citation of his rule
@@ -5720,7 +5622,7 @@ test('an unexplained move is silence, and opens no thread', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* THE CENSUS, BECAUSE EVERY OTHER CHECK HERE IS VERTICAL — one fact each,
-   deeply. The HORIZONTAL fault is six paths that should do comparable things,
+   deeply. The HORIZONTAL fault is several paths that should do comparable things,
    one missing a step. So the table is derived from the source and compared
    with a declaration: a new path that sends fails until someone writes down
    its gate and what it carries. An exemption is a row with a reason in it,
@@ -5737,7 +5639,6 @@ const SENDS = {
                             'the stored turn rather than writing one' },
   postPulse:      { gate: 'trim',     carries: 'sent' },
   postRelease:    { gate: 'trim',     carries: 'sent' },
-  postMove:       { gate: 'trim',     carries: 'sent' },
   handleMessage:  { gate: 'trim',     carries: 'answer' },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +

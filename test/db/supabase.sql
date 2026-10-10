@@ -84,3 +84,11 @@ returns bigint language sql as $$
   on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command
   returning jobid
 $$;
+-- By name, as upgrade.sql calls it; pg_cron refuses a name it does not hold.
+create function cron.unschedule(job_name text)
+returns boolean language plpgsql as $$
+begin
+  delete from cron.job where jobname = job_name;
+  if not found then raise exception 'could not find valid entry for job ''%''', job_name; end if;
+  return true;
+end $$;
