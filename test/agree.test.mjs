@@ -685,7 +685,7 @@ test('a commitment is recorded, audited, held against his trades and retired', (
   // The portrait's argument defaults the same way, so the same silence.
   assert.match(branch, /readPortrait\(\)/,
     '/notes no longer reads how she reads him — the audit still answers, minus it');
-  assert.match(branch, /notesList\([^)]*\bread[,)]/,
+  assert.match(branch, /notesList\([^)]*\bportrait[,)]/,
     '/notes reads the portrait and does not hand it to notesList');
   assert.match(branch, /readRows<Read>\('Reads', recordQuery\(\)\)/,
     '/notes no longer reads her record — the audit still answers, minus it');

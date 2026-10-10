@@ -2059,9 +2059,10 @@ type Channel = { channel: string; state: string; evidence: string | null; moved_
    defect it exists to prevent. Pure; the read stays with the caller. */
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
-                          promised: Note[] = [], read: Portrait | null = null,
+                          promised: Note[] = [], portrait: Portrait | null = null,
                           record: Read[] = []): string {
   const list = (ns: Note[]) => inWindow(ns).map(noteLine).join("\n");
+  const missed = misses(record);
   // Not loopsList, which is written to her about her own threads.
     const open = (kind: string, heading: string) => {
       const rs = loops.filter(l => l.kind === kind);
@@ -2074,13 +2075,15 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
     promised.length ? `What you have committed to (${howMany(promised)}), newest first:\n${list(promised)}` : "",
     noticed.length  ? `What I have noticed (${howMany(noticed)}), newest first:\n${list(noticed)}`         : "",
     told.length || promised.length || noticed.length ? "" : "I have not kept any notes yet, jefe.",
-    read ? `How I read you${read.moved_on ? `, last moved ${civilDay(read.moved_on)}` : ""}:\n${read.portrait}` : "",
+    portrait
+      ? `How I read you${portrait.moved_on ? `, last moved ${civilDay(portrait.moved_on)}` : ""}:\n${portrait.portrait}`
+      : "",
     open('watch',    "What I flagged and am still watching:"),
     open('question', "What I asked you and have not had back:"),
     story ? `The story I am carrying${story.moved_on ? `, last moved ${civilDay(story.moved_on)}` : ""}:\n${story.thesis}` : "",
     record.length
       ? `My reads over the last ${RECORD_DAYS} days, each judged by the test I stated and never by ` +
-        `where price went: ${tally(record)}.` + (misses(record) ? `\nThe latest I got wrong:\n${misses(record)}` : "")
+        `where price went: ${tally(record)}.` + (missed ? `\nThe latest I got wrong:\n${missed}` : "")
       : "",
     `Where you stand on each channel:\n${channelsList(channels)}`,
   ].filter(Boolean).join("\n\n");
@@ -3592,11 +3595,11 @@ async function handleMessage(update: any): Promise<void> {
     if (text.trim().toLowerCase() === '/notes') {
       try {
         // Everything she keeps that he cannot otherwise see, in one message.
-        const [told, noticed, channels, loops, story, promised, read, record] = await Promise.all([
+        const [told, noticed, channels, loops, story, promised, portrait, record] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
           readNotes('commitment'), readPortrait(), readRows<Read>('Reads', recordQuery()),
         ]);
-        await say(notesList(told, noticed, channels, loops, story, promised, read, record));
+        await say(notesList(told, noticed, channels, loops, story, promised, portrait, record));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —", why(err));
         await say("I cannot read my notes just now, jefe.");
