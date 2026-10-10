@@ -83,6 +83,8 @@ void power_start(void) {
     };
     i2c_master_bus_add_device(bsp_i2c_get_handle(), &dev, &chip);
     set(KEY_TIMES, (get(KEY_TIMES) & ~(3 << 2)) | OFF_10S);
+    gpio_config_t buttons = { .pin_bit_mask = 1ULL << PWR | 1ULL << BOOT, .mode = GPIO_MODE_INPUT };
+    gpio_config(&buttons);
     xTaskCreate(watch, "power", 3072, NULL, 3, NULL);
 }
 

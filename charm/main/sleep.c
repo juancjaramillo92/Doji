@@ -25,6 +25,11 @@ void sleep_release(void) {
     gpio_deep_sleep_hold_dis();
 }
 
+void sleep_woke(void) {
+    rtc_gpio_deinit(PWR);
+    for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
+}
+
 void sleep_until(time_t wake_at, bool motion) {
     for (size_t i = 0; i < COUNT(HELD); i++) gpio_hold_en(HELD[i]);
     gpio_deep_sleep_hold_en();

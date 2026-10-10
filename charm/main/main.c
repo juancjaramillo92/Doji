@@ -218,7 +218,7 @@ static void life(void *arg) {
     (void)arg;
     power_start();
     // A lift that was not him: back to sleep at once, the sensor resting.
-    if (woke == ESP_SLEEP_WAKEUP_EXT1 && esp_sleep_get_ext1_wakeup_status() & 1ULL << MOTION_PIN && !motion_looked()) {
+    if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;
         sleep_until(rest < errand_at ? rest : errand_at, false);
     }
@@ -234,6 +234,7 @@ static void life(void *arg) {
 
 void app_main(void) {
     woke = esp_sleep_get_wakeup_cause();
+    sleep_woke();
     config_load();
 
     // What the board turned out to be, for the first serial log.
