@@ -3513,6 +3513,25 @@ async function* charmAudio(words: Promise<string>): AsyncGenerator<Uint8Array> {
   }
 }
 
+/* The briefing, on the charm. The charm sleeps, so it is never told: it wakes
+   after the briefing's hour and asks `?briefing=ready`, which answers with her
+   line that it has landed, or 204 while it has not; then the charm shows its
+   dot until he presses and asks `?briefing=today` for the briefing itself. The
+   text is the one postBriefing stored, read back as the speaking worker reads
+   it, so the charm says exactly what Telegram received. */
+const CHARM_READY = "Your briefing is ready, jefe.";
+
+async function charmBriefing(which: string): Promise<Response> {
+  if (which !== 'ready' && which !== 'today') {
+    return json({ ok: false, error: "briefing is ready or today" }, 400);
+  }
+  const now = new Date();
+  const turn = await storedBriefing(nyClock(now).wd === 0 ? 'sunday' : 'weekday', nyDate(now));
+  if (!turn) return new Response(null, { status: 204 });
+  return new Response(ReadableStream.from(charmAudio(Promise.resolve(which === 'ready' ? CHARM_READY : turn.content))),
+                      { headers: { "Content-Type": "audio/pcm" } });
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
@@ -3564,6 +3583,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       if (!STT_URL || !STT_KEY || !TTS_KEY) {
         return json({ ok: false, error: "the charm needs STT_URL, STT_KEY and TTS_KEY" }, 503);
       }
+      const briefing = new URL(req.url).searchParams.get("briefing");
+      if (briefing !== null) return await charmBriefing(briefing);
       const bytes = new Uint8Array(await req.arrayBuffer());
       if (!bytes.length || bytes.length > FILE_MAX) {
         return json({ ok: false, error: `a recording, up to ${FILE_MAX} bytes` }, 400);

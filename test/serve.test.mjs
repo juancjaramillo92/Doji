@@ -353,3 +353,53 @@ test('doji-eugenia: the charm is refused at the door without its vendors or a re
   assert.equal((await serve(request('doji-eugenia', { header: 'x-charm-key', key: 'wrong', body: 'x' }))).status,
     401, 'the charm door admitted a wrong key');
 });
+
+/* ─── The briefing on the charm ───────────────────────────────────────────
+   The charm wakes after the briefing's hour and asks whether it has landed,
+   then asks for the briefing itself when he presses. Both read today's stored
+   briefing by its marker, as the speaking worker does. */
+
+const briefingStored = (content) => (url) => {
+  if (url.includes('/rest/v1/eugenia_turns?select=created_at')) {
+    return ok(content === null ? [] : [{ created_at: new Date().toISOString() }]);
+  }
+  if (url.includes('/rest/v1/eugenia_turns?select=content')) return ok([{ content }]);
+  if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
+  return Promise.reject(new Error(`the briefing door asked something unexpected: ${url}`));
+};
+const briefingDoor = (which) => new Request(`https://fn.test/functions/v1/doji-eugenia?briefing=${which}`,
+  { method: 'GET', headers: { 'x-charm-key': 'charm' } });
+
+test('doji-eugenia: the charm hears that the briefing landed, then the briefing itself', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored('Gold opened quiet.');
+  for (const [which, said] of [['ready', 'Your briefing is ready, jefe.'], ['today', 'Gold opened quiet.']]) {
+    calls.length = 0;
+    const res = await serve(briefingDoor(which));
+    assert.equal(res.status, 200, `?briefing=${which} did not answer with audio`);
+    assert.equal(res.headers.get('content-type'), 'audio/pcm');
+    assert.deepEqual([...new Uint8Array(await res.arrayBuffer())].slice(-PCM.length), PCM);
+    assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]), [[said, 'pcm']],
+      `?briefing=${which} read the charm something other than ${JSON.stringify(said)}`);
+    // Sunday's briefing on a Sunday in New York, the weekday one otherwise.
+    const sunday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+      .format(new Date()) === 'Sun';
+    const marker = calls.find(c => c.url.includes('select=created_at')).url;
+    assert.ok(marker.includes(encodeURIComponent(`[${sunday ? 'sunday' : 'weekday'} briefing]`)),
+      `the charm looked for the wrong briefing today: ${marker}`);
+  }
+});
+
+test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored(null);
+  for (const which of ['ready', 'today']) {
+    calls.length = 0;
+    const res = await serve(briefingDoor(which));
+    assert.equal(res.status, 204, `?briefing=${which} answered ${res.status} with no briefing stored`);
+    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), 'a briefing that is not there was spoken');
+  }
+  calls.length = 0;
+  assert.equal((await serve(briefingDoor('yesterday'))).status, 400, 'a briefing door it does not open answered');
+  assert.deepEqual(calls, [], 'a briefing door it does not open made a request');
+});
