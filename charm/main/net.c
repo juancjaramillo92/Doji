@@ -41,9 +41,10 @@ bool net_start(void) {
     esp_wifi_start();
 
     for (int i = 0; i < cfg.n_nets; i++) {
+        // The driver's fields need no terminator: a name may fill all 32 bytes.
         wifi_config_t sta = { 0 };
-        strncpy((char *)sta.sta.ssid, cfg.nets[i].ssid, sizeof sta.sta.ssid);
-        strncpy((char *)sta.sta.password, cfg.nets[i].pass, sizeof sta.sta.password);
+        memcpy(sta.sta.ssid, cfg.nets[i].ssid, strlen(cfg.nets[i].ssid));
+        memcpy(sta.sta.password, cfg.nets[i].pass, strlen(cfg.nets[i].pass));
         esp_wifi_set_config(WIFI_IF_STA, &sta);
         xEventGroupClearBits(events, JOINED | REFUSED);
         esp_wifi_connect();
