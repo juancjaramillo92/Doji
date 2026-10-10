@@ -1838,7 +1838,8 @@ taught it has rolled away. Its rules are the ones that keep a reading honest:
 each thing in it seen more than once, counted off his trades rather than
 recalled; written as what is true of him and never as an order to herself; and
 nothing about today's market or what he has open. She uses it as she uses the
-facts and never hands it to him as a verdict; `/notes` shows it to him in the
+facts — in the briefing and a reply, never the trade look — and never hands it to
+him as a verdict; `/notes` shows it to him in the
 second person, and he corrects it the way he corrects anything — by telling her,
 which the pass reads that night.
 
@@ -1873,9 +1874,10 @@ sharing one instant — otherwise no quote rather than a wrong one.
 **Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
 reply, the nightly pass and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`
-goes wherever the notes go, as its own block so a failed read costs the paragraph
-and never his instructions. `recordBlock()` goes to the briefing, a reply and the
-pass, and a test asserts it never reaches the trade look. `channelsBlock()`
+and `recordBlock()` go to the briefing, a reply and the pass, and a test asserts
+neither reaches the trade look: it lands while he is in a position, where *"he
+cuts winners early"* reads as an order about the trade he is in. The portrait is
+its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that

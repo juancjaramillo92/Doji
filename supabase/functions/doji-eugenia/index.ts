@@ -1144,7 +1144,8 @@ async function setThesis(thesis: unknown): Promise<string> {
    once a twenty-first fact arrives the oldest stops shaping anything unless she
    thinks to search for it. One paragraph carries what they add up to, and the
    lines can roll out of view without taking the lesson with them. Nightly only,
-   for the thesis's reason; moved, not replaced.
+   for the thesis's reason; moved, not replaced. Never on the trade look, which
+   reaches him in a position.
    ───────────────────────────────────────────────────────────────────────── */
 export const PORTRAIT_MAX = 800;
 
@@ -1153,7 +1154,7 @@ const PORTRAIT_TOOL = {
   description:
     "Rewrite how you read him — what his notes, his trades and his record against " +
     "his own word add up to. At the nightly pass and nowhere else. It is handed " +
-    "back to you with every message, so it is what keeps an old lesson about him " +
+    "back to you with every briefing and reply, so it keeps an old lesson about him " +
     "alive after the note that taught it has rolled out of the window. MOVE it " +
     "rather than replacing it: most nights it is the same man one day further on. " +
     "Statements of what is true of him, each one something seen more than once, " +
@@ -3346,13 +3347,13 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
   /* The reads come after the early returns, so an ordinary fill costs nothing.
      History matters most here: the print this warns about is the one the
      briefing likely named, and without the window she repeats herself. Notes,
-     or his instructions are obeyed everywhere but mid-trade; the portrait,
-     because it is what the notes add up to. Never her record: this message
-     carries no read. */
-  const [history, notes, portrait] = await Promise.all([recent(), notesBlock(), portraitBlock()]);
+     or his instructions are obeyed everywhere but mid-trade. Neither the
+     portrait nor her record: a reading of how he trades, reaching a man in a
+     position, is how a sentence becomes an order. */
+  const [history, notes] = await Promise.all([recent(), notesBlock()]);
 
   const said = await ask(
-    [...history, { role: 'user', content: `${TRADE_EVENT}\n\n${situation}${notes}${portrait}` }],
+    [...history, { role: 'user', content: `${TRADE_EVENT}\n\n${situation}${notes}` }],
     'medium', 'trade look', TRADE_TOOLS);
 
   if (isSilent(said)) return json({ ok: true, trade: id, said: "quiet" });

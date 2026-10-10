@@ -30,7 +30,7 @@ any change that touches it.
 
 ## 2 · THE REJECTED REGISTER
 
-Eleven are refused by a rule `CLAUDE.md` states, and are named here rather than
+Twelve are refused by a rule `CLAUDE.md` states, and are named here rather than
 argued, so the reason lives once, in the document every session reads.
 
 | Move | Refused by, in `CLAUDE.md` |
@@ -46,6 +46,7 @@ argued, so the reason lives once, in the document every session reads.
 | R-10 — regenerating `golden.json` or `golden-fold.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 | R-18 — a per-caller cache window in place of the tool array | the cache window is derived from the tool array; do not move a window on an argument |
 | R-25 — grading a read by where gold went, or handing her record to the trade look | her record is judged by the test she stated, never by where price went, and it is hers |
+| R-33 — handing the portrait to the trade look | the trade event is exempt from `TRIM`: a paraphrase reaching a man in a position is how a sentence becomes an order |
 
 The rest are refused by something no other document holds, so they carry their
 reasoning here.
