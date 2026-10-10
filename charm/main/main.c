@@ -24,6 +24,7 @@
 
 #include "briefing.h"
 #include "config.h"
+#include "dial.h"
 #include "face.h"
 #include "gladys.h"
 #include "net.h"
@@ -44,18 +45,27 @@ static RTC_DATA_ATTR bool waiting;  // her dot is up: a briefing, or a trade, wa
 static esp_sleep_wakeup_cause_t woke;
 static TaskHandle_t life_task;
 
-// A tap is for her; ten seconds held opens the setup page.
+// A tap is for her, a slide round the rim is the volume, and ten seconds held
+// opens the setup page.
 static void on_touch(lv_event_t *e) {
     static uint32_t pressed_at;
     static bool asked;
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) { pressed_at = lv_tick_get(); asked = false; }
+    lv_point_t at;
+    lv_indev_get_point(lv_indev_active(), &at);
+    if (code == LV_EVENT_PRESSED) {
+        pressed_at = lv_tick_get();
+        asked = false;
+        dial_press(at);
+    }
+    if (code == LV_EVENT_PRESSING) dial_slide(at);
     if (code == LV_EVENT_PRESSING && !asked && lv_tick_elaps(pressed_at) > SETUP_HOLD_MS) {
         asked = true;
         config_ask_setup();
         esp_restart();
     }
-    if (code == LV_EVENT_SHORT_CLICKED) xTaskNotifyGive(life_task);
+    if (code == LV_EVENT_RELEASED) dial_lift();
+    if (code == LV_EVENT_SHORT_CLICKED && !dial_turned()) xTaskNotifyGive(life_task);
 }
 
 // From the dark there is nothing to close.
@@ -78,6 +88,7 @@ static void journal(void) {
 static void life(void *arg) {
     (void)arg;
     sound_start();
+    sound_volume(cfg.volume);
     if (woke == ESP_SLEEP_WAKEUP_UNDEFINED) sound_chime();  // switched on, not woken
     if (!net_start()) ESP_LOGW(TAG, "none of her networks answered");
 
@@ -139,6 +150,7 @@ void app_main(void) {
     lv_obj_t *screen = lv_screen_active();
     lv_obj_add_event_cb(screen, on_touch, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(screen, on_touch, LV_EVENT_PRESSING, NULL);
+    lv_obj_add_event_cb(screen, on_touch, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(screen, on_touch, LV_EVENT_SHORT_CLICKED, NULL);
     bsp_display_unlock();
 }

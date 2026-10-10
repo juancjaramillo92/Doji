@@ -32,7 +32,6 @@ void sound_start(void) {
     speaker = bsp_audio_codec_speaker_init();
     mics = bsp_audio_codec_microphone_init();
     open_at(16000);
-    sound_volume(60);
 }
 
 void sound_volume(int percent) {

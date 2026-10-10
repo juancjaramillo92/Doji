@@ -12,6 +12,7 @@ void config_load(void) {
     memset(&cfg, 0, sizeof cfg);
     cfg.brightness = 75;
     cfg.check_min = 5;
+    cfg.volume = 60;
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -37,6 +38,7 @@ void config_load(void) {
     int32_t v;
     if (nvs_get_i32(h, "bright", &v) == ESP_OK && v >= 10 && v <= 100) cfg.brightness = v;
     if (nvs_get_i32(h, "check", &v) == ESP_OK && v >= 1 && v <= 60) cfg.check_min = v;
+    if (nvs_get_i32(h, "vol", &v) == ESP_OK && v >= 0 && v <= 100) cfg.volume = v;
     nvs_close(h);
 }
 
@@ -48,6 +50,7 @@ void config_save(void) {
     nvs_set_blob(h, "nets", cfg.nets, sizeof cfg.nets);
     nvs_set_i32(h, "bright", cfg.brightness);
     nvs_set_i32(h, "check", cfg.check_min);
+    nvs_set_i32(h, "vol", cfg.volume);
     nvs_commit(h);
     nvs_close(h);
 }

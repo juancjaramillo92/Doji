@@ -246,9 +246,9 @@ test('Gladys\'s charm sends the setups and answers her door takes', () => {
     'than the screens ask them');
 });
 
-/* The journal's words are drawn in a font holding only the letters
-   tools/fonts.sh gave it; a word with any other letter draws a gap. */
-test('every word on Gladys\'s screens is in the font that draws it', () => {
+/* The charm's words are drawn in fonts holding only the letters
+   tools/fonts.sh gave them; a word with any other letter draws a gap. */
+test('every word on the charm\'s screens is in the font that draws it', () => {
   const journal = source('charm/main/journal.c');
   const list = (name) => {
     const m = journal.match(new RegExp(`${name}\\[\\d\\] = \\{([^}]+)\\}`));
@@ -267,6 +267,13 @@ test('every word on Gladys\'s screens is in the font that draws it', () => {
   }
   // The setup screen's label is the small font's.
   for (const letter of words[0]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${words[0]}`);
+
+  // The dial's label, and its number, any of 0 to 100.
+  const dial = source('charm/main/dial.c');
+  const label = dial.match(/t\.text = "([^"]+)";/);
+  assert.ok(label, 'dial.c no longer draws its label as this test reads it');
+  for (const letter of label[1]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${label[1]}`);
+  for (const digit of '0123456789') assert.ok(held('hanken_36').includes(digit), `hanken_36 cannot draw a ${digit}`);
 });
 
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {

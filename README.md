@@ -72,6 +72,7 @@ charm/                                  firmware for the two charms — see The 
   main/briefing.c                       when Eugenia wakes to ask for the briefing
   main/gladys.c                         Gladys's door: what waits, and his answers
   main/journal.c                        the journal's questions, a screen each
+  main/dial.c                           the volume, a finger round the rim
   main/hanken_64.c                      Doji's typeface for the journal's words
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
@@ -376,7 +377,7 @@ single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, and her charm's `SETUPS` in `charm/main/gladys.c` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order |
-| the **letters the journal's font holds** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words in `charm/main/journal.c` |
+| the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c` and `charm/main/dial.c` |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
@@ -2607,8 +2608,15 @@ without a pause. Done, the ring sweeps round once in Doji's purples with a warm
 smile — delighted, eyes curved and cheeks pinker, when every answer was a yes.
 A minute without a tap and the rest waits for next time. Taps, not swipes: a
 swipe moves the whole screen, which this chip may not draw smoothly. The words
-are Doji's typeface, Hanken Grotesk, made into the two fonts by
+are Doji's typeface, Hanken Grotesk, made into the charm's three fonts by
 `charm/tools/fonts.sh` with only the letters they use.
+
+**A finger round the rim is the volume**, on both: one full turn from silent
+to loudest, from a press at least 160 px from the centre. The screen dims, and
+round the rim a faint track, the level in Doji's purples, a white knob at its
+end, and the number under *VOLUME*; it fades a moment after the finger lifts,
+and the volume is saved in her flash with the rest. A slide is not a tap, so it
+starts nothing.
 
 **Gladys wakes on her own every few minutes** — the setup page's *how often*,
 5 by default, around the clock — and asks in the dark. When a trade waits that
@@ -2619,8 +2627,7 @@ nothing does.
 chip sleeps, that the touch controller wakes it (the BOOT button always does),
 and how long a battery lasts.
 
-**Still to build**, in order: the volume dial round the rim, and the battery
-and power screens.
+**Still to build**: the battery and power screens.
 
 ---
 

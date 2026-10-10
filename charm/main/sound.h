@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// The speaker and both microphones, through the board's codecs.
+// The speaker and both microphones, through the board's codecs. Set the
+// volume after.
 void sound_start(void);
 
 // 0 to 100.
