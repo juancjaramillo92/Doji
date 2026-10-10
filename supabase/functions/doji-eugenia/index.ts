@@ -28,7 +28,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, MOVE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, RELEASE, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
@@ -37,7 +37,7 @@ import {
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
 import {
-  env, secretMatches, json, marketOpen, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why
+  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -1052,8 +1052,8 @@ const MARKET_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
-/* The market around gold, in a conversation: the reads the move look makes,
-   headlines wider, plus the rate odds and the speculators' count — "is gold
+/* The market around gold, in a conversation: the reads the briefing is handed,
+   the headlines, plus the rate odds and the speculators' count — "is gold
    crowded" gets asked on a Wednesday. Without it her only source was a web
    search, against her own rule. */
 const AROUND_TOOL = {
@@ -1328,8 +1328,7 @@ const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 
    schema for something a job has no business doing — it is paid on every
    request and it is an option that should not be taken. The pass has nothing
    to research but needs search to supersede rather than duplicate; the release
-   look gets no memory; the move look nothing to file; the trade look only his
-   strategy and journal. */
+   look gets no memory; the trade look only his strategy and journal. */
 const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
@@ -1346,9 +1345,6 @@ const CHAT_TOOLS = [
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
 // A look files an actual, through a PATCH that cannot mint a row.
 const RELEASE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, ACTUAL_TOOL, LOOP_TOOL];
-/* Its own array: borrowing the release look's handed it a tool for filing a
-   print and the hour-long cache write that array carries. */
-const MOVE_TOOLS = [WEB_SEARCH, WEB_FETCH, MARKET_TOOL, LOOP_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
@@ -1465,7 +1461,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
     case AROUND_TOOL.name:
-      return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(WIRES_CHAT_MIN),
+      return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), volumeBlock()])).join("").trim();
     case ACTUAL_TOOL.name:   return await recordActual(input.at, input.name, input.actual, input.note);
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
@@ -2381,8 +2377,8 @@ export async function weekBlock(now = Date.now()): Promise<string> {
 
 /* ─── The market around gold ───────────────────────────────────────────────
    The dollar, yields, real yield, silver, oil, the S&P and the VIX, and abroad
-   four European ten-year yields, Japan's and the euro, for the briefing and the
-   move look, which explain gold against them.
+   four European ten-year yields, Japan's and the euro, for the briefing and
+   get_around, which explain gold against them.
 
    Every line is a level now beside the level at a stated time, and no change
    is computed — quoteLine's lesson, applied here. The latest bar's time is
@@ -2464,23 +2460,20 @@ export async function ratesBlock(): Promise<string> {
 }
 
 /* ─── What the wires said ──────────────────────────────────────────────────
-   Gold's and the dollar's headlines, for the look at a move nothing on the
-   calendar explains. The last hour for the move look — a morning headline
-   explains nothing a quarter-hour old — and six for a conversation. Titles
-   only: most stories are paywalled.
+   Gold's and the dollar's headlines, for a conversation: the last six hours.
+   Titles only: most stories are paywalled.
 
    The feeds are read to a fixed count, so where one stops inside the span the
    block says how far back it reaches; a story both carry can make a feed look
    to reach later than it did, never earlier. Another day's line names it.
    ───────────────────────────────────────────────────────────────────────── */
-const WIRES_MIN = 60;
-const WIRES_CHAT_MIN = 6 * 60;
+const WIRES_MIN = 6 * 60;
 
 type Headline = { title: string; source: string; published: string; feed: string };
 
 export function headlinesList(answer: { headlines: Headline[]; missing: { symbol: string }[] },
                               now = Date.now(), minutes = WIRES_MIN): string {
-  const span = minutes === 60 ? "the last hour" : `the last ${minutes / 60} hours`;
+  const span = `the last ${minutes / 60} hours`;
   const today = nyDate(new Date(now));
   const when = (ms: number) => {
     const day = nyDate(new Date(ms));
@@ -2507,9 +2500,9 @@ export function headlinesList(answer: { headlines: Headline[]; missing: { symbol
     recent.map(h => `· ${when(Date.parse(h.published))}, ${h.source}: ${h.title}`).join("\n") + gap + short;
 }
 
-export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
+export async function headlinesBlock(): Promise<string> {
   try {
-    return headlinesList(await tvRead("news"), Date.now(), minutes);
+    return headlinesList(await tvRead("news"));
   } catch (err) {
     console.error("doji-eugenia: headlines unavailable —", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
@@ -2527,9 +2520,7 @@ export async function headlinesBlock(minutes = WIRES_MIN): Promise<string> {
    from the week before's row rather than the dataset's own change column,
    since the 52 rows are already here.
 
-   The Sunday briefing and get_around, not the move look: it changes weekly,
-   and handed to a look at a quarter-hour's move it is a plausible cause that
-   path is told not to invent. Never throws.
+   The Sunday briefing and get_around, since it changes weekly. Never throws.
    ───────────────────────────────────────────────────────────────────────── */
 const COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json" +
   "?cftc_contract_market_code=088691&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52" +
@@ -2588,8 +2579,7 @@ export async function positioningBlock(): Promise<string> {
    market's: the broker's is its own clients. The last finished session against
    the twenty before it, since heavy means something only against its own past.
 
-   Every briefing and get_around, not the move look: a day's total cannot be
-   the cause of a quarter-hour move. Never throws.
+   Every briefing and get_around. Never throws.
    ───────────────────────────────────────────────────────────────────────── */
 type Session = { start: string; volume: number };
 
@@ -2644,15 +2634,14 @@ async function readDesk(day: string): Promise<TradeRow[]> {
     `&order=entry_time.desc&limit=50`);
 }
 
-/* The mark carries its age, and no unrealised P&L is computed: the price can be
-   fifteen minutes old, and that figure would be the most anchoring number here
-   and the one staleness gets most wrong. Entry and mark, labelled; she
-   subtracts if asked. A null field is said, never printed — `from null` reads
+/* No price beside the position and no unrealised P&L: an open P&L would be the
+   most anchoring number here, and where gold is now is the briefing's quote or
+   get_market's. A null field is said, never printed — `from null` reads
    as a price. An entry from another day names the day: his holds run
    multi-session, and `open since 09:15 ET` on Wednesday for a Monday fill is a
    confident wrong fact about his own position. Today stays bare. */
 export function positionsList(
-  open: TradeRow[], standing: Standing | null, mark: Mark | null, now = Date.now(),
+  open: TradeRow[], standing: Standing | null, now = Date.now(),
 ): string {
   const today = nyDate(new Date(now));
   const lines = open.map(t => {
@@ -2673,12 +2662,6 @@ export function positionsList(
     const plan = seen.length ? `, ${seen.join(" and ")} as first seen` : "";
     return `· ${since} — ${what}${from}${plan}`;
   });
-
-  // Only beside a position; on a flat day it is a price of nothing.
-  if (lines.length && mark) {
-    lines.push(`· gold was ${mark.bid} ` +
-               `${Math.round((now - Date.parse(mark.at)) / 60_000)} minutes ago`);
-  }
 
   if (standing) {
     lines.push(
@@ -2703,17 +2686,11 @@ export function positionsList(
 export const isOpen = (t: TradeRow): boolean =>
   isBroker(t) && t.exit_price === null && t.fill_time === null;
 
-// The mark is caught on its own, so a price she cannot read costs one line
-// rather than the position; read only when something is open.
 export async function positionsBlock(): Promise<string> {
   try {
     const day = nyDate(new Date());
     const rows = await readDesk(day);
-    const open = rows.filter(isOpen);
-    return positionsList(
-      open,
-      dayStanding(rows, day),
-      open.length ? await readMark().catch(() => null) : null);
+    return positionsList(rows.filter(isOpen), dayStanding(rows, day));
   } catch (err) {
     console.error("doji-eugenia: positions unavailable —", why(err));
     return "";
@@ -2721,6 +2698,12 @@ export async function positionsBlock(): Promise<string> {
 }
 
 /* ─── The cron half: the briefing, and the quieter second look ───────────── */
+
+/* Paused to spend less, not because either is wrong (README, *Paused*), and
+   back on by deleting the name. Each still fires on its schedule and returns
+   before its model call — the release look after filing, so the calendar and
+   every actual keep landing while it is off. */
+export const PAUSED = new Set(['pulse', 'release']);
 
 /* The apology names the job. Every failure once said "No briefing", so a
    nightly pass that died — whose symptom is a memory that stops growing — sent
@@ -2731,7 +2714,6 @@ export const APOLOGY: Record<string, string> = {
   consolidate:  "My nightly tidy-up broke, jefe. I may not have kept what today was worth keeping.",
   release:      "I could not look at the number that just landed, jefe.",
   trade:        "Something broke while I was looking at your position, jefe.",
-  move:         "I lost sight of the price for a moment, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
   reply:        "Something broke on my side, jefe. Try again in a moment.",
@@ -2753,7 +2735,6 @@ async function postScheduled(url: URL): Promise<Response> {
     // The data-driven senses, each behind its own door: decided by a table,
     // not by the clock, so not in dueNow.
     if (url.searchParams.get("release") === "1")     { job = 'release';     return await postRelease(); }
-    if (url.searchParams.get("move") === "1")        { job = 'move';        return await postMove(); }
 
     // The backfill, called by hand until `left: 0`; the nightly pass sweeps
     // the trickle a failed vendor call leaves.
@@ -3169,6 +3150,7 @@ async function recordChannels() {
 /* The quiet look. Nothing is stored when she stays quiet: empty pairs would
    push the briefing out of the twelve turns. */
 async function postPulse(): Promise<Response> {
+  if (PAUSED.has('pulse')) return json({ ok: true, pulse: "paused" });
   const [notes, channels, story, loops, calendar, desk] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
     positionsBlock(),
@@ -3305,6 +3287,7 @@ async function markLooked(ids: number[]): Promise<void> {
 
 async function postRelease(): Promise<Response> {
   await filed();
+  if (PAUSED.has('release')) return json({ ok: true, skipped: "paused" });
   const due = await pendingRelease();
   if (!due.length) return json({ ok: true, skipped: "nothing has landed unlooked" });
   if (awaitingActual(due, Date.now())) return json({ ok: true, skipped: "waiting for TradingView's actual" });
@@ -3426,148 +3409,6 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
                   { role: 'assistant', content: said }]);
   return json({ ok: true, trade: id, said: "sent" });
 }
-
-/* ─── The move nobody filed ────────────────────────────────────────────────
-   Releases and positions are rows appearing; gold is always there, so "it
-   moved" is a fact about a price AND a previous reading — hence the mark. The
-   test is relative twice, to the session's range and to the price, because a
-   fixed dollar threshold means different things at 4,400 and at 2,000 and
-   goes stale silently. A move a fresh print explains is the release look's, or
-   payrolls reaches him twice. Silent by default after all of that.
-   ───────────────────────────────────────────────────────────────────────── */
-// Decisions rather than facts, so named here, as CLOSEOUT_MIN and STRETCH are.
-// A third of the session's range inside a quarter of an hour.
-export const MOVE_SHARE = 0.35;
-/* A quarter of a percent of the price, the least the bar may be. The range is
-   the broker's session's, which restarts at the 17:00 roll, so for hours every
-   evening it is small because the session is young — and a tenth of a percent
-   let a $7 drift at 20:57 through. Applied to the bar, below. */
-export const MOVE_FLOOR = 0.0025;
-// Past two missed runs the gap is not a quarter-hour, so the reading restarts.
-export const MARK_STALE_MIN = 40;
-// One message per move: a trending afternoon is one story.
-export const MOVE_QUIET_H = 2;
-// How recently a print counts as the explanation — a different question from
-// the release look's own staleness window.
-const MOVE_EXPLAINED_H = 1;
-
-export interface Mark { bid: number; at: string; looked_at: string | null }
-
-/* Pure, so every gate is driven both ways: for a sense silent by design, that
-   is the only way to know it can fire. */
-export function moveWorth(spot: Quote, mark: Mark, now = Date.now()):
-  { worth: true; move: number } | { worth: false; why: string } {
-  // The seeded zero row, the one shape that is not a price.
-  if (!(mark.bid > 0)) return { worth: false, why: "no mark yet" };
-
-  const age = (now - Date.parse(mark.at)) / 60_000;
-  if (!(age <= MARK_STALE_MIN)) return { worth: false, why: "mark is stale" };
-
-  if (mark.looked_at &&
-      now - Date.parse(mark.looked_at) < MOVE_QUIET_H * 3600_000) {
-    return { worth: false, why: "already said something about a move" };
-  }
-
-  const move = Math.round((spot.bid - mark.bid) * 100) / 100;
-  const size = Math.abs(move);
-
-  /* The floor bounds the bar rather than standing beside it. A session too
-     young to have a range is one she cannot judge, and silence beats a lower
-     standard: beside it, the floor alone let post-roll wobbles of $13 and $17
-     through as loops nothing could ever close. A quote with no range lands
-     here too. */
-  const bar = (spot.high - spot.low) * MOVE_SHARE;
-  if (bar < spot.bid * MOVE_FLOOR) {
-    return { worth: false, why: "no session range to judge against yet" };
-  }
-  if (size < bar) return { worth: false, why: "small against the day's range" };
-
-  return { worth: true, move };
-}
-
-async function readMark(): Promise<Mark | null> {
-  const [row] = await readRows<Mark>('Mark',
-    `eugenia_price?id=eq.current&select=bid,at,looked_at&limit=1`);
-  return row ?? null;
-}
-
-/* The mark advances every run and looked_at does not, so the window is the gap
-   between runs. Stamped before the look, for markLooked's reason. */
-async function markPrice(bid: number, looked: boolean): Promise<void> {
-  const res = await fetch(`${SB_URL}/rest/v1/eugenia_price?id=eq.current`, {
-    method: "PATCH", headers: sbHeaders("return=minimal"),
-    body: JSON.stringify({
-      bid, at: new Date().toISOString(),
-      ...(looked ? { looked_at: new Date().toISOString() } : {}),
-    }),
-  });
-  if (!res.ok) throw new Error(`Mark write failed (HTTP ${res.status})`);
-}
-
-// A high US print in the last hour, looked at or not: that message is the one
-// he gets about this move. A print abroad has no look, so it explains nothing.
-async function explained(now = Date.now()): Promise<Release | null> {
-  const from = new Date(now - MOVE_EXPLAINED_H * 3600_000).toISOString();
-  const [row] = await readRows<Release>('Calendar',
-    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
-    `&importance=eq.high&country=eq.${HOME}&at=gte.${from}&at=lte.${new Date(now).toISOString()}` +
-    `&order=at.desc&limit=1`);
-  return row ?? null;
-}
-
-async function postMove(): Promise<Response> {
-  // The weekend quote is Friday's last; the poller's rule, the same function.
-  if (!marketOpen()) return json({ ok: true, skipped: "market closed" });
-
-  const [spot, mark] = await Promise.all([marketQuote(), readMark()]);
-  if (!spot) return json({ ok: true, skipped: "no readable quote" });
-  if (!mark) throw new Error("eugenia_price has no row — schema.sql has not been applied");
-
-  const worth = moveWorth(spot, mark);
-  if (!worth.worth) {
-    await markPrice(spot.bid, false);
-    return json({ ok: true, bid: spot.bid, skipped: worth.why });
-  }
-
-  const behind = await explained();
-  if (behind) {
-    await markPrice(spot.bid, false);
-    return json({ ok: true, bid: spot.bid, skipped: `${behind.name} explains it` });
-  }
-
-  await markPrice(spot.bid, true);
-
-  const [notes, map, story, loops, ahead, desk, around, wires] = await Promise.all([
-    notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), aheadToday(),
-    positionsBlock(), aroundBlock(), headlinesBlock(),
-  ]);
-  // The window from the mark, not assumed: a missed run makes it longer.
-  const since = Math.round((Date.now() - Date.parse(mark.at)) / 60_000);
-  const asked = MOVE +
-    `\n\nGold is ${spot.bid}, ${worth.move > 0 ? "up" : "down"} ` +
-    `${Math.abs(worth.move)} in the last ${since} minutes. ` +
-    `No high-impact US release has printed in the last hour.` +
-    // quoteLine, which names the session window — this path fires in the
-    // evening, when the session and the calendar day disagree.
-    `\n\n${quoteLine(spot, new Date())}` +
-    (ahead.length
-      ? `\nStill ahead today: ` +
-        ahead.map(r => `${nyTime(r.at)} ET ${r.name}`).join(", ") + "."
-      : "") +
-    around + wires + notes + map + story + loops + desk;
-
-  const said = await ask([...await recent(), { role: 'user', content: asked }],
-                         'medium', 'move look', MOVE_TOOLS);
-
-  if (isSilent(said)) return json({ ok: true, move: worth.move, said: "quiet" });
-
-  const sent = await trim(said, desk, story);
-  await sayAloud(sent);
-  await remember([{ role: 'user', content: `[gold ${worth.move > 0 ? "up" : "down"} ${Math.abs(worth.move)}]` },
-                  { role: 'assistant', content: sent }]);
-  return json({ ok: true, move: worth.move, said: "sent" });
-}
-
 
 /* ─── What he sends that is not typing ─────────────────────────────────────
    A voice note and a chart, the two things he sends mid-session, both used to

@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 727 tests, seven suites
+npm test      # 712 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -187,8 +187,8 @@ what could not be verified.
   `positionsBlock` shows whichever half exists and never names the absence.
 - **`quoteLine` is the only place a quote becomes words**, with `quoteWindow`
   inside it, and the briefing is handed the price (`marketBlock()`) rather than
-  asked to fetch it. `agree.test.mjs` reads `readMarket`, `marketBlock` and
-  `postMove` for `quoteLine`. `foldSpot` yields null for an unreadable price, and
+  asked to fetch it. `agree.test.mjs` reads `readMarket` and `marketBlock` for
+  `quoteLine`. `foldSpot` yields null for an unreadable price, and
   its type says so — never force a null through `as number`. `aroundList` computes
   no change at all.
 - **Eugenia never holds the broker token**; the market read goes through
@@ -234,7 +234,7 @@ what could not be verified.
 
 - **The prohibitions in `prompt.ts` are the product.** *No signal* is enforced by
   nothing but the sentence, so `agree.test.mjs` reads for the line on price in
-  `SYSTEM`, `CRITIC`, `TRIM`, `MOVE` and `TRADE_EVENT`. The gates need it as much
+  `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need it as much
   as the writer: they REWRITE and run last. `RELEASE` and `CONSOLIDATE` inherit
   `SYSTEM`.
 - **Her read is fenced, not banned**: labelled as hers, with what would prove it
@@ -243,7 +243,7 @@ what could not be verified.
   judge the last. A printed level is a fact, never in the paragraph with her
   read. A plan he has not taken is checked when he asks, against rules §7 marks
   `journal` or R-08's arithmetic — `agree.test.mjs` reads the citations against
-  the table. `MOVE`, `RELEASE` and `TRADE_EVENT` keep the flat ban.
+  the table. `RELEASE` and `TRADE_EVENT` keep the flat ban.
 - **The verdict is not optional**: stated in `SYSTEM`, given room in the briefing
   slot, added by `CRITIC` when missing and never cut for length.
 - **The prompt states no preference of his.** A real one belongs in an
@@ -299,8 +299,8 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 - **Every read of a growing table carries a limit and takes the newest rows.**
   Select newest-first and reverse, as `recent()` does. `agree.test.mjs` refuses
   `order=id.asc` under a limit.
-- **`notesBlock()` reaches all seven paths, `channelsBlock()` the six that teach,
-  `recent()` the six that speak** (not the nightly pass), `positionsBlock()` six.
+- **`notesBlock()` reaches all six paths, `channelsBlock()` the five that teach,
+  `recent()` the five that speak** (not the nightly pass), `positionsBlock()` five.
   The trade look's reads sit after its early returns. `agree.test.mjs` reads every
   body, and asserts the absences too.
 - **Loops close.** `readLoops` takes the newest ten, so a loop that cannot close
@@ -348,10 +348,6 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 - **The trade event** decides from data before any model call, returns first for
   a trade not filed today, and says nothing on an "opened" event for a closed
   row. The close trigger uses `is distinct from` and a transition guard.
-- **The price sense refuses to judge a session with no range**: the floor bounds
-  the bar. `looked_at` on `eugenia_price` is written conditionally;
-  `MARK_STALE_MIN` stops an outage reading as a quarter-hour move. A move with no
-  cause is not sent and not filed as a loop.
 
 ### Checking his rules
 
@@ -370,6 +366,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   `?force=1` door, and `agree.test.mjs` reads `postScheduled` for the call. **A
   literal that is right by accident of another function's range is the shape to
   look for.**
+- **`PAUSED` is an off switch, not a retirement**: a paused job keeps its code,
+  its schedule and its tests, and returns before its model call;
+  `agree.test.mjs` holds every name to such a gate.
 - **The data-driven senses are not in `dueNow`.** Each flag is written in its
   cron job's URL and in `postScheduled`; `agree.test.mjs` holds both directions,
   with the doors a person opens declared.
@@ -424,7 +423,7 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   boot guard, each guarded where used — `agree.test.mjs` makes that cost
   something.
 - **Everything she writes is spoken, with the text as the fallback**, through
-  `sayAloud`; `agree.test.mjs` reads it and counts the seven call sites, and
+  `sayAloud`; `agree.test.mjs` reads it and counts the six call sites, and
   `fold.test.mjs` drives the fallback. There is no length cap and the prompt
   states none; `TTS_LIMIT` is a chunk size. The briefing speaks in a second worker
   (`postSpeak`), stored before the hand-off, falling back to speaking itself.
@@ -473,10 +472,11 @@ for when pg_cron is not; it imports `STALE_HOURS` rather than copying it.
   function body is `if not exists`, `or replace`, `on conflict do nothing` or
   guarded by a check, and `agree.test.mjs` holds that shape. **Never write a
   `drop` into it**: a re-run repeats it on the live database; a drop that is
-  needed is run by hand, once. `create or replace view` may only append a
-  column, and `create or replace function` may not change a return type or an
-  argument list. `npm run test:db` proves an edit: fresh, re-run, and run over
-  main's copy must dump identically. A new PL/pgSQL function needs a test that
+  needed goes in `upgrade.sql`, guarded, and is run by hand. `create or replace
+  view` may only append a column, and `create or replace function` may not
+  change a return type or an argument list. `npm run test:db` proves an edit:
+  fresh, re-run, and main's copy brought forward by `upgrade.sql` must dump
+  identically. A new PL/pgSQL function needs a test that
   calls it, or the suite's census goes red.
 - **The file is a claim; `verify.sql` tests it.** It is ONE statement, because a
   SQL editor shows only the last statement's result; `agree.test.mjs` counts its

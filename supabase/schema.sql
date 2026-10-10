@@ -708,30 +708,6 @@ create or replace trigger trades_eugenia_closed
         and old.fill_time is null and new.fill_time is distinct from null)
   execute function public.trades_eugenia_on_event();
 
--- ─── The mark a move is measured from ──────────────────────────────────────
--- One row, rewritten every quarter hour: `bid` and `at` are the last reading,
--- so a move is a subtraction. `looked_at` moves only when a move was worth
--- waking her for, which keeps a trending afternoon to one message; it is
--- stamped before the look, for the calendar's reason.
-create table if not exists public.eugenia_price (
-  id        text primary key
-    constraint eugenia_price_singleton check (id = 'current'),
-
-  -- A display price; the poller converts out of pipettes before she sees it.
-  bid       numeric not null,
-  at        timestamptz not null default now(),
-
-  looked_at timestamptz
-);
-
--- Seeded so the first run has a row to PATCH. A zero mark cannot be mistaken
--- for a price: the first look rejects it and writes the real one.
-insert into public.eugenia_price (id, bid, at)
-  values ('current', 0, now())
-  on conflict (id) do nothing;
-
-alter table public.eugenia_price enable row level security;
-
 -- ─── What the app may see ──────────────────────────────────────────────────
 -- The three tables the dashboard card draws: the calendar, the story, the open
 -- threads. Never her notes or turns, which stay denied to the publishable key.
@@ -932,8 +908,7 @@ create table if not exists public.dispatch (
   -- by a flag. agree.test.mjs holds this list against the dispatch sites.
   job     text not null,
   constraint dispatch_job_check check (job in (
-    'poller', 'eugenia', 'eugenia-spine', 'eugenia-price',
-    'trade-event', 'gladys')),
+    'poller', 'eugenia', 'eugenia-spine', 'trade-event', 'gladys')),
 
   at      timestamptz not null default now(),
 
@@ -1012,7 +987,7 @@ returns boolean
 language sql
 immutable
 as $$
-  select job in ('poller', 'eugenia-spine', 'eugenia-price');
+  select job in ('poller', 'eugenia-spine');
 $$;
 
 -- ─── Telling him ───────────────────────────────────────────────────────────
@@ -1339,8 +1314,8 @@ revoke all on public.calendar_weeks from anon, authenticated;
 
 -- ═══ Everything that runs on a timer ════════════════════════════════════
 
--- Seven jobs: the poller, Eugenia's hourly job and her two quarter-hourly
--- senses, the two watchers, and a nightly purge. No calling job holds database
+-- Six jobs: the poller, Eugenia's hourly job and her quarter-hourly spine, the
+-- two watchers, and a nightly purge. No calling job holds database
 -- power: each presents the cron secret, read from Vault at call time. Vault
 -- names it lower case (doji_cron_secret), the Edge Functions upper case
 -- (DOJI_CRON_SECRET), and Postgres compares Vault names case-sensitively — the
@@ -1410,26 +1385,6 @@ select cron.schedule(
                                     where name = 'doji_cron_secret')),
       timeout_milliseconds := 120000
     ), 'eugenia-spine';
-  $$
-);
-
--- ─── Her price sense ───────────────────────────────────────────────────────
--- A move is measured against the mark the previous run left, so the gap
--- between these firings IS the window. Offset from the spine, which writes the
--- calendar this reads to decide whether a print explains the move.
-select cron.schedule(
-  'doji-eugenia-price',
-  '12,27,42,57 * * * *',
-  $$
-    insert into public.dispatch (id, job)
-    select net.http_post(
-      url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia?move=1',
-      headers := jsonb_build_object(
-                   'Content-Type', 'application/json',
-                   'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
-                                    where name = 'doji_cron_secret')),
-      timeout_milliseconds := 120000
-    ), 'eugenia-price';
   $$
 );
 

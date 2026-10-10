@@ -46,6 +46,7 @@ icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
 supabase/config.toml                    Edge Function deploy settings
 supabase/schema.sql                     the whole database, safe to re-run in full
+supabase/upgrade.sql                    by hand, before it: what a re-run cannot change
 supabase/verify.sql                     read-only: does the database match it?
 supabase/diagnose.sql                   read-only: what the database actually holds
 supabase/functions/_shared/edge.ts      the primitives every function needs
@@ -120,8 +121,8 @@ she keeps herself.
    WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
  ┌─────────────────────────┐        ┌────────────────────────────────────┐
  │ pg_cron   hourly        │        │ eugenia_trades   select only       │
- │           spine  ×4/h   │        │ her own tables   9, 7 backed up    │
- │           price  ×4/h   │        │ strategy.ts      no write path     │
+ │           spine  ×4/h   │        │ her own tables   8, 7 backed up    │
+ │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
  │ trades    opened/closed │        │ the broker's price, via the poller │
  │                         │        │ calendar, market   via TradingView │
@@ -132,8 +133,8 @@ she keeps herself.
               │             Eugenia              │
               │           doji-eugenia           │
               │  briefing · pulse · reply ·      │
-              │  release look · move look ·      │
-              │  trade event · nightly pass      │
+              │  release look · trade event ·    │
+              │  nightly pass                    │
               └────────────────┬─────────────────┘
                                │ every composed message is read once
                                │ more — CRITIC for the briefing, TRIM
@@ -371,7 +372,6 @@ single-sourced at run time:
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
-| the **columns of `eugenia_price`** | the table and what `markPrice` PATCHes |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the spine's `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
@@ -735,10 +735,10 @@ that roll, so the same `change` is the overnight move before 17:00 and only the
 evening's after it, and a bare number reads as *on the day* either way. Nothing
 here sees the calendar day — daily bars roll on the same boundary — so
 `quoteWindow` names the window rather than computing one. `quoteLine` is the only
-place a quote becomes words, with that sentence inside it, for its three callers:
-the `get_market` tool, `marketBlock()` (the briefing is handed the price rather
+place a quote becomes words, with that sentence inside it, for its two callers:
+the `get_market` tool and `marketBlock()` (the briefing is handed the price rather
 than asked to fetch it — a level off a search page is four digits and looks like
-gold), and the price sense.
+gold).
 
 **Minute bars go back a year.** Every age `?bars=raw` asked answered sixteen bars
 in under half a second; a bar carries `timestamp` (the minute it opens), `open`,
@@ -920,9 +920,7 @@ telling her not to quote the dollar or yields from a search.
 
 **`?news=1` is gold's and the dollar's headlines.** `foldHeadlines` merges the
 two feeds, a story on both being one headline, newest first with title, source
-and time. The move look is handed the last hour; she reads them before
-searching, cites a headline with its time and source, and claims nothing about a
-paywalled story beyond its title.
+and time.
 
 **A conversation reads both through `get_around`** — `aroundBlock` and six hours
 of headlines. Each feed is read to a fixed count and may not hold six hours, so
@@ -971,8 +969,7 @@ volume; the broker's is its own clients, and the prompt tells her never to read
 volume off it. `volumeList` decides which sessions have finished — a Globex
 session runs 23 hours, 18:00 to 17:00 New York, and is named for the day it
 ends — and states the latest beside its average over the twenty before. Every
-briefing and `get_around` get it; the move look does not, since a day's total
-cannot be the cause of a quarter-hour move. The front month moves to the next
+briefing and `get_around` get it. The front month moves to the next
 contract every couple of months, and on that day the count can jump or drop for
 no reason in the market, so she says a sharp change may be the switch rather
 than reading it. TradingView serves neither daily open interest nor COMEX vault
@@ -1204,9 +1201,17 @@ hour of a week through the composition.
 
 ### The briefing is prose, with one list in it
 
-Five slots: what happened, in two or three sentences with the conclusion first;
-**why that matters for gold**, walked link by link, one sentence per step; the
-calendar; one context line; one thing worth noticing. Numbered sections with
+**It is the weeks behind his chart, not the hours on it.** He reads the hours
+off his own screen, so the overnight move, the session's range, an hour's swing
+in yields and a forty-dollar day stay out; a move earns a line only where it
+changed the bigger story. The live quote is still handed in, for knowing where
+gold stands rather than for opening on.
+
+Five slots: **where the big picture stands** — the Fed's path, the dollar's
+trend, inflation, central-bank buying, and which of them moved — in two or three
+sentences with the conclusion first, or one saying none did; **why that matters
+for gold**, walked link by link, one sentence per step; the calendar; one context
+line on the same scale; one thing worth noticing. Numbered sections with
 headings are a report whatever the vocabulary inside them, which is why there
 are none.
 
@@ -1229,8 +1234,8 @@ length, in `SYSTEM` and in `CRITIC`.
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
 with nothing saying what to lose cuts the teaching block, the longest thing on
 the page — and with channels at `unseen`, where §0 says build the term before
-using it, that is the part that matters. So the budget is 250–300 words, 400 at
-the outside, and beside it a fixed order of what comes out: numbers he cannot act
+using it, that is the part that matters. So the budget is 250–300 words, less on
+a day the picture did not move, 400 at the outside, and beside it a fixed order of what comes out: numbers he cannot act
 on, then levels he can read off his own screen, then any market sentence that
 could have been written on any morning. **Never the teaching block and never an
 event.** Still over means the briefing is about too many things. Four thousand
@@ -1258,7 +1263,8 @@ read as hard when one sentence carries three ideas. The rules, in `WRITING`:
   block is a wall. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
   their last step rather than reading for it among the rest.
 - **A number earns its place** by meaning something he can use; the briefing
-  holds four to six.
+  holds two to four, one budget the writer and `CRITIC` both state and a test
+  holds equal.
 
 **The judgement rules carry worked examples.** The countable rules landed at once
 — a first briefing with no sentence over twenty words — while the same message
@@ -1308,6 +1314,18 @@ Friday — plus any trade that CLOSED since then, R-15's Friday hold. The rules 
 handed the failures and told when nothing broke. A breach gets the fact, her
 verdict and the lesson in three short sentences, then back to the market. Closed
 trades only: a verdict on an open one is a hard prohibition.
+
+### Paused
+
+**The pulse and the release look are paused**, to spend less — not because
+either is wrong — and back on by deleting the name from `PAUSED` in
+`doji-eugenia`. Both still fire on their schedules and return before
+their model call. The release look returns only after filing, so the calendar and
+every actual keep landing; it looks back no further than `RELEASE_STALE_H`, so
+turned back on it picks up from that hour and never reads out a backlog. The
+next morning's briefing carries what a print said, and `revisionLine`, said only
+in the release look, waits with it. A test holds every paused name to a
+check that returns before the model call.
 
 ### The pulse
 
@@ -1425,8 +1443,8 @@ column added later is compared without anyone remembering it.
 everyone expected it is not news. `isSilent` is shared.
 
 **Every message she composes is read once more before it is sent.** `CRITIC`
-reads the briefing; `TRIM` reads the pulse, the release look, the move look and
-the reply — most of what arrives in a week. The reply is gated inside the typing
+reads the briefing; `TRIM` reads the pulse, the release look and the reply —
+most of what arrives in a week. The reply is gated inside the typing
 indicator, so she never reads as having finished and said nothing, and `TRIM`
 holds the reply to no short length: a plan checked against his rules can be nine
 findings long.
@@ -1495,57 +1513,6 @@ The trigger fires on the transition, not every poll. `fill_time` is null on ever
 open position, so the close clause uses `is distinct from` — `<>` is NULL there
 and the event would never fire — and the poller's two-minute re-upserts never
 re-fire it.
-
-### The price sense — the third thing that wakes her, and the first with no row behind it
-
-A release landing and a position opening are rows appearing. **Gold is always
-there**, so "it moved" is a fact about the instrument *and* a previous reading,
-which is why this sense needs a mark. `eugenia_price` is that mark: one row,
-`bid` and `at`, rewritten every quarter hour by its own job (`?move=1`). The move
-is a subtraction over the gap between firings.
-
-**What makes a move worth waking her for is the day's own measure.** A fixed
-dollar threshold means two things to gold at 4,400 and at 2,000, and the year
-nobody revises it the sense fires constantly or never — and never looks exactly
-like a quiet market. So both gates are relative:
-
-| Gate | Value | What it is for |
-|---|---|---|
-| `MOVE_SHARE` | 0.35 of the session range so far | the bar itself — what the move is measured against |
-| `MOVE_FLOOR` | 0.0025 of the price | the smallest bar worth applying; below it the session has no range to judge against and she says nothing |
-| `MARK_STALE_MIN` | 40 minutes | two missed runs and the gap is no longer a quarter of an hour — $15 in fifteen minutes is an event, $15 across an hour is a session |
-| `MOVE_QUIET_H` | 2 hours | one message about one move; a market that trends all afternoon is one story, and this is the only thing between it and eight messages before lunch |
-
-**The floor bounds the bar rather than standing beside it.** The share is taken
-against the BROKER'S session, which restarts at 17:00 New York, so for hours
-every evening the range is small because the session is *young*, not because the
-market is quiet. If `range × MOVE_SHARE` is under `price × MOVE_FLOOR`, the
-session cannot be measured against and she says nothing: **refusing to judge
-beats a lower standard.** A move under a quarter percent of the price is never
-reported, and the evening bar is higher than the midday one by intent — a real
-evening move is the range, and clears its own bar. **A sense that manufactures a
-loop it cannot close is worse than a quiet one**: the loop rides into every
-briefing after it.
-
-**A move a print explains belongs to the spine.** Anything `high` on her calendar
-inside the last hour hands the move over, or payrolls would reach him twice in
-ten minutes from two senses.
-
-`looked_at` on the same row is the quiet window and the one column written
-conditionally: the mark advances every run, `looked_at` only when a move cleared
-the gates. Written unconditionally the window would never reopen.
-
-**Silent by default after all of that.** The gates decide something happened;
-she decides whether it is worth a sentence. **A move with no cause under it is
-not sent**: without a cause, all that is left is the price, which is on his
-screen in more detail, and this path exists to teach what moved gold. Nor is it
-filed as an open thread, since nothing will arrive to close it. When there is a
-cause, she builds from the channel map on the release look's terms — build where
-the channel is thin; where he owns it, say what moved and stop.
-
-It runs only while the market is open, by the same `marketOpen` the poller uses,
-and most firings cost one quote and one indexed read: **no model call unless a
-move clears every gate.**
 
 **A thread that cannot close fills the list that holds the ones that can.**
 `readLoops` hands her the newest ten, so a loop that never closes pushes the
@@ -1625,10 +1592,10 @@ a sweep re-entry follows a close, and he trades one entry at a time.
 
 The briefing is researched and written in one generation, and its quality target
 lives on the far side of a model call. So `CRITIC` reads it once more before it
-goes, at `medium` effort with no tools: is the first sentence true only today,
-is a term built at a rung that no longer needs it, is a link missing from the
-chain, is there a forward call, is it inside the budget, does it obey his
-standing instructions. It returns the briefing, not notes about it.
+goes, at `medium` effort with no tools: does the first sentence say where the
+big picture stands today, is a term built at a rung that no longer needs it, is
+a link missing from the chain, is there a forward call, is it inside the budget,
+does it obey his standing instructions. It returns the briefing, not notes about it.
 
 **It is handed his notes and the channel map, because two of those checks read
 them.** Without the map, the mechanism sitting in the paragraph reads as a
@@ -1670,9 +1637,9 @@ gives `[object Object]` on exactly the turns carrying most context.
 
 **Everything she writes is spoken.** The old rule — answer in the channel he
 used — only ever decided a reply, so the briefing, the one message he wanted read
-to him, was never spoken. He decided it the other way. Seven call sites speak:
+to him, was never spoken. He decided it the other way. Six call sites speak:
 the briefing twice (its speaking worker, and its own fallback), the pulse, the
-release look, the trade event, the move look and the reply. `say()` keeps the
+release look, the trade event and the reply. `say()` keeps the
 `/notes` audit (a table, unlistenable), the apologies (failure notices, not her
 words), the short operational lines and the charm's copy, whose voice is on the
 charm.
@@ -1863,12 +1830,11 @@ before it is sent: when the forward look is empty, the newest two rows inside th
 speaking worker's budget are taken only if they are a briefing and its marker
 sharing one instant — otherwise no quote rather than a wrong one.
 
-**Who gets what.** `notesBlock()` reaches **all seven paths** — the briefing, the
-pulse, a reply, the nightly pass, the release look, the move look and the trade
-look — and its absence would be silent: she carries on ignoring an instruction he
-believes she took. `channelsBlock()` goes to the six asked to build a term; the
-release and move looks are among them, since what moves gold runs through a
-channel and a message saying the dollar came off teaches nothing to someone for
+**Who gets what.** `notesBlock()` reaches **all six paths** — the briefing, the
+pulse, a reply, the nightly pass, the release look and the trade look — and its
+absence would be silent: she carries on ignoring an instruction he believes she
+took. `channelsBlock()` goes to the five asked to build a term; the release look
+is among them, since what moves gold runs through a channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that
 speaks — not the nightly pass, which reads its own twenty-four hours. It matters
 most on the trade look, whose R-14/R-19 line fires on the print the briefing is
@@ -1895,13 +1861,11 @@ since `positionsList` renders whatever it is handed. The same missing close make
 R-10 and R-15 `unknown` rather than running a span to *now* or dropping the row.
 
 It renders each open position — age, side, size, entry, the stop and target as
-first seen — the quarter-hourly mark **with its age**, and where the day stands
-against R-11's 4%. **A position opened on an earlier day names the day**: his
+first seen — and where the day stands against R-11's 4%. **A position opened on an earlier day names the day**: his
 holds run multi-session, and a bare `open since 09:15 ET` under *right now* reads
-as this morning. Flat and not traded today, it is nothing at all. It goes to six
-paths — the briefing, the pulse, a reply, the release look, the nightly pass and
-the move look, the likeliest to land mid-position. The trade look is reached
-*from* the position and already holds its row.
+as this morning. Flat and not traded today, it is nothing at all. It goes to five
+paths — the briefing, the pulse, a reply, the release look and the nightly pass.
+The trade look is reached *from* the position and already holds its row.
 
 **What she may do with it is narrower than what she can see, by design.**
 Unprompted it stops anything setup-flavoured while a position is open, and lets
@@ -1912,9 +1876,9 @@ never appear in a message she starts** — a briefing framed around the number h
 is long from reads as relevance and is the opposite. That guard is a prompt
 paragraph with no structural half, so a test reads for it.
 
-**No unrealised P&L is computed.** The mark is up to fifteen minutes old, so the
-figure would be the most anchoring number in the block and the one staleness
-gets most wrong. Entry and mark are given, labelled; she subtracts if asked.
+**No price is given beside a position, and no unrealised P&L.** An open P&L would
+be the most anchoring number in the block, and where gold is now is the
+briefing's own quote, or `get_market`'s in a conversation.
 
 A run of losses is named — *"that is three this week"* — then explained by what
 the trades have **in common**, or admitted as not yet explained. A breach of his
@@ -2262,11 +2226,9 @@ looking like one he has never used.
 
 Three things outside the SQL, none of which fails loudly:
 
-- **The quarter-hourly jobs** are in `schema.sql`'s timer section with every
-  other schedule: `doji-eugenia-spine` calling `?release=1` and
-  `doji-eugenia-price` calling `?move=1`, offset from each other because the two
-  read the calendar for opposite purposes. Without the price job the mark never
-  advances, which reads as a market that has not moved.
+- **The quarter-hourly job** is in `schema.sql`'s timer section with every
+  other schedule: `doji-eugenia-spine` calling `?release=1`, off the hour and
+  clear of the briefing.
 - **The webhook must allow `callback_query`**: re-register with
   `allowed_updates = ["message", "callback_query"]`, or the taps under a
   briefing are never delivered.
@@ -2484,8 +2446,7 @@ them, six within five minutes — so eight a week wrote again a prefix the hour
 would still have held, and `CHAT_TOOLS` takes the hour too. The weekday briefing
 shares that array but not its effort, so it reads nothing the replies wrote and
 pays 2× for its own write; the replies more than cover it. So it is `1h` for
-`RELEASE_TOOLS` and `CHAT_TOOLS`, and `5m` for the rest. The move look has
-its own `MOVE_TOOLS`, without `record_actual`, at five minutes. `cached` counts
+`RELEASE_TOOLS` and `CHAT_TOOLS`, and `5m` for the rest. `cached` counts
 reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
 differ.
 
@@ -2720,17 +2681,22 @@ the SQL editor proves the live database does.
 again.** Every statement is `if not exists`, `or replace`, `on conflict do
 nothing` or guarded by a check, so a fresh project and the live one both end up
 matching the file, and a change is an edit to the file followed by a re-run.
-`agree.test.mjs` holds that shape, and `npm run test:db` proves it: a second
-run changes nothing, and run over main's copy the file leaves what a fresh apply
-leaves. Two
-constraints come from Postgres itself: `create or replace view` may only append
-a column, so the view's list is in the order columns were added, and `create or
-replace function` cannot change an argument list or a return type — either needs
-a `drop` first, run by hand once, never written into the file, because a re-run
-would repeat it on the live database.
+`agree.test.mjs` holds that shape. Two constraints come from Postgres itself:
+`create or replace view` may only append a column, so the view's list is in the
+order columns were added, and `create or replace function` cannot change an
+argument list or a return type.
+
+**What a re-run cannot change goes in `upgrade.sql`, run by hand before it.** A
+`drop` is never written into `schema.sql`, because a re-run would repeat it on
+the live database — so what the file stops declaring stays there, as does a
+constraint written inside `create table if not exists`. `upgrade.sql` removes
+or rewrites it, every statement guarded so a second run changes nothing. `npm
+run test:db` proves both files: a second run changes nothing, and main's copy
+brought forward by `upgrade.sql` and then this one leaves what a fresh apply
+leaves.
 
 **The schedules re-run like everything else**: `cron.schedule` upserts on the
-job name, so a re-run makes the jobs match the file. Seven jobs —
+job name, so a re-run makes the jobs match the file. Six jobs —
 `select jobname, schedule, active from cron.job order by jobname` reads them back:
 
 | Job | Schedule | What it drives |
@@ -2738,7 +2704,6 @@ job name, so a re-run makes the jobs match the file. Seven jobs —
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing, the pulse and the nightly pass — the function decides which, or neither |
 | `doji-eugenia-spine` | `5,20,35,50 * * * *` | the release look |
-| `doji-eugenia-price` | `12,27,42,57 * * * *` | the price mark and the move look |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
@@ -2850,7 +2815,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
-| `test/db/schema.test.mjs` | `schema.sql` applied to a real Postgres: a re-run changes nothing, and run over main's copy it leaves what a fresh apply leaves; `verify.sql` passes against what it builds; the trades triggers fire on what they should and nothing else, and a missing secret costs the message, never the write; the app's grants and RLS; the README's restore run over a backup's rows; the calendar's clock; both watchers driven from planted rows; her search by words, spelling and vector; every scheduled job's command run once; and a census that every PL/pgSQL function was driven |
+| `test/db/schema.test.mjs` | `schema.sql` applied to a real Postgres: a re-run changes nothing, and main's copy brought forward by `upgrade.sql` and then this one leaves what a fresh apply leaves, as `upgrade.sql` run twice over a fresh apply does; `verify.sql` passes against what it builds; the trades triggers fire on what they should and nothing else, and a missing secret costs the message, never the write; the app's grants and RLS; the README's restore run over a backup's rows; the calendar's clock; both watchers driven from planted rows; her search by words, spelling and vector; every scheduled job's command run once; and a census that every PL/pgSQL function was driven |
 | `test/db/supabase.sql` | the stand-ins: what Supabase provides, as far as `schema.sql` reaches it |
 | `supabase/verify.sql` | not a suite: run by hand against the live database, one statement, one row per fact. Nothing in it may raise on a wrong database — functions are asked by oid, tables through `query_to_xml` |
 
@@ -2938,7 +2903,7 @@ one `net.http_post` each.
 | Function | What a holder of the secret can do |
 |---|---|
 | `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`) or minute bars (`?bars=raw`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
-| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?pulse=1` costs a medium-effort call that usually answers `NOTHING` and sends nothing. `?embed=1` spends at the embedding vendor. `?release=1`, `?move=1` and a `{trade}` body reach the three cheaper event paths |
+| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?pulse=1` costs a medium-effort call that usually answers `NOTHING` and sends nothing. `?embed=1` spends at the embedding vendor. `?release=1` and a `{trade}` body reach the two cheaper event paths |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
 Neither of the last two can reach a column. The value sits in Vault and in

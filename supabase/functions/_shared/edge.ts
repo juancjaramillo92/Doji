@@ -151,7 +151,7 @@ export function nyClock(now: Date): { wd: number; hour: number } {
 /* ─── Market hours ─────────────────────────────────────────────────────────
    Gold trades Sunday 17:00 to Friday 17:00, New York. Decided here rather than
    in cron, which schedules in UTC and would be an hour wrong half the year.
-   The poller and the price sense both skip the weekend close.
+   The poller skips the weekend close.
    ───────────────────────────────────────────────────────────────────────── */
 export function marketOpen(now = new Date()): boolean {
   const { wd, hour } = nyClock(now);

@@ -90,17 +90,23 @@ test('a second run of schema.sql changes nothing', () => {
   assert.equal(dump(DB), fresh, 'a re-run of schema.sql leaves a different database than the first run');
 });
 
-/* The live database was built by an older copy and then re-run with this one,
-   so it must end where a fresh apply does — a default changed inside `create
-   table if not exists`, say, reaches a fresh project and never the live one. The
-   older copy is main where this branch left it, or main's previous commit on
-   main itself. */
-test('applied over what main holds, schema.sql leaves what a fresh apply leaves', () => {
+/* The live database was built by an older copy and then brought forward by
+   hand — upgrade.sql, then this one — so it must end where a fresh apply does.
+   A default changed inside `create table if not exists`, say, reaches a fresh
+   project and never the live one unless upgrade.sql carries it. The older copy
+   is main where this branch left it, or main's previous commit on main itself. */
+test('applied over what main holds, upgrade.sql and schema.sql leave what a fresh apply leaves', () => {
   let base = git('merge-base', 'HEAD', 'origin/main');
   if (base === git('rev-parse', 'HEAD')) base = git('rev-parse', 'HEAD^');
-  build('doji_test_live', git('show', `${base}:supabase/schema.sql`), SCHEMA);
+  build('doji_test_live', git('show', `${base}:supabase/schema.sql`), file('supabase/upgrade.sql'), SCHEMA);
   assert.equal(dump('doji_test_live'), fresh,
-    `re-run over ${base.slice(0, 7)}'s schema.sql, this file leaves a database a fresh apply would not`);
+    `brought forward from ${base.slice(0, 7)}'s schema.sql, the live database ends where a fresh apply would not`);
+});
+
+// On a fresh project too, and a second time: every statement is guarded.
+test('upgrade.sql changes nothing a fresh apply built, however often it runs', () => {
+  build('doji_test_again', SCHEMA, file('supabase/upgrade.sql'), file('supabase/upgrade.sql'));
+  assert.equal(dump('doji_test_again'), fresh, 'upgrade.sql changes a database schema.sql has just built');
 });
 
 /* ─── verify.sql asks what schema.sql builds ────────────────────────────── */

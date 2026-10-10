@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 86 checks.
+-- whole file after any manual change and read the `ok` column — all 84 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -31,23 +31,16 @@ from (values
    (select count(*)::text from information_schema.tables
      where table_schema = 'public'
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
-                          'eugenia_loops','eugenia_feedback','eugenia_price')),
-   '6'),
+                          'eugenia_loops','eugenia_feedback')),
+   '5'),
 
-  -- The singletons are PATCHed by primary key, so a missing seed row is a 200
-  -- that lands nowhere: every rewrite dropped, silently.
+  -- The thesis is PATCHed by primary key, so a missing seed row is a 200 that
+  -- lands nowhere: every rewrite dropped, silently.
   ('the thesis row is seeded',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from public.eugenia_thesis where id = ''current''',
              false, true, '')))[1]::text
      where to_regclass('public.eugenia_thesis') is not null),
-   '1'),
-
-  ('the price mark row is seeded',
-   (select (xpath('/row/c/text()', query_to_xml(
-             'select count(*) as c from public.eugenia_price where id = ''current''',
-             false, true, '')))[1]::text
-     where to_regclass('public.eugenia_price') is not null),
    '1'),
 
   -- Without it `<%` does not exist and the search cannot be created.
@@ -310,21 +303,21 @@ from (values
 
   -- agree.test.mjs holds this count against schema.sql. Through query_to_xml,
   -- so a database without pg_cron answers false rather than raising.
-  ('seven cron jobs, all active',
+  ('six cron jobs, all active',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from cron.job where active',
              false, true, '')))[1]::text
      where to_regclass('cron.job') is not null),
-   '7'),
+   '6'),
 
   -- Vault names compare case-sensitively; the upper-case spelling yields null.
   -- The other three jobs call nothing outside the database.
-  ('all four calling jobs read the lower-case Vault secret',
+  ('all three calling jobs read the lower-case Vault secret',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from cron.job where command like ''%''''doji_cron_secret''''%''',
              false, true, '')))[1]::text
      where to_regclass('cron.job') is not null),
-   '4'),
+   '3'),
 
   -- The two callers that are trigger functions rather than jobs.
   ('the Telegram trigger function reads the lower-case Vault secret',
@@ -471,9 +464,6 @@ from (values
 
   ('RLS on eugenia_feedback',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_feedback')),
-   'true'),
-  ('RLS on eugenia_price',
-   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_price')),
    'true'),
 
   -- No policy: only secret-key writers and Eugenia.

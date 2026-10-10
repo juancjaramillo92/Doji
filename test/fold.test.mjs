@@ -35,7 +35,6 @@ import {
   spokenBriefing, ask,
   consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
-  moveWorth, MOVE_SHARE, MOVE_FLOOR, MOVE_QUIET_H, MARK_STALE_MIN,
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
@@ -749,18 +748,16 @@ test('two feeds fold to one list of headlines, a story on both counted once, new
   assert.equal(folded.find(h => h.id.endsWith('L1N45N0PD:0')).feed, 'TVC:GOLD');
 });
 
-test('the move look is handed the last hour of headlines and says so, and says when a feed failed', () => {
+test('the headlines come newest first, and say when there are none or a feed failed', () => {
   const headlines = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
   const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T17:45:00Z'));
-  assert.match(out, /Headlines in the last hour, from TradingView's gold and dollar feeds — titles only/);
+  assert.match(out, /Headlines in the last 6 hours, from TradingView's gold and dollar feeds — titles only/);
   assert.match(out, /· 13:38 ET, Mace News: FED GOV JEFFERSON/);
   assert.match(out, /· 12:52 ET, Reuters: Yields fall after US 10-year hits highest since 2002/);
-  // The morning's gold story is not an explanation for a move a quarter-hour old.
-  assert.doesNotMatch(out, /Gold holds steady/);
   assert.ok(out.indexOf('13:38') < out.indexOf('12:52'), 'the headlines are not newest first');
 
-  assert.match(headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T21:00:00Z')),
-    /No headline on gold's or the dollar's TradingView feeds in the last hour\./);
+  assert.match(headlinesList({ headlines, missing: [] }, Date.parse('2026-10-02T01:00:00Z')),
+    /No headline on gold's or the dollar's TradingView feeds in the last 6 hours\./);
   assert.match(headlinesList({ headlines: [], missing: [{ symbol: 'TVC:DXY' }] }, Date.now()),
     /One of the two feeds could not be read\./);
 });
@@ -771,7 +768,7 @@ test('the move look is handed the last hour of headlines and says so, and says w
    was an unread one. */
 test('the conversation reads six hours of headlines, names another day, and says where a feed stops', () => {
   const headlines = foldHeadlines([{ symbol: 'TVC:GOLD', answer: GOLD_NEWS }, { symbol: 'TVC:DXY', answer: DXY_NEWS }]);
-  const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T18:00:00Z'), 6 * 60);
+  const out = headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T18:00:00Z'));
   assert.match(out, /Headlines in the last 6 hours/, 'the span is not the one that was read');
   assert.match(out, /Gold holds steady/, 'a headline from earlier in the six hours is dropped');
   assert.match(out, /feeds reach back only to 12:52 ET/,
@@ -783,7 +780,7 @@ test('the conversation reads six hours of headlines, names another day, and says
     /on Thursday/, 'a headline from today carries a date it does not need');
 });
 
-test('headlines that will not read send her to search, and never take the look down', async () => {
+test('headlines that will not read send her to search, and never take the reply down', async () => {
   await stubbed(async () => {
     globalThis.fetch = async () => new Response('not json', { status: 502 });
     assert.match(await headlinesBlock(), /could not be read just now; search for what moved it/);
@@ -4555,169 +4552,6 @@ test('R-04 fails a loss taken after the trade had already run $20 his way', () =
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   THE PRICE SENSE — DRIVEN FROM BOTH SIDES OF EVERY GATE
-   ───────────────────────────────────────────────────────────────────────────
-   A sense silent by design is one where a broken predicate and a quiet market
-   look identical for weeks. So every gate is shown to block, and to pass with
-   the one thing it objects to removed — against the real `?market=1` capture.
-   ═══════════════════════════════════════════════════════════════════════════ */
-const QUOTE = {                            // the SPOT capture, after foldSpot
-  bid: 4419.82, ask: 4419.93, high: 4420.14, low: 4381.13,
-  prev_close: 4387.96, change: 31.86,
-  at: '2026-09-03T12:15:05.346Z',
-};
-const LOOKED = Date.parse('2026-09-03T12:15:30Z');
-// A mark taken a quarter of an hour ago, at a price a big move below the quote.
-// The session range is 39.01, so 35% of it is 13.65 — this clears it.
-const MARK = { bid: 4404.82, at: '2026-09-03T12:00:30Z', looked_at: null };
-
-test('a move large by the day own measure is worth waking her for', () => {
-  const out = moveWorth(QUOTE, MARK, LOOKED);
-  assert.equal(out.worth, true);
-  assert.equal(out.move, 15);
-});
-
-test('the mark seeded at zero is not a price, and cannot be a move of 4,400', () => {
-  /* schema.sql SEEDS THE ROW so the first run has something to PATCH. Read as a price,
-     the seed is a move of gold's entire value after any rebuild. */
-  const out = moveWorth(QUOTE, { ...MARK, bid: 0 }, LOOKED);
-  assert.equal(out.worth, false);
-  assert.match(out.why, /no mark/);
-});
-
-test('a move measured across an outage is not a quarter-hour move', () => {
-  // Two missed runs and the gap is no longer the window this sense is about:
-  // $15 in fifteen minutes is an event, $15 across an hour is a session.
-  const stale = { ...MARK, at: new Date(LOOKED - (MARK_STALE_MIN + 1) * 60_000).toISOString() };
-  assert.equal(moveWorth(QUOTE, stale, LOOKED).worth, false);
-  assert.match(moveWorth(QUOTE, stale, LOOKED).why, /stale/);
-
-  // And one missed run still counts, which is the half that makes it a bound
-  // rather than a rejection of anything but an exact fifteen minutes.
-  const late = { ...MARK, at: new Date(LOOKED - (MARK_STALE_MIN - 1) * 60_000).toISOString() };
-  assert.equal(moveWorth(QUOTE, late, LOOKED).worth, true);
-});
-
-test('she says one thing about one move, however long it keeps going', () => {
-  /* A trend of $15 a quarter hour clears every other gate on every run; this is
-     what stands between that and eight messages before lunch on one story. */
-  const spoken = { ...MARK, looked_at: new Date(LOOKED - (MOVE_QUIET_H - 0.5) * 3600_000).toISOString() };
-  assert.equal(moveWorth(QUOTE, spoken, LOOKED).worth, false);
-  assert.match(moveWorth(QUOTE, spoken, LOOKED).why, /already said/);
-
-  // And it opens again once the window has passed, rather than latching shut.
-  const older = { ...MARK, looked_at: new Date(LOOKED - (MOVE_QUIET_H + 0.5) * 3600_000).toISOString() };
-  assert.equal(moveWorth(QUOTE, older, LOOKED).worth, true);
-});
-
-test('the floor is a share of the price, so it cannot go stale as gold moves', () => {
-  /* A FIXED $4 MEANS DIFFERENT THINGS at 4,400 and at 2,000, and never fires
-     looks exactly like a quiet market. */
-  const small = { ...MARK, bid: QUOTE.bid - QUOTE.bid * MOVE_FLOOR * 0.9 };
-  assert.equal(moveWorth(QUOTE, small, LOOKED).worth, false);
-
-  /* THE GUARANTEE THAT SURVIVES THE COMPOSITION: the floor bounds the BAR, so
-     nothing under this share of the price can ever be reported. Swept across
-     prices, because one quote cannot tell a floor that scales from one that
-     happens to be right at 4,400. */
-  for (const price of [1800, 2000, 3000, 4400, 6000]) {
-    const range = price * 0.01;                        // a full, ordinary session
-    const spot = { ...QUOTE, bid: price, high: price, low: price - range };
-    const just = price * MOVE_FLOOR * 0.99;
-    assert.equal(moveWorth(spot, { ...MARK, bid: price - just }, LOOKED).worth, false,
-      `a move of ${just.toFixed(2)} was reported at ${price}, under the floor`);
-  }
-});
-
-test('a move small against the day range is the day, not an event', () => {
-  // Below the share and above the floor: $12.50 on a session that has travelled
-  // $39 is an ordinary swing. The band between the gates is narrow — $11.05 to
-  // $13.65 on this quote — so the figure is asserted inside it, making this a
-  // test of the SHARE rather than a second test of the floor.
-  const ordinary = { ...MARK, bid: QUOTE.bid - 12.5 };
-  const out = moveWorth(QUOTE, ordinary, LOOKED);
-  assert.equal(out.worth, false);
-  assert.match(out.why, /range/);
-  assert.ok(12.5 > QUOTE.bid * MOVE_FLOOR, 'the floor is doing the rejecting, not the share');
-  assert.ok(12.5 < (QUOTE.high - QUOTE.low) * MOVE_SHARE);
-});
-
-/* ─── The evening roll, which is where the gates were weakest ────────────────
-   THE SESSION RESTARTS AT 17:00 NEW YORK, so for hours every evening the range
-   is small because the session is YOUNG, not because the market is quiet. Side
-   by side, a near-zero range stops the share binding and leaves the floor — a
-   bar written for a full day — carried alone through the thinnest hours.
-
-   Lowering the standard is the wrong answer; REFUSING TO JUDGE is the right
-   one. A session with no range yet cannot be measured against, and silence
-   beats a lower bar. A sense that manufactures a loop it cannot close is worse
-   than a quiet one: the loop rides into every briefing after it.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-// The session as she described it at 20:57: 4,485 the top, and a range that
-// began at the 17:00 roll rather than at the day's low near 4,440.
-const EVENING = { ...QUOTE, bid: 4485, high: 4485, low: 4467, prev_close: 4473,
-                  change: 12 };
-
-test('the $7 evening drift that reached him does not clear the gates now', () => {
-  const out = moveWorth(EVENING, { ...MARK, bid: 4478 }, LOOKED);
-  assert.equal(out.worth, false, 'a $7 drift in thin evening trade is not a sharp move');
-  assert.match(out.why, /no session range/);
-
-  // THE SHARE ADMITS IT: $7 of an $18 range passes a test written for $14 of $39.
-  // What rejects it is that an $18 range is too narrow to be a bar at all.
-  assert.ok(7 >= (EVENING.high - EVENING.low) * MOVE_SHARE,
-    'the share no longer admits this, so it is not the case this test was built on');
-});
-
-test('the two drops that became loops nobody could close are silent now', () => {
-  /* THE ACTUAL MESSAGES, from the open threads in his own audit. Both cleared
-     the old floor by a couple of dollars with nothing behind it. */
-  for (const [size, when] of [[13, 'Sun 6 Sept, 21:00 ET'], [17, 'Sun 13 Sept, after the roll']]) {
-    const out = moveWorth(EVENING, { ...MARK, bid: EVENING.bid - size }, LOOKED);
-    assert.equal(out.worth, false, `the $${size} drop of ${when} still reaches him`);
-    assert.ok(size > EVENING.bid * MOVE_FLOOR,
-      `$${size} is under the floor, so this proves nothing about the composition`);
-  }
-});
-
-test('and the evening is not simply shut: a move that builds its own range speaks', () => {
-  /* THE COST, STATED: the bar is higher after the roll than at noon, by intent. A
-     real move is not silenced, because it IS the range — a $35 fall takes the
-     low with it. */
-  const violent = { ...EVENING, low: 4450 };
-  const out = moveWorth(violent, { ...MARK, bid: 4485 + 35 }, LOOKED);
-  assert.equal(out.worth, true, 'a $35 evening move is silenced, which is too far');
-  assert.equal(out.move, -35);
-});
-
-test('the mid-session drop that was a real find still is', () => {
-  // $33 at 11:12 on 9 September, on a full day's session. It must clear both
-  // gates, or quiet was bought by turning the sense off.
-  const midday = { ...QUOTE, bid: 4419.82, high: 4452, low: 4413 };
-  const out = moveWorth(midday, { ...MARK, bid: 4419.82 + 33 }, LOOKED);
-  assert.equal(out.worth, true);
-  assert.equal(out.move, -33);
-});
-
-test('a quote carrying no range is not judged at all', () => {
-  /* foldSpot falls back to the bid for a quote with no high or low, so the range
-     is zero, and she says nothing. */
-  const flat = { ...QUOTE, high: QUOTE.bid, low: QUOTE.bid };
-  const out = moveWorth(flat, MARK, LOOKED);
-  assert.equal(out.worth, false);
-  assert.match(out.why, /no session range/);
-});
-
-test('a fall is a move, and it is reported as one', () => {
-  // Signed, not absolute: the gates measure size and the message needs the
-  // direction, and a sense that only noticed rallies would be half a sense.
-  const out = moveWorth(QUOTE, { ...MARK, bid: QUOTE.bid + 15 }, LOOKED);
-  assert.equal(out.worth, true);
-  assert.equal(out.move, -15);
-});
-
-/* ═══════════════════════════════════════════════════════════════════════════
    WHICH SESSION THE QUOTE IS DESCRIBING
    ───────────────────────────────────────────────────────────────────────────
    `high`, `low`, `prev_close` and `change` are measured from the broker's
@@ -5008,12 +4842,9 @@ test('there is nothing to speak when there is nothing to say', () => {
 
 /* ─── What he has on, rendered ───────────────────────────────────────────────
    Every field is nullable and most are null on a hand-opened row, so the
-   failure is a block that renders the word `null` where a price goes. The mark
-   is quarter-hourly, so its AGE makes it usable, and it belongs beside a
-   position or nowhere.
+   failure is a block that renders the word `null` where a price goes.
    ─────────────────────────────────────────────────────────────────────────── */
 const DESK_NOW = Date.parse('2026-09-03T14:20:00Z');
-const MARK_NOW = { bid: 4386.1, at: '2026-09-03T14:09:00Z', looked_at: null };
 const OPEN = trade({
   id: 'PID9', direction: 'BUY', entry_time: '2026-09-03T13:14:00Z',
   entry_price: 4388.2, size_oz: 4, open_day: '2026-09-03',
@@ -5051,11 +4882,11 @@ test('a pre-sync row is not an open position, however long it sits there', () =>
 });
 
 test('a flat day with nothing traded is no block at all', () => {
-  assert.equal(positionsList([], null, MARK_NOW, DESK_NOW), '');
+  assert.equal(positionsList([], null, DESK_NOW), '');
 });
 
 test('an open position states its age, its side, its size and its plan', () => {
-  const out = positionsList([OPEN], null, null, DESK_NOW);
+  const out = positionsList([OPEN], null, DESK_NOW);
   assert.match(out, /open since 09:14 ET/);
   assert.match(out, /BUY 4oz from 4388\.2/);
   assert.match(out, /stop 4380 and target 4412 as first seen/);
@@ -5069,7 +4900,7 @@ test('an open position states its age, its side, its size and its plan', () => {
 test('a position opened on an earlier day says which day', () => {
   // Opened 09:14 New York on the 1st, still open on the 3rd.
   const held = trade({ ...OPEN, entry_time: '2026-09-01T13:14:00Z', open_day: '2026-09-01' });
-  const out = positionsList([held], null, null, DESK_NOW);
+  const out = positionsList([held], null, DESK_NOW);
   assert.match(out, /open since 09:14 ET on 1 Sep/,
     'a multi-session hold that names only an hour reads as having opened today');
 });
@@ -5077,14 +4908,14 @@ test('a position opened on an earlier day says which day', () => {
 test("a position opened today says the hour and no date", () => {
   // The other direction, because dating every fill would bury the one line
   // where the date is the point.
-  const out = positionsList([OPEN], null, null, DESK_NOW);
+  const out = positionsList([OPEN], null, DESK_NOW);
   assert.match(out, /open since 09:14 ET —/);
   assert.doesNotMatch(out, /on \d+ Sep/);
 });
 
 test('a position with no plan recorded says nothing about a plan', () => {
   const out = positionsList([trade({ ...OPEN, planned_sl: null, planned_tp: null })],
-                            null, null, DESK_NOW);
+                            null, DESK_NOW);
   assert.match(out, /BUY 4oz from 4388\.2/);
   assert.doesNotMatch(out, /stop|target/);
 });
@@ -5096,18 +4927,18 @@ test('a position with no plan recorded says nothing about a plan', () => {
 test('a row carrying one half of the plan shows that half and never the absence', () => {
   /* The half that exists is said; the half that does not is never named: a null
      is equally "he set none" and "the poller never saw this position open". */
-  const stopOnly = positionsList([trade({ ...OPEN, planned_tp: null })], null, null, DESK_NOW);
+  const stopOnly = positionsList([trade({ ...OPEN, planned_tp: null })], null, DESK_NOW);
   assert.doesNotMatch(stopOnly, /null/, `renders a null: ${stopOnly}`);
   assert.match(stopOnly, /stop 4380 as first seen/, 'the stop it has is dropped');
   assert.doesNotMatch(stopOnly, /target/, 'a target it does not have is named');
 
-  const targetOnly = positionsList([trade({ ...OPEN, planned_sl: null })], null, null, DESK_NOW);
+  const targetOnly = positionsList([trade({ ...OPEN, planned_sl: null })], null, DESK_NOW);
   assert.doesNotMatch(targetOnly, /null/, `renders a null: ${targetOnly}`);
   assert.match(targetOnly, /target 4412 as first seen/, 'the target it has is dropped');
   assert.doesNotMatch(targetOnly, /stop/, 'a stop it does not have is named');
 
   const neither = positionsList(
-    [trade({ ...OPEN, planned_sl: null, planned_tp: null })], null, null, DESK_NOW);
+    [trade({ ...OPEN, planned_sl: null, planned_tp: null })], null, DESK_NOW);
   assert.doesNotMatch(neither, /stop|target|null/,
     'a row the poller never saw open claims a plan');
 });
@@ -5116,27 +4947,19 @@ test('a hand-opened row with no side, size or price prints no nulls', () => {
   const out = positionsList([trade({
     id: 'legacy-1', direction: null, entry_time: null,
     entry_price: null, size_oz: null,
-  })], null, null, DESK_NOW);
+  })], null, DESK_NOW);
   assert.doesNotMatch(out, /null|undefined|NaN/);
   assert.match(out, /side and size not recorded/);
 });
 
-test('the mark is given with its age, counted from the clock passed in', () => {
-  assert.match(positionsList([OPEN], null, MARK_NOW, DESK_NOW), /gold was 4386\.1 11 minutes ago/);
-});
-
-/* A PRICE WITH NOTHING TO BE A PRICE OF. Handed over on a flat day, a quote
-   fifteen minutes old ends up in a briefing as the current level. */
-test('the mark is withheld when nothing is open, however fresh it is', () => {
+test('a flat day with trades behind it states where the day stands', () => {
   const standing = { day: '2026-09-03', pnl: -182.4, account: 2000, breached: false };
-  const out = positionsList([], standing, MARK_NOW, DESK_NOW);
-  assert.doesNotMatch(out, /gold was/);
-  assert.match(out, /his day so far: -182\.40/);
+  assert.match(positionsList([], standing, DESK_NOW), /his day so far: -182\.40/);
 });
 
 test('a day inside the limit and a day past it are not rendered the same', () => {
-  const inside = positionsList([], { day: 'd', pnl: -50, account: 2000, breached: false }, null, DESK_NOW);
-  const past   = positionsList([], { day: 'd', pnl: -90, account: 2000, breached: true }, null, DESK_NOW);
+  const inside = positionsList([], { day: 'd', pnl: -50, account: 2000, breached: false }, DESK_NOW);
+  const past   = positionsList([], { day: 'd', pnl: -90, account: 2000, breached: true }, DESK_NOW);
   assert.match(inside, /inside the 4% R-11 sets/);
   assert.match(past, /PAST the 4% R-11 sets/);
   assert.doesNotMatch(inside, /PAST/);
