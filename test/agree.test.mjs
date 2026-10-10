@@ -21,7 +21,8 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
+import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, parseFeedback, feedbackKeyboard,
+         EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
@@ -2281,15 +2282,15 @@ test('the supersede write may only retire a note that is still live', () => {
   assert.ok(retire.length && retire.length < body.length,
     'writeNote no longer has a retirement branch to check');
 
-  assert.match(retire, /eugenia_notes\?id=eq\.\$\{old\}&superseded_by=is\.null/,
+  assert.match(retire, /eugenia_notes\?id=in\.\(\$\{old\.join\(','\)\}\)&superseded_by=is\.null/,
     'the supersede PATCH no longer filters on superseded_by=is.null, so a note ' +
     'that was already retired is re-pointed at the new row and the note that ' +
     'first corrected it is orphaned — with nothing erroring');
   assert.match(retire, /method: "PATCH", headers: sbHeaders\("return=representation"\)/,
     'the supersede PATCH stopped asking for the row back, so a filtered-to-nothing ' +
     'retirement is a 200 with an empty body and reads as done');
-  assert.match(retire, /\.length === 0/,
-    'nothing checks that the retirement matched a row, so she reports a ' +
+  assert.match(retire, /old\.filter\(id => !hit\.includes\(id\)\)/,
+    'nothing checks that the retirement matched every row it named, so she reports a ' +
     'contradiction retired while it is still handed to her every turn');
 });
 
@@ -3046,6 +3047,21 @@ test('the thesis budget is one number on both sides of the wire', () => {
   assert.equal(THESIS_MAX, Number(declared[1]),
     'index.ts truncates the thesis at a different length than the table accepts — ' +
     'the longer side is a 400 on a write she reports as saved');
+});
+
+// The prompts spell the window, and the point five short of it where the pass
+// merges, out as words; NOTES is the number.
+test('the window the nightly pass is told is the window the read takes', () => {
+  const [word, near] = { 20: ['twenty', 'fifteen'] }[NOTES] ?? [];
+  assert.ok(word, `NOTES is ${NOTES}, which CONSOLIDATE does not spell — update both`);
+  const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
+  assert.match(consolidate, new RegExp(`the ${word} newest notes of each kind`),
+    'the nightly pass is told a different window from the one it is handed');
+  assert.match(consolidate, new RegExp(`you are shown ${word} at most`),
+    'the merge rule names a different window from the one the read takes, so ' +
+    'it merges too late or never');
+  assert.match(consolidate, new RegExp(`holds more than ${near}, find`),
+    'the pass merges at a point that is no longer five short of the window');
 });
 
 test('the portrait budget is one number on both sides of the wire', () => {

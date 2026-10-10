@@ -1024,6 +1024,16 @@ longer true. Retire those by passing supersedes with the replacement, or, if
 there is nothing to replace it with, leave it — a note that is merely old stays,
 and only what is no longer TRUE goes.
 
+KEEP WHAT HE TOLD YOU AND WHAT HE COMMITTED TO INSIDE THE WINDOW. Each list says
+how many it holds, and you are shown twenty at most. A fact that rolls past the
+twentieth is still searchable and the portrait carries its lesson; an instruction
+that rolls past it is one you stop obeying while he believes you took it, and
+nothing tells either of you. So when either list holds more than fifteen, find
+the notes in it that already say the same thing and merge them: one remember
+call, in his words, with supersedes naming every note it replaces. Merge only
+what is already one note said twice — never drop one he still means because
+the list is long, and never bend his words to make two fit.
+
 THEN MOVE THE STORY. You are handed the running thesis — the one thing the
 market has been trading and what has been happening to it. set_thesis rewrites
 it, and tonight is the only time it is written.

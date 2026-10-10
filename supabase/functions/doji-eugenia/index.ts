@@ -201,12 +201,14 @@ const NOTES_TOOL = {
           "told you to do; 'commitment' for something he said he would do.",
       },
       supersedes: {
-        type: "integer",
+        type: "array",
+        items: { type: "integer" },
         description:
-          "Optional. The id of the note this one replaces, taken from the bracketed " +
-          "number beside it. Use it whenever the new line contradicts, corrects or " +
-          "updates an existing one — the old note stops being shown rather than " +
-          "sitting alongside the new one disagreeing with it.",
+          "Optional. The ids of the notes this one replaces, taken from the bracketed " +
+          "number beside each. Usually one: whenever the new line contradicts, corrects " +
+          "or updates an existing one — the old note stops being shown rather than " +
+          "sitting alongside the new one disagreeing with it. Several when the new line " +
+          "merges notes that already say the same thing into one.",
       },
     },
     required: ["note", "kind"],
@@ -435,7 +437,7 @@ async function searchMemory(query: unknown): Promise<string> {
 
 // Twenty of each: a season of observations, and more instructions than he will
 // give — the whole memory costs less than a paragraph.
-const NOTES = 20;
+export const NOTES = 20;
 
 /* Every read of her tables: ask, refuse a bad status, parse. In one place
    because PostgREST answers a missing table with a 404 whose JSON body parses
@@ -449,16 +451,25 @@ async function readRows<T>(what: string, path: string): Promise<T[]> {
 
 // Live notes only: drop `superseded_by=is.null` and she is handed each
 // correction beside what it corrected. The id comes back so she can retire one.
+// One past the window, so a list that overflows can say so: otherwise the
+// twenty-first instruction leaves every prompt and /notes with nothing marking
+// the loss, and she stops obeying what he believes she took.
 async function readNotes(kind: string): Promise<Note[]> {
   return readRows<Note>('Notes',
     `eugenia_notes?select=id,note&kind=eq.${kind}` +
-    `&superseded_by=is.null&order=id.desc&limit=${NOTES}`);
+    `&superseded_by=is.null&order=id.desc&limit=${NOTES + 1}`);
 }
 
 type Note = { id: number; note: string };
 
 // The number is how a note is named when one is retired — in both renderings.
 const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
+
+// Both renderings show the window and say how many it holds, so the nightly
+// pass can merge before a list overflows, and he can see that one did.
+const inWindow = (ns: Note[]) => ns.slice(0, NOTES);
+const howMany = (ns: Note[]) =>
+  ns.length > NOTES ? `more than ${NOTES}, the oldest not shown` : `${ns.length}`;
 
 // What every tool that writes answers when the write failed and the failure is
 // not his to hear about.
@@ -480,9 +491,11 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   const kept = text.slice(0, NOTE_MAX);
 
   // Only a retirement needs the new row back; an unread body holds its
-  // connection open.
-  const old = Math.trunc(Number(supersedes));
-  const retiring = Number.isFinite(old) && old > 0;
+  // connection open. Several ids is a merge; a lone number is taken too, since
+  // this is where the model's arguments enter.
+  const old = [supersedes ?? []].flat().map(n => Math.trunc(Number(n)))
+    .filter(n => Number.isFinite(n) && n > 0);
+  const retiring = old.length > 0;
 
   try {
     // Embedded before the insert, so the note lands with its vector in one
@@ -499,14 +512,17 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     if (retiring) {
       const [row] = await res.json();
       const done = await fetch(
-        `${SB_URL}/rest/v1/eugenia_notes?id=eq.${old}&superseded_by=is.null`, {
+        `${SB_URL}/rest/v1/eugenia_notes?id=in.(${old.join(',')})&superseded_by=is.null`, {
           method: "PATCH", headers: sbHeaders("return=representation"),
           body: JSON.stringify({ superseded_by: row.id }),
         });
       // A miss must not pass as done, or she believes a contradiction is gone
-      // while it is still handed to her every turn.
-      if (!done.ok || (await done.json()).length === 0) {
-        return `Remembered, but note ${old} is not there to retire — ` +
+      // while it is still handed to her every turn — each id is answered for.
+      const hit: number[] = done.ok ? (await done.json()).map((r: Note) => r.id) : [];
+      const missed = old.filter(id => !hit.includes(id));
+      if (missed.length) {
+        return `Remembered, but ${missed.length > 1 ? 'notes' : 'note'} ${missed.join(', ')} ` +
+               `${missed.length > 1 ? 'are' : 'is'} not there to retire — ` +
                `it may already be superseded. Check the list you were given.`;
       }
     }
@@ -1946,17 +1962,17 @@ export async function notesBlock(): Promise<string> {
     const [told, promised, noticed] = await Promise.all([
       readNotes('instruction'), readNotes('commitment'), readNotes('fact'),
     ]);
-    const list = (ns: Note[]) => `\n· ` + ns.map(noteLine).join("\n· ");
+    const list = (ns: Note[]) => `\n· ` + inWindow(ns).map(noteLine).join("\n· ");
     return (told.length
-             ? `\n\nWhat he has told you to do, newest first. These are not optional and a` +
-               ` later one replaces an earlier one:${list(told)}`
+             ? `\n\nWhat he has told you to do (${howMany(told)}), newest first. These are not` +
+               ` optional and a later one replaces an earlier one:${list(told)}`
              : "")
          + (promised.length
-             ? `\n\nWhat he has committed to, newest first. Hold his trades against these` +
-               ` and say so plainly when one broke one:${list(promised)}`
+             ? `\n\nWhat he has committed to (${howMany(promised)}), newest first. Hold his trades` +
+               ` against these and say so plainly when one broke one:${list(promised)}`
              : "")
          + (noticed.length
-             ? `\n\nWhat you have noticed about him, newest first:${list(noticed)}`
+             ? `\n\nWhat you have noticed about him (${howMany(noticed)}), newest first:${list(noticed)}`
              : "");
   } catch (err) {
     console.error("doji-eugenia: notes unavailable —", why(err));
@@ -1978,7 +1994,7 @@ type Channel = { channel: string; state: string; evidence: string | null; moved_
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
                           promised: Note[] = [], read: Portrait | null = null): string {
-  const list = (ns: Note[]) => ns.map(noteLine).join("\n");
+  const list = (ns: Note[]) => inWindow(ns).map(noteLine).join("\n");
   // Not loopsList, which is written to her about her own threads.
     const open = (kind: string, heading: string) => {
       const rs = loops.filter(l => l.kind === kind);
@@ -1987,9 +2003,9 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
         : "";
     };
   return [
-    told.length     ? `What you have told me, newest first:\n${list(told)}`         : "",
-    promised.length ? `What you have committed to, newest first:\n${list(promised)}` : "",
-    noticed.length  ? `What I have noticed, newest first:\n${list(noticed)}`        : "",
+    told.length     ? `What you have told me (${howMany(told)}), newest first:\n${list(told)}`             : "",
+    promised.length ? `What you have committed to (${howMany(promised)}), newest first:\n${list(promised)}` : "",
+    noticed.length  ? `What I have noticed (${howMany(noticed)}), newest first:\n${list(noticed)}`         : "",
     told.length || promised.length || noticed.length ? "" : "I have not kept any notes yet, jefe.",
     read ? `How I read you${read.moved_on ? `, last moved ${civilDay(read.moved_on)}` : ""}:\n${read.portrait}` : "",
     open('watch',    "What I flagged and am still watching:"),

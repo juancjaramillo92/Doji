@@ -39,7 +39,7 @@ import {
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -3965,7 +3965,7 @@ test('his audit shows what he committed to, between what he told her and what sh
     [{ channel: 'dollar', state: 'used', evidence: null, moved_on: null }],
     [], null,
     [{ id: 3, note: 'this week I stop after two losses' }]);
-  assert.match(out, /What you have committed to, newest first:\n\[3\] this week I stop after two losses/);
+  assert.match(out, /What you have committed to \(1\), newest first:\n\[3\] this week I stop after two losses/);
   assert.ok(out.indexOf('[1]') < out.indexOf('[3]') && out.indexOf('[3]') < out.indexOf('[2]'),
     'a commitment is neither an instruction to her nor her observation, and ' +
     'reads between the two');
@@ -3987,6 +3987,69 @@ test('the notes she is handed carry his commitments, asked for by their kind', a
     assert.match(out, /What he has committed to/,
       'notesBlock no longer reads commitments, so nothing is ever held against one');
     assert.match(out, /\[9\] this week I stop after two losses/);
+  });
+});
+
+/* ─── A list that overflows says so ──────────────────────────────────────────
+   The window is twenty, and the twenty-first instruction once left every prompt
+   and /notes with nothing marking the loss. Driven through the real read: the
+   stub answers as PostgREST does, honouring the limit it was sent. */
+test('a list past the window shows the window and says the oldest are not shown', async () => {
+  const live = Array.from({ length: 25 }, (_, i) => ({ id: 25 - i, note: `instruction ${25 - i}` }));
+  let asked;
+  await stubbed(async () => {
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      if (/kind=eq\.instruction/.test(u)) asked = u;
+      const limit = Number(u.match(/limit=(\d+)/)?.[1] ?? Infinity);
+      const rows = /kind=eq\.instruction/.test(u) ? live.slice(0, limit) : [];
+      return new Response(JSON.stringify(rows), {
+        status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const out = await notesBlock();
+    assert.match(asked, new RegExp(`limit=${NOTES + 1}\\b`),
+      'the read asks for exactly the window, so an overflow can never be seen');
+    assert.match(out, new RegExp(`What he has told you to do \\(more than ${NOTES}, the oldest not shown\\)`),
+      'an overflowing list reads like a complete one — she stops obeying the oldest unaware');
+    assert.equal((out.match(/\[\d+\] instruction/g) ?? []).length, NOTES,
+      'she is handed more or fewer than the window');
+    assert.ok(out.includes('[25] instruction 25') && !out.includes(`[${25 - NOTES}] instruction`),
+      'the window is not the newest notes');
+  });
+
+  // Under the window, the count is the count — what the nightly pass merges on.
+  const under = notesList(live.slice(0, 17), [], []);
+  assert.match(under, /What you have told me \(17\), newest first/);
+  const over = notesList(live.slice(0, NOTES + 1), [], []);
+  assert.match(over, new RegExp(`What you have told me \\(more than ${NOTES}, the oldest not shown\\)`),
+    'his audit hides the overflow from him too');
+});
+
+test('one note can retire several, and every id it could not retire is named', async () => {
+  let patched;
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      const u = String(url);
+      if (opts.method === 'POST') return new Response(JSON.stringify([{ id: 40 }]), { status: 201 });
+      if (opts.method === 'PATCH') {
+        patched = u;
+        // Note 12 was already retired, so the filter leaves only 11.
+        return new Response(JSON.stringify([{ id: 11 }]), { status: 200 });
+      }
+      return new Response('[]', { status: 200 });
+    };
+    const said = await serve('remember',
+      { note: 'mornings under a minute', kind: 'instruction', supersedes: [11, 12] });
+    assert.match(patched, /id=in\.\(11,12\)&superseded_by=is\.null/,
+      'a merge does not retire every note it names in one filtered write');
+    assert.match(said, /note 12 is not there to retire/,
+      'a note the merge could not retire passes as retired, and both stay in her window');
+    assert.doesNotMatch(said, /\b11\b/, 'a note that was retired is reported as missed');
+
+    // A lone id is still a retirement: the model's arguments enter here.
+    const one = await serve('remember', { note: 'x', kind: 'fact', supersedes: 11 });
+    assert.match(patched, /id=in\.\(11\)&/);
+    assert.equal(one, 'Remembered.');
   });
 });
 

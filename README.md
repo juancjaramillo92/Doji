@@ -361,6 +361,7 @@ single-sourced at run time:
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
+| Eugenia's **notes window** | `NOTES` in `index.ts`, and the *twenty* and the *fifteen* five short of it that `CONSOLIDATE` spells out |
 | the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `schema.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
@@ -1807,6 +1808,15 @@ facts and never hands it to him as a verdict; `/notes` shows it to him in the
 second person, and he corrects it the way he corrects anything — by telling her,
 which the pass reads that night.
 
+**Every list says how many it holds, and one past the window says so.** The read
+takes one row more than the twenty it shows, so each heading carries its count —
+or *more than 20, the oldest not shown* — in her blocks and in `/notes` alike.
+A fact past the twentieth is still searchable and the portrait carries it; an
+instruction past it is one she stops obeying while he believes she took it. So
+the nightly pass merges a list that holds more than fifteen — only what is
+already one note said twice, in his words — before anything is lost,
+and if something ever is, both of them can see it.
+
 **What is never a note** is written into `remember` itself, so it binds the
 mid-reply write and the nightly pass alike. A fact is what is true of him — *"he
 reads the first paragraph and stops"* — never an order to herself, which reads
@@ -2011,8 +2021,10 @@ whole reply rather than being swallowed: an audit that silently omits half of
 what it audits is the defect it exists to prevent.
 
 **A note can be retired.** Every note reaches her with its number, and `remember`
-takes an optional `supersedes`, so a correction names what it replaces. **The
-filter is the whole feature and fails silently**: without `superseded_by is null`
+takes an optional `supersedes`, so a correction names what it replaces — or
+several, when one line merges notes that already said the same thing; every id
+the write could not retire is named back to her. **The filter is the whole
+feature and fails silently**: without `superseded_by is null`
 on the read she is handed the correction *and* the thing it corrected, every
 turn. The column, the filter and the tool parameter are held together by a test.
 The row itself stays — findable by search and marked no longer true — and there
