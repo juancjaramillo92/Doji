@@ -2509,9 +2509,11 @@ both; which character a board is lives in its own flash.
 digest) whenever `charm/` changes. The board's support package
 (`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
 component registry, at the versions Waveshare's own examples for this board use.
-The download is **`charm.bin`**, one image written at `0x0`: plug the board in
-by USB-C and flash it from Chrome with Espressif's web flasher, or with
-`esptool.py write_flash 0x0 charm.bin`. Nothing secret is in it, so the same
+The download is **`charm-full.bin`**, one image written at `0x0`: plug the
+board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
+`esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
+ESP-IDF's name for the app alone; the workflow fails a build whose image is
+smaller than the bootloader's space plus the app. Nothing secret is in it, so the same
 file goes on both boards.
 
 **The face is her render plus a drawing.** Each character's render is a still

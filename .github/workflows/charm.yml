@@ -1,5 +1,7 @@
 # Builds the charm's firmware, the one program both boards run, and keeps it as
-# a download: charm.bin, a single image written at 0x0 by any ESP flasher.
+# a download: charm-full.bin, a single image written at 0x0 by any ESP flasher.
+# Not charm.bin: that is ESP-IDF's name for the app alone, and merging onto it
+# once wrote a 128 KB image with no app in it, from a green build.
 # Espressif's own ESP-IDF image, pinned by digest like every action here by
 # commit, so the toolchain that built a firmware is the one that will build it
 # again. The board package and LVGL come from Espressif's component registry.
@@ -28,9 +30,17 @@ jobs:
           . "$IDF_PATH/export.sh"
           idf.py set-target esp32s3
           idf.py build
-          idf.py merge-bin -o charm.bin
+          idf.py merge-bin -o charm-full.bin
+      # The image must hold the app where the bootloader looks for it, at 0x10000.
+      - name: Check the image holds the app
+        shell: bash
+        working-directory: charm/build
+        run: |
+          app=$(stat -c %s charm.bin); full=$(stat -c %s charm-full.bin)
+          echo "app $app bytes, full image $full bytes"
+          test "$full" -ge $(( 0x10000 + app ))
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: charm-firmware
-          path: charm/build/charm.bin
+          path: charm/build/charm-full.bin
           if-no-files-found: error
