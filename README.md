@@ -121,7 +121,7 @@ she keeps herself.
    WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
  ┌─────────────────────────┐        ┌────────────────────────────────────┐
  │ pg_cron   hourly        │        │ eugenia_trades   select only       │
- │           spine  ×4/h   │        │ her own tables   8, 7 backed up    │
+ │           calendar ×4/h │        │ her own tables   8, 7 backed up    │
  │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
  │ trades    opened/closed │        │ the broker's price, via the poller │
@@ -132,8 +132,7 @@ she keeps herself.
               ┌──────────────────────────────────┐
               │             Eugenia              │
               │           doji-eugenia           │
-              │  briefing · pulse · reply ·      │
-              │  release look · trade event ·    │
+              │  briefing · reply · trade event  │
               │  nightly pass                    │
               └────────────────┬─────────────────┘
                                │ every composed message is read once
@@ -367,12 +366,12 @@ single-sourced at run time:
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
 | the **`eugenia_trades` column list** | the view in `schema.sql`, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `schema.sql` |
-| each **sense's query flag** | the cron job's URL in `schema.sql` and the branch in `postScheduled` — held in both directions, so a rename and a sense with no job both fail |
+| each **job's query flag** | the cron job's URL in `schema.sql` and the branch in `postScheduled` — held in both directions, so a rename and a door with no job both fail |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
-| the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the spine's `importance=eq.high` |
+| the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
@@ -1022,7 +1021,7 @@ artifact is the account.
 
 **One renewal at a time, by a lease.** A rotating server may treat a refresh
 token presented twice as stolen and revoke the sign-in, and the briefing and the
-release look can find it stale in the same second. A renewal first takes the
+calendar's filing can find it stale in the same second. A renewal first takes the
 lease `refreshing_until` holds, by a PATCH filtered on it being empty or
 lapsed — `balance`'s arbitration. A caller without the lease waits for the token
 the holder writes; the holder re-reads the row once it holds the lease, since
@@ -1172,7 +1171,7 @@ than add. No web search — a bookkeeping pass has nothing to research.
   limit at the oldest end would distil the morning and drop the evening, where a
   late instruction lives. `agree.test.mjs` refuses `order=id.asc` under a limit
   on every read of her tables. Ordering by a clock is a different question — the
-  spine reads `at.asc` because the next release is the earliest.
+  trade event reads `at.asc` because the next release is the earliest.
 - **Twenty-four hours, no watermark**, since the window and the gap between runs
   are the same length. A missed night loses that day's distillation and never
   the day: the turns stay in the table, searchable.
@@ -1192,7 +1191,7 @@ than add. No web search — a bookkeeping pass has nothing to research.
 
 **The schedule is decided in the function, not in cron.** pg_cron is UTC, so a
 fixed expression is an hour wrong for half the year. The job runs hourly and the
-function asks America/New_York for its own clock — `briefDue()`, `pulseDue()`,
+function asks America/New_York for its own clock — `briefDue()`,
 `consolidateDue()` and their retries, composed by `dueNow` — and most calls find
 nothing due. Because the job is `0 * * * *`, a new schedule costs nothing in cron,
 which is also how one could be answered correctly and dispatched by nobody:
@@ -1315,32 +1314,7 @@ handed the failures and told when nothing broke. A breach gets the fact, her
 verdict and the lesson in three short sentences, then back to the market. Closed
 trades only: a verdict on an open one is a hard prohibition.
 
-### Paused
-
-**The pulse and the release look are paused**, to spend less — not because
-either is wrong — and back on by deleting the name from `PAUSED` in
-`doji-eugenia`. Both still fire on their schedules and return before
-their model call. The release look returns only after filing, so the calendar and
-every actual keep landing; it looks back no further than `RELEASE_STALE_H`, so
-turned back on it picks up from that hour and never reads out a backlog. The
-next morning's briefing carries what a print said, and `revisionLine`, said only
-in the release look, waits with it. A test holds every paused name to a
-check that returns before the model call.
-
-### The pulse
-
-Weekdays at 10:00 ET, past the 08:30 data window. **Its default answer is
-silence:** she replies with the single word `NOTHING`, and nothing is sent or
-stored — empty pairs would push the briefing out of the twelve-turn window. It is
-a second scheduled look, not an event-driven one. `isSilent()` matches the bare
-word only, so *"Nothing much has changed, except gold is up forty"* is sent: a
-swallowed message is invisible, an extra one merely extra.
-
-### The event spine — the first thing here that is not a clock
-
-A print at 08:30 lands after the briefing and before a pulse whose default is
-silence, so the one moment something genuinely happens would be the moment she
-is least likely to speak. The spine is driven by data rather than an hour.
+### The calendar — filed for her every quarter hour
 
 **The calendar is filed for her, from TradingView.** `fileCalendar` reads
 `doji-tradingview?calendar=1` for the days around now, through the cron secret
@@ -1361,21 +1335,26 @@ rates Lagarde medium and every auction and China's reserves low, and rates a doz
 surveys high. About 12 events a week, out of more than 100 listed. China's gold
 imports are not on TradingView's calendar. A row from abroad carries its country
 at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
-economies publish that title in one hour and `record_actual` matches on the name.
-**None of it is one of his**: R-14 and R-19, the look, the trade event's warning
-and the move's explanation all read `country=eq.US` (`HOME`, beside `HIGH` in
-`adherence.ts`), and a list that carries a line from abroad tells her so once.
-The rolling list and the Sunday week carry it; the week takes only what is rated
-high, so abroad that is the central banks' decisions and headline inflation. The briefing files before it reads, and a **quarter-hourly
-job** files before asking one question: **which release time has landed and not
-yet been looked at?** Every filing is an `eugenia_runs` row under `calendar`,
-failed or not, since a calendar that stopped moving looks like a quiet week.
+economies publish that title in one hour. **None of it is one of his**: R-14 and
+R-19 and the trade event's warning all read `country=eq.US` (`HOME`, beside
+`HIGH` in `adherence.ts`), and a list that carries a line from abroad tells her
+so once. The rolling list and the Sunday week carry it; the week takes only what
+is rated high, so abroad that is the central banks' decisions and headline
+inflation.
+
+**The briefing files before it reads, and a quarter-hourly job files on its
+own** — `doji-eugenia-calendar`, on `?calendar=1` — so an actual lands within
+fifteen minutes of printing for the dashboard card and the trade event's warning
+between briefings. It is a second job rather than a faster one, because the
+hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
+Every filing is an `eugenia_runs` row under `calendar`, failed or not, since a
+calendar that stopped moving looks like a quiet week.
 
 **One release is one row, whatever it is called**, because the key is
 TradingView's id and nothing she can call creates a row. Keyed on a name the
-model wrote, one CPI once became five rows and five looks. `calendarList` marks a
-row with no figure **PAST** once its time has gone — every speech, and every
-print whose number has not arrived.
+model wrote, one CPI once became five rows. `calendarList` marks a row with no
+figure **PAST** once its time has gone — every speech, and every print whose
+number has not arrived.
 
 **The read is bounded at forty rows, earliest first, and a full read says so.** A
 heavy day loses tomorrow's rows, which the next briefing reads — the right end
@@ -1384,7 +1363,7 @@ later releases were not read.
 
 **A figure TradingView has not published is left out of the row, never sent as
 null.** `merge-duplicates` writes exactly the keys present, so `actual: null`
-would erase an actual recorded by hand. Rows go up grouped by the columns they
+would erase an actual already filed. Rows go up grouped by the columns they
 carry, since PostgREST refuses a bulk insert whose objects differ.
 
 **The window reaches past tomorrow's morning prints.** A trade opened before
@@ -1393,61 +1372,18 @@ today and tomorrow up to noon New York; filed at twenty-four hours, the London
 session would never hear of the 08:30. Read and write share one bound, and every
 calendar line from another day names its day — two mornings each have an 08:30.
 
-**One look per release time.** The 08:30 slot is most of a report, so
-`dueRelease` takes the earliest time nothing has looked at and every high row
-standing at it: several numbers landing together are one message. `looked_at` is
-stamped **before** the look, since a look that generates and fails to write would
-repeat every fifteen minutes, each billed. **The look waits for the number, not
-for ever**: a group still missing a figure is left for the next quarter-hour,
-for thirty minutes at most (`awaitingActual`); a speech has no figure coming and
-is looked at on time. It is a second job rather than a faster one, because the
-hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
-`?release=1` is its door.
-
-**The look reads a release against its own record.** Each row carries
-TradingView's `ticker`, the series it belongs to, and
-the look is handed the last twelve prints of each series in the group, oldest
-first, each against what was expected (`recordList`, read by `recordQuery`).
-Listed, never scored — parsing "0.2%" into a sign is a chance to get every unit
-backwards. `RELEASE` asks whether a miss runs the way the series has been
-missing. Only a release with a figure coming gets one: the FOMC minutes carry
-the rate decision's ticker, so their record was the decisions', and a release
-with no consensus and no prior has nothing to read against, which is
-`awaitingActual`'s own test.
-
-**And what the last print became.** A release revises the one before, and
-TradingView carries the revised figure as the new row's `prior` while last
-month's row keeps the first report. `revisionLine` reads the two off the same
-record: *"Revised: Non Farm Payrolls (Aug) was first reported at 162K on 4 Sept,
-and this release revises it to 133K."* It compares only with the print
-immediately before, and a gap half as long again as the series' last says
-nothing. She says a revision beside the miss and never works one out; the
-briefing does not carry it, since at 08:00 there is none yet.
-
-**A look fills a release in and cannot file one.** Where TradingView has not yet
-published a figure, the look records one with `record_actual`, a **PATCH and
-nothing else**, matching `(at, name)` and writing `actual` and `note` — no insert
-path, and no write to `consensus` or `prior`, which are TradingView's. A name
-matching nothing is a 200 with an empty body, so it answers with the names
-actually on file. The look is handed the UTC stamp beside the ET heading, since
-the tool matches the instant. **A speech is recorded by its line alone**: either
-half may come without the other, and an absent key is left as it was.
-
 **The row records when its content was last written.** `updated_at` moves through
-a trigger, `eugenia_calendar_touch`, but **not on a mark**: `markLooked` writes `looked_at` alone, so the
-column says which of two rows carries the later content rather than when one was
-last handled. The trigger compares the row as `jsonb` less those two columns, so a
-column added later is compared without anyone remembering it.
+a trigger, `eugenia_calendar_touch`, only when the content changed: the filing
+re-upserts every row each quarter hour, so the column says which of two rows
+carries the later content rather than when one was last filed. The trigger
+compares the row as `jsonb` less `updated_at`, so a column added later is
+compared without anyone remembering it.
 
-**Its default is silence**, on the pulse's reasoning: a number landing where
-everyone expected it is not news. `isSilent` is shared.
-
-**Every message she composes is read once more before it is sent.** `CRITIC`
-reads the briefing; `TRIM` reads the pulse, the release look and the reply —
-most of what arrives in a week. The reply is gated inside the typing
-indicator, so she never reads as having finished and said nothing, and `TRIM`
-holds the reply to no short length: a plan checked against his rules can be nine
-findings long.
+**Every reply is read once more before it is sent**, as the briefing is.
+`CRITIC` reads the briefing; `TRIM` reads every reply. The reply is gated inside
+the typing indicator, so she never reads as having finished and said nothing,
+and `TRIM` holds the reply to no short length: a plan checked against his rules
+can be nine findings long.
 
 `TRIM` is **not `CRITIC` with a shorter prompt**. The briefing's checks — a first
 sentence true only today, a complete chain, one chain only, 250–300 words —
@@ -1476,7 +1412,9 @@ lean rather than inventing a figure.
 reaches him in a position or just past his day's limit, where a paraphrased
 citation of his rule is how a sentence becomes an order. `TRADE_EVENT` is also
 the most constrained prompt in the file — two sentences, the fact then the rule,
-`NOTHING` as a way out.
+`NOTHING` as a way out. `isSilent()` matches that bare word only, so *"Nothing
+much, but the 08:30 is still ahead"* is sent: a swallowed message is invisible,
+an extra one merely extra.
 
 `gate()` is one function for both: a revision failing `keepDraft` is overruled,
 and a gate that *throws* costs nothing — copied, that catch is where one gate
@@ -1637,9 +1575,9 @@ gives `[object Object]` on exactly the turns carrying most context.
 
 **Everything she writes is spoken.** The old rule — answer in the channel he
 used — only ever decided a reply, so the briefing, the one message he wanted read
-to him, was never spoken. He decided it the other way. Six call sites speak:
-the briefing twice (its speaking worker, and its own fallback), the pulse, the
-release look, the trade event and the reply. `say()` keeps the
+to him, was never spoken. He decided it the other way. Four call sites speak:
+the briefing twice (its speaking worker, and its own fallback), the trade event
+and the reply. `say()` keeps the
 `/notes` audit (a table, unlistenable), the apologies (failure notices, not her
 words), the short operational lines and the charm's copy, whose voice is on the
 charm.
@@ -1798,7 +1736,7 @@ stays until it closes; and the calendar is the one dataset here that compounds.
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
-| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar`, and an actual TradingView has not published by `record_actual` |
+| `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings
@@ -1823,18 +1761,18 @@ noticed.
 **A reply to one of her messages tells her which one.** Swipe a message and
 answer, typed or spoken, and she is handed the message he answered — its text, or
 the stored turn sent at that moment, since a voice note carries no words. Without
-it, *"too dense"* under the pulse and under the release look arrive identically.
+it, *"too dense"* under the briefing and under a trade message arrive identically.
 What is stored is his words behind a marker carrying her message's opening.
 **The briefing is found looking back**, because it is the one message stored
 before it is sent: when the forward look is empty, the newest two rows inside the
 speaking worker's budget are taken only if they are a briefing and its marker
 sharing one instant — otherwise no quote rather than a wrong one.
 
-**Who gets what.** `notesBlock()` reaches **all six paths** — the briefing, the
-pulse, a reply, the nightly pass, the release look and the trade look — and its
-absence would be silent: she carries on ignoring an instruction he believes she
-took. `channelsBlock()` goes to the five asked to build a term; the release look
-is among them, since what moves gold runs through a channel and a message saying the dollar came off teaches nothing to someone for
+**Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
+reply, the nightly pass and the trade look — and its absence would be silent:
+she carries on ignoring an instruction he believes she took. `channelsBlock()`
+goes to the three asked to build a term, since what moves gold runs through a
+channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that
 speaks — not the nightly pass, which reads its own twenty-four hours. It matters
 most on the trade look, whose R-14/R-19 line fires on the print the briefing is
@@ -1863,8 +1801,8 @@ R-10 and R-15 `unknown` rather than running a span to *now* or dropping the row.
 It renders each open position — age, side, size, entry, the stop and target as
 first seen — and where the day stands against R-11's 4%. **A position opened on an earlier day names the day**: his
 holds run multi-session, and a bare `open since 09:15 ET` under *right now* reads
-as this morning. Flat and not traded today, it is nothing at all. It goes to five
-paths — the briefing, the pulse, a reply, the release look and the nightly pass.
+as this morning. Flat and not traded today, it is nothing at all. It goes to
+three paths — the briefing, a reply and the nightly pass.
 The trade look is reached *from* the position and already holds its row.
 
 **What she may do with it is narrower than what she can see, by design.**
@@ -2138,8 +2076,8 @@ in her voice. An empty answer is an answer only when something was read.
 **A read that does not answer has failed after `READ_MS`, 45 seconds.** Every
 market read is bounded: TradingView's doors through `tvRead`, the broker's
 price and the CFTC's count. Unbounded, a feed that stopped answering held the
-caller until the platform closed the request at 150s. The 7 October pulse
-spent that long learning TradingView was down, and in a briefing the wait lands
+caller until the platform closed the request at 150s. A 7 October look spent
+that long learning TradingView was down, and in a briefing the wait lands
 on the writing worker's clock. Each caller already says what a failed read
 means, so a dead feed now costs 45 seconds and that sentence. **A timeout names
 its door** — *TradingView calendar: no answer in 45s* — since the abort's own
@@ -2148,8 +2086,8 @@ message names nothing, and the meter rows are where an outage is read afterwards
 **A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
 at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the
 22:00 pass — and stops once one has landed. `retryDue` answers **which**
-briefing, so a retry sends the shape the failed one would have. At 10:00 the
-retry takes the pulse's hour. `briefedToday()` reads the marker `postBriefing`
+briefing, so a retry sends the shape the failed one would have.
+`briefedToday()` reads the marker `postBriefing`
 stores *before* the send, so a failed insert cannot produce four briefings and
 four bills, and a read failure counts as *already briefed*. `briefedQuery()`
 filters on the two marker strings rather than scanning recent turns, which a
@@ -2166,7 +2104,7 @@ on every plan** — send the caller nothing that long and the request is closed,
 a briefing that delivers perfectly still hands pg_net a `504 IDLE_TIMEOUT`, and in
 `net._http_response` a good briefing and a call that never ran become the same
 row. Answering first makes a non-2xx there mean what it says, and the body names
-the job (`accepted: "pulse=1"`), since the row carries no URL. `?embed=1` alone
+the job (`accepted: "calendar=1"`), since the row carries no URL. `?embed=1` alone
 waits: its answer *is* its interface — call it until it reports `left: 0` — and
 it is the one flag no cron job dispatches, which `agree.test.mjs` holds against
 the timer section of `schema.sql`.
@@ -2227,7 +2165,7 @@ looking like one he has never used.
 Three things outside the SQL, none of which fails loudly:
 
 - **The quarter-hourly job** is in `schema.sql`'s timer section with every
-  other schedule: `doji-eugenia-spine` calling `?release=1`, off the hour and
+  other schedule: `doji-eugenia-calendar` calling `?calendar=1`, off the hour and
   clear of the briefing.
 - **The webhook must allow `callback_query`**: re-register with
   `allowed_updates = ["message", "callback_query"]`, or the taps under a
@@ -2343,14 +2281,14 @@ across a weekend; her own words go back unprefixed.
 
 **A slash command costs no model call**: `/notes` and `/channel` are answered
 from the database, and anything else is addressed to Telegram, not to her. **Effort is per caller**: the briefing and the nightly pass run
-`high`, a reply and the pulse `medium`, nothing `low` — a careless read of his
+`high`, a reply `medium`, nothing `low` — a careless read of his
 discipline is worse than a slow one. **The typing indicator repeats** while she
 works, since Telegram's lasts five seconds.
 
 **`MAX_ROUNDS` is ten, a backstop.** The failure it guards against is a loop
 billing for ever; the one it can cause is a message that never arrives.
 `eugenia_runs.rounds` shows how close each caller runs, and a successful turn's
-`detail` says what the rounds were spent on — `record_actual×4, get_market×1` —
+`detail` says what the rounds were spent on — `check_rules×4, get_market×1` —
 since a name that cannot match, a tool called one per round and a model that
 will not batch are different repairs.
 
@@ -2406,13 +2344,13 @@ tiers, Opus a fifth cheaper on input, output and writes, and a cache read down t
 a twentieth of the input rate on both.
 
 **A cheaper caller that does not answer is not cheaper.** In September three
-callers were moved to Sonnet, and the release look then died at `MAX_ROUNDS` twice
-in its first half hour — but `record_actual` had become its tool eighty minutes
-earlier, and with the model reverted its rounds stayed at seven to ten where they
-had been two or three. The pair is confounded, so it establishes nothing about
-the model. The cause turned up in the first tally: `record_actual×6` in seven
-rounds, every call refused by a filter that wrapped the name in quotes PostgREST
-compared as part of it. What stands is the policy: a move is one caller at a time
+callers were moved to Sonnet, and the release look, since retired, then died at
+`MAX_ROUNDS` twice in its first half hour — but a tool for filing a print had
+joined it eighty minutes earlier, and with the model reverted its rounds stayed
+at seven to ten where they had been two or three. The pair is confounded, so it
+establishes nothing about the model. The cause turned up in the first tally: six
+calls to that tool in seven rounds, every one refused by a filter that wrapped
+the name in quotes PostgREST compared as part of it. What stands is the policy: a move is one caller at a time
 with `rounds` read afterwards. **Only `trim` runs on Sonnet**: it is handed
 `CRITIC_TOOLS`, which is empty — one request, no loop to run out of. The critic
 stays on Opus: about $2 a month saved, against the last gate on exactly what he
@@ -2438,15 +2376,14 @@ answered *is a second turn likely inside the hour* per array:
 | Sunday briefing | 1 | 1 | 0 |
 
 (Consolidation's sixth turn is the row for a turn that failed before the model
-answered.) That week only `RELEASE_TOOLS` earned the hour, because its
-quarter-hourly job clusters several looks into one morning; the briefing and the
-pulse are two hours apart. One reply could not say how replies arrive. The week
-to 2026-10-08 had eighteen: fourteen within an hour of the reply or pulse before
-them, six within five minutes — so eight a week wrote again a prefix the hour
-would still have held, and `CHAT_TOOLS` takes the hour too. The weekday briefing
-shares that array but not its effort, so it reads nothing the replies wrote and
-pays 2× for its own write; the replies more than cover it. So it is `1h` for
-`RELEASE_TOOLS` and `CHAT_TOOLS`, and `5m` for the rest. `cached` counts
+answered.) That week only the release look's array earned the hour, because its
+quarter-hourly job clustered several looks into one morning. One reply could not
+say how replies arrive. The week to 2026-10-08 had eighteen: fourteen within an
+hour of the turn before them, six within five minutes — so eight a week wrote
+again a prefix the hour would still have held, and `CHAT_TOOLS` takes the hour.
+The weekday briefing shares that array but not its effort, so it reads nothing
+the replies wrote and pays 2× for its own write; the replies more than cover it.
+So it is `1h` for `CHAT_TOOLS` and `5m` for the rest. `cached` counts
 reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
 differ.
 
@@ -2492,8 +2429,8 @@ briefing reading like a wire feed.
 
 **She may give her read, fenced three ways**: said as *her read*, with what would
 prove her wrong in the same breath, and with no level in it — a read with a price
-in it is a signal. One per message, in the briefing or a conversation; the pulse,
-the looks and the trade event carry none, landing at moments she did not choose.
+in it is a signal. One per message, in the briefing or a conversation; the trade
+event carries none, landing at a moment she did not choose.
 **None at all while you are in a position**, where a view on price is advice about
 the trade. Both gates carry the same fence and are handed what you have on.
 
@@ -2702,8 +2639,8 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 | Job | Schedule | What it drives |
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
-| `doji-eugenia` | `0 * * * *` | the briefing, the pulse and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-spine` | `5,20,35,50 * * * *` | the release look |
+| `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
@@ -2863,10 +2800,6 @@ curl -s https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-<ver>.tgz
   | openssl dgst -sha512 -binary | openssl base64 -A
 ```
 
-**A release reaches her within a quarter of an hour.** The spine is a
-quarter-hourly job, so an 08:30 print is looked at between 08:35 and 08:50. If the
-first minutes ever matter, the fix is a shorter interval on that job alone.
-
 **Three capabilities need a vendor Anthropic does not serve** — hearing
 (`STT_URL`/`STT_KEY`), speaking (`TTS_URL`/`TTS_KEY`) and semantic search
 (`EMBED_KEY`) — each written against a shape rather than a provider, each unset a
@@ -2903,7 +2836,7 @@ one `net.http_post` each.
 | Function | What a holder of the secret can do |
 |---|---|
 | `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`) or minute bars (`?bars=raw`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
-| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?pulse=1` costs a medium-effort call that usually answers `NOTHING` and sends nothing. `?embed=1` spends at the embedding vendor. `?release=1` and a `{trade}` body reach the two cheaper event paths |
+| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
 Neither of the last two can reach a column. The value sits in Vault and in

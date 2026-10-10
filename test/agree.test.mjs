@@ -1631,12 +1631,12 @@ test('the strategy rides on the cached system prompt, not on a message', () => {
     'stopped being given it at all, or it is being paid for on every message');
 
   /* THE WINDOW IS DERIVED FROM THE TOOL ARRAY, where the cache key starts. Only
-     the release look's and the chat array's prefixes are reused inside the hour;
-     a literal here reads as a decision and costs 2× for a lifetime nothing
-     reads. README.md carries the rows. */
-  assert.match(src, /ttl:\s*tools === RELEASE_TOOLS \|\| tools === CHAT_TOOLS \? "1h" : "5m"/,
+     the chat array's prefix is reused inside the hour; a literal here reads as
+     a decision and costs 2× for a lifetime nothing reads. README.md carries the
+     rows. */
+  assert.match(src, /ttl:\s*tools === CHAT_TOOLS \? "1h" : "5m"/,
     'the cached prefix states one window for every caller again — the hour is ' +
-    'only earned by RELEASE_TOOLS and CHAT_TOOLS, see the measurements in README.md');
+    'only earned by CHAT_TOOLS, see the measurements in README.md');
 });
 
 test('what is summarised into every turn can also be read in full', () => {
@@ -1835,7 +1835,7 @@ test('the tools she is offered are exactly the tools the loop can run', () => {
   /* DERIVED: a list of sets typed here goes stale when one is added. CRITIC_TOOLS
      is the empty one, deliberately, and exempt from offering anything. */
   const sets = [...src.matchAll(/const ([A-Z_]+_TOOLS)(?:: unknown\[\])? = \[([\s\S]*?)\];/g)];
-  assert.ok(sets.length >= 5,
+  assert.ok(sets.length >= 4,
     `read ${sets.length} tool sets out of the file — the reader has gone blind`);
 
   for (const [, set, block] of sets) {
@@ -2222,8 +2222,8 @@ test('every row-returning read of her own tables carries a limit', () => {
     /* AND A LIMIT TAKES AN END. `id` is the only monotonic key, so ordering by it
        asks for the newest rows or the oldest, and the two are indistinguishable
        until there is more than a window's worth. Ordering by a clock is a
-       different question — the spine reads `at.asc` because the next release is
-       the earliest. */
+       different question — the trade event reads `at.asc` because the next
+       release is the earliest. */
     assert.doesNotMatch(query, /order=id\.asc/,
       `the read of ${table} orders id.asc under a limit, so it keeps the OLDEST ` +
       `rows in the window and silently drops everything since — which is what ` +
@@ -2317,18 +2317,14 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
   const body = (name) => bodyOf(src, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
 
   /* postConsolidation is the worst to lose: without its notes she cannot see what
-     she holds, never supersedes, and writes the same fact nightly. postRelease
-     teaches — what is behind a print runs through a channel — so a look not
-     handed the ladder teaches the wrong thing well. */
-  /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the five whose prompts build a
-     term, so they get the map. `SENDS` is the five that put a message in front of
-     him now — the nightly pass writes memory and sends nothing. His notes go to
-     all six. A reply is `converse`, the turn every door into the
+     she holds, never supersedes, and writes the same fact nightly. */
+  /* FOUR LISTS FOR FOUR QUESTIONS. `TEACHES` is the three whose prompts build a
+     term, so they get the map. `SENDS` is the three that put a message in front
+     of him now — the nightly pass writes memory and sends nothing. His notes go
+     to all four. A reply is `converse`, the turn every door into the
      conversation shares. */
-  const TEACHES = ['postBriefing', 'postPulse', 'converse', 'postConsolidation',
-                   'postRelease'];
-  const SENDS = ['postBriefing', 'postPulse', 'converse', 'postRelease',
-                 'postTradeEvent'];
+  const TEACHES = ['postBriefing', 'converse', 'postConsolidation'];
+  const SENDS = ['postBriefing', 'converse', 'postTradeEvent'];
 
   const reads = (fn) => uncomment(body(fn));
 
@@ -2347,7 +2343,7 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
       `which channels are thin, and nothing would report it`);
   }
 
-  /* NOTES REACH SIX PATHS — the trade look, which arrives while he is in a
+  /* NOTES REACH FOUR PATHS — the trade look, which arrives while he is in a
      position, included. */
   for (const fn of [...new Set([...TEACHES, ...SENDS])]) {
     assert.ok(reaches(reads(fn), 'notesBlock'),
@@ -2372,7 +2368,7 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     'fixed twenty-four hours — a second, shorter copy of the same day, paid ' +
     'for on every request of the one caller that reads a whole day at once');
 
-  /* AND WHAT HE HAS ON, on the five that teach. postTradeEvent is reached FROM
+  /* AND WHAT HE HAS ON, on the three that teach. postTradeEvent is reached FROM
      the position and already carries its row. */
   for (const fn of TEACHES) {
     const code = reads(fn);
@@ -2844,26 +2840,16 @@ test('the importance a release may carry is the one the table accepts', () => {
   assert.deepEqual([...mapped[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
     "TradingView's importance maps to one the table refuses, or one is unreachable");
 
-  /* AND THE ONE THAT WAKES HER IS ONE OF THEM: a rename leaves a spine that
-     matches nothing, with no error anywhere. */
-  assert.ok(declared.includes('high'), 'nothing is filed as high, so the spine can never fire');
+  /* AND THE ONE HIS RULES COUNT IS ONE OF THEM: a rename leaves the trade
+     event's warning matching nothing, with no error anywhere. */
+  assert.ok(declared.includes('high'), 'nothing is filed as high, so no print ever warns him');
 
-  /* READ OUT OF pendingRelease ITSELF: aheadToday filters on the same value, so
-     a whole-file match stays green with the spine's own filter deleted. */
-  const spine = bodyOf(src, 'async function pendingRelease(', 'doji-eugenia no longer has pendingRelease()');
-  assert.match(spine, /importance=eq\.high/,
-    'the release spine no longer filters on importance, so every medium and low ' +
-    'entry filed all week would wake her');
-  /* THE MARK IS SELECTED RATHER THAN FILTERED ON. The question is whether
-     ANYTHING at that release time has been looked at, and `looked_at=is.null`
-     would hide exactly the mark that answers it. dueRelease is driven in
-     fold.test.mjs; here the column must still come back. */
-  assert.match(spine, /select=[^&`]*looked_at/,
-    'pendingRelease no longer reads looked_at, so dueRelease cannot see the mark ' +
-    'and every print is looked at every quarter of an hour until it ages out');
-  assert.doesNotMatch(spine, /looked_at=is\.null/,
-    'the filter is back, so the duplicates are handed over one at a time again — ' +
-    'which is the five-looks-per-print this replaced');
+  /* READ OUT OF aheadToday ITSELF: other reads filter on the same value, so a
+     whole-file match stays green with the warning's own filter deleted. */
+  const ahead = bodyOf(src, 'async function aheadToday(', 'doji-eugenia no longer has aheadToday()');
+  assert.match(ahead, /importance=eq\.high/,
+    'the trade event no longer filters what is ahead on importance, so every ' +
+    'medium entry of the day would warn him');
 });
 
 /* ─── The calendar reaches abroad; his rules do not ──────────────────────────
@@ -2871,9 +2857,9 @@ test('the importance a release may carry is the one the table accepts', () => {
    which of theirs are filed, so the two lists are one fact in two files: an
    economy asked for and never kept is paid for on every filing, and one kept
    and never asked for is a selection that can never fire. And everything that
-   acts on a release — R-14 and R-19, the look, the trade warning — counts the
-   US alone, while only the Sunday week and the
-   rolling list carry what is filed from abroad.
+   acts on a release — R-14 and R-19, the trade warning — counts the US alone,
+   while only the Sunday week and the rolling list carry what is filed from
+   abroad.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the economies the calendar is asked for are the ones calendarRows keeps', () => {
@@ -2892,7 +2878,7 @@ test('the economies the calendar is asked for are the ones calendarRows keeps', 
     'the calendar is asked for an economy nothing keeps, or keeps one it never asks for');
 });
 
-test('only US releases are counted, looked at or warned of', () => {
+test('only US releases are counted or warned of', () => {
   /* EVERY READ FILTERED ON A RATING, found rather than listed, so a new one
      arrives already asked the question. The Sunday week is the one declared
      exception: it is a list for her to read, not a release anything acts on. */
@@ -2902,7 +2888,7 @@ test('only US releases are counted, looked at or warned of', () => {
       .map(d => EUGENIA_TS.lastIndexOf(d, m.index))) + 1;
     return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('(', at) + 1);
   });
-  assert.ok(reads.length >= 4, `only ${reads.length} rated reads found — the reader has gone blind`);
+  assert.ok(reads.length >= 3, `only ${reads.length} rated reads found — the reader has gone blind`);
   for (const decl of reads) {
     const body = bodyOf(EUGENIA_TS, decl);
     if (LISTS.includes(decl)) {
@@ -2923,25 +2909,6 @@ test('only US releases are counted, looked at or warned of', () => {
   const watch = bodyOf(source('index.html'), 'const Watch = {');
   assert.match(watch, new RegExp(`from\\('eugenia_calendar'\\)[\\s\\S]*?\\.eq\\('country', '${HOME}'\\)`),
     "the app's calendar card reads abroad too, and a night of it pushes the morning's prints off twenty rows");
-});
-
-/* ─── The pure half settles nothing about the call ───────────────────────────
-   `dueRelease` stays green while postRelease marks only the row its message
-   names, leaving the rest of the group unlooked — and the next quarter-hour
-   hands back the same print. So markLooked must take every id in the group.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-test('every row at the release time is marked, not the one the message names', () => {
-  const body = bodyOf(EUGENIA_TS, 'async function postRelease(', 'doji-eugenia no longer has postRelease()');
-
-  assert.match(body, /markLooked\(due\.map\(r => r\.id\)\)/,
-    'postRelease marks something other than the whole group, so the duplicates ' +
-    'it just decided to skip come back unlooked at the next quarter hour');
-
-  // THE MARK GOES DOWN BEFORE THE LOOK: one that generates and fails to write
-  // would repeat every fifteen minutes, each billed.
-  assert.ok(body.indexOf('markLooked') < body.indexOf('await ask('),
-    'the mark now lands after the model call, so a look that dies repeats');
 });
 
 /* ─── A command nothing routes does not exist ────────────────────────────────
@@ -3153,7 +3120,7 @@ test('every column the cost meter writes is a column the table has', () => {
    line between a market analyst and a signal service, enforced by nothing but
    the sentence. THE TWO GATES NEED IT AS MUCH AS THE WRITER: they REWRITE, and
    run last, so a gate not told the rule can hand back a message breaking it.
-   RELEASE and CONSOLIDATE inherit SYSTEM.
+   CONSOLIDATE inherits SYSTEM.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('no prompt that writes or rewrites may lose the line on price', () => {
@@ -3174,9 +3141,8 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
   }
 
   // And the two that send nothing he reads as analysis are deliberately out:
-  // CONSOLIDATE writes memory, RELEASE runs under SYSTEM like every caller.
-  assert.ok(bodies.CONSOLIDATE && bodies.RELEASE,
-    'prompt.ts no longer exports CONSOLIDATE or RELEASE');
+  // CONSOLIDATE writes memory and runs under SYSTEM like every caller.
+  assert.ok(bodies.CONSOLIDATE, 'prompt.ts no longer exports CONSOLIDATE');
 });
 
 /* ─── Her read is allowed because it is fenced, and the fence is three copies ─
@@ -3215,12 +3181,6 @@ test('the writing rules ban a figure of speech, with his own example of one besi
   assert.match(writing, /NO FIGURES OF SPEECH/, 'WRITING no longer bans figures of speech');
   assert.match(writing, /contained rather than clean" makes him work out that it means "that mix is why gold has only risen a little"/,
     'the figure-of-speech rule has lost its worked example — the description alone is what failed');
-
-  /* AND A LOOK REPORTS THE WHOLE RELEASE, not one number from it, or the rest
-     arrives later from the pulse as things the look missed. */
-  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
-  assert.match(release, /A RELEASE IS A REPORT, NOT ONE NUMBER\. Read everything that came out at that time/,
-    'RELEASE no longer asks for the whole report — the pulse is left to finish it');
 });
 
 test('the critic counts paragraphs and dashes last, after everything that can add them', () => {
@@ -3241,7 +3201,7 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
   }
 });
 
-test('TRIM counts too, last, because the short messages broke the rule the critic fixed', () => {
+test('TRIM counts too, last, because replies broke the rule the critic fixed', () => {
   /* TRIM counts too, last, for the critic's reason. */
   const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)[1];
   const count = trim.indexOf('LAST, COUNT.');
@@ -3338,7 +3298,7 @@ test('her read on price is fenced in the writer and in both gates', () => {
       `is asked whether a view was given while he was in one`);
   }
   const calls = [...EUGENIA_TS.matchAll(/await trim\(([^)]*)\)/g)].map(m => m[1]);
-  assert.ok(calls.length >= 3, `read ${calls.length} calls to trim() — the reader has gone blind`);
+  assert.ok(calls.length >= 1, `read ${calls.length} calls to trim() — the reader has gone blind`);
   for (const args of calls) {
     assert.match(args, /,\s*desk,\s*story$/,
       `trim(${args}) is not handed the desk and the story — that gate cannot tell ` +
@@ -3595,44 +3555,7 @@ test('every flag a cron job calls with is a flag the function reads', () => {
 
   // AND EACH DOOR REACHES ITS OWN WORK. A branch that reads the flag and then
   // falls through to the briefing would pass the check above.
-  assert.match(body, /get\("release"\) === "1"\)\s*\{[^}]*postRelease\(\)/);
-});
-
-/* ─── What is paused is paused where it costs ─────────────────────────────────
-   PAUSED names jobs by the word APOLOGY knows them by, and a gate checks each
-   name. A name nothing checks is a job that still runs; a check on a word no
-   job is called can never be paused. The pulse returns before its reads; the
-   release look only after filing, or the calendar and every actual stop with
-   it. Neither may reach its model call.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-test('every paused job is checked, and each check returns before the model call', () => {
-  const held = EUGENIA_TS.match(/export const PAUSED = new Set\(\[([^\]]*)\]\)/);
-  assert.ok(held, 'doji-eugenia no longer declares PAUSED as a literal set');
-  const paused = [...held[1].matchAll(/'(\w+)'/g)].map(m => m[1]);
-  const checked = [...uncomment(EUGENIA_TS).matchAll(/PAUSED\.has\('(\w+)'\)/g)].map(m => m[1]);
-  assert.ok(checked.length >= 2, `only ${checked.length} pause checks read — the reader has gone blind`);
-
-  const apology = EUGENIA_TS.match(/export const APOLOGY: Record<string, string> = \{([\s\S]*?)\n\};/);
-  assert.ok(apology, 'doji-eugenia no longer declares APOLOGY, the word for each job');
-  const jobs = [...apology[1].matchAll(/^\s+(\w+):/gm)].map(m => m[1]);
-  for (const name of checked) {
-    assert.ok(jobs.includes(name), `a pause check names '${name}', which is no job — it can never be paused`);
-  }
-  for (const name of paused) {
-    assert.ok(checked.includes(name), `PAUSED holds '${name}' and nothing checks it — that job still runs`);
-  }
-
-  const pulse = uncomment(bodyOf(EUGENIA_TS, 'async function postPulse('));
-  assert.match(pulse, /\{\s*if \(PAUSED\.has\('pulse'\)\) return json\(/,
-    'the pulse no longer checks the pause first, so a paused pulse still reads and may still ask');
-
-  const release = uncomment(bodyOf(EUGENIA_TS, 'async function postRelease('));
-  const at = (s) => release.indexOf(s);
-  assert.ok(at('await filed()') > -1 && at('await filed()') < at("PAUSED.has('release')"),
-    'the release look checks the pause before filing, so pausing it stops the calendar and every actual');
-  assert.ok(at("PAUSED.has('release')") < at('await ask('),
-    'the release look reaches its model call before it checks the pause');
+  assert.match(body, /get\("calendar"\) === "1"\)\s*\{[^}]*filed\(\)/);
 });
 
 /* ─── And the same census from the other side ────────────────────────────────
@@ -3647,10 +3570,9 @@ const BY_HAND = {
                'whose answer IS its interface, and so the one that may wait',
   force:       'the repair door: a briefing on demand, taking its kind from ' +
                'briefKind rather than from the hour',
-  pulse:       'the hourly job carries no flag and dueNow decides the hour — ' +
-               'this forces a pulse out of that schedule',
-  consolidate: 'the same door for the nightly pass, which is how a missed ' +
-               'night is made up without waiting for the next one',
+  consolidate: 'the hourly job carries no flag and dueNow decides the hour — ' +
+               'this runs the nightly pass out of that schedule, which is how a ' +
+               'missed night is made up without waiting for the next one',
   history:     'the weeks he has already traded, walked once from the date ' +
                'given so R-14 and R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
@@ -4220,28 +4142,6 @@ test('every number off the quote reaches her with the window it was measured ove
     'an hour wrong for every winter evening, which is half the hours this matters in');
 });
 
-test('the release look builds a term before it uses one', () => {
-  /* THE PRINT LOOK IS TOLD TO BUILD FROM THE MAP it is handed. A ladder without
-     the instruction fails exactly as the instruction without the ladder: she
-     teaches well about whatever the message is about. */
-  const text = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)?.[1];
-  assert.ok(text, 'prompt.ts no longer exports RELEASE');
-  assert.match(text, /where he stands on each channel/i,
-    'RELEASE never tells her she has the channel map, so the block reaches her ' +
-    'as context she has no instruction to use');
-
-  /* THE RUNG IT NAMES IS `explained`. `unseen` is a ONE-WAY DOOR, so a build
-     instruction gated on it stops being reachable the first time a channel is
-     mentioned, and a binary rule over four rungs reads as "the other case". */
-  assert.match(text, /\bexplained\b/,
-    'RELEASE no longer names the rung nearly every channel sits at — bound to ' +
-    'the bottom rung instead, it stops building the first time a subject comes ' +
-    'up and never starts again');
-  assert.match(text, /\bowns\b/,
-    'RELEASE no longer says when NOT to build, and explaining something he owns ' +
-    'is the one failure worse than saying nothing');
-});
-
 /* ─── The app's arithmetic, in a second runtime ──────────────────────────────
    `journal.ts` is index.html's stats layer ported, with no build step between
    them. The break-even band matters most: ±$3 of the entry PRICE, where ±$3
@@ -4614,38 +4514,14 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
-     and is silent. Six sites — the briefing's two (the speaking worker and
-     postBriefing's fallback), then the pulse, the release look, the trade event
-     and the reply. `/notes`, the apologies, the short operational lines and the
+     and is silent. Four sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the trade event and the reply. `/notes`, the apologies, the short operational lines and the
      charm's copy keep `say` deliberately — the charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 6,
-    `${spoken} call sites speak where six should — a message she writes that goes ` +
+  assert.equal(spoken, 4,
+    `${spoken} call sites speak where four should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
-});
-
-test('the two gated paths remember what the gate returned, not the draft', () => {
-  /* WHAT IS STORED IS WHAT HE READ. `trim` may rewrite, and storing the draft
-     would put words he never saw in her history, resent as hers for six
-     exchanges. `postBriefing` stores what `critique` returned. Read from the
-     source, since nothing here drives a path that sends. */
-  const src = source('supabase/functions/doji-eugenia/index.ts');
-
-  for (const fn of ['postPulse', 'postRelease']) {
-    const body = bodyOf(src, `async function ${fn}(`, `doji-eugenia no longer has ${fn}()`);
-
-    assert.match(body, /const sent = await trim\(said, desk, story\);/,
-      `${fn} no longer binds the revision — inlined into sayAloud it cannot ` +
-      'also be the thing that is stored');
-    assert.match(body, /await sayAloud\(sent\)/,
-      `${fn} speaks something other than the revision it bound`);
-    assert.match(body, /role: 'assistant', content: sent/,
-      `${fn} stores a text other than the one it sent — her history now holds ` +
-      'a message he never read');
-    assert.doesNotMatch(body, /role: 'assistant', content: said/,
-      `${fn} is back to storing the draft`);
-  }
 });
 
 test('the audio is asked for in the one format Telegram renders as a voice note', () => {
@@ -5111,8 +4987,8 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
 /* ─── Only the TradingView filing makes a calendar row ───────────────────────
    An upsert keyed on a model-written name files a print on a new row, silently,
    and an instruction cannot carry this. So it is structural: one write in the
-   file creates a row, keyed on TradingView's id, and what she is handed can
-   only PATCH. A second writer still answers and leaves a row nobody watches.
+   file touches the table, keyed on TradingView's id, and no tool she is handed
+   writes to it. A second writer still answers and leaves a row nobody watches.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('one write makes a calendar row, keyed on the id, and she holds none', () => {
@@ -5134,29 +5010,11 @@ test('one write makes a calendar row, keyed on the id, and she holds none', () =
     assert.ok(from > -1 && body.includes('upsertCalendar(') && body.includes('calendarRows('),
       `${fn} no longer files through calendarRows and upsertCalendar`);
   }
-
-  const array = EUGENIA_TS.match(/const RELEASE_TOOLS = \[([^\]]*)\]/)?.[1];
-  assert.ok(array, 'RELEASE_TOOLS is no longer an array literal, so nothing here can read it');
-  assert.match(array, /ACTUAL_TOOL/,
-    'the release look has no way to record what a release printed, so the table ' +
-    'keeps a consensus for ever and never the number');
-});
-
-test('record_actual cannot be handed a column the briefing owns', () => {
-  const schema = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const ACTUAL_TOOL'));
-  const props = schema.slice(0, schema.indexOf('required:'));
-  for (const owned of ['consensus', 'prior', 'importance']) {
-    assert.doesNotMatch(props, new RegExp(`\\b${owned}:`),
-      `record_actual offers ${owned} — the same release once carried two ` +
-      `contradictory priors because a look could write one`);
-  }
-});
-
-test('the release prompt asks for the tool the release look actually has', () => {
-  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)?.[1];
-  assert.ok(release, 'the RELEASE prompt is no longer readable from here');
-  assert.match(release, /record_actual/,
-    'the release prompt names no tool for the number, so the look reads the print and files nothing');
+  // AND NOTHING ELSE WRITES: every request addressed to the table is the upsert.
+  const writes = [...EUGENIA_TS.matchAll(/rest\/v1\/eugenia_calendar/g)].map(m => m.index);
+  assert.ok(writes.length >= 1 && writes.every(i => i > at && i < EUGENIA_TS.indexOf('\n}', at)),
+    'something outside upsertCalendar writes to the calendar — a second writer, ' +
+    'and the row it leaves is one nobody watches');
 });
 
 test('the market around gold reaches the briefing, and only from one list', () => {
@@ -5193,25 +5051,6 @@ test('the briefing is handed the rules his trades broke, and told to take them f
   // One reader for the tool and the block, so the two cannot be fed differently.
   assert.match(bodyOf(EUGENIA_TS, 'export async function breachesBlock('), /readRules\(/,
     'the briefing evaluates the rules through a reader check_rules does not use');
-});
-
-test('the release look is told a speech is recorded by its line alone', () => {
-  // record_actual takes a line without a figure (driven in fold.test.mjs);
-  // a look not told so still searches for a number a speech will never print.
-  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
-  assert.match(release, /A speech prints no figure: leave the actual out and give the line alone/,
-    'RELEASE no longer tells her how to record a speech, so it leaves no record');
-});
-
-test('the release look is handed the release\'s own record, and told to read against it', () => {
-  // recordList is pure and driven in fold.test.mjs; whether the look reads it is not.
-  const body = bodyOf(EUGENIA_TS, 'async function postRelease(');
-  assert.match(body, /recordBlock\(due\)/, 'the release look no longer reads the track record');
-  assert.match(body, /\brecord \+ notes/, 'the release look reads the record and never hands it to her');
-  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
-  assert.match(release, /READ IT AGAINST ITS OWN RECORD/, 'RELEASE no longer asks her to use the record');
-  // And the filing writes the series, or the record stays empty for ever.
-  assert.match(bodyOf(EUGENIA_TS, 'export function calendarRows('), /'ticker'/, 'calendarRows no longer files the ticker');
 });
 
 /* ─── The briefing that opens the week ───────────────────────────────────────
@@ -5329,11 +5168,8 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
   }
 });
 
-/* THE ORDER OF THE RECORD READ IS THE WHOLE OF IT. revisionLine wants rows
-   newest first and recordList oldest first; `rows.reverse()` reverses in
-   place, so reversing first hands revisionLine the OLDEST print. */
 /* EVERY MARKET READ CARRIES THE BOUND, AND THE SET IS DERIVED. Unbounded, a
-   feed that stopped answering held the 7 October pulse until the platform cut
+   feed that stopped answering held a 7 October look until the platform cut
    the request at 150s. Nothing in the suite can hang a real request, so the
    reads are found by what they address — TradingView's doors, the broker's
    price, the CFTC's count — and a new one arriving without the bound fails. */
@@ -5350,23 +5186,8 @@ test('every market read gives up at READ_MS rather than at the platform', () => 
   }
 });
 
-test('the release look is handed the revision, off the record read newest first', () => {
-  const body = bodyOf(EUGENIA_TS, 'async function recordBlock(', 'doji-eugenia no longer has recordBlock()');
-  assert.match(body, /recordList\(r\.name, \[\.\.\.rows\]\.reverse\(\)\) \+ revisionLine\(r, rows\)/,
-    'the record is reversed in place before the revision reads it, or the revision is not handed over');
-  // The minutes carry the rate decision's ticker, so their record was the decisions'.
-  assert.match(body, /due\.filter\(r => r\.ticker && \(r\.consensus \|\| r\.prior\)\)/,
-    'a release with no figure coming is handed a record, and the minutes read as rate decisions');
-  const release = EUGENIA_PROMPT.match(/export const RELEASE = `([\s\S]*?)`;/)[1];
-  assert.match(release, /A REVISION IS PART OF THE PRINT/, 'RELEASE no longer tells her what a revision line is');
-  assert.match(release, /never work one\s+out yourself/,
-    'RELEASE no longer keeps her from computing a revision the line did not give');
-});
-
-test('the calendar is filed before the briefing reads it and before the look decides', () => {
-  /* A briefing that reads before it files hands her yesterday's calendar; a look
-     that decides before it files never sees the actual, and waits out the half
-     hour on every print. */
+test('the calendar is filed before the briefing reads it, and every filing is a row', () => {
+  /* A briefing that reads before it files hands her yesterday's calendar. */
   const body = (name) =>
     bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
   const brief = body('postBriefing');
@@ -5377,49 +5198,9 @@ test('the calendar is filed before the briefing reads it and before the look dec
   for (const read of ['calendarBlock()', 'weekBlock()']) {
     assert.ok(brief.indexOf(read) > files, `the briefing reads ${read} before it files it`);
   }
-  const look = body('postRelease');
-  const order = ['await filed()', 'await pendingRelease()', 'awaitingActual(due', 'await markLooked('];
-  const at = order.map(s => look.indexOf(s));
-  assert.ok(at.every(i => i > -1), `postRelease no longer does all of: ${order.join(', ')}`);
-  assert.deepEqual([...at].sort((a, b) => a - b), at,
-    'the release look files, reads, waits for the number and marks, in that order — ' +
-    'marked before it waits, a print waiting on its actual is looked at never');
   const run = body('filed');
   assert.equal((run.match(/recordRun\(\{ caller: 'calendar'/g) ?? []).length, 2,
     'the filing no longer records both outcomes — a calendar that stopped moving looks like a quiet week');
-});
-
-test('the release look is handed the stamp its tool takes', () => {
-  /* THE HEADING IS IN ET AND THE TOOL TAKES UTC. Asked to convert, she converts
-     from words — an instant an hour out for half the year, silently. */
-  const body = bodyOf(EUGENIA_TS, 'async function postRelease(');
-  assert.match(body, /toISOString\(\)[\s\S]{0,80}record_actual/,
-    'postRelease no longer hands her the UTC stamp record_actual matches on');
-});
-
-test('a mark is not an edit, so stamping looked_at leaves updated_at alone', () => {
-  /* `updated_at` says which of two contradictory rows carries the later CONTENT.
-     markLooked writes looked_at alone, so an unconditional touch would make it
-     say when a row was last HANDLED instead. */
-  const fn = SENSES_SQL.slice(SENSES_SQL.indexOf('function public.eugenia_calendar_touch()'));
-  const body = fn.slice(0, fn.indexOf('$$;') + 3);
-  assert.match(body, /is distinct from/,
-    'eugenia_calendar_touch moves updated_at on every update again, so a look ' +
-    'marking a stale row makes it read as the later one');
-  /* AND THE WRITER IS THE OTHER HALF: a mark PATCH naming `updated_at` moves it
-     whatever the trigger compares. Proved by adding it and watching this go red. */
-  const sent = bodyOf(EUGENIA_TS, 'async function markLooked').match(/JSON\.stringify\(\{([^}]*)\}/);
-  assert.ok(sent, 'markLooked no longer PATCHes a literal body this can read');
-  assert.deepEqual([...sent[1].matchAll(/(\w+):/g)].map(m => m[1]), ['looked_at'],
-    'markLooked writes a column other than looked_at, so a mark is an edit — ' +
-    'and updated_at then says when a row was last HANDLED rather than which ' +
-    'of two contradictory rows carries the later content');
-
-  for (const ignored of ['updated_at', 'looked_at']) {
-    assert.ok(body.split(`- '${ignored}'`).length === 3,
-      `${ignored} is not excluded from both sides of the comparison, so the ` +
-      `trigger compares a column it is in the middle of writing`);
-  }
 });
 
 /* ─── The shape rules, and the critic's second copy of each ──────────────────
@@ -5609,9 +5390,9 @@ test('every model the map names belongs to a caller that exists', () => {
 });
 
 test('no caller that runs a tool loop is on the cheaper model', () => {
-  /* A TOOL-LOOPING CALLER STAYS ON THE DEFAULT. The release look on Sonnet died
-     at MAX_ROUNDS twice in half an hour; whether the model or the new
-     `record_actual` tool spent the rounds is confounded, and the policy needs
+  /* A TOOL-LOOPING CALLER STAYS ON THE DEFAULT. The release look, since retired,
+     died on Sonnet at MAX_ROUNDS twice in half an hour; whether the model or a
+     new tool spent the rounds is confounded, and the policy needs
      neither answer: a cheaper caller that does not answer is not cheaper.
      `trim` is handed `CRITIC_TOOLS`, which is empty, so it has no loop to run
      out of — the shape a cheaper model is safe on. A caller added with a
@@ -5679,8 +5460,8 @@ test('the refusal fallback rides only with the model it is proven on', () => {
 });
 
 /* ─── The gate reaches every message she composes ────────────────────────────
-   The pulse and the release look are most of what he receives unasked, and
-   the writing rules had to answer for them too.
+   The briefing has the critic and every reply has TRIM, and the writing rules
+   answer for both.
 
    THE TRADE EVENT STAYS OUT, because TRIM REWRITES. It reaches a man in a
    position or past his day, where a gate paraphrasing a citation of his rule
@@ -5705,8 +5486,6 @@ const SENDS = {
                          'what he hears differ from what she remembers',
                     stored: 'by postBriefing, before the hand-off — this reads ' +
                             'the stored turn rather than writing one' },
-  postPulse:      { gate: 'trim',     carries: 'sent' },
-  postRelease:    { gate: 'trim',     carries: 'sent' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
   hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
                     copy: 'the charm speaks what this returns, through ' +
@@ -5834,11 +5613,11 @@ test('every message a gate decides leaves one verdict row, on all three outcomes
     'verdict has to be able to say');
 });
 
-test('keepDraft is relative, because it now reads three-sentence messages', () => {
-  /* NO FLAT FLOOR: a release look is often under four hundred characters, and a
+test('keepDraft is relative, because it reads short replies', () => {
+  /* NO FLAT FLOOR: a short reply is often under four hundred characters, and a
      gate overruled every time looks exactly like one that agreed. */
   assert.doesNotMatch(EUGENIA_TS, /CRITIC_FLOOR/,
-    'the absolute floor is back, so the gate on the short paths is paid for and ' +
+    'the absolute floor is back, so the gate on a short reply is paid for and ' +
     'overruled on every message it ever checks');
   assert.match(EUGENIA_TS, /t\.length < draft\.length \/ 3/,
     'keepDraft no longer scales with the draft it is judging');
@@ -5891,18 +5670,18 @@ test('a swipe-reply looks forward first and back for the briefing only after', (
     'briefing is the one message stored before it is sent — so it is never found');
 });
 
-/* ─── The short-message gate reads replies too ───────────────────────────────
+/* ─── The reply gate holds no length ─────────────────────────────────────────
    A reply's length is whatever the answer needs, and `keepDraft` only refuses
-   a revision under a third of the draft — so TRIM is told whose length the
-   three-sentence rule is, or it cuts a nine-finding plan check to three. */
+   a revision under a third of the draft — so a sentence count in TRIM cuts a
+   nine-finding plan check to that count. */
 
-test('the short-message gate does not hold a reply to two or three sentences', () => {
+test('the reply gate does not hold a reply to a fixed length', () => {
   const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
   assert.ok(trim, 'prompt.ts no longer exports TRIM');
-  assert.match(trim, /A REPLY TO HIM IS AS LONG AS WHAT HE ASKED NEEDS/,
+  assert.match(trim, /A REPLY IS AS LONG AS WHAT HE ASKED NEEDS/,
     'TRIM no longer says a reply is as long as it needs, and it gates every reply');
-  assert.doesNotMatch(trim, /This is two or three sentences/,
-    'TRIM tells every message it reads that it is two or three sentences, replies included');
+  assert.doesNotMatch(trim, /two or three sentences/,
+    'TRIM holds a reply to two or three sentences, which cuts a plan check short');
 });
 
 /* ─── The trade look is told what happened, not a state that may be false ────

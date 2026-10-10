@@ -12,14 +12,25 @@
 -- a fresh build, which is what proves it.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- The price sense: its job, its mark, and its name in the ledger. The rows go
--- before the constraint, which would refuse them.
+-- The price sense: its job and its mark.
 select cron.unschedule(jobname) from cron.job where jobname = 'doji-eugenia-price';
 
 drop table if exists public.eugenia_price;
 
-delete from public.dispatch where job = 'eugenia-price';
+-- The release look: the job that woke it, which schema.sql schedules again
+-- under the name of what it still does, the mark it stamped on each release,
+-- and the line it wrote beside one.
+select cron.unschedule(jobname) from cron.job where jobname = 'doji-eugenia-spine';
 
+alter table public.eugenia_calendar drop column if exists looked_at;
+alter table public.eugenia_calendar drop column if exists note;
+
+-- Both jobs' names in the ledger. The rows change before the constraint does,
+-- which would refuse them.
 alter table public.dispatch drop constraint if exists dispatch_job_check;
+
+delete from public.dispatch where job = 'eugenia-price';
+update public.dispatch set job = 'eugenia-calendar' where job = 'eugenia-spine';
+
 alter table public.dispatch add constraint dispatch_job_check check (job in (
-  'poller', 'eugenia', 'eugenia-spine', 'trade-event', 'gladys'));
+  'poller', 'eugenia', 'eugenia-calendar', 'trade-event', 'gladys'));
