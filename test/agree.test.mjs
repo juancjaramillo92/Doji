@@ -255,10 +255,13 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
     assert.ok(m, `journal.c no longer lists ${name}`);
     return [...m[1].matchAll(/"([^"]+)"/g)].map(w => w[1]);
   };
+  // What a font holds, as its own header records the run: its symbols, and
+  // the space when it was asked for by code point.
   const held = (font) => {
-    const m = source(`charm/main/${font}.c`).match(/--symbols (\S+)/);
+    const opts = source(`charm/main/${font}.c`);
+    const m = opts.match(/--symbols (\S+)/);
     assert.ok(m, `${font}.c no longer says which letters it holds`);
-    return m[1];
+    return m[1] + (/--range 0x20 /.test(opts) ? ' ' : '');
   };
   const words = list('WORDS'), short = list('SHORT');
   assert.equal(words.length, 4, 'a word for each of the four answers');
@@ -276,6 +279,16 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
   for (const digit of '0123456789%') assert.ok(held('hanken_36').includes(digit), `hanken_36 cannot draw a ${digit}`);
   assert.match(source('charm/main/face.c'), /snprintf\(percent, sizeof percent, "%d%%", charge\)/,
     'face.c no longer draws the charge as a number and %, which is what this test checks the font for');
+
+  // The setup screen: what it says while it works, and her network's name,
+  // Charm- and four hex digits.
+  const setup = source('charm/main/setup.c');
+  const say = setup.match(/SAY\[\] = \{([^}]+)\}/);
+  assert.ok(say, 'setup.c no longer lists what its screen says');
+  assert.match(setup, /"Charm-%02X%02X"/, 'setup.c no longer names her network as this test reads it');
+  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF']) {
+    for (const letter of words) assert.ok(held('hanken_18').includes(letter), `hanken_18 cannot draw the ${JSON.stringify(letter)} of ${words}`);
+  }
 });
 
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {

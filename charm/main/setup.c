@@ -1,3 +1,14 @@
+/* The setup, the playground's ("Charm setup"). The charm becomes its own
+   Wi-Fi network, locked with a password made up for this setup, and shows a
+   QR code that carries both: a phone's camera joins it in one tap, and the
+   page opens by itself, because every name the phone asks for resolves to the
+   charm and every page but its own redirects there.
+
+   The page (setup.html) asks for her Wi-Fi networks and the two keys, and
+   each is tried before it is saved: a network by joining it, a key by asking
+   its door, which can only be done once she is online. The charm's screen
+   follows along — trying, then a tick or a cross — and finishing restarts her
+   as herself. */
 #include "setup.h"
 
 #include <ctype.h>
@@ -6,50 +17,141 @@
 #include <string.h>
 #include "bsp/esp-bsp.h"
 #include "config.h"
+#include "esp_crt_bundle.h"
+#include "esp_event.h"
+#include "esp_http_client.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
+#include "esp_random.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "lvgl.h"
 #include "lwip/sockets.h"
+#include "net.h"
 
 static const char *TAG = "setup";
 
-#define PAGE_MAX  9000
-#define BODY_MAX  2048
-#define SEEN_MAX  12
+LV_FONT_DECLARE(hanken_18);
 
-static char ap_name[24];
-static wifi_ap_record_t seen[SEEN_MAX];
-static uint16_t n_seen;
+extern const char page_start[] asm("_binary_setup_html_start");
 
-/* ─── The screen ──────────────────────────────────────────────────────── */
+#define BODY_MAX  512
+#define SEEN_MAX  16
+#define JOIN_MS   12000
+#define CHECK_MS  10000
+#define TICK_MS   1600   // how long the charm shows a tick or a cross
 
-static void show_screen(void) {
+#define JOINED  BIT0
+#define REFUSED BIT1
+
+// What the charm's screen says while it works; agree.test.mjs holds these,
+// with the network's name, against the letters hanken_18 holds.
+static const char *const SAY[] = { "Phone connected", "Carry on there", "Trying the Wi-Fi", "Checking the keys" };
+
+static char ap_name[16], ap_pass[12];
+static EventGroupHandle_t events;
+static volatile bool online;
+
+/* ─── The screen ──────────────────────────────────────────────────────────
+   Everything centred on the screen's own centre: the code on a white tile so
+   any camera reads it, the network's name under it; the spinner; the tick or
+   the cross alone. */
+
+typedef enum { SHOW_CODE, SHOW_JOINED, SHOW_BUSY, SHOW_TICK, SHOW_CROSS } show_t;
+
+static lv_obj_t *screens[5], *busy;
+
+static lv_obj_t *text(lv_obj_t *parent, const char *s, uint32_t color, int32_t y) {
+    lv_obj_t *l = lv_label_create(parent);
+    lv_label_set_text_static(l, s);
+    lv_obj_set_style_text_font(l, &hanken_18, 0);
+    lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
+    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y);
+    return l;
+}
+
+static lv_obj_t *group(void) {
+    lv_obj_t *g = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(g);
+    lv_obj_set_size(g, 466, 466);
+    lv_obj_remove_flag(g, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(g, LV_OBJ_FLAG_HIDDEN);
+    return g;
+}
+
+static lv_obj_t *mark(const lv_point_precise_t *points, uint32_t n, uint32_t color) {
+    lv_obj_t *g = group();
+    lv_obj_t *l = lv_line_create(g);
+    lv_line_set_points(l, points, n);
+    lv_obj_set_style_line_width(l, 9, 0);
+    lv_obj_set_style_line_rounded(l, true, 0);
+    lv_obj_set_style_line_color(l, lv_color_hex(color), 0);
+    return g;
+}
+
+static void build_screen(void) {
+    static char wifi[64];
+    snprintf(wifi, sizeof wifi, "WIFI:T:WPA;S:%s;P:%s;;", ap_name, ap_pass);
+
     bsp_display_lock(-1);
-    lv_obj_t *veil = lv_obj_create(lv_screen_active());
-    lv_obj_remove_style_all(veil);
-    lv_obj_set_size(veil, 466, 466);
-    lv_obj_set_style_bg_color(veil, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(veil, LV_OPA_80, 0);
+    screens[SHOW_CODE] = group();
+    lv_obj_t *tile = lv_obj_create(screens[SHOW_CODE]);
+    lv_obj_remove_style_all(tile);
+    lv_obj_set_size(tile, 180, 180);
+    lv_obj_set_pos(tile, 143, 143);
+    lv_obj_set_style_bg_color(tile, lv_color_white(), 0);
+    lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(tile, 18, 0);
+    lv_obj_t *qr = lv_qrcode_create(tile);
+    lv_qrcode_set_size(qr, 152);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+    lv_qrcode_update(qr, wifi, strlen(wifi));
+    lv_obj_center(qr);
+    text(screens[SHOW_CODE], ap_name, 0x9a92b0, 340);
 
-    lv_obj_t *title = lv_label_create(veil);
-    lv_label_set_text(title, "Set me up");
-    lv_obj_set_style_text_color(title, lv_color_hex(0xe8e6f0), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
-    lv_obj_align(title, LV_ALIGN_CENTER, 0, -40);
+    screens[SHOW_JOINED] = group();
+    text(screens[SHOW_JOINED], SAY[0], 0xe8e6f0, 204);
+    text(screens[SHOW_JOINED], SAY[1], 0x9a92b0, 238);
 
-    lv_obj_t *how = lv_label_create(veil);
-    lv_label_set_text_fmt(how, "On your phone, join\n%s", ap_name);
-    lv_obj_set_style_text_align(how, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(how, lv_color_hex(0x9a92b0), 0);
-    lv_obj_set_style_text_font(how, &lv_font_montserrat_16, 0);
-    lv_obj_align(how, LV_ALIGN_CENTER, 0, 24);
+    screens[SHOW_BUSY] = group();
+    lv_obj_t *s = lv_spinner_create(screens[SHOW_BUSY]);
+    lv_spinner_set_anim_params(s, 1000, 90);
+    lv_obj_set_size(s, 74, 74);
+    lv_obj_set_pos(s, 196, 177);
+    lv_obj_set_style_arc_width(s, 6, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(s, lv_color_hex(0x1a1528), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(s, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(s, lv_color_hex(0xb45cd9), LV_PART_INDICATOR);
+    busy = text(screens[SHOW_BUSY], SAY[2], 0xe8e6f0, 270);
+
+    // A tick in two strokes and a cross, each with its box centred on (233, 233).
+    static const lv_point_precise_t ticked[] = { { 203, 237 }, { 223, 257 }, { 263, 209 } };
+    static const lv_point_precise_t crossed[] = { { 209, 209 }, { 257, 257 }, { 233, 233 }, { 257, 209 }, { 209, 257 } };
+    screens[SHOW_TICK] = mark(ticked, 3, 0xb45cd9);
+    screens[SHOW_CROSS] = mark(crossed, 5, 0xf3a2e4);
     bsp_display_unlock();
+}
+
+// One screen at a time; busy says which of SAY's two waits it is.
+static void show(show_t what, const char *doing) {
+    bsp_display_lock(-1);
+    for (int i = 0; i < 5; i++) lv_obj_add_flag(screens[i], LV_OBJ_FLAG_HIDDEN);
+    if (doing) lv_label_set_text_static(busy, doing);
+    lv_obj_remove_flag(screens[what], LV_OBJ_FLAG_HIDDEN);
+    bsp_display_unlock();
+}
+
+// A tick or a cross for a moment, then back to the phone's step.
+static void answer_shown(bool ok) {
+    show(ok ? SHOW_TICK : SHOW_CROSS, NULL);
+    vTaskDelay(pdMS_TO_TICKS(TICK_MS));
+    show(SHOW_JOINED, NULL);
 }
 
 /* ─── The network and the answer to every name ────────────────────────────
@@ -79,103 +181,55 @@ static void dns_task(void *arg) {
     }
 }
 
+static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
+    (void)arg; (void)data;
+    if (base == WIFI_EVENT && id == WIFI_EVENT_AP_STACONNECTED) show(SHOW_JOINED, NULL);
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) { online = false; xEventGroupSetBits(events, REFUSED); }
+    if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) { online = true; xEventGroupSetBits(events, JOINED); }
+}
+
 static void start_network(void) {
+    events = xEventGroupCreate();
     esp_netif_init();
     esp_event_loop_create_default();
     esp_netif_create_default_wifi_ap();
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&init);
+    esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL);
+    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL);
 
+    // Her name from her own address; the password new for every setup, from
+    // letters and digits no one misreads.
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
-    snprintf(ap_name, sizeof ap_name, "Charm-Setup-%02X%02X", mac[4], mac[5]);
+    snprintf(ap_name, sizeof ap_name, "Charm-%02X%02X", mac[4], mac[5]);
+    static const char alphabet[] = "abcdefghjkmnpqrstuvwxyz23456789";
+    for (size_t i = 0; i < sizeof ap_pass - 1; i++) ap_pass[i] = alphabet[esp_random() % (sizeof alphabet - 1)];
 
-    wifi_config_t ap = { .ap = { .channel = 1, .max_connection = 2, .authmode = WIFI_AUTH_OPEN } };
-    strcpy((char *)ap.ap.ssid, ap_name);
+    wifi_config_t ap = { .ap = { .channel = 1, .max_connection = 2, .authmode = WIFI_AUTH_WPA2_PSK } };
+    memcpy(ap.ap.ssid, ap_name, strlen(ap_name));
     ap.ap.ssid_len = strlen(ap_name);
+    memcpy(ap.ap.password, ap_pass, strlen(ap_pass));
     esp_wifi_set_mode(WIFI_MODE_APSTA);
     esp_wifi_set_config(WIFI_IF_AP, &ap);
     esp_wifi_start();
-
-    // The networks in range, offered on the page so a name need not be typed.
-    if (esp_wifi_scan_start(NULL, true) == ESP_OK) {
-        n_seen = SEEN_MAX;
-        esp_wifi_scan_get_ap_records(&n_seen, seen);
-    }
     xTaskCreate(dns_task, "dns", 3072, NULL, 4, NULL);
 }
 
-/* ─── The page ────────────────────────────────────────────────────────── */
-
-// Network names are whatever a neighbour typed.
-static void escape(char *out, size_t size, const char *in) {
-    size_t o = 0;
-    for (; *in && o + 7 < size; in++) {
-        const char *rep = *in == '&' ? "&amp;" : *in == '<' ? "&lt;" : *in == '>' ? "&gt;"
-                        : *in == '"' ? "&quot;" : NULL;
-        if (rep) { strcpy(out + o, rep); o += strlen(rep); }
-        else out[o++] = *in;
-    }
-    out[o] = 0;
+// Joins one network, keeping her own up beside it. True once it gave an address.
+static bool join(const char *ssid, const char *pass) {
+    esp_wifi_disconnect();
+    wifi_config_t sta = { 0 };
+    memcpy(sta.sta.ssid, ssid, strlen(ssid));
+    memcpy(sta.sta.password, pass, strlen(pass));
+    esp_wifi_set_config(WIFI_IF_STA, &sta);
+    xEventGroupClearBits(events, JOINED | REFUSED);
+    esp_wifi_connect();
+    return xEventGroupWaitBits(events, JOINED | REFUSED, pdTRUE, pdFALSE, pdMS_TO_TICKS(JOIN_MS)) & JOINED;
 }
 
-static const char *HEAD =
-    "<!doctype html><html><head><meta charset=utf-8>"
-    "<meta name=viewport content='width=device-width,initial-scale=1'><title>Charm setup</title><style>"
-    "body{margin:0;padding:20px 16px 40px;background:#070611;color:#e8e6f0;"
-    "font:16px/1.5 -apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif}"
-    "main{max-width:440px;margin:0 auto;display:grid;gap:22px}h1{margin:0;font-size:26px}"
-    "p{margin:0;color:#9a92b0}fieldset{border:1px solid #251d39;border-radius:14px;padding:14px;"
-    "display:grid;gap:10px;margin:0}legend{padding:0 6px;color:#9a92b0;font-size:13px;"
-    "letter-spacing:.1em;text-transform:uppercase}input{font:inherit;color:#e8e6f0;background:#0a0813;"
-    "border:1px solid #342948;border-radius:10px;padding:10px 12px;width:100%;box-sizing:border-box}"
-    "input:focus{outline:2px solid #8b35b8}"
-    ".row{display:grid;grid-template-columns:1fr 1fr;gap:8px}"
-    "button{font-family:inherit;font-weight:600;font-size:16px;color:#fff;background:#8b35b8;border:0;border-radius:999px;padding:14px}"
-    "small{color:#6f6788}</style></head><body><main>";
-
-static esp_err_t page(httpd_req_t *req) {
-    // Anything but the page is a phone checking whether it is online: send it here.
-    if (strcmp(req->uri, "/") != 0) {
-        httpd_resp_set_status(req, "302 Found");
-        httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
-        return httpd_resp_send(req, NULL, 0);
-    }
-    char *html = malloc(PAGE_MAX), esc[100];
-    if (!html) return httpd_resp_send_500(req);
-    int o = snprintf(html, PAGE_MAX, "%s<h1>Set up your charm</h1>"
-        "<p>Saved on the charm itself. Leave a password or a key empty to keep the one it has.</p>"
-        "<form method=post action=/save><fieldset><legend>Wi-Fi, tried in order</legend><datalist id=near>",
-        HEAD);
-    for (int i = 0; i < n_seen && o < PAGE_MAX - 200; i++) {
-        escape(esc, sizeof esc, (const char *)seen[i].ssid);
-        o += snprintf(html + o, PAGE_MAX - o, "<option value=\"%s\">", esc);
-    }
-    o += snprintf(html + o, PAGE_MAX - o, "</datalist>");
-    for (int i = 0; i < MAX_NETS && o < PAGE_MAX - 400; i++) {
-        escape(esc, sizeof esc, i < cfg.n_nets ? cfg.nets[i].ssid : "");
-        o += snprintf(html + o, PAGE_MAX - o,
-            "<div class=row><input name=s%d list=near placeholder='Network %d' value=\"%s\" autocapitalize=off>"
-            "<input name=p%d type=password placeholder='%s'></div>",
-            i, i + 1, esc, i, i < cfg.n_nets ? "Keep password" : "Password");
-    }
-    snprintf(html + o, PAGE_MAX - o,
-        "<small>Your phone's hotspot works too.</small></fieldset>"
-        "<fieldset><legend>Their keys</legend>"
-        "<input name=ekey type=password autocapitalize=off placeholder='%s'>"
-        "<input name=gkey type=password autocapitalize=off placeholder='%s'>"
-        "<small>EUGENIA_CHARM_SECRET and GLADYS_CHARM_SECRET, as set in Supabase.</small></fieldset>"
-        "<button>Save</button></form></main></body></html>",
-        cfg.eugenia_key[0] ? "Keep Eugenia's key" : "Eugenia's key",
-        cfg.gladys_key[0] ? "Keep Gladys's key" : "Gladys's key");
-    httpd_resp_set_type(req, "text/html");
-    esp_err_t r = httpd_resp_sendstr(req, html);
-    free(html);
-    return r;
-}
-
-/* ─── Saving ──────────────────────────────────────────────────────────── */
+/* ─── The page's questions ─────────────────────────────────────────────── */
 
 // One field of a form body, decoded. False when the field is absent.
 static bool field(const char *body, const char *name, char *out, size_t size) {
@@ -198,66 +252,172 @@ static bool field(const char *body, const char *name, char *out, size_t size) {
     return false;
 }
 
-static esp_err_t save(httpd_req_t *req) {
-    char body[BODY_MAX + 1], v[100];
+static bool body(httpd_req_t *req, char *out) {
     int len = 0;
     while (len < req->content_len && len < BODY_MAX) {
-        int r = httpd_req_recv(req, body + len, BODY_MAX - len);
-        if (r <= 0) return httpd_resp_send_500(req);
+        int r = httpd_req_recv(req, out + len, BODY_MAX - len);
+        if (r <= 0) return false;
         len += r;
     }
-    body[len] = 0;
+    out[len] = 0;
+    return true;
+}
 
-    // A blank password keeps the one stored for that same network name.
-    charm_net_t nets[MAX_NETS] = { 0 };
-    int n = 0;
-    for (int i = 0; i < MAX_NETS; i++) {
-        char key[4];
-        snprintf(key, sizeof key, "s%d", i);
-        if (!field(body, key, nets[n].ssid, sizeof nets[n].ssid) || !nets[n].ssid[0]) continue;
-        snprintf(key, sizeof key, "p%d", i);
-        field(body, key, nets[n].pass, sizeof nets[n].pass);
-        if (!nets[n].pass[0]) {
-            for (int j = 0; j < cfg.n_nets; j++)
-                if (!strcmp(cfg.nets[j].ssid, nets[n].ssid)) strcpy(nets[n].pass, cfg.nets[j].pass);
-        }
-        n++;
+// A network name is whatever a neighbour typed: escaped for JSON.
+static int json_string(char *out, size_t size, const char *in) {
+    size_t o = 0;
+    out[o++] = '"';
+    for (; *in && o + 8 < size; in++) {
+        unsigned char c = (unsigned char)*in;
+        if (c == '"' || c == '\\') { out[o++] = '\\'; out[o++] = c; }
+        else if (c < 0x20) o += snprintf(out + o, size - o, "\\u%04x", c);
+        else out[o++] = c;
     }
-    memcpy(cfg.nets, nets, sizeof nets);
-    cfg.n_nets = n;
+    out[o++] = '"';
+    out[o] = 0;
+    return (int)o;
+}
 
-    if (field(body, "ekey", v, sizeof v) && v[0]) strlcpy(cfg.eugenia_key, v, sizeof cfg.eugenia_key);
-    if (field(body, "gkey", v, sizeof v) && v[0]) strlcpy(cfg.gladys_key, v, sizeof cfg.gladys_key);
-    config_save();
-    ESP_LOGI(TAG, "saved: %d network(s), keys %s", cfg.n_nets, config_ready() ? "set" : "missing");
+static esp_err_t reply(httpd_req_t *req, const char *json) {
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, json);
+}
 
-    httpd_resp_set_type(req, "text/html");
-    httpd_resp_sendstr(req, config_ready()
-        ? "<!doctype html><meta name=viewport content='width=device-width'><body style='background:#070611;"
-          "color:#e8e6f0;font:18px -apple-system,sans-serif;padding:40px 20px'>Saved. She is restarting.</body>"
-        : "<!doctype html><meta name=viewport content='width=device-width'><body style='background:#070611;"
-          "color:#e8e6f0;font:18px -apple-system,sans-serif;padding:40px 20px'>Saved, but she still needs "
-          "a Wi-Fi network and both keys. <a style='color:#b45cd9' href=/>Back</a></body>");
-    if (config_ready()) {
-        vTaskDelay(pdMS_TO_TICKS(1500));
-        esp_restart();
+static esp_err_t api_state(httpd_req_t *req) {
+    char out[400];
+    int o = snprintf(out, sizeof out, "{\"ready\":%s,\"nets\":[", config_ready() ? "true" : "false");
+    for (int i = 0; i < cfg.n_nets; i++) {
+        if (i) out[o++] = ',';
+        o += json_string(out + o, sizeof out - o, cfg.nets[i].ssid);
     }
+    snprintf(out + o, sizeof out - o, "]}");
+    return reply(req, out);
+}
+
+// The networks in range, strongest first, each once, as one to three bars.
+static esp_err_t api_scan(httpd_req_t *req) {
+    static wifi_ap_record_t seen[SEEN_MAX];
+    uint16_t n = SEEN_MAX;
+    if (esp_wifi_scan_start(NULL, true) != ESP_OK || esp_wifi_scan_get_ap_records(&n, seen) != ESP_OK) n = 0;
+    static char out[1400];
+    int o = snprintf(out, sizeof out, "[");
+    for (int i = 0; i < n && o < (int)sizeof out - 120; i++) {
+        const char *ssid = (const char *)seen[i].ssid;
+        bool again = !ssid[0];
+        for (int j = 0; j < i && !again; j++) again = !strcmp(ssid, (const char *)seen[j].ssid);
+        if (again) continue;
+        if (o > 1) out[o++] = ',';
+        o += snprintf(out + o, sizeof out - o, "{\"ssid\":");
+        o += json_string(out + o, sizeof out - o, ssid);
+        o += snprintf(out + o, sizeof out - o, ",\"bars\":%d}", seen[i].rssi > -60 ? 3 : seen[i].rssi > -75 ? 2 : 1);
+    }
+    snprintf(out + o, sizeof out - o, "]");
+    return reply(req, out);
+}
+
+// Tried before it is saved. A name already saved has its password replaced,
+// and past four networks the newest takes the last place.
+static esp_err_t api_wifi(httpd_req_t *req) {
+    char in[BODY_MAX + 1];
+    charm_net_t net = { 0 };
+    if (!body(req, in) || !field(in, "ssid", net.ssid, sizeof net.ssid) || !net.ssid[0]) return reply(req, "{\"ok\":false}");
+    field(in, "pass", net.pass, sizeof net.pass);
+    show(SHOW_BUSY, SAY[2]);
+    bool ok = join(net.ssid, net.pass);
+    if (ok) {
+        int at = 0;
+        while (at < cfg.n_nets && strcmp(cfg.nets[at].ssid, net.ssid)) at++;
+        if (at == MAX_NETS) at = MAX_NETS - 1;
+        cfg.nets[at] = net;
+        if (at == cfg.n_nets) cfg.n_nets++;
+        config_save();
+    }
+    ESP_LOGI(TAG, "%s %s", net.ssid, ok ? "joined" : "refused");
+    reply(req, ok ? "{\"ok\":true}" : "{\"ok\":false}");
+    answer_shown(ok);
     return ESP_OK;
+}
+
+// Online on a saved network, if she is not already.
+static bool get_online(void) {
+    for (int i = 0; i < cfg.n_nets && !online; i++) join(cfg.nets[i].ssid, cfg.nets[i].pass);
+    return online;
+}
+
+/* A key is right when its door lets it in. Eugenia's is asked with an empty
+   recording, which a right key is refused with a 400 for, and which costs
+   nothing; Gladys's is asked what waits. A 503 is a right key at a door short
+   of a secret of its own. */
+static esp_err_t api_key(httpd_req_t *req) {
+    char in[BODY_MAX + 1], who[12] = "", key[sizeof cfg.eugenia_key] = "";
+    if (!body(req, in) || !field(in, "who", who, sizeof who) || !field(in, "key", key, sizeof key) || !key[0])
+        return reply(req, "{\"ok\":false,\"why\":\"refused\"}");
+    bool eugenia = !strcmp(who, "eugenia");
+    show(SHOW_BUSY, SAY[3]);
+    if (!get_online()) {
+        show(SHOW_JOINED, NULL);
+        return reply(req, "{\"ok\":false,\"why\":\"offline\"}");
+    }
+    esp_http_client_config_t c = {
+        .url = eugenia ? EUGENIA_DOOR : GLADYS_DOOR,
+        .method = eugenia ? HTTP_METHOD_POST : HTTP_METHOD_GET,
+        .timeout_ms = CHECK_MS,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+    esp_http_client_handle_t h = esp_http_client_init(&c);
+    esp_http_client_set_header(h, "x-charm-key", key);
+    int status = esp_http_client_perform(h) == ESP_OK ? esp_http_client_get_status_code(h) : -1;
+    esp_http_client_cleanup(h);
+    bool ok = status == 503 || (eugenia ? status == 400 : status == 200);
+    if (ok) {
+        strlcpy(eugenia ? cfg.eugenia_key : cfg.gladys_key, key, sizeof cfg.eugenia_key);
+        config_save();
+    }
+    ESP_LOGI(TAG, "%s's key: her door answered %d", who, status);
+    reply(req, ok ? "{\"ok\":true}" : status < 0 ? "{\"ok\":false,\"why\":\"offline\"}" : "{\"ok\":false,\"why\":\"refused\"}");
+    answer_shown(ok);
+    return ESP_OK;
+}
+
+static esp_err_t api_finish(httpd_req_t *req) {
+    reply(req, "{\"ok\":true}");
+    vTaskDelay(pdMS_TO_TICKS(800));
+    esp_restart();
+    return ESP_OK;
+}
+
+// Anything but the page and its questions is a phone checking whether it is
+// online: send it to the page.
+static esp_err_t page(httpd_req_t *req) {
+    if (strcmp(req->uri, "/") != 0) {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+        return httpd_resp_send(req, NULL, 0);
+    }
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_sendstr(req, page_start);
 }
 
 void setup_run(void) {
     start_network();
-    show_screen();
+    build_screen();
+    show(SHOW_CODE, NULL);
 
     httpd_handle_t server = NULL;
     httpd_config_t conf = HTTPD_DEFAULT_CONFIG();
     conf.uri_match_fn = httpd_uri_match_wildcard;
-    conf.stack_size = 8192;
+    conf.stack_size = 10240;  // a key is checked over TLS from its handler
     if (httpd_start(&server, &conf) == ESP_OK) {
-        static const httpd_uri_t post = { .uri = "/save", .method = HTTP_POST, .handler = save };
-        static const httpd_uri_t get = { .uri = "/*", .method = HTTP_GET, .handler = page };
-        httpd_register_uri_handler(server, &post);
-        httpd_register_uri_handler(server, &get);
+        // In order: the questions before the page that answers every other path.
+        static const httpd_uri_t uris[] = {
+            { .uri = "/api/state",  .method = HTTP_GET,  .handler = api_state },
+            { .uri = "/api/scan",   .method = HTTP_GET,  .handler = api_scan },
+            { .uri = "/api/wifi",   .method = HTTP_POST, .handler = api_wifi },
+            { .uri = "/api/key",    .method = HTTP_POST, .handler = api_key },
+            { .uri = "/api/finish", .method = HTTP_POST, .handler = api_finish },
+            { .uri = "/*",          .method = HTTP_GET,  .handler = page },
+        };
+        for (size_t i = 0; i < sizeof uris / sizeof *uris; i++) httpd_register_uri_handler(server, &uris[i]);
     }
     ESP_LOGI(TAG, "waiting on %s", ap_name);
     for (;;) vTaskDelay(portMAX_DELAY);

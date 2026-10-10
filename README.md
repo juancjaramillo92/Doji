@@ -65,7 +65,8 @@ charm/                                  firmware for the two charms — see The 
   main/face.c                           both faces, drawn live, and the sleep screen
   main/sound.c                          the speaker and both microphones
   main/config.c                         what the setup page saved, in her flash
-  main/setup.c                          the setup page, on her own Wi-Fi network
+  main/setup.c                          the setup, on her own Wi-Fi network
+  main/setup.html                       the page the setup serves to the phone
   main/net.c                            joining her Wi-Fi, and New York time
   main/talk.c                           talking with Eugenia, through her door
   main/sleep.c                          deep sleep, and what wakes her
@@ -378,7 +379,7 @@ single-sourced at run time:
 |---|---|
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, and her charm's `SETUPS` in `charm/main/gladys.c` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order |
-| the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c` and `charm/main/dial.c` |
+| the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c`, `charm/main/dial.c`, `charm/main/face.c` and `charm/main/setup.c` |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
@@ -2557,17 +2558,25 @@ on the cable, the charge as a ring round the rim with its percent. The dots and
 the battery wander a few pixels each time she sleeps, so a mark left all night
 never burns in.
 
-**The setup page is the only way anything gets onto a board.** With no Wi-Fi
-network or without both keys — a board fresh from flashing — or after the
-screen is held for ten seconds, she shows *Set me up* and becomes her own open
-network, **Charm-Setup-** and four characters of her own, like
-*Charm-Setup-4F2A*. Every name it is asked resolves to the charm and every page
-but its own redirects there, so a phone that joins opens the page by itself.
-It asks for **up to four Wi-Fi networks**, tried in order, with the ones in
-range offered by name, and **the two keys**, `EUGENIA_CHARM_SECRET` and
-`GLADYS_CHARM_SECRET`. A blank password or key keeps the one she has, so adding
-a network never means pasting a key again. It is saved in her own flash (NVS,
-namespace `charm`) and she restarts. The addresses of the two doors are the
+**The setup is the only way anything gets onto a board**, the playground's
+(*Charm setup*). With no Wi-Fi network or without both keys — a board fresh
+from flashing — or after BOOT is held for five seconds, she becomes her own
+Wi-Fi network, named for her address like *Charm-4F2A* and **locked with a
+password made up for that setup**, and shows a **QR code** carrying both,
+centred on her screen with the name under it. A phone's camera joins it in one
+tap, and the page opens by itself: every name the phone asks for resolves to
+the charm and every page but its own redirects there. The page
+(`charm/main/setup.html`, in the phone's own typeface, since the charm has no
+internet to fetch one) asks for **her Wi-Fi networks** — the ones in range
+offered by name, the phone's hotspot first so she has internet anywhere — and
+**the two keys**, `EUGENIA_CHARM_SECRET` and `GLADYS_CHARM_SECRET`. **Each is
+tried before it is saved**: a network by joining it, a key by asking its door —
+Eugenia's with an empty recording, which a right key is refused with a `400`
+for, Gladys's with what waits — while her screen shows a spinner, then a tick
+or a cross. Coming back later, the page shows what she has and offers to add a
+network, which never asks for the keys again; past four, the newest takes the
+last place. Everything is kept in her own flash (NVS, namespace `charm`), and
+finishing restarts her as herself. The addresses of the two doors are the
 repository's — in `charm/main/net.h`, which `agree.test.mjs` reads with every
 other caller — and only the keys are secret, so a lost charm is cut off by
 changing them in Supabase.
@@ -2623,7 +2632,7 @@ pause. Done, the ring sweeps round once with a warm smile — delighted when
 every answer was a yes. With nothing waiting, a tap gets a smile. A minute
 without a tap and the rest waits for next time. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
-typeface, Hanken Grotesk, made into the charm's three fonts by
+typeface, Hanken Grotesk, made into the charm's four fonts by
 `charm/tools/fonts.sh` with only the letters they use.
 
 **A finger round the rim is the volume**: one full turn from silent to
@@ -2633,7 +2642,8 @@ end, and the number under *VOLUME*; it fades a moment after the finger lifts,
 and the volume is saved in her flash with the rest. A slide is not a tap, so it
 starts nothing.
 
-**PWR switches her on and off.** The button belongs to the power chip, an
+**PWR switches her on and off**, and **BOOT held for five seconds opens the
+setup**. PWR belongs to the power chip, an
 AXP2101 (`charm/main/power.c`): a press switches the board on, and she wakes
 with her eyes opening and the chime. Held for a second and a half while she is
 awake, she closes her eyes and switches the board off. Asleep, the chip is not
@@ -2645,8 +2655,10 @@ longest, ten seconds, so that awake the goodnight always comes first. Below
 while the chip sleeps, that the touch controller wakes it (the BOOT button
 always does), that the power chip's registers are where Waveshare's example and
 the datasheet put them (the long press, the switch-off, the cable and the
-battery), whether a full-screen swipe is smooth enough to replace the journal's
-taps, and how long a battery lasts.
+battery), that a phone stays on her setup network while she joins another —
+the two share one radio, so her own moves to the other's channel — whether a
+full-screen swipe is smooth enough to replace the journal's taps, and how long
+a battery lasts.
 
 ---
 

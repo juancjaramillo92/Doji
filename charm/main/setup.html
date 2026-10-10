@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your charm</title>
+<!-- The page the charm serves on its own network, the playground's ("Charm
+     setup"). The phone's own face: the charm has no internet to fetch a font
+     from. Each step is tried on the charm before it is saved. -->
+<style>
+:root {
+  color-scheme: dark;
+  --ground: #0a0813; --panel: #0e0b19; --line: #251d39;
+  --ink: #e8e6f0; --muted: #9a92b0; --accent: #8b35b8;
+  --ok: #c9a6ff; --warn: #f3a2e4;
+  --sheen: linear-gradient(120deg, #5c40b0, #8b35b8 55%, #b45cd9);
+  --system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 var(--system); }
+main { max-width: 440px; margin: 0 auto; min-height: 100vh; padding: 20px 20px 28px; display: flex; flex-direction: column; gap: 14px; }
+h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+p { margin: 0; color: var(--muted); font-size: 14px; }
+.steps { display: flex; gap: 6px; }
+.steps i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
+.steps i.on { background: var(--sheen); }
+.list { display: grid; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.net { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--panel); border: 0; border-top: 1px solid var(--line); color: var(--ink); font: 500 15px var(--system); text-align: left; width: 100%; }
+.net:first-child { border-top: 0; }
+.net span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.net small { color: var(--muted); font-size: 12px; }
+.net.saved small { color: var(--ok); }
+label { font-size: 13px; color: var(--muted); }
+.input { display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-top: 6px; }
+.input:focus-within { border-color: var(--accent); }
+.input input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--ink); font: 16px var(--system); padding: 12px 14px; outline: none; }
+.input button { background: none; border: 0; color: var(--muted); font: 600 13px var(--system); padding: 0 14px; }
+.status { font-size: 13px; display: flex; align-items: center; gap: 6px; min-height: 20px; margin-top: 6px; }
+.status.ok { color: var(--ok); }
+.status.ok::before { content: "✓"; font-weight: 700; }
+.status.bad { color: var(--warn); }
+.status.bad::before { content: "!"; font-weight: 800; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; display: inline-grid; place-items: center; font-size: 11px; flex: none; }
+.status.wait { color: var(--muted); }
+.spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--muted); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.summary { display: grid; gap: 8px; }
+.summary div { display: flex; justify-content: space-between; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; font-size: 14px; }
+.summary b { font-weight: 600; color: var(--ok); }
+.cta { margin-top: auto; display: grid; gap: 8px; padding-top: 10px; }
+.go { background: var(--sheen); color: #fff; border: 0; border-radius: 14px; font: 600 16px var(--system); padding: 14px; box-shadow: 0 8px 24px rgba(139,53,184,.35); }
+.go:disabled { opacity: .4; }
+.ghost { background: none; color: var(--muted); border: 0; font: 500 14px var(--system); padding: 6px; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main id="page"></main>
+<script>
+(() => {
+  const page = document.getElementById('page');
+  const state = { first: true, nets: [], picked: null, keys: { eugenia: null, gladys: null } };
+  const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const bars = (n) => '▂▄▆'.slice(0, n).padEnd(3, '·');
+  const progress = (i) => `<div class="steps">${[0, 1, 2].map((n) => `<i class="${n <= i ? 'on' : ''}"></i>`).join('')}</div>`;
+  const NAMES = { eugenia: 'Eugenia', gladys: 'Gladys' };
+
+  // The charm answers in JSON; a network that drops for a moment while she
+  // joins Wi-Fi is asked again once.
+  async function ask(path, fields) {
+    const body = fields ? new URLSearchParams(fields) : undefined;
+    for (let tries = 0; ; tries++) {
+      try {
+        const r = await fetch(path, { method: fields ? 'POST' : 'GET', body });
+        return await r.json();
+      } catch (e) {
+        if (tries) throw e;
+        await new Promise((ok) => setTimeout(ok, 1500));
+      }
+    }
+  }
+
+  function home(s) {
+    page.innerHTML = `
+      <h1>Your charm</h1>
+      <p>Everything she has. Change what you need; the rest stays.</p>
+      <div><label>Wi-Fi</label><div class="list" style="margin-top:6px">
+        ${s.nets.map((n) => `<div class="net saved"><span>${esc(n)}</span><small>Saved</small></div>`).join('')}
+      </div></div>
+      <div class="summary"><div><span>Eugenia</span><b>Key saved</b></div><div><span>Gladys</span><b>Key saved</b></div></div>
+      <div class="cta"><button class="go" id="add">Add a network</button><button class="ghost" id="done">Done</button></div>`;
+    document.getElementById('add').onclick = wifi;
+    document.getElementById('done').onclick = finish;
+  }
+
+  async function wifi() {
+    page.innerHTML = `${state.first ? progress(0) : ''}<h1>${state.first ? 'Her Wi-Fi' : 'Add a network'}</h1>
+      <p>${state.first ? 'Start with your phone’s hotspot, so she has internet wherever you go.' : 'The networks she can see from here.'}</p>
+      <div class="status wait"><span class="spin"></span> Looking around…</div>`;
+    const seen = (await ask('/api/scan')).filter((n) => !state.nets.includes(n.ssid));
+    page.innerHTML = `
+      ${state.first ? progress(0) : ''}
+      <h1>${state.first ? 'Her Wi-Fi' : 'Add a network'}</h1>
+      <p>${state.first ? 'Start with your phone’s hotspot, so she has internet wherever you go.' : 'The networks she can see from here.'}</p>
+      <div class="list">${seen.map((n, i) => `<button class="net" data-i="${i}"><span>${esc(n.ssid)}</span><small>${bars(n.bars)}</small></button>`).join('')}</div>
+      ${state.nets.length ? `<p>Saved: ${state.nets.map(esc).join(', ')}.</p>` : ''}
+      <div class="cta">${state.first && state.nets.length ? '<button class="go" id="next">Next</button>' : ''}${state.first ? '' : '<button class="ghost" id="back">Back</button>'}</div>`;
+    page.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { state.picked = seen[b.dataset.i].ssid; password(); }; });
+    const next = document.getElementById('next'), back = document.getElementById('back');
+    if (next) next.onclick = keys;
+    if (back) back.onclick = start;
+  }
+
+  function password() {
+    page.innerHTML = `
+      ${state.first ? progress(0) : ''}
+      <h1>${esc(state.picked)}</h1>
+      <div><label for="pw">Password</label>
+        <div class="input"><input id="pw" type="password" autocomplete="off" autocapitalize="off"><button id="show" type="button">Show</button></div>
+        <div class="status" id="st"></div></div>
+      <div class="cta"><button class="go" id="connect">Connect</button><button class="ghost" id="back">Back</button></div>`;
+    const pw = document.getElementById('pw'), st = document.getElementById('st'), go = document.getElementById('connect');
+    pw.focus();
+    document.getElementById('show').onclick = (e) => { const shown = pw.type === 'text'; pw.type = shown ? 'password' : 'text'; e.target.textContent = shown ? 'Show' : 'Hide'; };
+    document.getElementById('back').onclick = wifi;
+    go.onclick = async () => {
+      go.disabled = true;
+      st.className = 'status wait'; st.innerHTML = '<span class="spin"></span> Connecting…';
+      const r = await ask('/api/wifi', { ssid: state.picked, pass: pw.value }).catch(() => ({ ok: false }));
+      go.disabled = false;
+      if (!r.ok) { st.className = 'status bad'; st.textContent = 'That password didn’t work. Check it and try again.'; return; }
+      st.className = 'status ok'; st.textContent = 'Connected';
+      state.nets.push(state.picked);
+      setTimeout(state.first ? wifi : start, 900);
+    };
+  }
+
+  function keys() {
+    const row = (who) => {
+      const k = state.keys[who];
+      return `<div><label for="k-${who}">${NAMES[who]}</label>
+        <div class="input"><input id="k-${who}" autocomplete="off" autocapitalize="off" placeholder="Paste the key" value="${k ? esc(k.value) : ''}"></div>
+        <div class="status ${k ? k.state : ''}" id="s-${who}">${k ? k.say : ''}</div></div>`;
+    };
+    page.innerHTML = `
+      ${progress(1)}
+      <h1>Their keys</h1>
+      <p>From Supabase, Edge Functions, Secrets: EUGENIA_CHARM_SECRET and GLADYS_CHARM_SECRET. Each is checked with her as you paste it.</p>
+      ${row('eugenia')}${row('gladys')}
+      <div class="cta"><button class="go" id="next" ${state.keys.eugenia?.state === 'ok' && state.keys.gladys?.state === 'ok' ? '' : 'disabled'}>Next</button></div>`;
+    for (const who of ['eugenia', 'gladys']) {
+      const input = document.getElementById(`k-${who}`);
+      input.oninput = () => check(who, input.value.trim());
+    }
+    document.getElementById('next').onclick = done;
+  }
+
+  const timers = {};
+  function check(who, value) {
+    clearTimeout(timers[who]);
+    if (!value) { state.keys[who] = null; keys(); return; }
+    timers[who] = setTimeout(async () => {
+      state.keys[who] = { value, state: 'wait', say: '<span class="spin"></span> Asking her…' };
+      keys();
+      const r = await ask('/api/key', { who, key: value }).catch(() => ({ ok: false, why: 'offline' }));
+      state.keys[who] = { value, state: r.ok ? 'ok' : 'bad',
+        say: r.ok ? `${NAMES[who]} answered` : r.why === 'offline' ? 'She can’t reach the internet. Add a network first.' : 'Refused. Copy it again from Supabase; a character may be missing.' };
+      keys();
+      document.getElementById(`k-${who}`).focus();
+    }, 600);
+  }
+
+  function done() {
+    page.innerHTML = `
+      ${progress(2)}
+      <h1>She’s ready</h1>
+      <div class="summary">
+        <div><span>Wi-Fi</span><b>${state.nets.length} saved</b></div>
+        <div><span>Eugenia</span><b>Answered</b></div>
+        <div><span>Gladys</span><b>Answered</b></div>
+      </div>
+      <p>Your phone goes back to its own Wi-Fi when you finish.</p>
+      <div class="cta"><button class="go" id="finish">Finish</button></div>`;
+    document.getElementById('finish').onclick = finish;
+  }
+
+  async function finish() {
+    await ask('/api/finish', {}).catch(() => null);
+    page.innerHTML = '<h1>Done</h1><p>She restarts and wakes as herself. Your phone goes back to its own network.</p>';
+  }
+
+  async function start() {
+    const s = await ask('/api/state');
+    state.first = !s.ready;
+    state.nets = s.nets;
+    if (state.first) wifi(); else home(s);
+  }
+  start();
+})();
+</script>
+</body>
+</html>

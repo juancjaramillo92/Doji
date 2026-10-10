@@ -1,6 +1,6 @@
 /* The charm: Eugenia and Gladys on one board. Their Wi-Fi and their keys are
-   the setup page's, kept in flash; without them, or when asked by holding the
-   screen for ten seconds, she shows the setup page instead.
+   the setup's, kept in flash; without them, or when asked by holding BOOT for
+   five seconds (power.c), she shows the setup instead (setup.c).
 
    She lives in short waking spells, and whoever is needed is who wakes —
    decided before the screen lights, so waking is never a switch: Gladys when
@@ -48,7 +48,6 @@ static const char *TAG = "charm";
 #define BRIGHTNESS    75     // percent
 #define CHECK_S       300    // how often she asks what waits, around the clock
 #define CHARGING_S    120    // on the cable, how often the charge is redrawn
-#define SETUP_HOLD_MS 10000
 #define AWAKE_MS      30000
 #define GOODNIGHT_MS  1200   // her eyes closing
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
@@ -64,25 +63,18 @@ static volatile bool swiped;
 static character_t showing;
 static bool lit;
 
-// A tap is for whoever shows, a swipe across her face switches them, a slide
-// round the rim is the volume, and ten seconds held opens the setup page.
+// A tap is for whoever shows, a swipe across her face switches them, and a
+// slide round the rim is the volume.
 static void on_touch(lv_event_t *e) {
-    static uint32_t pressed_at;
-    static bool asked, gestured;
+    static bool gestured;
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t at;
     lv_indev_get_point(lv_indev_active(), &at);
     if (code == LV_EVENT_PRESSED) {
-        pressed_at = lv_tick_get();
-        asked = gestured = false;
+        gestured = false;
         dial_press(at);
     }
     if (code == LV_EVENT_PRESSING) dial_slide(at);
-    if (code == LV_EVENT_PRESSING && !asked && lv_tick_elaps(pressed_at) > SETUP_HOLD_MS) {
-        asked = true;
-        config_ask_setup();
-        esp_restart();
-    }
     if (code == LV_EVENT_GESTURE && !dial_turned() && !gestured) {
         lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
         if (dir == LV_DIR_LEFT || dir == LV_DIR_RIGHT) {
@@ -220,7 +212,7 @@ void app_main(void) {
              (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20), (int)woke);
 
     if (config_take_setup_request() || !config_ready()) {
-        light(EUGENIA, FACE_IDLE);
+        light(EUGENIA, FACE_DARK);
         setup_run();
     }
     // The stack holds a TLS handshake.

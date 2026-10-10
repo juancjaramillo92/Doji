@@ -1,7 +1,7 @@
 #pragma once
 
-/* The setup page. The charm becomes its own open Wi-Fi network,
-   "Charm-Setup-XXXX"; a phone that joins it is sent to the page, which asks
-   who she is, her Wi-Fi networks and her key. Saving restarts her. Never
-   returns. Call with the display unlocked. */
+/* The setup. The charm becomes her own locked Wi-Fi network and shows a QR
+   code that joins it; the page that opens asks for her Wi-Fi networks and the
+   two keys, each tried before it is saved, and finishing restarts her. Never
+   returns. Call with the screen started and unlocked. */
 void setup_run(void);

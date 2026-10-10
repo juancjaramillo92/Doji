@@ -27,6 +27,6 @@ void config_save(void);
 // A charm with no network, or without both keys, can do nothing but ask to be set up.
 bool config_ready(void);
 
-// The setup page on the next start: set by holding the screen, cleared there.
+// The setup on the next start: set by holding BOOT, cleared there.
 void config_ask_setup(void);
 bool config_take_setup_request(void);

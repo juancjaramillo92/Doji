@@ -11,6 +11,9 @@
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
+#include "config.h"
+#include "driver/gpio.h"
+#include "esp_system.h"
 #include "face.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -30,6 +33,7 @@ static const char *TAG = "power";
 #define OFF_10S      (3 << 2)
 
 #define POLL_MS      200
+#define SETUP_HOLD_MS 5000   // BOOT held this long opens the setup
 #define LOW_PERCENT  15
 #define GOODNIGHT_MS 1200
 
@@ -48,8 +52,14 @@ static void set(uint8_t reg, uint8_t v) {
 
 static void watch(void *arg) {
     (void)arg;
-    for (;;) {
+    for (int boot_held = 0;; ) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+        // BOOT pulls low while pressed; held long enough, setup on the next start.
+        boot_held = gpio_get_level(GPIO_NUM_0) ? 0 : boot_held + POLL_MS;
+        if (boot_held >= SETUP_HOLD_MS) {
+            config_ask_setup();
+            esp_restart();
+        }
         if (!(get(IRQ_STATUS2) & LONG_PRESS)) continue;
         set(IRQ_STATUS2, LONG_PRESS);
         ESP_LOGI(TAG, "goodnight");
