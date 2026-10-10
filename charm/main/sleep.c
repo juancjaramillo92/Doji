@@ -47,7 +47,9 @@ void sleep_until(time_t wake_at, bool motion) {
     rtc_gpio_pulldown_dis(PWR_PIN);
     esp_sleep_enable_ext0_wakeup(PWR_PIN, 1);
 
+    // A time already past is a second from now: with no timer at all, only a
+    // press would wake her.
     time_t now = time(NULL);
-    if (wake_at > now) esp_sleep_enable_timer_wakeup((uint64_t)(wake_at - now) * 1000000ULL);
+    esp_sleep_enable_timer_wakeup((uint64_t)(wake_at > now ? wake_at - now : 1) * 1000000ULL);
     esp_deep_sleep_start();
 }

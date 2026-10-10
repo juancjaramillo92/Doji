@@ -149,7 +149,7 @@ static void errand(void) {
         // quietly, for this errand's place.
         if (ota_due(time(NULL)) && !power_low() && ota_update()) {
             errand_at = time(NULL);
-            sleep_until(errand_at + 1, false);
+            sleep_until(errand_at, false);
         }
     }
     sleep_now();

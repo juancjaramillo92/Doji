@@ -17,6 +17,7 @@
 #include <string.h>
 #include "bsp/esp-bsp.h"
 #include "config.h"
+#include "dns.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
 #include "esp_http_client.h"
@@ -170,15 +171,9 @@ static void dns_task(void *arg) {
     for (;;) {
         struct sockaddr_in from;
         socklen_t fl = sizeof from;
-        int n = recvfrom(s, buf, sizeof buf - 16, 0, (struct sockaddr *)&from, &fl);
-        if (n < 12) continue;
-        // The question stays as asked; one A record answers it with 192.168.4.1.
-        buf[2] = 0x81; buf[3] = 0x80;          // a response, recursion available
-        buf[6] = 0; buf[7] = 1;                // one answer
-        buf[8] = buf[9] = buf[10] = buf[11] = 0;
-        static const uint8_t answer[] = { 0xC0, 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 192, 168, 4, 1 };
-        memcpy(buf + n, answer, sizeof answer);
-        sendto(s, buf, n + sizeof answer, 0, (struct sockaddr *)&from, fl);
+        int n = recvfrom(s, buf, sizeof buf, 0, (struct sockaddr *)&from, &fl);
+        size_t len = n > 0 ? dns_answer(buf, (size_t)n, sizeof buf) : 0;
+        if (len) sendto(s, buf, len, 0, (struct sockaddr *)&from, fl);
     }
 }
 
