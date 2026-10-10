@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 695 tests, seven suites
+npm test      # 696 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -302,8 +302,7 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   `you` or `him`, a vocabulary shared with `searchList`.
 - **Every read of a growing table carries a limit and takes the newest rows.**
   Select newest-first and reverse, as `recent()` does. `agree.test.mjs` refuses
-  `order=id.asc` under a limit. `readNotes` reads one past `NOTES`, so a list
-  that overflows says so rather than ending quietly at the window.
+  `order=id.asc` under a limit.
 - **`notesBlock()` and `portraitBlock()` reach all four paths, `channelsBlock()`
   the three that teach, `recent()` the three that speak** (not the nightly
   pass), `positionsBlock()` three.

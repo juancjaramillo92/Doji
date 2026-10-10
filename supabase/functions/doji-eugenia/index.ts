@@ -1280,8 +1280,8 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
 }
 
 /* ─── Her record ───────────────────────────────────────────────────────────
-   Every read she gives says what would prove it wrong, and nothing ever
-   looked. The nightly pass files each read of the day with a verdict on the
+   Every read she gives says what would prove it wrong, and this is what
+   looks. The nightly pass files each read of the day with a verdict on the
    test she stated — never on where price went, which would pull a read toward
    the forecast the prohibitions forbid — and the record comes back to the two
    paths that give reads, so how loudly she holds a view is set by how her
@@ -3346,7 +3346,9 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
   /* The reads come after the early returns, so an ordinary fill costs nothing.
      History matters most here: the print this warns about is the one the
      briefing likely named, and without the window she repeats herself. Notes,
-     or his instructions are obeyed everywhere but mid-trade. */
+     or his instructions are obeyed everywhere but mid-trade; the portrait,
+     because it is what the notes add up to. Never her record: this message
+     carries no read. */
   const [history, notes, portrait] = await Promise.all([recent(), notesBlock(), portraitBlock()]);
 
   const said = await ask(
