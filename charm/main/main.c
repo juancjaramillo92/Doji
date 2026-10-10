@@ -4,12 +4,9 @@
    for ten seconds, she shows the setup page instead. Otherwise she joins her
    Wi-Fi and sets her clock to New York.
 
-   A tap still records three seconds and plays them back with her mouth moving
-   to it: the screen, touch, both microphones and the speaker, proved on the
-   real board before the conversation is built on them. */
+   Eugenia: a tap and he talks to her, and she answers (talk.c). */
 #include "bsp/esp-bsp.h"
 #include "esp_flash.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_system.h"
@@ -22,15 +19,15 @@
 #include "net.h"
 #include "setup.h"
 #include "sound.h"
+#include "talk.h"
 
 static const char *TAG = "charm";
 
-#define TEST_SECONDS 3
 #define SETUP_HOLD_MS 10000
 
 static TaskHandle_t audio_task;
 
-// A tap starts the test; ten seconds held opens the setup page.
+// A tap is for the audio task; ten seconds held opens the setup page.
 static void on_touch(lv_event_t *e) {
     static uint32_t pressed_at;
     static bool asked;
@@ -54,16 +51,9 @@ static void audio_loop(void *arg) {
     (void)arg;
     sound_start();
     sound_chime();
-
-    size_t max = 16000 * TEST_SECONDS;
-    int16_t *clip = heap_caps_malloc(max * sizeof(int16_t), MALLOC_CAP_SPIRAM);
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        face_set_mode(FACE_LISTENING);
-        size_t got = sound_record(clip, max, face_set_level);
-        face_set_mode(FACE_SPEAKING);
-        sound_play(clip, got, face_set_level);
-        face_set_mode(FACE_IDLE);
+        if (!cfg.gladys) talk();
     }
 }
 
@@ -80,8 +70,9 @@ void app_main(void) {
     bsp_display_start();
     bsp_display_brightness_set(cfg.brightness);
 
-    // Before the touch handler that wakes it can run.
-    xTaskCreatePinnedToCore(audio_loop, "audio", 6144, NULL, 5, &audio_task, 0);
+    // Before the touch handler that wakes it can run. The stack holds a TLS
+    // handshake.
+    xTaskCreatePinnedToCore(audio_loop, "audio", 12288, NULL, 5, &audio_task, 0);
 
     bsp_display_lock(-1);
     face_start(cfg.gladys);

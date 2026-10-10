@@ -7,6 +7,8 @@ typedef enum {
     FACE_IDLE,       // awake: blinks, glances
     FACE_LISTENING,  // he is talking: eyes up, the ring follows his voice
     FACE_SPEAKING,   // she is talking: the mouth follows her voice
+    FACE_THINKING,   // her answer is on its way: up and away, the thought dots
+    FACE_CONFUSED,   // something went wrong: a door refused, no network
 } face_mode_t;
 
 // Builds the screen for one of the two characters. Under the display lock.

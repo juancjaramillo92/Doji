@@ -30,3 +30,7 @@ CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 # The two sizes the setup screen writes in.
 CONFIG_LV_FONT_MONTSERRAT_16=y
 CONFIG_LV_FONT_MONTSERRAT_24=y
+
+# TLS for her door: its buffers in PSRAM, where the internal RAM the screen
+# needs is not.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y

@@ -706,17 +706,18 @@ const read = (path) => ({ path, text: source(path) });
 
 // Everything that names a FUNCTION, each on its own, so one that stops naming
 // any is not covered by the others: Gladys's trigger, the trade event, the
-// schedules, and the Apps Script.
+// schedules, the Apps Script and the charm.
 const CALLERS = [
   ...['Gladys', 'Her senses', 'Everything that runs on a timer']
     .map(t => ({ path: `schema.sql (${t})`, text: subject(t) })),
   read('doji_gmail_sync.gs'),
+  read('charm/main/net.h'),
 ];
 
 // Every file that names the PROJECT, which is a longer list: the app connects
 // to it, config.toml links the CLI to it and the deploy workflow pushes to it.
 const PROJECT_FILES = ['supabase/schema.sql', 'doji_gmail_sync.gs', 'index.html',
-  'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
+  'supabase/config.toml', '.github/workflows/deploy-functions.yml', 'charm/main/net.h'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]

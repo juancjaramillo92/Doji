@@ -63,7 +63,7 @@ static volatile face_mode_t mode = FACE_IDLE;
 static volatile float level;
 
 // What is on screen, eased toward what the mode asks for.
-static struct { float open, gx, gy, mouth, smile, blush, ring; } V = { .open = 0, .smile = 1 };
+static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused; } V = { .open = 0, .smile = 1 };
 static float gaze[2];
 static uint32_t next_glance, next_blink, blink_at;
 static float lid = 1;  // the blink, on top of how open the mode wants the eyes
@@ -133,11 +133,13 @@ static void draw_face(lv_event_t *e) {
     }
 
     // Eyes, a line when shut, with the highlight once open enough to hold it.
+    // Confused, one is smaller and they sit at a tilt.
     for (int i = 0; i < 2; i++) {
         const float *c = i ? F->eye_r : F->eye_l;
-        float cx = c[0] + V.gx, cy = c[1] + V.gy;
+        float odd = 1 + V.confused * (i ? 0.12f : -0.18f);
+        float cx = c[0] + V.gx, cy = c[1] + V.gy + V.confused * (i ? -1.6f : 1.6f);
         float open = V.open * lid;
-        float rx = F->rx, ry = F->ry * open;
+        float rx = F->rx * odd, ry = F->ry * odd * open;
         if (ry < 1.8f) {
             draw_curve(layer, cx, cy, rx * 0.9f, 1.2f, 2.6f, ink);
             continue;
@@ -165,6 +167,17 @@ static void draw_face(lv_event_t *e) {
         lv_draw_rect(layer, &d, &a);
     }
 
+    // Thought dots above her head, lighting up one after another.
+    if (V.dots > 0.02f) {
+        static const float at[3][3] = { { 208, 52, 3.2f }, { 233, 44, 3.8f }, { 258, 52, 3.2f } };
+        uint32_t now = lv_tick_get();
+        for (int i = 0; i < 3; i++) {
+            float pulse = 0.5f + 0.5f * sinf(now / 260.0f - i * 1.1f);
+            dot(layer, at[i][0], at[i][1] - pulse * 2.5f, at[i][2], at[i][2], lv_color_hex(0xead3b6),
+                (lv_opa_t)(255 * V.dots * (0.25f + 0.75f * pulse)));
+        }
+    }
+
     // The listening ring, on the rim.
     if (V.ring > 0.02f) {
         lv_draw_arc_dsc_t d;
@@ -188,11 +201,15 @@ static void tick(lv_timer_t *t) {
     last = now;
 
     face_mode_t m = mode;
-    float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, glance = 1;
+    float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, glance = 1;
     const float *fixed = NULL;
-    static const float up[2] = { 0, -2 };
+    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f };
+    // Thinking looks up to one side, then the other, every 1.7 seconds.
+    float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
     if (m == FACE_LISTENING) { t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up; }
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
+    if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
+    if (m == FACE_CONFUSED)  { t_smile = -0.35f; t_confused = 1; fixed = puzzled; }
 
     // Glances: a quick jump to a point, held for a moment.
     if (fixed) { gaze[0] = fixed[0]; gaze[1] = fixed[1]; }
@@ -221,6 +238,8 @@ static void tick(lv_timer_t *t) {
     V.smile = ease(V.smile, t_smile, 10, dt);
     V.blush = ease(V.blush, BLUSH, 4, dt);
     V.ring = ease(V.ring, t_ring, 18, dt);
+    V.dots = ease(V.dots, t_dots, 5, dt);
+    V.confused = ease(V.confused, t_confused, 8, dt);
 
     // The ring needs the rim; everything else lives in the face's patch.
     bool ring_on = V.ring > 0.02f;
@@ -228,6 +247,10 @@ static void tick(lv_timer_t *t) {
     else {
         lv_area_t a = { 110, 175, 356, 300 };
         lv_obj_invalidate_area(layer_obj, &a);
+        if (V.dots > 0.01f) {
+            lv_area_t d = { 195, 30, 272, 62 };
+            lv_obj_invalidate_area(layer_obj, &d);
+        }
     }
     ring_was_on = ring_on;
 }

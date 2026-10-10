@@ -67,6 +67,7 @@ charm/                                  firmware for the two charms — see The 
   main/config.c                         what the setup page saved, in her flash
   main/setup.c                          the setup page, on her own Wi-Fi network
   main/net.c                            joining her Wi-Fi, and New York time
+  main/talk.c                           talking with Eugenia, through her door
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
   tools/art.py                          turns a render into those bytes
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -2524,7 +2525,9 @@ file goes on both boards.
 (`charm/tools/art.py` makes them from `charm/art/*.png`), so nothing is decoded
 at boot. Her eyes, highlight, smile and cheeks are drawn live on top, measured
 from the render: blinks, glances, the mouth following the loudness of what
-plays. Only the face's own patch is redrawn on a frame; the listening ring,
+plays; thinking, she looks up and away from one side to the other under three
+thought dots; when something goes wrong, her eyes go uneven and her smile turns
+down. Only the face's own patch is redrawn on a frame; the listening ring,
 round the whole rim, is the one thing that redraws the full screen, and only
 while it shows. The design was settled in two playgrounds before any of this —
 the claude.ai artifacts *Eugenia, on the charm* and *Gladys, on the charm* —
@@ -2541,20 +2544,28 @@ networks**, tried in order, with the ones in range offered by name, **her key**
 default) and how often **Gladys checks** (every 5 minutes). A blank password or
 key keeps the one she has, so adding a network never means pasting the key
 again. It is saved in her own flash (NVS, namespace `charm`) and she restarts.
-The address of the doors is the repository's, and only the key is secret, so
+The address of her door is the repository's — in `charm/main/net.h`, which
+`agree.test.mjs` reads with every other caller — and only the key is secret, so
 the same firmware goes on both boards and a lost charm is cut off by changing
 her key in Supabase.
 
 **What a board does today:** she comes up as whoever the setup page made her,
 her face alive at the saved brightness, and chimes; joins the first of her
 networks that answers and sets her clock to New York, clock changes included,
-since the briefing is 08:00 there all year. **A tap** records three seconds and
-plays them back with her mouth moving to them — the screen, touch, both
-microphones and the speaker proved on the real board before the conversation
-is built on them. The first serial line names the character, the flash size and
-the PSRAM the chip actually has.
+since the briefing is 08:00 there all year. The first serial line names the
+character, the flash size and the PSRAM the chip actually has.
 
-**Still to build**, in order: the conversation with Eugenia's door, sleep and
+**A tap and he talks to Eugenia.** The ring shows round the rim and follows his
+voice; his turn ends at a pause of over a second after he has spoken, at a
+second tap, or at a minute, and a tap with nothing said in six seconds is
+dropped. The recording goes to her door as 16 kHz WAV and the answer is played
+as it streams in (*The charm — her voice on his keyring*): her face thinks
+through the silence and speaks when her voice starts, since the silence is
+exact zeros. A tap while she thinks or speaks cuts her off; the copy in
+Telegram is the whole of it. A door that cannot be reached or refuses her key
+shows her confused for four seconds. Gladys's taps do nothing yet.
+
+**Still to build**, in order: sleep and
 the briefing alert with its still purple dot, Gladys's journal on screen with
 her near-white dot, the volume dial round the rim, and the battery and power
 screens.

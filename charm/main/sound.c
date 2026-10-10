@@ -13,8 +13,13 @@
 
 static esp_codec_dev_handle_t speaker, mics;
 static int16_t wire[CHUNK * 2];
+static uint32_t rate_now;
 
+// Reopened only when the rate changes, so a reply played in pieces as it
+// arrives runs on as one sound.
 static void open_at(uint32_t rate) {
+    if (rate == rate_now) return;
+    rate_now = rate;
     esp_codec_dev_close(speaker);
     esp_codec_dev_close(mics);
     esp_codec_dev_sample_info_t fs = { .sample_rate = rate, .channel = 2, .bits_per_sample = 16 };
@@ -61,26 +66,26 @@ void sound_chime(void) {
     }
 }
 
-size_t sound_record(int16_t *out, size_t max, void (*loudness)(float)) {
+size_t sound_record(int16_t *out, size_t max, bool (*more)(float)) {
     open_at(16000);
     size_t got = 0;
     while (got < max) {
         size_t k = max - got < CHUNK ? max - got : CHUNK;
         if (esp_codec_dev_read(mics, wire, (int)(k * 4)) != ESP_CODEC_DEV_OK) break;
         for (size_t i = 0; i < k; i++) out[got + i] = wire[2 * i];
-        if (loudness) loudness(loudness_of(wire, k, 2));
         got += k;
+        if (!more(loudness_of(wire, k, 2))) break;
     }
     return got;
 }
 
-void sound_play(const int16_t *in, size_t samples, void (*loudness)(float)) {
-    open_at(16000);
+bool sound_play(const int16_t *in, size_t samples, uint32_t rate, bool (*more)(float)) {
+    open_at(rate);
     for (size_t at = 0; at < samples; at += CHUNK) {
         size_t k = samples - at < CHUNK ? samples - at : CHUNK;
+        if (!more(loudness_of(in + at, k, 1))) return false;
         for (size_t i = 0; i < k; i++) wire[2 * i] = wire[2 * i + 1] = in[at + i];
-        if (loudness) loudness(loudness_of(in + at, k, 1));
         esp_codec_dev_write(speaker, wire, (int)(k * 4));
     }
-    if (loudness) loudness(0);
+    return true;
 }
