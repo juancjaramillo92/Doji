@@ -1,0 +1,36 @@
+# Builds the charm's firmware, the one program both boards run, and keeps it as
+# a download: charm.bin, a single image written at 0x0 by any ESP flasher.
+# Espressif's own ESP-IDF image, pinned by digest like every action here by
+# commit, so the toolchain that built a firmware is the one that will build it
+# again. The board package and LVGL come from Espressif's component registry.
+name: charm
+
+on:
+  push:
+    paths:
+      - 'charm/**'
+      - '.github/workflows/charm.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf@sha256:b9f2d6ea1c19e0c9f7959bdb74a9e3c775642f9d0f3b841937c5fa3363db892b # v5.5.4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build
+        shell: bash
+        working-directory: charm
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py set-target esp32s3
+          idf.py build
+          idf.py merge-bin -o charm.bin
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: charm-firmware
+          path: charm/build/charm.bin
+          if-no-files-found: error

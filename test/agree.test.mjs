@@ -1159,7 +1159,16 @@ test('every workflow takes its Node version from the one file that states it', (
     '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
     'and npm installs on any version without a word');
 
-  for (const { path, text } of WORKFLOWS) {
+  // The rule is about Node, so it binds the workflows that run it: the charm's
+  // firmware build runs ESP-IDF in its own image and has no Node to version.
+  // Comments are not running anything.
+  const runsNode = ({ text }) => text.split('\n')
+    .some(line => !/^\s*#/.test(line) && /\b(npm|node)\b/.test(line));
+  const nodeWorkflows = WORKFLOWS.filter(runsNode);
+  assert.ok(nodeWorkflows.length >= 4,
+    `only ${nodeWorkflows.length} workflows run Node — the reader has gone blind`);
+
+  for (const { path, text } of nodeWorkflows) {
     // Anchored to setup-node: a `node-version` under any other step is not this.
     assert.ok(/actions\/setup-node/.test(text), `${path} no longer sets Node up at all`);
     assert.match(text, /node-version-file: package\.json/,

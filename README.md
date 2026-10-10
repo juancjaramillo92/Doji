@@ -60,6 +60,12 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/adherence.ts             the thirteen rules a journal row can answer
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
+charm/                                  firmware for the two charms — see The charms
+  main/main.c                           boot, and which character she is
+  main/face.c                           her face drawn live over her render
+  main/sound.c                          the speaker and both microphones
+  art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
+  tools/art.py                          turns a render into those bytes
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 test/                                   node:test suites — see Tests
@@ -67,11 +73,13 @@ test/                                   node:test suites — see Tests
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
+.github/workflows/charm.yml             builds the charm firmware, kept as a download
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
 .npmrc                                  engine-strict: the Node floor made a gate
 .gitignore                              node_modules, and nothing else
+charm/.gitignore                        ESP-IDF's build output and fetched components
 ```
 
 ---
@@ -2485,6 +2493,51 @@ plan you entered with. A loss inside your rules was a good trade; a win that bro
 one was a bad trade that paid. Blunt, once, about the trade rather than about you.
 **Never the fact alone**: the verdict is not optional, and the critic adds a
 missing one and may not cut it for length. A trade still open gets no verdict.
+
+---
+
+## The charms
+
+Two Waveshare **ESP32-S3-Touch-AMOLED-1.75C** boards — a 466 × 466 round AMOLED
+(CO5300) with touch (CST9217), two microphones (ES7210), a speaker (ES8311), a
+power chip (AXP2101), a motion sensor and 8 MB of PSRAM — each one of the bots
+in a hand-sized case: purple **Eugenia**, grey **Gladys**. One firmware runs on
+both; which character a board is lives in its own flash.
+
+**The firmware is `charm/`, an ESP-IDF project**, built by
+`.github/workflows/charm.yml` in Espressif's ESP-IDF v5.5.4 image (pinned by
+digest) whenever `charm/` changes. The board's support package
+(`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
+component registry, at the versions Waveshare's own examples for this board use.
+The download is **`charm.bin`**, one image written at `0x0`: plug the board in
+by USB-C and flash it from Chrome with Espressif's web flasher, or with
+`esptool.py write_flash 0x0 charm.bin`. Nothing secret is in it, so the same
+file goes on both boards.
+
+**The face is her render plus a drawing.** Each character's render is a still
+466 × 466 image, embedded as the RGB565 bytes the screen draws
+(`charm/tools/art.py` makes them from `charm/art/*.png`), so nothing is decoded
+at boot. Her eyes, highlight, smile and cheeks are drawn live on top, measured
+from the render: blinks, glances, the mouth following the loudness of what
+plays. Only the face's own patch is redrawn on a frame; the listening ring,
+round the whole rim, is the one thing that redraws the full screen, and only
+while it shows. The design was settled in two playgrounds before any of this —
+the claude.ai artifacts *Eugenia, on the charm* and *Gladys, on the charm* —
+and the numbers here are theirs.
+
+**First milestone, what a board does today:** it comes up as Eugenia (or
+Gladys), her face alive at 75% brightness, and chimes. **A tap** records three
+seconds and plays them back with her mouth moving to them — the screen, touch,
+both microphones and the speaker proved before Wi-Fi or the doors. **Holding the
+screen for five seconds** switches which character she is and restarts; that
+stands in for the setup page until it exists. The first serial line names the
+character, the flash size and the PSRAM the chip actually has.
+
+**Still to build**, in order: the setup page (her Wi-Fi networks, which
+character, her key), the conversation with Eugenia's door, sleep and the
+briefing alert with its still purple dot, Gladys's journal on screen with her
+near-white dot, the volume dial round the rim, and the battery and power
+screens.
 
 ---
 
