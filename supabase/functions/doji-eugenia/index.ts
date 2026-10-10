@@ -2693,6 +2693,12 @@ export async function positionsBlock(): Promise<string> {
 
 /* ─── The cron half: the briefing, and the quieter second look ───────────── */
 
+/* Paused to spend less, not because either is wrong (README, *Paused*), and
+   back on by deleting the name. Each still fires on its schedule and returns
+   before its model call — the release look after filing, so the calendar and
+   every actual keep landing while it is off. */
+export const PAUSED = new Set(['pulse', 'release']);
+
 /* The apology names the job. Every failure once said "No briefing", so a
    nightly pass that died — whose symptom is a memory that stops growing — sent
    him looking for a missing message. A map, so the words can be enumerated. */
@@ -3137,6 +3143,7 @@ async function recordChannels() {
 /* The quiet look. Nothing is stored when she stays quiet: empty pairs would
    push the briefing out of the twelve turns. */
 async function postPulse(): Promise<Response> {
+  if (PAUSED.has('pulse')) return json({ ok: true, pulse: "paused" });
   const [notes, channels, story, loops, calendar, desk] = await Promise.all([
     notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(), calendarBlock(),
     positionsBlock(),
@@ -3273,6 +3280,7 @@ async function markLooked(ids: number[]): Promise<void> {
 
 async function postRelease(): Promise<Response> {
   await filed();
+  if (PAUSED.has('release')) return json({ ok: true, skipped: "paused" });
   const due = await pendingRelease();
   if (!due.length) return json({ ok: true, skipped: "nothing has landed unlooked" });
   if (awaitingActual(due, Date.now())) return json({ ok: true, skipped: "waiting for TradingView's actual" });

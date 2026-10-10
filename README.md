@@ -1306,6 +1306,18 @@ handed the failures and told when nothing broke. A breach gets the fact, her
 verdict and the lesson in three short sentences, then back to the market. Closed
 trades only: a verdict on an open one is a hard prohibition.
 
+### Paused
+
+**The pulse and the release look are paused**, to spend less — not because
+either is wrong — and back on by deleting the name from `PAUSED` in
+`doji-eugenia`. Both still fire on their schedules and return before
+their model call. The release look returns only after filing, so the calendar and
+every actual keep landing; it looks back no further than `RELEASE_STALE_H`, so
+turned back on it picks up from that hour and never reads out a backlog. The
+next morning's briefing carries what a print said, and `revisionLine`, said only
+in the release look, waits with it. A test holds every paused name to a
+check that returns before the model call.
+
 ### The pulse
 
 Weekdays at 10:00 ET, past the 08:30 data window. **Its default answer is

@@ -3594,6 +3594,43 @@ test('every flag a cron job calls with is a flag the function reads', () => {
   assert.match(body, /get\("release"\) === "1"\)\s*\{[^}]*postRelease\(\)/);
 });
 
+/* ─── What is paused is paused where it costs ─────────────────────────────────
+   PAUSED names jobs by the word APOLOGY knows them by, and a gate checks each
+   name. A name nothing checks is a job that still runs; a check on a word no
+   job is called can never be paused. The pulse returns before its reads; the
+   release look only after filing, or the calendar and every actual stop with
+   it. Neither may reach its model call.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every paused job is checked, and each check returns before the model call', () => {
+  const held = EUGENIA_TS.match(/export const PAUSED = new Set\(\[([^\]]*)\]\)/);
+  assert.ok(held, 'doji-eugenia no longer declares PAUSED as a literal set');
+  const paused = [...held[1].matchAll(/'(\w+)'/g)].map(m => m[1]);
+  const checked = [...uncomment(EUGENIA_TS).matchAll(/PAUSED\.has\('(\w+)'\)/g)].map(m => m[1]);
+  assert.ok(checked.length >= 2, `only ${checked.length} pause checks read — the reader has gone blind`);
+
+  const apology = EUGENIA_TS.match(/export const APOLOGY: Record<string, string> = \{([\s\S]*?)\n\};/);
+  assert.ok(apology, 'doji-eugenia no longer declares APOLOGY, the word for each job');
+  const jobs = [...apology[1].matchAll(/^\s+(\w+):/gm)].map(m => m[1]);
+  for (const name of checked) {
+    assert.ok(jobs.includes(name), `a pause check names '${name}', which is no job — it can never be paused`);
+  }
+  for (const name of paused) {
+    assert.ok(checked.includes(name), `PAUSED holds '${name}' and nothing checks it — that job still runs`);
+  }
+
+  const pulse = uncomment(bodyOf(EUGENIA_TS, 'async function postPulse('));
+  assert.match(pulse, /\{\s*if \(PAUSED\.has\('pulse'\)\) return json\(/,
+    'the pulse no longer checks the pause first, so a paused pulse still reads and may still ask');
+
+  const release = uncomment(bodyOf(EUGENIA_TS, 'async function postRelease('));
+  const at = (s) => release.indexOf(s);
+  assert.ok(at('await filed()') > -1 && at('await filed()') < at("PAUSED.has('release')"),
+    'the release look checks the pause before filing, so pausing it stops the calendar and every actual');
+  assert.ok(at("PAUSED.has('release')") < at('await ask('),
+    'the release look reaches its model call before it checks the pause');
+});
+
 /* ─── And the same census from the other side ────────────────────────────────
    A door in postScheduled with no job behind it is answered correctly by
    nobody. A scheduled sense needs a job in schema.sql; a door a PERSON opens must not

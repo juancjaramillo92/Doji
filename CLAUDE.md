@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 706 tests, seven suites
+npm test      # 707 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -366,6 +366,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
   `?force=1` door, and `agree.test.mjs` reads `postScheduled` for the call. **A
   literal that is right by accident of another function's range is the shape to
   look for.**
+- **`PAUSED` is an off switch, not a retirement**: a paused job keeps its code,
+  its schedule and its tests, and returns before its model call;
+  `agree.test.mjs` holds every name to such a gate.
 - **The data-driven senses are not in `dueNow`.** Each flag is written in its
   cron job's URL and in `postScheduled`; `agree.test.mjs` holds both directions,
   with the doors a person opens declared.
