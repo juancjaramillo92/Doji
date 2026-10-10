@@ -26,3 +26,6 @@ void face_set_mode(face_mode_t mode);
 // How loud the audio is right now, 0 to 1: the ring while listening, the
 // mouth while speaking.
 void face_set_level(float level);
+
+// The battery is low: awake and idle, she looks sleepy, the hint to charge her.
+void face_set_tired(bool tired);

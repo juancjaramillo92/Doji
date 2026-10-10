@@ -73,6 +73,7 @@ charm/                                  firmware for the two charms — see The 
   main/gladys.c                         Gladys's door: what waits, and his answers
   main/journal.c                        the journal's questions, a screen each
   main/dial.c                           the volume, a finger round the rim
+  main/power.c                          the PWR button and the battery
   main/hanken_64.c                      Doji's typeface for the journal's words
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
@@ -2623,11 +2624,20 @@ starts nothing.
 did not before, a soft double tick, and she sleeps with her dot up until
 nothing does.
 
+**PWR switches her on and off.** The button belongs to the power chip, an
+AXP2101 (`charm/main/power.c`): a press switches the board on, and she wakes
+with her eyes opening and the chime. Held for a second and a half while she is
+awake, she closes her eyes and switches the board off. Asleep, the chip is not
+listening, so the hold runs on to the power chip's own switch-off, set to its
+longest, ten seconds, so that awake the goodnight always comes first. Below
+15% with nothing charging her, her idle face is sleepy, the hint to charge her.
+
 **To check on the real board first**: that the panel keeps the dot while the
 chip sleeps, that the touch controller wakes it (the BOOT button always does),
-and how long a battery lasts.
-
-**Still to build**: the battery and power screens.
+that the power chip's registers are where Waveshare's example and the
+datasheet put them (the long press, the switch-off and the battery), whether a
+full-screen swipe is smooth enough to replace the journal's taps, and how long
+a battery lasts.
 
 ---
 

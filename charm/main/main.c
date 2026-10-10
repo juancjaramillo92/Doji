@@ -10,7 +10,10 @@
    waits first. She also wakes on her own, in the dark: Eugenia after the
    briefing's hour (briefing.c) to ask whether it has landed, saying so when it
    has; Gladys every few minutes to ask what waits, with a soft double tick
-   when something new does. Either then sleeps with her still dot up. */
+   when something new does. Either then sleeps with her still dot up.
+
+   PWR is the power chip's (power.c): a press switches her on, held while she
+   is awake she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
@@ -28,6 +31,7 @@
 #include "face.h"
 #include "gladys.h"
 #include "net.h"
+#include "power.h"
 #include "setup.h"
 #include "sleep.h"
 #include "sound.h"
@@ -135,6 +139,8 @@ void app_main(void) {
 
     bsp_display_start();
     bsp_display_brightness_set(cfg.brightness);
+    power_start();
+    face_set_tired(power_low());
 
     // An errand starts in the dark, or with her dot still up.
     if (woke == ESP_SLEEP_WAKEUP_TIMER) face_set_mode(waiting ? FACE_DOT : FACE_DARK);

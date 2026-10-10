@@ -61,6 +61,7 @@ static lv_obj_t *base_obj, *layer_obj;
 
 static volatile face_mode_t mode = FACE_IDLE;
 static volatile float level;
+static volatile bool tired;
 
 // What is on screen, eased toward what the mode asks for.
 static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused, happy; } V = { .open = 0, .smile = 1 };
@@ -76,6 +77,7 @@ static bool hides(face_mode_t m) { return m == FACE_DARK || m == FACE_DOT; }
 
 void face_set_mode(face_mode_t m) { mode = m; }
 void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
+void face_set_tired(bool t) { tired = t; }
 
 static float rnd(void) { return (float)esp_random() / 4294967295.0f; }
 
@@ -270,6 +272,7 @@ static void tick(lv_timer_t *t) {
     static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 }, ahead[2] = { 0, 0 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
+    if (m == FACE_IDLE && tired) { t_open = 0.42f; t_smile = 0.6f; glance = 0.3f; }
     if (m == FACE_LISTENING) { t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up; }
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
     if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
