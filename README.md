@@ -74,7 +74,9 @@ charm/                                  firmware for the two charms — see The 
   main/gladys.c                         Gladys's door: what waits, and his answers
   main/journal.c                        the journal's questions, a screen each
   main/dial.c                           the volume, a finger round the rim
-  main/power.c                          the PWR button and the battery
+  main/power.c                          the two buttons and the battery
+  main/motion.c                         the motion sensor, armed to wake her
+  main/lift.c                           whether a lift was him looking
   main/hanken_64.c                      Doji's typeface for the journal's words
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
@@ -2589,7 +2591,14 @@ what woke it.
 
 **She lives in short waking spells, and whoever is needed wakes.** Thirty
 seconds without a tap and her eyes close and the chip goes into deep sleep,
-where it wakes as if switched on again: on a tap, the BOOT button, or a time.
+where it wakes as if switched on again: **lifted to look**, on a tap, PWR, the
+BOOT button, or a time. A lift is the motion sensor's: armed before every
+sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it wakes the chip on a
+movement, which then takes two readings a moment apart and keeps her awake
+only when the screen is tilted up toward him and held still
+(`charm/main/lift.c`); a swing on the keyring or a bump in a pocket sends her
+straight back to sleep without lighting the screen, and rests the sensor for
+twenty seconds, so a keyring swinging all day cannot keep waking her.
 Who wakes is decided before the screen lights, so waking is never a switch:
 **Gladys when a trade waits** for its journal, Eugenia otherwise. Gladys
 journals it and goes back to sleep, unless a briefing waits too; only then does
@@ -2643,19 +2652,21 @@ and the volume is saved in her flash with the rest. A slide is not a tap, so it
 starts nothing.
 
 **PWR switches her on and off**, and **BOOT held for five seconds opens the
-setup**. PWR belongs to the power chip, an
-AXP2101 (`charm/main/power.c`): a press switches the board on, and she wakes
-with her eyes opening and the chime. Held for a second and a half while she is
-awake, she closes her eyes and switches the board off. Asleep, the chip is not
-listening, so the hold runs on to the power chip's own switch-off, set to its
-longest, ten seconds, so that awake the goodnight always comes first. Below
-15% off the cable, her idle face is sleepy, the hint to charge her.
+setup**. PWR belongs to the power chip, an AXP2101 (`charm/main/power.c`): a
+press switches the board on, and she wakes with her eyes opening and the
+chime. It also reaches the chip, high while pressed, on GPIO3, so a press wakes
+her from sleep and the charm times the hold itself: at a second and a half,
+awake or just woken by it, she closes her eyes and switches the board off
+through the power chip, whose own switch-off is set to its longest, ten
+seconds, so the goodnight always comes first. Below 15% off the cable, her idle
+face is sleepy, the hint to charge her.
 
 **To check on the real board first**: that the panel keeps the sleep screen
 while the chip sleeps, that the touch controller wakes it (the BOOT button
 always does), that the power chip's registers are where Waveshare's example and
-the datasheet put them (the long press, the switch-off, the cable and the
-battery), that a phone stays on her setup network while she joins another —
+the datasheet put them (the switch-off, the cable and the battery), that the
+motion sensor's wake-on-motion is set as its datasheet has it and which way its
+z axis faces the screen, the readings `lift.c` judges a lift by, that a phone stays on her setup network while she joins another —
 the two share one radio, so her own moves to the other's channel — whether a
 full-screen swipe is smooth enough to replace the journal's taps, and how long
 a battery lasts.

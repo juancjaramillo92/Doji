@@ -9,7 +9,11 @@
    it. Awake, a tap is for whoever shows — Eugenia: he talks to her (talk.c);
    Gladys: she journals what waits (gladys.c) — a swipe across her face
    switches them, and AWAKE_MS without a tap puts her to sleep: her eyes close
-   and the chip stops (sleep.c). A tap or the BOOT button wakes her.
+   and the chip stops (sleep.c). Lifting her to look wakes her (motion.c), and
+   so do a tap, PWR and BOOT. A lift that was not him looking — a swing, a
+   bump — sends her straight back to sleep without lighting the screen, and
+   rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
+   cannot keep waking her.
 
    Asleep, she wakes on her own every CHECK_S, without lighting the screen, to
    ask Gladys's door what waits, with a soft double tick when something new
@@ -18,8 +22,8 @@
    only when its marks must change: the panel keeps its picture while the chip
    sleeps, so most errands never touch it.
 
-   PWR is the power chip's (power.c): a press switches her on, held while she
-   is awake she says goodnight and switches off. */
+   PWR is the power chip's (power.c): a press switches her on, and held she
+   says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
@@ -36,6 +40,7 @@
 #include "dial.h"
 #include "face.h"
 #include "gladys.h"
+#include "motion.h"
 #include "net.h"
 #include "power.h"
 #include "setup.h"
@@ -52,10 +57,14 @@ static const char *TAG = "charm";
 #define GOODNIGHT_MS  1200   // her eyes closing
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define SLIDE_MS      500    // a switch, and a moment over
+#define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
+#define EARLY_S       5      // how early a timer may wake her and still be the errand's
 
-// What waits, and what the sleep screen last drew; both kept through sleep.
+// What waits, what the sleep screen last drew, and when the next errand is;
+// all kept through sleep.
 static RTC_DATA_ATTR bool briefing_waits, trade_waits;
 static RTC_DATA_ATTR int drawn = -1;
+static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
 static TaskHandle_t life_task;
@@ -105,7 +114,7 @@ static void light_eugenia(void) { light(EUGENIA, FACE_THINKING); }
 
 /* Goodnight, when her face is showing, then the sleep screen — drawn only
    when its marks differ from what the panel already holds — then deep sleep
-   until the next errand. */
+   until the next errand, the motion sensor armed. */
 static void sleep_now(void) {
     int charge = power_charge();
     bool tired = power_low();
@@ -122,7 +131,9 @@ static void sleep_now(void) {
         vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
         drawn = marks;
     }
-    sleep_until(time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S));
+    errand_at = time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S);
+    motion_arm();
+    sleep_until(errand_at, true);
 }
 
 // In the dark: what waits for Gladys, and in its hours whether the briefing has.
@@ -197,6 +208,17 @@ static void awake(void) {
 static void life(void *arg) {
     (void)arg;
     power_start();
+    // A lift that was not him: back to sleep at once, the sensor resting.
+    if (woke == ESP_SLEEP_WAKEUP_EXT1 && esp_sleep_get_ext1_wakeup_status() & 1ULL << MOTION_PIN && !motion_looked()) {
+        time_t rest = time(NULL) + LIFT_REST_S;
+        sleep_until(rest < errand_at ? rest : errand_at, false);
+    }
+    if (woke == ESP_SLEEP_WAKEUP_TIMER && time(NULL) + EARLY_S < errand_at) {
+        // The rest is over before the errand is due: armed again, nothing else.
+        // A timer a moment early is the errand's own.
+        motion_arm();
+        sleep_until(errand_at, true);
+    }
     if (woke == ESP_SLEEP_WAKEUP_TIMER) errand();
     else awake();
 }
