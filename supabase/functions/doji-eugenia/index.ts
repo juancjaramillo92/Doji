@@ -2885,26 +2885,32 @@ async function postBriefing(due: Brief): Promise<Response> {
   return json({ ok: true, brief: due, chars: brief.length });
 }
 
-/* The second worker: today's stored briefing, found by its marker and paired
-   with its text by the instant they were written in one INSERT — adjacent ids
-   would not prove that. Today's only, since the door is also a person's repair
-   and yesterday's would arrive as this morning's. The delivered row is written
-   here, after the send: pace_line reads its absence as a missing briefing.
-   Exported so find, pair, speak, record is driven. */
-export async function postSpeak(due: string): Promise<Response> {
-  if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
-  const opened = Date.now();
+/* Today's stored briefing, found by its marker and paired with its text by the
+   instant they were written in one INSERT — adjacent ids would not prove that.
+   Today's only, and null when there is none yet: yesterday's would arrive as
+   this morning's. */
+async function storedBriefing(due: Brief, today: string): Promise<{ content: string } | null> {
   const [marker] = await readRows<{ created_at: string }>('Briefing marker',
     `eugenia_turns?select=created_at&role=eq.user` +
     `&content=eq.${encodeURIComponent(briefingMarker(due))}&order=id.desc&limit=1`);
-  const today = nyDate(new Date());
-  if (!marker || nyDate(new Date(marker.created_at)) !== today) {
-    throw new Error(`no ${due} briefing is stored for ${today}`);
-  }
+  if (!marker || nyDate(new Date(marker.created_at)) !== today) return null;
   const [turn] = await readRows<{ content: string }>('Briefing',
     `eugenia_turns?select=content&role=eq.assistant` +
     `&created_at=eq.${encodeURIComponent(marker.created_at)}&order=id.desc&limit=1`);
   if (!turn) throw new Error(`the ${due} briefing's marker is stored and its text is not`);
+  return turn;
+}
+
+/* The second worker: today's stored briefing, spoken. Today's only, since the
+   door is also a person's repair. The delivered row is written here, after the
+   send: pace_line reads its absence as a missing briefing. Exported so find,
+   pair, speak, record is driven. */
+export async function postSpeak(due: string): Promise<Response> {
+  if (due !== 'weekday' && due !== 'sunday') throw new Error(`no such briefing to speak: ${due}`);
+  const opened = Date.now();
+  const today = nyDate(new Date());
+  const turn = await storedBriefing(due, today);
+  if (!turn) throw new Error(`no ${due} briefing is stored for ${today}`);
 
   const heard = await sayAloud(turn.content, feedbackKeyboard(today), SPEAK_WORKER_MS);
   const spoken = Date.now();

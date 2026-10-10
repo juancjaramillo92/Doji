@@ -3960,7 +3960,10 @@ test('the briefing is written in one worker and spoken in another, and never los
     'the speaking worker speaks on the one-worker budget, which is the clock it was split off to escape');
   assert.ok(at(speak, 'await sayAloud(') < at(speak, "caller: `${due} briefing delivered`"),
     'the delivered row is written before the send — pace_line reads it as the statement that he has it');
-  assert.match(speak, /created_at=eq\.\$\{encodeURIComponent\(marker\.created_at\)\}/,
+  assert.match(speak, /const turn = await storedBriefing\(due, today\);/,
+    'the speaking worker no longer reads today\'s briefing through storedBriefing');
+  assert.match(bodyOf(EUGENIA_TS, 'async function storedBriefing('),
+    /created_at=eq\.\$\{encodeURIComponent\(marker\.created_at\)\}/,
     'the text is no longer paired with its marker by the instant both were written');
   assert.match(EUGENIA_TS, /if \(speak\) \{ job = 'speak'; return await postSpeak\(speak\); \}/,
     'postScheduled no longer opens the speaking worker\'s door');
