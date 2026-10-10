@@ -85,9 +85,10 @@ static void play_answer(esp_http_client_handle_t h) {
 }
 
 /* Knocks at her door — a POST of `wav` when there is one, else a GET of
-   `url` — and plays the answer when it is 200, lighting her face for it
-   first. Returns the status, or -1 when the door could not be reached. */
-static int knock(const char *url, const uint8_t *wav, size_t len) {
+   `url` — and plays the answer when it is 200, after `lit`, when there is
+   one, has lit the screen for her. Returns the status, or -1 when the door
+   could not be reached. */
+static int knock(const char *url, const uint8_t *wav, size_t len, void (*lit)(void)) {
     esp_http_client_config_t c = {
         .url = url,
         .method = wav ? HTTP_METHOD_POST : HTTP_METHOD_GET,
@@ -95,7 +96,7 @@ static int knock(const char *url, const uint8_t *wav, size_t len) {
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
     esp_http_client_handle_t h = esp_http_client_init(&c);
-    esp_http_client_set_header(h, "x-charm-key", cfg.key);
+    esp_http_client_set_header(h, "x-charm-key", cfg.eugenia_key);
     if (wav) esp_http_client_set_header(h, "Content-Type", "audio/wav");
     bool sent = esp_http_client_open(h, (int)len) == ESP_OK;
     for (size_t at = 0; sent && at < len;) {
@@ -109,6 +110,7 @@ static int knock(const char *url, const uint8_t *wav, size_t len) {
         status = esp_http_client_get_status_code(h);
     }
     if (status == 200) {
+        if (lit) lit();
         face_set_mode(FACE_THINKING);
         play_answer(h);
     } else {
@@ -137,17 +139,17 @@ void talk(void) {
 
     face_set_mode(FACE_THINKING);
     wav_header(wav, got);
-    if (knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2) != 200) confused();
+    if (knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2, NULL) != 200) confused();
     face_set_mode(FACE_IDLE);
 }
 
-bool talk_ready(void) {
-    return knock(EUGENIA_DOOR "?briefing=ready", NULL, 0) == 200;
+bool talk_ready(void (*lit)(void)) {
+    return knock(EUGENIA_DOOR "?briefing=ready", NULL, 0, lit) == 200;
 }
 
 void talk_briefing(void) {
     face_set_mode(FACE_THINKING);
-    int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0);
+    int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
     if (status != 200 && status != 204) confused();
     face_set_mode(FACE_IDLE);
 }

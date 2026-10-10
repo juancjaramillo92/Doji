@@ -10,8 +10,6 @@ charm_config_t cfg;
 
 void config_load(void) {
     memset(&cfg, 0, sizeof cfg);
-    cfg.brightness = 75;
-    cfg.check_min = 5;
     cfg.volume = 60;
 
     esp_err_t err = nvs_flash_init();
@@ -22,13 +20,10 @@ void config_load(void) {
     nvs_handle_t h;
     if (nvs_open(NS, NVS_READONLY, &h) != ESP_OK) return;
 
-    char who[16] = "";
-    size_t len = sizeof who;
-    nvs_get_str(h, "who", who, &len);
-    cfg.gladys = strcmp(who, "gladys") == 0;
-
-    len = sizeof cfg.key;
-    nvs_get_str(h, "key", cfg.key, &len);
+    size_t len = sizeof cfg.eugenia_key;
+    nvs_get_str(h, "ekey", cfg.eugenia_key, &len);
+    len = sizeof cfg.gladys_key;
+    nvs_get_str(h, "gkey", cfg.gladys_key, &len);
 
     len = sizeof cfg.nets;
     if (nvs_get_blob(h, "nets", cfg.nets, &len) == ESP_OK) {
@@ -36,8 +31,6 @@ void config_load(void) {
     }
 
     int32_t v;
-    if (nvs_get_i32(h, "bright", &v) == ESP_OK && v >= 10 && v <= 100) cfg.brightness = v;
-    if (nvs_get_i32(h, "check", &v) == ESP_OK && v >= 1 && v <= 60) cfg.check_min = v;
     if (nvs_get_i32(h, "vol", &v) == ESP_OK && v >= 0 && v <= 100) cfg.volume = v;
     nvs_close(h);
 }
@@ -45,18 +38,16 @@ void config_load(void) {
 void config_save(void) {
     nvs_handle_t h;
     if (nvs_open(NS, NVS_READWRITE, &h) != ESP_OK) return;
-    nvs_set_str(h, "who", cfg.gladys ? "gladys" : "eugenia");
-    nvs_set_str(h, "key", cfg.key);
+    nvs_set_str(h, "ekey", cfg.eugenia_key);
+    nvs_set_str(h, "gkey", cfg.gladys_key);
     nvs_set_blob(h, "nets", cfg.nets, sizeof cfg.nets);
-    nvs_set_i32(h, "bright", cfg.brightness);
-    nvs_set_i32(h, "check", cfg.check_min);
     nvs_set_i32(h, "vol", cfg.volume);
     nvs_commit(h);
     nvs_close(h);
 }
 
 bool config_ready(void) {
-    return cfg.n_nets > 0 && cfg.key[0];
+    return cfg.n_nets > 0 && cfg.eugenia_key[0] && cfg.gladys_key[0];
 }
 
 void config_ask_setup(void) {

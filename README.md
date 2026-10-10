@@ -61,8 +61,8 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the two charms — see The charms
-  main/main.c                           boot, and what a touch does
-  main/face.c                           her face drawn live over her render
+  main/main.c                           who wakes, her errands, and what a touch does
+  main/face.c                           both faces, drawn live, and the sleep screen
   main/sound.c                          the speaker and both microphones
   main/config.c                         what the setup page saved, in her flash
   main/setup.c                          the setup page, on her own Wi-Fi network
@@ -2513,11 +2513,12 @@ missing one and may not cut it for length. A trade still open gets no verdict.
 
 ## The charms
 
-Two Waveshare **ESP32-S3-Touch-AMOLED-1.75C** boards — a 466 × 466 round AMOLED
-(CO5300) with touch (CST9217), two microphones (ES7210), a speaker (ES8311), a
-power chip (AXP2101), a motion sensor and 8 MB of PSRAM — each one of the bots
-in a hand-sized case: purple **Eugenia**, grey **Gladys**. One firmware runs on
-both; which character a board is lives in its own flash.
+A Waveshare **ESP32-S3-Touch-AMOLED-1.75C** — a 466 × 466 round AMOLED (CO5300)
+with touch (CST9217), two microphones (ES7210), a speaker (ES8311), a power
+chip (AXP2101), a motion sensor (QMI8658), 16 MB of flash and 8 MB of PSRAM —
+in a hand-sized case on his keyring, with **both bots on it**: purple
+**Eugenia** and grey **Gladys**. A second board is a spare; the same firmware
+goes on any.
 
 **The firmware is `charm/`, an ESP-IDF project**, built by
 `.github/workflows/charm.yml` in Espressif's ESP-IDF v5.5.4 image (pinned by
@@ -2528,64 +2529,76 @@ The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
 ESP-IDF's name for the app alone; the workflow fails a build whose image is
-smaller than the bootloader's space plus the app. Nothing secret is in it, so the same
-file goes on both boards.
+smaller than the bootloader's space plus the app. Nothing secret is in it.
 
-**The face is her render plus a drawing.** Each character's render is a still
+**A face is a render plus a drawing.** Each character's render is a still
 466 × 466 image, embedded as the RGB565 bytes the screen draws
 (`charm/tools/art.py` makes them from `charm/art/*.png`), so nothing is decoded
 at boot. Her eyes, highlight, smile and cheeks are drawn live on top, measured
 from the render: blinks, glances, the mouth following the loudness of what
 plays; thinking, she looks up and away from one side to the other under three
 thought dots; when something goes wrong, her eyes go uneven and her smile turns
-down; going to sleep, her eyes close slowly. Asleep, the screen is black, or
-black but for her **still dot** — the playground's, low on the screen with a
-glow: purple for Eugenia, the light silver of Gladys's fur for her. Only the
-face's own patch is redrawn on a frame; the ring, Doji's purples turning slowly
-round the whole rim, is the one thing that redraws the full screen, and only
-while it shows. The design was settled in two playgrounds before any of this —
-the claude.ai artifacts *Eugenia, on the charm* and *Gladys, on the charm* —
-and the numbers here are theirs.
+down; delighted, her eyes curve and her cheeks go pinker; going to sleep, her
+eyes close slowly. Each character is on her own card, and **a switch slides one
+out and the other in**. Only the face's own patch is redrawn on a frame; the
+ring — Doji's purples turning slowly round the rim — and a switch are the only
+things that redraw the full screen, and only while they last. No network shows
+a small mark under her face, so a confused look always has its reason. The
+design was settled in playgrounds before any of this — the claude.ai artifacts
+*Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
+numbers here are theirs.
+
+**The sleep screen is black but for its marks**, still, so they stay on the
+panel while the chip sleeps: Eugenia's purple dot while a briefing waits and
+Gladys's — the light silver of her fur, since grey on black reads as a smudge
+— while a trade does, low on the screen with a glow, side by side when both
+wait; a small battery at the top when she is below 15% and off the cable; and
+on the cable, the charge as a ring round the rim with its percent. The dots and
+the battery wander a few pixels each time she sleeps, so a mark left all night
+never burns in.
 
 **The setup page is the only way anything gets onto a board.** With no Wi-Fi
-network or no key saved — a board fresh from flashing — or after the screen is
-held for ten seconds, she shows *Set me up* and becomes her own open network,
-**Charm-Setup-** and four characters of her own, like *Charm-Setup-4F2A*. Every name it is asked resolves to the charm and every
-page but its own redirects there, so a phone that joins opens the page by
-itself. It asks **who she is** (Eugenia or Gladys), **up to four Wi-Fi
-networks**, tried in order, with the ones in range offered by name, **her key**
-(`EUGENIA_CHARM_SECRET` or `GLADYS_CHARM_SECRET`), the **brightness** (75% by
-default) and how often **Gladys checks** (every 5 minutes). A blank password or
-key keeps the one she has, so adding a network never means pasting the key
-again. It is saved in her own flash (NVS, namespace `charm`) and she restarts.
-The address of her door is the repository's — in `charm/main/net.h`, which
-`agree.test.mjs` reads with every other caller — and only the key is secret, so
-the same firmware goes on both boards and a lost charm is cut off by changing
-her key in Supabase.
+network or without both keys — a board fresh from flashing — or after the
+screen is held for ten seconds, she shows *Set me up* and becomes her own open
+network, **Charm-Setup-** and four characters of her own, like
+*Charm-Setup-4F2A*. Every name it is asked resolves to the charm and every page
+but its own redirects there, so a phone that joins opens the page by itself.
+It asks for **up to four Wi-Fi networks**, tried in order, with the ones in
+range offered by name, and **the two keys**, `EUGENIA_CHARM_SECRET` and
+`GLADYS_CHARM_SECRET`. A blank password or key keeps the one she has, so adding
+a network never means pasting a key again. It is saved in her own flash (NVS,
+namespace `charm`) and she restarts. The addresses of the two doors are the
+repository's — in `charm/main/net.h`, which `agree.test.mjs` reads with every
+other caller — and only the keys are secret, so a lost charm is cut off by
+changing them in Supabase.
 
-**What a board does today:** switched on, she comes up as whoever the setup
-page made her, her face alive at the saved brightness, and chimes; joins the
-first of her networks that answers and sets her clock to New York, clock
-changes included, since the briefing is 08:00 there all year. The first serial
-line names the character, the flash size, the PSRAM the chip actually has and
+**Switched on**, she comes up as Eugenia, her face alive at 75% brightness,
+and chimes; joins the first of her networks that answers and sets her clock to
+New York, clock changes included, since the briefing is 08:00 there all year.
+The first serial line names the flash size, the PSRAM the chip actually has and
 what woke it.
 
-**She lives in short waking spells.** Thirty seconds without a tap and her eyes
-close and the chip goes into deep sleep, where it wakes as if switched on
-again: on a tap, the BOOT button, or a time. The screen keeps what it last
-showed — the panel holds its own picture while it has power, and the two pins
-that could reset it are held — so the dot needs no chip awake to stay up. Each
-waking joins her Wi-Fi again, a few seconds while her eyes open.
+**She lives in short waking spells, and whoever is needed wakes.** Thirty
+seconds without a tap and her eyes close and the chip goes into deep sleep,
+where it wakes as if switched on again: on a tap, the BOOT button, or a time.
+Who wakes is decided before the screen lights, so waking is never a switch:
+**Gladys when a trade waits** for its journal, Eugenia otherwise. Gladys
+journals it and goes back to sleep, unless a briefing waits too; only then does
+Eugenia slide in and read it (`?briefing=today`). Awake, **a swipe across her
+face switches them.** The panel's reset and select pins and the touch
+controller's reset are held through sleep, so the sleep screen needs no chip
+awake to stay up and a tap can still wake her. Each waking joins her Wi-Fi
+again, a few seconds while her eyes open.
 
-**Eugenia wakes on her own for the briefing.** At five past its hour — 08:00
-on a weekday, 17:00 on a Sunday, none on a Saturday — and every ten minutes
-through the hour of the last retry (`retryDue`), she wakes in the dark and asks
-`?briefing=ready`. A `204` and she sleeps again, unseen; her line and her face
-light up, she says it, and sleeps with her dot up, asking no more that day.
-The next time he wakes her, that press is for the briefing: she reads it
-(`?briefing=today`) before anything else. A tap while she asks turns the
-errand into a waking spell. The hours are a copy of the server's
-(`charm/main/briefing.c`), held by `agree.test.mjs`.
+**Asleep, she runs errands in the dark** every five minutes, around the clock,
+and on the cable every two so the charge stays current. She asks Gladys's door
+what waits — a soft double tick when a trade waits that did not before — and in
+the briefing's hours, from five past 08:00 on a weekday or 17:00 on a Sunday
+through the hour of the last retry (`retryDue`), Eugenia's `?briefing=ready`.
+When it has landed, her face lights and she says so, then sleeps with her dot
+up and asks no more that day. The screen is started only when its marks must
+change, so most errands never touch it. The briefing's hours are a copy of the
+server's (`charm/main/briefing.c`), held by `agree.test.mjs`.
 
 **A tap and he talks to Eugenia.** The ring shows round the rim and follows his
 voice; his turn ends at a pause of over a second after he has spoken, at a
@@ -2597,32 +2610,28 @@ exact zeros. A tap while she thinks or speaks cuts her off; the copy in
 Telegram is the whole of it. A door that cannot be reached or refuses her key
 shows her confused for four seconds.
 
-**A press and Gladys journals what waits.** She asks her door, and while a
-trade waits her eyes open on him and then the questions take the whole screen,
-the playground's: the setup split down the middle, **B&R** on the left and
-**S&R** on the right; then **RULES**, **SL** and **TP**, each one word on a
-screen whose left half is red for no and right half green for yes. Four dots
-at the top say what is answered. A tap on a half lights it and sends that one
-answer at once, in a tap's own grammar (*Her charm journals a trade on its own
-screen*), and her door answers with what waits next, so the next trade follows
-without a pause. Done, the ring sweeps round once in Doji's purples with a warm
-smile — delighted, eyes curved and cheeks pinker, when every answer was a yes.
-A minute without a tap and the rest waits for next time. Taps, not swipes: a
-swipe moves the whole screen, which this chip may not draw smoothly. The words
-are Doji's typeface, Hanken Grotesk, made into the charm's three fonts by
+**A tap and Gladys journals what waits.** She asks her door, and while a
+trade waits the questions take the whole screen, the playground's: the setup
+split down the middle, **B&R** on the left and **S&R** on the right; then
+**RULES**, **SL** and **TP**, each one word on a screen whose left half is no
+and right half yes — a cool blue-violet and a warm magenta, Doji's purples
+rather than a win's green and a loss's red, each brightening when tapped. Four
+dots at the top say what is answered. A tap on a half sends that one answer at
+once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
+and her door answers with what waits next, so the next trade follows without a
+pause. Done, the ring sweeps round once with a warm smile — delighted when
+every answer was a yes. With nothing waiting, a tap gets a smile. A minute
+without a tap and the rest waits for next time. Taps, not swipes: a swipe moves
+the whole screen, which this chip may not draw smoothly. The words are Doji's
+typeface, Hanken Grotesk, made into the charm's three fonts by
 `charm/tools/fonts.sh` with only the letters they use.
 
-**A finger round the rim is the volume**, on both: one full turn from silent
-to loudest, from a press at least 160 px from the centre. The screen dims, and
+**A finger round the rim is the volume**: one full turn from silent to
+loudest, from a press at least 160 px from the centre. The screen dims, and
 round the rim a faint track, the level in Doji's purples, a white knob at its
 end, and the number under *VOLUME*; it fades a moment after the finger lifts,
 and the volume is saved in her flash with the rest. A slide is not a tap, so it
 starts nothing.
-
-**Gladys wakes on her own every few minutes** — the setup page's *how often*,
-5 by default, around the clock — and asks in the dark. When a trade waits that
-did not before, a soft double tick, and she sleeps with her dot up until
-nothing does.
 
 **PWR switches her on and off.** The button belongs to the power chip, an
 AXP2101 (`charm/main/power.c`): a press switches the board on, and she wakes
@@ -2630,14 +2639,14 @@ with her eyes opening and the chime. Held for a second and a half while she is
 awake, she closes her eyes and switches the board off. Asleep, the chip is not
 listening, so the hold runs on to the power chip's own switch-off, set to its
 longest, ten seconds, so that awake the goodnight always comes first. Below
-15% with nothing charging her, her idle face is sleepy, the hint to charge her.
+15% off the cable, her idle face is sleepy, the hint to charge her.
 
-**To check on the real board first**: that the panel keeps the dot while the
-chip sleeps, that the touch controller wakes it (the BOOT button always does),
-that the power chip's registers are where Waveshare's example and the
-datasheet put them (the long press, the switch-off and the battery), whether a
-full-screen swipe is smooth enough to replace the journal's taps, and how long
-a battery lasts.
+**To check on the real board first**: that the panel keeps the sleep screen
+while the chip sleeps, that the touch controller wakes it (the BOOT button
+always does), that the power chip's registers are where Waveshare's example and
+the datasheet put them (the long press, the switch-off, the cable and the
+battery), whether a full-screen swipe is smooth enough to replace the journal's
+taps, and how long a battery lasts.
 
 ---
 

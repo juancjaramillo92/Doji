@@ -8,8 +8,10 @@
 // The BOOT button and the touch controller's interrupt: both pull low.
 static const gpio_num_t WAKE[] = { GPIO_NUM_0, BSP_LCD_TOUCH_INT };
 
-// What would reset or select the panel if it floated.
-static const gpio_num_t HELD[] = { BSP_LCD_RST, BSP_LCD_CS };
+/* What would reset or select the panel, or reset the touch controller, if it
+   floated. Held through sleep and through an errand that never starts the
+   screen, so the picture stays and a tap can still wake her. */
+static const gpio_num_t HELD[] = { BSP_LCD_RST, BSP_LCD_CS, BSP_LCD_TOUCH_RST };
 
 #define COUNT(a) (sizeof a / sizeof *a)
 

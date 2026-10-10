@@ -1,10 +1,10 @@
-/* The journal on her screen, the playground's (claude.ai artifact "Gladys, on
-   the charm"): each question owns the whole screen, split down the middle,
-   with one word in Doji's typeface and nothing else to read. Right is yes and
-   left is no, green and red as Doji colours a win and a loss. Tapping a half
-   rather than swiping: a swipe moves the whole screen, which this chip may not
-   draw smoothly, so taps first until the real board says otherwise. It sits on
-   LVGL's top layer, over her face. */
+/* The journal on her screen, the playgrounds' (claude.ai artifacts "Gladys,
+   on the charm" and "Your charm"): each question owns the whole screen, split
+   down the middle, with one word in Doji's typeface and nothing else to read.
+   Right is yes and left is no. Tapping a half rather than swiping: a swipe
+   moves the whole screen, which this chip may not draw smoothly, so taps first
+   until the real board says otherwise. It sits on LVGL's top layer, over her
+   face. */
 #include "journal.h"
 
 #include "bsp/esp-bsp.h"
@@ -21,16 +21,22 @@ static const char *const WORDS[4] = { "SETUP", "RULES", "SL", "TP" };
 static const char *const SHORT[2] = { "B&R", "S&R" };
 
 // Doji's palette.
-#define YES      0x3ba585
-#define NO       0xd63d5a
-#define ACCENT   0x8b35b8
 #define INK      0xe8e6f0
 #define MUTED    0x9a92b0
-#define PANEL    0x141022
+#define ACCENT   0x8b35b8
 #define GROUND   0x0a0813
 #define LINE     0x251d39
-#define YES_TINT 0x0b1f1b
-#define NO_TINT  0x200b16
+
+/* The halves, in Doji's purples rather than a win's green and a loss's red:
+   no is the cool blue-violet on the left, yes the warm magenta on the right,
+   each a gradient, top to bottom, that brightens when tapped. The setup's two
+   halves share one. As the playground ("Your charm") has them. */
+static const uint32_t HALVES[3][2][2] = {
+    //            resting               lit
+    /* setup */ { { 0x16123a, 0x221a4e }, { 0x5c40b0, 0xb45cd9 } },
+    /* no    */ { { 0x120f33, 0x1d1a4a }, { 0x3a3aa8, 0x6a4fd0 } },
+    /* yes   */ { { 0x22103a, 0x34184f }, { 0x8b35b8, 0xd26ce6 } },
+};
 
 #define ASK_MS   60000  // then she goes back to sleep, the rest left waiting
 #define FLASH_MS 260
@@ -45,6 +51,13 @@ static void on_tap(lv_event_t *e) {
     lv_indev_get_point(lv_indev_active(), &p);
     int side = p.x >= 233;
     xQueueOverwrite(taps, &side);
+}
+
+// A half in its gradient: kind 0 the setup, 1 no, 2 yes.
+static void paint(lv_obj_t *o, int kind, bool lit) {
+    lv_obj_set_style_bg_color(o, lv_color_hex(HALVES[kind][lit][0]), 0);
+    lv_obj_set_style_bg_grad_color(o, lv_color_hex(HALVES[kind][lit][1]), 0);
+    lv_obj_set_style_bg_grad_dir(o, LV_GRAD_DIR_VER, 0);
 }
 
 static lv_obj_t *box(lv_obj_t *parent, int x, int y, int w, int h, uint32_t bg) {
@@ -74,7 +87,7 @@ static void build(void) {
     lv_obj_add_flag(root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(root, on_tap, LV_EVENT_CLICKED, NULL);
     for (int i = 0; i < 2; i++) {
-        half[i] = box(root, i ? 235 : 0, 0, 231, 466, PANEL);
+        half[i] = box(root, i ? 235 : 0, 0, 231, 466, 0x000000);
         half_word[i] = text(half[i], &hanken_64, INK, 1);
         lv_label_set_text_static(half_word[i], SHORT[i]);
     }
@@ -99,7 +112,7 @@ int journal_ask(int q, const bool missing[4]) {
     if (!root) build();
     bool setup = q == 0;
     for (int i = 0; i < 2; i++) {
-        lv_obj_set_style_bg_color(half[i], lv_color_hex(setup ? PANEL : i ? YES_TINT : NO_TINT), 0);
+        paint(half[i], setup ? 0 : 1 + i, false);
         lv_obj_set_style_text_color(half_word[i], lv_color_hex(INK), 0);
         if (setup) lv_obj_remove_flag(half_word[i], LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(half_word[i], LV_OBJ_FLAG_HIDDEN);
@@ -134,7 +147,7 @@ int journal_ask(int q, const bool missing[4]) {
     if (!xQueueReceive(taps, &side, pdMS_TO_TICKS(ASK_MS))) return -1;
 
     bsp_display_lock(-1);
-    lv_obj_set_style_bg_color(half[side], lv_color_hex(setup ? ACCENT : side ? YES : NO), 0);
+    paint(half[side], setup ? 0 : 1 + side, true);
     if (setup) lv_obj_set_style_text_color(half_word[side], lv_color_white(), 0);
     bsp_display_unlock();
     vTaskDelay(pdMS_TO_TICKS(FLASH_MS));

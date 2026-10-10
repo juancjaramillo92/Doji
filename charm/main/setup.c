@@ -130,9 +130,7 @@ static const char *HEAD =
     "display:grid;gap:10px;margin:0}legend{padding:0 6px;color:#9a92b0;font-size:13px;"
     "letter-spacing:.1em;text-transform:uppercase}input{font:inherit;color:#e8e6f0;background:#0a0813;"
     "border:1px solid #342948;border-radius:10px;padding:10px 12px;width:100%;box-sizing:border-box}"
-    "input:focus{outline:2px solid #8b35b8}.who{display:flex;gap:10px}.who label{flex:1}"
-    ".who input{display:none}.who span{display:block;text-align:center;padding:12px;border-radius:999px;"
-    "border:1px solid #342948;font-weight:600}.who input:checked+span{background:#8b35b8;border-color:#8b35b8}"
+    "input:focus{outline:2px solid #8b35b8}"
     ".row{display:grid;grid-template-columns:1fr 1fr;gap:8px}"
     "button{font-family:inherit;font-weight:600;font-size:16px;color:#fff;background:#8b35b8;border:0;border-radius:999px;padding:14px}"
     "small{color:#6f6788}</style></head><body><main>";
@@ -147,12 +145,9 @@ static esp_err_t page(httpd_req_t *req) {
     char *html = malloc(PAGE_MAX), esc[100];
     if (!html) return httpd_resp_send_500(req);
     int o = snprintf(html, PAGE_MAX, "%s<h1>Set up your charm</h1>"
-        "<p>Saved on the charm itself. Leave a password or the key empty to keep the one it has.</p>"
-        "<form method=post action=/save><fieldset><legend>Who is she</legend><div class=who>"
-        "<label><input type=radio name=who value=eugenia %s><span>Eugenia</span></label>"
-        "<label><input type=radio name=who value=gladys %s><span>Gladys</span></label></div></fieldset>"
-        "<fieldset><legend>Wi-Fi, tried in order</legend><datalist id=near>",
-        HEAD, cfg.gladys ? "" : "checked", cfg.gladys ? "checked" : "");
+        "<p>Saved on the charm itself. Leave a password or a key empty to keep the one it has.</p>"
+        "<form method=post action=/save><fieldset><legend>Wi-Fi, tried in order</legend><datalist id=near>",
+        HEAD);
     for (int i = 0; i < n_seen && o < PAGE_MAX - 200; i++) {
         escape(esc, sizeof esc, (const char *)seen[i].ssid);
         o += snprintf(html + o, PAGE_MAX - o, "<option value=\"%s\">", esc);
@@ -167,13 +162,13 @@ static esp_err_t page(httpd_req_t *req) {
     }
     snprintf(html + o, PAGE_MAX - o,
         "<small>Your phone's hotspot works too.</small></fieldset>"
-        "<fieldset><legend>Her key</legend><input name=key type=password autocapitalize=off "
-        "placeholder='%s'><small>EUGENIA_CHARM_SECRET or GLADYS_CHARM_SECRET, as set in Supabase.</small></fieldset>"
-        "<fieldset><legend>Screen and checks</legend><div class=row>"
-        "<label>Brightness %%<input name=bright type=number min=10 max=100 value=%d></label>"
-        "<label>Gladys checks every (min)<input name=check type=number min=1 max=60 value=%d></label>"
-        "</div></fieldset><button>Save</button></form></main></body></html>",
-        cfg.key[0] ? "Keep the key she has" : "Paste her key", cfg.brightness, cfg.check_min);
+        "<fieldset><legend>Their keys</legend>"
+        "<input name=ekey type=password autocapitalize=off placeholder='%s'>"
+        "<input name=gkey type=password autocapitalize=off placeholder='%s'>"
+        "<small>EUGENIA_CHARM_SECRET and GLADYS_CHARM_SECRET, as set in Supabase.</small></fieldset>"
+        "<button>Save</button></form></main></body></html>",
+        cfg.eugenia_key[0] ? "Keep Eugenia's key" : "Eugenia's key",
+        cfg.gladys_key[0] ? "Keep Gladys's key" : "Gladys's key");
     httpd_resp_set_type(req, "text/html");
     esp_err_t r = httpd_resp_sendstr(req, html);
     free(html);
@@ -213,8 +208,6 @@ static esp_err_t save(httpd_req_t *req) {
     }
     body[len] = 0;
 
-    if (field(body, "who", v, sizeof v)) cfg.gladys = strcmp(v, "gladys") == 0;
-
     // A blank password keeps the one stored for that same network name.
     charm_net_t nets[MAX_NETS] = { 0 };
     int n = 0;
@@ -233,15 +226,10 @@ static esp_err_t save(httpd_req_t *req) {
     memcpy(cfg.nets, nets, sizeof nets);
     cfg.n_nets = n;
 
-    if (field(body, "key", v, sizeof v) && v[0]) {
-        strncpy(cfg.key, v, sizeof cfg.key - 1);
-        cfg.key[sizeof cfg.key - 1] = 0;
-    }
-    if (field(body, "bright", v, sizeof v) && atoi(v) >= 10 && atoi(v) <= 100) cfg.brightness = atoi(v);
-    if (field(body, "check", v, sizeof v) && atoi(v) >= 1 && atoi(v) <= 60) cfg.check_min = atoi(v);
+    if (field(body, "ekey", v, sizeof v) && v[0]) strlcpy(cfg.eugenia_key, v, sizeof cfg.eugenia_key);
+    if (field(body, "gkey", v, sizeof v) && v[0]) strlcpy(cfg.gladys_key, v, sizeof cfg.gladys_key);
     config_save();
-    ESP_LOGI(TAG, "saved: %s, %d network(s), key %s", cfg.gladys ? "Gladys" : "Eugenia",
-             cfg.n_nets, cfg.key[0] ? "set" : "missing");
+    ESP_LOGI(TAG, "saved: %d network(s), keys %s", cfg.n_nets, config_ready() ? "set" : "missing");
 
     httpd_resp_set_type(req, "text/html");
     httpd_resp_sendstr(req, config_ready()
@@ -249,7 +237,7 @@ static esp_err_t save(httpd_req_t *req) {
           "color:#e8e6f0;font:18px -apple-system,sans-serif;padding:40px 20px'>Saved. She is restarting.</body>"
         : "<!doctype html><meta name=viewport content='width=device-width'><body style='background:#070611;"
           "color:#e8e6f0;font:18px -apple-system,sans-serif;padding:40px 20px'>Saved, but she still needs "
-          "a Wi-Fi network and her key. <a style='color:#b45cd9' href=/>Back</a></body>");
+          "a Wi-Fi network and both keys. <a style='color:#b45cd9' href=/>Back</a></body>");
     if (config_ready()) {
         vTaskDelay(pdMS_TO_TICKS(1500));
         esp_restart();

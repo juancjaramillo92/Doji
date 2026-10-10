@@ -1,16 +1,22 @@
-/* The charm. The board comes up as Eugenia or Gladys — which, her Wi-Fi and
-   her key are the setup page's, kept in flash — with her face alive on screen.
-   Without a network or a key, or when asked by holding the screen for ten
-   seconds, she shows the setup page instead.
+/* The charm: Eugenia and Gladys on one board. Their Wi-Fi and their keys are
+   the setup page's, kept in flash; without them, or when asked by holding the
+   screen for ten seconds, she shows the setup page instead.
 
-   She lives in short waking spells. Awake, a tap is for her — Eugenia: he
-   talks to her (talk.c); Gladys: she journals what waits (gladys.c) — and
-   AWAKE_MS without one puts her to sleep: her eyes close and the chip stops
-   (sleep.c). A tap or the BOOT button wakes her, and that press is for what
-   waits first. She also wakes on her own, in the dark: Eugenia after the
-   briefing's hour (briefing.c) to ask whether it has landed, saying so when it
-   has; Gladys every few minutes to ask what waits, with a soft double tick
-   when something new does. Either then sleeps with her still dot up.
+   She lives in short waking spells, and whoever is needed is who wakes —
+   decided before the screen lights, so waking is never a switch: Gladys when
+   a trade waits for its journal, Eugenia otherwise. Gladys journals it and
+   sleeps, unless a briefing waits too; only then does Eugenia slide in to read
+   it. Awake, a tap is for whoever shows — Eugenia: he talks to her (talk.c);
+   Gladys: she journals what waits (gladys.c) — a swipe across her face
+   switches them, and AWAKE_MS without a tap puts her to sleep: her eyes close
+   and the chip stops (sleep.c). A tap or the BOOT button wakes her.
+
+   Asleep, she wakes on her own every CHECK_S, without lighting the screen, to
+   ask Gladys's door what waits, with a soft double tick when something new
+   does, and in the briefing's hours (briefing.c) Eugenia's whether it has
+   landed; when it has, her face lights and she says so. The screen is started
+   only when its marks must change: the panel keeps its picture while the chip
+   sleeps, so most errands never touch it.
 
    PWR is the power chip's (power.c): a press switches her on, held while she
    is awake she says goodnight and switches off. */
@@ -39,27 +45,36 @@
 
 static const char *TAG = "charm";
 
+#define BRIGHTNESS    75     // percent
+#define CHECK_S       300    // how often she asks what waits, around the clock
+#define CHARGING_S    120    // on the cable, how often the charge is redrawn
 #define SETUP_HOLD_MS 10000
 #define AWAKE_MS      30000
 #define GOODNIGHT_MS  1200   // her eyes closing
-#define LAST_FRAME_MS 200    // the dark, or the dot, reaching the panel
+#define LAST_FRAME_MS 200    // the sleep screen reaching the panel
+#define SLIDE_MS      500    // a switch, and a moment over
 
-static RTC_DATA_ATTR bool waiting;  // her dot is up: a briefing, or a trade, waits for him
+// What waits, and what the sleep screen last drew; both kept through sleep.
+static RTC_DATA_ATTR bool briefing_waits, trade_waits;
+static RTC_DATA_ATTR int drawn = -1;
 
 static esp_sleep_wakeup_cause_t woke;
 static TaskHandle_t life_task;
+static volatile bool swiped;
+static character_t showing;
+static bool lit;
 
-// A tap is for her, a slide round the rim is the volume, and ten seconds held
-// opens the setup page.
+// A tap is for whoever shows, a swipe across her face switches them, a slide
+// round the rim is the volume, and ten seconds held opens the setup page.
 static void on_touch(lv_event_t *e) {
     static uint32_t pressed_at;
-    static bool asked;
+    static bool asked, gestured;
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t at;
     lv_indev_get_point(lv_indev_active(), &at);
     if (code == LV_EVENT_PRESSED) {
         pressed_at = lv_tick_get();
-        asked = false;
+        asked = gestured = false;
         dial_press(at);
     }
     if (code == LV_EVENT_PRESSING) dial_slide(at);
@@ -68,95 +83,146 @@ static void on_touch(lv_event_t *e) {
         config_ask_setup();
         esp_restart();
     }
+    if (code == LV_EVENT_GESTURE && !dial_turned() && !gestured) {
+        lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+        if (dir == LV_DIR_LEFT || dir == LV_DIR_RIGHT) {
+            gestured = swiped = true;
+            xTaskNotifyGive(life_task);
+        }
+    }
     if (code == LV_EVENT_RELEASED) dial_lift();
-    if (code == LV_EVENT_SHORT_CLICKED && !dial_turned()) xTaskNotifyGive(life_task);
+    if (code == LV_EVENT_SHORT_CLICKED && !dial_turned() && !gestured) xTaskNotifyGive(life_task);
 }
 
-// From the dark there is nothing to close.
-static void sleep_now(bool lit) {
+// The screen, started once, with `who` showing in `mode`.
+static void light(character_t who, face_mode_t mode) {
+    if (lit) return;
+    lit = true;
+    showing = who;
+    sleep_release();
+    bsp_display_start();
+    bsp_display_brightness_set(BRIGHTNESS);
+    face_set_mode(mode);
+    bsp_display_lock(-1);
+    face_start(who);
+    bsp_display_unlock();
+}
+
+// Her briefing has landed: lit for Eugenia to say so.
+static void light_eugenia(void) { light(EUGENIA, FACE_THINKING); }
+
+/* Goodnight, when her face is showing, then the sleep screen — drawn only
+   when its marks differ from what the panel already holds — then deep sleep
+   until the next errand. */
+static void sleep_now(void) {
+    int charge = power_charge();
+    bool tired = power_low();
+    int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
     if (lit) {
         face_set_mode(FACE_ASLEEP);
         vTaskDelay(pdMS_TO_TICKS(GOODNIGHT_MS));
     }
-    face_set_mode(waiting ? FACE_DOT : FACE_DARK);
-    vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
-    sleep_until(cfg.gladys ? time(NULL) + cfg.check_min * 60 : briefing_next_ask(time(NULL)));
+    if (lit || marks != drawn) {
+        light(showing, FACE_DARK);
+        face_set_tired(tired);
+        face_set_marks(briefing_waits, trade_waits, charge);
+        face_set_mode(FACE_DARK);
+        vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+        drawn = marks;
+    }
+    sleep_until(time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S));
+}
+
+// In the dark: what waits for Gladys, and in its hours whether the briefing has.
+static void errand(void) {
+    if (net_start()) {
+        int left = gladys_check();
+        bool tick = left > 0 && !trade_waits, ask = briefing_due(time(NULL));
+        if (tick || ask) {
+            sound_start();
+            sound_volume(cfg.volume);
+        }
+        if (tick) sound_tick();
+        if (left >= 0) trade_waits = left > 0;
+        if (ask && talk_ready(light_eugenia)) {
+            briefing_waits = true;
+            briefing_announced(time(NULL));
+        }
+    }
+    sleep_now();
 }
 
 // Gladys journals what waits, and her dot follows what is left.
 static void journal(void) {
     int left = gladys_journal();
-    if (left >= 0) waiting = left > 0;
+    if (left >= 0) trade_waits = left > 0;
 }
 
-static void life(void *arg) {
-    (void)arg;
+static void awake(void) {
+    character_t who = trade_waits ? GLADYS : EUGENIA;
+    face_set_tired(power_low());
+    light(who, FACE_IDLE);
+    bsp_display_lock(-1);
+    lv_obj_t *screen = lv_screen_active();
+    static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED,
+                                             LV_EVENT_SHORT_CLICKED, LV_EVENT_GESTURE };
+    for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
+    bsp_display_unlock();
+
     sound_start();
     sound_volume(cfg.volume);
     if (woke == ESP_SLEEP_WAKEUP_UNDEFINED) sound_chime();  // switched on, not woken
-    if (!net_start()) ESP_LOGW(TAG, "none of her networks answered");
-
-    if (woke == ESP_SLEEP_WAKEUP_TIMER) {
-        bool lit = false;
-        if (cfg.gladys) {
-            int left = gladys_check();
-            if (left > 0 && !waiting) sound_tick();
-            if (left >= 0) waiting = left > 0;
-        } else if ((lit = talk_ready())) {
-            waiting = true;
-            briefing_announced(time(NULL));
-        }
-        // A tap meanwhile turns the errand into a waking spell, and is a press.
-        if (!ulTaskNotifyTake(pdTRUE, 0)) sleep_now(lit);
-        face_set_mode(FACE_IDLE);
+    if (!net_start()) {
+        ESP_LOGW(TAG, "none of her networks answered");
+        face_set_offline(true);
     }
 
-    // A press is for what waits first.
-    if (cfg.gladys) journal();
-    else if (waiting) {
-        waiting = false;
+    // A press is for what waits first: Gladys's journal, then Eugenia's briefing.
+    if (who == GLADYS) {
+        journal();
+        if (!briefing_waits) sleep_now();
+        face_switch(showing = EUGENIA);
+        vTaskDelay(pdMS_TO_TICKS(SLIDE_MS));
+    }
+    if (briefing_waits) {
+        briefing_waits = false;
         talk_briefing();
     }
 
     while (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(AWAKE_MS))) {
-        if (cfg.gladys) journal();
-        else talk();
+        if (swiped) {
+            swiped = false;
+            face_switch(showing = showing == EUGENIA ? GLADYS : EUGENIA);
+        } else if (showing == EUGENIA) {
+            talk();
+        } else {
+            journal();
+        }
     }
-    sleep_now(true);
+    sleep_now();
+}
+
+static void life(void *arg) {
+    (void)arg;
+    power_start();
+    if (woke == ESP_SLEEP_WAKEUP_TIMER) errand();
+    else awake();
 }
 
 void app_main(void) {
-    sleep_release();
     woke = esp_sleep_get_wakeup_cause();
     config_load();
-    bool setup = config_take_setup_request() || !config_ready();
 
     // What the board turned out to be, for the first serial log.
     uint32_t flash = 0;
     esp_flash_get_size(NULL, &flash);
-    ESP_LOGI(TAG, "%s · flash %lu MB · PSRAM %u MB · woken by %d", cfg.gladys ? "Gladys" : "Eugenia",
+    ESP_LOGI(TAG, "flash %lu MB · PSRAM %u MB · woken by %d",
              (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20), (int)woke);
 
-    bsp_display_start();
-    bsp_display_brightness_set(cfg.brightness);
-    power_start();
-    face_set_tired(power_low());
-
-    // An errand starts in the dark, or with her dot still up.
-    if (woke == ESP_SLEEP_WAKEUP_TIMER) face_set_mode(waiting ? FACE_DOT : FACE_DARK);
-    bsp_display_lock(-1);
-    face_start(cfg.gladys);
-    bsp_display_unlock();
-    if (setup) setup_run();
-
+    if (config_take_setup_request() || !config_ready()) {
+        light(EUGENIA, FACE_IDLE);
+        setup_run();
+    }
     // The stack holds a TLS handshake.
     xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, &life_task, 0);
-
-    bsp_display_lock(-1);
-    lv_obj_t *screen = lv_screen_active();
-    lv_obj_add_event_cb(screen, on_touch, LV_EVENT_PRESSED, NULL);
-    lv_obj_add_event_cb(screen, on_touch, LV_EVENT_PRESSING, NULL);
-    lv_obj_add_event_cb(screen, on_touch, LV_EVENT_RELEASED, NULL);
-    lv_obj_add_event_cb(screen, on_touch, LV_EVENT_SHORT_CLICKED, NULL);
-    bsp_display_unlock();
 }

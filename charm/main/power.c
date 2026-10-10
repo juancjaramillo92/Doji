@@ -18,8 +18,7 @@
 static const char *TAG = "power";
 
 #define ADDRESS      0x34
-#define STATUS1      0x00  // bit 3: a battery is connected
-#define STATUS2      0x01  // bits 6:5: 01 charging
+#define STATUS1      0x00  // bit 5: a cable's power is good; bit 3: a battery is connected
 #define COMMON       0x10  // bit 0: switch off
 #define KEY_TIMES    0x27  // 5:4 how long a long press is, 3:2 how long switches off
 #define IRQ_ENABLE2  0x41
@@ -63,6 +62,7 @@ static void watch(void *arg) {
 }
 
 void power_start(void) {
+    bsp_i2c_init();
     i2c_device_config_t dev = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = ADDRESS,
@@ -79,7 +79,10 @@ void power_start(void) {
 }
 
 bool power_low(void) {
-    bool battery = get(STATUS1) & (1 << 3);
-    bool charging = ((get(STATUS2) >> 5) & 0x03) == 1;
-    return battery && !charging && get(BATTERY) <= LOW_PERCENT;
+    uint8_t status = get(STATUS1);
+    return (status & (1 << 3)) && !(status & (1 << 5)) && get(BATTERY) <= LOW_PERCENT;
+}
+
+int power_charge(void) {
+    return get(STATUS1) & (1 << 5) ? get(BATTERY) : -1;
 }

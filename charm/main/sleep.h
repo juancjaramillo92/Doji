@@ -7,5 +7,5 @@
    the pins that could reset it are held. Only RTC_DATA_ATTR memory survives. */
 void sleep_until(time_t wake_at);
 
-// Lets go of the held pins. First thing at boot, before the screen starts.
+// Lets go of the held pins, before the screen starts.
 void sleep_release(void);

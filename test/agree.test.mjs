@@ -268,12 +268,14 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
   // The setup screen's label is the small font's.
   for (const letter of words[0]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${words[0]}`);
 
-  // The dial's label, and its number, any of 0 to 100.
+  // The dial's label and its number, any of 0 to 100; the charge's, with its %.
   const dial = source('charm/main/dial.c');
   const label = dial.match(/t\.text = "([^"]+)";/);
   assert.ok(label, 'dial.c no longer draws its label as this test reads it');
   for (const letter of label[1]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${label[1]}`);
-  for (const digit of '0123456789') assert.ok(held('hanken_36').includes(digit), `hanken_36 cannot draw a ${digit}`);
+  for (const digit of '0123456789%') assert.ok(held('hanken_36').includes(digit), `hanken_36 cannot draw a ${digit}`);
+  assert.match(source('charm/main/face.c'), /snprintf\(percent, sizeof percent, "%d%%", charge\)/,
+    'face.c no longer draws the charge as a number and %, which is what this test checks the font for');
 });
 
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {
@@ -1296,7 +1298,7 @@ test('the charm asks for the briefing in the hours it is written', () => {
     return Number(m[1]);
   });
   // The days, as the walk below takes them: Sunday's hour, weekdays', none on Saturday.
-  assert.match(c, /day\.tm_wday == 0 \? BRIEF_SUNDAY : day\.tm_wday <= 5 \? BRIEF_WEEKDAY : -1;/,
+  assert.match(c, /(\w+)\.tm_wday == 0 \? BRIEF_SUNDAY : \1\.tm_wday <= 5 \? BRIEF_WEEKDAY : -1;/,
     'briefing.c no longer gives the days their hours as this test walks them');
   // Sunday 16 August 2026 to the Saturday after, New York on daylight time.
   for (let day = 0; day < 7; day++) {

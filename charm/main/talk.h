@@ -6,10 +6,10 @@
    early, or cuts her off. The same holds for the two below. */
 void talk(void);
 
-/* Asks whether today's briefing has landed. When it has, her face lights and
-   she says so, and this is true; false while it has not, or when her door
-   could not be reached. The screen stays as it was until then. */
-bool talk_ready(void);
+/* Asks whether today's briefing has landed. When it has, `lit` lights the
+   screen for her and she says so, and this is true; false while it has not,
+   or when her door could not be reached, and the screen is left alone. */
+bool talk_ready(void (*lit)(void));
 
 // Today's briefing, read to him. Nothing happens while none is stored.
 void talk_briefing(void);

@@ -39,6 +39,7 @@ static const char *const SETUPS[2] = { "Break & Retest", "Support & Resistance" 
 #define READ_MS    15000
 #define HELLO_MS   1500
 #define DONE_MS    2600
+#define HAPPY_MS   1100
 #define CONFUSED_MS 4000
 
 static bool read_answer(const char *body, trade_t *t) {
@@ -69,7 +70,7 @@ static bool knock(const char *body, trade_t *t) {
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
     esp_http_client_handle_t h = esp_http_client_init(&c);
-    esp_http_client_set_header(h, "x-charm-key", cfg.key);
+    esp_http_client_set_header(h, "x-charm-key", cfg.gladys_key);
     if (body) esp_http_client_set_header(h, "Content-Type", "application/json");
     int len = body ? (int)strlen(body) : 0;
     bool ok = esp_http_client_open(h, len) == ESP_OK && (!body || esp_http_client_write(h, body, len) == len);
@@ -120,8 +121,11 @@ int gladys_journal(void) {
         face_set_mode(FACE_CONFUSED);
         vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
     } else if (answered && t.waiting == 0) {
-        face_set_mode(all_yes ? FACE_HAPPY : FACE_DONE);
+        face_set_mode(all_yes ? FACE_DELIGHTED : FACE_DONE);
         vTaskDelay(pdMS_TO_TICKS(DONE_MS));
+    } else if (!answered) {
+        face_set_mode(FACE_HAPPY);  // nothing waits: a smile for the tap
+        vTaskDelay(pdMS_TO_TICKS(HAPPY_MS));
     }
     face_set_mode(FACE_IDLE);
     return reached ? t.waiting : -1;

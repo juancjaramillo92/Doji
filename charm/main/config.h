@@ -12,12 +12,10 @@ typedef struct {
 } charm_net_t;
 
 typedef struct {
-    bool gladys;                 // which character this board is
     charm_net_t nets[MAX_NETS];  // tried in order
     int n_nets;
-    char key[80];                // her charm secret, EUGENIA_ or GLADYS_CHARM_SECRET
-    int brightness;              // percent
-    int check_min;               // how often Gladys asks what waits
+    char eugenia_key[80];        // EUGENIA_CHARM_SECRET
+    char gladys_key[80];         // GLADYS_CHARM_SECRET
     int volume;                  // percent, from the dial round the rim
 } charm_config_t;
 
@@ -26,7 +24,7 @@ extern charm_config_t cfg;
 void config_load(void);
 void config_save(void);
 
-// A board with no network or no key can do nothing but ask to be set up.
+// A charm with no network, or without both keys, can do nothing but ask to be set up.
 bool config_ready(void);
 
 // The setup page on the next start: set by holding the screen, cleared there.
