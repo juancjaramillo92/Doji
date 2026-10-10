@@ -61,9 +61,12 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the two charms — see The charms
-  main/main.c                           boot, and which character she is
+  main/main.c                           boot, and what a touch does
   main/face.c                           her face drawn live over her render
   main/sound.c                          the speaker and both microphones
+  main/config.c                         what the setup page saved, in her flash
+  main/setup.c                          the setup page, on her own Wi-Fi network
+  main/net.c                            joining her Wi-Fi, and New York time
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
   tools/art.py                          turns a render into those bytes
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -2527,18 +2530,33 @@ while it shows. The design was settled in two playgrounds before any of this —
 the claude.ai artifacts *Eugenia, on the charm* and *Gladys, on the charm* —
 and the numbers here are theirs.
 
-**First milestone, what a board does today:** it comes up as Eugenia (or
-Gladys), her face alive at 75% brightness, and chimes. **A tap** records three
-seconds and plays them back with her mouth moving to them — the screen, touch,
-both microphones and the speaker proved before Wi-Fi or the doors. **Holding the
-screen for five seconds** switches which character she is and restarts; that
-stands in for the setup page until it exists. The first serial line names the
-character, the flash size and the PSRAM the chip actually has.
+**The setup page is the only way anything gets onto a board.** With no Wi-Fi
+network or no key saved — a board fresh from flashing — or after the screen is
+held for ten seconds, she shows *Set me up* and becomes her own open network,
+**Charm-Setup-** and four characters of her own, like *Charm-Setup-4F2A*. Every name it is asked resolves to the charm and every
+page but its own redirects there, so a phone that joins opens the page by
+itself. It asks **who she is** (Eugenia or Gladys), **up to four Wi-Fi
+networks**, tried in order, with the ones in range offered by name, **her key**
+(`EUGENIA_CHARM_SECRET` or `GLADYS_CHARM_SECRET`), the **brightness** (75% by
+default) and how often **Gladys checks** (every 5 minutes). A blank password or
+key keeps the one she has, so adding a network never means pasting the key
+again. It is saved in her own flash (NVS, namespace `charm`) and she restarts.
+The address of the doors is the repository's, and only the key is secret, so
+the same firmware goes on both boards and a lost charm is cut off by changing
+her key in Supabase.
 
-**Still to build**, in order: the setup page (her Wi-Fi networks, which
-character, her key), the conversation with Eugenia's door, sleep and the
-briefing alert with its still purple dot, Gladys's journal on screen with her
-near-white dot, the volume dial round the rim, and the battery and power
+**What a board does today:** she comes up as whoever the setup page made her,
+her face alive at the saved brightness, and chimes; joins the first of her
+networks that answers and sets her clock to New York, clock changes included,
+since the briefing is 08:00 there all year. **A tap** records three seconds and
+plays them back with her mouth moving to them — the screen, touch, both
+microphones and the speaker proved on the real board before the conversation
+is built on them. The first serial line names the character, the flash size and
+the PSRAM the chip actually has.
+
+**Still to build**, in order: the conversation with Eugenia's door, sleep and
+the briefing alert with its still purple dot, Gladys's journal on screen with
+her near-white dot, the volume dial round the rim, and the battery and power
 screens.
 
 ---

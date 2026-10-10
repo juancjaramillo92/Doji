@@ -1,13 +1,13 @@
-/* The charm, first milestone: the board comes up as Eugenia or Gladys, her face
-   lives on screen, the speaker chimes, and a tap records three seconds and
-   plays them back with her mouth moving to it — screen, touch, both
-   microphones and the speaker proved before any of Wi-Fi or the doors.
+/* The charm. The board comes up as Eugenia or Gladys — which, her Wi-Fi and
+   her key are the setup page's, kept in flash — with her face alive on screen
+   and a chime. Without a network or a key, or when asked by holding the screen
+   for ten seconds, she shows the setup page instead. Otherwise she joins her
+   Wi-Fi and sets her clock to New York.
 
-   Which of the two she is lives in flash (NVS "charm"/"who"). Until the setup
-   page exists, holding the screen for five seconds switches it and restarts. */
-#include <string.h>
+   A tap still records three seconds and plays them back with her mouth moving
+   to it: the screen, touch, both microphones and the speaker, proved on the
+   real board before the conversation is built on them. */
 #include "bsp/esp-bsp.h"
-#include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -16,53 +16,38 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
-#include "nvs.h"
-#include "nvs_flash.h"
 
+#include "config.h"
 #include "face.h"
+#include "net.h"
+#include "setup.h"
 #include "sound.h"
 
 static const char *TAG = "charm";
 
-#define BRIGHTNESS   75   // percent: bright enough, and kinder to the battery and the panel
 #define TEST_SECONDS 3
-#define SWITCH_MS    5000
+#define SETUP_HOLD_MS 10000
 
 static TaskHandle_t audio_task;
-static bool gladys;
 
-static bool read_who(void) {
-    nvs_handle_t h;
-    char who[16] = "eugenia";
-    size_t len = sizeof who;
-    if (nvs_open("charm", NVS_READONLY, &h) == ESP_OK) {
-        nvs_get_str(h, "who", who, &len);
-        nvs_close(h);
-    }
-    return strcmp(who, "gladys") == 0;
-}
-
-static void write_who(bool g) {
-    nvs_handle_t h;
-    if (nvs_open("charm", NVS_READWRITE, &h) != ESP_OK) return;
-    nvs_set_str(h, "who", g ? "gladys" : "eugenia");
-    nvs_commit(h);
-    nvs_close(h);
-}
-
-// A tap starts the test; five seconds held switches who she is.
+// A tap starts the test; ten seconds held opens the setup page.
 static void on_touch(lv_event_t *e) {
     static uint32_t pressed_at;
-    static bool switched;
+    static bool asked;
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) { pressed_at = lv_tick_get(); switched = false; }
-    if (code == LV_EVENT_PRESSING && !switched && lv_tick_elaps(pressed_at) > SWITCH_MS) {
-        switched = true;
-        write_who(!gladys);
-        ESP_LOGI(TAG, "switching to %s", gladys ? "eugenia" : "gladys");
+    if (code == LV_EVENT_PRESSED) { pressed_at = lv_tick_get(); asked = false; }
+    if (code == LV_EVENT_PRESSING && !asked && lv_tick_elaps(pressed_at) > SETUP_HOLD_MS) {
+        asked = true;
+        config_ask_setup();
         esp_restart();
     }
     if (code == LV_EVENT_SHORT_CLICKED) xTaskNotifyGive(audio_task);
+}
+
+static void net_task(void *arg) {
+    (void)arg;
+    if (!net_start()) ESP_LOGW(TAG, "none of her networks answered");
+    vTaskDelete(NULL);
 }
 
 static void audio_loop(void *arg) {
@@ -83,30 +68,29 @@ static void audio_loop(void *arg) {
 }
 
 void app_main(void) {
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        nvs_flash_init();
-    }
-    gladys = read_who();
+    config_load();
+    bool setup = config_take_setup_request() || !config_ready();
 
     // What the board turned out to be, for the first serial log.
     uint32_t flash = 0;
     esp_flash_get_size(NULL, &flash);
-    ESP_LOGI(TAG, "%s · flash %lu MB · PSRAM %u MB", gladys ? "Gladys" : "Eugenia",
+    ESP_LOGI(TAG, "%s · flash %lu MB · PSRAM %u MB", cfg.gladys ? "Gladys" : "Eugenia",
              (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20));
 
     bsp_display_start();
-    bsp_display_brightness_set(BRIGHTNESS);
+    bsp_display_brightness_set(cfg.brightness);
 
     // Before the touch handler that wakes it can run.
     xTaskCreatePinnedToCore(audio_loop, "audio", 6144, NULL, 5, &audio_task, 0);
 
     bsp_display_lock(-1);
-    face_start(gladys);
+    face_start(cfg.gladys);
     lv_obj_t *screen = lv_screen_active();
     lv_obj_add_event_cb(screen, on_touch, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(screen, on_touch, LV_EVENT_PRESSING, NULL);
     lv_obj_add_event_cb(screen, on_touch, LV_EVENT_SHORT_CLICKED, NULL);
     bsp_display_unlock();
+
+    if (setup) setup_run();
+    xTaskCreate(net_task, "net", 6144, NULL, 4, NULL);
 }
