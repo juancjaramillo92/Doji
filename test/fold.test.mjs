@@ -33,13 +33,13 @@ import {
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
-  consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft, TRIM_MOST,
+  consolidateRetryDue, thesisLine, portraitLine, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -1975,7 +1975,7 @@ test('the backup names every table that has no other source', async () => {
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
   for (const t of ['trades', 'eugenia_notes', 'eugenia_turns', 'eugenia_channels',
-                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
+                   'eugenia_thesis', 'eugenia_portrait', 'eugenia_loops', 'eugenia_calendar',
                    'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
@@ -3769,6 +3769,15 @@ test('the story carries the day it last moved, and an absent one says nothing', 
   assert.equal(thesisLine(null), '');
 });
 
+test('how she reads him carries the day it last moved, and an absent one says nothing', () => {
+  const line = portraitLine({ portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' });
+  assert.match(line, /cuts winners/);
+  assert.match(line, /12 Mar/);
+  // Written to her, about him: the audit is the one place it is said to him.
+  assert.match(line, /How you read him/);
+  assert.equal(portraitLine(null), '');
+});
+
 test('the open threads are split by what closes them', () => {
   const out = loopsList([
     { id: 4, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-12' },
@@ -3919,9 +3928,11 @@ test('the audit he asks for carries everything she keeps', () => {
     [{ id: 2, note: 'he trades the London open' }],
     [{ channel: 'dollar', state: 'used', evidence: null, moved_on: '2026-03-12' }],
     [{ id: 7, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-11' }],
-    { thesis: 'Still trading the December cut.', moved_on: '2026-03-12' });
+    { thesis: 'Still trading the December cut.', moved_on: '2026-03-12' },
+    [], { portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' });
 
   assert.match(out, /What you have told me/);
+  assert.match(out, /How I read you, last moved 12 Mar:\nHe cuts winners/);
   assert.match(out, /What I have noticed/);
   assert.match(out, /What I flagged/);
   assert.match(out, /The story I am carrying/);
@@ -4904,6 +4915,7 @@ const TOOL_CALLS = [
   ['get_market',    {}],
   ['get_around',    {}],
   ['set_thesis',    { thesis: 'a reading' }],
+  ['set_portrait',  { portrait: 'a reading of him' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
 ];
@@ -4987,7 +4999,7 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
    ─────────────────────────────────────────────────────────────────────────── */
 
 const BLOCKS = {
-  marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock, portraitBlock,
   healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
 };
 
@@ -5015,6 +5027,7 @@ test('every block says something when its read succeeds', async () => {
     eugenia_notes:    [{ id: 1, note: 'he asked for shorter mornings' }],
     eugenia_channels: [{ channel: 'rates', state: 'explained', moved_on: '2026-07-01' }],
     eugenia_thesis:   [{ thesis: 'gold heavy above 3450', moved_on: '2026-07-30' }],
+    eugenia_portrait: [{ portrait: 'he cuts winners before the target', moved_on: '2026-07-30' }],
     eugenia_loops:    [{ id: 1, kind: 'question', body: 'does he size up after two losses',
                          opened_on: '2026-07-28' }],
     eugenia_calendar: [{ id: 1, at: '2026-07-30T12:30:00Z', name: 'CPI', importance: 'high' }],
@@ -5031,7 +5044,8 @@ test('every block says something when its read succeeds', async () => {
       return new Response(JSON.stringify(rows[table] ?? []), {
         status: 200, headers: { 'content-type': 'application/json' } });
     };
-    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'loopsBlock', 'calendarBlock']) {
+    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'portraitBlock', 'loopsBlock',
+                        'calendarBlock']) {
       const out = await BLOCKS[name]();
       assert.ok(out.trim().length > 0,
         `${name} read its rows and said nothing — a block that returns "" on success ` +

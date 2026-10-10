@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
+import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
@@ -679,8 +679,13 @@ test('a commitment is recorded, audited, held against his trades and retired', (
   const branch = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('return;', at));
   assert.match(branch, /readNotes\('commitment'\)/,
     '/notes no longer reads his commitments — the audit still answers, minus them');
-  assert.match(branch, /notesList\([^)]*promised\)/,
+  assert.match(branch, /notesList\([^)]*\bpromised[,)]/,
     '/notes reads his commitments and does not hand them to notesList');
+  // The portrait's argument defaults the same way, so the same silence.
+  assert.match(branch, /readPortrait\(\)/,
+    '/notes no longer reads how she reads him — the audit still answers, minus it');
+  assert.match(branch, /notesList\([^)]*\bread[,)]/,
+    '/notes reads the portrait and does not hand it to notesList');
 
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
@@ -2349,6 +2354,12 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     assert.ok(reaches(reads(fn), 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
       `he gave would be ignored, with nothing anywhere reporting it`);
+    /* AND HOW SHE READS HIM, wherever the notes go: it is what the notes add
+       up to once the oldest have rolled out of the window, and the nightly pass
+       has to see the paragraph it is asked to move. */
+    assert.ok(reaches(reads(fn), 'portraitBlock'),
+      `${fn} never gets portraitBlock() into the message it sends — a lesson about ` +
+      `him whose note rolled out of the window is gone there, with nothing reporting it`);
   }
 
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
@@ -3034,6 +3045,14 @@ test('the thesis budget is one number on both sides of the wire', () => {
   assert.ok(declared, 'schema.sql no longer bounds the thesis');
   assert.equal(THESIS_MAX, Number(declared[1]),
     'index.ts truncates the thesis at a different length than the table accepts — ' +
+    'the longer side is a 400 on a write she reports as saved');
+});
+
+test('the portrait budget is one number on both sides of the wire', () => {
+  const declared = SCHEMA_SQL.match(/eugenia_portrait_length check \(char_length\(portrait\) between 1 and (\d+)\)/);
+  assert.ok(declared, 'schema.sql no longer bounds the portrait');
+  assert.equal(PORTRAIT_MAX, Number(declared[1]),
+    'index.ts truncates the portrait at a different length than the table accepts — ' +
     'the longer side is a 400 on a write she reports as saved');
 });
 

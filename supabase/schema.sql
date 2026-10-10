@@ -579,6 +579,31 @@ on conflict (id) do nothing;
 
 alter table public.eugenia_thesis enable row level security;
 
+-- ─── How she reads him ─────────────────────────────────────────────────────
+-- The thesis's twin, about him: one row, rewritten nightly, carrying what the
+-- notes add up to once the oldest have rolled out of the twenty she is shown.
+-- No app policy: it is about him, and the card shows the market.
+create table if not exists public.eugenia_portrait (
+  id         text primary key
+    constraint eugenia_portrait_singleton check (id = 'current'),
+
+  -- Longer than the thesis, still a paragraph.
+  portrait   text not null
+    constraint eugenia_portrait_length check (char_length(portrait) between 1 and 800),
+
+  -- A New York civil day written by the function, for eugenia_channels' reason.
+  moved_on   date,
+  updated_at timestamptz not null default now()
+);
+
+-- Seeded, so the PATCH always lands and the read never has to tell "no row"
+-- from "nothing decided".
+insert into public.eugenia_portrait (id, portrait) values
+  ('current', 'No portrait yet — this is written by the nightly pass once there is enough to read.')
+on conflict (id) do nothing;
+
+alter table public.eugenia_portrait enable row level security;
+
 -- ─── Open threads ──────────────────────────────────────────────────────────
 -- An odd thing she flagged (`watch`) or a question she asked him in a
 -- conversation (`question`), handed back until the nightly pass closes it.

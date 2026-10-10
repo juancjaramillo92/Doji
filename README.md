@@ -376,6 +376,7 @@ single-sourced at run time:
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
+| the **portrait length** | `PORTRAIT_MAX` and the check constraint |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
@@ -452,10 +453,10 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-nine tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the eight of hers with no other source — the channel map,
-notes, turns, thesis, open loops, calendar, feedback, and every stop and target a
-position carried. `trades` goes whole, the soft-deleted rows included: a restore
+ten tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the nine of hers with no other source — the channel map,
+notes, turns, thesis, portrait, open loops, calendar, feedback, and every stop and
+target a position carried. `trades` goes whole, the soft-deleted rows included: a restore
 without them lets the poller rebuild every trade you removed. `eugenia_runs` is
 left out: the largest table, and facts about model calls rather than about you.
 
@@ -1201,6 +1202,11 @@ than add. No web search — a bookkeeping pass has nothing to research.
   running thesis — *moved*, since most nights it is the same story a day on —
   and `close_loop` closes a thread that resolved. Both are nightly-only, like
   `set_channel`: judgments across days.
+- **It moves how she reads him.** `set_portrait` rewrites one paragraph of what
+  his notes, his trades and his record against his own word add up to — moved,
+  as the story is, and each thing in it seen more than once, counted with
+  `check_rules` and `get_stats` rather than remembered. Nightly-only for the same
+  reason.
 - **It retries at 23:00**, gated on whether tonight's pass already ran, read off
   `eugenia_runs` (the pass stores no turn to read). A read failure counts as
   *already run*, and a quiet day records itself, so the retry never re-runs a
@@ -1752,9 +1758,10 @@ the taps are never delivered — `allowed_updates` must name `callback_query` to
 
 ### What she remembers
 
-Seven tables, separated by how long a thing is true for. A turn rolls over inside
+Eight tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
-outlives both; a thesis is only ever current, so it is one row rewritten; a loop
+outlives both; a thesis and a portrait are only ever current, so each is one row
+rewritten; a loop
 stays until it closes; and the calendar is the one dataset here that compounds.
 
 | | Holds | Window | Written by |
@@ -1763,6 +1770,7 @@ stays until it closes; and the calendar is the one dataset here that compounds.
 | `eugenia_notes` | facts about him, what he has told her to do, and what he has committed to | last 20 of each kind | her `remember` tool |
 | `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
+| `eugenia_portrait` | how she reads him — what his notes and trades add up to | 1 row, rewritten | her `set_portrait` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
@@ -1786,6 +1794,28 @@ his own word outlives the commitment. Its own kind because the two are read in
 opposite directions. `/notes` lists them between what he told her and what she
 noticed.
 
+**What the notes add up to is one paragraph, and it outlives them.** She is shown
+the newest twenty of each kind, so the twenty-first fact pushes the oldest out of
+view: still searchable, but shaping nothing unless she thinks to look. The
+portrait is the thesis's twin about him — one row, at most 800 characters,
+rewritten only by the nightly pass — and carries the lesson once the line that
+taught it has rolled away. Its rules are the ones that keep a reading honest:
+each thing in it seen more than once, counted off his trades rather than
+recalled; written as what is true of him and never as an order to herself; and
+nothing about today's market or what he has open. She uses it as she uses the
+facts and never hands it to him as a verdict; `/notes` shows it to him in the
+second person, and he corrects it the way he corrects anything — by telling her,
+which the pass reads that night.
+
+**What is never a note** is written into `remember` itself, so it binds the
+mid-reply write and the nightly pass alike. A fact is what is true of him — *"he
+reads the first paragraph and stops"* — never an order to herself, which reads
+back next month as one he gave. A tool, a source or a read that failed or came
+back empty is not a note: it is fixed by the time it matters, and the note would
+have her refusing for months. And an approach that did not work is never written
+up as one that does. These are the shapes a memory that curates itself falls
+into, each of which hardens into a rule nobody gave.
+
 **A reply to one of her messages tells her which one.** Swipe a message and
 answer, typed or spoken, and she is handed the message he answered — its text, or
 the stored turn sent at that moment, since a voice note carries no words. Without
@@ -1798,7 +1828,9 @@ sharing one instant — otherwise no quote rather than a wrong one.
 
 **Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
 reply, the nightly pass and the trade look — and its absence would be silent:
-she carries on ignoring an instruction he believes she took. `channelsBlock()`
+she carries on ignoring an instruction he believes she took. `portraitBlock()`
+goes wherever the notes go, as its own block so a failed read costs the paragraph
+and never his instructions. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that

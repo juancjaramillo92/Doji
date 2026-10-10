@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 686 tests, seven suites
+npm test      # 688 tests, seven suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -273,9 +273,9 @@ what could not be verified.
 
 ### Her memory
 
-Five lifetimes — turns, notes (three `kind`s, `commitment` held against his
-trades rather than obeyed), channels, the thesis, loops — plus the calendar, and
-`strategy.ts`, which she cannot write.
+Six lifetimes — turns, notes (three `kind`s, `commitment` held against his
+trades rather than obeyed), channels, the thesis and the portrait, loops — plus
+the calendar, and `strategy.ts`, which she cannot write.
 
 - **The strategy rides the cached prefix** (summary, index, rules table) and the
   rest is `get_strategy`. It is markdown in a template literal: every backtick is
@@ -298,9 +298,9 @@ trades rather than obeyed), channels, the thesis, loops — plus the calendar, a
 - **Every read of a growing table carries a limit and takes the newest rows.**
   Select newest-first and reverse, as `recent()` does. `agree.test.mjs` refuses
   `order=id.asc` under a limit.
-- **`notesBlock()` reaches all four paths, `channelsBlock()` the three that teach,
-  `recent()` the three that speak** (not the nightly pass), `positionsBlock()`
-  three.
+- **`notesBlock()` and `portraitBlock()` reach all four paths, `channelsBlock()`
+  the three that teach, `recent()` the three that speak** (not the nightly
+  pass), `positionsBlock()` three.
   The trade look's reads sit after its early returns. `agree.test.mjs` reads every
   body, and asserts the absences too.
 - **Loops close.** `readLoops` takes the newest ten, so a loop that cannot close
