@@ -394,8 +394,8 @@ single-sourced at run time:
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
-| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script |
-| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow and the Apps Script |
+| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script, the charm's `charm/main/net.h` |
+| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 
