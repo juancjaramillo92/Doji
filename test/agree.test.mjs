@@ -1384,7 +1384,7 @@ const TRACKED = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filte
 /* Everything the repository is, as one string. THIS FILE IS EXCLUDED: with it
    in the corpus, every entry below would validate against its own exception. */
 const CODE = TRACKED
-  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f) && f !== 'test/agree.test.mjs')
+  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml|c|h|py)$/.test(f) && f !== 'test/agree.test.mjs')
   .map(f => source(`${f}`)).join('\n');
 
 /* Backticked names that look like code — camelCase, snake_case, hyphenated,
@@ -1444,7 +1444,8 @@ test('the documents name only symbols the repository has', () => {
 
     for (const name of named) {
       // A name with a file extension is a FILE, checked against what git tracks.
-      if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md)$/.test(name)) {
+      // Checked by its last part, `net.h` would be found in any file holding an h.
+      if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md|c|h|py)$/.test(name)) {
         if (!TRACKED.some(f => f === name || f.endsWith('/' + name))) {
           missing.push(`${doc}: ${name} (no such file)`);
         }
