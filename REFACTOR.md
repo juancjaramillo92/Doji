@@ -30,7 +30,7 @@ any change that touches it.
 
 ## 2 · THE REJECTED REGISTER
 
-Ten are refused by a rule `CLAUDE.md` states, and are named here rather than
+Twelve are refused by a rule `CLAUDE.md` states, and are named here rather than
 argued, so the reason lives once, in the document every session reads.
 
 | Move | Refused by, in `CLAUDE.md` |
@@ -45,6 +45,8 @@ argued, so the reason lives once, in the document every session reads.
 | R-8 — writing a `drop` into `schema.sql` | never write a `drop` into it: a re-run repeats it on the live database |
 | R-10 — regenerating `golden.json` or `golden-fold.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 | R-18 — a per-caller cache window in place of the tool array | the cache window is derived from the tool array; do not move a window on an argument |
+| R-25 — grading a read by where gold went, or handing her record to the trade look | her record is judged by the test she stated, never by where price went, and it is hers |
+| R-33 — handing the portrait to the trade look | the trade event is exempt from `TRIM`: a paraphrase reaching a man in a position is how a sentence becomes an order |
 
 The rest are refused by something no other document holds, so they carry their
 reasoning here.
@@ -279,6 +281,62 @@ on merge while the SQL waits for a person: shipped in that order, the sign-in
 breaks.
 **Revisit if:** a sign-in is lost to a stray `?connect=1`, or `tradingview_auth`
 changes for another reason. Then it goes in the same pass, SQL applied first.
+
+### R-26 — folding the portrait into `notesBlock`
+**Why refused:** both are what she knows of him, and one block would save a
+read and an argument on four paths. But `notesBlock` fails whole: a function
+deploys on merge while `schema.sql` waits for a person, so a missing
+`eugenia_portrait` — or any failed read of it — would take his instructions
+with it. Its own block costs the paragraph and nothing else.
+**Revisit if:** applying `schema.sql` is ever automated with the deploy.
+
+### R-27 — reading the live note count with `count=exact`
+**Why refused:** an exact number matters only past the window, and one row
+more than the window answers "is there more" inside the read already made. A
+counted read is a second request per kind on every path, for the same answer
+below twenty.
+**Revisit if:** the nightly pass ever needs the exact count past twenty.
+
+### R-28 — Hermes Agent's review every ten turns
+**Why refused:** Hermes forks itself after a run of turns to ask what is worth
+saving. Her day has one end, and a note decided mid-conversation is decided at
+the worst moment (README); the nightly pass is that review, over the whole day,
+with the week's trades beside it.
+**Revisit if:** a day's turns stop fitting the pass's window.
+
+### R-29 — playbooks: lessons loaded only in the situation they govern
+**Deferred, not refused.** Hermes keeps "how to do this kind of task for this
+user" in skills that load when the task comes up, so always-loaded memory stays
+small. For her it would be a second memory that changes how she behaves, which
+needs his audit and his correction channel as notes have, and nothing yet shows
+an instruction that should hold only some days. Twelve standing instructions
+fit the window.
+**Revisit if:** he wants an instruction that holds only on certain days, or the
+merges the pass makes past fifteen start losing meaning.
+
+### R-30 — recalling memory before every reply
+**Deferred, not refused.** Hermes searches its memory before each turn; she
+searches when she decides to. Automatic recall costs an embedding and a search
+on every reply and puts unasked-for rows in front of her. Unmeasured: a reply's
+`detail` counts `search_memory` calls, so how often she reaches past the window
+can be read.
+**Revisit if:** that count shows her rarely searching while he refers back to
+conversations she no longer holds.
+
+### R-31 — ranking her own turns below his in search
+**Deferred, not refused.** Hermes demoted scheduled sessions once their
+vocabulary crowded the user's own out of recall. `eugenia_search` ranks her
+long daily briefings beside his short lines, and `ts_rank` is not normalised
+for length. Unmeasured.
+**Revisit if:** a search for words he used comes back mostly as her briefings.
+
+### R-32 — opening a read when it is given and grading it later
+**Why refused:** a read is about today's news and the pass runs after the day
+it was about, so filing and judging are one write. An open state would need a
+window and a closing rule, as loops do, for reads that would almost all close
+the same night.
+**Revisit if:** reads about a week — Sunday's — are untested so often that the
+record stops saying anything about them.
 
 ---
 

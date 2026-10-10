@@ -459,9 +459,10 @@ add-on.
 eleven tables into one JSON artifact: `trades`, whose journal columns only
 you can supply, and the ten of hers with no other source — the channel map,
 notes, turns, thesis, portrait, her record, open loops, calendar, feedback, and
-every stop and target a position carried. `trades` goes whole, the soft-deleted rows included: a restore
-without them lets the poller rebuild every trade you removed. `eugenia_runs` is
-left out: the largest table, and facts about model calls rather than about you.
+every stop and target a position carried. `trades` goes whole, the soft-deleted
+rows included: a restore without them lets the poller rebuild every trade you
+removed. `eugenia_runs` is left out: the largest table, and facts about model
+calls rather than about you.
 
 It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
 step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
@@ -1185,8 +1186,10 @@ writes what changed and will stay changed, and retires what is no longer true.
 Its default is almost nothing — most days deserve no note, and the visible
 window is twenty, so five mediocre notes push five good ones out. It is given
 what it judges with: the week's trades, since it is asked what he has started
-doing differently, and `search_memory`, since it is asked to supersede rather
-than add. No web search — a bookkeeping pass has nothing to research.
+doing differently; `search_memory`, since it is asked to supersede rather
+than add; and the market around gold and the Fed pricing as the day closed,
+since it judges the day's reads against them. No web search — a bookkeeping
+pass has nothing to research.
 
 - **Its window takes the newest turns.** Two hundred is more than a real day; a
   limit at the oldest end would distil the morning and drop the evening, where a
@@ -1210,6 +1213,8 @@ than add. No web search — a bookkeeping pass has nothing to research.
   as the story is, and each thing in it seen more than once, counted with
   `check_rules` and `get_stats` rather than remembered. Nightly-only for the same
   reason.
+- **It files the day's reads**, each with a verdict on the test she stated —
+  *Whether her reads held* below.
 - **It retries at 23:00**, gated on whether tonight's pass already ran, read off
   `eugenia_runs` (the pass stores no turn to read). A read failure counts as
   *already run*, and a quiet day records itself, so the retry never re-runs a
@@ -1761,13 +1766,13 @@ the taps are never delivered — `allowed_updates` must name `callback_query` to
 
 ### Whether her reads held
 
-Every read she gives says what would prove it wrong, and until this nothing
-looked. **The nightly pass files each of the day's reads with a verdict** —
+Every read she gives says what would prove it wrong, and the nightly pass is
+what looks. **It files each of the day's reads with a verdict** —
 `record_read`, one row in `eugenia_reads`: *wrong* when the thing she named
 happened, *held* when it had its chance and did not, *untested* for everything
 else. It judges against the market around gold and the Fed pricing as the day
-closed, which the pass is now handed for this alone, and the calendar and the
-day's turns. Filed and judged in one write, because a read is about today's news
+closed, which the pass is handed for this alone, and the calendar and the day's
+turns. Filed and judged in one write, because a read is about today's news
 and 22:00 is after the day it was about; a unique index on the day and the words
 makes a retry's refiling a no-op.
 
@@ -1790,9 +1795,8 @@ makes a retry's refiling a no-op.
 Nine tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
-rewritten; a loop
-stays until it closes; and the calendar and her record are the datasets here that
-compound.
+rewritten; a loop stays until it closes; and the calendar and her record are the
+datasets here that compound.
 
 | | Holds | Window | Written by |
 |---|---|---|---|
@@ -1834,7 +1838,8 @@ taught it has rolled away. Its rules are the ones that keep a reading honest:
 each thing in it seen more than once, counted off his trades rather than
 recalled; written as what is true of him and never as an order to herself; and
 nothing about today's market or what he has open. She uses it as she uses the
-facts and never hands it to him as a verdict; `/notes` shows it to him in the
+facts — in the briefing and a reply, never the trade look — and never hands it to
+him as a verdict; `/notes` shows it to him in the
 second person, and he corrects it the way he corrects anything — by telling her,
 which the pass reads that night.
 
@@ -1869,9 +1874,10 @@ sharing one instant — otherwise no quote rather than a wrong one.
 **Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
 reply, the nightly pass and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`
-goes wherever the notes go, as its own block so a failed read costs the paragraph
-and never his instructions. `recordBlock()` goes to the briefing, a reply and the
-pass, and a test asserts it never reaches the trade look. `channelsBlock()`
+and `recordBlock()` go to the briefing, a reply and the pass, and a test asserts
+neither reaches the trade look: it lands while he is in a position, where *"he
+cuts winners early"* reads as an order about the trade he is in. The portrait is
+its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that

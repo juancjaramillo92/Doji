@@ -685,7 +685,7 @@ test('a commitment is recorded, audited, held against his trades and retired', (
   // The portrait's argument defaults the same way, so the same silence.
   assert.match(branch, /readPortrait\(\)/,
     '/notes no longer reads how she reads him — the audit still answers, minus it');
-  assert.match(branch, /notesList\([^)]*\bread[,)]/,
+  assert.match(branch, /notesList\([^)]*\bportrait[,)]/,
     '/notes reads the portrait and does not hand it to notesList');
   assert.match(branch, /readRows<Read>\('Reads', recordQuery\(\)\)/,
     '/notes no longer reads her record — the audit still answers, minus it');
@@ -2359,13 +2359,20 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     assert.ok(reaches(reads(fn), 'notesBlock'),
       `${fn} never gets notesBlock() into the message it sends — an instruction ` +
       `he gave would be ignored, with nothing anywhere reporting it`);
-    /* AND HOW SHE READS HIM, wherever the notes go: it is what the notes add
-       up to once the oldest have rolled out of the window, and the nightly pass
-       has to see the paragraph it is asked to move. */
+  }
+
+  /* AND HOW SHE READS HIM, wherever the notes go but the trade look: it is what
+     the notes add up to once the oldest have rolled out of the window, and the
+     nightly pass has to see the paragraph it is asked to move. The trade look
+     reaches him in a position, where "he cuts winners early" is an order. */
+  for (const fn of ['postBriefing', 'converse', 'postConsolidation']) {
     assert.ok(reaches(reads(fn), 'portraitBlock'),
       `${fn} never gets portraitBlock() into the message it sends — a lesson about ` +
       `him whose note rolled out of the window is gone there, with nothing reporting it`);
   }
+  assert.ok(!reaches(reads('postTradeEvent'), 'portraitBlock'),
+    'the trade look is handed the portrait — a line about how he trades, reaching ' +
+    'a man in a position, reads as an instruction about the trade he is in');
 
   /* AND HER RECORD, to the two paths that give a read and to the pass that
      files them — and never to the trade look, which carries no read, so a

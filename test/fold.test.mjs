@@ -39,7 +39,7 @@ import {
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -3803,6 +3803,15 @@ test('her record counts every verdict and names the newest misses, three at most
   assert.equal(recordList([]), '');
 });
 
+/* A month of New York days, read at the pass: 22:00 on 9 October is already
+   the 10th in UTC, so a UTC day would start the window a day late. */
+test('her record is the last thirty New York days, newest first', () => {
+  const q = recordQuery(Date.parse('2026-10-10T02:00:00Z'));
+  assert.match(q, /&given_on=gte\.2026-09-09&/,
+    'the window is not thirty New York days back from the pass');
+  assert.match(q, /&order=id\.desc&limit=\d+$/, 'the record does not take the newest reads');
+});
+
 test('the open threads are split by what closes them', () => {
   const out = loopsList([
     { id: 4, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-12' },
@@ -4019,8 +4028,9 @@ test('the notes she is handed carry his commitments, asked for by their kind', a
 });
 
 /* ─── A list that overflows says so ──────────────────────────────────────────
-   The window is twenty, and the twenty-first instruction once left every prompt
-   and /notes with nothing marking the loss. Driven through the real read: the
+   The window is twenty, and without the row past it the twenty-first
+   instruction leaves every prompt and /notes with nothing marking the loss.
+   Driven through the real read: the
    stub answers as PostgREST does, honouring the limit it was sent. */
 test('a list past the window shows the window and says the oldest are not shown', async () => {
   const live = Array.from({ length: 25 }, (_, i) => ({ id: 25 - i, note: `instruction ${25 - i}` }));
