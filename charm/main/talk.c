@@ -130,7 +130,7 @@ static void confused(void) {
     vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
 }
 
-void talk(void) {
+bool talk(void) {
     static uint8_t *wav;
     if (!wav) wav = heap_caps_malloc(WAV_HEADER + MAX_SAMPLES * 2, MALLOC_CAP_SPIRAM);
 
@@ -140,21 +140,24 @@ void talk(void) {
     began = xTaskGetTickCount();
     size_t got = sound_record((int16_t *)(wav + WAV_HEADER), MAX_SAMPLES, heard);
     face_set_level(0);
-    if (!spoke) { face_set_mode(FACE_IDLE); return; }
+    if (!spoke) { face_set_mode(FACE_IDLE); return false; }
 
     face_set_mode(FACE_THINKING);
     wav_header(wav, got);
-    if (knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2, NULL) != 200) confused();
+    bool answered = knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2, NULL) == 200;
+    if (!answered) confused();
     face_set_mode(FACE_IDLE);
+    return answered;
 }
 
 bool talk_ready(void (*lit)(void)) {
     return knock(EUGENIA_DOOR "?briefing=ready", NULL, 0, lit) == 200;
 }
 
-void talk_briefing(void) {
+bool talk_briefing(void) {
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
     if (status != 200 && status != 204) confused();
     face_set_mode(FACE_IDLE);
+    return status == 200;
 }

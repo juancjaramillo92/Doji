@@ -127,7 +127,7 @@ int gladys_journal(void) {
         face_set_mode(all_yes ? FACE_DELIGHTED : FACE_DONE);
         vTaskDelay(pdMS_TO_TICKS(DONE_MS));
     } else if (!answered) {
-        face_set_mode(FACE_HAPPY);  // nothing waits: a smile for the tap
+        face_set_mode(FACE_HAPPY);  // nothing waited after all: a smile
         vTaskDelay(pdMS_TO_TICKS(HAPPY_MS));
     }
     face_set_mode(FACE_IDLE);

@@ -2616,8 +2616,11 @@ twenty seconds, so a keyring swinging all day cannot keep waking her.
 Who wakes is decided before the screen lights, so waking is never a switch:
 **Gladys when a trade waits** for its journal, Eugenia otherwise. Gladys
 journals it and goes back to sleep, unless a briefing waits too; only then does
-Eugenia slide in and read it (`?briefing=today`). Awake, **a swipe across her
-face switches them.** The panel's reset and select pins and the touch
+Eugenia slide in and read it (`?briefing=today`). Awake, a tap is for
+Eugenia, and **a trade that comes in while she speaks brings Gladys in once she
+is done** — asked after each answer and after the briefing, never during them —
+to journal it, and then she sleeps. Gladys never shows with nothing to journal.
+The panel's reset and select pins and the touch
 controller's reset are held through sleep, so the sleep screen needs no chip
 awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
 in the background**, the network she was last on first, asked directly on its
@@ -2647,7 +2650,7 @@ exact zeros. A tap while she thinks or speaks cuts her off; the copy in
 Telegram is the whole of it. A door that cannot be reached or refuses her key
 shows her confused for four seconds.
 
-**A tap and Gladys journals what waits.** She asks her door, and while a
+**Gladys journals what waits.** She asks her door, and while a
 trade waits the questions take the whole screen, the playground's: the setup
 split down the middle, **B&R** on the left and **S&R** on the right; then
 **RULES**, **SL** and **TP**, each one word on a screen whose left half is no
@@ -2657,8 +2660,8 @@ dots at the top say what is answered. A tap on a half sends that one answer at
 once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
 and her door answers with what waits next, so the next trade follows without a
 pause. Done, the ring sweeps round once with a warm smile — delighted when
-every answer was a yes. With nothing waiting, a tap gets a smile. A minute
-without a tap and the rest waits for next time. Taps, not swipes: a swipe moves
+every answer was a yes. With nothing waiting after all — journaled in Telegram
+since — she smiles. A minute without a tap and the rest waits for next time. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
 typeface, Hanken Grotesk, made into the charm's four fonts by
 `charm/tools/fonts.sh` with only the letters they use.
