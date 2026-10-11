@@ -2,201 +2,367 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
 <title>Your charm</title>
 <!-- The page the charm serves on its own network, the playground's ("Charm
-     setup"). The phone's own face: the charm has no internet to fetch a font
-     from. Each step is tried on the charm before it is saved. -->
+     setup"). Doji's typeface comes from the charm itself, since the phone has
+     no internet while it is on her network. Each step is tried on the charm
+     before it is saved. -->
 <style>
+@font-face { font-family: "Hanken Grotesk"; src: url(/font.woff2) format("woff2"); font-weight: 400 700; font-display: swap; }
 :root {
   color-scheme: dark;
   /* The app's tokens under the app's names, which agree.test.mjs holds them
      to; the rest are the page's own. */
   --glass: #0a0813; --bd: #251d39; --tx: #e8e6f0; --mt2: #9a92b0; --p: #8b35b8;
-  --panel: #0e0b19; --ok: #c9a6ff; --bad: #f3a2e4;
+  --panel: #110d1f; --raise: #181230; --edge: #3a2f55; --glow: #b45cd9; --ok: #c9a6ff; --bad: #f3a2e4;
   --sheen: linear-gradient(120deg, #5c40b0, #8b35b8 55%, #b45cd9);
-  --system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --face: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--glass); color: var(--tx); font: 15px/1.5 var(--system); }
-main { max-width: 440px; margin: 0 auto; min-height: 100vh; padding: 20px 20px 28px; display: flex; flex-direction: column; gap: 14px; }
-h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
-p { margin: 0; color: var(--mt2); font-size: 14px; }
-.steps { display: flex; gap: 6px; }
-.steps i { flex: 1; height: 3px; border-radius: 2px; background: var(--bd); }
+html, body { margin: 0; height: 100%; background: var(--glass); color: var(--tx); font: 16px/1.45 var(--face); -webkit-text-size-adjust: 100%; }
+body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+button, input { font: inherit; color: inherit; }
+.top { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 20px 0; min-height: 44px; }
+.top .who { font-size: 13px; font-weight: 600; color: var(--mt2); letter-spacing: .02em; }
+.steps { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mt2); font-variant-numeric: tabular-nums; }
+.steps i { display: block; width: 18px; height: 3px; border-radius: 2px; background: var(--edge); }
 .steps i.on { background: var(--sheen); }
-.list { display: grid; border: 1px solid var(--bd); border-radius: 14px; overflow: hidden; }
-.net { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--panel); border: 0; border-top: 1px solid var(--bd); color: var(--tx); font: 500 15px var(--system); text-align: left; width: 100%; }
-.net:first-child { border-top: 0; }
-.net span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.net small { color: var(--mt2); font-size: 12px; }
-.net.saved small { color: var(--ok); }
-label { font-size: 13px; color: var(--mt2); }
-.input { display: flex; align-items: center; background: var(--panel); border: 1px solid var(--bd); border-radius: 12px; margin-top: 6px; }
-.input:focus-within { border-color: var(--p); }
-.input input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--tx); font: 16px var(--system); padding: 12px 14px; outline: none; }
-.input button { background: none; border: 0; color: var(--mt2); font: 600 13px var(--system); padding: 0 14px; }
-.status { font-size: 13px; display: flex; align-items: center; gap: 6px; min-height: 20px; margin-top: 6px; }
-.status.ok { color: var(--ok); }
-.status.ok::before { content: "✓"; font-weight: 700; }
-.status.bad { color: var(--bad); }
-.status.bad::before { content: "!"; font-weight: 800; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; display: inline-grid; place-items: center; font-size: 11px; flex: none; }
-.status.wait { color: var(--mt2); }
-.spin { width: 12px; height: 12px; border: 2px solid var(--bd); border-top-color: var(--mt2); border-radius: 50%; animation: spin .8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
-.summary { display: grid; gap: 8px; }
-.summary div { display: flex; justify-content: space-between; gap: 10px; background: var(--panel); border: 1px solid var(--bd); border-radius: 12px; padding: 11px 14px; font-size: 14px; }
-.summary b { font-weight: 600; color: var(--ok); }
-.cta { margin-top: auto; display: grid; gap: 8px; padding-top: 10px; }
-.go { background: var(--sheen); color: #fff; border: 0; border-radius: 14px; font: 600 16px var(--system); padding: 14px; box-shadow: 0 8px 24px rgba(139,53,184,.35); }
-.go:disabled { opacity: .4; }
-.ghost { background: none; color: var(--mt2); border: 0; font: 500 14px var(--system); padding: 6px; }
-button:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; }
+form, .shell { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0; }
+.view { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 12px; display: flex; flex-direction: column; gap: 18px; max-width: 520px; width: 100%; margin: 0 auto; }
+.view > * { animation: rise .28s cubic-bezier(.2,.8,.2,1) both; }
+.view > *:nth-child(2) { animation-delay: .03s; } .view > *:nth-child(3) { animation-delay: .06s; } .view > *:nth-child(n+4) { animation-delay: .09s; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+h1 { font-size: 28px; font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; margin: 0; text-wrap: balance; outline: none; }
+.lede { margin: 0; color: var(--mt2); font-size: 15px; }
+.group { display: grid; gap: 8px; }
+.ghead { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; min-height: 28px; }
+.ghead span { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mt2); }
+.list { border: 1px solid var(--bd); border-radius: 16px; background: var(--panel); overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 0 14px; background: none; border: 0; border-top: 1px solid var(--bd); font-weight: 500; text-align: left; cursor: pointer; }
+.row:first-child { border-top: 0; }
+button.row:active { background: var(--raise); }
+.row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .sub { display: block; font-size: 12px; font-weight: 500; color: var(--mt2); }
+.row.add { color: var(--ok); font-weight: 600; }
+.row[disabled] { color: var(--mt2); cursor: default; }
+.badge { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--ok); background: rgba(201,166,255,.12); border-radius: 999px; padding: 3px 8px; }
+.ico { flex: none; width: 20px; height: 20px; fill: none; stroke: var(--mt2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sig path { stroke: var(--edge); } .sig path.on { stroke: var(--tx); } .sig circle { fill: var(--tx); stroke: none; }
+.iconbtn { display: inline-grid; grid-auto-flow: column; place-items: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 8px; background: none; border: 0; border-radius: 12px; color: var(--mt2); font-size: 14px; font-weight: 600; cursor: pointer; }
+.iconbtn .ico { stroke: currentColor; }
+.iconbtn.danger { color: var(--bad); }
+.spinning .ico { animation: turn .8s linear infinite; }
+@keyframes turn { to { transform: rotate(360deg); } }
+.confirm { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 6px 8px 6px 14px; border-top: 1px solid var(--bd); background: rgba(243,162,228,.07); }
+.confirm:first-child { border-top: 0; }
+.confirm span { flex: 1; min-width: 0; font-size: 15px; }
+.pill { min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--edge); background: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pill.danger { background: var(--bad); border-color: transparent; color: #2a0d26; }
+.field { display: grid; gap: 8px; }
+.field > label { font-size: 13px; font-weight: 600; color: var(--mt2); padding: 0 4px; }
+.input { display: flex; align-items: center; min-height: 56px; background: var(--panel); border: 1px solid var(--bd); border-radius: 14px; }
+.input:focus-within { border-color: var(--p); box-shadow: 0 0 0 3px rgba(139,53,184,.25); }
+.input input { flex: 1; min-width: 0; min-height: 54px; padding: 0 14px; background: transparent; border: 0; font-size: 17px; outline: none; }
+.input input.key { font: 15px var(--code); }
+.help { margin: 0; padding: 0 4px; font-size: 13px; color: var(--mt2); }
+.help code { font: 12px var(--code); color: var(--tx); background: var(--raise); border-radius: 6px; padding: 1px 5px; }
+.status { display: flex; align-items: center; gap: 8px; min-height: 20px; padding: 0 4px; font-size: 14px; font-weight: 500; }
+.status:empty { display: none; }
+.status.ok { color: var(--ok); } .status.bad { color: var(--bad); } .status.wait { color: var(--mt2); }
+.status .ico { stroke: currentColor; width: 18px; height: 18px; }
+.spin { flex: none; width: 14px; height: 14px; border: 2px solid var(--edge); border-top-color: var(--tx); border-radius: 50%; animation: turn .8s linear infinite; }
+.summary .row { cursor: default; }
+.summary .row b { font-weight: 600; color: var(--ok); display: inline-flex; align-items: center; gap: 6px; }
+.dock { flex: none; display: grid; gap: 6px; padding: 10px 20px calc(18px + env(safe-area-inset-bottom)); max-width: 520px; width: 100%; margin: 0 auto; }
+.primary { min-height: 56px; border: 0; border-radius: 16px; background: var(--sheen); color: #fff; font-size: 17px; font-weight: 600; cursor: pointer; box-shadow: 0 10px 28px rgba(139,53,184,.35); }
+.primary:disabled { opacity: .38; box-shadow: none; cursor: default; }
+.quiet { min-height: 44px; border: 0; background: none; color: var(--mt2); font-size: 15px; font-weight: 600; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+.banner { position: fixed; left: 12px; right: 12px; top: calc(12px + env(safe-area-inset-top)); z-index: 2; display: flex; gap: 10px; align-items: flex-start; max-width: 496px; margin: 0 auto; padding: 12px 14px; border-radius: 14px; background: #1d1636; border: 1px solid var(--edge); box-shadow: 0 12px 30px rgba(0,0,0,.5); font-size: 14px; line-height: 1.4; animation: rise .25s both; }
+.banner .spin { margin-top: 3px; }
+.banner b { display: block; font-weight: 600; }
+.banner span { color: var(--mt2); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .view > *, .banner { animation: none; } .spin, .spinning .ico { animation: none; } }
 </style>
 </head>
 <body>
-<main id="page"></main>
+<div class="shell" id="app"></div>
+<div id="over"></div>
+<div class="sr" aria-live="polite" id="live"></div>
 <script>
 (() => {
-  const page = document.getElementById('page');
-  const state = { first: true, nets: [], picked: null, keys: { eugenia: null, gladys: null } };
-  const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const bars = (n) => '▂▄▆'.slice(0, n).padEnd(3, '·');
-  const progress = (i) => `<div class="steps">${[0, 1, 2].map((n) => `<i class="${n <= i ? 'on' : ''}"></i>`).join('')}</div>`;
+  const app = document.getElementById('app'), over = document.getElementById('over'), live = document.getElementById('live');
+  const state = { first: true, name: 'Charm', max: 4, nets: [], step: 'wifi', picked: null, seen: null, keys: { eugenia: null, gladys: null }, confirm: null, replace: null };
   const NAMES = { eugenia: 'Eugenia', gladys: 'Gladys' };
+  const SECRETS = { eugenia: 'EUGENIA_CHARM_SECRET', gladys: 'GLADYS_CHARM_SECRET' };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const svg = (body, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+  const I = {
+    lock: svg('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+    eye: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+    eyeOff: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
+    scan: svg('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
+    plus: svg('<path d="M12 5v14M5 12h14"/>'),
+    check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+    alert: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>'),
+    back: svg('<path d="M15 6l-6 6 6 6"/>'),
+  };
+  const QUALITY = ['', 'Weak signal', 'Good signal', 'Strong signal'];
+  const signal = (n) => `<svg class="ico sig" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0" class="${n >= 3 ? 'on' : ''}"/><path d="M5.8 12.4a9 9 0 0 1 12.4 0" class="${n >= 2 ? 'on' : ''}"/><path d="M9.1 15.8a4.4 4.4 0 0 1 5.8 0" class="on"/><circle cx="12" cy="19.2" r="1.4"/></svg><span class="sr">${QUALITY[n]}</span>`;
+  // A phone's hotspot is named for the phone; it goes first, so she has internet anywhere.
+  const isHotspot = (name) => /iphone|android|galaxy|pixel|hotspot/i.test(name);
+  const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  function announce(text) { live.textContent = ''; setTimeout(() => { live.textContent = text; }, 30); }
 
-  // The charm answers in JSON; a network that drops for a moment while she
-  // joins Wi-Fi is asked again once.
+  /* The charm answers in JSON. While she tests a network her radio moves to
+     its channel, so the phone can drop off her network for a moment: the page
+     says so, and keeps asking for twenty-five seconds before giving up. */
   async function ask(path, fields) {
     const body = fields ? new URLSearchParams(fields) : undefined;
-    for (let tries = 0; ; tries++) {
+    const until = Date.now() + 25000;
+    for (;;) {
       try {
         const r = await fetch(path, { method: fields ? 'POST' : 'GET', body });
+        over.innerHTML = '';
         return await r.json();
       } catch (e) {
-        if (tries) throw e;
-        await new Promise((ok) => setTimeout(ok, 1500));
+        if (Date.now() > until) { over.innerHTML = ''; throw e; }
+        over.innerHTML = `<div class="banner" role="status"><span class="spin"></span><div><b>Reconnecting to ${esc(state.name)}</b><span>Her Wi-Fi moves for a moment while she tests a network. This page carries on by itself.</span></div></div>`;
+        await wait(1500);
       }
     }
   }
 
-  function home(s) {
-    page.innerHTML = `
-      <h1>Your charm</h1>
-      <p>Everything she has. Change what you need; the rest stays.</p>
-      <div><label>Wi-Fi</label><div class="list" style="margin-top:6px">
-        ${s.nets.map((n) => `<div class="net saved"><span>${esc(n)}</span><small>Saved</small></div>`).join('')}
-      </div></div>
-      <div class="summary"><div><span>Eugenia</span><b>Key saved</b></div><div><span>Gladys</span><b>Key saved</b></div></div>
-      <div class="cta"><button class="go" id="add">Add a network</button><button class="ghost" id="done">Done</button></div>`;
-    document.getElementById('add').onclick = wifi;
-    document.getElementById('done').onclick = finish;
+  const STEP = { wifi: 1, password: 1, other: 1, keys: 2, done: 3 };
+  function shell(body, dock, opts = {}) {
+    const n = state.first ? STEP[state.step] : 0;
+    app.innerHTML = `
+      <div class="top">
+        ${opts.back ? `<button class="iconbtn" id="back" type="button" aria-label="Back">${I.back}</button>` : `<span class="who">${esc(state.name)}</span>`}
+        ${n ? `<span class="steps" aria-label="Step ${n} of 3">${[1, 2, 3].map((i) => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}<span aria-hidden="true">${n} of 3</span></span>` : ''}
+      </div>
+      <form id="form" novalidate><div class="view">${body}</div><div class="dock">${dock}</div></form>`;
+    const h = app.querySelector('h1');
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+    if (opts.back) document.getElementById('back').onclick = opts.back;
+    document.getElementById('form').onsubmit = (e) => { e.preventDefault(); if (opts.submit) opts.submit(); };
+  }
+  function go(step) { state.step = step; render(); }
+
+  // Saved networks, tried in this order, each removable with a second tap.
+  function savedGroup(title) {
+    if (!state.nets.length) return '';
+    return `<div class="group"><div class="ghead"><span>${title}</span></div><div class="list">
+      ${state.nets.map((n, i) => state.confirm === n
+        ? `<div class="confirm"><span>Remove ${esc(n)}?</span><button class="pill" type="button" data-keep>Keep</button><button class="pill danger" type="button" data-remove="${i}">Remove</button></div>`
+        : `<div class="row">${I.check}<span class="name">${esc(n)}${i === 0 ? '<span class="sub">Tried first</span>' : ''}</span><button class="iconbtn danger" type="button" data-ask="${i}">Remove</button></div>`).join('')}
+    </div></div>`;
+  }
+  function wireSaved() {
+    app.querySelectorAll('[data-ask]').forEach((b) => b.onclick = () => { state.confirm = state.nets[b.dataset.ask]; render(); app.querySelector('[data-keep]').focus(); });
+    app.querySelectorAll('[data-keep]').forEach((b) => b.onclick = () => { state.confirm = null; render(); });
+    app.querySelectorAll('[data-remove]').forEach((b) => b.onclick = async () => {
+      const ssid = state.nets[b.dataset.remove];
+      b.disabled = true;
+      const r = await ask('/api/forget', { ssid }).catch(() => ({ ok: false }));
+      state.confirm = null;
+      if (r.ok) { state.nets = state.nets.filter((n) => n !== ssid); announce(`${ssid} removed`); }
+      render();
+    });
   }
 
-  async function wifi() {
-    page.innerHTML = `${state.first ? progress(0) : ''}<h1>${state.first ? 'Her Wi-Fi' : 'Add a network'}</h1>
-      <p>${state.first ? 'Start with your phone’s hotspot, so she has internet wherever you go.' : 'The networks she can see from here.'}</p>
-      <div class="status wait"><span class="spin"></span> Looking around…</div>`;
-    const seen = (await ask('/api/scan')).filter((n) => !state.nets.includes(n.ssid));
-    page.innerHTML = `
-      ${state.first ? progress(0) : ''}
-      <h1>${state.first ? 'Her Wi-Fi' : 'Add a network'}</h1>
-      <p>${state.first ? 'Start with your phone’s hotspot, so she has internet wherever you go.' : 'The networks she can see from here.'}</p>
-      <div class="list">${seen.map((n, i) => `<button class="net" data-i="${i}"><span>${esc(n.ssid)}</span><small>${bars(n.bars)}</small></button>`).join('')}</div>
-      ${state.nets.length ? `<p>Saved: ${state.nets.map(esc).join(', ')}.</p>` : ''}
-      <div class="cta">${state.first && state.nets.length ? '<button class="go" id="next">Next</button>' : ''}${state.first ? '' : '<button class="ghost" id="back">Back</button>'}</div>`;
-    page.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { state.picked = seen[b.dataset.i].ssid; password(); }; });
-    const next = document.getElementById('next'), back = document.getElementById('back');
-    if (next) next.onclick = keys;
-    if (back) back.onclick = start;
+  function passwordField(id, label) {
+    return `<div class="field"><label for="${id}">${label}</label>
+      <div class="input"><input id="${id}" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="join">
+      <button class="iconbtn" type="button" data-show="${id}" aria-label="Show password" aria-pressed="false">${I.eye}</button></div></div>`;
+  }
+  function wireShow() {
+    app.querySelectorAll('[data-show]').forEach((b) => b.onclick = () => {
+      const input = document.getElementById(b.dataset.show), shown = input.type === 'text';
+      input.type = shown ? 'password' : 'text';
+      b.innerHTML = shown ? I.eye : I.eyeOff;
+      b.setAttribute('aria-pressed', String(!shown));
+      b.setAttribute('aria-label', shown ? 'Show password' : 'Hide password');
+    });
+  }
+  function status(el, kind, text) {
+    el.className = `status ${kind}`;
+    el.innerHTML = kind === 'wait' ? `<span class="spin"></span>${esc(text)}` : `${kind === 'ok' ? I.check : I.alert}${esc(text)}`;
+    announce(text);
   }
 
-  function password() {
-    page.innerHTML = `
-      ${state.first ? progress(0) : ''}
-      <h1>${esc(state.picked)}</h1>
-      <div><label for="pw">Password</label>
-        <div class="input"><input id="pw" type="password" autocomplete="off" autocapitalize="off"><button id="show" type="button">Show</button></div>
-        <div class="status" id="st"></div></div>
-      <div class="cta"><button class="go" id="connect">Connect</button><button class="ghost" id="back">Back</button></div>`;
-    const pw = document.getElementById('pw'), st = document.getElementById('st'), go = document.getElementById('connect');
-    pw.focus();
-    document.getElementById('show').onclick = (e) => { const shown = pw.type === 'text'; pw.type = shown ? 'password' : 'text'; e.target.textContent = shown ? 'Show' : 'Hide'; };
-    document.getElementById('back').onclick = wifi;
-    go.onclick = async () => {
-      go.disabled = true;
-      st.className = 'status wait'; st.innerHTML = '<span class="spin"></span> Connecting…';
-      const r = await ask('/api/wifi', { ssid: state.picked, pass: pw.value }).catch(() => ({ ok: false }));
-      go.disabled = false;
-      if (!r.ok) { st.className = 'status bad'; st.textContent = 'That password didn’t work. Check it and try again.'; return; }
-      st.className = 'status ok'; st.textContent = 'Connected';
-      state.nets.push(state.picked);
-      setTimeout(state.first ? wifi : start, 900);
-    };
-  }
-
-  function keys() {
-    const row = (who) => {
-      const k = state.keys[who];
-      return `<div><label for="k-${who}">${NAMES[who]}</label>
-        <div class="input"><input id="k-${who}" autocomplete="off" autocapitalize="off" placeholder="Paste the key" value="${k ? esc(k.value) : ''}"></div>
-        <div class="status ${k ? k.state : ''}" id="s-${who}">${k ? k.say : ''}</div></div>`;
-    };
-    page.innerHTML = `
-      ${progress(1)}
-      <h1>Their keys</h1>
-      <p>From Supabase, Edge Functions, Secrets: EUGENIA_CHARM_SECRET and GLADYS_CHARM_SECRET. Each is checked with her as you paste it.</p>
-      ${row('eugenia')}${row('gladys')}
-      <div class="cta"><button class="go" id="next" ${state.keys.eugenia?.state === 'ok' && state.keys.gladys?.state === 'ok' ? '' : 'disabled'}>Next</button></div>`;
-    for (const who of ['eugenia', 'gladys']) {
-      const input = document.getElementById(`k-${who}`);
-      input.oninput = () => check(who, input.value.trim());
+  async function join(ssid, pass, st, button) {
+    button.disabled = true;
+    status(st, 'wait', 'Connecting…');
+    const r = await ask('/api/wifi', { ssid, pass }).catch(() => ({ ok: false, why: 'lost' }));
+    button.disabled = false;
+    if (!r.ok) {
+      status(st, 'bad', r.why === 'full' ? `She keeps ${state.max} networks. Remove one first.`
+        : r.why === 'lost' ? 'The page lost the charm. Make sure your phone is on her network, then try again.'
+        : 'That password didn’t work. Check it and try again.');
+      return;
     }
-    document.getElementById('next').onclick = done;
+    status(st, 'ok', `Connected to ${ssid}`);
+    await wait(900);
+    if (!state.nets.includes(ssid)) state.nets.push(ssid);
+    state.seen = null;
+    go(state.first ? 'wifi' : 'home');
+  }
+
+  async function scan() {
+    state.seen = 'scanning';
+    render();
+    const seen = await ask('/api/scan').catch(() => []);
+    state.seen = seen.sort((a, b) => isHotspot(b.ssid) - isHotspot(a.ssid) || b.bars - a.bars);
+    if (state.step === 'wifi') render();
+  }
+
+  function render() {
+    if (state.step === 'home') {
+      const keyRow = (who) => `<div class="row"><span class="name">${NAMES[who]}<span class="sub">Key saved</span></span><button class="iconbtn" type="button" data-replace="${who}">Replace</button></div>`;
+      const full = state.nets.length >= state.max;
+      shell(`
+        <h1>Your charm</h1>
+        <p class="lede">What she has saved. Change what you need; the rest stays.</p>
+        ${savedGroup('Wi-Fi · tried in this order')}
+        <div class="list"><button class="row add" type="button" id="add" ${full ? 'disabled' : ''}>${I.plus}<span class="name">Add a network${full ? `<span class="sub">She keeps ${state.max}. Remove one first.</span>` : ''}</span></button></div>
+        <div class="group"><div class="ghead"><span>Keys</span></div><div class="list">${keyRow('eugenia')}${keyRow('gladys')}</div></div>`,
+        '<button class="primary" type="submit">Done</button>', { submit: finish });
+      wireSaved();
+      document.getElementById('add').onclick = () => go('wifi');
+      app.querySelectorAll('[data-replace]').forEach((b) => b.onclick = () => { state.replace = b.dataset.replace; state.keys[state.replace] = null; go('keys'); });
+      return;
+    }
+
+    if (state.step === 'wifi') {
+      if (!state.seen) { scan(); return; }
+      const full = state.nets.length >= state.max;
+      const nearby = state.seen === 'scanning' ? [] : state.seen.filter((n) => !state.nets.includes(n.ssid));
+      shell(`
+        <h1>${state.first ? 'Her Wi-Fi' : 'Add a network'}</h1>
+        <p class="lede">${state.first ? 'Start with your phone’s hotspot, so she has internet wherever you go. Add home and work after.' : 'Pick one she can see from here, or type one in.'}</p>
+        ${state.first ? savedGroup('Saved') : ''}
+        <div class="group">
+          <div class="ghead"><span>Nearby</span><button class="iconbtn ${state.seen === 'scanning' ? 'spinning' : ''}" type="button" id="rescan">${I.scan}Scan again</button></div>
+          <div class="list">
+            ${full ? `<div class="row" role="note"><span class="name">She keeps ${state.max} networks<span class="sub">Remove one to add another.</span></span></div>` : ''}
+            ${state.seen === 'scanning' ? '<div class="row"><span class="spin"></span><span class="name">Looking around…</span></div>'
+              : nearby.map((n, i) => `<button class="row" type="button" data-net="${i}" ${full ? 'disabled' : ''}>${signal(n.bars)}<span class="name">${esc(n.ssid)}</span>${isHotspot(n.ssid) ? '<span class="badge">Hotspot</span>' : ''}${n.lock ? I.lock : ''}</button>`).join('')}
+            <button class="row add" type="button" id="other" ${full ? 'disabled' : ''}>${I.plus}<span class="name">Other network…</span></button>
+          </div>
+        </div>`,
+        state.first ? `<button class="primary" type="submit" ${state.nets.length ? '' : 'disabled'}>Next: her keys</button>`
+                    : '<button class="quiet" type="submit">Back to your charm</button>',
+        { submit: () => go(state.first ? 'keys' : 'home'), back: state.first ? null : () => go('home') });
+      wireSaved();
+      app.querySelectorAll('[data-net]').forEach((b) => b.onclick = () => { state.picked = nearby[b.dataset.net]; go('password'); });
+      document.getElementById('other').onclick = () => go('other');
+      document.getElementById('rescan').onclick = scan;
+      return;
+    }
+
+    if (state.step === 'password') {
+      const n = state.picked;
+      shell(`
+        <h1>${esc(n.ssid)}</h1>
+        ${n.lock ? passwordField('pw', 'Password') : '<p class="lede">An open network: no password needed.</p>'}
+        <div class="status" id="st" role="status"></div>`,
+        '<button class="primary" type="submit" id="go">Join</button>',
+        { back: () => go('wifi'), submit: () => join(n.ssid, n.lock ? document.getElementById('pw').value : '', document.getElementById('st'), document.getElementById('go')) });
+      if (n.lock) { wireShow(); document.getElementById('pw').focus(); }
+      return;
+    }
+
+    if (state.step === 'other') {
+      shell(`
+        <h1>Other network</h1>
+        <p class="lede">For a hidden network, or one you are not near yet. She saves it only once she has joined it.</p>
+        <div class="field"><label for="ssid">Network name</label>
+          <div class="input"><input id="ssid" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="Exactly as it is spelled"></div></div>
+        ${passwordField('opw', 'Password')}
+        <div class="status" id="st" role="status"></div>`,
+        '<button class="primary" type="submit" id="go">Join</button>',
+        { back: () => go('wifi'), submit: () => {
+          const ssid = document.getElementById('ssid').value.trim(), st = document.getElementById('st');
+          if (!ssid) { status(st, 'bad', 'Type the network’s name first.'); document.getElementById('ssid').focus(); return; }
+          join(ssid, document.getElementById('opw').value, st, document.getElementById('go'));
+        } });
+      wireShow();
+      return;
+    }
+
+    if (state.step === 'keys') {
+      const only = state.replace, who = only ? [only] : ['eugenia', 'gladys'];
+      const row = (w) => {
+        const k = state.keys[w];
+        return `<div class="field"><label for="k-${w}">${NAMES[w]}’s key</label>
+          <div class="input"><input id="k-${w}" class="key" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="${w === 'eugenia' && !only ? 'next' : 'done'}" placeholder="Paste the key" value="${k ? esc(k.value) : ''}"></div>
+          <p class="help">Supabase → Edge Functions → Secrets → <code>${SECRETS[w]}</code></p>
+          <div class="status ${k ? k.state : ''}" id="s-${w}" role="status">${k ? (k.state === 'wait' ? '<span class="spin"></span>' : k.state === 'ok' ? I.check : I.alert) + esc(k.say) : ''}</div></div>`;
+      };
+      const ready = who.every((w) => state.keys[w] && state.keys[w].state === 'ok');
+      shell(`
+        <h1>${only ? `${NAMES[only]}’s new key` : 'Their keys'}</h1>
+        <p class="lede">${only ? 'Paste the key you set in Supabase. She checks it with her door before replacing the old one.' : 'Each key is checked with her door as you paste it.'}</p>
+        ${who.map(row).join('')}`,
+        `<button class="primary" type="submit" ${ready ? '' : 'disabled'}>${only ? 'Save' : 'Next'}</button>`,
+        { back: only ? () => { state.replace = null; go('home'); } : () => go('wifi'),
+          submit: () => { if (!ready) return; if (only) { state.replace = null; announce('Key replaced'); go('home'); } else go('done'); } });
+      for (const w of who) { const input = document.getElementById(`k-${w}`); input.oninput = () => check(w, input.value); }
+      return;
+    }
+
+    if (state.step === 'done') {
+      shell(`
+        <h1>She’s ready</h1>
+        <div class="list summary">
+          <div class="row"><span class="name">Wi-Fi</span><b>${state.nets.length} saved</b></div>
+          <div class="row"><span class="name">Eugenia</span><b>${I.check}Answered</b></div>
+          <div class="row"><span class="name">Gladys</span><b>${I.check}Answered</b></div>
+        </div>
+        <p class="lede">Finish and she restarts as herself. Your phone goes back to its own Wi-Fi.</p>`,
+        '<button class="primary" type="submit">Finish</button>', { submit: finish });
+      return;
+    }
+
+    if (state.step === 'finished') {
+      app.innerHTML = '<div class="view"><h1 tabindex="-1">All set</h1><p class="lede">She restarted and is joining your Wi-Fi, and your phone is going back to its own network. You can close this page.</p></div>';
+      app.querySelector('h1').focus({ preventScroll: true });
+    }
   }
 
   const timers = {};
   function check(who, value) {
     clearTimeout(timers[who]);
-    if (!value) { state.keys[who] = null; keys(); return; }
+    const st = document.getElementById(`s-${who}`), next = app.querySelector('.primary');
+    if (!value.trim()) { state.keys[who] = null; st.className = 'status'; st.innerHTML = ''; next.disabled = true; return; }
     timers[who] = setTimeout(async () => {
-      state.keys[who] = { value, state: 'wait', say: '<span class="spin"></span> Asking her…' };
-      keys();
-      const r = await ask('/api/key', { who, key: value }).catch(() => ({ ok: false, why: 'offline' }));
+      state.keys[who] = { value, state: 'wait', say: 'Asking her door…' };
+      status(st, 'wait', 'Asking her door…');
+      next.disabled = true;
+      const r = await ask('/api/key', { who, key: value.trim() }).catch(() => ({ ok: false, why: 'offline' }));
       state.keys[who] = { value, state: r.ok ? 'ok' : 'bad',
         say: r.ok ? `${NAMES[who]} answered` : r.why === 'offline' ? 'She can’t reach the internet. Add a network first.' : 'Refused. Copy it again from Supabase; a character may be missing.' };
-      keys();
-      document.getElementById(`k-${who}`).focus();
+      render();
+      const input = document.getElementById(`k-${who}`);
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
     }, 600);
-  }
-
-  function done() {
-    page.innerHTML = `
-      ${progress(2)}
-      <h1>She’s ready</h1>
-      <div class="summary">
-        <div><span>Wi-Fi</span><b>${state.nets.length} saved</b></div>
-        <div><span>Eugenia</span><b>Answered</b></div>
-        <div><span>Gladys</span><b>Answered</b></div>
-      </div>
-      <p>Your phone goes back to its own Wi-Fi when you finish.</p>
-      <div class="cta"><button class="go" id="finish">Finish</button></div>`;
-    document.getElementById('finish').onclick = finish;
   }
 
   async function finish() {
     await ask('/api/finish', {}).catch(() => null);
-    page.innerHTML = '<h1>Done</h1><p>She restarts and wakes as herself. Your phone goes back to its own network.</p>';
+    go('finished');
   }
 
-  async function start() {
-    const s = await ask('/api/state');
-    state.first = !s.ready;
-    state.nets = s.nets;
-    if (state.first) wifi(); else home(s);
-  }
-  start();
+  ask('/api/state').then((s) => {
+    state.first = !s.ready; state.name = s.name; state.max = s.max; state.nets = s.nets;
+    go(state.first ? 'wifi' : 'home');
+  });
 })();
 </script>
 </body>

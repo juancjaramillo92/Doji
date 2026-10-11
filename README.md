@@ -67,6 +67,7 @@ charm/                                  firmware for the charm — see The charm
   main/config.c                         what the setup page saved, in her flash
   main/setup.c                          the setup, on her own Wi-Fi network
   main/setup.html                       the page the setup serves to the phone
+  main/setup.woff2                      Doji's typeface for that page, served by the charm
   main/dns.c                            the setup's answer to every name the phone asks
   main/net.c                            joining her Wi-Fi, and New York time
   main/talk.c                           talking with Eugenia, through her door
@@ -83,7 +84,7 @@ charm/                                  firmware for the charm — see The charm
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
   tools/art.py                          turns a render into those bytes
-  tools/fonts.sh                        turns the typeface into the four fonts
+  tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 test/                                   node:test suites — see Tests
@@ -2672,16 +2673,28 @@ password made up for that setup**, and shows a **QR code** carrying both,
 centred on her screen with the name under it. A phone's camera joins it in one
 tap, and the page opens by itself: every name the phone asks for resolves to
 the charm and every page but its own redirects there. The page
-(`charm/main/setup.html`, in the phone's own typeface, since the charm has no
-internet to fetch one) asks for **her Wi-Fi networks** — the ones in range
-offered by name, the phone's hotspot first so she has internet anywhere — and
-**the two keys**, `EUGENIA_CHARM_SECRET` and `GLADYS_CHARM_SECRET`. **Each is
+(`charm/main/setup.html`) is set in Doji's typeface, which the charm serves
+herself (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the
+phone has no internet while it is on her network, and it is built for a
+phone: thumb-sized buttons, the main one at the bottom, the keyboard's return
+key saying what it does, no auto-correct on passwords or keys, and every
+result read out to a screen reader. It asks for **her Wi-Fi networks** — the
+ones in range, each with its signal and a lock when it has a password, the
+phone's hotspot recognised by its name and offered first so she has internet
+anywhere, a scan again on request, and "Other network" for one that is hidden
+or not in range — and **the two keys**, `EUGENIA_CHARM_SECRET` and
+`GLADYS_CHARM_SECRET`. **Each is
 tried before it is saved**: a network by joining it, a key by asking its door —
 Eugenia's with an empty recording, which a right key is refused with a `400`
 for, Gladys's with what waits — while her screen shows a spinner, then a tick
-or a cross. Coming back later, the page shows what she has and offers to add a
-network, which never asks for the keys again; past four, the newest takes the
-last place. Everything is kept in her own flash (NVS, namespace `charm`), and
+or a cross. While she tests a network her radio moves to its channel, so the
+phone can drop off her network for a moment; the page says it is
+reconnecting and carries on by itself. Coming back later, the page shows what
+she has: her networks in the order she tries them, each with Remove behind a
+second tap, a way to add one, and Replace for either key, checked before the
+old one goes. She keeps four networks: a fifth is refused until one is
+removed, never swapped in silently. Finishing ends on "All set", since the
+page cannot close itself. Everything is kept in her own flash (NVS, namespace `charm`), and
 finishing restarts her as herself. The addresses of the two doors are the
 repository's — in `charm/main/net.h`, which `agree.test.mjs` reads with every
 other caller — and only the keys are secret, so a lost charm is cut off by
