@@ -1,6 +1,7 @@
-/* Eugenia's door, each exchange one request. He talks until he stops — a
-   second of quiet after his voice, a tap, or a minute — and the recording goes
-   to her door as WAV; the briefing is a GET. What comes back is her raw voice,
+/* Eugenia's door, each exchange one request. He presses PWR and talks, as
+   long as he likes and pausing as long as he needs, until he presses it
+   again or the recording is full; the recording goes to her door as WAV. The
+   briefing is a GET. What comes back is her raw voice,
    24 kHz mono, played as it arrives: silence while she thinks, which her face
    shows as thinking, then her voice with her mouth following it. */
 #include "talk.h"
@@ -24,29 +25,28 @@ static const char *TAG = "talk";
 #define WAV_HEADER  44
 #define HER_RATE    24000
 
-// Readings, not facts: what counts as his voice, how long a pause ends his
-// turn, and how long she waits for him to start.
-#define VOICE    0.12f
-#define QUIET_MS 1200
-#define WAIT_MS  6000
+// A reading, not a fact: what counts as his voice. And how long she waits
+// for him to start before dropping the turn: he pressed, then said nothing.
+#define VOICE     0.12f
+#define SILENT_MS 30000
 
 // Her door sends a beat of silence every 15 s while she thinks; twice that
 // with nothing is a dead line.
 #define READ_MS 30000
 #define CONFUSED_MS 4000
 
-static TickType_t began, voice_at;
+static TickType_t began;
 static bool spoke, speaking;
 
-// A tap is a notification to this task: it ends his turn or cuts her off.
+// PWR is a notification to this task: it ends his turn or cuts her off.
 static bool tapped(void) { return ulTaskNotifyTake(pdTRUE, 0); }
 
+// His pauses are his own: once he has spoken only PWR ends the turn.
 static bool heard(float loud) {
     face_set_level(loud);
     if (tapped()) return false;
-    TickType_t now = xTaskGetTickCount();
-    if (loud > VOICE) { spoke = true; voice_at = now; }
-    return spoke ? now - voice_at < pdMS_TO_TICKS(QUIET_MS) : now - began < pdMS_TO_TICKS(WAIT_MS);
+    if (loud > VOICE) spoke = true;
+    return spoke || xTaskGetTickCount() - began < pdMS_TO_TICKS(SILENT_MS);
 }
 
 // Her silence is exact zeros, so the first sound above nothing is her voice.
@@ -139,6 +139,7 @@ int talk(void) {
     face_set_level(0);
     if (!spoke) { face_set_mode(FACE_IDLE); return 0; }
 
+    sound_sent();
     face_set_mode(FACE_THINKING);
     wav_header(wav, got);
     int status = knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2, NULL);
@@ -152,6 +153,7 @@ bool talk_ready(void (*lit)(void)) {
 }
 
 int talk_briefing(void) {
+    tapped();  // a press during the journal before it is not a word to her
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
     if (status > 0 && status != 200 && status != 204) confused();

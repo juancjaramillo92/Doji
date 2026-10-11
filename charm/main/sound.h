@@ -16,8 +16,11 @@ void sound_chime(void);
 // Gladys's soft double tick: a trade waits for its journal.
 void sound_tick(void);
 
-// Two quick notes, rising: she heard the tap and is listening.
+// Two quick notes, rising: she heard PWR and is listening.
 void sound_listen(void);
+
+// The same two, falling: his words are on their way to her.
+void sound_sent(void);
 
 /* Both hand `more` how loud each moment is, 0 to 1, and stop when it answers
    false. Recording is mono 16 kHz into `out`, up to `max` samples, and returns

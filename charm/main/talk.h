@@ -2,8 +2,8 @@
 #include <stdbool.h>
 
 /* One exchange with Eugenia: he talks, she answers. Call from her task after
-   a tap; a tap while it runs — a notification to that task — ends his turn
-   early, or cuts her off. The same holds for the two below. Returns what her
+   PWR; PWR while it runs — a notification to that task — ends his turn, or
+   cuts her off. The same holds for the two below. Returns what her
    door answered — 200 when she did — 0 when he said nothing, and -1 when the
    network could not reach her, which is left to the lock screen to show;
    any other answer shows her confused. */

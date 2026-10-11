@@ -91,6 +91,11 @@ void sound_listen(void) {
     play_notes(notes, 400.0f, 22.0f, 6000);
 }
 
+void sound_sent(void) {
+    static const float notes[2][2] = { { 990.0f, 0.07f }, { 660.0f, 0.11f } };
+    play_notes(notes, 400.0f, 22.0f, 6000);
+}
+
 size_t sound_record(int16_t *out, size_t max, bool (*more)(float)) {
     open_at(16000);
     size_t got = 0;

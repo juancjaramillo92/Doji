@@ -29,6 +29,9 @@ face_mode_t face_get_mode(void);
 // mouth while speaking.
 void face_set_level(float level);
 
+// PWR held toward switching off, 0 to 1: a ring empties round the rim.
+void face_set_hold(float hold);
+
 /* What the sleep screen shows. Low on it, one mark for what waits: a purple
    dot while a briefing does, a white ring while a trade does, the dot inside
    the ring for both. At the top, a small battery when it is `low` and nothing

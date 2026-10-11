@@ -3,11 +3,13 @@
    PWR is the power chip's: a press switches the board on, and a long hold
    switches it off. It also reaches the chip through a transistor as SYS_OUT
    on GPIO3, high while pressed (Waveshare's schematic for the 1.75C), so the
-   charm times the hold itself, asleep or awake — a press wakes her — and at a
-   second and a half closes her eyes and switches the board off through the
+   charm reads it too: a press wakes her, a short one is the talk button, and
+   at three seconds she closes her eyes and switches the board off through the
    power chip. The chip's own switch-off is set to its longest, ten seconds,
-   so the goodnight always comes first. BOOT pulls GPIO0 low while pressed;
-   held five seconds, it opens the setup.
+   so the goodnight always comes first, and stays the way out of a hung
+   charm. BOOT pulls GPIO0 low while pressed; held five seconds, it opens the
+   setup. BOOT is not the talk button: the chip reads it at start to choose
+   its programming mode, and a press at the wrong moment would choose it.
 
    The registers are those of Waveshare's own AXP2101 example for this board
    (axp2101_registers.h) and the chip's datasheet. */
@@ -33,7 +35,8 @@ static const char *TAG = "power";
 #define OFF_10S      (3 << 2)
 
 #define POLL_MS       50
-#define OFF_HOLD_MS   1500
+#define TAP_MS        600    // shorter than this, a press is the talk button
+#define OFF_HOLD_MS   3000
 #define SETUP_HOLD_MS 5000
 #define LOW_PERCENT   15
 
@@ -51,11 +54,21 @@ static void set(uint8_t reg, uint8_t v) {
 }
 
 static void watch(void *arg) {
-    (void)arg;
+    TaskHandle_t talker = arg;
+    // The press that woke her is answered by main.c, which listens at once;
+    // only its hold still counts, toward switching off.
+    bool waking = gpio_get_level(PWR_PIN);
     int pwr_held = 0, boot_held = 0;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
-        pwr_held = gpio_get_level(PWR_PIN) ? pwr_held + POLL_MS : 0;
+        if (gpio_get_level(PWR_PIN)) {
+            pwr_held += POLL_MS;
+        } else {
+            if (pwr_held && pwr_held < TAP_MS && !waking) xTaskNotifyGive(talker);
+            pwr_held = 0;
+            waking = false;
+        }
+        face_set_hold(pwr_held > TAP_MS ? (float)(pwr_held - TAP_MS) / (OFF_HOLD_MS - TAP_MS) : 0);
         boot_held = gpio_get_level(BOOT_PIN) ? 0 : boot_held + POLL_MS;
         if (boot_held >= SETUP_HOLD_MS) {
             config_ask_setup();
@@ -71,7 +84,7 @@ static void watch(void *arg) {
     }
 }
 
-void power_start(void) {
+void power_start(TaskHandle_t talker) {
     bsp_i2c_init();
     i2c_device_config_t dev = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
@@ -82,7 +95,7 @@ void power_start(void) {
     set(KEY_TIMES, (get(KEY_TIMES) & ~(3 << 2)) | OFF_10S);
     gpio_config_t buttons = { .pin_bit_mask = 1ULL << PWR_PIN | 1ULL << BOOT_PIN, .mode = GPIO_MODE_INPUT };
     gpio_config(&buttons);
-    xTaskCreate(watch, "power", 3072, NULL, 3, NULL);
+    xTaskCreate(watch, "power", 3072, talker, 3, NULL);
 }
 
 bool power_low(void) {

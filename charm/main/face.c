@@ -58,7 +58,7 @@ static lv_image_dsc_t blush_dsc = {
 static lv_obj_t *card, *night;
 
 static volatile face_mode_t mode = FACE_IDLE;
-static volatile float level;
+static volatile float level, hold;
 static volatile bool briefing_waits, trade_waits, low, offline;
 static volatile int charge = -1;
 
@@ -74,6 +74,7 @@ static int shift[2];
 void face_set_mode(face_mode_t m) { mode = m; }
 face_mode_t face_get_mode(void) { return mode; }
 void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
+void face_set_hold(float h) { hold = h < 0 ? 0 : h > 1 ? 1 : h; }
 void face_set_marks(bool b, bool t, bool l, bool o, int c) {
     briefing_waits = b; trade_waits = t; low = l; offline = o; charge = c;
 }
@@ -184,6 +185,17 @@ static void draw_low(lv_layer_t *layer, int bx, int by) {
     lv_draw_rect(layer, &d, &left);
 }
 
+// PWR held: a quiet ring round the rim, emptying toward switching off.
+static void draw_hold(lv_layer_t *layer) {
+    lv_draw_arc_dsc_t a;
+    lv_draw_arc_dsc_init(&a);
+    a.center.x = 233; a.center.y = 233;
+    a.radius = 222; a.width = 6; a.rounded = 1; a.color = lv_color_hex(MUTED);
+    a.start_angle = 270;
+    a.end_angle = (int32_t)(270 + 360 * (1 - hold)) % 360;
+    if (hold < 0.99f) lv_draw_arc(layer, &a);
+}
+
 static void draw_face(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     float open = V.open * lid;
@@ -246,6 +258,7 @@ static void draw_face(lv_event_t *e) {
 
     // The ring on the rim, while listening, follows his voice.
     if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / 1800.0f, 0.35f + 0.65f * V.ring);
+    if (hold > 0) draw_hold(layer);
 }
 
 /* The sleep screen, still, so it stays on the panel while the chip sleeps.
@@ -303,6 +316,7 @@ static void draw_night(lv_event_t *e) {
         lv_area_t where = { 0, 211, 465, 255 };
         lv_draw_label(layer, &t, &where);
     }
+    if (hold > 0) draw_hold(layer);
 }
 
 static void tick(lv_timer_t *t) {
@@ -330,6 +344,11 @@ static void tick(lv_timer_t *t) {
         }
         V.open = 0;
     }
+    // PWR held: the whole screen, for the emptying ring, while it lasts.
+    static bool held;
+    bool holding = hold > 0;
+    if (holding || held) lv_obj_invalidate(lv_screen_active());
+    held = holding;
     if (dark) {
         // Redrawn only when a mark changes: the panel holds the rest.
         static int drawn = -1;

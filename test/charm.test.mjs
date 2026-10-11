@@ -15,7 +15,8 @@ import { briefDue, retryDue } from '../supabase/functions/doji-eugenia/index.ts'
 const MAIN = 'charm/main';
 
 // Questions on stdin, one answer a line: `due <epoch>`, `announce <epoch>`,
-// `lift <six readings in g>`, `dns <a message in hex>` (- for no answer).
+// `lift <six readings in g>`, `hold <six readings in g>`, `dns <a message in
+// hex>` (- for no answer).
 const DRIVER = `
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,8 @@ int main(int argc, char **argv) {
         if (!strcmp(op, "announce") && scanf("%lld", &t) == 1) { briefing_announced((time_t)t); printf("ok\\n"); }
         if (!strcmp(op, "lift") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
             printf("%d\\n", lift_seen(a, b));
+        if (!strcmp(op, "hold") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
+            printf("%d\\n", lift_hold(a, b));
         if (!strcmp(op, "dns") && scanf("%1024s", hex) == 1) {
             size_t n = 0;
             for (; hex[2 * n] && n < sizeof msg; n++) sscanf(hex + 2 * n, "%2hhx", &msg[n]);
@@ -110,6 +113,19 @@ test('a lift is him looking only when the screen faces up and is held still', ()
     lift([0, 0.3, 0.9], [0.3, 0.1, 0.7]),      // facing up but swinging
     lift([0, 0.1, -0.95], [0, 0.1, -0.95]),    // face down
   ]), ['1', '0', '0', '0']);
+});
+
+test('awake, held up she stays, put down she sleeps, and anything else is left to the quiet spell', () => {
+  const hold = (a, b) => `hold ${[...a, ...b].join(' ')}`;
+  const [ELSE, HELD, DOWN] = ['0', '1', '2'];
+  assert.deepEqual(charm([
+    hold([0, 0.5, 0.85], [0.03, 0.52, 0.84]),    // tilted toward him in a hand, a little tremor
+    hold([0, 0.05, 0.99], [0.02, 0.06, 0.99]),   // flat in his palm, still a hand's tremor
+    hold([0, 0.01, 1.0], [0, 0.01, 1.0]),        // lying face up on a table
+    hold([0, 0.01, -1.0], [0, 0.01, -1.0]),      // lying face down
+    hold([0.1, 0.2, -0.6], [0.3, 0.1, -0.7]),    // face down in a moving hand
+    hold([0.1, 0.95, 0.1], [0.3, 0.9, 0.2]),     // upright in a pocket, walking
+  ]), [HELD, HELD, DOWN, DOWN, DOWN, ELSE]);
 });
 
 test('the setup answers every name with the charm, whether or not the phone adds an EDNS record', () => {

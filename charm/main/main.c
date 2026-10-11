@@ -7,11 +7,16 @@
    for its journal puts its questions up straight from the dark (gladys.c),
    with no face before them; the journal ends on the dark, and she sleeps,
    unless a briefing waits too, when Eugenia comes up from black to read it.
-   Otherwise Eugenia wakes, and reads a waiting briefing at once. Awake, a tap
-   and he talks to her (talk.c); a trade that came in while she spoke puts its
-   questions up once she is done, and then she sleeps. AWAKE_MS without a tap
-   puts her to sleep: her eyes close and the chip stops (sleep.c). Lifting her
-   to look wakes her (motion.c), and so do a tap, PWR and BOOT. With no
+   Otherwise Eugenia wakes, and reads a waiting briefing at once. PWR is the
+   talk button (power.c, talk.c): a press and she listens, the next sends; from
+   sleep, the press that wakes her has her listening before anything else, a
+   waiting trade's questions coming after her answer. A trade that came in
+   while she spoke puts its questions up once she is done, and then she
+   sleeps. Awake, she feels about once a second whether she is held up to
+   look, which keeps her awake, or has been put down, which puts her to sleep
+   a couple of seconds later; otherwise AWAKE_MS without a press does: her eyes
+   close and the chip stops (sleep.c). Lifting her to look wakes her
+   (motion.c), and so do a tap on the screen, PWR and BOOT. With no
    internet when she last looked she stays on her lock screen, its mark saying
    why, unless the network answers within OFFLINE_TRY_MS; and losing it while
    they talk sends her back there. A lift that was not him looking — a swing, a
@@ -27,8 +32,8 @@
    sleeps, so most errands never touch it. Once a night an errand also looks
    for a new app from main (ota.c).
 
-   PWR is the power chip's (power.c): a press switches her on, and held she
-   says goodnight and switches off. */
+   PWR is also the power chip's (power.c): off, a press switches her on, and
+   held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
@@ -64,6 +69,8 @@ static const char *TAG = "charm";
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
+#define LOOK_MS       1000   // awake and idle, how often she feels whether she is held
+#define DOWN_READS    2      // put down this many readings running, she sleeps
 
 // What waits, whether the internet answered last time, what the sleep screen
 // last drew, and when the next errand is; all kept through sleep.
@@ -72,10 +79,9 @@ static RTC_DATA_ATTR int drawn = -1;
 static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
-static TaskHandle_t life_task;
-static bool lit;
+static bool lit, journaled;
 
-// A tap on her face is for Eugenia, and a slide round the rim is the volume.
+// A slide round the rim is the volume; a tap on a question is the journal's.
 static void on_touch(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t at;
@@ -83,7 +89,6 @@ static void on_touch(lv_event_t *e) {
     if (code == LV_EVENT_PRESSED) dial_press(at);
     if (code == LV_EVENT_PRESSING) dial_slide(at);
     if (code == LV_EVENT_RELEASED) dial_lift();
-    if (code == LV_EVENT_SHORT_CLICKED && !dial_turned()) xTaskNotifyGive(life_task);
 }
 
 // The screen, started once, in `mode`.
@@ -162,6 +167,7 @@ static void errand(void) {
 
 // The journal of what waits; the sleep screen's mark follows what is left.
 static void journal(void) {
+    journaled = true;
     int left = gladys_journal();
     if (left >= 0) trade_waits = left > 0;
     else offline = !net_wait(0);
@@ -176,6 +182,28 @@ static void sleep_if_offline(int status) {
     }
 }
 
+// One exchange with Eugenia: true when she answered.
+static bool exchange(void) {
+    int status = talk();
+    sleep_if_offline(status);
+    return status == 200;
+}
+
+/* Awake and idle, until PWR: true when it is pressed, false when it is time
+   to sleep — put down DOWN_READS readings running, or AWAKE_MS without a
+   press, counted from the last time she was held up to look. */
+static bool await_press(void) {
+    TickType_t looked = xTaskGetTickCount();
+    int down = 0;
+    for (;;) {
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LOOK_MS))) return true;
+        lift_hold_t hold = motion_hold();
+        if (hold == LIFT_HELD) looked = xTaskGetTickCount();
+        down = hold == LIFT_DOWN ? down + 1 : 0;
+        if (down == DOWN_READS || xTaskGetTickCount() - looked >= pdMS_TO_TICKS(AWAKE_MS)) return false;
+    }
+}
+
 static void awake(void) {
     // Joining runs beside everything else: she listens while it does, and
     // waits for it only to send. Offline when she last looked, nothing lights
@@ -184,13 +212,14 @@ static void awake(void) {
     if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
     offline = false;
 
-    // A trade waiting: the screen stays dark until its questions cover it.
-    bool trade = trade_waits;
+    // PWR woke her: he wants to talk, so she listens before anything that
+    // waits. Otherwise a trade waiting keeps the screen dark until its
+    // questions cover it.
+    bool pressed = woke == ESP_SLEEP_WAKEUP_EXT0, trade = trade_waits && !pressed;
     light(trade ? FACE_DARK : FACE_IDLE);
     bsp_display_lock(-1);
     lv_obj_t *screen = lv_screen_active();
-    static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED,
-                                             LV_EVENT_SHORT_CLICKED };
+    static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED };
     for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
     bsp_display_unlock();
 
@@ -204,31 +233,31 @@ static void awake(void) {
         journal();
         if (!briefing_waits) sleep_now();
     }
-    bool spoke = false;
-    if (briefing_waits) {
-        briefing_waits = false;
-        int status = talk_briefing();
-        sleep_if_offline(status);
-        spoke = status == 200;
-    }
+    bool spoke = pressed && exchange();
 
     for (;;) {
-        // A trade that came in while she spoke: its questions once she is done,
-        // and only then, so nothing interrupts her.
-        if (spoke && trade_came()) {
+        if (briefing_waits) {
+            briefing_waits = false;
+            int status = talk_briefing();
+            sleep_if_offline(status);
+            spoke |= status == 200;
+        }
+        // A trade waiting once she is done — one that came in while she spoke,
+        // or one PWR put off — gets its questions then, and only then, so
+        // nothing interrupts her; once a waking, so walking away from it
+        // holds.
+        if (spoke && !journaled && (trade_came() || trade_waits)) {
             journal();
             sleep_now();
         }
-        if (!ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(AWAKE_MS))) sleep_now();
-        int status = talk();
-        sleep_if_offline(status);
-        spoke = status == 200;
+        if (!await_press()) sleep_now();
+        spoke = exchange();
     }
 }
 
 static void life(void *arg) {
     (void)arg;
-    power_start();
+    power_start(xTaskGetCurrentTaskHandle());
     // A lift that was not him: back to sleep at once, the sensor resting.
     if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;
@@ -260,5 +289,5 @@ void app_main(void) {
         setup_run();
     }
     // The stack holds a TLS handshake.
-    xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, &life_task, 0);
+    xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, NULL, 0);
 }
