@@ -304,6 +304,15 @@ one driver reaching into the other, to save six lines between two chips that
 share nothing but the bus.
 **Revisit if:** a third chip on the bus is driven.
 
+### R-28 — signing the charm's updates
+**Why refused:** she installs whatever app the public `charm` bucket holds,
+over TLS, and only the workflow writes it, with `SB_SECRET_KEY`. Whoever holds
+that key already reads and writes every table, so a signature would guard a
+door behind one already open, at the price of a signing key to keep and a
+public key built into every board.
+**Revisit if:** anyone but him ever holds a credential here, or the bucket is
+ever written by anything but the workflow.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
