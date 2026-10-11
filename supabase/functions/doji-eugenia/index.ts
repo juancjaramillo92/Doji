@@ -179,9 +179,14 @@ const NOTES_TOOL = {
     "Keep one short line for later. Use kind='fact' for something about the trader — " +
     "how he trades, what he is working on, what he already understands, what " +
     "explanation landed; never today's price or today's data, which are stale " +
-    "tomorrow. Use kind='instruction' for something he has told you to do or stop " +
-    "doing, in his own words: those are standing, and every later message obeys " +
-    "them. Use kind='commitment' for something he has said HE will do or stop " +
+    "tomorrow. Write a fact as what is true of him — 'he reads the first paragraph " +
+    "and stops' — never as an order to yourself, which reads back next month as " +
+    "one he gave. Never a note that a tool, a source or a read of yours failed or " +
+    "came back empty: that is fixed by the time it matters, and the note would " +
+    "have you refusing for months. Never an approach that did not work written up " +
+    "as one that does. Use kind='instruction' for something he has told you to do " +
+    "or stop doing, in his own words: those are standing, and every later message " +
+    "obeys them. Use kind='commitment' for something he has said HE will do or stop " +
     "doing, in his own words and with its period if he gave one: those are what " +
     "his trades are held against. Record a fact silently; acknowledge an " +
     "instruction or a commitment in four words or fewer.",
@@ -196,12 +201,14 @@ const NOTES_TOOL = {
           "told you to do; 'commitment' for something he said he would do.",
       },
       supersedes: {
-        type: "integer",
+        type: "array",
+        items: { type: "integer" },
         description:
-          "Optional. The id of the note this one replaces, taken from the bracketed " +
-          "number beside it. Use it whenever the new line contradicts, corrects or " +
-          "updates an existing one — the old note stops being shown rather than " +
-          "sitting alongside the new one disagreeing with it.",
+          "Optional. The ids of the notes this one replaces, taken from the bracketed " +
+          "number beside each. Usually one: whenever the new line contradicts, corrects " +
+          "or updates an existing one — the old note stops being shown rather than " +
+          "sitting alongside the new one disagreeing with it. Several when the new line " +
+          "merges notes that already say the same thing into one.",
       },
     },
     required: ["note", "kind"],
@@ -430,7 +437,7 @@ async function searchMemory(query: unknown): Promise<string> {
 
 // Twenty of each: a season of observations, and more instructions than he will
 // give — the whole memory costs less than a paragraph.
-const NOTES = 20;
+export const NOTES = 20;
 
 /* Every read of her tables: ask, refuse a bad status, parse. In one place
    because PostgREST answers a missing table with a 404 whose JSON body parses
@@ -444,16 +451,25 @@ async function readRows<T>(what: string, path: string): Promise<T[]> {
 
 // Live notes only: drop `superseded_by=is.null` and she is handed each
 // correction beside what it corrected. The id comes back so she can retire one.
+// One past the window, so a list that overflows can say so: otherwise the
+// twenty-first instruction leaves every prompt and /notes with nothing marking
+// the loss, and she stops obeying what he believes she took.
 async function readNotes(kind: string): Promise<Note[]> {
   return readRows<Note>('Notes',
     `eugenia_notes?select=id,note&kind=eq.${kind}` +
-    `&superseded_by=is.null&order=id.desc&limit=${NOTES}`);
+    `&superseded_by=is.null&order=id.desc&limit=${NOTES + 1}`);
 }
 
 type Note = { id: number; note: string };
 
 // The number is how a note is named when one is retired — in both renderings.
 const noteLine = (n: Note) => `[${n.id}] ${n.note}`;
+
+// Both renderings show the window and say how many it holds, so the nightly
+// pass can merge before a list overflows, and he can see that one did.
+const inWindow = (ns: Note[]) => ns.slice(0, NOTES);
+const howMany = (ns: Note[]) =>
+  ns.length > NOTES ? `more than ${NOTES}, the oldest not shown` : `${ns.length}`;
 
 // What every tool that writes answers when the write failed and the failure is
 // not his to hear about.
@@ -475,9 +491,11 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   const kept = text.slice(0, NOTE_MAX);
 
   // Only a retirement needs the new row back; an unread body holds its
-  // connection open.
-  const old = Math.trunc(Number(supersedes));
-  const retiring = Number.isFinite(old) && old > 0;
+  // connection open. Several ids is a merge; a lone number is taken too, since
+  // this is where the model's arguments enter.
+  const old = [supersedes ?? []].flat().map(n => Math.trunc(Number(n)))
+    .filter(n => Number.isFinite(n) && n > 0);
+  const retiring = old.length > 0;
 
   try {
     // Embedded before the insert, so the note lands with its vector in one
@@ -494,14 +512,17 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     if (retiring) {
       const [row] = await res.json();
       const done = await fetch(
-        `${SB_URL}/rest/v1/eugenia_notes?id=eq.${old}&superseded_by=is.null`, {
+        `${SB_URL}/rest/v1/eugenia_notes?id=in.(${old.join(',')})&superseded_by=is.null`, {
           method: "PATCH", headers: sbHeaders("return=representation"),
           body: JSON.stringify({ superseded_by: row.id }),
         });
       // A miss must not pass as done, or she believes a contradiction is gone
-      // while it is still handed to her every turn.
-      if (!done.ok || (await done.json()).length === 0) {
-        return `Remembered, but note ${old} is not there to retire — ` +
+      // while it is still handed to her every turn — each id is answered for.
+      const hit: number[] = done.ok ? (await done.json()).map((r: Note) => r.id) : [];
+      const missed = old.filter(id => !hit.includes(id));
+      if (missed.length) {
+        return `Remembered, but ${missed.length > 1 ? 'notes' : 'note'} ${missed.join(', ')} ` +
+               `${missed.length > 1 ? 'are' : 'is'} not there to retire — ` +
                `it may already be superseded. Check the list you were given.`;
       }
     }
@@ -1118,6 +1139,56 @@ async function setThesis(thesis: unknown): Promise<string> {
   }
 }
 
+/* ─── How she reads him ────────────────────────────────────────────────────
+   The thesis's twin, about him: the notes are lines in a window of twenty, so
+   once a twenty-first fact arrives the oldest stops shaping anything unless she
+   thinks to search for it. One paragraph carries what they add up to, and the
+   lines can roll out of view without taking the lesson with them. Nightly only,
+   for the thesis's reason; moved, not replaced. Never on the trade look, which
+   reaches him in a position.
+   ───────────────────────────────────────────────────────────────────────── */
+export const PORTRAIT_MAX = 800;
+
+const PORTRAIT_TOOL = {
+  name: "set_portrait",
+  description:
+    "Rewrite how you read him — what his notes, his trades and his record against " +
+    "his own word add up to. At the nightly pass and nowhere else. It is handed " +
+    "back to you with every briefing and reply, so it keeps an old lesson about him " +
+    "alive after the note that taught it has rolled out of the window. MOVE it " +
+    "rather than replacing it: most nights it is the same man one day further on. " +
+    "Statements of what is true of him, each one something seen more than once, " +
+    "never an order to yourself and never anything about today's market.",
+  input_schema: {
+    type: "object",
+    properties: {
+      portrait: { type: "string", description: `How you read him now, at most ${PORTRAIT_MAX} characters.` },
+    },
+    required: ["portrait"],
+    additionalProperties: false,
+  },
+} as const;
+
+async function setPortrait(portrait: unknown): Promise<string> {
+  const text = String(portrait ?? "").trim().slice(0, PORTRAIT_MAX);
+  if (!text) return "Nothing to write.";
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_portrait?id=eq.current`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ portrait: text, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Empty means the seed row is missing, as with setThesis.
+    if ((await res.json()).length === 0) {
+      return "There is no portrait row — schema.sql has not been applied, so nothing was saved. Say nothing about this to him.";
+    }
+    return "Portrait updated.";
+  } catch (err) {
+    console.error("doji-eugenia: portrait not written —", why(err));
+    return UNSAVED;
+  }
+}
+
 /* ─── What she flagged, and what she asked ─────────────────────────────────
    Threads she flagged or questions she put to him, handed back until they
    close — without them, follow-through depended on the turn still being inside
@@ -1209,6 +1280,71 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
   }
 }
 
+/* ─── Her record ───────────────────────────────────────────────────────────
+   Every read she gives says what would prove it wrong, and this is what
+   looks. The nightly pass files each read of the day with a verdict on the
+   test she stated — never on where price went, which would pull a read toward
+   the forecast the prohibitions forbid — and the record comes back to the two
+   paths that give reads, so how loudly she holds a view is set by how her
+   views have done. Filed and judged in one write: a read is about today's
+   news, and 22:00 is after the day it was about.
+   ───────────────────────────────────────────────────────────────────────── */
+export const READ_VERDICTS = ['held', 'wrong', 'untested'] as const;
+export const READ_MAX = 300;
+
+const RECORD_TOOL = {
+  name: "record_read",
+  description:
+    "File one read you gave today — a view labelled as yours, with what you said " +
+    "would prove it wrong — and its verdict. At the nightly pass and nowhere else. " +
+    "'wrong' when the thing you said would prove you wrong happened; 'held' when it " +
+    "had its chance and did not, and what you were handed shows that; 'untested' " +
+    "when the day did not settle it, what would settle it is not in front of you, " +
+    "or the test was gold's own price. Judge only the test you stated, never where " +
+    "price went.",
+  input_schema: {
+    type: "object",
+    properties: {
+      reading: { type: "string", description: `The read, in your words as you said it, at most ${READ_MAX} characters.` },
+      test: { type: "string", description: `What you said would prove it wrong, at most ${READ_MAX} characters.` },
+      verdict: { type: "string", enum: READ_VERDICTS },
+      evidence: { type: "string", description: `What in front of you settled it, or why nothing did, at most ${READ_MAX} characters.` },
+    },
+    required: ["reading", "test", "verdict", "evidence"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* Never throws, for writeNote's reason. The verdict is checked here, or the
+   check constraint answers a bad one with a 400 that reads as a database
+   fault. */
+async function recordRead(reading: unknown, test: unknown, verdict: unknown,
+                          evidence: unknown): Promise<string> {
+  const said = String(reading ?? "").trim().slice(0, READ_MAX);
+  const against = String(test ?? "").trim().slice(0, READ_MAX);
+  if (!said || !against) return "A read is filed with what would prove it wrong, or not at all.";
+  const v = String(verdict ?? "");
+  if (!(READ_VERDICTS as readonly string[]).includes(v)) {
+    return `"${v}" is not a verdict. They are ${READ_VERDICTS.join(", ")}.`;
+  }
+  try {
+    // A retry after a pass that failed half-way files the same reads again;
+    // the same words on the same day are one read.
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_reads?on_conflict=given_on,reading`, {
+      method: "POST", headers: sbHeaders("resolution=ignore-duplicates,return=minimal"),
+      body: JSON.stringify([{
+        given_on: nyDate(new Date()), reading: said, test: against, verdict: v,
+        evidence: String(evidence ?? "").trim().slice(0, READ_MAX) || null,
+      }]),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return "Filed.";
+  } catch (err) {
+    console.error("doji-eugenia: read not filed —", why(err));
+    return UNSAVED;
+  }
+}
+
 /* ─── Claude ───────────────────────────────────────────────────────────────
    Raw fetch rather than the SDK, like every other outbound call here. Web
    search is what makes a briefing possible at all: a briefing invented from
@@ -1262,7 +1398,8 @@ const CHAT_TOOLS = [
   STRATEGY_TOOL,
   LOOP_TOOL,
 ];
-const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, CLOSE_TOOL, CHECK_TOOL, STATS_TOOL];
+const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
+                           RECORD_TOOL, CHECK_TOOL, STATS_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
@@ -1381,8 +1518,10 @@ export async function serve(name: string, input: any): Promise<string> {
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), volumeBlock()])).join("").trim();
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
+    case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
+    case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
       return unserved(name);
@@ -1890,17 +2029,17 @@ export async function notesBlock(): Promise<string> {
     const [told, promised, noticed] = await Promise.all([
       readNotes('instruction'), readNotes('commitment'), readNotes('fact'),
     ]);
-    const list = (ns: Note[]) => `\n· ` + ns.map(noteLine).join("\n· ");
+    const list = (ns: Note[]) => `\n· ` + inWindow(ns).map(noteLine).join("\n· ");
     return (told.length
-             ? `\n\nWhat he has told you to do, newest first. These are not optional and a` +
-               ` later one replaces an earlier one:${list(told)}`
+             ? `\n\nWhat he has told you to do (${howMany(told)}), newest first. These are not` +
+               ` optional and a later one replaces an earlier one:${list(told)}`
              : "")
          + (promised.length
-             ? `\n\nWhat he has committed to, newest first. Hold his trades against these` +
-               ` and say so plainly when one broke one:${list(promised)}`
+             ? `\n\nWhat he has committed to (${howMany(promised)}), newest first. Hold his trades` +
+               ` against these and say so plainly when one broke one:${list(promised)}`
              : "")
          + (noticed.length
-             ? `\n\nWhat you have noticed about him, newest first:${list(noticed)}`
+             ? `\n\nWhat you have noticed about him (${howMany(noticed)}), newest first:${list(noticed)}`
              : "");
   } catch (err) {
     console.error("doji-eugenia: notes unavailable —", why(err));
@@ -1921,8 +2060,10 @@ type Channel = { channel: string; state: string; evidence: string | null; moved_
    defect it exists to prevent. Pure; the read stays with the caller. */
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
-                          promised: Note[] = []): string {
-  const list = (ns: Note[]) => ns.map(noteLine).join("\n");
+                          promised: Note[] = [], portrait: Portrait | null = null,
+                          record: Read[] = []): string {
+  const list = (ns: Note[]) => inWindow(ns).map(noteLine).join("\n");
+  const missed = misses(record);
   // Not loopsList, which is written to her about her own threads.
     const open = (kind: string, heading: string) => {
       const rs = loops.filter(l => l.kind === kind);
@@ -1931,13 +2072,20 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
         : "";
     };
   return [
-    told.length     ? `What you have told me, newest first:\n${list(told)}`         : "",
-    promised.length ? `What you have committed to, newest first:\n${list(promised)}` : "",
-    noticed.length  ? `What I have noticed, newest first:\n${list(noticed)}`        : "",
+    told.length     ? `What you have told me (${howMany(told)}), newest first:\n${list(told)}`             : "",
+    promised.length ? `What you have committed to (${howMany(promised)}), newest first:\n${list(promised)}` : "",
+    noticed.length  ? `What I have noticed (${howMany(noticed)}), newest first:\n${list(noticed)}`         : "",
     told.length || promised.length || noticed.length ? "" : "I have not kept any notes yet, jefe.",
+    portrait
+      ? `How I read you${portrait.moved_on ? `, last moved ${civilDay(portrait.moved_on)}` : ""}:\n${portrait.portrait}`
+      : "",
     open('watch',    "What I flagged and am still watching:"),
     open('question', "What I asked you and have not had back:"),
     story ? `The story I am carrying${story.moved_on ? `, last moved ${civilDay(story.moved_on)}` : ""}:\n${story.thesis}` : "",
+    record.length
+      ? `My reads over the last ${RECORD_DAYS} days, each judged by the test I stated and never by ` +
+        `where price went: ${tally(record)}.` + (missed ? `\nThe latest I got wrong:\n${missed}` : "")
+      : "",
     `Where you stand on each channel:\n${channelsList(channels)}`,
   ].filter(Boolean).join("\n\n");
 }
@@ -2089,6 +2237,71 @@ export async function thesisBlock(): Promise<string> {
     return thesisLine(await readThesis());
   } catch (err) {
     console.error("doji-eugenia: thesis unavailable —", why(err));
+    return "";
+  }
+}
+
+/* The portrait, read and dated as the thesis is, and its own block rather than
+   part of notesBlock: a failed read here costs the paragraph, never his
+   instructions. */
+type Portrait = { portrait: string; moved_on: string | null };
+
+async function readPortrait(): Promise<Portrait | null> {
+  const [row] = await readRows<Portrait>('Portrait',
+    `eugenia_portrait?select=portrait,moved_on&id=eq.current&limit=1`);
+  return row ?? null;
+}
+
+export function portraitLine(row: Portrait | null): string {
+  if (!row) return "";
+  const since = row.moved_on ? ` (last moved ${civilDay(row.moved_on)})` : "";
+  return `\n\nHow you read him${since}:\n${row.portrait}`;
+}
+
+export async function portraitBlock(): Promise<string> {
+  try {
+    return portraitLine(await readPortrait());
+  } catch (err) {
+    console.error("doji-eugenia: portrait unavailable —", why(err));
+    return "";
+  }
+}
+
+/* Her record, a month of it: long enough that one bad week is a part of it,
+   short enough that it is about how she reads now. The three newest misses
+   come with it, because a count says how often and only the misses say what
+   she keeps getting wrong. */
+type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null };
+
+const RECORD_DAYS = 30;
+const RECORD_MISSES = 3;
+
+// A read a message at most, so a month is never near the limit; it is there
+// because every read carries one.
+export function recordQuery(now = Date.now()): string {
+  return `eugenia_reads?select=given_on,reading,test,verdict,evidence` +
+    `&given_on=gte.${nyDate(new Date(now - RECORD_DAYS * 86_400_000))}&order=id.desc&limit=200`;
+}
+
+const tally = (rows: Read[]) => READ_VERDICTS.map(v =>
+  `${rows.filter(r => r.verdict === v).length} ${v === 'wrong' ? 'proved wrong' : v}`).join(", ");
+
+const misses = (rows: Read[]) => rows.filter(r => r.verdict === 'wrong').slice(0, RECORD_MISSES)
+  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}`)
+  .join("\n");
+
+export function recordList(rows: Read[]): string {
+  if (!rows.length) return "";
+  const missed = misses(rows);
+  return `\n\nYour record — every read of the last ${RECORD_DAYS} days, judged at night by the test ` +
+    `you stated: ${tally(rows)}.` + (missed ? `\nThe latest proved wrong:\n${missed}` : "");
+}
+
+export async function recordBlock(): Promise<string> {
+  try {
+    return recordList(await readRows<Read>('Reads', recordQuery()));
+  } catch (err) {
+    console.error("doji-eugenia: record unavailable —", why(err));
     return "";
   }
 }
@@ -2824,11 +3037,12 @@ async function postBriefing(due: Brief): Promise<Response> {
   // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   // Every read at once: independent and small, so the batch costs its slowest.
-  const [price, around, rates, crowd, traded, notes, channels, trades, breaches, story, health, loops, calendar, desk] =
+  const [price, around, rates, crowd, traded, notes, portrait, channels, trades, breaches, story, health, loops,
+         calendar, desk, record] =
     await Promise.all([
       marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", volumeBlock(),
-      notesBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(), loopsBlock(),
-      due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(),
+      notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(),
+      loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(),
     ]);
 
   const asked = (due === 'sunday'
@@ -2836,7 +3050,8 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped, everything after it may be
     // missing rows.
-    + health + price + around + rates + crowd + traded + notes + channels + trades + breaches + story + loops + calendar + desk;
+    + health + price + around + rates + crowd + traded + notes + portrait + channels + trades + breaches + story
+    + loops + calendar + desk + record;
 
   const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
@@ -2995,14 +3210,18 @@ async function postConsolidation(): Promise<Response> {
   if (day.length) {
 
   // His week too: it is asked to notice what he has started doing
-  // differently, which most days' transcripts never mention.
-  const [notes, channels, trades, story, loops, calendar, verdicts, desk] = await Promise.all([
-    notesBlock(), channelsBlock(), tradesBlock(),
-    thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(),
-  ]);
+  // differently, which most days' transcripts never mention. And the market
+  // around gold and the Fed pricing as they closed, which is what a read's
+  // stated test is judged against.
+  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, around, rates] =
+    await Promise.all([
+      notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(),
+      thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(), recordBlock(),
+      aroundBlock(), ratesBlock(),
+    ]);
 
-  const asked = CONSOLIDATE + notes + channels + trades + story + loops + calendar +
-    verdicts + desk +
+  const asked = CONSOLIDATE + notes + portrait + channels + trades + story + loops + calendar +
+    verdicts + desk + record + around + rates +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
@@ -3128,7 +3347,9 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
   /* The reads come after the early returns, so an ordinary fill costs nothing.
      History matters most here: the print this warns about is the one the
      briefing likely named, and without the window she repeats herself. Notes,
-     or his instructions are obeyed everywhere but mid-trade. */
+     or his instructions are obeyed everywhere but mid-trade. Neither the
+     portrait nor her record: a reading of how he trades, reaching a man in a
+     position, is how a sentence becomes an order. */
   const [history, notes] = await Promise.all([recent(), notesBlock()]);
 
   const said = await ask(
@@ -3273,9 +3494,9 @@ async function handleFeedback(query: any): Promise<void> {
    ───────────────────────────────────────────────────────────────────────── */
 async function converse(text: string, blocks: any[],
                         quoting: Promise<string | null>): Promise<{ asked: string; answer: string }> {
-  const [history, notes, channels, story, loops, calendar, desk, quoted] = await Promise.all([
-    recent(), notesBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
-    calendarBlock(), positionsBlock(), quoting,
+  const [history, notes, portrait, channels, story, loops, calendar, desk, record, quoted] = await Promise.all([
+    recent(), notesBlock(), portraitBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
+    calendarBlock(), positionsBlock(), recordBlock(), quoting,
   ]);
   // A marker with the opening words is stored, so the nightly pass knows
   // which message "too long" was about; the quote itself is not.
@@ -3291,7 +3512,7 @@ async function converse(text: string, blocks: any[],
     `\n\nYour answer reaches him as a voice note, so write it ` +
     `to be heard: plain sentences, no headings, and nothing that only works ` +
     `on a page. Its length is whatever the answer needs.`;
-  const context = asked + about + aloud + notes + channels + story + loops + calendar + desk;
+  const context = asked + about + aloud + notes + portrait + channels + story + loops + calendar + desk + record;
   const draft = await ask(
     [...history, {
       role: 'user',
@@ -3377,11 +3598,11 @@ async function handleMessage(update: any): Promise<void> {
     if (text.trim().toLowerCase() === '/notes') {
       try {
         // Everything she keeps that he cannot otherwise see, in one message.
-        const [told, noticed, channels, loops, story, promised] = await Promise.all([
+        const [told, noticed, channels, loops, story, promised, portrait, record] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
-          readNotes('commitment'),
+          readNotes('commitment'), readPortrait(), readRows<Read>('Reads', recordQuery()),
         ]);
-        await say(notesList(told, noticed, channels, loops, story, promised));
+        await say(notesList(told, noticed, channels, loops, story, promised, portrait, record));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —", why(err));
         await say("I cannot read my notes just now, jefe.");

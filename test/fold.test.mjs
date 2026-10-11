@@ -33,13 +33,13 @@ import {
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
-  consolidateRetryDue, thesisLine, loopsList, calendarList, keepDraft, TRIM_MOST,
+  consolidateRetryDue, thesisLine, portraitLine, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
-  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -1975,7 +1975,8 @@ test('the backup names every table that has no other source', async () => {
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
   for (const t of ['trades', 'eugenia_notes', 'eugenia_turns', 'eugenia_channels',
-                   'eugenia_thesis', 'eugenia_loops', 'eugenia_calendar',
+                   'eugenia_thesis', 'eugenia_portrait', 'eugenia_reads', 'eugenia_loops',
+                   'eugenia_calendar',
                    'trade_stops']) {
     assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
   }
@@ -3769,6 +3770,48 @@ test('the story carries the day it last moved, and an absent one says nothing', 
   assert.equal(thesisLine(null), '');
 });
 
+test('how she reads him carries the day it last moved, and an absent one says nothing', () => {
+  const line = portraitLine({ portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' });
+  assert.match(line, /cuts winners/);
+  assert.match(line, /12 Mar/);
+  // Written to her, about him: the audit is the one place it is said to him.
+  assert.match(line, /How you read him/);
+  assert.equal(portraitLine(null), '');
+});
+
+/* ─── Her record ─────────────────────────────────────────────────────────────
+   A count says how often; only the misses say what she keeps getting wrong. */
+const READS = [
+  { given_on: '2026-07-30', reading: 'a hot print is bad for gold', test: 'the two-year falls on it',
+    verdict: 'wrong', evidence: 'the two-year fell eight basis points' },
+  { given_on: '2026-07-29', reading: 'claims do not move the Fed', test: 'December pricing moves',
+    verdict: 'held', evidence: 'December barely moved' },
+  { given_on: '2026-07-28', reading: 'the dollar leads today', test: 'the dollar index falls',
+    verdict: 'untested', evidence: null },
+  ...['07-27', '07-24', '07-23'].map((d, i) => ({ given_on: `2026-${d}`, reading: `miss ${i}`,
+    test: 'a test', verdict: 'wrong', evidence: 'it fired' })),
+];
+
+test('her record counts every verdict and names the newest misses, three at most', () => {
+  const out = recordList(READS);
+  assert.match(out, /judged at night by the test you stated: 1 held, 4 proved wrong, 1 untested\./);
+  assert.match(out, /30 Jul: a hot print is bad for gold \(wrong if the two-year falls on it\) — the two-year fell/);
+  assert.ok(out.includes('miss 0') && out.includes('miss 1') && !out.includes('miss 2'),
+    'more than three misses are listed, or not the newest');
+  assert.ok(!out.includes('claims do not move'), 'a read that held is listed as a miss');
+  // No reads yet is no record, not a record of zeros.
+  assert.equal(recordList([]), '');
+});
+
+/* A month of New York days, read at the pass: 22:00 on 9 October is already
+   the 10th in UTC, so a UTC day would start the window a day late. */
+test('her record is the last thirty New York days, newest first', () => {
+  const q = recordQuery(Date.parse('2026-10-10T02:00:00Z'));
+  assert.match(q, /&given_on=gte\.2026-09-09&/,
+    'the window is not thirty New York days back from the pass');
+  assert.match(q, /&order=id\.desc&limit=\d+$/, 'the record does not take the newest reads');
+});
+
 test('the open threads are split by what closes them', () => {
   const out = loopsList([
     { id: 4, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-12' },
@@ -3919,9 +3962,14 @@ test('the audit he asks for carries everything she keeps', () => {
     [{ id: 2, note: 'he trades the London open' }],
     [{ channel: 'dollar', state: 'used', evidence: null, moved_on: '2026-03-12' }],
     [{ id: 7, kind: 'watch', body: 'Gold rose on a hot print.', opened_on: '2026-03-11' }],
-    { thesis: 'Still trading the December cut.', moved_on: '2026-03-12' });
+    { thesis: 'Still trading the December cut.', moved_on: '2026-03-12' },
+    [], { portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' },
+    READS);
 
   assert.match(out, /What you have told me/);
+  assert.match(out, /My reads over the last 30 days, each judged by the test I stated and never by where price went: 1 held, 4 proved wrong, 1 untested\./);
+  assert.match(out, /The latest I got wrong:\n· 30 Jul: a hot print/);
+  assert.match(out, /How I read you, last moved 12 Mar:\nHe cuts winners/);
   assert.match(out, /What I have noticed/);
   assert.match(out, /What I flagged/);
   assert.match(out, /The story I am carrying/);
@@ -3954,7 +4002,7 @@ test('his audit shows what he committed to, between what he told her and what sh
     [{ channel: 'dollar', state: 'used', evidence: null, moved_on: null }],
     [], null,
     [{ id: 3, note: 'this week I stop after two losses' }]);
-  assert.match(out, /What you have committed to, newest first:\n\[3\] this week I stop after two losses/);
+  assert.match(out, /What you have committed to \(1\), newest first:\n\[3\] this week I stop after two losses/);
   assert.ok(out.indexOf('[1]') < out.indexOf('[3]') && out.indexOf('[3]') < out.indexOf('[2]'),
     'a commitment is neither an instruction to her nor her observation, and ' +
     'reads between the two');
@@ -3976,6 +4024,97 @@ test('the notes she is handed carry his commitments, asked for by their kind', a
     assert.match(out, /What he has committed to/,
       'notesBlock no longer reads commitments, so nothing is ever held against one');
     assert.match(out, /\[9\] this week I stop after two losses/);
+  });
+});
+
+/* ─── A list that overflows says so ──────────────────────────────────────────
+   The window is twenty, and without the row past it the twenty-first
+   instruction leaves every prompt and /notes with nothing marking the loss.
+   Driven through the real read: the
+   stub answers as PostgREST does, honouring the limit it was sent. */
+test('a list past the window shows the window and says the oldest are not shown', async () => {
+  const live = Array.from({ length: 25 }, (_, i) => ({ id: 25 - i, note: `instruction ${25 - i}` }));
+  let asked;
+  await stubbed(async () => {
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      if (/kind=eq\.instruction/.test(u)) asked = u;
+      const limit = Number(u.match(/limit=(\d+)/)?.[1] ?? Infinity);
+      const rows = /kind=eq\.instruction/.test(u) ? live.slice(0, limit) : [];
+      return new Response(JSON.stringify(rows), {
+        status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const out = await notesBlock();
+    assert.match(asked, new RegExp(`limit=${NOTES + 1}\\b`),
+      'the read asks for exactly the window, so an overflow can never be seen');
+    assert.match(out, new RegExp(`What he has told you to do \\(more than ${NOTES}, the oldest not shown\\)`),
+      'an overflowing list reads like a complete one — she stops obeying the oldest unaware');
+    assert.equal((out.match(/\[\d+\] instruction/g) ?? []).length, NOTES,
+      'she is handed more or fewer than the window');
+    assert.ok(out.includes('[25] instruction 25') && !out.includes(`[${25 - NOTES}] instruction`),
+      'the window is not the newest notes');
+  });
+
+  // Under the window, the count is the count — what the nightly pass merges on.
+  const under = notesList(live.slice(0, 17), [], []);
+  assert.match(under, /What you have told me \(17\), newest first/);
+  const over = notesList(live.slice(0, NOTES + 1), [], []);
+  assert.match(over, new RegExp(`What you have told me \\(more than ${NOTES}, the oldest not shown\\)`),
+    'his audit hides the overflow from him too');
+});
+
+test('a read is filed once, with a verdict the table accepts, and never without its test', async () => {
+  const posts = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      posts.push({ url: String(url), prefer: opts.headers?.Prefer, body: opts.body });
+      return new Response(null, { status: 201 });
+    };
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'right', evidence: 'x' }), /"right" is not a verdict/,
+      'a verdict the check constraint refuses is sent, and fails as a database fault');
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: '  ', verdict: 'held', evidence: 'x' }), /what would prove it wrong/,
+      'a read with no test is filed, so a verdict on nothing enters her record');
+    assert.equal(posts.length, 0, 'a refused read still reached the database');
+
+    assert.equal(await serve('record_read',
+      { reading: 'a hot print is bad for gold', test: 'the two-year falls', verdict: 'wrong',
+        evidence: 'it fell' }), 'Filed.');
+  });
+  // A retry's refiling lands on the unique index and is dropped, not doubled.
+  assert.match(posts[0].url, /eugenia_reads\?on_conflict=given_on,reading$/);
+  assert.match(posts[0].prefer, /resolution=ignore-duplicates/);
+  const [row] = JSON.parse(posts[0].body);
+  assert.equal(row.verdict, 'wrong');
+  assert.match(row.given_on, /^\d{4}-\d\d-\d\d$/, 'the read is not filed under a New York civil day');
+});
+
+test('one note can retire several, and every id it could not retire is named', async () => {
+  let patched;
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      const u = String(url);
+      if (opts.method === 'POST') return new Response(JSON.stringify([{ id: 40 }]), { status: 201 });
+      if (opts.method === 'PATCH') {
+        patched = u;
+        // Note 12 was already retired, so the filter leaves only 11.
+        return new Response(JSON.stringify([{ id: 11 }]), { status: 200 });
+      }
+      return new Response('[]', { status: 200 });
+    };
+    const said = await serve('remember',
+      { note: 'mornings under a minute', kind: 'instruction', supersedes: [11, 12] });
+    assert.match(patched, /id=in\.\(11,12\)&superseded_by=is\.null/,
+      'a merge does not retire every note it names in one filtered write');
+    assert.match(said, /note 12 is not there to retire/,
+      'a note the merge could not retire passes as retired, and both stay in her window');
+    assert.doesNotMatch(said, /\b11\b/, 'a note that was retired is reported as missed');
+
+    // A lone id is still a retirement: the model's arguments enter here.
+    const one = await serve('remember', { note: 'x', kind: 'fact', supersedes: 11 });
+    assert.match(patched, /id=in\.\(11\)&/);
+    assert.equal(one, 'Remembered.');
   });
 });
 
@@ -4904,8 +5043,10 @@ const TOOL_CALLS = [
   ['get_market',    {}],
   ['get_around',    {}],
   ['set_thesis',    { thesis: 'a reading' }],
+  ['set_portrait',  { portrait: 'a reading of him' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
+  ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close' }],
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH: a tool added to `serve` and not
@@ -4987,8 +5128,8 @@ test('a tool name the file has no handler for is answered, not thrown', async ()
    ─────────────────────────────────────────────────────────────────────────── */
 
 const BLOCKS = {
-  marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock,
-  healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
+  marketBlock, notesBlock, channelsBlock, tradesBlock, breachesBlock, thesisBlock, portraitBlock,
+  recordBlock, healthBlock, loopsBlock, calendarBlock, weekBlock, positionsBlock,
 };
 
 test('every block degrades to nothing when its read fails, and never throws', async () => {
@@ -5015,6 +5156,9 @@ test('every block says something when its read succeeds', async () => {
     eugenia_notes:    [{ id: 1, note: 'he asked for shorter mornings' }],
     eugenia_channels: [{ channel: 'rates', state: 'explained', moved_on: '2026-07-01' }],
     eugenia_thesis:   [{ thesis: 'gold heavy above 3450', moved_on: '2026-07-30' }],
+    eugenia_portrait: [{ portrait: 'he cuts winners before the target', moved_on: '2026-07-30' }],
+    eugenia_reads:    [{ given_on: '2026-07-29', reading: 'a hot print is bad for gold',
+                         test: 'the two-year falls on it', verdict: 'held', evidence: 'it rose' }],
     eugenia_loops:    [{ id: 1, kind: 'question', body: 'does he size up after two losses',
                          opened_on: '2026-07-28' }],
     eugenia_calendar: [{ id: 1, at: '2026-07-30T12:30:00Z', name: 'CPI', importance: 'high' }],
@@ -5031,7 +5175,8 @@ test('every block says something when its read succeeds', async () => {
       return new Response(JSON.stringify(rows[table] ?? []), {
         status: 200, headers: { 'content-type': 'application/json' } });
     };
-    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'loopsBlock', 'calendarBlock']) {
+    for (const name of ['notesBlock', 'channelsBlock', 'thesisBlock', 'portraitBlock', 'recordBlock',
+                        'loopsBlock', 'calendarBlock']) {
       const out = await BLOCKS[name]();
       assert.ok(out.trim().length > 0,
         `${name} read its rows and said nothing — a block that returns "" on success ` +
