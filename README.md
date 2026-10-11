@@ -71,6 +71,8 @@ charm/                                  firmware for the charm — see The charm
   main/dns.c                            the setup's answer to every name the phone asks
   main/net.c                            joining her Wi-Fi, and New York time
   main/talk.c                           talking with Eugenia, through her door
+  main/ogg.c                            the Ogg file a recording travels in
+  main/frames.c                         her answer, read out of its frames
   main/sleep.c                          deep sleep, and what wakes her
   main/briefing.c                       when Eugenia wakes to ask for the briefing
   main/gladys.c                         Gladys's door: what waits, and his answers
@@ -401,6 +403,8 @@ single-sourced at run time:
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
+| the **charm's answer frames** | `FRAME` and `charmFrame` in `doji-eugenia`, and `FRAME_VOICE` and `FRAME_VOLUME` in `charm/main/frames.h`, whose parser `charm.test.mjs` feeds `charmFrame`'s own bytes |
+| the **charm's headers** | each `x-charm-` header `charm/main/talk.c` sets and `doji-eugenia` reads, in both directions |
 | the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
@@ -1721,21 +1725,37 @@ the listener built the bot; a forwarded note carries no such context.
 
 ### The charm — her voice on his keyring
 
-A round screen with a microphone and a speaker: he holds it, talks, lets go,
-and she answers out of it. **It is a door into the same conversation, not a
-second bot.** The charm posts its recording to `doji-eugenia` with
-`x-charm-key: <EUGENIA_CHARM_SECRET>` and plays the response body; nothing
+A round screen with a microphone and a speaker: he presses, talks, presses
+again, and she answers out of it. **It is a door into the same conversation,
+not a second bot.** The charm posts its recording to `doji-eugenia` with
+`x-charm-key: <EUGENIA_CHARM_SECRET>` — an Ogg Opus file, as a Telegram voice
+note is — and plays the response body; nothing
 about it goes near Telegram's Bot API, which has no way to speak to a bot as
 him. The turn is **`converse`**, the reply's own — the same twelve turns, notes,
 map, thesis, loops, calendar and desk, the same model and the same `TRIM` gate —
 so the charm and Telegram are one memory and either can follow up the other.
 His words are stored marked `[voice note]`, which is what they are.
 
+**The charm tells her about itself.** Its headers carry its battery
+(`x-charm-battery`, a percent), whether a cable is charging it
+(`x-charm-charging`) and its volume (`x-charm-volume`), clamped and put into
+her turn as context, never stored. That turn alone is told she may set the
+volume: asked to speak up or down, she opens her draft with `[volume N]`,
+which comes off before `TRIM`, so nothing gates, stores, copies or speaks it.
+**A low battery is the charm's news**: with `x-charm-low: 1` the line *"Jefe,
+I'm running out of battery. Charge me when you can."* is spoken after her
+answer, and is neither copied to Telegram nor stored. The charm asks once a
+charge — told, it does not ask again until a cable is in.
+
 **One request, answered at once.** The response starts before the turn does
-and is the audio itself: the vendor's raw **`pcm` — 24 kHz, 16-bit
-little-endian, mono**. No decoder on the device, and the parts of a long answer
-join end to end where a file format's header would not; `chunk()` splits it at
-`TTS_LIMIT` as for a voice note. **While she thinks, the wire carries silence**:
+and is the audio itself, in **frames**: a kind byte, three bytes of length,
+big-endian, then that many bytes (`FRAME`, `charmFrame`). A voice frame is the
+vendor's raw **`pcm` — 24 kHz, 16-bit little-endian, mono**: no decoder on the
+device, and the parts of a long answer join end to end where a file format's
+header would not; `chunk()` splits it at `TTS_LIMIT` as for a voice note. A
+volume frame, one byte from 0 to 100, goes ahead of her voice when she set
+one, so she already sounds that way — it cannot be a header, since the
+response starts before she has decided anything. **While she thinks, the wire carries silence**:
 a tenth of a second of zeros at once and every fifteen seconds (`BEAT`,
 `BEAT_MS`), because a turn can run for minutes and a response quiet that long is
 closed by a proxy on the way — the shortest such limit known is a hundred
@@ -1761,7 +1781,7 @@ leaves the voice what is left of four hundred seconds.
 **The briefing reaches the charm without waking it.** The charm sleeps with its
 radio off, so nothing can be pushed to it: after the briefing's hour it wakes and
 asks **`?briefing=ready`** (a `GET` with the same key), which answers with her
-line *"Your briefing is ready, jefe."* as `pcm`, or a `204` while no briefing is
+line *"Your briefing is ready, jefe."* in the same frames, or a `204` while no briefing is
 stored for today. Writing takes up to six minutes, so the charm asks again every
 few minutes until it lands. Then it shows a still purple dot until he presses,
 and asks **`?briefing=today`** for the briefing itself. Both read today's
@@ -1775,13 +1795,18 @@ it could neither hear nor speak; an empty recording, or one over `FILE_MAX`, is
 a 400. **`EUGENIA_CHARM_SECRET` is optional** — unset, the door is shut, because
 `secretMatches` refuses an empty secret, and nothing else changes.
 
-A laptop stands in for the charm with `sox` and `curl` — record 16 kHz mono
-WAV, post it, play what streams back:
+A laptop stands in for the charm with `sox`, `ffmpeg`, `curl` and Node —
+record, make it Ogg Opus, post it, and play the voice frames of what streams
+back:
 
 ```sh
 rec -r 16000 -c 1 -b 16 ask.wav      # talk, then Ctrl-C
-curl -sN --data-binary @ask.wav -H "x-charm-key: $EUGENIA_CHARM_SECRET" \
+ffmpeg -loglevel error -i ask.wav -c:a libopus -b:a 24k ask.ogg
+curl -sN --data-binary @ask.ogg -H "x-charm-key: $EUGENIA_CHARM_SECRET" \
      "https://<project>.supabase.co/functions/v1/doji-eugenia" |
+  node -e 'let b=Buffer.alloc(0);process.stdin.on("data",d=>{b=Buffer.concat([b,d]);
+    while(b.length>=4&&b.length>=4+b.readUIntBE(1,3)){const n=b.readUIntBE(1,3);
+    if(!b[0])process.stdout.write(b.subarray(4,4+n));b=b.subarray(4+n)}})' |
   play -t raw -r 24000 -e signed -b 16 -c 1 -
 ```
 
@@ -2756,9 +2781,15 @@ even while she is still joining her Wi-Fi, the recording waiting for it, not
 him. The ring shows round the rim and follows his voice. **His pauses are his
 own**: nothing ends his turn but the next press, so he can stop to think as
 long as he needs; **two falling notes** say his words are on their way. A
-press with nothing said for thirty seconds is dropped quietly, and a minute
-fills the recording. The recording goes to her door as 16 kHz WAV and the
-answer is played as it streams in (*The charm — her voice on his keyring*):
+press with nothing said for thirty seconds is dropped quietly. **A turn runs
+to five minutes**, a soft tick half a minute before the end; the recording is
+encoded as he speaks — Opus at 24 kbit/s, 16 kHz mono, in an Ogg file built in
+memory (`charm/main/ogg.c`), one packet a page, about a megabyte and a half
+for the whole five — and goes to her door with her battery, the cable and
+her volume in its headers, and the battery line asked for once a charge when
+she is low. Asked to speak up or down, she sets the volume before she
+answers, and keeps it, as the dial does. The answer is read out of its frames
+(`charm/main/frames.c`) and played as it streams in (*The charm — her voice on his keyring*):
 her face thinks through the silence and speaks when her voice starts, since
 the silence is exact zeros. A press while she thinks or speaks cuts her off;
 the copy in Telegram is the whole of it. The screen is not for talking: a tap
@@ -2815,7 +2846,9 @@ Storage API takes the secret key the workflow publishes with, that her own
 leaving of a network reports `WIFI_REASON_ASSOC_LEAVE`, that a phone stays on
 her setup network while she joins another — the two share one radio, so her
 own moves to the other's channel — whether a full-screen swipe is smooth
-enough to replace the journal's taps, and how long a battery lasts.
+enough to replace the journal's taps, that the Opus encoder keeps up with the
+microphones and five minutes of it fit the room `talk.c` gives the file, and
+how long a battery lasts.
 
 ---
 
@@ -3106,8 +3139,8 @@ home-screen shortcut and every bookmark open `/`.
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
-| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — silence first, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm`, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret |
-| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/lift.c` and `charm/main/dns.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, never before the clock is set, a lift judged on readings, held and put down told apart, and the setup's answer to a name, with and without the EDNS record a phone may add |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret |
+| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, never before the clock is set, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |

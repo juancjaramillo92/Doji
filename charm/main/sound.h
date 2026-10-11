@@ -13,7 +13,8 @@ void sound_volume(int percent);
 // Two soft notes: the board is alive and the speaker works.
 void sound_chime(void);
 
-// Gladys's soft double tick: a trade waits for its journal.
+// Gladys's soft double tick: a trade waits for its journal. While he talks,
+// half a minute of his turn is left.
 void sound_tick(void);
 
 // Two quick notes, rising: she heard PWR and is listening.
@@ -23,8 +24,7 @@ void sound_listen(void);
 void sound_sent(void);
 
 /* Both hand `more` how loud each moment is, 0 to 1, and stop when it answers
-   false. Recording is mono 16 kHz into `out`, up to `max` samples, and returns
-   how many it took. Playing is mono at `rate` and returns false when `more`
-   stopped it. */
-size_t sound_record(int16_t *out, size_t max, bool (*more)(float));
+   false. Recording is mono 16 kHz, handed to `more` a run of samples at a
+   time. Playing is mono at `rate` and returns false when `more` stopped it. */
+void sound_record(bool (*more)(const int16_t *in, size_t n, float loud));
 bool sound_play(const int16_t *in, size_t samples, uint32_t rate, bool (*more)(float));

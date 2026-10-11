@@ -106,3 +106,7 @@ bool power_low(void) {
 int power_charge(void) {
     return get(STATUS1) & (1 << 5) ? get(BATTERY) : -1;
 }
+
+int power_battery(void) {
+    return get(STATUS1) & (1 << 3) ? get(BATTERY) : -1;
+}

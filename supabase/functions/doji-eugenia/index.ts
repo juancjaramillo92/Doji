@@ -3492,8 +3492,10 @@ async function handleFeedback(query: any): Promise<void> {
    memory, notes, map and desk. What comes back is his turn as it is stored
    (marked when he was quoting her) and her answer as the gate left it.
    ───────────────────────────────────────────────────────────────────────── */
-async function converse(text: string, blocks: any[],
-                        quoting: Promise<string | null>): Promise<{ asked: string; answer: string }> {
+/* `device` is the charm telling her about itself, for this turn only — never
+   stored, like the rest of the context. "" from Telegram. */
+async function converse(text: string, blocks: any[], quoting: Promise<string | null>,
+                        device: string): Promise<{ asked: string; answer: string; volume: number | null }> {
   const [history, notes, portrait, channels, story, loops, calendar, desk, record, quoted] = await Promise.all([
     recent(), notesBlock(), portraitBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
     calendarBlock(), positionsBlock(), recordBlock(), quoting,
@@ -3512,7 +3514,7 @@ async function converse(text: string, blocks: any[],
     `\n\nYour answer reaches him as a voice note, so write it ` +
     `to be heard: plain sentences, no headings, and nothing that only works ` +
     `on a page. Its length is whatever the answer needs.`;
-  const context = asked + about + aloud + notes + portrait + channels + story + loops + calendar + desk + record;
+  const context = asked + about + aloud + device + notes + portrait + channels + story + loops + calendar + desk + record;
   const draft = await ask(
     [...history, {
       role: 'user',
@@ -3520,8 +3522,13 @@ async function converse(text: string, blocks: any[],
       content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
     }],
     'medium', 'reply');
-  const answer = await trim(draft, desk, story);
-  return { asked, answer };
+  // A volume she set for the charm opens her draft, and comes off before the
+  // gate, so TRIM never sees it and nothing stores or speaks it. Only the
+  // charm's turn is told it may set one.
+  const set = draft.match(/^\s*\[volume (\d{1,3})\]\s*/i);
+  const said = set ? draft.slice(set[0].length) : draft;
+  const answer = await trim(said, desk, story);
+  return { asked, answer, volume: set ? Math.min(100, Number(set[1])) : null };
 }
 
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
@@ -3643,7 +3650,7 @@ async function handleMessage(update: any): Promise<void> {
     try {
       // Gated while the indicator still runs, or three silent seconds read as
       // her finishing and saying nothing.
-      ({ asked, answer } = await converse(text, blocks, quoting));
+      ({ asked, answer } = await converse(text, blocks, quoting, ""));
     } finally {
       // Stopped before sending, or a ping lands after the message.
       clearInterval(keepTyping);
@@ -3675,36 +3682,72 @@ function background(work: Promise<unknown>) {
 }
 
 /* ─── The charm half: he spoke to the charm ────────────────────────────────
-   A round screen on his keyring with a microphone and a speaker. He holds it,
-   talks and lets go; it posts the recording here and plays what comes back,
-   all on one request. The turn is converse, the reply's own, so the charm and
-   Telegram are one conversation with one memory. Telegram gets the text as a
-   copy, his words first, so a mishearing shows where he can scroll back.
+   A round screen on his keyring with a microphone and a speaker. He presses,
+   talks and presses again; it posts the recording here, an Ogg Opus file as a
+   Telegram voice note is, and plays what comes back, all on one request. The
+   turn is converse, the reply's own, so the charm and Telegram are one
+   conversation with one memory. Telegram gets the text as a copy, his words
+   first, so a mishearing shows where he can scroll back.
    ───────────────────────────────────────────────────────────────────────── */
 const CHARM_SECRET = env("EUGENIA_CHARM_SECRET");
 
+type Spoken = { answer: string; volume: number | null };
+
 /* Never throws: whatever happens, the charm has something to say. The copy
    and the write go after the charm has her words, which are what he is
-   waiting on, and the pair is stored whether or not the copy lands. */
-async function hearCharm(bytes: Uint8Array): Promise<string> {
-  const heard = await transcribe(bytes, "charm.wav", "audio/wav");
-  if ('trouble' in heard) return VOICE_TROUBLE[heard.trouble];
+   waiting on, and the pair is stored whether or not the copy lands.
+
+   The headers are the charm telling her about itself — its battery, whether
+   it is charging, its volume — for this turn only, and how she sets its volume
+   when he asks. Clamped: a header is only what the charm sent. */
+async function hearCharm(bytes: Uint8Array, h: Headers): Promise<Spoken> {
+  const heard = await transcribe(bytes, "charm.ogg", "audio/ogg");
+  if ('trouble' in heard) return { answer: VOICE_TROUBLE[heard.trouble], volume: null };
+  const percent = (name: string) => {
+    const v = parseInt(h.get(name) ?? '', 10);
+    return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : null;
+  };
+  const battery = percent('x-charm-battery'), volume = percent('x-charm-volume');
+  const device = `\n\nHe is talking to you through the charm on his keyring` +
+    (battery === null ? '' : `; its battery is at ${battery}%${h.get('x-charm-charging') === '1' ? ' and charging' : ''}`) +
+    (volume === null ? '' : `; its volume is ${volume} of 100`) +
+    `. If he asks you to speak louder or softer, or for a volume, open your answer with ` +
+    `[volume N], N from 0 to 100: the charm sets it before your answer plays, so answer ` +
+    `as if it already sounds that way.`;
   try {
-    const { asked, answer } = await converse(`[voice note] ${heard.said}`, [], Promise.resolve(null));
+    const { asked, answer, volume } = await converse(`[voice note] ${heard.said}`, [], Promise.resolve(null), device);
     background(say(`«${heard.said}»\n\n${answer}`));
     background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
-    return answer;
+    return { answer, volume };
   } catch (err) {
     console.error("doji-eugenia:", why(err));
-    return APOLOGY.reply;
+    return { answer: APOLOGY.reply, volume: null };
   }
 }
 
 /* What the charm plays is the vendor's raw `pcm`: 24 kHz, 16-bit little-endian,
    mono. It needs no decoder on the device, and the parts of a long answer join
-   end to end, where each part of a file format would carry its own header. */
-const BEAT = new Uint8Array(4_800);
+   end to end, where each part of a file format would carry its own header.
+
+   It arrives in frames — a kind byte, three bytes of length, then that many
+   bytes — because the answer starts before she has decided anything, so a
+   volume she sets cannot ride in a header: a volume frame, one byte from 0 to
+   100, goes ahead of her voice, so it already sounds that way. Exported so the
+   charm's own parser can be fed these exact bytes in a test. */
+export const FRAME = { voice: 0, volume: 1 } as const;
+
+export function charmFrame(kind: number, bytes: Uint8Array): Uint8Array {
+  const out = new Uint8Array(4 + bytes.length);
+  out.set([kind, bytes.length >> 16 & 255, bytes.length >> 8 & 255, bytes.length & 255]);
+  out.set(bytes, 4);
+  return out;
+}
+
+const BEAT = charmFrame(FRAME.voice, new Uint8Array(4_800));
 const BEAT_MS = 15_000;
+
+// Said at the end of an answer when the charm asks, once a charge: its battery is low.
+const CHARM_LOW = "Jefe, I'm running out of battery. Charge me when you can.";
 
 /* Silence while she thinks: a tenth of a second of zeros every BEAT_MS, from
    the first instant. A turn can run for minutes, and a response with nothing
@@ -3714,20 +3757,21 @@ const BEAT_MS = 15_000;
    format, so the charm plays them like anything else, and its face can tell
    thinking from speaking by the level alone. A part the vendor will not read
    ends the audio; the copy in Telegram is the whole of it. */
-async function* charmAudio(words: Promise<string>): AsyncGenerator<Uint8Array> {
-  let said: string | null = null;
+async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
+  let said: Spoken | null = null;
   while (said === null) {
     yield BEAT;
     let beat = 0;
     said = await Promise.race([words, new Promise<null>(r => { beat = setTimeout(r, BEAT_MS, null); })]);
     clearTimeout(beat);
   }
+  if (said.volume !== null) yield charmFrame(FRAME.volume, Uint8Array.of(said.volume));
   const signal = AbortSignal.timeout(SPEAK_MS);
   try {
-    for (const part of chunk(said, TTS_LIMIT)) {
+    for (const part of chunk(said.answer, TTS_LIMIT)) {
       const spoken = await reading(part, "pcm", signal);
       if (!spoken.ok || !spoken.body) throw new Error(`speech HTTP ${spoken.status}`);
-      yield* spoken.body;
+      for await (const bytes of spoken.body) yield charmFrame(FRAME.voice, bytes);
     }
   } catch (err) {
     console.error("doji-eugenia: the charm could not speak —", why(err));
@@ -3749,8 +3793,8 @@ async function charmBriefing(which: string): Promise<Response> {
   const now = new Date();
   const turn = await storedBriefing(nyClock(now).wd === 0 ? 'sunday' : 'weekday', nyDate(now));
   if (!turn) return new Response(null, { status: 204 });
-  return new Response(ReadableStream.from(charmAudio(Promise.resolve(which === 'ready' ? CHARM_READY : turn.content))),
-                      { headers: { "Content-Type": "audio/pcm" } });
+  return new Response(ReadableStream.from(charmAudio(Promise.resolve({ answer: which === 'ready' ? CHARM_READY : turn.content, volume: null }))),
+                      { headers: { "Content-Type": "application/octet-stream" } });
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
@@ -3812,10 +3856,14 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }
       // Answered at once, the audio following as it exists. The turn is kept
       // alive past a charm that hangs up, so the copy and the memory still land.
-      const words = hearCharm(bytes);
+      // A low battery is said after her answer when the charm asks, and only
+      // spoken: it is the charm's news, not a turn of hers to keep.
+      const words = hearCharm(bytes, req.headers);
       background(words);
-      return new Response(ReadableStream.from(charmAudio(words)),
-                          { headers: { "Content-Type": "audio/pcm" } });
+      const low = req.headers.get('x-charm-low') === '1';
+      const spoken = words.then(w => low ? { ...w, answer: `${w.answer} ${CHARM_LOW}` } : w);
+      return new Response(ReadableStream.from(charmAudio(spoken)),
+                          { headers: { "Content-Type": "application/octet-stream" } });
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {

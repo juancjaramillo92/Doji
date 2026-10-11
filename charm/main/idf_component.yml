@@ -1,5 +1,6 @@
 ## The board's own support package (screen, touch, codecs, power chip) and the
-## LVGL it was built against, at the versions Waveshare's examples use.
+## LVGL it was built against, at the versions Waveshare's examples use; and
+## Espressif's audio codecs, for the Opus a recording is encoded in.
 dependencies:
   idf:
     version: ">=5.5"
@@ -7,3 +8,5 @@ dependencies:
     version: "^3.0.0"
   lvgl/lvgl:
     version: "9.5.0"
+  espressif/esp_audio_codec:
+    version: "^2.6.2"

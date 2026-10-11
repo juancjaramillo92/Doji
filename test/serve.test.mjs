@@ -283,24 +283,47 @@ const charmTurn = (said, answer) => (url, init) => {
   if (url.startsWith('https://db.test/rest/v1/')) return ok([]);
   return Promise.reject(new Error(`the charm asked something unexpected: ${url}`));
 };
-const charm = (body) => request('doji-eugenia', { header: 'x-charm-key', key: 'charm', body });
+const charm = (body, headers = {}) => new Request('https://fn.test/functions/v1/doji-eugenia',
+  { method: 'POST', body, headers: { 'x-charm-key': 'charm', ...headers } });
 const bodies = (part) => calls.filter(c => c.url.includes(part)).map(c => JSON.parse(c.body));
+
+/* What the charm is sent, read as the charm reads it: a kind byte, three bytes
+   of length, that many bytes, to the last byte. A frame that overran the end
+   or a stray byte after the last is a stream the charm cannot follow. */
+async function framesOf(res) {
+  assert.equal(res.headers.get('content-type'), 'application/octet-stream');
+  const b = new Uint8Array(await res.arrayBuffer());
+  const out = [];
+  for (let i = 0; i < b.length;) {
+    assert.ok(i + 4 <= b.length, `a frame header was cut off at byte ${i}`);
+    const n = b[i + 1] << 16 | b[i + 2] << 8 | b[i + 3];
+    assert.ok(i + 4 + n <= b.length, `a frame at byte ${i} runs past the end`);
+    out.push({ kind: b[i], bytes: [...b.subarray(i + 4, i + 4 + n)] });
+    i += 4 + n;
+  }
+  return out;
+}
+const voiceOf = (frames) => frames.filter(f => f.kind === 0).flatMap(f => f.bytes);
 
 test('doji-eugenia: the charm is answered at once, hears her answer, and Telegram gets the copy', async () => {
   const serve = await serving('doji-eugenia');
   respond = charmTurn('how is gold doing', 'Gold is holding 4,410.');
   const res = await serve(charm(new Uint8Array(64)));
   assert.equal(res.status, 200);
-  assert.equal(res.headers.get('content-type'), 'audio/pcm');
   assert.equal(kept.length, 1, 'the turn was not handed to EdgeRuntime.waitUntil, so a charm that hangs up kills it');
 
-  const played = [...new Uint8Array(await res.arrayBuffer())];
+  const frames = await framesOf(res);
   await Promise.all(kept);
+  assert.deepEqual([...new Set(frames.map(f => f.kind))], [0], 'a frame other than her voice was sent unasked');
+  const played = voiceOf(frames);
   assert.ok(played.length > PCM.length, 'nothing was on the wire while she thought');
   assert.ok(played.slice(0, -PCM.length).every(b => b === 0),
     'what played before her answer was not silence');
   assert.deepEqual(played.slice(-PCM.length), PCM, 'her answer is not what the charm played');
 
+  const file = calls.find(c => c.url.startsWith('https://stt.test/')).body.get('file');
+  assert.deepEqual([file.name, file.type], ['charm.ogg', 'audio/ogg'],
+    'the recording was handed to transcription as something other than the Ogg it is');
   assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]),
     [['Gold is holding 4,410.', 'pcm']],
     'the charm was read something other than the gated answer, or in a format it cannot play');
@@ -317,12 +340,47 @@ test('doji-eugenia: a long answer reaches the charm whole, every part in order',
   const long = `${'Gold held. '.repeat(250).trim()}\n\n${'Then it gave way. '.repeat(150).trim()}`;
   const serve = await serving('doji-eugenia');
   respond = charmTurn('tell me everything', long);
-  const played = [...new Uint8Array(await (await serve(charm(new Uint8Array(64)))).arrayBuffer())];
+  const played = voiceOf(await framesOf(await serve(charm(new Uint8Array(64)))));
   await Promise.all(kept);
   const read = bodies('/audio/speech').map(b => b.input);
   assert.equal(read.length, 2, `the answer was read in ${read.length} parts`);
   assert.equal(read.join('\n\n'), long, 'what was read is not the whole answer, in order');
   assert.deepEqual(played.slice(-2 * PCM.length), [...PCM, ...PCM], 'the charm did not play every part');
+});
+
+test('doji-eugenia: the charm tells her about itself, and the volume she sets goes ahead of her voice', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('speak up a little', '[volume 80] Is this better, jefe?');
+  const frames = await framesOf(await serve(charm(new Uint8Array(64),
+    { 'x-charm-battery': '37', 'x-charm-charging': '1', 'x-charm-volume': '55' })));
+  await Promise.all(kept);
+  const told = JSON.stringify(bodies('api.anthropic.com/v1/messages')[0].messages.at(-1));
+  for (const fact of ['battery is at 37% and charging', 'volume is 55 of 100', '[volume N]']) {
+    assert.ok(told.includes(fact), `her turn was not told ${fact}`);
+  }
+  const volume = frames.findIndex(f => f.kind === 1);
+  assert.deepEqual(frames[volume]?.bytes, [80], 'the charm was not sent the volume she set');
+  assert.ok(frames.slice(volume + 1).some(f => f.kind === 0 && f.bytes.some(b => b !== 0)) &&
+            !frames.slice(0, volume).some(f => f.bytes.some(b => b !== 0)),
+    'her voice did not wait for the volume');
+  const answer = 'Is this better, jefe?';
+  assert.deepEqual(bodies('/audio/speech').map(b => b.input), [answer], 'the volume marker was read aloud');
+  assert.ok(bodies('/sendMessage')[0].text.endsWith(`\n\n${answer}`), 'the copy carries the volume marker');
+  assert.equal(calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns'))
+    .map(c => JSON.parse(c.body))[0][1].content, answer, 'the volume marker was stored as hers');
+});
+
+test('doji-eugenia: a low battery is said on the charm after her answer, and nowhere else', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('anything else', 'Nothing more today.');
+  await framesOf(await serve(charm(new Uint8Array(64), { 'x-charm-low': '1' })));
+  await Promise.all(kept);
+  assert.deepEqual(bodies('/audio/speech').map(b => b.input),
+    ["Nothing more today. Jefe, I'm running out of battery. Charge me when you can."],
+    'the charm did not say its battery is low after her answer');
+  assert.ok(!bodies('/sendMessage')[0].text.includes('battery'), 'the battery line reached Telegram');
+  assert.ok(!calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns')).some(c => c.body.includes('battery')),
+    'the battery line was stored as a turn of hers');
 });
 
 test('doji-eugenia: a recording with no words is answered on the charm, and nothing else happens', async () => {
@@ -377,8 +435,7 @@ test('doji-eugenia: the charm hears that the briefing landed, then the briefing 
     calls.length = 0;
     const res = await serve(briefingDoor(which));
     assert.equal(res.status, 200, `?briefing=${which} did not answer with audio`);
-    assert.equal(res.headers.get('content-type'), 'audio/pcm');
-    assert.deepEqual([...new Uint8Array(await res.arrayBuffer())].slice(-PCM.length), PCM);
+    assert.deepEqual(voiceOf(await framesOf(res)).slice(-PCM.length), PCM);
     assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]), [[said, 'pcm']],
       `?briefing=${which} read the charm something other than ${JSON.stringify(said)}`);
     // Sunday's briefing on a Sunday in New York, the weekday one otherwise.

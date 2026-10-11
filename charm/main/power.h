@@ -20,3 +20,6 @@ bool power_low(void);
 
 // On the cable, the battery's percent; -1 off it.
 int power_charge(void);
+
+// The battery's percent, on the cable or off it; -1 with none connected.
+int power_battery(void);
