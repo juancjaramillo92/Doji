@@ -25,6 +25,7 @@ any change that touches it.
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | a red-team set that does not exist |
+| the charm's firmware beyond its pure C | the charm workflow's build for the rest of its code; the board itself for what it does |
 
 ---
 
@@ -337,6 +338,38 @@ window and a closing rule, as loops do, for reads that would almost all close
 the same night.
 **Revisit if:** reads about a week — Sunday's — are untested so often that the
 record stops saying anything about them.
+
+### R-33 — folding the charm's `sound_tick` into `play_notes`
+**Why refused:** the chime and the listening notes were one loop with
+different numbers and now share `play_notes`, proved byte-identical. The tick
+is not the same sound: its note stops dead at 8 ms where `play_notes` lets a
+decay run on, so folding it changes the samples, and a refactor may not.
+**Revisit if:** the tick is redesigned, as a behaviour change with its own
+commit.
+
+### R-34 — dropping `agree.test.mjs`'s read of the charm's briefing hours
+**Why refused:** `charm.test.mjs` compiles `briefing.c` and walks it against
+`briefDue` and `retryDue`, which is the stronger proof, and the two look like
+one check twice. They answer different questions: the Facts list is held by
+`agree.test.mjs`, which reads every copy as written, and the compiled walk
+proves what the copy does. Each would go red where the other might not.
+**Revisit if:** the Facts list stops being `agree.test.mjs`'s alone.
+
+### R-35 — one register helper for the charm's power chip and motion sensor
+**Why refused:** `power.c` and `motion.c` each write a register through their
+own device handle in three lines. A shared helper needs a file of its own, or
+one driver reaching into the other, to save six lines between two chips that
+share nothing but the bus.
+**Revisit if:** a third chip on the bus is driven.
+
+### R-36 — signing the charm's updates
+**Why refused:** she installs whatever app the public `charm` bucket holds,
+over TLS, and only the workflow writes it, with `SB_SECRET_KEY`. Whoever holds
+that key already reads and writes every table, so a signature would guard a
+door behind one already open, at the price of a signing key to keep and a
+public key built into every board.
+**Revisit if:** anyone but him ever holds a credential here, or the bucket is
+ever written by anything but the workflow.
 
 ---
 

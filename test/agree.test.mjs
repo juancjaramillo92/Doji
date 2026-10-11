@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         parseFeedback, feedbackKeyboard, EMBED_DIMS }
+         parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
@@ -229,6 +229,89 @@ test('the setups vocabulary is the same list in all three places', async () => {
     assert.deepEqual([...inSchema].sort(), [...inApp].sort(),
       'trades_setup_check and index.html disagree — the app can offer a setup the database will refuse');
   } finally { close(); }
+});
+
+/* Gladys's charm sends a setup by its name and an answer by its key, and reads
+   the trade's answers by their columns: the same three lists in C. */
+const GLADYS_C = source('charm/main/gladys.c');
+
+test('Gladys\'s charm sends the setups and answers her door takes', () => {
+  const setups = GLADYS_C.match(/SETUPS\[2\] = \{ ("[^"]+"), ("[^"]+") \}/);
+  assert.ok(setups, 'gladys.c no longer lists SETUPS as this test reads them');
+  assert.deepEqual(setups.slice(1).map(s => JSON.parse(s)), [...SETUPS],
+    'the charm offers a setup her door would refuse');
+
+  const pairs = [...GLADYS_C.matchAll(/\{ "(\w+)",\s*"(\w+)" \}/g)].map(m => [m[1], m[2]]);
+  assert.deepEqual(pairs, Object.entries(COLUMNS),
+    'the charm answers a key, or reads a column, her door does not have — or in another order ' +
+    'than the screens ask them');
+});
+
+/* The charm's words are drawn in fonts holding only the letters
+   tools/fonts.sh gave them; a word with any other letter draws a gap. */
+test('every word on the charm\'s screens is in the font that draws it', () => {
+  const journal = source('charm/main/journal.c');
+  const list = (name) => {
+    const m = journal.match(new RegExp(`${name}\\[\\d\\] = \\{([^}]+)\\}`));
+    assert.ok(m, `journal.c no longer lists ${name}`);
+    return [...m[1].matchAll(/"([^"]+)"/g)].map(w => w[1]);
+  };
+  // What a font holds, as its own header records the run: its symbols, and
+  // the space when it was asked for by code point.
+  const held = (font) => {
+    const opts = source(`charm/main/${font}.c`);
+    const m = opts.match(/--symbols (\S+)/);
+    assert.ok(m, `${font}.c no longer says which letters it holds`);
+    return m[1] + (/--range 0x20 /.test(opts) ? ' ' : '');
+  };
+  const words = list('WORDS'), short = list('SHORT');
+  assert.equal(words.length, 4, 'a word for each of the four answers');
+  for (const word of [...words, ...short]) {
+    for (const letter of word) assert.ok(held('hanken_64').includes(letter), `hanken_64 cannot draw the ${letter} of ${word}`);
+  }
+  // The setup screen's label is the small font's.
+  for (const letter of words[0]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${words[0]}`);
+
+  // The dial's label and its number, any of 0 to 100; the charge's, with its %.
+  const dial = source('charm/main/dial.c');
+  const label = dial.match(/t\.text = "([^"]+)";/);
+  assert.ok(label, 'dial.c no longer draws its label as this test reads it');
+  for (const letter of label[1]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${label[1]}`);
+  for (const digit of '0123456789%') assert.ok(held('hanken_36').includes(digit), `hanken_36 cannot draw a ${digit}`);
+  assert.match(source('charm/main/face.c'), /snprintf\(percent, sizeof percent, "%d%%", charge\)/,
+    'face.c no longer draws the charge as a number and %, which is what this test checks the font for');
+
+  // The setup screen: what it says while it works, and her network's name,
+  // Charm- and four hex digits.
+  const setup = source('charm/main/setup.c');
+  const say = setup.match(/SAY\[\] = \{([^}]+)\}/);
+  assert.ok(say, 'setup.c no longer lists what its screen says');
+  assert.match(setup, /"Charm-%02X%02X"/, 'setup.c no longer names her network as this test reads it');
+  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF']) {
+    for (const letter of words) assert.ok(held('hanken_18').includes(letter), `hanken_18 cannot draw the ${JSON.stringify(letter)} of ${words}`);
+  }
+});
+
+/* The charm draws in Doji's colours: copies of the app's tokens in C, each
+   beside the token it copies, and in the setup page's CSS under the app's own
+   names. Each copy is read against index.html's first declaration. */
+test('the charm and its setup page draw in the app\'s own colours', () => {
+  const app = new Map();
+  for (const [, name, value] of source('index.html').matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)) {
+    if (!app.has(name)) app.set(name, value.toLowerCase());
+  }
+  const palette = [...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})\s+\/\/ (--[\w-]+)$/gim)];
+  assert.ok(palette.length >= 5, `palette.h names only ${palette.length} tokens beside its colours — the reader has gone blind`);
+  for (const [, name, hex, token] of palette) {
+    assert.equal(`#${hex.toLowerCase()}`, app.get(token), `palette.h's ${name} is not index.html's ${token}`);
+  }
+  const page = source('charm/main/setup.html').match(/:root \{([^}]+)\}/);
+  assert.ok(page, 'setup.html no longer declares its colours in :root');
+  const shared = [...page[1].matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].filter(([, name]) => app.has(name));
+  assert.ok(shared.length >= 5, `setup.html shares only ${shared.length} of the app's tokens — the reader has gone blind`);
+  for (const [, name, value] of shared) {
+    assert.equal(value.toLowerCase(), app.get(name), `setup.html's ${name} is not index.html's`);
+  }
 });
 
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {
@@ -716,17 +799,18 @@ const read = (path) => ({ path, text: source(path) });
 
 // Everything that names a FUNCTION, each on its own, so one that stops naming
 // any is not covered by the others: Gladys's trigger, the trade event, the
-// schedules, and the Apps Script.
+// schedules, the Apps Script and the charm.
 const CALLERS = [
   ...['Gladys', 'Her senses', 'Everything that runs on a timer']
     .map(t => ({ path: `schema.sql (${t})`, text: subject(t) })),
   read('doji_gmail_sync.gs'),
+  read('charm/main/net.h'),
 ];
 
 // Every file that names the PROJECT, which is a longer list: the app connects
 // to it, config.toml links the CLI to it and the deploy workflow pushes to it.
 const PROJECT_FILES = ['supabase/schema.sql', 'doji_gmail_sync.gs', 'index.html',
-  'supabase/config.toml', '.github/workflows/deploy-functions.yml'].map(read);
+  'supabase/config.toml', '.github/workflows/deploy-functions.yml', 'charm/main/net.h'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
@@ -1169,7 +1253,16 @@ test('every workflow takes its Node version from the one file that states it', (
     '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
     'and npm installs on any version without a word');
 
-  for (const { path, text } of WORKFLOWS) {
+  // The rule is about Node, so it binds the workflows that run it: the charm's
+  // firmware build runs ESP-IDF in its own image and has no Node to version.
+  // Comments are not running anything.
+  const runsNode = ({ text }) => text.split('\n')
+    .some(line => !/^\s*#/.test(line) && /\b(npm|node)\b/.test(line));
+  const nodeWorkflows = WORKFLOWS.filter(runsNode);
+  assert.ok(nodeWorkflows.length >= 4,
+    `only ${nodeWorkflows.length} workflows run Node — the reader has gone blind`);
+
+  for (const { path, text } of nodeWorkflows) {
     // Anchored to setup-node: a `node-version` under any other step is not this.
     assert.ok(/actions\/setup-node/.test(text), `${path} no longer sets Node up at all`);
     assert.match(text, /node-version-file: package\.json/,
@@ -1237,6 +1330,50 @@ test('every file that names the Supabase project names the same one', () => {
     `the project is split across refs: ${[...new Set(found)].join(', ')}`);
 });
 
+/* The charm cannot be told the briefing has landed — it sleeps — so it wakes
+   to ask in the hours the briefing is written, and holds its own copy of them.
+   Read out of briefing.c and walked against briefDue and retryDue, every hour
+   of a week: a copy an hour early asks for nothing, an hour short misses the
+   last retry. */
+test('the charm asks for the briefing in the hours it is written', () => {
+  const c = source('charm/main/briefing.c');
+  const [weekday, sunday, retries] = ['BRIEF_WEEKDAY', 'BRIEF_SUNDAY', 'BRIEF_RETRIES'].map(name => {
+    const m = c.match(new RegExp(`^#define ${name}\\s+(\\d+)`, 'm'));
+    assert.ok(m, `briefing.c no longer defines ${name}`);
+    return Number(m[1]);
+  });
+  // The days, as the walk below takes them: Sunday's hour, weekdays', none on Saturday.
+  assert.match(c, /(\w+)\.tm_wday == 0 \? BRIEF_SUNDAY : \1\.tm_wday <= 5 \? BRIEF_WEEKDAY : -1;/,
+    'briefing.c no longer gives the days their hours as this test walks them');
+  // Sunday 16 August 2026 to the Saturday after, New York on daylight time.
+  for (let day = 0; day < 7; day++) {
+    const first = day === 0 ? sunday : day <= 5 ? weekday : null;
+    for (let hour = 0; hour < 24; hour++) {
+      const at = new Date(Date.UTC(2026, 7, 16 + day, hour + 4));
+      const charm = first !== null && hour >= first && hour <= first + retries;
+      assert.equal(charm, Boolean(briefDue(at) || retryDue(at)),
+        `day ${day} at ${hour}:00 New York: the charm ${charm ? 'asks' : 'does not ask'} and the briefing ` +
+        `${charm ? 'is not' : 'is'} written`);
+    }
+  }
+});
+
+
+/* The charm joins a network by waiting for an address or a refusal, and gives
+   up on a failed attempt by leaving it. That leaving arrives as a disconnect,
+   possibly once the next attempt has begun, and counted as a refusal it ends
+   that attempt before it is tried. So every file that marks a refusal on a
+   disconnect skips the reason her own leaving carries. Found, not listed, so
+   a third joiner is held too. */
+test('the charm never takes her own leaving for a network refusing her', () => {
+  const joiners = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
+    .filter(f => f.endsWith('.c') && /WIFI_EVENT_STA_DISCONNECTED/.test(source(f)) && /REFUSED\)/.test(source(f)));
+  assert.ok(joiners.length >= 2, `only ${joiners.length} files join a network — the reader has gone blind`);
+  for (const f of joiners) {
+    assert.match(source(f), /id == WIFI_EVENT_STA_DISCONNECTED &&\s*\(\(wifi_event_sta_disconnected_t \*\)data\)->reason != WIFI_REASON_ASSOC_LEAVE\)/,
+      `${f} marks a refusal on any disconnect, her own leaving included`);
+  }
+});
 
 /* ─── Every secret a function needs is one it refuses to run without ────────
    Each function answers 503 if a required secret is unset, rather than starting
@@ -1384,7 +1521,7 @@ const TRACKED = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filte
 /* Everything the repository is, as one string. THIS FILE IS EXCLUDED: with it
    in the corpus, every entry below would validate against its own exception. */
 const CODE = TRACKED
-  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml)$/.test(f) && f !== 'test/agree.test.mjs')
+  .filter(f => /\.(html|ts|gs|sql|mjs|toml|json|yml|c|h|py)$/.test(f) && f !== 'test/agree.test.mjs')
   .map(f => source(`${f}`)).join('\n');
 
 /* Backticked names that look like code — camelCase, snake_case, hyphenated,
@@ -1444,7 +1581,8 @@ test('the documents name only symbols the repository has', () => {
 
     for (const name of named) {
       // A name with a file extension is a FILE, checked against what git tracks.
-      if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md)$/.test(name)) {
+      // Checked by its last part, `net.h` would be found in any file holding an h.
+      if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md|c|h|py)$/.test(name)) {
         if (!TRACKED.some(f => f === name || f.endsWith('/' + name))) {
           missing.push(`${doc}: ${name} (no such file)`);
         }
@@ -2671,7 +2809,7 @@ test('the test count the instructions state is the count the suite runs', () => 
   assert.equal(Number(stated[1]), total,
     `CLAUDE.md says ${stated[1]} tests and the suite runs ${total}`);
 
-  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
   assert.equal(stated[2], WORDS[files.length],
     `CLAUDE.md says ${stated[2]} suites and test/ holds ${files.length} — the ` +
     `script globs one level, so a fifth suite is either running unmentioned or ` +

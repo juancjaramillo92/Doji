@@ -1,0 +1,9 @@
+## The board's own support package (screen, touch, codecs, power chip) and the
+## LVGL it was built against, at the versions Waveshare's examples use.
+dependencies:
+  idf:
+    version: ">=5.5"
+  waveshare/esp32_s3_touch_amoled_1_75c:
+    version: "^3.0.0"
+  lvgl/lvgl:
+    version: "9.5.0"
