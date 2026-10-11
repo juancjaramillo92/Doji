@@ -11,7 +11,10 @@
    and he talks to her (talk.c); a trade that came in while she spoke puts its
    questions up once she is done, and then she sleeps. AWAKE_MS without a tap
    puts her to sleep: her eyes close and the chip stops (sleep.c). Lifting her
-   to look wakes her (motion.c), and so do a tap, PWR and BOOT. A lift that was not him looking — a swing, a
+   to look wakes her (motion.c), and so do a tap, PWR and BOOT. With no
+   internet when she last looked she stays on her lock screen, its mark saying
+   why, unless the network answers within OFFLINE_TRY_MS; and losing it while
+   they talk sends her back there. A lift that was not him looking — a swing, a
    bump — sends her straight back to sleep without lighting the screen, and
    rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
    cannot keep waking her.
@@ -60,10 +63,11 @@ static const char *TAG = "charm";
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
+#define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
 
-// What waits, what the sleep screen last drew, and when the next errand is;
-// all kept through sleep.
-static RTC_DATA_ATTR bool briefing_waits, trade_waits;
+// What waits, whether the internet answered last time, what the sleep screen
+// last drew, and when the next errand is; all kept through sleep.
+static RTC_DATA_ATTR bool briefing_waits, trade_waits, offline;
 static RTC_DATA_ATTR int drawn = -1;
 static RTC_DATA_ATTR time_t errand_at;
 
@@ -104,16 +108,15 @@ static void light_eugenia(void) { light(FACE_THINKING); }
    sensor armed. */
 static void sleep_now(void) {
     int charge = power_charge();
-    bool tired = power_low();
-    int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
+    bool low = power_low();
+    int marks = briefing_waits | trade_waits << 1 | low << 2 | offline << 3 | (charge + 1) << 4;
     if (lit && face_get_mode() != FACE_DARK) {
         face_set_mode(FACE_ASLEEP);
         vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
     }
     if (lit || marks != drawn) {
         light(FACE_DARK);
-        face_set_tired(tired);
-        face_set_marks(briefing_waits, trade_waits, charge);
+        face_set_marks(briefing_waits, trade_waits, low, offline, charge);
         face_set_mode(FACE_DARK);
         vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
         drawn = marks;
@@ -134,7 +137,8 @@ static bool trade_came(void) {
 // In the dark: what waits for Gladys, and in its hours whether the briefing has.
 static void errand(void) {
     net_start();
-    if (net_wait(NET_ALL_MS)) {
+    offline = !net_wait(NET_ALL_MS);
+    if (!offline) {
         ota_confirm();
         bool tick = trade_came(), ask = briefing_due(time(NULL));
         if (tick || ask) {
@@ -160,12 +164,28 @@ static void errand(void) {
 static void journal(void) {
     int left = gladys_journal();
     if (left >= 0) trade_waits = left > 0;
+    else offline = !net_wait(0);
+}
+
+// Her door out of reach because the network is: back to the lock screen,
+// where the no-internet mark says why.
+static void sleep_if_offline(int status) {
+    if (status < 0 && !net_wait(0)) {
+        offline = true;
+        sleep_now();
+    }
 }
 
 static void awake(void) {
+    // Joining runs beside everything else: she listens while it does, and
+    // waits for it only to send. Offline when she last looked, nothing lights
+    // unless it answers now.
+    net_start();
+    if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
+    offline = false;
+
     // A trade waiting: the screen stays dark until its questions cover it.
     bool trade = trade_waits;
-    face_set_tired(power_low());
     light(trade ? FACE_DARK : FACE_IDLE);
     bsp_display_lock(-1);
     lv_obj_t *screen = lv_screen_active();
@@ -174,9 +194,6 @@ static void awake(void) {
     for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
     bsp_display_unlock();
 
-    // Joining runs beside everything else: she listens while it does, and
-    // waits for it only to send.
-    net_start();
     sound_start();
     sound_volume(cfg.volume);
     if (esp_reset_reason() == ESP_RST_POWERON) sound_chime();  // switched on, not woken or restarted
@@ -190,7 +207,9 @@ static void awake(void) {
     bool spoke = false;
     if (briefing_waits) {
         briefing_waits = false;
-        spoke = talk_briefing();
+        int status = talk_briefing();
+        sleep_if_offline(status);
+        spoke = status == 200;
     }
 
     for (;;) {
@@ -201,7 +220,9 @@ static void awake(void) {
             sleep_now();
         }
         if (!ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(AWAKE_MS))) sleep_now();
-        spoke = talk();
+        int status = talk();
+        sleep_if_offline(status);
+        spoke = status == 200;
     }
 }
 

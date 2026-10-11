@@ -66,9 +66,7 @@ static bool knock(const char *body, trade_t *t) {
         .timeout_ms = READ_MS,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
-    bool online = net_wait(NET_ALL_MS);
-    face_set_offline(!online);
-    if (!online) return false;
+    if (!net_wait(NET_ALL_MS)) return false;
     esp_http_client_handle_t h = esp_http_client_init(&c);
     esp_http_client_set_header(h, "x-charm-key", cfg.gladys_key);
     if (body) esp_http_client_set_header(h, "Content-Type", "application/json");

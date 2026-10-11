@@ -2644,20 +2644,25 @@ down; going to sleep, her eyes close slowly. Only the face's own patch is
 redrawn on a frame; the ring — Doji's purples turning slowly round the rim — is
 the only thing that redraws the full screen, and only while it shows. **Nothing
 flashes between screens**: whatever comes up first is the only thing seen, so
-no face shows for a moment before the journal's questions or after them. No network shows
-a small mark under her face, so a confused look always has its reason. The
-design was settled in playgrounds before any of this — the claude.ai artifacts
+no face shows for a moment before the journal's questions or after them. Her
+state — a low battery, no internet — is never an expression on her face; it is
+a mark on the sleep screen. The design was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
 numbers here are theirs.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
-panel while the chip sleeps: Eugenia's purple dot while a briefing waits and
-Gladys's — the light silver of her fur, since grey on black reads as a smudge
-— while a trade does, low on the screen with a glow, side by side when both
-wait; a small battery at the top when she is below 15% and off the cable; and
-on the cable, the charge as a ring round the rim with its percent. The dots and
-the battery wander a few pixels each time she sleeps, so a mark left all night
-never burns in.
+panel while the chip sleeps. Low on the screen, **one mark for what waits**:
+a purple dot with a glow while a briefing does, a white ring while a trade
+does, and the dot inside the ring when both do — one place and one size each,
+so nothing moves or shrinks when the other arrives, and shape tells them apart
+at a glance. At the top, a small battery when she is below 15% and off the
+cable, and the **no-internet mark** when her last look for a network found
+none, side by side when both. On the cable, the charge as a ring round the rim
+with its percent. The marks wander a few pixels each time she sleeps, so a mark
+left all night never burns in. **Woken without internet** — the last errand
+found none — she stays on that screen rather than waking to a face that cannot
+answer: she tries the network for eight seconds, wakes properly if it answers,
+and otherwise sleeps again with the mark still up.
 
 **The setup is the only way anything gets onto a board**, the playground's
 (*Charm setup*). With no Wi-Fi network or without both keys — a board fresh
@@ -2734,8 +2739,9 @@ dropped. The recording goes to her door as 16 kHz WAV and the answer is played
 as it streams in (*The charm — her voice on his keyring*): her face thinks
 through the silence and speaks when her voice starts, since the silence is
 exact zeros. A tap while she thinks or speaks cuts her off; the copy in
-Telegram is the whole of it. A door that cannot be reached or refuses her key
-shows her confused for four seconds.
+Telegram is the whole of it. Losing the network sends her back to the sleep
+screen, where the no-internet mark says why; a door that answers with an
+error, or refuses her key, shows her confused for four seconds.
 
 **The journal asks what waits**, through Gladys's door, and while a
 trade waits the questions take the whole screen, the playground's: the setup
@@ -2770,8 +2776,7 @@ chime. It also reaches the chip, high while pressed, on GPIO3, so a press wakes
 her from sleep and the charm times the hold itself: at a second and a half,
 awake or just woken by it, she closes her eyes and switches the board off
 through the power chip, whose own switch-off is set to its longest, ten
-seconds, so the goodnight always comes first. Below 15% off the cable, her idle
-face is sleepy, the hint to charge her.
+seconds, so the goodnight always comes first.
 
 **To check on the real board first**: that the panel keeps the sleep screen
 while the chip sleeps, that the touch controller wakes it (the BOOT button

@@ -95,10 +95,7 @@ static int knock(const char *url, const uint8_t *wav, size_t len, void (*lit)(vo
         .timeout_ms = READ_MS,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
-    // Her mark under the face says whether the network is why she cannot answer.
-    bool online = net_wait(NET_ALL_MS);
-    face_set_offline(!online);
-    if (!online) return -1;
+    if (!net_wait(NET_ALL_MS)) return -1;
     esp_http_client_handle_t h = esp_http_client_init(&c);
     esp_http_client_set_header(h, "x-charm-key", cfg.eugenia_key);
     if (wav) esp_http_client_set_header(h, "Content-Type", "audio/wav");
@@ -130,7 +127,7 @@ static void confused(void) {
     vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
 }
 
-bool talk(void) {
+int talk(void) {
     static uint8_t *wav;
     if (!wav) wav = heap_caps_malloc(WAV_HEADER + MAX_SAMPLES * 2, MALLOC_CAP_SPIRAM);
 
@@ -140,24 +137,24 @@ bool talk(void) {
     began = xTaskGetTickCount();
     size_t got = sound_record((int16_t *)(wav + WAV_HEADER), MAX_SAMPLES, heard);
     face_set_level(0);
-    if (!spoke) { face_set_mode(FACE_IDLE); return false; }
+    if (!spoke) { face_set_mode(FACE_IDLE); return 0; }
 
     face_set_mode(FACE_THINKING);
     wav_header(wav, got);
-    bool answered = knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2, NULL) == 200;
-    if (!answered) confused();
+    int status = knock(EUGENIA_DOOR, wav, WAV_HEADER + got * 2, NULL);
+    if (status > 0 && status != 200) confused();
     face_set_mode(FACE_IDLE);
-    return answered;
+    return status;
 }
 
 bool talk_ready(void (*lit)(void)) {
     return knock(EUGENIA_DOOR "?briefing=ready", NULL, 0, lit) == 200;
 }
 
-bool talk_briefing(void) {
+int talk_briefing(void) {
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
-    if (status != 200 && status != 204) confused();
+    if (status > 0 && status != 200 && status != 204) confused();
     face_set_mode(FACE_IDLE);
-    return status == 200;
+    return status;
 }

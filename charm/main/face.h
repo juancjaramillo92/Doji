@@ -10,7 +10,7 @@ typedef enum {
     FACE_LISTENING,  // he is talking: eyes up, the ring follows his voice
     FACE_SPEAKING,   // she is talking: the mouth follows her voice
     FACE_THINKING,   // her answer is on its way: up and away, the thought dots
-    FACE_CONFUSED,   // something went wrong: a door refused, no network
+    FACE_CONFUSED,   // something went wrong: her door refused
     FACE_ASLEEP,     // going to sleep: the eyes close slowly
     FACE_DARK,       // the sleep screen: black but for its marks
 } face_mode_t;
@@ -29,17 +29,13 @@ face_mode_t face_get_mode(void);
 // mouth while speaking.
 void face_set_level(float level);
 
-/* The battery is low and nothing is charging it: awake and idle she looks
-   sleepy, and the sleep screen shows a small battery. */
-void face_set_tired(bool tired);
-
-// No network: a small mark under her face, so a confused look has its reason.
-void face_set_offline(bool offline);
-
-/* What the sleep screen shows: Eugenia's purple dot while a briefing waits,
-   Gladys's white one while a trade does, and while the cable charges her the
-   battery as a ring round the rim with its percent; charge is -1 otherwise. */
-void face_set_marks(bool briefing, bool trade, int charge);
+/* What the sleep screen shows. Low on it, one mark for what waits: a purple
+   dot while a briefing does, a white ring while a trade does, the dot inside
+   the ring for both. At the top, a small battery when it is `low` and nothing
+   charges it, and the no-internet mark when `offline`. While the cable
+   charges her, the battery as a ring round the rim with its percent; charge
+   is -1 otherwise. */
+void face_set_marks(bool briefing, bool trade, bool low, bool offline, int charge);
 
 /* Doji's purples round the rim, from the top for `part` of a turn, `turn`
    spinning the colours: her listening ring, the charge, the journal's done. */

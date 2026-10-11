@@ -59,7 +59,7 @@ static lv_obj_t *card, *night;
 
 static volatile face_mode_t mode = FACE_IDLE;
 static volatile float level;
-static volatile bool tired, offline, briefing_waits, trade_waits;
+static volatile bool briefing_waits, trade_waits, low, offline;
 static volatile int charge = -1;
 
 // What is on screen, eased toward what the mode asks for.
@@ -74,9 +74,9 @@ static int shift[2];
 void face_set_mode(face_mode_t m) { mode = m; }
 face_mode_t face_get_mode(void) { return mode; }
 void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
-void face_set_tired(bool t) { tired = t; }
-void face_set_offline(bool o) { offline = o; }
-void face_set_marks(bool b, bool t, int c) { briefing_waits = b; trade_waits = t; charge = c; }
+void face_set_marks(bool b, bool t, bool l, bool o, int c) {
+    briefing_waits = b; trade_waits = t; low = l; offline = o; charge = c;
+}
 
 static float rnd(void) { return (float)esp_random() / 4294967295.0f; }
 
@@ -151,19 +151,37 @@ void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, flo
     }
 }
 
-// No network: the arcs of a signal, struck through, under her face.
-static void draw_offline(lv_layer_t *layer) {
+// No internet: the arcs of a signal, struck through.
+static void draw_offline(lv_layer_t *layer, int x, int y) {
     lv_draw_arc_dsc_t a;
     lv_draw_arc_dsc_init(&a);
-    a.center.x = 233; a.center.y = 416;
+    a.center.x = x; a.center.y = y + 6;
     a.width = 2; a.rounded = 1; a.color = lv_color_hex(MUTED);
     a.start_angle = 225; a.end_angle = 315;
     for (int r = 5; r <= 15; r += 5) { a.radius = r; lv_draw_arc(layer, &a); }
     lv_draw_line_dsc_t l;
     lv_draw_line_dsc_init(&l);
-    l.p1.x = 222; l.p1.y = 401; l.p2.x = 244; l.p2.y = 419;
+    l.p1.x = x - 11; l.p1.y = y - 9; l.p2.x = x + 11; l.p2.y = y + 9;
     l.width = 2; l.round_start = 1; l.round_end = 1; l.color = lv_color_hex(GLOW);
     lv_draw_line(layer, &l);
+}
+
+// Low and nothing charging: a small battery with a sliver left.
+static void draw_low(lv_layer_t *layer, int bx, int by) {
+    lv_draw_rect_dsc_t d;
+    lv_draw_rect_dsc_init(&d);
+    d.bg_opa = LV_OPA_TRANSP; d.radius = 4;
+    d.border_color = lv_color_hex(MUTED); d.border_width = 2; d.border_opa = LV_OPA_COVER;
+    lv_area_t body = { bx - 16, by - 8, bx + 14, by + 8 };
+    lv_draw_rect(layer, &d, &body);
+    lv_draw_rect_dsc_init(&d);
+    d.bg_color = lv_color_hex(MUTED); d.radius = 1;
+    lv_area_t nub = { bx + 15, by - 3, bx + 18, by + 3 };
+    lv_draw_rect(layer, &d, &nub);
+    d.bg_color = lv_color_hex(GLOW); d.radius = 2;
+    d.shadow_color = lv_color_hex(GLOW); d.shadow_width = 8; d.shadow_opa = 200;
+    lv_area_t left = { bx - 13, by - 5, bx - 7, by + 5 };
+    lv_draw_rect(layer, &d, &left);
 }
 
 static void draw_face(lv_event_t *e) {
@@ -225,55 +243,46 @@ static void draw_face(lv_event_t *e) {
                 (lv_opa_t)(255 * V.dots * (0.25f + 0.75f * pulse)));
         }
     }
-    if (offline) draw_offline(layer);
 
     // The ring on the rim, while listening, follows his voice.
     if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / 1800.0f, 0.35f + 0.65f * V.ring);
 }
 
-/* A mark of the sleep screen: a still dot with a glow, purple for Eugenia,
-   the light silver of Gladys's fur at its brightest for her, since grey on
-   black reads as a smudge. */
-static void mark(lv_layer_t *layer, int x, int y, int r, uint32_t color, uint32_t glow, lv_opa_t opa) {
-    lv_draw_rect_dsc_t d;
-    lv_draw_rect_dsc_init(&d);
-    d.bg_color = lv_color_hex(color);
-    d.radius = LV_RADIUS_CIRCLE;
-    d.shadow_color = lv_color_hex(glow);
-    d.shadow_opa = opa;
-    d.shadow_width = 26;
-    lv_area_t a = { x - r, y - r, x + r, y + r };
-    lv_draw_rect(layer, &d, &a);
-}
-
-/* The sleep screen, still, so it stays on the panel while the chip sleeps: the
-   dots low on the screen, side by side when both wait; a small battery at the
-   top when low; on the cable, the charge round the rim. All but the ring
-   wander a few pixels each time she sleeps. */
+/* The sleep screen, still, so it stays on the panel while the chip sleeps.
+   Low on the screen, one mark for what waits: Eugenia's purple dot with a
+   glow for a briefing, a white ring for a trade, the dot inside the ring for
+   both — one place and one size each, so nothing moves or shrinks when the
+   other arrives, and shape tells them apart. At the top, a small battery when
+   low and the no-internet mark when offline, side by side when both. On the
+   cable, the charge round the rim. All but the ring wander a few pixels each
+   time she sleeps. */
 static void draw_night(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     int x = 233 + shift[0], y = 404 + shift[1];
-    bool both = briefing_waits && trade_waits;
-    if (briefing_waits) mark(layer, both ? x - 15 : x, y, both ? 9 : 11, GLOW, ACCENT, 230);
-    if (trade_waits) mark(layer, both ? x + 15 : x, y, both ? 9 : 11, 0xeeecf4, INK, 190);
-
-    if (tired && charge < 0) {
-        int bx = 233 + shift[0], by = 62 + shift[1];
+    if (trade_waits) {
+        lv_draw_arc_dsc_t a;
+        lv_draw_arc_dsc_init(&a);
+        a.center.x = x; a.center.y = y;
+        a.radius = 19; a.width = 3; a.start_angle = 0; a.end_angle = 360;
+        a.color = lv_color_hex(0xeeecf4);
+        lv_draw_arc(layer, &a);
+    }
+    if (briefing_waits) {
         lv_draw_rect_dsc_t d;
         lv_draw_rect_dsc_init(&d);
-        d.bg_opa = LV_OPA_TRANSP; d.radius = 4;
-        d.border_color = lv_color_hex(MUTED); d.border_width = 2; d.border_opa = LV_OPA_COVER;
-        lv_area_t body = { bx - 16, by - 8, bx + 14, by + 8 };
-        lv_draw_rect(layer, &d, &body);
-        lv_draw_rect_dsc_init(&d);
-        d.bg_color = lv_color_hex(MUTED); d.radius = 1;
-        lv_area_t nub = { bx + 15, by - 3, bx + 18, by + 3 };
-        lv_draw_rect(layer, &d, &nub);
-        d.bg_color = lv_color_hex(GLOW); d.radius = 2;
-        d.shadow_color = lv_color_hex(GLOW); d.shadow_width = 8; d.shadow_opa = 200;
-        lv_area_t left = { bx - 13, by - 5, bx - 7, by + 5 };
-        lv_draw_rect(layer, &d, &left);
+        d.bg_color = lv_color_hex(GLOW);
+        d.radius = LV_RADIUS_CIRCLE;
+        d.shadow_color = lv_color_hex(ACCENT);
+        d.shadow_opa = 230;
+        d.shadow_width = 22;
+        lv_area_t a = { x - 9, y - 9, x + 9, y + 9 };
+        lv_draw_rect(layer, &d, &a);
     }
+
+    bool tired = low && charge < 0, both = tired && offline;
+    int top = 62 + shift[1];
+    if (tired) draw_low(layer, both ? x - 22 : x, top);
+    if (offline) draw_offline(layer, both ? x + 22 : x, top);
 
     if (charge >= 0) {
         lv_draw_arc_dsc_t a;
@@ -324,7 +333,7 @@ static void tick(lv_timer_t *t) {
     if (dark) {
         // Redrawn only when a mark changes: the panel holds the rest.
         static int drawn = -1;
-        int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
+        int marks = briefing_waits | trade_waits << 1 | low << 2 | offline << 3 | (charge + 1) << 4;
         if (marks != drawn) lv_obj_invalidate(night);
         drawn = marks;
         return;
@@ -336,7 +345,6 @@ static void tick(lv_timer_t *t) {
     static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
-    if (m == FACE_IDLE && tired) { t_open = 0.42f; t_smile = 0.6f; glance = 0.3f; }
     if (m == FACE_LISTENING) { t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up; }
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
     if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
@@ -374,11 +382,11 @@ static void tick(lv_timer_t *t) {
     V.confused = ease(V.confused, t_confused, 8, dt);
 
     // The ring needs the whole screen; everything else lives in the face's
-    // patch, the thought dots' and the offline mark's.
+    // patch and the thought dots'.
     bool ring_on = V.ring > 0.02f;
     if (ring_on || ring_was_on) lv_obj_invalidate(lv_screen_active());
     else {
-        static const lv_area_t patches[] = { { 110, 175, 356, 300 }, { 195, 30, 272, 62 }, { 215, 395, 251, 425 } };
+        static const lv_area_t patches[] = { { 110, 175, 356, 300 }, { 195, 30, 272, 62 } };
         for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
     ring_was_on = ring_on;
