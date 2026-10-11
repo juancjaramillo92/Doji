@@ -177,10 +177,15 @@ static void dns_task(void *arg) {
     }
 }
 
+// Her own leaving is no refusal, as in net.c; join() marks her offline itself.
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
-    (void)arg; (void)data;
+    (void)arg;
     if (base == WIFI_EVENT && id == WIFI_EVENT_AP_STACONNECTED) show(SHOW_JOINED, NULL);
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) { online = false; xEventGroupSetBits(events, REFUSED); }
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
+        ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) {
+        online = false;
+        xEventGroupSetBits(events, REFUSED);
+    }
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) { online = true; xEventGroupSetBits(events, JOINED); }
 }
 
@@ -216,6 +221,7 @@ static void start_network(void) {
 // Joins one network, keeping her own up beside it. True once it gave an address.
 static bool join(const char *ssid, const char *pass) {
     esp_wifi_disconnect();
+    online = false;
     wifi_config_t sta = { 0 };
     memcpy(sta.sta.ssid, ssid, strlen(ssid));
     memcpy(sta.sta.password, pass, strlen(pass));

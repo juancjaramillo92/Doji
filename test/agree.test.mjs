@@ -1349,6 +1349,22 @@ test('the charm asks for the briefing in the hours it is written', () => {
 });
 
 
+/* The charm joins a network by waiting for an address or a refusal, and gives
+   up on a failed attempt by leaving it. That leaving arrives as a disconnect,
+   possibly once the next attempt has begun, and counted as a refusal it ends
+   that attempt before it is tried. So every file that marks a refusal on a
+   disconnect skips the reason her own leaving carries. Found, not listed, so
+   a third joiner is held too. */
+test('the charm never takes her own leaving for a network refusing her', () => {
+  const joiners = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
+    .filter(f => f.endsWith('.c') && /WIFI_EVENT_STA_DISCONNECTED/.test(source(f)) && /REFUSED\)/.test(source(f)));
+  assert.ok(joiners.length >= 2, `only ${joiners.length} files join a network — the reader has gone blind`);
+  for (const f of joiners) {
+    assert.match(source(f), /id == WIFI_EVENT_STA_DISCONNECTED &&\s*\(\(wifi_event_sta_disconnected_t \*\)data\)->reason != WIFI_REASON_ASSOC_LEAVE\)/,
+      `${f} marks a refusal on any disconnect, her own leaving included`);
+  }
+});
+
 /* ─── Every secret a function needs is one it refuses to run without ────────
    Each function answers 503 if a required secret is unset, rather than starting
    and authorising nobody. The guard is a hand-written list, so this reads the

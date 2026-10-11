@@ -384,6 +384,7 @@ single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, and her charm's `SETUPS` in `charm/main/gladys.c` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order |
 | the **app's colours on the charm** | `index.html`'s tokens, and their copies in `charm/main/palette.h`, each beside the token it copies, and in `charm/main/setup.html`'s `:root` under the app's own names |
+| the **disconnect that is the charm's own** | each charm file that joins a network — `charm/main/net.c` and `charm/main/setup.c` — skipping `WIFI_REASON_ASSOC_LEAVE` where it marks a refusal, so leaving a failed attempt cannot end the next |
 | the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c`, `charm/main/dial.c`, `charm/main/face.c` and `charm/main/setup.c` |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
@@ -2627,7 +2628,8 @@ controller's reset are held through sleep, so the sleep screen needs no chip
 awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
 in the background**, the network she was last on first, asked directly on its
 own channel and access point so no scan is needed, then each saved one in
-turn; nothing waits for it but the moment something must be sent.
+turn; nothing waits for it but the moment something must be sent. Leaving an
+attempt that failed is never taken for the next network refusing her.
 
 **Asleep, she runs errands in the dark** every five minutes, around the clock,
 and on the cable every two so the charge stays current. She asks Gladys's door
@@ -2691,10 +2693,11 @@ always does), that the power chip's registers are where Waveshare's example and
 the datasheet put them (the switch-off, the cable and the battery), that the
 motion sensor's wake-on-motion is set as its datasheet has it and which way its
 z axis faces the screen, the readings `lift.c` judges a lift by, that the
-Storage API takes the secret key the workflow publishes with, that a phone stays on her setup network while she joins another —
-the two share one radio, so her own moves to the other's channel — whether a
-full-screen swipe is smooth enough to replace the journal's taps, and how long
-a battery lasts.
+Storage API takes the secret key the workflow publishes with, that her own
+leaving of a network reports `WIFI_REASON_ASSOC_LEAVE`, that a phone stays on
+her setup network while she joins another — the two share one radio, so her
+own moves to the other's channel — whether a full-screen swipe is smooth
+enough to replace the journal's taps, and how long a battery lasts.
 
 ---
 

@@ -29,9 +29,13 @@ static RTC_DATA_ATTR struct { char ssid[33]; uint8_t bssid[6]; uint8_t channel; 
 
 static EventGroupHandle_t events;
 
+/* Her own leaving, after an attempt that failed, is no network refusing her:
+   it can arrive once the next attempt has begun, and would end that one
+   before it is tried. */
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
-    (void)arg; (void)data;
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) xEventGroupSetBits(events, REFUSED);
+    (void)arg;
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
+        ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) xEventGroupSetBits(events, REFUSED);
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) xEventGroupSetBits(events, JOINED);
 }
 
