@@ -2,15 +2,16 @@
    the setup's, kept in flash; without them, or when asked by holding BOOT for
    five seconds (power.c), she shows the setup instead (setup.c).
 
-   She lives in short waking spells, and whoever is needed is who wakes —
-   decided before the screen lights, so waking is never a switch: Gladys when
-   a trade waits for its journal, Eugenia otherwise. Gladys journals it and
-   sleeps, unless a briefing waits too; only then does Eugenia slide in to read
-   it. Awake, a tap and he talks to Eugenia (talk.c); a trade that came in
-   while she spoke brings Gladys in once she is done, to journal it
-   (gladys.c), and then sleep. AWAKE_MS without a tap puts her to sleep: her
-   eyes close and the chip stops (sleep.c). Lifting her to look wakes her (motion.c), and
-   so do a tap, PWR and BOOT. A lift that was not him looking — a swing, a
+   She lives in short waking spells, and what waits decides what shows first,
+   before the screen lights, so nothing flashes on the way: a trade waiting
+   for its journal puts its questions up straight from the dark (gladys.c),
+   with no face before them; the journal ends on the dark, and she sleeps,
+   unless a briefing waits too, when Eugenia comes up from black to read it.
+   Otherwise Eugenia wakes, and reads a waiting briefing at once. Awake, a tap
+   and he talks to her (talk.c); a trade that came in while she spoke puts its
+   questions up once she is done, and then she sleeps. AWAKE_MS without a tap
+   puts her to sleep: her eyes close and the chip stops (sleep.c). Lifting her
+   to look wakes her (motion.c), and so do a tap, PWR and BOOT. A lift that was not him looking — a swing, a
    bump — sends her straight back to sleep without lighting the screen, and
    rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
    cannot keep waking her.
@@ -57,7 +58,6 @@ static const char *TAG = "charm";
 #define CHARGING_S    120    // on the cable, how often the charge is redrawn
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
-#define SLIDE_MS      500    // a switch, and a moment over
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
 
@@ -82,8 +82,8 @@ static void on_touch(lv_event_t *e) {
     if (code == LV_EVENT_SHORT_CLICKED && !dial_turned()) xTaskNotifyGive(life_task);
 }
 
-// The screen, started once, with `who` showing in `mode`.
-static void light(character_t who, face_mode_t mode) {
+// The screen, started once, in `mode`.
+static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
     sleep_release();
@@ -91,26 +91,27 @@ static void light(character_t who, face_mode_t mode) {
     bsp_display_brightness_set(BRIGHTNESS);
     face_set_mode(mode);
     bsp_display_lock(-1);
-    face_start(who);
+    face_start();
     bsp_display_unlock();
 }
 
 // Her briefing has landed: lit for Eugenia to say so.
-static void light_eugenia(void) { light(EUGENIA, FACE_THINKING); }
+static void light_eugenia(void) { light(FACE_THINKING); }
 
-/* Goodnight, when her face is showing, then the sleep screen — drawn only
-   when its marks differ from what the panel already holds — then deep sleep
-   until the next errand, the motion sensor armed. */
+/* Goodnight, when her face is showing — the journal leaves the dark already
+   up — then the sleep screen, drawn only when its marks differ from what the
+   panel already holds, then deep sleep until the next errand, the motion
+   sensor armed. */
 static void sleep_now(void) {
     int charge = power_charge();
     bool tired = power_low();
     int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
-    if (lit) {
+    if (lit && face_get_mode() != FACE_DARK) {
         face_set_mode(FACE_ASLEEP);
         vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
     }
     if (lit || marks != drawn) {
-        light(EUGENIA, FACE_DARK);
+        light(FACE_DARK);
         face_set_tired(tired);
         face_set_marks(briefing_waits, trade_waits, charge);
         face_set_mode(FACE_DARK);
@@ -155,16 +156,17 @@ static void errand(void) {
     sleep_now();
 }
 
-// Gladys journals what waits, and her dot follows what is left.
+// The journal of what waits; the sleep screen's mark follows what is left.
 static void journal(void) {
     int left = gladys_journal();
     if (left >= 0) trade_waits = left > 0;
 }
 
 static void awake(void) {
-    character_t who = trade_waits ? GLADYS : EUGENIA;
+    // A trade waiting: the screen stays dark until its questions cover it.
+    bool trade = trade_waits;
     face_set_tired(power_low());
-    light(who, FACE_IDLE);
+    light(trade ? FACE_DARK : FACE_IDLE);
     bsp_display_lock(-1);
     lv_obj_t *screen = lv_screen_active();
     static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED,
@@ -179,12 +181,11 @@ static void awake(void) {
     sound_volume(cfg.volume);
     if (esp_reset_reason() == ESP_RST_POWERON) sound_chime();  // switched on, not woken or restarted
 
-    // A press is for what waits first: Gladys's journal, then Eugenia's briefing.
-    if (who == GLADYS) {
+    // What waits goes first: the journal, then the briefing, which brings her
+    // face up from the dark the journal left.
+    if (trade) {
         journal();
         if (!briefing_waits) sleep_now();
-        face_switch(EUGENIA);
-        vTaskDelay(pdMS_TO_TICKS(SLIDE_MS));
     }
     bool spoke = false;
     if (briefing_waits) {
@@ -193,11 +194,9 @@ static void awake(void) {
     }
 
     for (;;) {
-        // A trade that came in while she spoke: Gladys, once she is done, and
-        // only then, so nothing interrupts her and nothing opens Gladys idle.
+        // A trade that came in while she spoke: its questions once she is done,
+        // and only then, so nothing interrupts her.
         if (spoke && trade_came()) {
-            face_switch(GLADYS);
-            vTaskDelay(pdMS_TO_TICKS(SLIDE_MS));
             journal();
             sleep_now();
         }
@@ -236,7 +235,7 @@ void app_main(void) {
              (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20), (int)woke);
 
     if (config_take_setup_request() || !config_ready()) {
-        light(EUGENIA, FACE_DARK);
+        light(FACE_DARK);
         setup_run();
     }
     // The stack holds a TLS handshake.

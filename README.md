@@ -62,7 +62,7 @@ supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the charm — see The charms
   main/main.c                           who wakes, her errands, and what a touch does
-  main/face.c                           both faces, drawn live, and the sleep screen
+  main/face.c                           her face, drawn live, and the sleep screen
   main/sound.c                          the speaker and both microphones
   main/config.c                         what the setup page saved, in her flash
   main/setup.c                          the setup, on her own Wi-Fi network
@@ -2604,9 +2604,10 @@ missing one and may not cut it for length. A trade still open gets no verdict.
 A Waveshare **ESP32-S3-Touch-AMOLED-1.75C** — a 466 × 466 round AMOLED (CO5300)
 with touch (CST9217), two microphones (ES7210), a speaker (ES8311), a power
 chip (AXP2101), a motion sensor (QMI8658), 16 MB of flash and 8 MB of PSRAM —
-in a hand-sized case on his keyring, with **both bots on it**: purple
-**Eugenia** and grey **Gladys**. A second board is a spare; the same firmware
-goes on any.
+in a hand-sized case on his keyring, carrying **both bots**: **Eugenia**,
+whose face it shows, and **Gladys's journal**, whose questions it asks without
+a face of their own — Gladys herself stays in Telegram. A second board is a
+spare; the same firmware goes on any.
 
 **The firmware is `charm/`, an ESP-IDF project**, built by
 `.github/workflows/charm.yml` in Espressif's ESP-IDF v5.5.4 image (pinned by
@@ -2632,18 +2633,18 @@ the bootloader at the wake after, to the app that was (`charm/main/ota.c`).
 Only a power-on chimes, so neither an update nor the setup's restart wakes
 anyone.
 
-**A face is a render plus a drawing.** Each character's render is a still
+**A face is a render plus a drawing.** Eugenia's render is a still
 466 × 466 image, embedded as the RGB565 bytes the screen draws
-(`charm/tools/art.py` makes them from `charm/art/*.png`), so nothing is decoded
+(`charm/tools/art.py` makes them from `charm/art/eugenia.png`), so nothing is decoded
 at boot. Her eyes, highlight, smile and cheeks are drawn live on top, measured
 from the render: blinks, glances, the mouth following the loudness of what
 plays; thinking, she looks up and away from one side to the other under three
 thought dots; when something goes wrong, her eyes go uneven and her smile turns
-down; delighted, her eyes curve and her cheeks go pinker; going to sleep, her
-eyes close slowly. Each character is on her own card, and **a switch slides one
-out and the other in**. Only the face's own patch is redrawn on a frame; the
-ring — Doji's purples turning slowly round the rim — and a switch are the only
-things that redraw the full screen, and only while they last. No network shows
+down; going to sleep, her eyes close slowly. Only the face's own patch is
+redrawn on a frame; the ring — Doji's purples turning slowly round the rim — is
+the only thing that redraws the full screen, and only while it shows. **Nothing
+flashes between screens**: whatever comes up first is the only thing seen, so
+no face shows for a moment before the journal's questions or after them. No network shows
 a small mark under her face, so a confused look always has its reason. The
 design was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
@@ -2697,13 +2698,14 @@ only when the screen is tilted up toward him and held still
 (`charm/main/lift.c`); a swing on the keyring or a bump in a pocket sends her
 straight back to sleep without lighting the screen, and rests the sensor for
 twenty seconds, so a keyring swinging all day cannot keep waking her.
-Who wakes is decided before the screen lights, so waking is never a switch:
-**Gladys when a trade waits** for its journal, Eugenia otherwise. Gladys
-journals it and goes back to sleep, unless a briefing waits too; only then does
-Eugenia slide in and read it (`?briefing=today`). Awake, a tap is for
-Eugenia, and **a trade that comes in while she speaks brings Gladys in once she
-is done** — asked after each answer and after the briefing, never during them —
-to journal it, and then she sleeps. Gladys never shows with nothing to journal.
+What shows first is decided before the screen lights: **a trade waiting puts
+its questions up straight from the dark**, with no face before them. The
+journal ends on the dark and she goes back to sleep, unless a briefing waits
+too; then Eugenia comes up from black and reads it at once
+(`?briefing=today`), as she does whenever she wakes with a briefing waiting.
+Awake, a tap is for Eugenia, and **a trade that comes in while she speaks puts
+its questions up once she is done** — asked after each answer and after the
+briefing, never during them — and then she sleeps.
 The panel's reset and select pins and the touch
 controller's reset are held through sleep, so the sleep screen needs no chip
 awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
@@ -2735,7 +2737,7 @@ exact zeros. A tap while she thinks or speaks cuts her off; the copy in
 Telegram is the whole of it. A door that cannot be reached or refuses her key
 shows her confused for four seconds.
 
-**Gladys journals what waits.** She asks her door, and while a
+**The journal asks what waits**, through Gladys's door, and while a
 trade waits the questions take the whole screen, the playground's: the setup
 split down the middle, **B&R** on the left and **S&R** on the right; then
 **RULES**, **SL** and **TP**, each one word on a screen whose left half is no
@@ -2744,10 +2746,12 @@ rather than a win's green and a loss's red, each brightening when tapped. Four
 dots at the top say what is answered. A tap on a half sends that one answer at
 once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
 and her door answers with what waits next, so the next trade follows without a
-pause. Done, the ring sweeps round once with a warm smile — delighted when
-every answer was a yes. With nothing waiting after all — journaled in Telegram
-since — she smiles. A minute without a tap and the rest waits for next time,
-with no smile, since nothing was done. Taps, not swipes: a swipe moves
+pause. Done, the journal's own screen: the four dots fill, a tick draws itself
+in and the ring sweeps round once — the tick light purple and the ring at full
+strength when every answer was a yes. Whatever ends it — done, a minute without
+a tap, nothing waiting after all because it was journaled in Telegram, her
+door out of reach — the journal gives way to the dark: the sleep screen is put
+up under it before it leaves. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
 typeface, Hanken Grotesk, made into the charm's four fonts by
 `charm/tools/fonts.sh` with only the letters they use.

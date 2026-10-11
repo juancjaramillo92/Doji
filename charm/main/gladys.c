@@ -37,10 +37,7 @@ static const struct { const char *key, *column; } ANSWERS[4] = {
 static const char *const SETUPS[2] = { "Break & Retest", "Support & Resistance" };
 
 #define READ_MS    15000
-#define HELLO_MS   1500
-#define DONE_MS    2600
-#define HAPPY_MS   1100
-#define CONFUSED_MS 4000
+#define FRAME_MS   50     // the dark reaching the screen before the journal leaves it
 
 static bool read_answer(const char *body, trade_t *t) {
     cJSON *root = cJSON_Parse(body);
@@ -101,15 +98,11 @@ int gladys_check(void) {
 
 int gladys_journal(void) {
     trade_t t;
-    bool reached = knock(NULL, &t);
-    bool all_yes = true, answered = false;
-    if (reached && t.waiting > 0) {
-        vTaskDelay(pdMS_TO_TICKS(HELLO_MS));  // her eyes open on him first
-        face_set_mode(FACE_DARK);
-    }
+    bool reached = knock(NULL, &t), shown = false, all_yes = true, answered = false;
     while (reached && t.waiting > 0) {
         int q = 0;
         while (q < 3 && !t.missing[q]) q++;
+        shown = true;
         int half = journal_ask(q, t.missing);
         if (half < 0) break;
         all_yes &= q == 0 || half;
@@ -119,17 +112,13 @@ int gladys_journal(void) {
         reached = knock(body, &t);
         answered = true;
     }
-    journal_hide();
-    if (!reached) {
-        face_set_mode(FACE_CONFUSED);
-        vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
-    } else if (answered && t.waiting == 0) {
-        face_set_mode(all_yes ? FACE_DELIGHTED : FACE_DONE);
-        vTaskDelay(pdMS_TO_TICKS(DONE_MS));
-    } else if (!answered && t.waiting == 0) {
-        face_set_mode(FACE_HAPPY);  // nothing waited after all: a smile
-        vTaskDelay(pdMS_TO_TICKS(HAPPY_MS));
+    if (reached && answered && t.waiting == 0) journal_done(all_yes);
+    // The journal gives way to the dark, never to a face: the sleep screen is
+    // put under it first, so taking it away shows nothing in between.
+    if (shown) {
+        face_set_mode(FACE_DARK);
+        vTaskDelay(pdMS_TO_TICKS(FRAME_MS));
     }
-    face_set_mode(FACE_IDLE);
+    journal_hide();
     return reached ? t.waiting : -1;
 }

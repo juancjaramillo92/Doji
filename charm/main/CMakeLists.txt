@@ -3,6 +3,6 @@ idf_component_register(
          gladys.c journal.c dial.c power.c hanken_64.c hanken_16.c hanken_36.c hanken_18.c
     INCLUDE_DIRS .
     # The art, embedded as the bytes the screen draws: charm/tools/art.py makes them.
-    EMBED_FILES ../art/eugenia.rgb565 ../art/gladys.rgb565 ../art/blush.argb
+    EMBED_FILES ../art/eugenia.rgb565 ../art/blush.argb
     # The setup's page, served as written.
     EMBED_TXTFILES setup.html)

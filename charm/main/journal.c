@@ -4,12 +4,15 @@
    Right is yes and left is no. Tapping a half rather than swiping: a swipe
    moves the whole screen, which this chip may not draw smoothly, so taps first
    until the real board says otherwise. It sits on LVGL's top layer, over her
-   face. */
+   face, and ends on a screen of its own: the dots filled, a tick drawn in and
+   the ring swept round once, so the journal never gives way to a face. */
 #include "journal.h"
 
+#include <math.h>
 #include "bsp/esp-bsp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "face.h"
 #include "lvgl.h"
 #include "palette.h"
 
@@ -34,10 +37,16 @@ static const uint32_t HALVES[3][2][2] = {
 
 #define ASK_MS   60000  // then she goes back to sleep, the rest left waiting
 #define FLASH_MS 260
+#define TICK_MS  420    // the tick drawing itself in
+#define SWEEP_MS 700    // the ring going round once
+#define DONE_MS  2600
 
-static lv_obj_t *root, *half[2], *half_word[2], *tag, *pill, *word, *dots[4];
+static lv_obj_t *root, *half[2], *half_word[2], *tag, *pill, *word, *dots[4], *done;
+static lv_timer_t *drawing;
 static QueueHandle_t taps;
 static int asked = -1;
+static uint32_t done_at;
+static bool all_yes;
 
 static void on_tap(lv_event_t *e) {
     (void)e;
@@ -74,6 +83,35 @@ static lv_obj_t *text(lv_obj_t *parent, const lv_font_t *font, uint32_t color, i
     return l;
 }
 
+/* The tick in two strokes, its box centred on the screen's centre, drawn in
+   over TICK_MS; the ring swept round over SWEEP_MS, brighter, and the tick
+   light purple, when every answer was a yes. */
+static void draw_done(lv_event_t *e) {
+    lv_layer_t *layer = lv_event_get_layer(e);
+    uint32_t t = lv_tick_elaps(done_at);
+    static const float at[3][2] = { { 203, 237 }, { 223, 257 }, { 263, 209 } };
+    float first = hypotf(20, 20), second = hypotf(40, 48);
+    float drawn = fminf(1, t / (float)TICK_MS) * (first + second);
+    lv_draw_line_dsc_t l;
+    lv_draw_line_dsc_init(&l);
+    l.width = 9; l.round_start = 1; l.round_end = 1;
+    l.color = lv_color_hex(all_yes ? GLOW : INK);
+    for (int s = 0; s < 2 && drawn > 0; s++) {
+        float len = s ? second : first, k = fminf(1, drawn / len);
+        l.p1.x = at[s][0]; l.p1.y = at[s][1];
+        l.p2.x = at[s][0] + (at[s + 1][0] - at[s][0]) * k;
+        l.p2.y = at[s][1] + (at[s + 1][1] - at[s][1]) * k;
+        lv_draw_line(layer, &l);
+        drawn -= len;
+    }
+    face_ring(layer, 231, 8, fminf(1, t / (float)SWEEP_MS), t / 1800.0f, all_yes ? 1 : 0.55f);
+}
+
+static void redraw(lv_timer_t *t) {
+    (void)t;
+    lv_obj_invalidate(done);
+}
+
 // Built on first use, under the display lock.
 static void build(void) {
     taps = xQueueCreate(1, sizeof(int));
@@ -99,13 +137,33 @@ static void build(void) {
         dots[i] = box(root, 0, 0, 10, 10, INK);
         lv_obj_set_style_radius(dots[i], LV_RADIUS_CIRCLE, 0);
     }
+
+    done = box(root, 0, 0, 466, 466, 0x000000);
+    lv_obj_set_style_bg_opa(done, LV_OPA_TRANSP, 0);
+    lv_obj_add_event_cb(done, draw_done, LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_add_flag(done, LV_OBJ_FLAG_HIDDEN);
+    drawing = lv_timer_create(redraw, 33, NULL);
+    lv_timer_pause(drawing);
+}
+
+// Where the four dots sit: answered purple, this one larger.
+static void place_dots(int q, const bool missing[4]) {
+    for (int i = 0; i < 4; i++) {
+        int r = i == q ? 5 : 4;
+        lv_obj_set_size(dots[i], 2 * r, 2 * r);
+        lv_obj_set_pos(dots[i], 233 + (i - 1.5f) * 22 - r, 34 - r);
+        lv_obj_set_style_bg_color(dots[i], lv_color_hex(!missing[i] ? ACCENT : INK), 0);
+        lv_obj_set_style_bg_opa(dots[i], !missing[i] || i == q ? LV_OPA_COVER : 56, 0);
+    }
 }
 
 int journal_ask(int q, const bool missing[4]) {
     bsp_display_lock(-1);
     if (!root) build();
     bool setup = q == 0;
+    lv_obj_add_flag(done, LV_OBJ_FLAG_HIDDEN);
     for (int i = 0; i < 2; i++) {
+        lv_obj_remove_flag(half[i], LV_OBJ_FLAG_HIDDEN);
         paint(half[i], setup ? 0 : 1 + i, false);
         lv_obj_set_style_text_color(half_word[i], lv_color_hex(INK), 0);
         if (setup) lv_obj_remove_flag(half_word[i], LV_OBJ_FLAG_HIDDEN);
@@ -125,13 +183,7 @@ int journal_ask(int q, const bool missing[4]) {
         lv_obj_align(pill, LV_ALIGN_TOP_MID, 0, 190);
         if (q != asked) lv_obj_fade_in(pill, 180, 0);
     }
-    for (int i = 0; i < 4; i++) {
-        int r = i == q ? 5 : 4;
-        lv_obj_set_size(dots[i], 2 * r, 2 * r);
-        lv_obj_set_pos(dots[i], 233 + (i - 1.5f) * 22 - r, 34 - r);
-        lv_obj_set_style_bg_color(dots[i], lv_color_hex(!missing[i] ? ACCENT : INK), 0);
-        lv_obj_set_style_bg_opa(dots[i], !missing[i] || i == q ? LV_OPA_COVER : 56, 0);
-    }
+    place_dots(q, missing);
     asked = q;
     lv_obj_remove_flag(root, LV_OBJ_FLAG_HIDDEN);
     bsp_display_unlock();
@@ -148,9 +200,27 @@ int journal_ask(int q, const bool missing[4]) {
     return side;
 }
 
+void journal_done(bool yes) {
+    static const bool none_missing[4] = { false, false, false, false };
+    bsp_display_lock(-1);
+    for (int i = 0; i < 2; i++) lv_obj_add_flag(half[i], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(tag, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pill, LV_OBJ_FLAG_HIDDEN);
+    place_dots(-1, none_missing);
+    all_yes = yes;
+    done_at = lv_tick_get();
+    lv_obj_remove_flag(done, LV_OBJ_FLAG_HIDDEN);
+    lv_timer_resume(drawing);
+    bsp_display_unlock();
+    vTaskDelay(pdMS_TO_TICKS(DONE_MS));
+}
+
 void journal_hide(void) {
     bsp_display_lock(-1);
-    if (root) lv_obj_add_flag(root, LV_OBJ_FLAG_HIDDEN);
+    if (root) {
+        lv_obj_add_flag(root, LV_OBJ_FLAG_HIDDEN);
+        lv_timer_pause(drawing);
+    }
     asked = -1;
     bsp_display_unlock();
 }

@@ -1,11 +1,9 @@
-/* The face: each of them as one still render, her eyes, mouth and cheeks
-   drawn live on top of it. Each sits on her own card, so a switch slides one
-   card out and the other in; the one showing has the live expression, the
-   other a resting one. Only the face's own patch of screen is redrawn on a
-   frame, which is what keeps it smooth on this chip — the ring and a switch
-   are the only things that redraw the full screen, and only while they last.
+/* The face: Eugenia as one still render, her eyes, mouth and cheeks drawn
+   live on top of it. Only the face's own patch of screen is redrawn on a
+   frame, which is what keeps it smooth on this chip — the ring is the only
+   thing that redraws the full screen, and only while it shows.
 
-   The sleep screen is a third layer over both: black but for its marks.
+   The sleep screen is a layer over her: black but for its marks.
 
    The numbers are the playgrounds' (claude.ai artifacts "Eugenia, on the
    charm" and "Your charm"), measured from each render, in pixels of the
@@ -28,19 +26,11 @@ typedef struct {
     float blush_l[2], blush_r[2];
 } face_geometry_t;
 
-static const face_geometry_t GEOMETRY[2] = {
-    [EUGENIA] = {
-        {168.9f, 230.0f}, {292.7f, 230.0f}, 12.59f, 13.5f,
-        {7.8f, -7.3f, 2.7f},
-        {231.9f, 254.6f}, 38.0f, 6.9f, 3.2f,
-        {164.3f, 262.6f}, {301.7f, 262.6f},
-    },
-    [GLADYS] = {
-        {169.2f, 230.0f}, {292.4f, 230.0f}, 12.53f, 13.44f,
-        {7.7f, -7.3f, 2.7f},
-        {231.9f, 254.9f}, 37.8f, 6.8f, 3.2f,
-        {164.7f, 263.1f}, {301.3f, 263.1f},
-    },
+static const face_geometry_t F = {
+    {168.9f, 230.0f}, {292.7f, 230.0f}, 12.59f, 13.5f,
+    {7.8f, -7.3f, 2.7f},
+    {231.9f, 254.6f}, 38.0f, 6.9f, 3.2f,
+    {164.3f, 262.6f}, {301.7f, 262.6f},
 };
 
 // Tunings from the playground's defaults.
@@ -48,21 +38,15 @@ static const face_geometry_t GEOMETRY[2] = {
 #define LOOK_RANGE      6.0f
 #define BLUSH           0.55f
 #define FRAME_MS        33
-#define SLIDE_MS        450
 #define SHIFT_X         8     // how far the sleep screen's marks wander, so none burns in
 #define SHIFT_Y         4
 
 extern const uint8_t eugenia_rgb565_start[] asm("_binary_eugenia_rgb565_start");
-extern const uint8_t gladys_rgb565_start[]  asm("_binary_gladys_rgb565_start");
 extern const uint8_t blush_argb_start[]     asm("_binary_blush_argb_start");
 
-static lv_image_dsc_t art_dsc[2] = {
-    [EUGENIA] = { .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565,
-                              .w = 466, .h = 466, .stride = 466 * 2 },
-                  .data_size = 466 * 466 * 2 },
-    [GLADYS]  = { .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565,
-                              .w = 466, .h = 466, .stride = 466 * 2 },
-                  .data_size = 466 * 466 * 2 },
+static lv_image_dsc_t art_dsc = {
+    .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565, .w = 466, .h = 466, .stride = 466 * 2 },
+    .data_size = 466 * 466 * 2,
 };
 
 static lv_image_dsc_t blush_dsc = {
@@ -71,29 +55,24 @@ static lv_image_dsc_t blush_dsc = {
     .data_size = 52 * 44 * 4,
 };
 
-static lv_obj_t *card[2], *night;
-static character_t who;
+static lv_obj_t *card, *night;
 
 static volatile face_mode_t mode = FACE_IDLE;
-static volatile character_t wanted;
 static volatile float level;
 static volatile bool tired, offline, briefing_waits, trade_waits;
 static volatile int charge = -1;
 
 // What is on screen, eased toward what the mode asks for.
-static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused, happy; } V = { .open = 0, .smile = 1 };
+static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused; } V = { .open = 0, .smile = 1 };
 static float gaze[2];
-static uint32_t next_glance, next_blink, blink_at, slide_at;
+static uint32_t next_glance, next_blink, blink_at;
 static float lid = 1;  // the blink, on top of how open the mode wants the eyes
-static bool blinking, ring_was_on, was_done, sliding;
-static float sweep = 1;  // how much of the ring is drawn, from the top
+static bool blinking, ring_was_on;
 static bool dark;
-static face_mode_t shown;
 static int shift[2];
-static int32_t ox;       // the card being drawn's place: it moves while sliding
 
-void face_switch(character_t c) { wanted = c; }
 void face_set_mode(face_mode_t m) { mode = m; }
+face_mode_t face_get_mode(void) { return mode; }
 void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
 void face_set_tired(bool t) { tired = t; }
 void face_set_offline(bool o) { offline = o; }
@@ -117,7 +96,6 @@ static float ease(float v, float t, float rate, float dt) {
    the same circle below; a straight mouth is a line. */
 static void draw_curve(lv_layer_t *layer, float cx, float y, float half, float sag,
                        float width, lv_color_t color) {
-    cx += ox;
     if (fabsf(sag) < 0.6f) {
         lv_draw_line_dsc_t d;
         lv_draw_line_dsc_init(&d);
@@ -147,16 +125,15 @@ static void dot(lv_layer_t *layer, float cx, float cy, float rx, float ry,
     lv_draw_rect_dsc_t d;
     lv_draw_rect_dsc_init(&d);
     d.bg_color = color; d.bg_opa = opa; d.radius = LV_RADIUS_CIRCLE;
-    lv_area_t a = { lroundf(ox + cx - rx), lroundf(cy - ry), lroundf(ox + cx + rx), lroundf(cy + ry) };
+    lv_area_t a = { lroundf(cx - rx), lroundf(cy - ry), lroundf(cx + rx), lroundf(cy + ry) };
     lv_draw_rect(layer, &d, &a);
 }
 
-/* Doji's purples round the rim: LVGL draws no conic gradient, so a ring is
-   short arcs, each the colour of its place. `turn` spins the colours. */
+// Short arcs, each the colour of its place: LVGL draws no conic gradient.
 static const uint32_t RING[] = { DEEP, ACCENT, GLOW, VIOLET, DEEP };
 #define RING_STEPS 36
 
-static void draw_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa) {
+void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa) {
     int steps = (int)ceilf(RING_STEPS * part);
     for (int i = 0; i < steps; i++) {
         float at = fmodf((float)i / RING_STEPS + turn, 1.0f) * 4;
@@ -178,53 +155,39 @@ static void draw_ring(lv_layer_t *layer, int32_t radius, int32_t width, float pa
 static void draw_offline(lv_layer_t *layer) {
     lv_draw_arc_dsc_t a;
     lv_draw_arc_dsc_init(&a);
-    a.center.x = ox + 233; a.center.y = 416;
+    a.center.x = 233; a.center.y = 416;
     a.width = 2; a.rounded = 1; a.color = lv_color_hex(MUTED);
     a.start_angle = 225; a.end_angle = 315;
     for (int r = 5; r <= 15; r += 5) { a.radius = r; lv_draw_arc(layer, &a); }
     lv_draw_line_dsc_t l;
     lv_draw_line_dsc_init(&l);
-    l.p1.x = ox + 222; l.p1.y = 401; l.p2.x = ox + 244; l.p2.y = 419;
+    l.p1.x = 222; l.p1.y = 401; l.p2.x = 244; l.p2.y = 419;
     l.width = 2; l.round_start = 1; l.round_end = 1; l.color = lv_color_hex(GLOW);
     lv_draw_line(layer, &l);
 }
 
 static void draw_face(lv_event_t *e) {
-    character_t c = (character_t)(intptr_t)lv_event_get_user_data(e);
-    const face_geometry_t *F = &GEOMETRY[c];
     lv_layer_t *layer = lv_event_get_layer(e);
-    lv_area_t at;
-    lv_obj_get_coords(card[c], &at);
-    ox = at.x1;
-
-    // The one not showing rests: eyes open, her smile, her cheeks.
-    bool live = c == who;
-    float open = live ? V.open * lid : 1, smile = live ? V.smile : 1, blush = live ? V.blush : BLUSH;
-    float gx = live ? V.gx : 0, gy = live ? V.gy : 0, confused = live ? V.confused : 0;
-    float happy = live ? V.happy : 0, mouth = live ? V.mouth : 0;
+    float open = V.open * lid;
     const lv_color_t ink = lv_color_hex(0x0d0c0b);
 
     for (int i = 0; i < 2; i++) {
-        const float *b = i ? F->blush_r : F->blush_l;
+        const float *b = i ? F.blush_r : F.blush_l;
         lv_draw_image_dsc_t d;
         lv_draw_image_dsc_init(&d);
         d.src = &blush_dsc;
-        d.opa = (lv_opa_t)(255 * 0.62f * blush);
-        lv_area_t a = { lroundf(ox + b[0] - 26), lroundf(b[1] - 22), lroundf(ox + b[0] + 25), lroundf(b[1] + 21) };
+        d.opa = (lv_opa_t)(255 * 0.62f * V.blush);
+        lv_area_t a = { lroundf(b[0] - 26), lroundf(b[1] - 22), lroundf(b[0] + 25), lroundf(b[1] + 21) };
         lv_draw_image(layer, &d, &a);
     }
 
     // Eyes, a line when shut, with the highlight once open enough to hold it.
-    // Confused, one is smaller and they sit at a tilt; delighted, they are arcs.
+    // Confused, one is smaller and they sit at a tilt.
     for (int i = 0; i < 2; i++) {
-        const float *eye = i ? F->eye_r : F->eye_l;
-        float odd = 1 + confused * (i ? 0.12f : -0.18f);
-        float cx = eye[0] + gx, cy = eye[1] + gy + confused * (i ? -1.6f : 1.6f);
-        float rx = F->rx * odd, ry = F->ry * odd * open;
-        if (happy > 0.5f) {
-            draw_curve(layer, cx, cy, rx * 0.85f, -rx * 0.52f, 3.4f, ink);
-            continue;
-        }
+        const float *eye = i ? F.eye_r : F.eye_l;
+        float odd = 1 + V.confused * (i ? 0.12f : -0.18f);
+        float cx = eye[0] + V.gx, cy = eye[1] + V.gy + V.confused * (i ? -1.6f : 1.6f);
+        float rx = F.rx * odd, ry = F.ry * odd * open;
         if (ry < 1.8f) {
             draw_curve(layer, cx, cy, rx * 0.9f, 1.2f, 2.6f, ink);
             continue;
@@ -232,26 +195,25 @@ static void draw_face(lv_event_t *e) {
         dot(layer, cx, cy, rx, ry, ink, LV_OPA_COVER);
         if (open > 0.45f) {
             float k = open - 0.45f > 0.25f ? 1.0f : (open - 0.45f) * 4;
-            dot(layer, cx + F->hl[0], cy + F->hl[1] * open, F->hl[2], F->hl[2],
+            dot(layer, cx + F.hl[0], cy + F.hl[1] * open, F.hl[2], F.hl[2],
                 lv_color_hex(0xf2f0ec), (lv_opa_t)(235 * k));
         }
     }
 
     // Mouth: the smile, or open while she speaks.
-    float mx = F->mouth[0], my = F->mouth[1];
-    if (mouth < 0.06f) {
-        draw_curve(layer, mx, my, F->mouth_w / 2, F->sag * smile, F->stroke, ink);
+    float mx = F.mouth[0], my = F.mouth[1];
+    if (V.mouth < 0.06f) {
+        draw_curve(layer, mx, my, F.mouth_w / 2, F.sag * V.smile, F.stroke, ink);
     } else {
-        float half = F->mouth_w / 2 * 0.86f, h = mouth * 12.0f;
+        float half = F.mouth_w / 2 * 0.86f, h = V.mouth * 12.0f;
         lv_draw_rect_dsc_t d;
         lv_draw_rect_dsc_init(&d);
         d.bg_color = lv_color_hex(0x1d0e0b); d.radius = LV_RADIUS_CIRCLE;
         d.border_color = ink; d.border_width = 2; d.border_opa = LV_OPA_COVER;
-        lv_area_t a = { lroundf(ox + mx - half), lroundf(my - 1), lroundf(ox + mx + half),
-                        lroundf(my + F->sag * 0.8f + 2 * h) };
+        lv_area_t a = { lroundf(mx - half), lroundf(my - 1), lroundf(mx + half),
+                        lroundf(my + F.sag * 0.8f + 2 * h) };
         lv_draw_rect(layer, &d, &a);
     }
-    if (!live) return;
 
     // Thought dots above her head, lighting up one after another.
     if (V.dots > 0.02f) {
@@ -265,12 +227,8 @@ static void draw_face(lv_event_t *e) {
     }
     if (offline) draw_offline(layer);
 
-    // The ring on the rim: listening, it follows his voice; done, it sweeps in.
-    if (V.ring > 0.02f) {
-        bool listening = shown == FACE_LISTENING;
-        int32_t width = listening ? 4 + (int32_t)(7 * V.ring) : 8;
-        draw_ring(layer, 231, width, sweep, lv_tick_get() / 1800.0f, listening ? 0.35f + 0.65f * V.ring : V.ring);
-    }
+    // The ring on the rim, while listening, follows his voice.
+    if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / 1800.0f, 0.35f + 0.65f * V.ring);
 }
 
 /* A mark of the sleep screen: a still dot with a glow, purple for Eugenia,
@@ -324,7 +282,7 @@ static void draw_night(lv_event_t *e) {
         a.radius = 226; a.width = 4; a.start_angle = 0; a.end_angle = 360;
         a.color = lv_color_white(); a.opa = 20;
         lv_draw_arc(layer, &a);
-        draw_ring(layer, 226, 4, charge / 100.0f, 0, 1);
+        face_ring(layer, 226, 4, charge / 100.0f, 0, 1);
         static char percent[5];
         snprintf(percent, sizeof percent, "%d%%", charge);
         lv_draw_label_dsc_t t;
@@ -354,16 +312,15 @@ static void tick(lv_timer_t *t) {
         dark = m == FACE_DARK;
         if (dark) {
             wander();
-            lv_obj_add_flag(card[who], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(card, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(night, LV_OBJ_FLAG_HIDDEN);
             lv_obj_invalidate(night);
         } else {
-            lv_obj_remove_flag(card[who], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(card, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(night, LV_OBJ_FLAG_HIDDEN);
         }
         V.open = 0;
     }
-    shown = m;
     if (dark) {
         // Redrawn only when a mark changes: the panel holds the rest.
         static int drawn = -1;
@@ -373,30 +330,10 @@ static void tick(lv_timer_t *t) {
         return;
     }
 
-    // A switch: the cards slide past each other, easing out over SLIDE_MS.
-    character_t w = wanted;
-    if (w != who && !sliding) {
-        sliding = true;
-        slide_at = now;
-        lv_obj_remove_flag(card[w], LV_OBJ_FLAG_HIDDEN);
-    }
-    if (sliding) {
-        float p = fminf(1, (now - slide_at) / (float)SLIDE_MS), k = 1 - powf(1 - p, 3);
-        int dir = w == GLADYS ? 1 : -1;
-        lv_obj_set_x(card[who], (int32_t)lroundf(-dir * 466 * k));
-        lv_obj_set_x(card[w], (int32_t)lroundf(dir * 466 * (1 - k)));
-        if (p >= 1) {
-            lv_obj_add_flag(card[who], LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_x(card[who], 0);
-            who = w;
-            sliding = false;
-        }
-    }
-
     float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, glance = 1;
-    float t_happy = 0, t_blush = BLUSH;
+    float t_blush = BLUSH;
     const float *fixed = NULL;
-    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 }, ahead[2] = { 0, 0 };
+    static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
     if (m == FACE_IDLE && tired) { t_open = 0.42f; t_smile = 0.6f; glance = 0.3f; }
@@ -404,17 +341,7 @@ static void tick(lv_timer_t *t) {
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
     if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
     if (m == FACE_CONFUSED)  { t_smile = -0.35f; t_confused = 1; fixed = puzzled; }
-    if (m == FACE_DONE)      { t_smile = 1.1f; t_ring = 1; fixed = ahead; }
-    if (m == FACE_HAPPY || m == FACE_DELIGHTED) { t_smile = 1.6f; t_happy = 1; t_blush = BLUSH + 0.35f; fixed = ahead; }
-    if (m == FACE_DELIGHTED) t_ring = 1;
     if (m == FACE_ASLEEP)    { t_open = 0; t_smile = 0.6f; fixed = rest; }
-
-    // Done, the ring sweeps round once from the top in 700 ms; otherwise it is whole.
-    static uint32_t done_at;
-    bool done = m == FACE_DONE || m == FACE_DELIGHTED;
-    if (done && !was_done) done_at = now;
-    was_done = done;
-    sweep = done ? fminf(1, (now - done_at) / 700.0f) : 1;
 
     // Glances: a quick jump to a point, held for a moment.
     if (fixed) { gaze[0] = fixed[0]; gaze[1] = fixed[1]; }
@@ -442,18 +369,17 @@ static void tick(lv_timer_t *t) {
     V.mouth = ease(V.mouth, t_mouth, 28, dt);
     V.smile = ease(V.smile, t_smile, 10, dt);
     V.blush = ease(V.blush, t_blush, 4, dt);
-    V.happy = ease(V.happy, t_happy, 10, dt);
     V.ring = ease(V.ring, t_ring, 18, dt);
     V.dots = ease(V.dots, t_dots, 5, dt);
     V.confused = ease(V.confused, t_confused, 8, dt);
 
-    // The ring and a switch need the whole screen; everything else lives in
-    // the face's patch, the thought dots' and the offline mark's.
+    // The ring needs the whole screen; everything else lives in the face's
+    // patch, the thought dots' and the offline mark's.
     bool ring_on = V.ring > 0.02f;
-    if (ring_on || ring_was_on || sliding) lv_obj_invalidate(lv_screen_active());
+    if (ring_on || ring_was_on) lv_obj_invalidate(lv_screen_active());
     else {
         static const lv_area_t patches[] = { { 110, 175, 356, 300 }, { 195, 30, 272, 62 }, { 215, 395, 251, 425 } };
-        for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card[who], &patches[i]);
+        for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
     ring_was_on = ring_on;
 }
@@ -466,33 +392,28 @@ static lv_obj_t *plain(lv_obj_t *parent) {
     return o;
 }
 
-void face_start(character_t c) {
-    art_dsc[EUGENIA].data = eugenia_rgb565_start;
-    art_dsc[GLADYS].data = gladys_rgb565_start;
+void face_start(void) {
+    art_dsc.data = eugenia_rgb565_start;
     blush_dsc.data = blush_argb_start;
 
     lv_obj_t *screen = lv_screen_active();
     lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
     lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    for (int i = 0; i < 2; i++) {
-        card[i] = plain(screen);
-        lv_obj_t *art = lv_image_create(card[i]);
-        lv_image_set_src(art, &art_dsc[i]);
-        lv_obj_remove_flag(art, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_t *layer = plain(card[i]);
-        lv_obj_add_event_cb(layer, draw_face, LV_EVENT_DRAW_MAIN, (void *)(intptr_t)i);
-        lv_obj_add_flag(card[i], LV_OBJ_FLAG_HIDDEN);
-    }
+    card = plain(screen);
+    lv_obj_t *art = lv_image_create(card);
+    lv_image_set_src(art, &art_dsc);
+    lv_obj_remove_flag(art, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(plain(card), draw_face, LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_add_flag(card, LV_OBJ_FLAG_HIDDEN);
     night = plain(screen);
     lv_obj_add_event_cb(night, draw_night, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(night, LV_OBJ_FLAG_HIDDEN);
 
     // Started on the sleep screen, her face never shows.
-    who = wanted = c;
     dark = mode == FACE_DARK;
     wander();
-    lv_obj_remove_flag(dark ? night : card[who], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(dark ? night : card, LV_OBJ_FLAG_HIDDEN);
 
     uint32_t now = lv_tick_get();
     next_blink = now + 400;
