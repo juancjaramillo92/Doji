@@ -2665,7 +2665,8 @@ once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
 and her door answers with what waits next, so the next trade follows without a
 pause. Done, the ring sweeps round once with a warm smile — delighted when
 every answer was a yes. With nothing waiting after all — journaled in Telegram
-since — she smiles. A minute without a tap and the rest waits for next time. Taps, not swipes: a swipe moves
+since — she smiles. A minute without a tap and the rest waits for next time,
+with no smile, since nothing was done. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
 typeface, Hanken Grotesk, made into the charm's four fonts by
 `charm/tools/fonts.sh` with only the letters they use.

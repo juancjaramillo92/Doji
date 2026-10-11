@@ -126,7 +126,7 @@ int gladys_journal(void) {
     } else if (answered && t.waiting == 0) {
         face_set_mode(all_yes ? FACE_DELIGHTED : FACE_DONE);
         vTaskDelay(pdMS_TO_TICKS(DONE_MS));
-    } else if (!answered) {
+    } else if (!answered && t.waiting == 0) {
         face_set_mode(FACE_HAPPY);  // nothing waited after all: a smile
         vTaskDelay(pdMS_TO_TICKS(HAPPY_MS));
     }
