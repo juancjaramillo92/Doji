@@ -12,7 +12,9 @@
    sleep, the press that wakes her has her listening before anything else, a
    waiting trade's questions coming after her answer. A trade that came in
    while she spoke puts its questions up once she is done, and then she
-   sleeps. Awake, she feels about once a second whether she is held up to
+   sleeps; if he has put her down to listen, she sleeps at once and the trade
+   waits under its mark. A waiting briefing is read either way: he is near,
+   listening. Awake, she feels about once a second whether she is held up to
    look, which keeps her awake, or has been put down, which puts her to sleep
    a couple of seconds later; otherwise AWAKE_MS without a press does: her eyes
    close and the chip stops (sleep.c). Lifting her to look wakes her
@@ -204,6 +206,18 @@ static bool await_press(void) {
     }
 }
 
+/* Whether she lies put down now: DOWN_READS readings running, LOOK_MS apart,
+   as await_press takes them. The first only refreshes the reading they are
+   judged against, which is otherwise from before she spoke. */
+static bool lying_down(void) {
+    motion_hold();
+    for (int i = 0; i < DOWN_READS; i++) {
+        vTaskDelay(pdMS_TO_TICKS(LOOK_MS));
+        if (motion_hold() != LIFT_DOWN) return false;
+    }
+    return true;
+}
+
 static void awake(void) {
     // Joining runs beside everything else: she listens while it does, and
     // waits for it only to send. Offline when she last looked, nothing lights
@@ -245,9 +259,10 @@ static void awake(void) {
         // A trade waiting once she is done — one that came in while she spoke,
         // or one PWR put off — gets its questions then, and only then, so
         // nothing interrupts her; once a waking, so walking away from it
-        // holds.
+        // holds. Put down, nobody is looking at the screen: the trade waits
+        // under its mark for the next lift.
         if (spoke && !journaled && (trade_came() || trade_waits)) {
-            journal();
+            if (!lying_down()) journal();
             sleep_now();
         }
         if (!await_press()) sleep_now();

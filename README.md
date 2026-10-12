@@ -2755,7 +2755,12 @@ talk: a waiting briefing is read after her answer, and a waiting trade's
 questions come after that. **A trade that comes in while she speaks puts its
 questions up once she is done** — asked after each answer and after the
 briefing, never during them — and then she sleeps; once a waking, so walking
-away from them holds.
+away from them holds. **Put down while she thinks, she finishes**: nothing
+reads the motion sensor while she listens, thinks or speaks, so setting her on
+the table to listen costs nothing, and a waiting briefing is still read after
+her answer, since he is near. Only the trade's questions ask first whether she
+lies put down, as she is put down anywhere else; if so she sleeps at once, the
+trade waiting under its ring for the next lift.
 The panel's reset and select pins and the touch
 controller's reset are held through sleep, so the sleep screen needs no chip
 awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
