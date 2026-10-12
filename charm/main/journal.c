@@ -12,6 +12,7 @@
 #include "bsp/esp-bsp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
 #include "face.h"
 #include "lvgl.h"
 #include "palette.h"
@@ -36,6 +37,7 @@ static const uint32_t HALVES[3][2][2] = {
 };
 
 #define ASK_MS   60000  // then she goes back to sleep, the rest left waiting
+#define PWR_LOOK_MS 50  // how often a question looks for PWR while it waits for a tap
 #define FLASH_MS 260
 #define TICK_MS  420    // the tick drawing itself in
 #define SWEEP_MS 700    // the ring going round once
@@ -188,9 +190,14 @@ int journal_ask(int q, const bool missing[4]) {
     lv_obj_remove_flag(root, LV_OBJ_FLAG_HIDDEN);
     bsp_display_unlock();
 
+    // PWR, a notification to her task, closes the questions as walking away
+    // does; it is only looked at, and left for her task to take.
     xQueueReset(taps);
+    TickType_t from = xTaskGetTickCount();
     int side;
-    if (!xQueueReceive(taps, &side, pdMS_TO_TICKS(ASK_MS))) return -1;
+    while (!xQueueReceive(taps, &side, pdMS_TO_TICKS(PWR_LOOK_MS))) {
+        if (ulTaskNotifyValueClear(NULL, 0) || xTaskGetTickCount() - from >= pdMS_TO_TICKS(ASK_MS)) return -1;
+    }
 
     bsp_display_lock(-1);
     paint(half[side], setup ? 0 : 1 + side, true);

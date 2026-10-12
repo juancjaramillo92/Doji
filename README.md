@@ -2751,16 +2751,21 @@ journal ends on the dark and she goes back to sleep, unless a briefing waits
 too; then Eugenia comes up from black and reads it at once
 (`?briefing=today`), as she does whenever she wakes with a briefing waiting.
 **Woken by PWR**, she listens first instead, since a press means he wants to
-talk: a waiting briefing is read after her answer, and a waiting trade's
-questions come after that. **A trade that comes in while she speaks puts its
-questions up once she is done** — asked after each answer and after the
-briefing, never during them — and then she sleeps; once a waking, so walking
-away from them holds. **Put down while she thinks, she finishes**: nothing
-reads the motion sensor while she listens, thinks or speaks, so setting her on
-the table to listen costs nothing, and a waiting briefing is still read after
-her answer, since he is near. Only the trade's questions ask first whether she
-lies put down, as she is put down anywhere else; if so she sleeps at once, the
-trade waiting under its ring for the next lift.
+talk, and a waiting briefing is read after her answer. **The conversation
+comes first; a trade waits for it to end.** A trade that waits, or comes in
+while they talk — Gladys's door is asked after each answer — is never put
+between her words, nor before a waiting briefing. **The conversation is over
+when he stops**: held up to look and quiet for eight seconds after her last
+word (`QUIET_MS`), her eyes close to the dark and the trade's questions come up
+from it, then she sleeps, so walking away from them holds; put down, or thirty
+seconds without being held up, she sleeps with the trade under its ring, and
+its questions come up from the dark at the next lift. **PWR while the questions
+are up closes them** and she listens, the trade waiting again until the
+conversation is over — on waking too, where the press puts a waiting briefing
+after her answer. **Put down while she thinks, she finishes**: nothing reads
+the motion sensor while she listens, thinks or speaks, so setting her on the
+table to listen costs nothing, and a waiting briefing is still read after her
+answer, since he is near.
 The panel's reset and select pins and the touch
 controller's reset are held through sleep, so the sleep screen needs no chip
 awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
@@ -2814,7 +2819,7 @@ and her door answers with what waits next, so the next trade follows without a
 pause. Done, the journal's own screen: the four dots fill, a tick draws itself
 in and the ring sweeps round once — the tick light purple and the ring at full
 strength when every answer was a yes. Whatever ends it — done, a minute without
-a tap, nothing waiting after all because it was journaled in Telegram, her
+a tap, PWR, nothing waiting after all because it was journaled in Telegram, her
 door out of reach — the journal gives way to the dark: the sleep screen is put
 up under it before it leaves. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
