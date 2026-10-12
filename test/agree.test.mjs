@@ -1455,6 +1455,20 @@ test('the charm asks for the briefing in the hours it is written', () => {
 });
 
 
+/* A new app is good once she has reached her Wi-Fi, whichever waking it is:
+   confirmed where every join succeeds, and nowhere else. Confirmed on one
+   path only, a press in the second after an update took the other, and the
+   bootloader rolled a good app back at the next wake. */
+test('the charm keeps a new app wherever she reaches her Wi-Fi', () => {
+  const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
+    .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
+  assert.deepEqual(callers, ['charm/main/net.c'], 'a new app is confirmed somewhere other than where she joins, or nowhere');
+  const join = bodyOf(source('charm/main/net.c'), 'static void join(void *arg) {', 'net.c has no join()');
+  const gaveUp = join.indexOf('xEventGroupSetBits(events, GAVE_UP);');
+  assert.ok(gaveUp > -1 && join.indexOf('ota_confirm();') > gaveUp,
+    'join() confirms the app before it knows she joined');
+});
+
 /* The charm joins a network by waiting for an address or a refusal, and gives
    up on a failed attempt by leaving it. That leaving arrives as a disconnect,
    possibly once the next attempt has begun, and counted as a refusal it ends

@@ -153,7 +153,6 @@ static void errand(void) {
     net_start();
     offline = !net_wait(NET_ALL_MS);
     if (!offline) {
-        ota_confirm();
         bool tick = trade_came(), ask = briefing_due(time(NULL));
         if (tick || ask) {
             sound_start();
