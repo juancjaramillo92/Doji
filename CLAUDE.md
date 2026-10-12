@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 714 tests, eight suites
+npm test      # 718 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -374,7 +374,8 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   idle timeout behind the 400s paid wall clock. `?embed=1` is the derived
   exception. The body names the job.
 - **`eugenia_runs` is where the meters survive.** Every `recordRun` key is a column
-  and every column is written; both outcomes, always. `postConsolidation` has
+  and every column is written; both outcomes, always — but `unread`, whose
+  success is the row of the briefing or reply it fed. `postConsolidation` has
   exactly one `return`, and the census stays after the pass. `postScheduled`'s
   catch writes its row before the apology. `caller` is free text.
 - **`gate` is one function.** Every outcome records a verdict row before it

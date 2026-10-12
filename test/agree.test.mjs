@@ -5469,6 +5469,55 @@ test('every market read gives up at READ_MS rather than at the platform', () => 
   }
 });
 
+/* A LONG DOOR ANSWERS INSIDE HER BOUND, or the deadline that keeps what was
+   read lands after she has stopped listening and keeps nothing. Two files,
+   one relation: ten seconds for the boot, the sign-in and the wire. And every
+   call the two doors make carries the deadline, the calendar check included. */
+test('a door that reads one chart at a time answers inside READ_MS', () => {
+  const tv = source('supabase/functions/doji-tradingview/index.ts');
+  const ms = (src, name) => {
+    const m = src.match(new RegExp(`const ${name} = ([\\d_]+);`));
+    assert.ok(m, `${name} is gone`);
+    return Number(m[1].replace(/_/g, ''));
+  };
+  assert.ok(ms(EUGENIA_TS, 'READ_MS') - ms(tv, 'DOOR_MS') >= 10_000,
+    'DOOR_MS leaves less than ten seconds of READ_MS — the door answers after she has given up on it');
+  for (const fn of ['readMarket', 'readRates']) {
+    const body = bodyOf(tv, `export async function ${fn}(`);
+    assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
+    const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);
+    assert.ok(calls.length >= 1, `read no tvCall in ${fn} — the reader has gone blind`);
+    for (const call of calls) {
+      assert.match(call, /, signal\)\)$/, `${call.slice(0, 60)}… in ${fn} is outside the deadline`);
+    }
+  }
+});
+
+/* EVERY MARKET READ SHE GOES WITHOUT IS A ROW, and the set is the one READ_MS
+   bounds, found the same way — by what each function addresses — and held
+   against a declaration, so a new read arriving without the meter fails. The
+   briefing's own row reads ok either way. The calendar's read throws to
+   filed() and filedWeek(), which write both outcomes. */
+test('every market read she goes without writes a row', () => {
+  const starts = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)\(/gm)];
+  const readers = starts
+    .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
+    .filter(([, body]) => /tvRead\("|fetch\((MARKET_URL|COT_URL)/.test(uncomment(body)));
+  assert.deepEqual(readers.map(([name]) => name).sort(),
+    ['aroundBlock', 'headlinesBlock', 'marketQuote', 'positioningBlock', 'ratesBlock', 'readTvCalendar', 'volumeBlock'],
+    'the market reads have changed — declare the new one, and give it the meter');
+  for (const [name, body] of readers) {
+    if (name === 'readTvCalendar') continue;
+    assert.match(body.slice(body.indexOf('} catch')), /await unread\(/,
+      `${name}'s failure reaches the console and no row`);
+  }
+  // In part, too, where the door names what it did not read.
+  for (const name of ['aroundBlock', 'ratesBlock']) {
+    assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
+      /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
+  }
+});
+
 test('the calendar is filed before the briefing reads it, and every filing is a row', () => {
   /* A briefing that reads before it files hands her yesterday's calendar. */
   const body = (name) =>

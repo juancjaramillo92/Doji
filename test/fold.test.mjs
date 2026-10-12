@@ -27,6 +27,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
+  readMarket, readRates,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -666,6 +667,56 @@ test('a calendar answer that is not ok is a refusal, not an empty day', () => {
 const DXY_BARS = { bars: [
   { c: 102.081, h: 102.103, l: 101.997, o: 102.102, t: 1790875800, v: null },
   { c: 102.16, h: 102.164, l: 102.081, o: 102.082, t: 1790876700, v: null }], success: true };
+/* TradingView behind a door: a fresh sign-in, a session, then `answers` calls
+   served and every one after held until its signal aborts — as a server that
+   has stopped answering does. */
+function slowTradingView(answers) {
+  let served = 0;
+  return async (url, init = {}) => {
+    if (url.includes('/rest/v1/tradingview_auth')) {
+      return Response.json([{ id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString() }]);
+    }
+    const { method } = JSON.parse(init.body);
+    if (method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+    if (method !== 'tools/call') return new Response('', { status: 202 });
+    if (init.signal?.aborted) throw init.signal.reason;
+    if (served++ < answers) {
+      return new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: 2, result: { structuredContent: DXY_BARS } })}\n\n`);
+    }
+    // A call that carries no signal is held for ever.
+    return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(init.signal.reason)));
+  };
+}
+
+/* THE DEADLINE, DRIVEN. On 12 October the market's fourteen calls outran her
+   45 seconds and the block was lost whole, the symbols that had answered with
+   it. Against a server that answers three and then stops, each door answers
+   with what it has and names the rest, with DOOR_MS shortened so the test does
+   not wait it out. */
+test('a TradingView that stops answering costs the symbols not reached, not the ones read', async () => {
+  const realTimeout = AbortSignal.timeout;
+  // The stub holds no socket open, and the timer behind the signal is unref'd.
+  const open = setTimeout(() => {}, 1_000);
+  try {
+    AbortSignal.timeout = () => realTimeout.call(AbortSignal, 30);
+    const market = await stubbed(async () => { globalThis.fetch = slowTradingView(3); return readMarket(); });
+    // MARKET's first three: its order is what a slow morning keeps.
+    assert.deepEqual(market.market.map(m => m.symbol), ['TVC:DXY', 'TVC:US02Y', 'TVC:US10Y']);
+    assert.deepEqual(market.missing.map(m => m.error), Array(11).fill('not reached in 35s'));
+
+    const rates = await stubbed(async () => { globalThis.fetch = slowTradingView(1); return readRates(); });
+    assert.equal(rates.ok, true);
+    assert.equal(rates.contracts.length, 1);
+    assert.ok(rates.missing.length && rates.missing.every(m => m.error === 'not reached in 35s'),
+      JSON.stringify(rates.missing));
+    // The meeting check is unread rather than waited for.
+    assert.equal(rates.calendar, null);
+  } finally {
+    clearTimeout(open);
+    AbortSignal.timeout = realTimeout;
+  }
+});
+
 const DFII10_BARS = { bars: [
   { c: 2.83, h: 2.83, l: 2.83, o: 2.83, t: 1790294400, v: null },
   { c: 2.9, h: 2.9, l: 2.9, o: 2.9, t: 1790553600, v: null },
@@ -690,7 +741,7 @@ const AROUND = {
     { name: 'Ten-year real yield (TIPS)', unit: '%', daily: true, from: 2.83, since: '2026-09-25T00:00:00.000Z',
       last: 2.91, at: '2026-09-29T00:00:00.000Z' },
   ],
-  missing: [{ name: 'VIX' }],
+  missing: [{ symbol: 'TVC:VIX', name: 'VIX', error: 'TradingView mcp-tv-get-ohlcv: no answer' }],
 };
 
 test('every line of the market says what its number is measured from, and computes no change', () => {
@@ -717,6 +768,44 @@ test('a market that will not read is a sentence telling her not to reach for a s
     globalThis.fetch = async () => new Response(JSON.stringify(AROUND), { status: 200 });
     assert.match(await aroundBlock(), /Dollar index 102\.16/);
   });
+});
+
+/* A READ SHE WENT WITHOUT IS A ROW. The briefing's own row reads ok either
+   way, so on 12 October the Edge log was the only place a briefing written
+   without the dollar and the Fed showed. Whole or in part; none when whole. */
+test('a market read she goes without is a row, whole or in part, and a full one is none', async () => {
+  const rows = [];
+  const door = (answer, status = 200) => async (url, init = {}) => {
+    if (url.includes('/rest/v1/eugenia_runs')) {
+      rows.push(...JSON.parse(init.body));
+      return new Response('', { status: 201 });
+    }
+    return Response.json(answer, { status });
+  };
+  await stubbed(async () => {
+    globalThis.fetch = door({ ...AROUND, missing: [] });
+    await aroundBlock();
+    globalThis.fetch = door({ ok: true, ...RATES, missing: [] });
+    await ratesBlock();
+    assert.deepEqual(rows, [], 'a read that answered whole wrote a row');
+
+    globalThis.fetch = door({ ...AROUND, missing: [
+      { symbol: 'TVC:VIX', name: 'VIX', error: 'not reached in 35s' },
+      { symbol: 'SP:SPX', name: 'S&P 500', error: 'TradingView mcp-tv-get-ohlcv: no answer' },
+      { symbol: 'TVC:DE10Y', name: 'German ten-year yield', error: 'not reached in 35s' }] });
+    assert.match(await aroundBlock(), /Not read just now: VIX, S&P 500, German ten-year yield\./);
+    globalThis.fetch = door({ ok: true, ...RATES,
+      missing: [{ symbol: 'CBOT:ZQG2027', error: 'not reached in 35s' }] });
+    await ratesBlock();
+    globalThis.fetch = door({ ok: false, error: 'not connected' }, 500);
+    await ratesBlock();
+  });
+  assert.deepEqual(rows, [
+    { caller: 'market read', ok: false,
+      detail: 'market: TVC:VIX, TVC:DE10Y: not reached in 35s; SP:SPX: TradingView mcp-tv-get-ohlcv: no answer' },
+    { caller: 'market read', ok: false, detail: 'rates: CBOT:ZQG2027: not reached in 35s' },
+    { caller: 'market read', ok: false, detail: 'rates: TradingView rates: not connected' },
+  ]);
 });
 
 /* ─── What the wires said ────────────────────────────────────────────────────

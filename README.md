@@ -420,6 +420,7 @@ single-sourced at run time:
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
+| a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
 | the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
 | each **function's name** | its directory, the triggers, the cron jobs, the Apps Script, the charm's `charm/main/net.h` |
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
@@ -952,7 +953,8 @@ doubt, and the euro is more than half the dollar index. The quote batch refused 
 OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
 `foldBars` to where the first opened and where the last stands, each with its
 time. The real yield is FRED's daily series and is marked `daily`. Symbols, names
-and units live in one list, `MARKET`; a symbol that fails is named in `missing`.
+and units live in one list, `MARKET`, most-needed first; a symbol that fails is
+named in `missing`.
 `aroundList` states every line as a level beside the level at a stated time and
 computes no change, so a move cannot lose its window. A failed read is a sentence
 telling her not to quote the dollar or yields from a search.
@@ -2251,6 +2253,17 @@ means, so a dead feed now costs 45 seconds and that sentence. **A timeout names
 its door** — *TradingView calendar: no answer in 45s* — since the abort's own
 message names nothing, and the meter rows are where an outage is read afterwards.
 
+**The two doors that read one chart at a time answer by `DOOR_MS`, 35 seconds.**
+`?market=1` makes fourteen calls and `?rates=1` six, one after another, and on
+12 October, with the news door's two taking 25 seconds, both outran her 45 and
+a briefing and a reply lost each block whole, the symbols that had answered
+with it. Now one deadline covers each door's calls: the call in flight is
+aborted, every one after it is named in `missing` as *not reached in 35s*, and
+the door answers with what it has. `MARKET` and the contract months run
+most-needed first, so a slow morning keeps the dollar, the yields and the
+nearest meeting. They stay one at a time, since TradingView refuses a burst and
+a deadline already bounds the wait.
+
 **A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
 at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the
 22:00 pass — and stops once one has landed. `retryDue` answers **which**
@@ -2308,6 +2321,16 @@ migration. **`postConsolidation` has exactly one `return`**, and a test counts
 it: a quiet day is a branch, and an early return is how both meters once skipped
 every night nobody spoke. The census stays after the pass, the only thing that
 can move a rung.
+
+**A market read she went without is a row**, `caller: 'market read'`, `ok:
+false`, the read and the reason in `detail`: the broker's price, the market
+around gold, the rate odds, the headlines, the speculators' count and COMEX
+volume, whole or — for the two doors that name a `missing` list — in part. The
+briefing or the reply still goes out and its own row reads ok, so on 12 October
+the Edge log was the only place a briefing written without the dollar and the
+Fed showed. Failures only: a row for every read that answered would be several
+a briefing saying nothing. The calendar's reads are left to `filed()` and
+`filedWeek()`, which already write both outcomes.
 
 **A job that dies before its first model call leaves a row too.**
 `postScheduled`'s catch writes `caller: '<job> job'` **before** the apology,
