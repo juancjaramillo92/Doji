@@ -264,6 +264,50 @@ test('Eugenia\'s charm sends the headers her door reads, and knows the frames it
   assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
 });
 
+/* Three more things the charm holds of her door, each a number or a word in
+   C beside the one in TypeScript it must agree with. The charm hangs up on a
+   silence longer than READ_MS, so it must outlast two of her BEAT_MS beats;
+   it records into FILE_ROOM, which her door refuses past FILE_MAX; and it
+   asks ?briefing= for the words charmBriefing answers, and no other. */
+test('the charm waits out her silence, records what her door takes, and asks the briefing it answers', () => {
+  const talk = source('charm/main/talk.c');
+  const number = (text, pattern, what) => {
+    const m = text.match(pattern);
+    assert.ok(m && /^[\d\s*+()_]+$/.test(m[1]), `${what} is no longer defined as this test reads it`);
+    return Function(`return ${m[1].replace(/_/g, '')}`)();
+  };
+  const readMs = number(talk, /^#define READ_MS\s+(.+)$/m, "talk.c's READ_MS");
+  const beatMs = number(EUGENIA_TS, /^const BEAT_MS = (.+);$/m, "doji-eugenia's BEAT_MS");
+  assert.ok(readMs >= 2 * beatMs,
+    `the charm gives up after ${readMs} ms of nothing, inside two of her ${beatMs} ms beats — it hangs up while she thinks`);
+  const room = number(talk, /^#define FILE_ROOM\s+(.+)$/m, "talk.c's FILE_ROOM");
+  const max = number(EUGENIA_TS, /^const FILE_MAX = (.+);$/m, "doji-eugenia's FILE_MAX");
+  assert.ok(room <= max, `the charm records up to ${room} bytes and her door refuses past ${max}`);
+
+  const asked = [...talk.matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]).sort();
+  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
+  assert.ok(asked.length && door, 'talk.c or charmBriefing no longer names the briefing as this test reads it');
+  assert.deepEqual(asked, door.slice(1).sort(), 'the charm asks ?briefing= for a word her door does not answer, or misses one');
+});
+
+/* The charm updates herself from the object the charm workflow publishes, and
+   the workflow checks the image it builds holds the app where the bootloader
+   looks: two names and an offset, each written in two files. */
+test('the charm updates from what the workflow publishes, and the image holds the app where it boots', () => {
+  const net = source('charm/main/net.h'), workflow = source('.github/workflows/charm.yml');
+  const reads = net.match(/#define FIRMWARE_URL "https:\/\/\w+\.supabase\.co\/storage\/v1\/object\/public\/(\w+)\/([\w.]+)"/);
+  const writes = workflow.match(/\/storage\/v1\/object\/(\w+)\/([\w.]+)"/);
+  const made = workflow.match(/"id":"(\w+)","name":"\w+","public":true/);
+  assert.ok(reads && writes && made, 'net.h or charm.yml no longer names the update as this test reads it');
+  assert.deepEqual(reads.slice(1), writes.slice(1), 'the charm looks for her update where the workflow does not put it');
+  assert.equal(made[1], reads[1], 'the workflow makes a bucket the charm does not read from');
+
+  const slot = source('charm/partitions.csv').match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
+  const checked = workflow.match(/test "\$full" -ge \$\(\( (0x[0-9a-f]+) \+ app \)\)/i);
+  assert.ok(slot && checked, 'partitions.csv or charm.yml no longer places the app as this test reads it');
+  assert.equal(Number(checked[1]), Number(slot[1]), 'the workflow checks for the app at an offset the partition table does not boot from');
+});
+
 /* The conversation comes first, and a trade waits for it to end. Its
    questions come up only once the conversation is over with him looking —
    never after a single answer, never before a waiting briefing, which is read
@@ -296,6 +340,12 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
 /* The charm's words are drawn in fonts holding only the letters
    tools/fonts.sh gave them; a word with any other letter draws a gap. */
 test('every word on the charm\'s screens is in the font that draws it', () => {
+  // The files that draw words, found rather than listed: a fifth would draw
+  // letters nothing below checks.
+  const drawers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
+    .filter(f => f.endsWith('.c') && /LV_FONT_DECLARE\(hanken_/.test(source(f))).map(f => f.slice('charm/main/'.length));
+  assert.deepEqual(drawers.sort(), ['dial.c', 'face.c', 'journal.c', 'setup.c'],
+    'a file draws words in the charm\'s fonts that this test does not read');
   const journal = source('charm/main/journal.c');
   const list = (name) => {
     const m = journal.match(new RegExp(`${name}\\[\\d\\] = \\{([^}]+)\\}`));
