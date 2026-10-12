@@ -91,17 +91,18 @@ void sound_listen(void) {
     play_notes(notes, 400.0f, 22.0f, 6000);
 }
 
-size_t sound_record(int16_t *out, size_t max, bool (*more)(float)) {
+void sound_sent(void) {
+    static const float notes[2][2] = { { 990.0f, 0.07f }, { 660.0f, 0.11f } };
+    play_notes(notes, 400.0f, 22.0f, 6000);
+}
+
+// One microphone of the pair, gathered to the front of the wire.
+void sound_record(bool (*more)(const int16_t *in, size_t n, float loud)) {
     open_at(16000);
-    size_t got = 0;
-    while (got < max) {
-        size_t k = max - got < CHUNK ? max - got : CHUNK;
-        if (esp_codec_dev_read(mics, wire, (int)(k * 4)) != ESP_CODEC_DEV_OK) break;
-        for (size_t i = 0; i < k; i++) out[got + i] = wire[2 * i];
-        got += k;
-        if (!more(loudness_of(wire, k, 2))) break;
-    }
-    return got;
+    do {
+        if (esp_codec_dev_read(mics, wire, (int)sizeof wire) != ESP_CODEC_DEV_OK) return;
+        for (size_t i = 0; i < CHUNK; i++) wire[i] = wire[2 * i];
+    } while (more(wire, CHUNK, loudness_of(wire, CHUNK, 1)));
 }
 
 bool sound_play(const int16_t *in, size_t samples, uint32_t rate, bool (*more)(float)) {

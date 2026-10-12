@@ -41,6 +41,8 @@ static const char *TAG = "setup";
 LV_FONT_DECLARE(hanken_18);
 
 extern const char page_start[] asm("_binary_setup_html_start");
+extern const uint8_t font_start[] asm("_binary_setup_woff2_start");
+extern const uint8_t font_end[]   asm("_binary_setup_woff2_end");
 
 #define BODY_MAX  512
 #define SEEN_MAX  16
@@ -285,9 +287,11 @@ static esp_err_t reply(httpd_req_t *req, const char *json) {
     return httpd_resp_sendstr(req, json);
 }
 
+// What she has, her network's name, and how many networks she keeps.
 static esp_err_t api_state(httpd_req_t *req) {
     char out[400];
-    int o = snprintf(out, sizeof out, "{\"ready\":%s,\"nets\":[", config_ready() ? "true" : "false");
+    int o = snprintf(out, sizeof out, "{\"ready\":%s,\"name\":\"%s\",\"max\":%d,\"nets\":[",
+                     config_ready() ? "true" : "false", ap_name, MAX_NETS);
     for (int i = 0; i < cfg.n_nets; i++) {
         if (i) out[o++] = ',';
         o += json_string(out + o, sizeof out - o, cfg.nets[i].ssid);
@@ -296,7 +300,8 @@ static esp_err_t api_state(httpd_req_t *req) {
     return reply(req, out);
 }
 
-// The networks in range, strongest first, each once, as one to three bars.
+// The networks in range, strongest first, each once, as one to three bars
+// and whether it asks for a password.
 static esp_err_t api_scan(httpd_req_t *req) {
     static wifi_ap_record_t seen[SEEN_MAX];
     uint16_t n = SEEN_MAX;
@@ -311,25 +316,33 @@ static esp_err_t api_scan(httpd_req_t *req) {
         if (o > 1) out[o++] = ',';
         o += snprintf(out + o, sizeof out - o, "{\"ssid\":");
         o += json_string(out + o, sizeof out - o, ssid);
-        o += snprintf(out + o, sizeof out - o, ",\"bars\":%d}", seen[i].rssi > -60 ? 3 : seen[i].rssi > -75 ? 2 : 1);
+        o += snprintf(out + o, sizeof out - o, ",\"bars\":%d,\"lock\":%s}", seen[i].rssi > -60 ? 3 : seen[i].rssi > -75 ? 2 : 1,
+                      seen[i].authmode == WIFI_AUTH_OPEN ? "false" : "true");
     }
     snprintf(out + o, sizeof out - o, "]");
     return reply(req, out);
 }
 
-// Tried before it is saved. A name already saved has its password replaced,
-// and past four networks the newest takes the last place.
+// Where a saved network sits, or n_nets when it is not saved.
+static int saved_at(const char *ssid) {
+    int at = 0;
+    while (at < cfg.n_nets && strcmp(cfg.nets[at].ssid, ssid)) at++;
+    return at;
+}
+
+/* Tried before it is saved; a name already saved has its password replaced.
+   A new one past MAX_NETS is refused untried: one has to be removed first,
+   rather than any being replaced without a word. */
 static esp_err_t api_wifi(httpd_req_t *req) {
     char in[BODY_MAX + 1];
     charm_net_t net = { 0 };
     if (!body(req, in) || !field(in, "ssid", net.ssid, sizeof net.ssid) || !net.ssid[0]) return reply(req, "{\"ok\":false}");
     field(in, "pass", net.pass, sizeof net.pass);
+    int at = saved_at(net.ssid);
+    if (at == MAX_NETS) return reply(req, "{\"ok\":false,\"why\":\"full\"}");
     show(SHOW_BUSY, SAY[2]);
     bool ok = join(net.ssid, net.pass);
     if (ok) {
-        int at = 0;
-        while (at < cfg.n_nets && strcmp(cfg.nets[at].ssid, net.ssid)) at++;
-        if (at == MAX_NETS) at = MAX_NETS - 1;
         cfg.nets[at] = net;
         if (at == cfg.n_nets) cfg.n_nets++;
         config_save();
@@ -377,11 +390,34 @@ static esp_err_t api_key(httpd_req_t *req) {
     return ESP_OK;
 }
 
+// A saved network forgotten; the ones after it move up a place.
+static esp_err_t api_forget(httpd_req_t *req) {
+    char in[BODY_MAX + 1], ssid[sizeof cfg.nets[0].ssid];
+    if (!body(req, in) || !field(in, "ssid", ssid, sizeof ssid)) return reply(req, "{\"ok\":false}");
+    int at = saved_at(ssid);
+    if (at == cfg.n_nets) return reply(req, "{\"ok\":false}");
+    memmove(&cfg.nets[at], &cfg.nets[at + 1], (cfg.n_nets - at - 1) * sizeof cfg.nets[0]);
+    memset(&cfg.nets[--cfg.n_nets], 0, sizeof cfg.nets[0]);
+    config_save();
+    ESP_LOGI(TAG, "%s forgotten", ssid);
+    reply(req, "{\"ok\":true}");
+    answer_shown(true);
+    return ESP_OK;
+}
+
 static esp_err_t api_finish(httpd_req_t *req) {
     reply(req, "{\"ok\":true}");
     vTaskDelay(pdMS_TO_TICKS(800));
     esp_restart();
     return ESP_OK;
+}
+
+// Doji's typeface, carried in her flash since the phone has no internet to
+// fetch it from while it is on her network.
+static esp_err_t font(httpd_req_t *req) {
+    httpd_resp_set_type(req, "font/woff2");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=31536000");
+    return httpd_resp_send(req, (const char *)font_start, font_end - font_start);
 }
 
 // Anything but the page and its questions is a phone checking whether it is
@@ -412,7 +448,9 @@ void setup_run(void) {
             { .uri = "/api/scan",   .method = HTTP_GET,  .handler = api_scan },
             { .uri = "/api/wifi",   .method = HTTP_POST, .handler = api_wifi },
             { .uri = "/api/key",    .method = HTTP_POST, .handler = api_key },
+            { .uri = "/api/forget", .method = HTTP_POST, .handler = api_forget },
             { .uri = "/api/finish", .method = HTTP_POST, .handler = api_finish },
+            { .uri = "/font.woff2", .method = HTTP_GET,  .handler = font },
             { .uri = "/*",          .method = HTTP_GET,  .handler = page },
         };
         for (size_t i = 0; i < sizeof uris / sizeof *uris; i++) httpd_register_uri_handler(server, &uris[i]);

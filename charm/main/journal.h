@@ -9,5 +9,10 @@
    from her task, with the display unlocked. */
 int journal_ask(int q, const bool missing[4]);
 
-// Takes the questions off the screen.
+/* The journal done, in place of the questions: the four dots filled, a tick
+   drawn in and the ring swept round once, brighter when `all_yes`. Returns
+   once it has shown. */
+void journal_done(bool all_yes);
+
+// Takes the journal off the screen.
 void journal_hide(void);

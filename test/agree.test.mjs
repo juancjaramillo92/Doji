@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue }
+         parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
@@ -245,6 +245,23 @@ test('Gladys\'s charm sends the setups and answers her door takes', () => {
   assert.deepEqual(pairs, Object.entries(COLUMNS),
     'the charm answers a key, or reads a column, her door does not have — or in another order ' +
     'than the screens ask them');
+});
+
+/* Eugenia's charm tells her door about itself in headers, and reads her
+   answer in frames whose kinds are a copy of the door's. Both directions: a
+   header the charm sends that nothing reads is news she never hears, and one
+   the door reads that the charm never sends is a sentence she is never told. */
+test('Eugenia\'s charm sends the headers her door reads, and knows the frames it sends', () => {
+  const talk = source('charm/main/talk.c');
+  const sent = [...talk.matchAll(/esp_http_client_set_header\(h, "(x-charm-[\w-]+)"/g)].map(m => m[1]).sort();
+  const read = [...new Set([...EUGENIA_TS.matchAll(/\.get\((['"])(x-charm-[\w-]+)\1\)|percent\('(x-charm-[\w-]+)'\)/g)]
+    .map(m => m[2] ?? m[3]))].sort();
+  assert.ok(sent.length > 1, 'talk.c no longer sets its headers as this test reads them');
+  assert.deepEqual(sent, read, 'the charm sends a header her door does not read, or the door reads one it never sends');
+
+  const kinds = Object.fromEntries([...source('charm/main/frames.h').matchAll(/^#define FRAME_(\w+)\s+(\d+)$/gm)]
+    .map(m => [m[1].toLowerCase(), Number(m[2])]));
+  assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
 });
 
 /* The charm's words are drawn in fonts holding only the letters
@@ -5735,7 +5752,10 @@ const SENDS = {
                     copy: 'the charm speaks what this returns, through ' +
                           'charmAudio — the voice goes to his keyring, so ' +
                           'Telegram is sent the text as its copy, not a ' +
-                          'second voice note of a thing he has just heard' },
+                          'second voice note of a thing he has just heard. ' +
+                          'It returns the volume she set beside the text, and ' +
+                          'the battery line the door may add after it is the ' +
+                          "charm's news, neither copied nor stored" },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +
                          'in a position or has just breached his day — the ' +
@@ -5795,7 +5815,7 @@ test('every censused path gates, speaks and stores the same one text', () => {
         `${fn} no longer speaks through ${spec.aloud} the text the census says it carries`);
     } else if (spec.copy) {
       // Spoken by whoever it returns to, and copied to Telegram as text.
-      assert.match(body, new RegExp(`return ${spec.carries};`),
+      assert.match(body, new RegExp(`return (?:${spec.carries}|\\{[^}]*\\b${spec.carries}\\b(?!\\s*:)[^}]*\\});`),
         `${fn} no longer hands back the text the census says it carries`);
       assert.match(body, new RegExp(`\\bsay\\([^;]*\\b${spec.carries}\\b`),
         `${fn} no longer copies to Telegram the text it sends`);

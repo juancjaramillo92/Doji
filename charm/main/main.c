@@ -2,15 +2,24 @@
    the setup's, kept in flash; without them, or when asked by holding BOOT for
    five seconds (power.c), she shows the setup instead (setup.c).
 
-   She lives in short waking spells, and whoever is needed is who wakes —
-   decided before the screen lights, so waking is never a switch: Gladys when
-   a trade waits for its journal, Eugenia otherwise. Gladys journals it and
-   sleeps, unless a briefing waits too; only then does Eugenia slide in to read
-   it. Awake, a tap and he talks to Eugenia (talk.c); a trade that came in
-   while she spoke brings Gladys in once she is done, to journal it
-   (gladys.c), and then sleep. AWAKE_MS without a tap puts her to sleep: her
-   eyes close and the chip stops (sleep.c). Lifting her to look wakes her (motion.c), and
-   so do a tap, PWR and BOOT. A lift that was not him looking — a swing, a
+   She lives in short waking spells, and what waits decides what shows first,
+   before the screen lights, so nothing flashes on the way: a trade waiting
+   for its journal puts its questions up straight from the dark (gladys.c),
+   with no face before them; the journal ends on the dark, and she sleeps,
+   unless a briefing waits too, when Eugenia comes up from black to read it.
+   Otherwise Eugenia wakes, and reads a waiting briefing at once. PWR is the
+   talk button (power.c, talk.c): a press and she listens, the next sends; from
+   sleep, the press that wakes her has her listening before anything else, a
+   waiting trade's questions coming after her answer. A trade that came in
+   while she spoke puts its questions up once she is done, and then she
+   sleeps. Awake, she feels about once a second whether she is held up to
+   look, which keeps her awake, or has been put down, which puts her to sleep
+   a couple of seconds later; otherwise AWAKE_MS without a press does: her eyes
+   close and the chip stops (sleep.c). Lifting her to look wakes her
+   (motion.c), and so do a tap on the screen, PWR and BOOT. With no
+   internet when she last looked she stays on her lock screen, its mark saying
+   why, unless the network answers within OFFLINE_TRY_MS; and losing it while
+   they talk sends her back there. A lift that was not him looking — a swing, a
    bump — sends her straight back to sleep without lighting the screen, and
    rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
    cannot keep waking her.
@@ -23,8 +32,8 @@
    sleeps, so most errands never touch it. Once a night an errand also looks
    for a new app from main (ota.c).
 
-   PWR is the power chip's (power.c): a press switches her on, and held she
-   says goodnight and switches off. */
+   PWR is also the power chip's (power.c): off, a press switches her on, and
+   held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
@@ -57,21 +66,22 @@ static const char *TAG = "charm";
 #define CHARGING_S    120    // on the cable, how often the charge is redrawn
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
-#define SLIDE_MS      500    // a switch, and a moment over
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
+#define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
+#define LOOK_MS       1000   // awake and idle, how often she feels whether she is held
+#define DOWN_READS    2      // put down this many readings running, she sleeps
 
-// What waits, what the sleep screen last drew, and when the next errand is;
-// all kept through sleep.
-static RTC_DATA_ATTR bool briefing_waits, trade_waits;
+// What waits, whether the internet answered last time, what the sleep screen
+// last drew, and when the next errand is; all kept through sleep.
+static RTC_DATA_ATTR bool briefing_waits, trade_waits, offline;
 static RTC_DATA_ATTR int drawn = -1;
 static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
-static TaskHandle_t life_task;
-static bool lit;
+static bool lit, journaled;
 
-// A tap on her face is for Eugenia, and a slide round the rim is the volume.
+// A slide round the rim is the volume; a tap on a question is the journal's.
 static void on_touch(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t at;
@@ -79,11 +89,10 @@ static void on_touch(lv_event_t *e) {
     if (code == LV_EVENT_PRESSED) dial_press(at);
     if (code == LV_EVENT_PRESSING) dial_slide(at);
     if (code == LV_EVENT_RELEASED) dial_lift();
-    if (code == LV_EVENT_SHORT_CLICKED && !dial_turned()) xTaskNotifyGive(life_task);
 }
 
-// The screen, started once, with `who` showing in `mode`.
-static void light(character_t who, face_mode_t mode) {
+// The screen, started once, in `mode`.
+static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
     sleep_release();
@@ -91,28 +100,28 @@ static void light(character_t who, face_mode_t mode) {
     bsp_display_brightness_set(BRIGHTNESS);
     face_set_mode(mode);
     bsp_display_lock(-1);
-    face_start(who);
+    face_start();
     bsp_display_unlock();
 }
 
 // Her briefing has landed: lit for Eugenia to say so.
-static void light_eugenia(void) { light(EUGENIA, FACE_THINKING); }
+static void light_eugenia(void) { light(FACE_THINKING); }
 
-/* Goodnight, when her face is showing, then the sleep screen — drawn only
-   when its marks differ from what the panel already holds — then deep sleep
-   until the next errand, the motion sensor armed. */
+/* Goodnight, when her face is showing — the journal leaves the dark already
+   up — then the sleep screen, drawn only when its marks differ from what the
+   panel already holds, then deep sleep until the next errand, the motion
+   sensor armed. */
 static void sleep_now(void) {
     int charge = power_charge();
-    bool tired = power_low();
-    int marks = briefing_waits | trade_waits << 1 | tired << 2 | (charge + 1) << 3;
-    if (lit) {
+    bool low = power_low();
+    int marks = briefing_waits | trade_waits << 1 | low << 2 | offline << 3 | (charge + 1) << 4;
+    if (lit && face_get_mode() != FACE_DARK) {
         face_set_mode(FACE_ASLEEP);
         vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
     }
     if (lit || marks != drawn) {
-        light(EUGENIA, FACE_DARK);
-        face_set_tired(tired);
-        face_set_marks(briefing_waits, trade_waits, charge);
+        light(FACE_DARK);
+        face_set_marks(briefing_waits, trade_waits, low, offline, charge);
         face_set_mode(FACE_DARK);
         vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
         drawn = marks;
@@ -133,7 +142,8 @@ static bool trade_came(void) {
 // In the dark: what waits for Gladys, and in its hours whether the briefing has.
 static void errand(void) {
     net_start();
-    if (net_wait(NET_ALL_MS)) {
+    offline = !net_wait(NET_ALL_MS);
+    if (!offline) {
         ota_confirm();
         bool tick = trade_came(), ask = briefing_due(time(NULL));
         if (tick || ask) {
@@ -155,60 +165,99 @@ static void errand(void) {
     sleep_now();
 }
 
-// Gladys journals what waits, and her dot follows what is left.
+// The journal of what waits; the sleep screen's mark follows what is left.
 static void journal(void) {
+    journaled = true;
     int left = gladys_journal();
     if (left >= 0) trade_waits = left > 0;
+    else offline = !net_wait(0);
+}
+
+// Her door out of reach because the network is: back to the lock screen,
+// where the no-internet mark says why.
+static void sleep_if_offline(int status) {
+    if (status < 0 && !net_wait(0)) {
+        offline = true;
+        sleep_now();
+    }
+}
+
+// One exchange with Eugenia: true when she answered.
+static bool exchange(void) {
+    int status = talk();
+    sleep_if_offline(status);
+    return status == 200;
+}
+
+/* Awake and idle, until PWR: true when it is pressed, false when it is time
+   to sleep — put down DOWN_READS readings running, or AWAKE_MS without a
+   press, counted from the last time she was held up to look. */
+static bool await_press(void) {
+    TickType_t looked = xTaskGetTickCount();
+    int down = 0;
+    for (;;) {
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LOOK_MS))) return true;
+        lift_hold_t hold = motion_hold();
+        if (hold == LIFT_HELD) looked = xTaskGetTickCount();
+        down = hold == LIFT_DOWN ? down + 1 : 0;
+        if (down == DOWN_READS || xTaskGetTickCount() - looked >= pdMS_TO_TICKS(AWAKE_MS)) return false;
+    }
 }
 
 static void awake(void) {
-    character_t who = trade_waits ? GLADYS : EUGENIA;
-    face_set_tired(power_low());
-    light(who, FACE_IDLE);
+    // Joining runs beside everything else: she listens while it does, and
+    // waits for it only to send. Offline when she last looked, nothing lights
+    // unless it answers now.
+    net_start();
+    if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
+    offline = false;
+
+    // PWR woke her: he wants to talk, so she listens before anything that
+    // waits. Otherwise a trade waiting keeps the screen dark until its
+    // questions cover it.
+    bool pressed = woke == ESP_SLEEP_WAKEUP_EXT0, trade = trade_waits && !pressed;
+    light(trade ? FACE_DARK : FACE_IDLE);
     bsp_display_lock(-1);
     lv_obj_t *screen = lv_screen_active();
-    static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED,
-                                             LV_EVENT_SHORT_CLICKED };
+    static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED };
     for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
     bsp_display_unlock();
 
-    // Joining runs beside everything else: she listens while it does, and
-    // waits for it only to send.
-    net_start();
     sound_start();
     sound_volume(cfg.volume);
     if (esp_reset_reason() == ESP_RST_POWERON) sound_chime();  // switched on, not woken or restarted
 
-    // A press is for what waits first: Gladys's journal, then Eugenia's briefing.
-    if (who == GLADYS) {
+    // What waits goes first: the journal, then the briefing, which brings her
+    // face up from the dark the journal left.
+    if (trade) {
         journal();
         if (!briefing_waits) sleep_now();
-        face_switch(EUGENIA);
-        vTaskDelay(pdMS_TO_TICKS(SLIDE_MS));
     }
-    bool spoke = false;
-    if (briefing_waits) {
-        briefing_waits = false;
-        spoke = talk_briefing();
-    }
+    bool spoke = pressed && exchange();
 
     for (;;) {
-        // A trade that came in while she spoke: Gladys, once she is done, and
-        // only then, so nothing interrupts her and nothing opens Gladys idle.
-        if (spoke && trade_came()) {
-            face_switch(GLADYS);
-            vTaskDelay(pdMS_TO_TICKS(SLIDE_MS));
+        if (briefing_waits) {
+            briefing_waits = false;
+            int status = talk_briefing();
+            sleep_if_offline(status);
+            spoke |= status == 200;
+        }
+        // A trade waiting once she is done — one that came in while she spoke,
+        // or one PWR put off — gets its questions then, and only then, so
+        // nothing interrupts her; once a waking, so walking away from it
+        // holds.
+        if (spoke && !journaled && (trade_came() || trade_waits)) {
             journal();
             sleep_now();
         }
-        if (!ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(AWAKE_MS))) sleep_now();
-        spoke = talk();
+        if (!await_press()) sleep_now();
+        spoke = exchange();
     }
 }
 
 static void life(void *arg) {
     (void)arg;
-    power_start();
+    power_start(xTaskGetCurrentTaskHandle());
     // A lift that was not him: back to sleep at once, the sensor resting.
     if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;
@@ -236,9 +285,9 @@ void app_main(void) {
              (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20), (int)woke);
 
     if (config_take_setup_request() || !config_ready()) {
-        light(EUGENIA, FACE_DARK);
+        light(FACE_DARK);
         setup_run();
     }
     // The stack holds a TLS handshake.
-    xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, &life_task, 0);
+    xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, NULL, 0);
 }

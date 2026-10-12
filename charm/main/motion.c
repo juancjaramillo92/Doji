@@ -12,6 +12,7 @@
 
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
+#include <string.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -41,8 +42,10 @@ static const char *TAG = "motion";
 #define THRESHOLD_MG 120
 #define BLANK        8
 #define APART_MS     150
+#define SAMPLES      8     // averaged into one reading, so the sensor's noise is not a hand's tremor
 
 static i2c_master_dev_handle_t chip;
+static bool reading;
 
 static void set(uint8_t reg, uint8_t v) {
     uint8_t out[2] = { reg, v };
@@ -68,6 +71,7 @@ static void command(uint8_t c) {
 
 void motion_arm(void) {
     attach();
+    reading = false;
     set(CTRL7, 0);
     set(CTRL1, 0x40 | 0x08);
     set(CTRL2, RANGE_2G | RATE_LOW);
@@ -83,13 +87,20 @@ static void read_g(float g[3]) {
     for (int i = 0; i < 3; i++) g[i] = (int16_t)(raw[2 * i] | raw[2 * i + 1] << 8) / 16384.0f;
 }
 
-bool motion_looked(void) {
+// Wake-on-motion off — a threshold of zero — and ordinary readings on.
+static void start_reading(void) {
+    if (reading) return;
     attach();
-    set(CAL1_L, 0);  // wake-on-motion off: a threshold of zero
+    set(CAL1_L, 0);
     command(WOM_SETTING);
     set(CTRL2, RANGE_2G | RATE_READ);
     set(CTRL7, 1);
     vTaskDelay(pdMS_TO_TICKS(30));
+    reading = true;
+}
+
+bool motion_looked(void) {
+    start_reading();
     float first[3], second[3];
     read_g(first);
     vTaskDelay(pdMS_TO_TICKS(APART_MS));
@@ -97,4 +108,20 @@ bool motion_looked(void) {
     bool looked = lift_seen(first, second);
     ESP_LOGI(TAG, "lift %s: %.2f %.2f %.2f", looked ? "seen" : "not him", second[0], second[1], second[2]);
     return looked;
+}
+
+lift_hold_t motion_hold(void) {
+    static float before[3];
+    static bool judged;
+    start_reading();
+    float now[3] = { 0 }, g[3];
+    for (int s = 0; s < SAMPLES; s++) {
+        read_g(g);
+        for (int i = 0; i < 3; i++) now[i] += g[i] / SAMPLES;
+        vTaskDelay(pdMS_TO_TICKS(8));
+    }
+    lift_hold_t hold = judged ? lift_hold(before, now) : LIFT_ELSE;
+    memcpy(before, now, sizeof now);
+    judged = true;
+    return hold;
 }

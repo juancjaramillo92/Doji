@@ -10,8 +10,25 @@
 #define FACING    0.4f
 #define STILL     0.15f
 
+/* Readings too: how flat is lying on a table — the share of gravity through
+   the screen — and how little two readings may differ for her to be lying
+   there rather than in a hand, which never holds that still. */
+#define FLAT      0.97f
+#define RESTING   0.01f
+
+static float moved(const float a[3], const float b[3]) {
+    float m = 0;
+    for (int i = 0; i < 3; i++) m += fabsf(a[i] - b[i]);
+    return m;
+}
+
 bool lift_seen(const float first[3], const float second[3]) {
-    float moved = 0;
-    for (int i = 0; i < 3; i++) moved += fabsf(first[i] - second[i]);
-    return SCREEN_Z * first[2] >= FACING && SCREEN_Z * second[2] >= FACING && moved <= STILL;
+    return SCREEN_Z * first[2] >= FACING && SCREEN_Z * second[2] >= FACING && moved(first, second) <= STILL;
+}
+
+lift_hold_t lift_hold(const float before[3], const float now[3]) {
+    float z = SCREEN_Z * now[2];
+    bool lying = fabsf(z) >= FLAT && moved(before, now) <= RESTING;
+    if (lying || z <= -FACING) return LIFT_DOWN;
+    return z >= FACING ? LIFT_HELD : LIFT_ELSE;
 }

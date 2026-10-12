@@ -145,4 +145,3 @@ void dial_lift(void) {
     }
 }
 
-bool dial_turned(void) { return turned; }
