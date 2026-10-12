@@ -82,9 +82,9 @@ charm/                                  firmware for the charm — see The charm
   main/motion.c                         the motion sensor, armed to wake her
   main/lift.c                           whether a lift was him looking
   main/ota.c                            her updates over Wi-Fi, from main
-  main/hanken_64.c                      Doji's typeface for the journal's words
+  main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
-  art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
+  art/eugenia.png                       a render; art/*.rgb565 and art/blush.argb the bytes drawn
   tools/art.py                          turns a render into those bytes
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -94,7 +94,7 @@ test/                                   node:test suites — see Tests
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
-.github/workflows/charm.yml             builds the charm firmware, kept as a download
+.github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -142,9 +142,9 @@ it.
 
 **The other half has no write path into any of it.** Eugenia reads the journal
 through `eugenia_trades`, a view granted `select` alone, and writes only tables
-of her own. She is woken by a schedule in pg_cron, a message he sent, or a
-trigger on `trades` firing when a position opens or closes — never by a clock
-she keeps herself.
+of her own. She is woken by a schedule in pg_cron, a message he sent, typed
+or spoken to his charm, or a trigger on `trades` firing when a position opens
+or closes — never by a clock she keeps herself.
 
 ```
    WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
@@ -153,8 +153,8 @@ she keeps herself.
  │           calendar ×4/h │        │ her own tables   8, 7 backed up    │
  │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
- │ trades    opened/closed │        │ the broker's price, via the poller │
- │                         │        │ calendar, market   via TradingView │
+ │ charm     he talks      │        │ the broker's price, via the poller │
+ │ trades    opened/closed │        │ calendar, market   via TradingView │
  └────────────┬────────────┘        └─────────────────┬──────────────────┘
               └───────────────┬───────────────────────┘
                               ▼
@@ -489,7 +489,8 @@ the delete back.
 
 **Supabase snapshots the whole database daily**, and the Pro plan keeps the last
 seven, under Database → Backups in the dashboard. A snapshot is every table,
-Vault included, and Doji keeps nothing in Storage, so it is everything there is.
+Vault included, and Doji keeps nothing in Storage but the charm's update, which
+the charm workflow rebuilds from `main`, so it is everything there is.
 It is the repair for a database that is gone or broken: a restore returns the
 whole project to that day, and everything written since — trades, answers, her
 memory — goes with it. Point-in-time recovery between snapshots is a paid
@@ -2670,7 +2671,8 @@ spare; the same firmware goes on any.
 `.github/workflows/charm.yml` in Espressif's ESP-IDF v5.5.4 image (pinned by
 digest) whenever `charm/` changes. The board's support package
 (`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
-component registry, at the versions Waveshare's own examples for this board use.
+component registry, at the versions Waveshare's own examples for this board use,
+with Espressif's audio codecs for the Opus a recording is encoded in.
 The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
@@ -2698,8 +2700,9 @@ from the render: blinks, glances, the mouth following the loudness of what
 plays; thinking, she looks up and away from one side to the other under three
 thought dots; when something goes wrong, her eyes go uneven and her smile turns
 down; going to sleep, her eyes close slowly. Only the face's own patch is
-redrawn on a frame; the ring — Doji's purples turning slowly round the rim — is
-the only thing that redraws the full screen, and only while it shows. **Nothing
+redrawn on a frame; the rings round the rim — Doji's purples turning slowly while
+she listens, and the one emptying while PWR is held — are the only things that
+redraw the full screen, and only while they show. **Nothing
 flashes between screens**: whatever comes up first is the only thing seen, so
 no face shows for a moment before the journal's questions or after them. Her
 state — a low battery, no internet — is never an expression on her face; it is
@@ -2712,7 +2715,7 @@ panel while the chip sleeps. Low on the screen, **one mark for what waits**:
 a purple dot with a glow while a briefing does, a white ring while a trade
 does, and the dot inside the ring when both do — one place and one size each,
 so nothing moves or shrinks when the other arrives, and shape tells them apart
-at a glance. At the top, a small battery when she is below 15% and off the
+at a glance. At the top, a small battery when she is at 15% or below and off the
 cable, and the **no-internet mark** when her last look for a network found
 none, side by side when both. On the cable, the charge as a ring round the rim
 with its percent. The marks wander a few pixels each time she sleeps, so a mark
@@ -3197,7 +3200,10 @@ the upserts, the Telegram sends, the model call — is tested for what it decide
 and through the doors `serve.test.mjs` drives, for what it sends; where a
 decision lives deeper than a test can reach, `agree.test.mjs` reads its source.
 Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
-`pg_cron` and Vault do, behind `test/db`'s stand-ins.
+`pg_cron` and Vault do, behind `test/db`'s stand-ins. The charm's firmware beyond its
+pure C: the charm workflow's build compiles the rest, and only the board shows
+what it does — **To check on the real board first** in **The charms** is that
+list.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and
