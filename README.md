@@ -1891,6 +1891,12 @@ his own word outlives the commitment. Its own kind because the two are read in
 opposite directions. `/notes` lists them between what he told her and what she
 noticed.
 
+**A commitment with a moment in it is the one that gets kept.** A plan that
+names its trigger is kept far more often than a resolution, and §9 says his
+failure has one trigger: the touch. So when he commits to something with no
+*when*, her one question is when it applies, and the note is written in his
+answer's words. The moment is his to name, never hers to supply.
+
 **What the notes add up to is one paragraph, and it outlives them.** She is shown
 the newest twenty of each kind, so the twenty-first fact pushes the oldest out of
 view: still searchable, but shaping nothing unless she thinks to look. The
@@ -2646,7 +2652,9 @@ stop and target distances (R-01, R-02), reward against risk at entry against R-0
 1:1.5, a high-rated US release inside R-14's thirty minutes, whether the day already
 rules out an entry (R-03, R-11, R-12, R-16), something already open (R-10), the
 Friday close (R-15). Whether the setup is the right kind of level is judgment and
-stays yours. **The levels stay yours**: she never suggests a different entry, stop
+stays yours, and her one question is your own probe for the touch, asked before
+the fact: what you will wait for at the level before you click. **The levels
+stay yours**: she never suggests a different entry, stop
 or target, never says whether to take it, and never turns "the ratio is 1:1.1"
 into the target that would fix it; `TRIM` removes a level she offers in place of
 yours. Both this and the printed level were your decision when the no-signal rule

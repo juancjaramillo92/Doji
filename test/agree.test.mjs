@@ -835,6 +835,29 @@ test('a commitment is recorded, audited, held against his trades and retired', (
     'retires the ones whose period is over');
 });
 
+/* ─── The moment a plan is kept or broken ────────────────────────────────────
+   A plan that names its trigger is kept far more often than one that does not,
+   and §9 says his failure has one trigger: the touch. Two sentences carry it,
+   and nothing structural does, so this reads for both. R-07's probe is quoted
+   as the rules table words it, so a reworded rule fails the copy here.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('she asks for the moment a commitment applies, and asks his probe for the touch before the fact', () => {
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  assert.match(system, /A COMMITMENT WITH A WHEN IN IT IS THE ONE THAT GETS KEPT/,
+    'SYSTEM no longer asks him when a commitment applies, so "be more patient" is ' +
+    'recorded as he said it and names no moment the habit fires in');
+  assert.match(system, /The moment is his to name, never yours to supply/,
+    'SYSTEM asks for the moment but no longer says it is his — she would write ' +
+    'a commitment he never made');
+  assert.match(system, /YOUR ONE QUESTION IS HIS OWN PROBE FOR THE TOUCH, ASKED BEFORE THE FACT/,
+    'a plan check no longer asks what he will wait for at the level');
+
+  const probe = ALWAYS.match(/\| R-07 \|[^\n]*?\*"([^"]+)"\*/)?.[1];
+  assert.ok(probe, 'the rules table no longer words R-07 as a probe');
+  assert.ok(system.includes(`"${probe}"`),
+    `SYSTEM quotes R-07's probe differently from the rules table ("${probe}")`);
+});
+
 /* ─── Who the database and Gmail think they are calling ─────────────────────
    A function's name is its directory and every caller's URL, and the callers
    are SQL and an Apps Script that nothing compiles. A missed rename is a 404
