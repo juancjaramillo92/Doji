@@ -5335,23 +5335,23 @@ test('the briefing is handed the rules his trades broke, and told to take them f
    Whether a Sunday reads weekBlock, is told what to do with it, and is spared
    the critic counting the week's list against the words — or the prose is cut
    to make room every Sunday. */
-test('the Sunday briefing reads the week, is told it is about the week, and the critic does not count it', () => {
+test('the Sunday briefing reads the week and tells it rather than lists it, in both copies', () => {
   const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
   assert.match(brief, /due === 'sunday' \? weekBlock\(\) : calendarBlock\(\)/,
     'the Sunday briefing no longer reads the week, so it sees only to Monday evening');
-  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
-  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1];
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
   assert.match(system, /Today's releases and nothing else/,
     'the weekday calendar lists more than its own day again, so tomorrow arrives twice');
-  assert.match(system, /the one briefing that lists more than its own day/,
-    'SYSTEM no longer says Sunday is the exception to the day-only calendar');
-  assert.match(system, /not\s+a look back at his week/,
+  assert.match(system, /not a look back at his week/,
     'SYSTEM no longer rules out a weekly review, which he decided against');
-  assert.match(system, /week's calendar is a list of the week\s+and is not counted/,
-    'SYSTEM counts the week\'s list against the words');
-  assert.match(critic.replace(/\s+/g, ' '), /a week's calendar, which the briefing that opens the week carries, is not counted/,
-    'CRITIC counts the week\'s list against the words, and it runs last');
+  /* THE WEEK IS TOLD, IN BOTH COPIES. The critic runs last, so a writer told
+     to tell the week under a critic that keeps the list gets the list back. */
+  assert.match(system, /THE WEEK IS TOLD, NOT LISTED: Sunday has no calendar slot\. Name the release that carries the week with its day/,
+    'SYSTEM has Sunday list the week again, which he has on his own screen');
+  assert.match(critic, /IS IT SUNDAY'S\? Then the week is told, not listed: a day-by-day list of releases comes out/,
+    'CRITIC no longer takes the week\'s list out of a Sunday briefing, and it runs last');
 });
 
 /* ─── The market around gold, in a conversation ──────────────────────────────
