@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 92 checks.
+-- whole file after any manual change and read the `ok` column — all 93 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -383,6 +383,15 @@ from (values
      where tgrelid in (to_regclass('public.eugenia_thesis'), to_regclass('public.eugenia_portrait'))
        and tgname in ('eugenia_thesis_keep', 'eugenia_portrait_keep') and not tgisinternal),
    'eugenia_portrait_keep,eugenia_thesis_keep'),
+
+  -- record_read writes both and the record reads both; missing, every filing
+  -- is a 400 she reports as unsaved and the record goes blank.
+  ('her record carries how firmly and what she misread',
+   (select coalesce(string_agg(column_name, ',' order by column_name), 'none')
+      from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_reads'
+       and column_name in ('firmness', 'lesson')),
+   'firmness,lesson'),
 
   ('RLS on eugenia_runs',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),

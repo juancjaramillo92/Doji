@@ -1296,6 +1296,9 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 export const READ_VERDICTS = ['held', 'wrong', 'untested'] as const;
 export const READ_MAX = 300;
+// How firmly a read was said, read off her words at night: the two halves the
+// record compares, since a firm read should miss less often than a light one.
+export const READ_FIRMNESS = ['light', 'firm'] as const;
 
 const RECORD_TOOL = {
   name: "record_read",
@@ -1306,7 +1309,8 @@ const RECORD_TOOL = {
     "had its chance and did not, and what you were handed shows that; 'untested' " +
     "when the day did not settle it, what would settle it is not in front of you, " +
     "or the test was gold's own price. Judge only the test you stated, never where " +
-    "price went.",
+    "price went. Say how firmly you said it, read off your own words. On a read that " +
+    "proved wrong, name the one link in the chain you misread.",
   input_schema: {
     type: "object",
     properties: {
@@ -1314,8 +1318,12 @@ const RECORD_TOOL = {
       test: { type: "string", description: `What you said would prove it wrong, at most ${READ_MAX} characters.` },
       verdict: { type: "string", enum: READ_VERDICTS },
       evidence: { type: "string", description: `What in front of you settled it, or why nothing did, at most ${READ_MAX} characters.` },
+      firmness: { type: "string", enum: READ_FIRMNESS,
+                  description: "'firm' when you said it as a view you held with conviction; 'light' when you said it as a lean." },
+      lesson: { type: "string",
+                description: `Only when the verdict is wrong: the one link in the chain you misread, in a sentence of at most ${NOTE_MAX} characters — "I read the dollar as leading when the two-year was". Never "be more careful".` },
     },
-    required: ["reading", "test", "verdict", "evidence"],
+    required: ["reading", "test", "verdict", "evidence", "firmness"],
     additionalProperties: false,
   },
 } as const;
@@ -1324,7 +1332,7 @@ const RECORD_TOOL = {
    check constraint answers a bad one with a 400 that reads as a database
    fault. */
 async function recordRead(reading: unknown, test: unknown, verdict: unknown,
-                          evidence: unknown): Promise<string> {
+                          evidence: unknown, firmness: unknown, lesson: unknown): Promise<string> {
   const said = String(reading ?? "").trim().slice(0, READ_MAX);
   const against = String(test ?? "").trim().slice(0, READ_MAX);
   if (!said || !against) return "A read is filed with what would prove it wrong, or not at all.";
@@ -1332,6 +1340,15 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
   if (!(READ_VERDICTS as readonly string[]).includes(v)) {
     return `"${v}" is not a verdict. They are ${READ_VERDICTS.join(", ")}.`;
   }
+  const firm = String(firmness ?? "");
+  if (!(READ_FIRMNESS as readonly string[]).includes(firm)) {
+    return `"${firm}" is not how firmly a read was said. It is ${READ_FIRMNESS.join(" or ")}.`;
+  }
+  // A miss teaches only with the link named; a lesson on anything else is a
+  // lesson from nothing.
+  const learnt = String(lesson ?? "").trim().slice(0, NOTE_MAX);
+  if (v === 'wrong' && !learnt) return "A read that proved wrong is filed with the link you misread.";
+  if (v !== 'wrong' && learnt) return "Only a read that proved wrong carries a lesson. File it without one.";
   try {
     // A retry after a pass that failed half-way files the same reads again;
     // the same words on the same day are one read.
@@ -1340,6 +1357,7 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
       body: JSON.stringify([{
         given_on: nyDate(new Date()), reading: said, test: against, verdict: v,
         evidence: String(evidence ?? "").trim().slice(0, READ_MAX) || null,
+        firmness: firm, lesson: learnt || null,
       }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1526,7 +1544,8 @@ export async function serve(name: string, input: any): Promise<string> {
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
-    case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence);
+    case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
+                                                 input.firmness, input.lesson);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
       return unserved(name);
@@ -2294,7 +2313,8 @@ export async function portraitBlock(): Promise<string> {
    short enough that it is about how she reads now. The three newest misses
    come with it, because a count says how often and only the misses say what
    she keeps getting wrong. */
-type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null };
+type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null;
+              firmness: string | null; lesson: string | null };
 
 const RECORD_DAYS = 30;
 const RECORD_MISSES = 3;
@@ -2302,15 +2322,24 @@ const RECORD_MISSES = 3;
 // A read a message at most, so a month is never near the limit; it is there
 // because every read carries one.
 export function recordQuery(now = Date.now()): string {
-  return `eugenia_reads?select=given_on,reading,test,verdict,evidence` +
+  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson` +
     `&given_on=gte.${nyDate(new Date(now - RECORD_DAYS * 86_400_000))}&order=id.desc&limit=200`;
 }
 
-const tally = (rows: Read[]) => READ_VERDICTS.map(v =>
+const count = (rows: Read[]) => READ_VERDICTS.map(v =>
   `${rows.filter(r => r.verdict === v).length} ${v === 'wrong' ? 'proved wrong' : v}`).join(", ");
 
+/* The whole month, then each firmness on its own: a firm read should miss less
+   often than a light one, and only the split can say whether it does. Reads
+   filed before firmness was asked are in the whole and in neither half. */
+const tally = (rows: Read[]) => count(rows) + READ_FIRMNESS
+  .map(f => [f, rows.filter(r => r.firmness === f)] as const)
+  .filter(([, said]) => said.length)
+  .map(([f, said]) => `; said ${f === 'firm' ? 'firmly' : 'lightly'}, ${count(said)}`).join("");
+
 const misses = (rows: Read[]) => rows.filter(r => r.verdict === 'wrong').slice(0, RECORD_MISSES)
-  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}`)
+  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}` +
+            (r.lesson ? `. Misread: ${r.lesson}` : ""))
   .join("\n");
 
 export function recordList(rows: Read[]): string {

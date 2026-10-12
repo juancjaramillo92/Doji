@@ -3872,18 +3872,24 @@ test('how she reads him carries the day it last moved, and an absent one says no
    A count says how often; only the misses say what she keeps getting wrong. */
 const READS = [
   { given_on: '2026-07-30', reading: 'a hot print is bad for gold', test: 'the two-year falls on it',
-    verdict: 'wrong', evidence: 'the two-year fell eight basis points' },
+    verdict: 'wrong', evidence: 'the two-year fell eight basis points', firmness: 'firm',
+    lesson: 'I took the dollar as leading when the two-year was' },
   { given_on: '2026-07-29', reading: 'claims do not move the Fed', test: 'December pricing moves',
-    verdict: 'held', evidence: 'December barely moved' },
+    verdict: 'held', evidence: 'December barely moved', firmness: 'light', lesson: null },
   { given_on: '2026-07-28', reading: 'the dollar leads today', test: 'the dollar index falls',
-    verdict: 'untested', evidence: null },
+    verdict: 'untested', evidence: null, firmness: 'firm', lesson: null },
+  // Filed before firmness was asked: in the month, in neither half.
   ...['07-27', '07-24', '07-23'].map((d, i) => ({ given_on: `2026-${d}`, reading: `miss ${i}`,
-    test: 'a test', verdict: 'wrong', evidence: 'it fired' })),
+    test: 'a test', verdict: 'wrong', evidence: 'it fired', firmness: null, lesson: null })),
 ];
 
 test('her record counts every verdict and names the newest misses, three at most', () => {
   const out = recordList(READS);
-  assert.match(out, /judged at night by the test you stated: 1 held, 4 proved wrong, 1 untested\./);
+  assert.match(out, /judged at night by the test you stated: 1 held, 4 proved wrong, 1 untested; /);
+  assert.match(out, /said lightly, 1 held, 0 proved wrong, 0 untested; said firmly, 0 held, 1 proved wrong, 1 untested\./,
+    'the record no longer splits by how firmly a read was said, or counts an unmarked read in a half');
+  assert.match(out, /Misread: I took the dollar as leading when the two-year was/,
+    'a miss no longer says which link she misread');
   assert.match(out, /30 Jul: a hot print is bad for gold \(wrong if the two-year falls on it\) — the two-year fell/);
   assert.ok(out.includes('miss 0') && out.includes('miss 1') && !out.includes('miss 2'),
     'more than three misses are listed, or not the newest');
@@ -4056,7 +4062,7 @@ test('the audit he asks for carries everything she keeps', () => {
     READS);
 
   assert.match(out, /What you have told me/);
-  assert.match(out, /My reads over the last 30 days, each judged by the test I stated and never by where price went: 1 held, 4 proved wrong, 1 untested\./);
+  assert.match(out, /My reads over the last 30 days, each judged by the test I stated and never by where price went: 1 held, 4 proved wrong, 1 untested; said lightly, 1 held, 0 proved wrong, 0 untested; said firmly, 0 held, 1 proved wrong, 1 untested\./);
   assert.match(out, /The latest I got wrong:\n· 30 Jul: a hot print/);
   assert.match(out, /How I read you, last moved 12 Mar:\nHe cuts winners/);
   assert.match(out, /What I have noticed/);
@@ -4167,15 +4173,29 @@ test('a read is filed once, with a verdict the table accepts, and never without 
       'a read with no test is filed, so a verdict on nothing enters her record');
     assert.equal(posts.length, 0, 'a refused read still reached the database');
 
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'held', evidence: 'x', firmness: 'loud' }),
+      /"loud" is not how firmly/, 'a firmness the check constraint refuses is sent');
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'wrong', evidence: 'x', firmness: 'firm' }),
+      /filed with the link you misread/, 'a miss is filed without what it teaches');
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'held', evidence: 'x', firmness: 'firm',
+        lesson: 'nothing' }), /Only a read that proved wrong carries a lesson/,
+      'a read that held is filed with a lesson from nothing');
+    assert.equal(posts.length, 0, 'a refused read still reached the database');
+
     assert.equal(await serve('record_read',
       { reading: 'a hot print is bad for gold', test: 'the two-year falls', verdict: 'wrong',
-        evidence: 'it fell' }), 'Filed.');
+        evidence: 'it fell', firmness: 'firm', lesson: 'I read the dollar as leading' }), 'Filed.');
   });
   // A retry's refiling lands on the unique index and is dropped, not doubled.
   assert.match(posts[0].url, /eugenia_reads\?on_conflict=given_on,reading$/);
   assert.match(posts[0].prefer, /resolution=ignore-duplicates/);
   const [row] = JSON.parse(posts[0].body);
   assert.equal(row.verdict, 'wrong');
+  assert.equal(row.firmness, 'firm');
+  assert.equal(row.lesson, 'I read the dollar as leading');
   assert.match(row.given_on, /^\d{4}-\d\d-\d\d$/, 'the read is not filed under a New York civil day');
 });
 

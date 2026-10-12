@@ -678,6 +678,17 @@ create table if not exists public.eugenia_reads (
 -- read. A plain unique index, for PostgREST's `on_conflict` to infer.
 create unique index if not exists eugenia_reads_once on public.eugenia_reads (given_on, reading);
 
+-- How firmly she said it, read off her own words at night, so her record can
+-- say whether her firm reads miss as often as her light ones; and on a miss,
+-- the one link in the chain she misread, so a miss teaches rather than counts.
+-- Added after the table, so a fresh build and the live one end with the same
+-- column order; null on every read filed before them. That a lesson rides only
+-- on a miss is the function's check: a column check may not name another.
+alter table public.eugenia_reads add column if not exists firmness text
+  constraint eugenia_reads_firmness_check check (firmness in ('light', 'firm'));
+alter table public.eugenia_reads add column if not exists lesson text
+  constraint eugenia_reads_lesson_length check (char_length(lesson) between 1 and 200);
+
 alter table public.eugenia_reads enable row level security;
 
 -- ─── Open threads ──────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
@@ -3308,6 +3308,12 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
   }
   const evidence = SCHEMA_SQL.match(/eugenia_reads_evidence_length check \(char_length\(evidence\) <= (\d+)\)/);
   assert.equal(READ_MAX, Number(evidence?.[1]), 'index.ts truncates evidence past what the table accepts');
+  const firmness = SCHEMA_SQL.match(/eugenia_reads_firmness_check check \(firmness in \(([^)]*)\)\)/);
+  assert.ok(firmness, 'schema.sql no longer bounds how firmly a read was said');
+  assert.deepEqual(firmness[1].split(',').map(v => v.trim().replace(/'/g, '')), [...READ_FIRMNESS],
+    'index.ts sends a firmness the table refuses, or never sends one it accepts');
+  const lesson = SCHEMA_SQL.match(/eugenia_reads_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
+  assert.equal(NOTE_MAX, Number(lesson?.[1]), 'index.ts truncates a lesson past what the table accepts');
 });
 
 /* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,

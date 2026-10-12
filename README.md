@@ -412,6 +412,7 @@ single-sourced at run time:
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
+| how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
 | the **verdicts a read may carry** | `READ_VERDICTS` in `index.ts` and the check constraint |
@@ -1844,6 +1845,13 @@ makes a retry's refiling a no-op.
   untested, and `SYSTEM` asks her to name a link in the chain instead — the
   two-year, the dollar, the next meeting's pricing — which is also the part he
   learns from.
+- **How firmly, and what she misread.** Each read is filed with how firmly she
+  said it, off her own words — firm or light — and the month is counted whole
+  and then by each, since a firm read that misses as often as a light one is
+  firmness telling him nothing. A miss is filed with the one link in the chain
+  she misread, which is what makes it teach rather than count; a lesson on a
+  read that held is refused. Reads filed before either column existed count in
+  the month and in neither half.
 - **The record is hers.** A month of counts and the three newest misses go to the
   briefing and a reply, the two paths that give a read, and to the pass; never
   the trade look, which carries none and arrives while he is in a position. It
