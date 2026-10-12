@@ -9,15 +9,17 @@
    unless a briefing waits too, when Eugenia comes up from black to read it.
    Otherwise Eugenia wakes, and reads a waiting briefing at once. PWR is the
    talk button (power.c, talk.c): a press and she listens, the next sends; from
-   sleep, the press that wakes her has her listening before anything else, a
-   waiting trade's questions coming after her answer. A trade that came in
-   while she spoke puts its questions up once she is done, and then she
-   sleeps; if he has put her down to listen, she sleeps at once and the trade
-   waits under its mark. A waiting briefing is read either way: he is near,
-   listening. Awake, she feels about once a second whether she is held up to
-   look, which keeps her awake, or has been put down, which puts her to sleep
-   a couple of seconds later; otherwise AWAKE_MS without a press does: her eyes
-   close and the chip stops (sleep.c). Lifting her to look wakes her
+   sleep, the press that wakes her has her listening before anything else.
+   The conversation comes first: a trade that waits, or comes in while they
+   talk, is kept for when it is over — never put between her words, nor
+   before a waiting briefing, which is read after her answer however she is
+   held. Between turns she feels about once a second whether she is held up
+   to look, which keeps her awake, or has been put down, which puts her to
+   sleep a couple of seconds later; otherwise AWAKE_MS without a press does:
+   her eyes close and the chip stops (sleep.c). Held up and quiet for
+   QUIET_MS, the conversation is over, and a waiting trade's questions come up
+   from the dark her eyes close to; put down, she sleeps with the trade under
+   its ring. PWR closes the questions for her, the trade waiting again. Lifting her to look wakes her
    (motion.c), and so do a tap on the screen, PWR and BOOT. With no
    internet when she last looked she stays on her lock screen, its mark saying
    why, unless the network answers within OFFLINE_TRY_MS; and losing it while
@@ -73,6 +75,7 @@ static const char *TAG = "charm";
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
 #define LOOK_MS       1000   // awake and idle, how often she feels whether she is held
 #define DOWN_READS    2      // put down this many readings running, she sleeps
+#define QUIET_MS      8000   // held up and quiet this long after her last word, the conversation is over
 
 // What waits, whether the internet answered last time, what the sleep screen
 // last drew, and when the next errand is; all kept through sleep.
@@ -81,7 +84,7 @@ static RTC_DATA_ATTR int drawn = -1;
 static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
-static bool lit, journaled;
+static bool lit;
 
 // A slide round the rim is the volume; a tap on a question is the journal's.
 static void on_touch(lv_event_t *e) {
@@ -109,18 +112,22 @@ static void light(face_mode_t mode) {
 // Her briefing has landed: lit for Eugenia to say so.
 static void light_eugenia(void) { light(FACE_THINKING); }
 
-/* Goodnight, when her face is showing — the journal leaves the dark already
-   up — then the sleep screen, drawn only when its marks differ from what the
+// Her eyes closing, when her face is showing; the journal leaves the dark already up.
+static void close_eyes(void) {
+    if (lit && face_get_mode() != FACE_DARK) {
+        face_set_mode(FACE_ASLEEP);
+        vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
+    }
+}
+
+/* Goodnight, her eyes closing, then the sleep screen, drawn only when its marks differ from what the
    panel already holds, then deep sleep until the next errand, the motion
    sensor armed. */
 static void sleep_now(void) {
     int charge = power_charge();
     bool low = power_low();
     int marks = briefing_waits | trade_waits << 1 | low << 2 | offline << 3 | (charge + 1) << 4;
-    if (lit && face_get_mode() != FACE_DARK) {
-        face_set_mode(FACE_ASLEEP);
-        vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
-    }
+    close_eyes();
     if (lit || marks != drawn) {
         light(FACE_DARK);
         face_set_marks(briefing_waits, trade_waits, low, offline, charge);
@@ -167,12 +174,13 @@ static void errand(void) {
     sleep_now();
 }
 
-// The journal of what waits; the sleep screen's mark follows what is left.
-static void journal(void) {
-    journaled = true;
+/* The journal of what waits; the sleep screen's mark follows what is left.
+   True when PWR closed it: he wants her, and the press is taken. */
+static bool journal(void) {
     int left = gladys_journal();
     if (left >= 0) trade_waits = left > 0;
     else offline = !net_wait(0);
+    return ulTaskNotifyTake(pdTRUE, 0);
 }
 
 // Her door out of reach because the network is: back to the lock screen,
@@ -191,31 +199,25 @@ static bool exchange(void) {
     return status == 200;
 }
 
-/* Awake and idle, until PWR: true when it is pressed, false when it is time
-   to sleep — put down DOWN_READS readings running, or AWAKE_MS without a
-   press, counted from the last time she was held up to look. */
-static bool await_press(void) {
-    TickType_t looked = xTaskGetTickCount();
+/* Between turns, how the conversation goes on or ends: PWR, and he talks
+   again; with a trade waiting, held up to look and quiet QUIET_MS since she
+   finished, and the conversation is over with him looking; put down
+   DOWN_READS readings running, or AWAKE_MS since she was last held up, and he
+   has gone. */
+typedef enum { NEXT_TURN, OVER_LOOKING, OVER_AWAY } between_t;
+
+static between_t between_turns(bool trade) {
+    TickType_t finished = xTaskGetTickCount(), looked = finished;
     int down = 0;
     for (;;) {
-        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LOOK_MS))) return true;
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LOOK_MS))) return NEXT_TURN;
         lift_hold_t hold = motion_hold();
-        if (hold == LIFT_HELD) looked = xTaskGetTickCount();
+        TickType_t now = xTaskGetTickCount();
+        if (hold == LIFT_HELD) looked = now;
+        if (trade && hold == LIFT_HELD && now - finished >= pdMS_TO_TICKS(QUIET_MS)) return OVER_LOOKING;
         down = hold == LIFT_DOWN ? down + 1 : 0;
-        if (down == DOWN_READS || xTaskGetTickCount() - looked >= pdMS_TO_TICKS(AWAKE_MS)) return false;
+        if (down == DOWN_READS || now - looked >= pdMS_TO_TICKS(AWAKE_MS)) return OVER_AWAY;
     }
-}
-
-/* Whether she lies put down now: DOWN_READS readings running, LOOK_MS apart,
-   as await_press takes them. The first only refreshes the reading they are
-   judged against, which is otherwise from before she spoke. */
-static bool lying_down(void) {
-    motion_hold();
-    for (int i = 0; i < DOWN_READS; i++) {
-        vTaskDelay(pdMS_TO_TICKS(LOOK_MS));
-        if (motion_hold() != LIFT_DOWN) return false;
-    }
-    return true;
 }
 
 static void awake(void) {
@@ -242,12 +244,14 @@ static void awake(void) {
     if (esp_reset_reason() == ESP_RST_POWERON) sound_chime();  // switched on, not woken or restarted
 
     // What waits goes first: the journal, then the briefing, which brings her
-    // face up from the dark the journal left.
+    // face up from the dark the journal left. PWR closes the journal and she
+    // listens, the briefing after her answer.
+    bool listen = pressed;
     if (trade) {
-        journal();
-        if (!briefing_waits) sleep_now();
+        listen = journal();
+        if (!listen && !briefing_waits) sleep_now();
     }
-    bool spoke = pressed && exchange();
+    bool spoke = listen && exchange();
 
     for (;;) {
         if (briefing_waits) {
@@ -256,16 +260,19 @@ static void awake(void) {
             sleep_if_offline(status);
             spoke |= status == 200;
         }
-        // A trade waiting once she is done — one that came in while she spoke,
-        // or one PWR put off — gets its questions then, and only then, so
-        // nothing interrupts her; once a waking, so walking away from it
-        // holds. Put down, nobody is looking at the screen: the trade waits
-        // under its mark for the next lift.
-        if (spoke && !journaled && (trade_came() || trade_waits)) {
-            if (!lying_down()) journal();
-            sleep_now();
+        // Each answer asks what waits, and a trade is kept for when the
+        // conversation is over: its questions come up from the dark once he
+        // has stopped and is looking, and walking away from them holds — she
+        // sleeps after. PWR on them and the conversation goes on, the trade
+        // waiting again.
+        if (spoke) trade_came();
+        between_t next = between_turns(trade_waits);
+        if (next == OVER_AWAY) sleep_now();
+        if (next == OVER_LOOKING) {
+            close_eyes();
+            face_set_mode(FACE_DARK);
+            if (!journal()) sleep_now();
         }
-        if (!await_press()) sleep_now();
         spoke = exchange();
     }
 }

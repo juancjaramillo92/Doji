@@ -264,19 +264,33 @@ test('Eugenia\'s charm sends the headers her door reads, and knows the frames it
   assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
 });
 
-/* Put down while she thinks, she finishes — and what follows her answer asks
-   whether she lies put down only where it would be wasted: the trade's
-   questions on a screen nobody looks at. The briefing is read regardless; he
-   put her down to listen. main.c is the board's, so the call is read. */
-test('after her answer, only the trade\'s questions wait on whether she is put down', () => {
-  const awake = bodyOf(source('charm/main/main.c'), 'static void awake(void) {', 'main.c has no awake()');
-  const after = awake.slice(awake.indexOf('for (;;) {'));
-  assert.match(after, /if \(spoke && !journaled && \(trade_came\(\) \|\| trade_waits\)\) \{\s*if \(!lying_down\(\)\) journal\(\);\s*sleep_now\(\);/,
-    'the trade after her answer no longer skips its questions when she lies put down');
-  const briefing = after.match(/if \(briefing_waits\) \{[^}]*\}/);
+/* The conversation comes first, and a trade waits for it to end. Its
+   questions come up only once the conversation is over with him looking —
+   never after a single answer, never before a waiting briefing, which is read
+   however she is held — and PWR on them is a press she keeps: the questions
+   only look for it, and her task takes it to listen. main.c and journal.c are
+   the board's, so the calls are read. */
+test('a trade\'s questions wait for the conversation to end, and PWR on them goes back to her', () => {
+  const main = source('charm/main/main.c');
+  const awake = bodyOf(main, 'static void awake(void) {', 'main.c has no awake()');
+  const loop = awake.slice(awake.indexOf('for (;;) {'));
+  assert.equal((loop.match(/journal\(\)/g) ?? []).length, 1, 'the conversation reaches the journal by more than one path');
+  assert.match(loop, /if \(next == OVER_LOOKING\) \{[^}]*if \(!journal\(\)\) sleep_now\(\);/,
+    'the journal after a conversation no longer waits for it to be over, or no longer goes back to her on PWR');
+  const briefing = loop.match(/if \(briefing_waits\) \{[^}]*\}/);
   assert.ok(briefing, 'awake() no longer reads a waiting briefing as this test finds it');
-  assert.doesNotMatch(briefing[0], /lying_down|motion_hold/, 'a waiting briefing now waits on whether she is put down');
-  assert.equal((awake.match(/lying_down\(\)/g) ?? []).length, 1, 'something else in awake() now asks whether she is put down');
+  assert.ok(loop.indexOf(briefing[0]) < loop.indexOf('between_turns('), 'a waiting briefing now waits for the conversation to end');
+  assert.doesNotMatch(briefing[0], /motion_hold|between_turns/, 'a waiting briefing now waits on how she is held');
+
+  const between = bodyOf(main, 'static between_t between_turns(bool trade) {', 'main.c has no between_turns()');
+  assert.match(between, /if \(trade && hold == LIFT_HELD && now - finished >= pdMS_TO_TICKS\(QUIET_MS\)\) return OVER_LOOKING;/,
+    'the conversation is no longer over only when a trade waits and he is held up and quiet');
+  assert.match(bodyOf(main, 'static bool journal(void) {', 'main.c has no journal()'), /return ulTaskNotifyTake\(pdTRUE, 0\);/,
+    'the journal no longer hands back the PWR that closed it');
+
+  const ask = bodyOf(source('charm/main/journal.c'), 'int journal_ask(int q, const bool missing[4]) {', 'journal.c has no journal_ask()');
+  assert.match(ask, /ulTaskNotifyValueClear\(NULL, 0\)/, 'a question no longer gives way to PWR');
+  assert.doesNotMatch(ask, /ulTaskNotifyTake/, 'a question takes the press that closed it, so she never hears it');
 });
 
 /* The charm's words are drawn in fonts holding only the letters
