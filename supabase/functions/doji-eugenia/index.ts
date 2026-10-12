@@ -736,8 +736,13 @@ const STATS_TOOL = {
   description:
     "The journal summarised over the last N days — win rate, wins/losses/break-evens, " +
     "gross, losses and net, average win and average loss, the realised " +
-    "reward-to-risk, how much of the total is the broker's settled figure, and " +
-    "the same broken down by session and by setup. These are " +
+    "reward-to-risk, how much of the total is the broker's settled figure, his " +
+    "own answers to whether he followed his rules, respected his stop and " +
+    "respected his target, each over the trades that answered it with the " +
+    "unanswered counted apart, and the same broken down by session and by " +
+    "setup. The rules answer is the only record of entering on the touch, §9 of " +
+    "his strategy, so a rate of it over a stretch with many blanks is a rate of " +
+    "his answering as much as of his discipline: say so. These are " +
     "the figures his own journal app shows him, computed from the rows the same " +
     "way, so they agree with what is on his screen. USE THIS RATHER THAN WORKING " +
     "IT OUT of get_trades: a break-even is measured in price and sits in the win " +

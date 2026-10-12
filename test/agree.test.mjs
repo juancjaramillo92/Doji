@@ -25,7 +25,8 @@ import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_V
          parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
-import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
+import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
+         discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
 import { HOME } from '../supabase/functions/doji-eugenia/adherence.ts';
 
@@ -4518,6 +4519,15 @@ test('the journal stats compute what the app computes, row for row', async () =>
     assert.equal(hers.wr, Math.round(theirs.wr * 100) / 100, 'the win rate differs');
     assert.deepEqual(money(rows), { ...app.money(rows) }, 'the money split differs');
     assert.deepEqual(averages(rows), { ...app.averages(rows) }, 'the averages differ');
+
+    /* His three answers, read off the bars the app draws: each bar's title is
+       followed/answered, Rules then Stop Loss then Take Profit. */
+    const bars = [...app.disciplineBars(rows).matchAll(/title="(\d+)\/(\d+) followed"/g)]
+      .map(m => ({ followed: Number(m[1]), answered: Number(m[2]) }));
+    const d = discipline(rows);
+    assert.deepEqual([d.rules, d.sl, d.tp], bars,
+      'his discipline answers differ from the bars on his screen — she would say ' +
+      'he followed his rules at a rate his own journal does not show');
 
     /* Every half hour of a year, so both daylight-saving seasons of all four
        centres are crossed; the boundaries are whole hours. */

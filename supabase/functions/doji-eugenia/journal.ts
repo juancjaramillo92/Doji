@@ -133,6 +133,22 @@ export function averages(rows: TradeRow[]): Averages {
 export const realisedRR = (a: Averages): number | null =>
   a.avgWin !== null && a.avgLoss ? round2(a.avgWin / a.avgLoss) : null;
 
+/* His own three answers, as the app's discipline bars count them: over the
+   trades where the question was ANSWERED, since every fill arrives blank and a
+   blank counted as a miss depresses every rate it touches. `followed_rules` is
+   §9's one signature of entering on the touch, which no price column can
+   see. `disciplineBars` in the app. */
+export interface Answers { followed: number; answered: number }
+export type Discipline = Record<'rules' | 'sl' | 'tp', Answers>;
+
+export function discipline(rows: TradeRow[]): Discipline {
+  const of = (key: 'followed_rules' | 'followed_sl' | 'followed_tp'): Answers => {
+    const answered = rows.filter(t => t[key] != null);
+    return { followed: answered.filter(t => t[key] === true).length, answered: answered.length };
+  };
+  return { rules: of('followed_rules'), sl: of('followed_sl'), tp: of('followed_tp') };
+}
+
 // Setup and all three answers; P&L is not required, since a position can be
 // journalled while open.
 export const isJournalled = (t: TradeRow): boolean =>
@@ -165,6 +181,7 @@ export interface Stats {
   money: Money;
   averages: Averages;
   rr: number | null;
+  discipline: Discipline;
   // Of the rows with a P&L: the broker's settled figure, or the fold.
   settled: number;
   fellBack: number;
@@ -186,6 +203,7 @@ export function journalStats(rows: TradeRow[]): Stats {
     money: money(rows),
     averages: avg,
     rr: realisedRR(avg),
+    discipline: discipline(rows),
     settled: priced.filter(t => t.net_pnl != null).length,
     fellBack: priced.filter(t => t.net_pnl == null).length,
     seam: rows.filter(t => t.entry_time == null && t.fill_time != null).length,
@@ -198,6 +216,8 @@ export function journalStats(rows: TradeRow[]): Stats {
 
 const pct = (v: number | null) => v === null ? '—' : `${v}%`;
 const usd = (v: number | null) => v === null ? '—' : `$${v.toFixed(2)}`;
+const answers = (a: Answers, n: number) =>
+  `${a.followed} of ${a.answered} answered (${n - a.answered} unanswered)`;
 
 /* Rendered here, so what she is told is a decision a test can read. Every
    figure carries its population: a rate without its denominator is what §8
@@ -225,6 +245,11 @@ export function statsList(s: Stats, days: number): string {
       : '',
     `· average win ${usd(s.averages.avgWin)}, average loss ${usd(s.averages.avgLoss)}, ` +
       `realised reward-to-risk ${s.rr === null ? '—' : `1:${s.rr}`} — realised, not planned`,
+    // His answers, each over the trades that answered it, the blanks said apart.
+    `· his own answers: rules followed on ${answers(s.discipline.rules, s.n)}; ` +
+      `stop respected on ${answers(s.discipline.sl, s.n)}; ` +
+      `target respected on ${answers(s.discipline.tp, s.n)}. The stop and target ` +
+      `answers are given at open, so they record intent rather than what happened`,
     // The session seam, on the same terms: a row without entry_time takes its
     // session from the close, which can differ on anything held across one.
     s.seam && s.bySession.length

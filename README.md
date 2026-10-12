@@ -2222,6 +2222,14 @@ The view is `security_invoker`, which a view is **not** by default: without it,
 RLS would depend on whoever ran `schema.sql` rather than on who is asking, and
 a grant widened by mistake would leak every user's trades.
 
+**`get_stats` carries his own three answers**, as the app's discipline bars count
+them: followed over answered, the unanswered said apart, since every fill
+arrives blank and a blank counted as a miss would sink every rate. The rules
+answer matters most. §9 says entering on the touch leaves no trace in any
+price, and his false is its only record, so the share he marks broken is the
+measure of what he is working on. A test hands the same rows to both and reads
+the bars off his screen.
+
 **Context goes in the user turn, not a mid-conversation system message.** That
 shape would keep the cached prefix intact, but it could not be exercised from
 where this was built, and a 400 there kills every reply. Nothing in the context is

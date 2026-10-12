@@ -5044,6 +5044,10 @@ test('the summary states every figure with the population it was taken over', ()
   assert.match(out, /London\+NY: 2 trades/);
   assert.match(out, /Asian: 1 trade,/, 'the undecided trade is still a trade in its session');
   assert.match(out, /Break & Retest: 2 trades/);
+  // His answers over the trades that answered, the blanks said apart: two of
+  // the three never answered, and a blank is not a miss.
+  assert.match(out, /rules followed on 1 of 1 answered \(2 unanswered\)/);
+  assert.match(out, /stop respected on 1 of 1 answered \(2 unanswered\)/);
 
   // An empty window says so rather than rendering a page of dashes.
   assert.match(statsList(journalStats([]), 7), /No trades in the last 7 days/);

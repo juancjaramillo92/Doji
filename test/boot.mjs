@@ -22,7 +22,7 @@ const EXPOSED = [
   'isComplete', 'resultOf', 'aggregateResult', 'dayOf', 'sessionOf',
   'counts', 'money', 'averages', 'pctSplit', 'byKey', 'round2', 'prevWeek', 'shiftMonth',
   'render', 'renderTable', 'renderSetups', 'renderPeriods', 'renderPnLCard', 'rangeStats',
-  'journalForm', 'pickYN', 'disciplineBar', 'sessionBars', 'esc', 'Watch',
+  'journalForm', 'pickYN', 'disciplineBar', 'disciplineBars', 'sessionBars', 'esc', 'Watch',
   // The undo window around a delete: its rules are about ORDER, and none is
   // reachable through Data alone.
   'PendingDelete'
