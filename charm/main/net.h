@@ -14,6 +14,9 @@ bool net_wait(int ms);
 // Long enough for the last network asked directly and four saved ones in turn.
 #define NET_ALL_MS 44000
 
+// Before this the internet has not set the clock, which reads 1970 unset.
+#define CLOCK_SET 1767225600  // 2026-01-01
+
 /* Their doors. Each takes the charm's key, the one the setup saved, in
    x-charm-key; the README's "The charms" says what each answers. */
 #define EUGENIA_DOOR "https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia"
