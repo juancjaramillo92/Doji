@@ -185,16 +185,18 @@ int talk(void) {
     opus.bitrate = BITRATE;
     opus.frame_duration = ESP_OPUS_ENC_FRAME_DURATION_20_MS;
     opus.enable_vbr = true;
-    if (esp_opus_enc_open(&opus, sizeof opus, &encoder) != ESP_AUDIO_ERR_OK) {
-        ESP_LOGE(TAG, "no encoder");
+    bool ready = room && esp_opus_enc_open(&opus, sizeof opus, &encoder) == ESP_AUDIO_ERR_OK;
+    if (ready && (!frame || !packet)) {
+        esp_opus_enc_get_frame_size(encoder, &frame_bytes, &packet_bytes);
+        if (!frame) frame = malloc((size_t)frame_bytes);
+        if (!packet) packet = malloc((size_t)packet_bytes);
+        if (!frame || !packet) { esp_opus_enc_close(encoder); ready = false; }
+    }
+    if (!ready) {
+        ESP_LOGE(TAG, "no encoder, or no room to record");
         confused();
         face_set_mode(FACE_IDLE);
         return 0;
-    }
-    if (!frame) {
-        esp_opus_enc_get_frame_size(encoder, &frame_bytes, &packet_bytes);
-        frame = malloc((size_t)frame_bytes);
-        packet = malloc((size_t)packet_bytes);
     }
     ogg_start(&file, room, FILE_ROOM, esp_random(), SOUND_RATE);
 
