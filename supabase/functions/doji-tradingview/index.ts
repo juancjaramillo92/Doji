@@ -319,10 +319,10 @@ async function tvSession() {
 
 // The only place a tool name becomes a request, as with the poller's mcpPost.
 async function tvPost(session: Record<string, string>, tool: AllowedTool,
-                      args: Record<string, unknown>): Promise<string> {
+                      args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
   const res = await fetch(TV_URL, {
-    method: "POST", headers: session,
+    method: "POST", headers: session, signal,
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
   });
   if (!res.ok) throw new Error(`MCP ${tool}: HTTP ${res.status}`);
@@ -344,8 +344,21 @@ export function unwrap(envelope: any, tool: string): any {
 }
 
 // What a tool answered, unwrapped — the read every folder starts from.
-const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>) =>
-  unwrap(parseSse(await tvPost(session, tool, args)), tool);
+const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>,
+                      signal?: AbortSignal) =>
+  unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
+
+/* What a door that reads one chart at a time may spend, so that it answers
+   inside her READ_MS, 45 seconds, with what it has rather than with nothing.
+   On 12 October the news door's two calls took 25 seconds, the market's
+   fourteen and the rates' six outran her, and a briefing and a reply lost
+   both blocks whole. Ten seconds are left for the boot, the sign-in and the wire. Whatever the
+   deadline cuts short, the call in flight and every one after, is named as
+   not reached; the lists run most-needed first, so a slow morning keeps those. */
+const DOOR_MS = 35_000;
+
+const unreached = (signal: AbortSignal, err: unknown) =>
+  signal.aborted ? `not reached in ${DOOR_MS / 1000}s` : why(err);
 
 /* ─── The calendar ─────────────────────────────────────────────────────────
    The releases as data, each with an id TradingView keeps — the key her
@@ -446,18 +459,20 @@ export function foldBars(answer: any) {
   return { from: first.o, since: iso(first.t), last: last.c, at: iso(last.t) };
 }
 
-/* One at a time, for the poller's ?bars=raw reason; a symbol that fails is
-   named, not dropped. */
-async function readMarket() {
+/* One at a time, for the poller's ?bars=raw reason, inside DOOR_MS; a symbol
+   that fails or is not reached is named, not dropped. Exported so the
+   deadline is driven. */
+export async function readMarket() {
+  const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
   const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
   for (const m of MARKET) {
     try {
       const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv",
-        { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 }));
+        { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 }, signal));
       market.push({ ...m, daily: !!m.daily, ...bars });
     } catch (err) {
-      missing.push({ symbol: m.symbol, name: m.name, error: why(err) });
+      missing.push({ symbol: m.symbol, name: m.name, error: unreached(signal, err) });
     }
   }
   return { ok: true, market, missing };
@@ -612,9 +627,11 @@ export function unlisted(listed: string[], meetings = FOMC): string[] {
   return listed.filter(d => !meetings.includes(d));
 }
 
-/* One at a time. A failed contract is named; an unreadable calendar leaves the
-   table unchecked and says so with a null rather than costing the odds. */
-async function readRates() {
+/* One at a time, inside DOOR_MS, nearest month first. A failed contract is
+   named; an unreadable calendar leaves the table unchecked and says so with a
+   null rather than costing the odds. Exported so the deadline is driven. */
+export async function readRates() {
+  const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
   const today = nyDate(new Date());
   const prices: Record<string, number> = {};
@@ -622,22 +639,22 @@ async function readRates() {
   for (const ym of contractMonths(today)) {
     const symbol = zq(ym);
     try {
-      const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 2 }));
+      const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 2 }, signal));
       prices[ym] = bars.last;
       contracts.push({ symbol, price: bars.last, at: bars.at });
     } catch (err) {
-      missing.push({ symbol, error: why(err) });
+      missing.push({ symbol, error: unreached(signal, err) });
     }
   }
   let calendar: string[] | null = null;
   try {
     const events = foldCalendar(await tvCall(session, "mcp-tv-get-economic-calendar",
       { countries: "US", date_from: today,
-        date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) }));
+        date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) }, signal));
     calendar = events.filter((e: { title: string }) => /interest rate decision/i.test(e.title))
       .map((e: { at: string }) => nyDate(new Date(e.at)));
   } catch (err) {
-    console.error("doji-tradingview: calendar unread for the meeting check —", why(err));
+    console.error("doji-tradingview: calendar unread for the meeting check —", unreached(signal, err));
   }
   const moved = unlisted(calendar ?? []);
   if (moved.length) {

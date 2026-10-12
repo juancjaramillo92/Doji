@@ -1032,7 +1032,7 @@ async function marketQuote(): Promise<Quote | null> {
     if (!quote?.ok || typeof quote.bid !== 'number') throw new Error("no readable quote");
     return quote as Quote;
   } catch (err) {
-    console.error("doji-eugenia: market read failed —", why(err));
+    await unread("price", why(err));
     return null;
   }
 }
@@ -1678,6 +1678,24 @@ async function recordRun(row: Record<string, unknown>): Promise<void> {
     console.error("doji-eugenia: run not recorded —", why(err));
   }
 }
+
+/* A market read a briefing or a reply went without, whole or in part. The
+   answer still goes out and its own row reads ok, so on 12 October the only
+   trace of a briefing written blind to the dollar and the Fed was the console.
+   Failures only: a row for every read that answered would be several a
+   briefing saying nothing. Never throws. */
+async function unread(what: string, reason: string): Promise<void> {
+  console.error(`doji-eugenia: ${what} not read —`, reason);
+  await recordRun({ caller: 'market read', ok: false, detail: `${what}: ${reason}`.slice(0, 500) });
+}
+
+// What a door answered without, grouped by why, so eleven symbols the deadline
+// cut short read as one clause and the row stays inside its 500 characters.
+const missed = (list: { symbol: string; error: string }[]) => {
+  const by = new Map<string, string[]>();
+  for (const m of list) (by.get(m.error) ?? by.set(m.error, []).get(m.error)!).push(m.symbol);
+  return [...by].map(([error, symbols]) => `${symbols.join(", ")}: ${error}`).join("; ");
+};
 
 /* ─── Telegram and history ─────────────────────────────────────────────── */
 
@@ -2543,9 +2561,10 @@ export async function aroundBlock(): Promise<string> {
   try {
     const answer = await tvRead("market");
     if (!answer.market?.length) throw new Error("no symbol served");
+    if (answer.missing.length) await unread("market", missed(answer.missing));
     return aroundList(answer);
   } catch (err) {
-    console.error("doji-eugenia: market around gold unavailable —", why(err));
+    await unread("market", why(err));
     return NO_AROUND;
   }
 }
@@ -2578,9 +2597,10 @@ export async function ratesBlock(): Promise<string> {
   try {
     const answer = await tvRead("rates");
     if (!answer.meetings?.length) throw new Error("no meeting served");
+    if (answer.missing.length) await unread("rates", missed(answer.missing));
     return ratesList(answer);
   } catch (err) {
-    console.error("doji-eugenia: rate odds unavailable —", why(err));
+    await unread("rates", why(err));
     return "\n\nWhat the futures price for the Fed could not be read just now. Do not quote rate " +
       "odds from a search; say you do not have them.";
   }
@@ -2631,7 +2651,7 @@ export async function headlinesBlock(): Promise<string> {
   try {
     return headlinesList(await tvRead("news"));
   } catch (err) {
-    console.error("doji-eugenia: headlines unavailable —", why(err));
+    await unread("news", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
   }
 }
@@ -2696,7 +2716,7 @@ export async function positioningBlock(): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return positioningList(await res.json());
   } catch (err) {
-    console.error("doji-eugenia: positioning unavailable —", why(err));
+    await unread("positioning", why(err));
     return "\n\nWhere the speculators stand could not be read just now; do not quote it from a search.";
   }
 }
@@ -2739,7 +2759,7 @@ export async function volumeBlock(): Promise<string> {
   try {
     return volumeList((await tvRead("volume")).sessions);
   } catch (err) {
-    console.error("doji-eugenia: futures volume unavailable —", why(err));
+    await unread("volume", why(err));
     return "\n\nWhat COMEX gold futures traded could not be read just now; do not quote it from a search.";
   }
 }
