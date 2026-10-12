@@ -1,6 +1,7 @@
 #include "briefing.h"
 
 #include "esp_attr.h"
+#include "net.h"
 
 /* The briefing's hours in New York: weekdays at BRIEF_WEEKDAY, Sunday at
    BRIEF_SUNDAY, each tried again on the hour for BRIEF_RETRIES hours, and none
@@ -13,9 +14,6 @@
 // Writing takes up to six minutes, so the first ask is at five past and the
 // asking runs through the hour the last retry starts.
 #define FIRST_ASK_MIN 5
-
-// Unset, the clock reads 1970.
-#define CLOCK_SET     1767225600  // 2026-01-01
 
 static RTC_DATA_ATTR int announced;  // yyyymmdd, New York
 

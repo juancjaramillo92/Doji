@@ -25,6 +25,9 @@ face_mode_t face_get_mode(void);
 // How long FACE_ASLEEP takes to close her eyes.
 #define FACE_GOODNIGHT_MS 1200
 
+// A frame of anything drawn moving: her face, the dial, the journal's done.
+#define FACE_FRAME_MS 33
+
 // How loud the audio is right now, 0 to 1: the ring while listening, the
 // mouth while speaking.
 void face_set_level(float level);
@@ -40,6 +43,11 @@ void face_set_hold(float hold);
    is -1 otherwise. */
 void face_set_marks(bool briefing, bool trade, bool low, bool offline, int charge);
 
+/* The same marks as one number, so a change to any of them is a change to it:
+   what the sleep screen redraws on, and what main.c compares across sleep. */
+int face_marks(bool briefing, bool trade, bool low, bool offline, int charge);
+
 /* Doji's purples round the rim, from the top for `part` of a turn, `turn`
    spinning the colours: her listening ring, the charge, the journal's done. */
+#define FACE_RING_TURN_MS 1800  // one turn of the colours, where they spin
 void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa);

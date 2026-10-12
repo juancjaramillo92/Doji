@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "config.h"
+#include "face.h"
 #include "palette.h"
 #include "sound.h"
 
@@ -118,7 +119,7 @@ void dial_press(lv_point_t p) {
         lv_obj_set_size(veil, 466, 466);
         lv_obj_remove_flag(veil, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(veil, draw, LV_EVENT_DRAW_MAIN, NULL);
-        timer = lv_timer_create(tick, 33, NULL);
+        timer = lv_timer_create(tick, FACE_FRAME_MS, NULL);
     }
     lv_obj_remove_flag(veil, LV_OBJ_FLAG_HIDDEN);
     lv_timer_resume(timer);

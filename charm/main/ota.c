@@ -19,7 +19,6 @@
 static const char *TAG = "ota";
 
 #define NIGHT_HOUR 3            // New York, between the nightly pass and the briefing
-#define CLOCK_SET  1767225600   // 2026-01-01; unset, the clock reads 1970
 #define READ_MS    30000
 
 static RTC_DATA_ATTR int looked;  // yyyymmdd of the last night's look
