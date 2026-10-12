@@ -41,6 +41,7 @@ manifest `background_color`, a dark `color-scheme` and an
 README.md                               the contract: what the app does and why
 CLAUDE.md                               how to work on it; the README outranks it
 REFACTOR.md                             every move refused, and why
+RESEARCH-eugenia.md                     what other systems do that Eugenia did not
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
