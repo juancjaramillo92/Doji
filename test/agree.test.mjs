@@ -264,6 +264,21 @@ test('Eugenia\'s charm sends the headers her door reads, and knows the frames it
   assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
 });
 
+/* Put down while she thinks, she finishes — and what follows her answer asks
+   whether she lies put down only where it would be wasted: the trade's
+   questions on a screen nobody looks at. The briefing is read regardless; he
+   put her down to listen. main.c is the board's, so the call is read. */
+test('after her answer, only the trade\'s questions wait on whether she is put down', () => {
+  const awake = bodyOf(source('charm/main/main.c'), 'static void awake(void) {', 'main.c has no awake()');
+  const after = awake.slice(awake.indexOf('for (;;) {'));
+  assert.match(after, /if \(spoke && !journaled && \(trade_came\(\) \|\| trade_waits\)\) \{\s*if \(!lying_down\(\)\) journal\(\);\s*sleep_now\(\);/,
+    'the trade after her answer no longer skips its questions when she lies put down');
+  const briefing = after.match(/if \(briefing_waits\) \{[^}]*\}/);
+  assert.ok(briefing, 'awake() no longer reads a waiting briefing as this test finds it');
+  assert.doesNotMatch(briefing[0], /lying_down|motion_hold/, 'a waiting briefing now waits on whether she is put down');
+  assert.equal((awake.match(/lying_down\(\)/g) ?? []).length, 1, 'something else in awake() now asks whether she is put down');
+});
+
 /* The charm's words are drawn in fonts holding only the letters
    tools/fonts.sh gave them; a word with any other letter draws a gap. */
 test('every word on the charm\'s screens is in the font that draws it', () => {
