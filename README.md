@@ -1854,11 +1854,11 @@ makes a retry's refiling a no-op.
 
 ### What she remembers
 
-Nine tables, separated by how long a thing is true for. A turn rolls over inside
+Ten tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
-rewritten; a loop stays until it closes; and the calendar and her record are the
-datasets here that compound.
+rewritten, and what each said before is kept beside it; a loop stays until it
+closes; and the calendar and her record are the datasets here that compound.
 
 | | Holds | Window | Written by |
 |---|---|---|---|
@@ -1871,6 +1871,7 @@ datasets here that compound.
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
+| `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings
 page, the button under a briefing carries a verdict and not a reason, and the
@@ -1910,6 +1911,16 @@ facts — in the briefing and a reply, never the trade look — and never hands 
 him as a verdict; `/notes` shows it to him in the
 second person, and he corrects it the way he corrects anything — by telling her,
 which the pass reads that night.
+
+**A rewrite keeps what it replaced.** The story and the portrait are one row
+each, rewritten at night, and the portrait shapes every briefing and reply. A
+rewrite that drops something true about him would otherwise be gone the moment
+it landed. So `eugenia_keep_rewrite`, one trigger function on both tables,
+copies the old text and the day it last moved into `eugenia_rewrites` whenever
+the text changes; a rewrite to the same words keeps nothing. It is for him and
+for repair, read by hand, and nothing hands it to her: a portrait she could
+read back a month of would argue with itself. Putting an old one back is an
+update of the row, which keeps the one it replaces in turn.
 
 **Every list says how many it holds, and one past the window says so.** The read
 takes one row more than the twenty it shows, so each heading carries its count —

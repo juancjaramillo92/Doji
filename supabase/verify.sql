@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 89 checks.
+-- whole file after any manual change and read the `ok` column — all 92 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -32,8 +32,8 @@ from (values
      where table_schema = 'public'
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
                           'eugenia_loops','eugenia_feedback','eugenia_portrait',
-                          'eugenia_reads')),
-   '7'),
+                          'eugenia_reads','eugenia_rewrites')),
+   '8'),
 
   -- The thesis is PATCHed by primary key, so a missing seed row is a 200 that
   -- lands nowhere: every rewrite dropped, silently.
@@ -375,6 +375,15 @@ from (values
        and tgname = 'eugenia_calendar_touch_updated_at' and not tgisinternal),
    '1'),
 
+  -- A rewrite of the story or the portrait keeps what it replaced; without the
+  -- triggers the history table exists and stays empty, which reads as nights
+  -- that changed nothing.
+  ('the story and the portrait keep what they replace',
+   (select coalesce(string_agg(tgname, ',' order by tgname), 'none') from pg_trigger
+     where tgrelid in (to_regclass('public.eugenia_thesis'), to_regclass('public.eugenia_portrait'))
+       and tgname in ('eugenia_thesis_keep', 'eugenia_portrait_keep') and not tgisinternal),
+   'eugenia_portrait_keep,eugenia_thesis_keep'),
+
   ('RLS on eugenia_runs',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),
    'true'),
@@ -398,6 +407,12 @@ from (values
    'true'),
   ('no policy on eugenia_reads',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reads')),
+   '0'),
+  ('RLS on eugenia_rewrites',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_rewrites')),
+   'true'),
+  ('no policy on eugenia_rewrites',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_rewrites')),
    '0'),
 
   -- The dispatch ledger. No policy on purpose.
@@ -555,9 +570,9 @@ from (values
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname in (
        'dispatch_bad','dispatch_failures','dispatch_repeats','dispatch_watch',
-       'eugenia_calendar_touch','eugenia_search','pace_line','pace_watch',
+       'eugenia_calendar_touch','eugenia_keep_rewrite','eugenia_search','pace_line','pace_watch',
        'tell_him','trades_eugenia_on_event','trades_telegram','trades_touch')),
    'dispatch_bad,dispatch_failures,dispatch_repeats,dispatch_watch,' ||
-   'eugenia_calendar_touch,eugenia_search,pace_line,pace_watch,' ||
+   'eugenia_calendar_touch,eugenia_keep_rewrite,eugenia_search,pace_line,pace_watch,' ||
    'tell_him,trades_eugenia_on_event,trades_telegram,trades_touch')
 ) as t(check_name, actual, expected);
