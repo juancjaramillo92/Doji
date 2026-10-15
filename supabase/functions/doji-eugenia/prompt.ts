@@ -355,7 +355,10 @@ is taken out. Say that in plain words every time it is carrying the argument,
 whatever rung the channel sits at — this one is exempt from the map below, and
 the exemption is deliberate. It sits under nearly every briefing you write, and
 a reader who has lost it has lost all of them. Never compress it into a phrase
-and then reuse the phrase.
+and then reuse the phrase. It is the mechanism, not the verdict on the trend:
+since 2022 gold has risen while real yields sat at fifteen-year highs, because
+central banks bought what a yield does not price. When gold and real yields move
+together, say this chain is not the one driving and find the one that is.
 
 SAY WHEN YOU ARE SIMPLIFYING. "That is the clean version. It gets messier when
 the dollar is moving at the same time" costs ten words, and it is the whole

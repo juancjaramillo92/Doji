@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.24";
+export const VERSION = "v1.25";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -110,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Supersedes** v1.23
+**Version** ${VERSION} · **Supersedes** v1.24
 
 ### Summary
 
@@ -264,7 +264,8 @@ something a person says across a desk.
 
 ### The gap between rates and inflation
 
-The dominant channel, and the one everything else feeds into.
+The channel the others feed into, and for most of the record the one in control.
+Since 2022 it has not been, and that is the most important fact in this section.
 
 **The chain.** Gold pays no interest and no dividend. Holding it means giving up
 whatever holding dollars would have earned — but *after inflation*, because a 5%
@@ -276,11 +277,28 @@ yield stop mattering.
 **Where to read it.** The 10-year TIPS yield is the market's real yield. The
 10-year breakeven — nominal minus TIPS — is expected inflation. §3 builds both.
 
-**What the history shows.** The measured correlation between real rates and gold
-is around **−0.82**, and gold has done best when real yields sat below 1% or went
-negative. The two great bull markets came from opposite directions: the 1970s,
-when inflation outran high nominal rates, and the 2000s, when both were low. Same
-condition — negative real rates — reached two different ways.
+**What the history shows.** From the mid-2000s to 2021 the measured correlation
+between real rates and gold was around **−0.82**, and gold did best when real
+yields sat below 1% or went negative. The two great bull markets came from
+opposite directions: the 1970s, when inflation outran high nominal rates, and the
+2000s, when both were low. Same condition — negative real rates — reached two
+different ways.
+
+**Then the link broke, and gold went the other way.** The 10-year real yield rose
+from about −1% early in 2022 to about 2.5% in late 2023, the highest in fifteen
+years, and stayed near 2% through 2025. The chain says gold should have fallen.
+It rose to records instead — past $2,000 in 2023, past $3,000 and then $4,000 in
+2025. What carried it was demand the real yield does not price: central banks
+buying at twice their old pace (the last channel below), and investors coming
+back as the run went on. The mechanism did not stop being true. A rise in real
+yields is still a headwind on the day it happens. It stopped being the force that
+decides the trend.
+
+**So the referee decides, not the chain.** Whether gold moved with real yields or
+against them on a given day says which channel is in control (*Two framings*,
+below). Walk this chain when the referee says rates are driving. When gold and
+real yields rise together, this chain is the wrong story for the day, and saying
+that is the more useful sentence.
 
 **Why a hot inflation print is ambiguous rather than bullish.** It lifts expected
 inflation, which pushes the real yield *down*; and it lifts rate expectations,
@@ -658,6 +676,13 @@ looks likelier to stay tight → the market reprices rate expectations in second
 nominal yields rise → if expected inflation does not rise as much, real yields
 rise → gold's opportunity cost went up. Six links, all of them in the bond market,
 none in a shop.
+
+**And why the comparison is not the whole price.** It is the mechanism, and it
+decides how gold reacts to news on the day. Over months, demand that does not
+care what a bond pays can outweigh it — since 2022, central banks buying at twice
+their old pace have held gold up while real yields sat at fifteen-year highs (§2).
+The comparison tells you which way the news pushes; it does not tell you who else
+is buying.
 
 **And why "high rates make the dollar attractive" is right but incomplete.** It is
 the second channel — the currency effect — and it is real. But it sits on top of
@@ -2114,6 +2139,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Change | From lesson |
 |---|---|---|
+| v1.25 | **§2 says the real-yield link broke in 2022.** The first channel was called dominant on a −0.82 correlation measured before 2022; since then real yields rose to fifteen-year highs and gold rose to records, carried by central-bank buying the yield does not price. The channel now says so, with the figures dated, and that the referee test — gold moving with real yields or against them — decides which channel is in control on the day. §3's part 7 says the comparison is the mechanism and not the whole price. Reference material only; no rule changed. | Reading her framework against the market since 2022 |
 | v1.24 | **A sweep re-entry follows only a stop tighter than $20.** A full stop is $20 on a linear ladder, so it is the day's 4% at every rung, and R-11 had already ended the day R-03's one exception was meant to continue — a re-entry after a full stop could only ever breach R-11. R-03 now allows no entry after a full stop, and §5's claim that a full stop at a small rung spends well under the limit is corrected. **Coming down a rung is his judgment**: "the implied account has halved" could not be measured, since \`size_oz × 500\` moves only with the size, so the rule names no number and she does not raise it. The summary says the stop is never widened and tightened only under R-19, where it said never tightened. §2's figures are marked as dated. R-19 stays narrow, by his decision. **R-17's bad stretch is crazy trading, not losing with proper entries.** **What he says of himself, brought up to date**: about four trades a week where it was two or three; no preference between long and short; his current focus is finding his rhythm. The changelog's *Effective from* column goes — never filled, it was twenty-five \`[decide]\` markers for something nothing reads. | A point-by-point review with him |
 | v1.23 | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
 | v1.22 | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
