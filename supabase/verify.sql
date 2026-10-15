@@ -210,12 +210,12 @@ from (values
 
   -- agree.test.mjs reads schema.sql's insert; only the database knows the
   -- rows are there. A missing one renders at the bottom rung forever.
-  ('all five channels are seeded',
+  ('all six channels are seeded',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from public.eugenia_channels',
              false, true, '')))[1]::text
      where to_regclass('public.eugenia_channels') is not null),
-   '5'),
+   '6'),
 
   -- Read through pg_options_to_table, so `security_invoker = on` is not drift.
   ('eugenia_trades runs with the caller''s rights',

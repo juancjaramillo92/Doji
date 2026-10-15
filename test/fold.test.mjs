@@ -2737,7 +2737,7 @@ test('the spoken name works, because that is the one he is shown', () => {
 });
 
 test('the rung is the last word, not the second', () => {
-  /* Three of the five names are several words, so reading the rung from position
+  /* Most of the names are several words, so reading the rung from position
      two fails as "no such channel" — like a name he got wrong. */
   const multi = CHANNELS.filter(([, n]) => n.includes(' '));
   assert.ok(multi.length >= 3, 'the names are no longer multi-word — this test is asserting nothing');

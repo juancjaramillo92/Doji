@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.25";
+export const VERSION = "v1.26";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -56,7 +56,7 @@ WHAT IS IN THE REST OF THE DOCUMENT, so you know when a question needs it. Call
 get_strategy with the number.
 
 - §0 header, retrieval contract, tolerance, notation, how to pitch an explanation
-- §2 the five channels — the mechanism, and where it may end in your read. The
+- §2 the six channels — the mechanism, and where it may end in your read. The
   briefing's vocabulary
 - §3 THE FOUNDATION — what inflation, rates, bonds and yields actually are, built
   from the ground up, plus every metric that appears in a briefing. Teaching, not
@@ -110,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Supersedes** v1.24
+**Version** ${VERSION} · **Supersedes** v1.25
 
 ### Summary
 
@@ -158,7 +158,7 @@ that a lot of the technical content in his briefings lands as terms he nods past
 So this document is not a static reference: what she says is meant to change as
 he changes.
 
-**\`eugenia_channels\` is the state.** Each of the five channels carries
+**\`eugenia_channels\` is the state.** Each of the six channels carries
 \`unseen\` → \`explained\` → \`used\` → \`owns\`, with an evidence line. Read it as: how
 much of this can be said bare, and how much has to be built first.
 
@@ -233,7 +233,7 @@ disagreeing, a \`[decide]\` his trading keeps running into — she puts it to hi
 as a proposal of hers: the rule, what she saw, what she would change. Never as a
 change, never inferred into one, and never in a message that lands mid-trade.`,
 
-  "2": `## 2 · The five channels
+  "2": `## 2 · The six channels
 
 **NOT HIS DECISIONS.** Researched reference material, written for him because he
 is learning macro deliberately. Treat it as shared vocabulary, never as something
@@ -381,7 +381,7 @@ ones like GDP**, and say when doing so.
 
 ### What central banks are buying
 
-The slowest channel, and the only one that is a flow rather than a price.
+The slowest channel, and one of the two that are a flow rather than a price.
 
 **Official-sector demand has run far above its historical norm since 2022:**
 1,082t in 2022, 1,037t in 2023, above 1,000t again in 2024, and 863t in 2025 —
@@ -402,7 +402,39 @@ value, which is the scale of the shift in one number.
 
 ---
 
-### Two framings that apply to all five
+### What investors are buying
+
+The other flow, and the fastest to turn. Two crowds buy gold to hold it as an
+investment rather than to wear it or keep it in a vault for a country: funds
+trading gold futures, and people buying shares in funds that hold the metal
+itself — exchange-traded funds, the largest of which is SPDR's GLD. Haven buying
+in a scare arrives through this channel too.
+
+**The chain.** When investors buy shares in a gold fund, the fund buys metal to
+back them. When they sell, it sells. So a run of fund buying is real demand on
+the physical market, and a run of selling is supply landing on it. Futures
+funds move faster still, and they carry no metal: what they add is the size of
+the move. A crowd that is very long has more to sell if the story turns, which
+is why a drop can run further than its news.
+
+**Where the rates channel actually lands.** Western investors are the buyers
+who care what a bond pays. Through 2022 and 2023, as real yields climbed, the
+gold funds' holdings fell — the first channel working, on the investors it
+reaches — while central banks bought more than ever and held the price up. They
+turned back to buying in 2024 and bought heavily in 2025 as the rally ran (as of
+2025). When this channel and the central banks pull the same way, the move has
+two legs under it; when they pull apart, the central banks have usually been the
+floor and investors the swing.
+
+**Where to read it.** The CFTC's weekly count of where the futures funds stand
+is handed to her on Sunday and in a conversation. The gold funds' holdings are
+not handed to her: the World Gold Council publishes the flows monthly, and SPDR
+GLD's tonnes daily. A figure from either is read off the page it is on, quoted
+with its date and its source, never from somebody's summary of it.
+
+---
+
+### Two framings that apply to all six
 
 **Pre-priced versus new information.** Markets move on surprises, not on events. A
 speech confirming what is already priced is close to neutral however hawkish it
@@ -2139,6 +2171,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Change | From lesson |
 |---|---|---|
+| v1.26 | **A sixth channel: what investors are buying.** Gold funds and futures funds — the flow that turns fastest, where haven buying arrives, and where the rates channel actually lands, on the investors who care what a bond pays. Their holdings fell through 2022 and 2023 while central banks held the price up, and turned back to buying as the rally ran. The CFTC's weekly count is handed to her; the funds' holdings are read off the World Gold Council's and SPDR's pages, dated and sourced. A new rung on her map, starting \`unseen\`. Reference material only; no rule changed. | The 2022–2025 market, which five channels could not tell |
 | v1.25 | **§2 says the real-yield link broke in 2022.** The first channel was called dominant on a −0.82 correlation measured before 2022; since then real yields rose to fifteen-year highs and gold rose to records, carried by central-bank buying the yield does not price. The channel now says so, with the figures dated, and that the referee test — gold moving with real yields or against them — decides which channel is in control on the day. §3's part 7 says the comparison is the mechanism and not the whole price. Reference material only; no rule changed. | Reading her framework against the market since 2022 |
 | v1.24 | **A sweep re-entry follows only a stop tighter than $20.** A full stop is $20 on a linear ladder, so it is the day's 4% at every rung, and R-11 had already ended the day R-03's one exception was meant to continue — a re-entry after a full stop could only ever breach R-11. R-03 now allows no entry after a full stop, and §5's claim that a full stop at a small rung spends well under the limit is corrected. **Coming down a rung is his judgment**: "the implied account has halved" could not be measured, since \`size_oz × 500\` moves only with the size, so the rule names no number and she does not raise it. The summary says the stop is never widened and tightened only under R-19, where it said never tightened. §2's figures are marked as dated. R-19 stays narrow, by his decision. **R-17's bad stretch is crazy trading, not losing with proper entries.** **What he says of himself, brought up to date**: about four trades a week where it was two or three; no preference between long and short; his current focus is finding his rhythm. The changelog's *Effective from* column goes — never filled, it was twenty-five \`[decide]\` markers for something nothing reads. | A point-by-point review with him |
 | v1.23 | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |

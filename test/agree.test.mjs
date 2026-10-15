@@ -612,7 +612,7 @@ test('the note length is one number on both sides of the wire', () => {
    is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* ─── The five channels, in four places and two vocabularies ────────────────
+/* ─── The channels, in four places and two vocabularies ─────────────────────
    prompt.ts declares them and the prose interpolates the names. The tool's enum
    is what she may name, the constraint what the database accepts, and §2 the
    mechanism behind each. Offered and refused is a set_channel that 400s;
@@ -621,17 +621,17 @@ test('the note length is one number on both sides of the wire', () => {
    Either way she teaches a channel the census cannot see.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the five channels are the same five in the prompt, the tool, the constraint and §2', () => {
+test('the channels are the same in the prompt, the tool, the constraint and §2', () => {
   const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
   const enforced = [...(EUGENIA_SQL.match(/check \(channel in \(([^)]*)\)/i)?.[1] ?? '')
     .matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
 
   assert.deepEqual(declared,
-    ['central_bank_buying', 'dollar', 'inflation', 'jobs', 'rates_vs_inflation'],
+    ['central_bank_buying', 'dollar', 'inflation', 'investment_demand', 'jobs', 'rates_vs_inflation'],
     'the channels have changed — say so here, then check the constraint and the seed');
   assert.deepEqual(enforced, declared,
-    'the check constraint and prompt.ts no longer hold the same five channels');
+    'the check constraint and prompt.ts no longer hold the same channels');
 
   // The tool offers whatever prompt.ts declares rather than a list of its own,
   // which is what makes the tool's copy impossible rather than merely checked.
@@ -639,7 +639,7 @@ test('the five channels are the same five in the prompt, the tool, the constrain
     'set_channel names its channels literally again instead of reading CHANNELS');
 
   // §2 heads each channel with the name she says out loud, so the mechanism she
-  // reads and the rung she moves are the same five channels under two spellings.
+  // reads and the rung she moves are the same channels under two spellings.
   const spoken = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['[a-z_]+',\s*'([^']+)'\]/g)].map(m => m[1]);
   assert.equal(spoken.length, declared.length,
@@ -653,7 +653,7 @@ test('the five channels are the same five in the prompt, the tool, the constrain
   }
 });
 
-test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
+test('every channel\'s row is seeded, or a channel is invisible rather than unseen', () => {
   /* A channel with no row drops out of her map, which hides exactly what the map
      exists to show. */
   const seeded = [...(EUGENIA_SQL.match(/insert into public\.eugenia_channels[\s\S]*?on conflict/)?.[0] ?? '')

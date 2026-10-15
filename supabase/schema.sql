@@ -285,7 +285,7 @@ create or replace trigger trades_telegram_on_answer
 -- ═══ Her memory ═════════════════════════════════════════════════════════
 
 -- Her conversation (eugenia_turns), what stays true about him for weeks
--- (eugenia_notes), where he stands on the five channels (eugenia_channels),
+-- (eugenia_notes), where he stands on the six channels (eugenia_channels),
 -- and a read-only view of his journal (eugenia_trades). Nothing here writes
 -- `trades`.
 
@@ -401,7 +401,7 @@ create index if not exists eugenia_turns_embedding
   on public.eugenia_turns using hnsw (embedding vector_cosine_ops);
 
 -- ─── Where he stands on each channel ───────────────────────────────────────
--- Five rows, never a window, so a busy month cannot crowd one out — and the
+-- A row per channel, never a window, so a busy month cannot crowd one out — and the
 -- only place an absence is visible: a channel he has never used is a row
 -- saying `unseen`, where in the notes it would be nothing at all.
 --
@@ -411,7 +411,8 @@ create table if not exists public.eugenia_channels (
   -- The id, not the spoken name; prompt.ts holds both.
   channel  text primary key
     constraint eugenia_channels_name_check check (channel in (
-      'rates_vs_inflation', 'dollar', 'inflation', 'jobs', 'central_bank_buying')),
+      'rates_vs_inflation', 'dollar', 'inflation', 'jobs', 'central_bank_buying',
+      'investment_demand')),
 
   state    text not null default 'unseen'
     constraint eugenia_channels_state_check check (state in (
@@ -429,7 +430,8 @@ create table if not exists public.eugenia_channels (
 
 -- Seeded, because a missing row would drop a channel out of her map silently.
 insert into public.eugenia_channels (channel) values
-  ('rates_vs_inflation'), ('dollar'), ('inflation'), ('jobs'), ('central_bank_buying')
+  ('rates_vs_inflation'), ('dollar'), ('inflation'), ('jobs'), ('central_bank_buying'),
+  ('investment_demand')
 on conflict (channel) do nothing;
 
 alter table public.eugenia_channels enable row level security;

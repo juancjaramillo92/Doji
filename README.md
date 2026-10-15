@@ -396,7 +396,7 @@ single-sourced at run time:
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | Eugenia's **notes window** | `NOTES` in `index.ts`, and the *twenty* and the *fifteen* five short of it that `CONSOLIDATE` spells out |
-| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `schema.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
+| the **six channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `schema.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
 | the **`eugenia_trades` column list** | the view in `schema.sql`, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
@@ -1279,7 +1279,7 @@ pass has nothing to research.
   the day: the turns stay in the table, searchable.
 - **Nothing is sent and no turn is stored**; storing one would spend two of
   tomorrow's twelve turns on bookkeeping. `?consolidate=1` runs it on demand.
-- **It records where the five channels stand**, at the one moment a rung could
+- **It records where the six channels stand**, at the one moment a rung could
   have moved — the only meter on whether his understanding grows. A ladder that
   stopped moving looks exactly like one that never had to.
 - **It moves the story and closes what resolved.** `set_thesis` rewrites the
@@ -2009,7 +2009,7 @@ closes; and the calendar and her record are the datasets here that compound.
 |---|---|---|---|
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
 | `eugenia_notes` | facts about him, what he has told her to do, and what he has committed to | last 20 of each kind | her `remember` tool |
-| `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
+| `eugenia_channels` | where he stands on each of the six channels | all 6 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_portrait` | how she reads him — what his notes and trades add up to | 1 row, rewritten | her `set_portrait` tool, nightly |
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
@@ -2215,7 +2215,7 @@ and the grants are held by tests; the rest shows up in use.
 
 ### Where he stands on each channel
 
-`eugenia_channels` is five rows, one per channel, and it never scrolls — a
+`eugenia_channels` is six rows, one per channel, and it never scrolls — a
 **census over a fixed set**, which makes it the only place an **absence** is
 legible. A channel he has never once used is a row saying `unseen`; in
 `eugenia_notes` it would be nothing written down, which nobody can notice. And
@@ -2260,15 +2260,26 @@ write: that rung says a channel never came up, and writing it back would report
 one she taught last week as never met. A channel he has lost goes to `explained`.
 
 **And `/channel` is the rung he moves himself.** `/channel <channel> <rung>` takes
-the id or the spoken name, with the rung as the last word, since three of the
-five names are several words. The ladder otherwise climbs only on him using a
+the id or the spoken name, with the rung as the last word, since four of the
+six names are several words. The ladder otherwise climbs only on him using a
 term back, so a reader who rarely answers would sit at `explained` — restate the
 mechanism every time — for ever. It goes through `setChannel`, so the one-way
 door and the unseeded-table check hold; and it is him saying where he is, not
 her reading of him, so `set_channel` stays out of `CHAT_TOOLS`.
 
-The five ids live in `prompt.ts`, read by the tool's enum and interpolated into
-her prose; the check constraint and the seed are the real second copies. §2 heads
+The six ids live in `prompt.ts`, read by the tool's enum and interpolated into
+her prose; the check constraint and the seed are the real second copies, and a
+read's channel references the table rather than copying it.
+
+**The sixth is what investors are buying** — gold funds and futures funds, the
+flow that turns fastest, where haven buying arrives, and where the rates channel
+actually lands, since Western investors are the buyers who care what a bond
+pays. Strategy v1.26 added it after the market from 2022 to 2025, which the five
+could not tell: the funds' holdings fell as real yields climbed while central
+banks held the price up. The CFTC's count is handed to her; the funds' holdings
+are read off the World Gold Council's and SPDR's own pages, dated and sourced. A
+database applied before it needs `upgrade.sql`, since the channel check is
+written inside `create table if not exists`, and then `schema.sql` seeds the row. §2 heads
 each channel with the **spoken** name, so `agree.test.mjs` resolves §2's headings
 against the names rather than the ids.
 
@@ -2554,7 +2565,7 @@ is not there gets a `400` it swallows, and the only sign is a meter reading `0`
 — `planned`, `excursions` and `stops` in the poller's answer all read `0` on a
 healthy poll and on a missing column alike. `verify.sql` names a row for each,
 which is how to tell an unapplied change from a quiet day. Then check its row
-for **all five channels**: `setChannel` PATCHes by key, so a missing row is a
+for **all six channels**: `setChannel` PATCHes by key, so a missing row is a
 `200` with an empty body, and that channel would sit at the bottom rung for ever,
 looking like one he has never used.
 

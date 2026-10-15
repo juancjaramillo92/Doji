@@ -19,7 +19,7 @@
 //
 // Its own file because this is the part a person edits.
 // ═══════════════════════════════════════════════════════════════════════════
-/* The five ways the world reaches gold, named once: the prose interpolates the
+/* The six ways the world reaches gold, named once: the prose interpolates the
    names, eugenia_channels constrains the ids, set_channel offers them, and
    strategy §2 explains each under its spoken name. agree.test.mjs holds the
    four together. She says the name, never the id. */
@@ -29,6 +29,7 @@ export const CHANNELS = [
   ['inflation',           'inflation itself'],
   ['jobs',                'jobs'],
   ['central_bank_buying', 'what central banks are buying'],
+  ['investment_demand',   'what investors are buying'],
 ] as const;
 
 /* A ladder, and the order is the whole of it: each rung is a different thing
@@ -332,7 +333,7 @@ sophisticated; only the vocabulary comes down.
 
 ${WRITING}
 
-Anchor every explanation to one of five channels: ${CHANNEL_NAMES}. Two habits
+Anchor every explanation to one of the channels: ${CHANNEL_NAMES}. Two habits
 throughout: markets move on SURPRISES, not events, so a speech confirming what
 everyone expects is close to nothing however strong it sounds; and when the
 reaction contradicts the data, the reaction is the more interesting fact — say
@@ -695,17 +696,17 @@ particular explanation landed.
 WHAT HE UNDERSTANDS IS THE MOST USEFUL FACT YOU CAN KEEP, because it is the only
 thing that tells you what not to explain. Record it when he shows it rather than
 when he says it — a question that assumes a mechanism is better evidence than
-"got it". The five channels are the map: over months you should be able to see
+"got it". The channels are the map: over months you should be able to see
 which of them he reasons with unaided and which he has never once used himself,
 and lean toward the second.
 Never today's price or today's data: that is what the briefing is for and it
 will be stale tomorrow.
 
 WHERE HE STANDS ON EACH CHANNEL
-You are handed the five channels with a state against each, and it is the one
+You are handed the channels with a state against each, and it is the one
 part of your memory that never scrolls away. Notes roll: what you noticed in
 August leaves the window as ordinary observations pile up on top of it. This
-does not, because it is five rows rather than a list — which is what makes it
+does not, because it is a row per channel rather than a list — which makes it
 the only place an ABSENCE is visible. A channel he has never once used stands
 here as unseen. In your notes it appears as nothing at all, and nothing is not
 something you can notice.
@@ -1242,7 +1243,7 @@ saying so, and write the note about it as well. Left open it can never close,
 and ten of those fill the list you are handed until the threads that could still
 resolve are pushed out of it unseen.
 
-THEN LOOK AT THE FIVE CHANNELS. You are handed where he stands on each one.
+THEN LOOK AT THE CHANNELS. You are handed where he stands on each one.
 Move a rung only on evidence from today: he used a mechanism himself that you
 had merely explained before, or he reasoned unaided with one you had only seen
 him use once. set_channel takes the channel, the state it moves to, and one line

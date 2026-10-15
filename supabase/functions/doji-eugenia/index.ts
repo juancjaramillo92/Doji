@@ -228,7 +228,7 @@ const NOTES_TOOL = {
 } as const;
 
 /* ─── Where he stands on each channel ──────────────────────────────────────
-   The five channels her teaching is anchored to: five rows rather than a
+   The channels her teaching is anchored to: a row each rather than a
    window, so a channel he has never used is a row saying so — an absence
    nobody would write down as a note.
 
@@ -2481,7 +2481,7 @@ export function parseChannel(text: string): { channel: string; state: string } |
            `<${CHANNEL_STATES.slice(1).join('|')}>.`;
   }
 
-  // The rung is the last word and the channel the rest: three spoken names are
+  // The rung is the last word and the channel the rest: four spoken names are
   // several words long.
   const to = words[words.length - 1].toLowerCase();
   const wanted = words.slice(1, -1).join(' ').toLowerCase();
@@ -2517,7 +2517,7 @@ export function channelsList(rows: Channel[]): string {
 /* The read, apart from both renderings — one speaks to her, one to him. */
 async function readChannels(): Promise<Channel[]> {
   return readRows<Channel>('Channels',
-    // A limit that can never bite — the key sits on a five-value check — kept
+    // A limit that can never bite — the key sits on a check of CHANNELS — kept
     // because every read here carries one.
     `eugenia_channels?select=channel,state,evidence,moved_on` +
     `&limit=${CHANNELS.length}`);
