@@ -3323,8 +3323,13 @@ real prompts, built as the reply, both gates and the trade look build them, and
 grades the answer: what is countable in code (em-dashes, sentences a paragraph,
 words, questions, patterns that must or must not appear), the rest by an Opus
 judge against a criterion written per case, answered as JSON a schema fixes.
-**`--plant` runs first** the cases a deliberately broken prompt must fail, and
-stops if one passes: an eval that cannot fail says nothing. It costs money, so
+She is sent no tools: a case hands her what a tool would have returned, a
+strategy section read from the module `get_strategy` serves, and an answer that
+reaches for a tool anyway fails, because it is not a message and a judge once
+passed one.
+**`--plant` runs first** the cases a deliberately broken prompt must fail, each
+three times since a broken prompt does not break every answer, and stops if
+all three pass: an eval that cannot fail says nothing. It costs money, so
 it is never in `npm test`; what can be checked without the model is —
 `fold.test.mjs` holds every case well formed, the counters against planted text,
 each request against its call site, and every plant against the prompt it
