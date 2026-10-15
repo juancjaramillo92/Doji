@@ -3322,7 +3322,8 @@ its own CI job, and `agree.test.mjs` holds that both still name it.
 matters most about her is a sentence, and no suite can say whether the model
 still obeys it. The eval sends the cases in `test/fixtures/eval-cases.json` —
 the failures this README records and the rules his decisions added — through her
-real prompts, built as the reply, both gates and the trade look build them, and
+real prompts, built as the reply, both gates, the trade look and the Saturday
+review's draft build them, and
 grades the answer: what is countable in code (em-dashes, sentences a paragraph,
 words, questions, patterns that must or must not appear), the rest by an Opus
 judge against a criterion written per case, answered as JSON a schema fixes.

@@ -22,7 +22,7 @@
          cached across them. Measured on the first run and stated in its output.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
-import { SYSTEM, CRITIC, TRIM, TRADE_EVENT } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 
 const file = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -39,7 +39,8 @@ export const MODEL = {
 
 /* ─── What she is asked, path by path ────────────────────────────────────────
    Each mirrors its call site in index.ts: converse for a reply, critique() and
-   trim() for the gates, postTradeEvent for the trade look. agree.test.mjs holds
+   trim() for the gates, postTradeEvent for the trade look, postReview for the
+   Saturday review's draft. agree.test.mjs holds
    the gates' two markers against the function's. `prompts` is a parameter so
    a planted defect can hand in a broken copy. A case whose prompt tells her to
    read a section names it as `strategy`, and is handed the section itself,
@@ -56,9 +57,10 @@ export const PATHS = {
                        content: `${p.TRIM}${context(c)}\n\nTHE MESSAGE:\n\n${c.draft}` }),
   trade:  (c, p) => ({ model: MODEL.opus, effort: 'medium',
                        content: `${p.TRADE_EVENT}\n\n${c.situation}${context(c)}` }),
+  review: (c, p) => ({ model: MODEL.opus, effort: 'high', content: `${p.REVIEW}${context(c)}` }),
 };
 
-export const PROMPTS = { SYSTEM, CRITIC, TRIM, TRADE_EVENT };
+export const PROMPTS = { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW };
 
 /* The request body, as ask() sends it but for the tools: a case hands her what
    a tool would have returned, so the answer depends on the prompt alone. */

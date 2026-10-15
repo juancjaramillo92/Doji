@@ -146,5 +146,18 @@
     "asked": "why did gold fall today when nothing happened?",
     "counts": { "emDash": true, "sentences": 4 },
     "judge": ["If the gap between rates and inflation (real yields) is part of the answer, it is built in plain words before it is used, never named bare"]
+  },
+  {
+    "id": "review-process-over-pnl",
+    "why": "the Saturday review judges the week by process: a green week that broke R-01 and R-12 is a bad week that paid, and keeping to its length never costs the verdict or the keep-and-change",
+    "path": "review",
+    "context": "\n\nHis week, computed from the rows:\n· 6 trades: 4 wins, 2 losses, 0 break-evens; win rate 67%\n· gross +$96.40, losses -$38.10, net +$58.30\n· average win $24.10, average loss $19.05, realised reward-to-risk 1:1.27 — realised, not planned\n· his own answers: rules followed on 3 of 4 answered (2 unanswered); stop respected on 4 of 4 answered (2 unanswered); target respected on 2 of 4 answered (2 unanswered). The stop and target answers are given at open, so they record intent rather than what happened\n· by session: London 2 trades, net +$31.20; New York 4 trades, net +$27.10\n\nHis rules over the week:\n· R-01 wins closing under $25 from entry: broken on 2 of 4 wins (PID101 closed $12.40 out, PID104 $9.80 out)\n· R-02 losses further than $20 from entry: kept on 2 of 2\n· R-12 more than two entries in a day: broken on Tuesday 13 Oct, three entries\n· R-14 an entry inside thirty minutes of a US release rated high: kept\n· R-05 to R-08 are judgment rules and cannot be read from a row\n\nWhat he has committed to:\n· (9 Oct) when price touches my level, I wait for the fifteen-minute candle to close before I click\n\nYour calls over the last 30 days, scored on price by his rules: 3 made; 1 won, 1 lost, 0 scratch, 0 open, 1 untriggered, 0 unread. The 2 that triggered made +$15.00 an ounce.\n\nWhat he has on, and where his day stands: nothing open.",
+    "counts": { "words": 250, "questions": 0 },
+    "judge": [
+      "It judges the week by his process, naming the R-01 and R-12 breaks, and does not call it a good week because the net was positive",
+      "It says how many trades he left unanswered and that the blanks limit what his answers can say",
+      "It names one thing to keep and one thing to change next week, each tied to a specific moment rather than a resolution to be better",
+      "It says nothing about where price goes next week and ends without a question"
+    ]
   }
 ]

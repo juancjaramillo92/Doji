@@ -5671,7 +5671,7 @@ test('every eval case names a path, carries what that path needs, and checks som
   const ids = EVAL.CASES.map(c => c.id);
   assert.equal(new Set(ids).size, ids.length, 'two eval cases share an id');
   assert.ok(EVAL.CASES.length >= 12, `only ${EVAL.CASES.length} eval cases`);
-  const needs = { reply: 'asked', critic: 'draft', trim: 'draft', trade: 'situation' };
+  const needs = { reply: 'asked', critic: 'draft', trim: 'draft', trade: 'situation', review: 'context' };
   for (const c of EVAL.CASES) {
     assert.ok(EVAL.PATHS[c.path], `${c.id} names a path the eval does not build: ${c.path}`);
     assert.ok(c[needs[c.path]], `${c.id} is a ${c.path} case with no ${needs[c.path]}`);
@@ -5710,12 +5710,15 @@ test('each eval path asks what its call site asks, of the model it runs on', () 
   const [opus, sonnet] = ['OPUS', 'SONNET'].map(k => fn.match(new RegExp(`const ${k} = "([^"]+)"`))[1]);
   const at = (path, extra = {}) => EVAL.request({ path, context: '', asked: 'q', draft: 'D', situation: 'S', ...extra });
   assert.equal(at('trim').model, sonnet, 'TRIM runs on Sonnet in the function and on something else here');
-  for (const path of ['reply', 'critic', 'trade']) {
+  for (const path of ['reply', 'critic', 'trade', 'review']) {
     assert.equal(at(path).model, opus, `the ${path} runs on Opus in the function and on something else here`);
   }
   assert.match(at('critic').messages[0].content, /THE BRIEFING:\n\nD$/);
   assert.match(at('trim').messages[0].content, /THE MESSAGE:\n\nD$/);
   assert.ok(at('trade').messages[0].content.startsWith(EVAL.PROMPTS.TRADE_EVENT));
+  assert.ok(at('review').messages[0].content.startsWith(EVAL.PROMPTS.REVIEW));
+  assert.match(fn, /`\$\{REVIEW\}\\n\\nHis week, computed from the rows:/,
+    'postReview no longer opens on REVIEW, so the eval\'s review asks something else');
   assert.ok(at('reply').system[0].text.startsWith(EVAL.PROMPTS.SYSTEM), 'the eval asks under a different system prompt');
   // The gates' markers are the function's own.
   assert.match(fn, /\\n\\nTHE BRIEFING:\\n\\n\$\{draft\}/);
