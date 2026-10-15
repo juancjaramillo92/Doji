@@ -534,6 +534,31 @@ turns and twenty notes, her memory is her own tables, and the nightly pass is a
 tool loop that a single batch request cannot run.
 **Revisit if:** a window is ever widened past what a request carries cheaply.
 
+### R-56 — several Opus packets to an Ogg page on the charm
+**Deferred, not refused.** `ogg.c` writes one 20 ms packet a page, and each
+page's head is 28 bytes against a packet of about 60 at 24 kbit/s, so a
+quarter or more of a five-minute file is heads — about 1.3 MB where packing
+pages would make it under a megabyte. It fits her door's 3 MB and the room
+`talk.c` gives it, and one packet a page is what the test can read against
+the specification page by page. **Revisit if:** the upload's time shows in
+how long he waits for her, or the room on the board proves short.
+
+### R-57 — the five-minute tick without a gap in the recording
+**Deferred, not refused.** The tick half a minute before the end plays on the
+same task that reads the microphones, so about a fifth of a second of his
+voice is not recorded while it sounds. Playing it beside the recording means
+a second task on a codec pair that is opened and closed together. **Revisit
+if:** a transcript is seen to lose the words said over the tick.
+
+### R-58 — one wait for the sleep screen reaching the panel
+**Why refused:** `main.c`'s `LAST_FRAME_MS` (200 ms) and the journal's two
+face frames both wait for the dark to be drawn, but before different things:
+the first before deep sleep stops the chip, which the panel must have
+finished with, the second only before the journal object is hidden over a
+dark that is already drawing. The first has no frame to count and keeps a
+margin the second does not need. **Revisit if:** the sleep screen is ever
+seen half drawn after she sleeps, or a flash is seen when the journal leaves.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
