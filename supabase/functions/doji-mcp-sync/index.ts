@@ -522,6 +522,29 @@ export function foldCandles(bars: Bar[]): Candle[] | null {
   }));
 }
 
+/* His charts up to `to`, at CHARTS' windows. One chart at a time, each failure
+   its own, for ?bars=raw's reason; a chart that will not read is named rather
+   than served short, and the rest are still worth having. */
+async function readCharts(session: Record<string, string>, to: number, charts: readonly typeof CHARTS[number][] = CHARTS) {
+  const out: Record<string, Candle[]> = {};
+  const missing: { period: string; error: string }[] = [];
+  for (const c of charts) {
+    try {
+      const got = await mcpCall(session, "get_trendbars", {
+        symbolId: SYMBOL_IDS[0], period: c.period,
+        fromTimestamp: String(to - c.hours * 3600_000), toTimestamp: String(to),
+      });
+      const candles = foldCandles(got.trendbars ?? []);
+      if (!candles) throw new Error("a bar that will not read");
+      if (!candles.length) throw new Error("no bars");
+      out[c.period] = candles;
+    } catch (err) {
+      missing.push({ period: c.period, error: why(err) });
+    }
+  }
+  return { charts: out, missing };
+}
+
 /* The newest closed trades still missing a figure, a few a poll — one path for
    a fresh close and for the year behind it, newest first so a new close never
    queues behind the backlog. Too short to measure is skipped at no broker
@@ -657,28 +680,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, symbol: SYMBOL_IDS[0], from, bars: candles });
     }
 
-    /* ?structure=1 — his six charts, folded, for Eugenia's map. One chart at
-       a time, each failure its own, for ?bars=raw's reason below; a chart
-       that will not read is named rather than served short, and the rest are
-       still worth having. */
+    /* ?structure=1 — his six charts, folded, for Eugenia's map. */
     if (structure) {
-      const charts: Record<string, Candle[]> = {};
-      const missing: { period: string; error: string }[] = [];
-      for (const c of CHARTS) {
-        try {
-          const got = await mcpCall(session, "get_trendbars", {
-            symbolId: SYMBOL_IDS[0], period: c.period,
-            fromTimestamp: String(to - c.hours * 3600_000), toTimestamp: String(to),
-          });
-          const candles = foldCandles(got.trendbars ?? []);
-          if (!candles) throw new Error("a bar that will not read");
-          if (!candles.length) throw new Error("no bars");
-          charts[c.period] = candles;
-        } catch (err) {
-          missing.push({ period: c.period, error: why(err) });
-        }
-      }
-      return json({ ok: true, symbol: SYMBOL_IDS[0], at: to, charts, missing });
+      return json({ ok: true, symbol: SYMBOL_IDS[0], at: to, ...await readCharts(session, to) });
     }
 
     /* ?bars=raw — minute bars at six ages, raw: their shape, their scale, and
